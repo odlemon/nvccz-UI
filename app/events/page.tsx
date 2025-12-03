@@ -1,5 +1,5 @@
-import { EventsLayout } from "@/components/layout/events-layout"
 import { EventsDashboard } from "@/components/events/events-dashboard"
+import { EventsLayout } from "@/components/layout/events-layout"
 
 export default function EventsPage() {
   return (

@@ -253,13 +253,13 @@ export const MODULE_CONFIG: ModuleConfig[] = [
         icon: CiGift,
         description: "Events you are hosting or managing",
       },
-      {
-        id: "my-invitations",
-        name: "My Invitations",
-        path: "/events/invitations",
-        icon: IoPeopleOutline,
-        description: "Events you are invited to attend",
-      },
+      // {
+      //   id: "my-invitations",
+      //   name: "My Invitations",
+      //   path: "/events/invitations",
+      //   icon: IoPeopleOutline,
+      //   description: "Events you are invited to attend",
+      // },
       // {
       //   id: "event-analytics",
       //   name: "Analytics",
@@ -268,20 +268,20 @@ export const MODULE_CONFIG: ModuleConfig[] = [
       //   description: "Event KPIs, RSVP rates, and performance insights",
       // },
       // venues
-      {
-        id: "event-venues",
-        name: "Venues",
-        path: "/events/venues",
-        icon: CiMapPin,
-        description: "Manage event venues and locations",
-      },
-      {
-        id: "event-settings",
-        name: "Settings",
-        path: "/events/settings",
-        icon: CiViewList,
-        description: "Access control and event module configuration",
-      },
+      // {
+      //   id: "event-venues",
+      //   name: "Venues",
+      //   path: "/events/venues",
+      //   icon: CiMapPin,
+      //   description: "Manage event venues and locations",
+      // },
+      // {
+      //   id: "event-settings",
+      //   name: "Settings",
+      //   path: "/events/settings",
+      //   icon: CiViewList,
+      //   description: "Access control and event module configuration",
+      // },
     ],
   },
 

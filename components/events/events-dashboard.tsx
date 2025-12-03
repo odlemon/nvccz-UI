@@ -1,16 +1,25 @@
 "use client"
 
-import { useAppSelector } from "@/lib/store"
-import { CiCalendar, CiDollar, CiUser, CiTrophy } from "react-icons/ci"
-import { ArrowUpRight, ArrowDownRight } from "lucide-react"
-import { Bar, BarChart, Line, LineChart, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { useAppDispatch, useAppSelector } from "@/lib/store"
+import { fetchEvents, fetchUpcomingEvents } from "@/lib/store/slices/eventsSlice"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { CiCalendar, CiDollar, CiUser, CiTrophy, CiCirclePlus } from "react-icons/ci"
+import { format } from "date-fns"
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts"
+import { EventsDashboardSkeleton } from "./events-skeleton"
 
 export function EventsDashboard() {
-  const events = useAppSelector((state) => state.events.list)
-  const analytics = useAppSelector((state) => state.analytics)
+  const router = useRouter()
+  const dispatch = useAppDispatch()
+  const { events, loading } = useAppSelector((state) => state.events)
+
+  useEffect(() => {
+    dispatch(fetchEvents())
+  }, [dispatch])
 
   // Calculate summary metrics
   const today = new Date()
@@ -23,26 +32,16 @@ export function EventsDashboard() {
       const eventDate = new Date(e.startDate)
       return eventDate.getMonth() === currentMonth && eventDate.getFullYear() === currentYear
     })
-    .reduce((sum, e) => sum + e.totalCost, 0)
+    .reduce((sum, e) => sum + Number(e.approvedBudget || e.estimatedBudget || 0), 0)
 
-  const avgRsvpRate = events.length > 0 ? events.reduce((sum, e) => sum + e.rsvpRate, 0) / events.length : 0
+  const totalBudget = events.reduce((sum, e) => sum + Number(e.approvedBudget || e.estimatedBudget || 0), 0)
 
-  const totalCost = events.reduce((sum, e) => sum + e.totalCost, 0)
-  const totalCheckedIn = events.reduce((sum, e) => sum + e.guests.filter((g) => g.checkedIn).length, 0)
-  const costPerAttendee = totalCheckedIn > 0 ? totalCost / totalCheckedIn : 0
-
-  // Get next 10 upcoming events sorted by date
-  const upcomingTimeline = [...upcomingEvents]
-    .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
-    .slice(0, 10)
-
-  // Add trend and amount for stat cards for parity with accounting dashboard
   const statCards = [
     {
       title: "Total Upcoming Events",
       value: upcomingEvents.length,
       amount: `${upcomingEvents.length} scheduled`,
-      change: "5% from last month",
+      change: "View all upcoming",
       trend: "up",
       icon: CiCalendar,
       color: "gradient-primary",
@@ -50,193 +49,225 @@ export function EventsDashboard() {
     {
       title: "This Month's Budget",
       value: `$${thisMonthBudget.toLocaleString()}`,
-      amount: "Budgeted",
-      change: "2% from last month",
+      amount: "Allocated",
+      change: `${events.filter(e => {
+        const eventDate = new Date(e.startDate)
+        return eventDate.getMonth() === currentMonth && eventDate.getFullYear() === currentYear
+      }).length} events`,
       trend: "up",
       icon: CiDollar,
       color: "bg-white",
     },
     {
-      title: "RSVP Rate",
-      value: `${avgRsvpRate.toFixed(1)}%`,
-      amount: "Avg RSVP",
-      change: "1% from last month",
-      trend: "down",
+      title: "Total Events",
+      value: events.length,
+      amount: "All time",
+      change: `${events.filter(e => e.status === "COMPLETED").length} completed`,
+      trend: "up",
       icon: CiUser,
       color: "gradient-primary",
     },
     {
-      title: "Cost per Attendee",
-      value: `$${costPerAttendee.toFixed(0)}`,
-      amount: "Avg cost",
-      change: "0% from last month",
+      title: "Total Budget",
+      value: `$${totalBudget.toLocaleString()}`,
+      amount: "Allocated",
+      change: `${events.filter(e => e.budgetStatus === "APPROVED").length} approved`,
       trend: "up",
       icon: CiTrophy,
       color: "bg-white",
     },
   ]
 
-  // Chart data for events (dummy, replace with real analytics if needed)
-  const eventsChartData = [
-    { month: "Jan", events: 8, rsvp: 70 },
-    { month: "Feb", events: 10, rsvp: 75 },
-    { month: "Mar", events: 12, rsvp: 80 },
-    { month: "Apr", events: 9, rsvp: 78 },
-    { month: "May", events: 11, rsvp: 82 },
-    { month: "Jun", events: 13, rsvp: 85 },
-  ]
-
-  function EventsChart({ data }: { data: any[] }) {
-    const config = {
-      events: { label: "Events", color: "#a78bfa" },
-      rsvp: { label: "RSVP Rate", color: "#60a5fa" },
+  // Events by month for chart
+  const eventsByMonth = events.reduce((acc, event) => {
+    const month = format(new Date(event.startDate), "MMM")
+    const existing = acc.find(item => item.month === month)
+    if (existing) {
+      existing.events += 1
+      existing.budget += Number(event.approvedBudget || event.estimatedBudget || 0)
+    } else {
+      acc.push({
+        month,
+        events: 1,
+        budget: Number(event.approvedBudget || event.estimatedBudget || 0)
+      })
     }
-    return (
-      <Card className="rounded-2xl border border-gray-200 py-6">
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between text-base font-normal mb-3">
-            <div className="flex items-center gap-2">
-              <CiCalendar className="w-5 h-5" /> Events Overview
-            </div>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={320}>
-            <LineChart data={data}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="month" tick={{ fontSize: 14, fill: '#111827' }} />
-              <YAxis tick={{ fontSize: 14, fill: '#111827' }} />
-              <Tooltip />
-              <Line type="monotone" dataKey="events" stroke="#a78bfa" strokeWidth={5} dot={{ r: 4 }} />
-              <Line type="monotone" dataKey="rsvp" stroke="#60a5fa" strokeWidth={5} dot={{ r: 4 }} />
-            </LineChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
-    )
-  }
+    return acc
+  }, [] as Array<{ month: string; events: number; budget: number }>)
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "APPROVED":
-        return "bg-green-100 text-green-700"
-      case "PENDING":
-        return "bg-yellow-100 text-yellow-700"
-      case "DRAFT":
-        return "bg-gray-100 text-gray-700"
-      case "REJECTED":
-        return "bg-red-100 text-red-700"
+      case "BUDGET_APPROVED":
+      case "ACTIVE":
+        return "bg-green-100 text-green-700 border-green-200"
+      case "BUDGET_PENDING":
+      case "PLANNING":
+        return "bg-yellow-100 text-yellow-700 border-yellow-200"
+      case "BUDGET_REJECTED":
+      case "CANCELLED":
+        return "bg-red-100 text-red-700 border-red-200"
+      case "COMPLETED":
+        return "bg-blue-100 text-blue-700 border-blue-200"
       default:
-        return "bg-gray-100 text-gray-700"
+        return "bg-gray-100 text-gray-700 border-gray-200"
     }
   }
 
+  if (loading && events.length === 0) {
+    return <EventsDashboardSkeleton />
+  }
+
+  if (loading && events.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Loading events...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl text-gray-900">Events Dashboard</h1>
-          <p className="text-gray-600 font-normal">Overview of your events performance</p>
+          <h1 className="text-3xl font-normal">Events Dashboard</h1>
+          <p className="text-muted-foreground">Manage and track all your events</p>
         </div>
+        <Button onClick={() => router.push("/events/my-events")} className="rounded-full gradient-primary text-white">
+          <CiCirclePlus size={20} className="mr-2" />
+          Create Event
+        </Button>
       </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {statCards.map((metric, index) => {
-          const Icon = metric.icon
-          const isPositive = metric.trend === "up"
+        {statCards.map((stat, index) => {
+          const Icon = stat.icon
           return (
-            <Card key={metric.title} className={`border border-gray-200 hover:border-gray-300 transition-all duration-300 ${index % 2 === 0 ? 'gradient-primary' : 'bg-white'}`}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className={`text-sm font-medium ${index % 2 === 0 ? 'text-white' : ''}`}>{metric.title}</CardTitle>
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${index % 2 === 0 ? 'bg-white/20' : 'gradient-primary'}`}>
-                  <Icon className={`h-4 w-4 ${index % 2 === 0 ? 'text-white' : 'text-white'}`} />
+            <Card
+              key={index}
+              className={`border border-gray-200 hover:border-gray-300 transition-all duration-300 ${index % 2 === 0 ? 'gradient-primary' : 'bg-white'}`}
+            >
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex-1">
+                    <p className={`text-sm font-medium ${index % 2 === 0 ? 'text-white' : 'text-muted-foreground'}`}>{stat.title}</p>
+                  </div>
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${index % 2 === 0 ? 'bg-white/20' : 'gradient-primary'}`}>
+                    <Icon className={`h-4 w-4 ${index % 2 === 0 ? 'text-white' : 'text-white'}`} />
+                  </div>
                 </div>
-              </CardHeader>
-              <CardContent>
-                <div className={`text-5xl ${index % 2 === 0 ? 'text-white' : 'text-gray-900'}`}>{metric.value}</div>
-                <div className={`text-lg font-semibold ${index % 2 === 0 ? 'text-white/90' : 'text-gray-700'} mb-2`}>{metric.amount}</div>
-                <div className={`flex items-center gap-1 ${index % 2 === 0 ? 'text-white/80' : 'text-gray-600'}`}>
-                  {isPositive ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-                  <span className="text-xs">{metric.change}</span>
-                </div>
+                <div className={`text-5xl font-normal ${index % 2 === 0 ? 'text-white' : ''}`}>{stat.value}</div>
+                <p className={`text-sm mt-2 ${index % 2 === 0 ? 'text-white/80' : 'text-muted-foreground'}`}>{stat.change}</p>
               </CardContent>
             </Card>
           )
         })}
       </div>
 
-      {/* Chart Section */}
-      <EventsChart data={eventsChartData} />
-
-      {/* Upcoming Events Timeline */}
-      <Card className="shadow-sm">
-        <CardHeader>
-          <CardTitle>Upcoming Events Timeline</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {upcomingTimeline.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">No upcoming events</p>
-            ) : (
-              upcomingTimeline.map((event) => {
-                const startDate = new Date(event.startDate)
-                const rsvpCount = event.guests.filter((g) => g.status === "RSVP_YES").length
-                const totalGuests = event.guests.length
-                const rsvpPercentage = totalGuests > 0 ? (rsvpCount / totalGuests) * 100 : 0
-
-                return (
-                  <div
-                    key={event.id}
-                    className="flex items-center justify-between p-4 rounded-lg border hover:bg-purple-50 transition-colors"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-3">
-                        <h4 className="font-medium truncate">{event.title}</h4>
-                        <Badge className={getStatusColor(event.procurementStatus)}>{event.procurementStatus}</Badge>
-                      </div>
-                      <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <CiCalendar className="w-4 h-4" />
-                          {startDate.toLocaleDateString()} at{" "}
-                          {startDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                        </span>
-                        <span>Budget: ${event.totalCost.toLocaleString()}</span>
-                        <span>
-                          RSVP: {rsvpPercentage.toFixed(0)}% ({rsvpCount}/{totalGuests})
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 ml-4">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="rounded-full bg-gradient-to-r from-purple-500 to-purple-600 text-white font-semibold shadow-md hover:from-purple-600 hover:to-purple-700"
-                      >
-                        View
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="rounded-full bg-gradient-to-r from-purple-500 to-purple-600 text-white font-semibold shadow-md hover:from-purple-600 hover:to-purple-700"
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="rounded-full bg-gradient-to-r from-purple-500 to-purple-600 text-white font-semibold shadow-md hover:from-purple-600 hover:to-purple-700"
-                      >
-                        Guests
-                      </Button>
-                    </div>
-                  </div>
-                )
-              })
-            )}
+      {/* Chart */}
+      {eventsByMonth.length > 0 && (
+        <div className="border border-gray-200 rounded-2xl p-6 bg-white hover:border-gray-300 transition-all duration-300">
+          <div className="mb-4">
+            <h3 className="text-lg font-medium flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full gradient-primary flex items-center justify-center">
+                <CiTrophy className="w-4 h-4 text-white" />
+              </div>
+              Events Overview
+            </h3>
+            <p className="text-sm text-muted-foreground">Events and budget by month</p>
           </div>
-        </CardContent>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={eventsByMonth}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.1)" />
+              <XAxis dataKey="month" stroke="#374151" />
+              <YAxis yAxisId="left" stroke="#374151" />
+              <YAxis yAxisId="right" orientation="right" stroke="#374151" />
+              <Tooltip contentStyle={{ backgroundColor: '#fff', borderRadius: '8px' }} />
+              <Legend />
+              <Bar yAxisId="left" dataKey="events" fill="#a78bfa" name="Events" />
+              <Bar yAxisId="right" dataKey="budget" fill="#60a5fa" name="Budget ($)" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* Upcoming Events */}
+      <Card className="rounded-2xl border border-gray-200 hover:border-gray-300 transition-all duration-300 bg-white">
+        <div className="p-6 border-b">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-medium flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full gradient-primary flex items-center justify-center">
+                  <CiCalendar className="w-4 h-4 text-white" />
+                </div>
+                Upcoming Events
+              </h3>
+              <p className="text-sm text-muted-foreground">Next 10 scheduled events</p>
+            </div>
+            <Button variant="outline" onClick={() => router.push("/events/my-events")} className="rounded-full">
+              View All
+            </Button>
+          </div>
+        </div>
+        <div className="p-6">
+          {upcomingEvents.length > 0 ? (
+            <div className="space-y-3">
+              {upcomingEvents.slice(0, 10).map((event) => (
+                <Card
+                  key={event.id}
+                  className="p-4 hover:shadow-md transition-shadow cursor-pointer"
+                  onClick={() => router.push(`/events/${event.id}`)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <h4 className="font-semibold text-foreground">{event.title}</h4>
+                        <Badge className={getStatusColor(event.status)}>
+                          {event.status.replace(/_/g, " ")}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                        <div className="flex items-center gap-1">
+                          <CiCalendar size={16} />
+                          {format(new Date(event.startDate), "MMM dd, yyyy")}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <CiUser size={16} />
+                          {event.author.firstName} {event.author.lastName}
+                        </div>
+                        {event.approvedBudget || event.estimatedBudget ? (
+                          <div className="flex items-center gap-1">
+                            <CiDollar size={16} />
+                            ${Number(event.approvedBudget || event.estimatedBudget).toLocaleString()}
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={(e) => {
+                      e.stopPropagation()
+                      router.push(`/events/${event.id}`)
+                    }}>
+                      View Details
+                    </Button>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <CiCalendar size={48} className="mx-auto text-muted-foreground mb-4" />
+              <p className="text-muted-foreground">No upcoming events</p>
+              <Button onClick={() => router.push("/events/my-events")} className="mt-4 gap-2">
+                <CiCirclePlus size={20} />
+                Create First Event
+              </Button>
+            </div>
+          )}
+        </div>
       </Card>
     </div>
   )

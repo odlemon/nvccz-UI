@@ -1,272 +1,501 @@
 "use client"
 
-import { useState } from "react"
-import { useForm } from "react-hook-form"
-import { yupResolver } from "@hookform/resolvers/yup"
-import * as yup from "yup"
-import { useAppDispatch } from "@/lib/store"
-import { addEvent } from "@/lib/store/slices/eventsSlice"
+import { useState, useEffect } from "react"
+import { useForm, Controller } from "react-hook-form"
+import { format } from "date-fns"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
-import { CiCircleCheck } from "react-icons/ci"
-import type { BudgetLineItem, Guest } from "@/lib/store/slices/eventsSlice"
+import { Textarea } from "@/components/ui/textarea"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { DatePicker } from "@/components/ui/date-picker"
+import { TimePicker } from "@/components/ui/time-picker"
+import { CiCalendar, CiLocationOn, CiSettings, CiCircleCheck } from "react-icons/ci"
+import { Loader2 } from "lucide-react"
+import { toast } from "sonner"
+import { useAppDispatch } from "@/lib/store"
+import { createEvent, updateEvent, fetchEvents } from "@/lib/store/slices/eventsSlice"
+import { type EventType, type AppEvent } from "@/lib/api/events-api"
 
 interface CreateEventWizardProps {
   isOpen: boolean
   onClose: () => void
+  initialDate?: Date
+  editMode?: boolean
+  eventToEdit?: AppEvent
 }
 
-const detailsSchema = yup.object({
-  title: yup.string().required("Title is required"),
-  description: yup.string(),
-  startDate: yup.string().required("Start date is required"),
-  endDate: yup.string(),
-  venue: yup.string().required("Venue is required"),
-})
+interface EventFormData {
+  title: string
+  description: string
+  startDate: Date
+  startTime: string
+  endDate: Date
+  endTime: string
+  location: string
+  eventType: EventType
+  maxAttendees: string
+  rsvpDeadline: Date | null
+  estimatedBudget: string
+  isPublic: boolean
+  requiresRSVP: boolean
+  checkInRequired: boolean
+  feedbackRequired: boolean
+}
 
-export function CreateEventWizard({ isOpen, onClose }: CreateEventWizardProps) {
+const EVENT_TYPES: EventType[] = ["CONFERENCE", "MEETING", "WORKSHOP", "SOCIAL", "TRAINING", "OTHER"]
+
+export function CreateEventWizard({ isOpen, onClose, initialDate, editMode = false, eventToEdit }: CreateEventWizardProps) {
   const dispatch = useAppDispatch()
-  const [currentStep, setCurrentStep] = useState(0)
-  const [formData, setFormData] = useState({
-    title: "",
-    description: "",
-    startDate: "",
-    endDate: "",
-    venue: "",
-    guests: [] as Guest[],
-    budgetLineItems: [] as BudgetLineItem[],
-  })
+  const [loading, setLoading] = useState(false)
 
   const {
-    register,
+    control,
     handleSubmit,
-    formState: { errors },
+    watch,
+    setValue,
     reset,
-  } = useForm({
-    resolver: yupResolver(detailsSchema),
-    defaultValues: formData,
-  })
-
-  const steps = [
-    { id: 0, name: "Details", description: "Event information" },
-    { id: 1, name: "Guests", description: "Invite attendees" },
-    { id: 2, name: "Budget", description: "Cost breakdown" },
-    { id: 3, name: "Review", description: "Confirm & create" },
-  ]
-
-  const handleNext = (data: any) => {
-    setFormData({ ...formData, ...data })
-    setCurrentStep((prev) => Math.min(prev + 1, steps.length - 1))
-  }
-
-  const handleBack = () => {
-    setCurrentStep((prev) => Math.max(prev - 1, 0))
-  }
-
-  const handleCreate = () => {
-    const newEvent = {
-      id: `evt_${Date.now()}`,
-      ...formData,
-      creatorId: "u_current",
-      creatorName: "Current User",
-      totalCost: formData.budgetLineItems.reduce((sum, item) => sum + item.total, 0),
-      procurementStatus: "DRAFT" as const,
-      rsvpRate: 0,
-      accessList: [],
-      private: false,
-      guests: formData.guests,
-      budgetLineItems: formData.budgetLineItems,
-      activity: [
-        {
-          id: `a_${Date.now()}`,
-          timestamp: new Date().toISOString(),
-          actor: "Current User",
-          action: "Created event",
-        },
-      ],
-    }
-
-    dispatch(addEvent(newEvent))
-    reset()
-    setCurrentStep(0)
-    setFormData({
+    formState: { errors }
+  } = useForm<EventFormData>({
+    mode: "onChange",
+    defaultValues: editMode && eventToEdit ? {
+      title: eventToEdit.title,
+      description: eventToEdit.description,
+      startDate: new Date(eventToEdit.startDate),
+      startTime: format(new Date(eventToEdit.startDate), "HH:mm"),
+      endDate: new Date(eventToEdit.endDate),
+      endTime: format(new Date(eventToEdit.endDate), "HH:mm"),
+      location: eventToEdit.location,
+      eventType: eventToEdit.eventType || "CONFERENCE",
+      maxAttendees: eventToEdit.maxAttendees?.toString() || "",
+      rsvpDeadline: eventToEdit.rsvpDeadline ? new Date(eventToEdit.rsvpDeadline) : null,
+      estimatedBudget: eventToEdit.estimatedBudget?.toString() || "",
+      isPublic: eventToEdit.isPublic,
+      requiresRSVP: eventToEdit.requiresRSVP,
+      checkInRequired: eventToEdit.checkInRequired,
+      feedbackRequired: eventToEdit.feedbackRequired,
+    } : {
       title: "",
       description: "",
-      startDate: "",
-      endDate: "",
-      venue: "",
-      guests: [],
-      budgetLineItems: [],
-    })
+      startDate: initialDate || new Date(),
+      startTime: "09:00",
+      endDate: initialDate || new Date(),
+      endTime: "17:00",
+      location: "",
+      eventType: "CONFERENCE",
+      maxAttendees: "",
+      rsvpDeadline: null,
+      estimatedBudget: "",
+      isPublic: false,
+      requiresRSVP: true,
+      checkInRequired: true,
+      feedbackRequired: true,
+    }
+  })
+
+  const startDate = watch("startDate")
+  const endDate = watch("endDate")
+  const startTime = watch("startTime")
+  const endTime = watch("endTime")
+  const rsvpDeadline = watch("rsvpDeadline")
+  const eventType = watch("eventType")
+  const isPublic = watch("isPublic")
+  const requiresRSVP = watch("requiresRSVP")
+  const checkInRequired = watch("checkInRequired")
+  const feedbackRequired = watch("feedbackRequired")
+
+  useEffect(() => {
+    if (initialDate && isOpen && !editMode) {
+      setValue("startDate", initialDate)
+      setValue("endDate", initialDate)
+    }
+    if (editMode && eventToEdit && isOpen) {
+      setValue("title", eventToEdit.title)
+      setValue("description", eventToEdit.description)
+      setValue("startDate", new Date(eventToEdit.startDate))
+      setValue("startTime", format(new Date(eventToEdit.startDate), "HH:mm"))
+      setValue("endDate", new Date(eventToEdit.endDate))
+      setValue("endTime", format(new Date(eventToEdit.endDate), "HH:mm"))
+      setValue("location", eventToEdit.location)
+      setValue("eventType", eventToEdit.eventType || "CONFERENCE")
+      setValue("maxAttendees", eventToEdit.maxAttendees?.toString() || "")
+      setValue("rsvpDeadline", eventToEdit.rsvpDeadline ? new Date(eventToEdit.rsvpDeadline) : null)
+      setValue("estimatedBudget", eventToEdit.estimatedBudget?.toString() || "")
+      setValue("isPublic", eventToEdit.isPublic)
+      setValue("requiresRSVP", eventToEdit.requiresRSVP)
+      setValue("checkInRequired", eventToEdit.checkInRequired)
+      setValue("feedbackRequired", eventToEdit.feedbackRequired)
+    }
+  }, [initialDate, isOpen, editMode, eventToEdit, setValue])
+
+  const onSubmit = async (data: EventFormData) => {
+    if (!data.title.trim()) {
+      toast.error("Please enter an event title")
+      return
+    }
+
+    if (!data.location.trim()) {
+      toast.error("Please enter a location")
+      return
+    }
+
+    if (!data.startDate || !data.endDate) {
+      toast.error("Please select start and end dates")
+      return
+    }
+
+    if (data.endDate < data.startDate) {
+      toast.error("End date must be after start date")
+      return
+    }
+
+    setLoading(true)
+    try {
+      const startDateTime = new Date(data.startDate)
+      const [startHour, startMinute] = data.startTime.split(':')
+      startDateTime.setHours(parseInt(startHour), parseInt(startMinute), 0, 0)
+
+      const endDateTime = new Date(data.endDate)
+      const [endHour, endMinute] = data.endTime.split(':')
+      endDateTime.setHours(parseInt(endHour), parseInt(endMinute), 0, 0)
+
+      let rsvpDeadlineDateTime
+      if (data.rsvpDeadline) {
+        rsvpDeadlineDateTime = new Date(data.rsvpDeadline)
+        rsvpDeadlineDateTime.setHours(23, 59, 59, 999)
+      }
+
+      const eventData = {
+        title: data.title,
+        description: data.description,
+        startDate: startDateTime.toISOString(),
+        endDate: endDateTime.toISOString(),
+        location: data.location,
+        eventType: data.eventType,
+        maxAttendees: data.maxAttendees ? Number(data.maxAttendees) : undefined,
+        rsvpDeadline: rsvpDeadlineDateTime?.toISOString(),
+        estimatedBudget: data.estimatedBudget ? Number(data.estimatedBudget) : undefined,
+        isPublic: data.isPublic,
+        requiresRSVP: data.requiresRSVP,
+        checkInRequired: data.checkInRequired,
+        feedbackRequired: data.feedbackRequired,
+      }
+
+      if (editMode && eventToEdit) {
+        await dispatch(updateEvent({ id: eventToEdit.id, data: eventData })).unwrap()
+        toast.success("Event updated successfully")
+      } else {
+        await dispatch(createEvent(eventData)).unwrap()
+        toast.success("Event created successfully")
+      }
+
+      await dispatch(fetchEvents())
+      handleClose()
+    } catch (error: any) {
+      console.error(`Failed to ${editMode ? 'update' : 'create'} event:`, error)
+      toast.error(`Failed to ${editMode ? 'update' : 'create'} event`, {
+        description: error.message || "Please try again"
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleClose = () => {
+    reset()
     onClose()
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+    <Dialog open={isOpen} onOpenChange={handleClose}>
+      <DialogContent className="max-w-3xl md:max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-2xl">Create New Event</DialogTitle>
+          <DialogTitle className="flex items-center gap-2 text-xl font-normal">
+            <CiCalendar className="w-5 h-5" />
+            {editMode ? "Edit Event" : "Create New Event"}
+          </DialogTitle>
+          <p className="text-gray-600">
+            {editMode ? "Update event details" : "Create a new event and manage all the details"}
+          </p>
         </DialogHeader>
 
-        {/* Stepper */}
-        <div className="flex items-center justify-between mb-8">
-          {steps.map((step, index) => (
-            <div key={step.id} className="flex items-center flex-1">
-              <div className="flex flex-col items-center flex-1">
-                <div
-                  className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                    index <= currentStep ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-                  }`}
-                >
-                  {index < currentStep ? <CiCircleCheck size={24} /> : index + 1}
-                </div>
-                <div className="text-center mt-2">
-                  <div className="text-sm font-medium">{step.name}</div>
-                  <div className="text-xs text-muted-foreground">{step.description}</div>
-                </div>
-              </div>
-              {index < steps.length - 1 && (
-                <div className={`h-0.5 flex-1 mx-2 ${index < currentStep ? "bg-primary" : "bg-muted"}`} />
-              )}
-            </div>
-          ))}
-        </div>
-
-        {/* Step Content */}
-        <form onSubmit={handleSubmit(handleNext)}>
-          {currentStep === 0 && (
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="title">Event Title *</Label>
-                <Input id="title" {...register("title")} placeholder="Enter event title" />
-                {errors.title && <p className="text-sm text-red-500 mt-1">{errors.title.message}</p>}
-              </div>
-
-              <div>
-                <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
-                  {...register("description")}
-                  placeholder="Enter event description"
-                  rows={4}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="startDate">Start Date & Time *</Label>
-                  <Input id="startDate" type="datetime-local" {...register("startDate")} />
-                  {errors.startDate && <p className="text-sm text-red-500 mt-1">{errors.startDate.message}</p>}
-                </div>
-
-                <div>
-                  <Label htmlFor="endDate">End Date & Time</Label>
-                  <Input id="endDate" type="datetime-local" {...register("endDate")} />
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="venue">Venue *</Label>
-                <Input id="venue" {...register("venue")} placeholder="Enter venue location" />
-                {errors.venue && <p className="text-sm text-red-500 mt-1">{errors.venue.message}</p>}
-              </div>
-            </div>
-          )}
-
-          {currentStep === 1 && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold">Guest List</h3>
-                <Button type="button" size="sm">
-                  Add Guest
-                </Button>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Add guests manually or upload a CSV file with guest information.
-              </p>
-              <div className="border-2 border-dashed rounded-lg p-8 text-center">
-                <p className="text-muted-foreground">No guests added yet</p>
-                <p className="text-sm text-muted-foreground mt-1">Click "Add Guest" to start inviting attendees</p>
-              </div>
-            </div>
-          )}
-
-          {currentStep === 2 && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold">Budget Line Items</h3>
-                <Button type="button" size="sm">
-                  Add Item
-                </Button>
-              </div>
-              <p className="text-sm text-muted-foreground">Add budget line items to track event costs.</p>
-              <div className="border-2 border-dashed rounded-lg p-8 text-center">
-                <p className="text-muted-foreground">No budget items added yet</p>
-                <p className="text-sm text-muted-foreground mt-1">Click "Add Item" to start building your budget</p>
-              </div>
-            </div>
-          )}
-
-          {currentStep === 3 && (
-            <div className="space-y-4">
-              <h3 className="font-semibold">Review Event Details</h3>
-
-              <div className="space-y-3 bg-muted p-4 rounded-lg">
-                <div>
-                  <div className="text-sm text-muted-foreground">Title</div>
-                  <div className="font-medium">{formData.title}</div>
-                </div>
-
-                {formData.description && (
-                  <div>
-                    <div className="text-sm text-muted-foreground">Description</div>
-                    <div>{formData.description}</div>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          {/* Basic Information */}
+          <div className="space-y-4">
+            <h3 className="text-base font-normal text-gray-900">Basic Information</h3>
+            <Card className="border-l-4 border-l-blue-500 shadow-none">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base font-normal flex items-center gap-2">
+                  <CiCalendar className="w-5 h-5 text-blue-500" />
+                  Event Details
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="title">Event Title *</Label>
+                    <Controller
+                      name="title"
+                      control={control}
+                      rules={{ required: "Title is required" }}
+                      render={({ field }) => (
+                        <Input
+                          {...field}
+                          id="title"
+                          placeholder="Annual Company Conference"
+                          className="rounded-lg"
+                        />
+                      )}
+                    />
+                    {errors.title && <span className="text-xs text-red-500">{errors.title.message}</span>}
                   </div>
-                )}
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <div className="text-sm text-muted-foreground">Start Date</div>
-                    <div>{formData.startDate}</div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-muted-foreground">Venue</div>
-                    <div>{formData.venue}</div>
+                  <div className="space-y-2">
+                    <Label htmlFor="eventType">Event Type</Label>
+                    <Select value={eventType} onValueChange={(value) => setValue("eventType", value as EventType)}>
+                      <SelectTrigger className="rounded-lg">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {EVENT_TYPES.map((type) => (
+                          <SelectItem key={type} value={type}>{type}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="description">Description</Label>
+                  <Controller
+                    name="description"
+                    control={control}
+                    render={({ field }) => (
+                      <Textarea
+                        {...field}
+                        id="description"
+                        placeholder="Describe your event..."
+                        rows={3}
+                        className="rounded-lg"
+                      />
+                    )}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <div className="text-sm text-muted-foreground">Guests</div>
-                    <div>{formData.guests.length} invited</div>
+          {/* Date & Time */}
+          <div className="space-y-4">
+            <h3 className="text-base font-normal text-gray-900">Date & Time</h3>
+            <Card className="border-l-4 border-l-green-500 shadow-none">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base font-normal flex items-center gap-2">
+                  <CiCalendar className="w-5 h-5 text-green-500" />
+                  Schedule
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Start Date *</Label>
+                    <DatePicker
+                      value={startDate}
+                      onChange={(date) => setValue("startDate", date || new Date())}
+                      placeholder="Select start date"
+                      allowFutureDates={true}
+                    />
                   </div>
-                  <div>
-                    <div className="text-sm text-muted-foreground">Budget Items</div>
-                    <div>{formData.budgetLineItems.length} items</div>
+                  <div className="space-y-2">
+                    <Label>Start Time</Label>
+                    <TimePicker value={startTime} onChange={(time) => setValue("startTime", time)} placeholder="09:00" />
                   </div>
                 </div>
-              </div>
-            </div>
-          )}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>End Date *</Label>
+                    <DatePicker
+                      value={endDate}
+                      onChange={(date) => setValue("endDate", date || new Date())}
+                      placeholder="Select end date"
+                      allowFutureDates={true}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>End Time</Label>
+                    <TimePicker value={endTime} onChange={(time) => setValue("endTime", time)} placeholder="17:00" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
-          {/* Navigation Buttons */}
-          <div className="flex items-center justify-between mt-8 pt-6 border-t">
-            <Button type="button" variant="outline" onClick={handleBack} disabled={currentStep === 0}>
-              Back
-            </Button>
+          {/* Location & Attendance */}
+          <div className="space-y-4">
+            <h3 className="text-base font-normal text-gray-900">Location & Attendance</h3>
+            <Card className="border-l-4 border-l-purple-500 shadow-none">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base font-normal flex items-center gap-2">
+                  <CiLocationOn className="w-5 h-5 text-purple-500" />
+                  Venue & Capacity
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="location">Location *</Label>
+                    <Controller
+                      name="location"
+                      control={control}
+                      rules={{ required: "Location is required" }}
+                      render={({ field }) => (
+                        <Input
+                          {...field}
+                          id="location"
+                          placeholder="Convention Center, Harare"
+                          className="rounded-lg"
+                        />
+                      )}
+                    />
+                    {errors.location && <span className="text-xs text-red-500">{errors.location.message}</span>}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="maxAttendees">Max Attendees</Label>
+                    <Controller
+                      name="maxAttendees"
+                      control={control}
+                      render={({ field }) => (
+                        <Input
+                          {...field}
+                          id="maxAttendees"
+                          type="number"
+                          placeholder="500"
+                          className="rounded-lg"
+                        />
+                      )}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>RSVP Deadline</Label>
+                    <DatePicker
+                      value={rsvpDeadline || undefined}
+                      onChange={(date) => setValue("rsvpDeadline", date || null)}
+                      placeholder="Select RSVP deadline"
+                      allowFutureDates={true}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="estimatedBudget">Estimated Budget</Label>
+                    <Controller
+                      name="estimatedBudget"
+                      control={control}
+                      render={({ field }) => (
+                        <Input
+                          {...field}
+                          id="estimatedBudget"
+                          type="number"
+                          placeholder="50000"
+                          className="rounded-lg"
+                        />
+                      )}
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
-            {currentStep < steps.length - 1 ? (
-              <Button type="submit">Next</Button>
-            ) : (
-              <Button type="button" onClick={handleCreate}>
-                Create Event
-              </Button>
-            )}
+          {/* Event Configuration */}
+          <div className="space-y-4">
+            <h3 className="text-base font-normal text-gray-900">Event Configuration</h3>
+            <Card className="border-l-4 border-l-amber-500 shadow-none">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base font-normal flex items-center gap-2">
+                  <CiSettings className="w-5 h-5 text-amber-500" />
+                  Settings & Options
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <label className="flex items-center gap-3 cursor-pointer p-3 rounded-lg hover:bg-gray-50 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={isPublic}
+                    onChange={(e) => setValue("isPublic", e.target.checked)}
+                    className="w-4 h-4 rounded"
+                  />
+                  <div className="flex-1">
+                    <span className="text-sm font-medium">Public Event</span>
+                    <p className="text-xs text-muted-foreground">Event will be visible to everyone</p>
+                  </div>
+                </label>
+
+                <label className="flex items-center gap-3 cursor-pointer p-3 rounded-lg hover:bg-gray-50 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={requiresRSVP}
+                    onChange={(e) => setValue("requiresRSVP", e.target.checked)}
+                    className="w-4 h-4 rounded"
+                  />
+                  <div className="flex-1">
+                    <span className="text-sm font-medium">Requires RSVP</span>
+                    <p className="text-xs text-muted-foreground">Attendees must confirm attendance</p>
+                  </div>
+                </label>
+
+                <label className="flex items-center gap-3 cursor-pointer p-3 rounded-lg hover:bg-gray-50 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={checkInRequired}
+                    onChange={(e) => setValue("checkInRequired", e.target.checked)}
+                    className="w-4 h-4 rounded"
+                  />
+                  <div className="flex-1">
+                    <span className="text-sm font-medium">Check-in Required</span>
+                    <p className="text-xs text-muted-foreground">Track attendee check-ins at the event</p>
+                  </div>
+                </label>
+
+                <label className="flex items-center gap-3 cursor-pointer p-3 rounded-lg hover:bg-gray-50 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={feedbackRequired}
+                    onChange={(e) => setValue("feedbackRequired", e.target.checked)}
+                    className="w-4 h-4 rounded"
+                  />
+                  <div className="flex-1">
+                    <span className="text-sm font-medium">Feedback Required</span>
+                    <p className="text-xs text-muted-foreground">Collect feedback after the event</p>
+                  </div>
+                </label>
+              </CardContent>
+            </Card>
           </div>
         </form>
+
+        <div className="flex justify-end gap-3 pt-6 border-t">
+          <Button variant="outline" onClick={handleClose} disabled={loading} className="rounded-full">
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSubmit(onSubmit)}
+            disabled={loading}
+            className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-full"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Creating...
+              </>
+            ) : (
+              <>
+                <CiCircleCheck className="mr-2 h-4 w-4" />
+                Create Event
+              </>
+            )}
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   )

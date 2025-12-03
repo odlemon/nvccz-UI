@@ -1,269 +1,572 @@
-import { createSlice, type PayloadAction } from "@reduxjs/toolkit"
+import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit'
+import {
+  eventsApi,
+  type AppEvent,
+  type EventGuest,
+  type BudgetItem,
+  type EventExpense,
+  type EventFeedback,
+  type EventAnalytics,
+  type EventReport,
+  type EventType,
+  type EventStatus,
+  type BudgetStatus,
+  type BudgetCategory,
+  type PaymentMethod,
+  type ReportType
+} from '@/lib/api/events-api'
 
-export interface BudgetLineItem {
-  id: string
-  name: string
-  category: string
-  qty: number
-  unitCost: number
-  total: number
-}
-
-export interface Guest {
-  id: string
-  name: string
-  email: string
-  phone?: string
-  role?: string
-  status: "INVITED" | "RSVP_YES" | "RSVP_NO" | "CHECKED_IN"
-  checkedIn: boolean
-  feedbackRating?: number
-  notes?: string
-  internalAttendee?: boolean
-}
-
-export interface ActivityLog {
-  id: string
-  timestamp: string
-  actor: string
-  action: string
-}
-
-export interface Event {
-  id: string
-  title: string
-  description?: string
-  creatorId: string
-  creatorName: string
-  startDate: string
-  endDate?: string
-  venue: string
-  totalCost: number
-  procurementStatus: "DRAFT" | "PENDING" | "APPROVED" | "REJECTED"
-  rsvpRate: number
-  myStatus?: "INVITED" | "RSVP_YES" | "RSVP_NO"
-  accessList: string[]
-  budgetLineItems: BudgetLineItem[]
-  guests: Guest[]
-  activity: ActivityLog[]
-  private: boolean
-  procurementId?: string
-}
-
-interface EventsState {
-  list: Event[]
-  currentEventId: string | null
+export interface EventsState {
+  events: AppEvent[]
+  currentEvent: AppEvent | null
+  currentEventGuests: EventGuest[]
+  currentEventBudgetItems: BudgetItem[]
+  currentEventExpenses: EventExpense[]
+  currentEventFeedback: EventFeedback[]
+  currentEventAnalytics: EventAnalytics | null
+  viewMode: 'list' | 'calendar' | 'grid'
   filters: {
     search: string
-    status: string[]
+    status: EventStatus | 'ALL'
+    eventType: EventType | 'ALL'
     dateRange: { start: string | null; end: string | null }
   }
-  viewMode: "list" | "calendar"
+  loading: boolean
+  error: string | null
+  guestsPagination: {
+    page: number
+    limit: number
+    total: number
+    pages: number
+  }
 }
-
-// Dummy data
-const dummyEvents: Event[] = [
-  {
-    id: "evt_001",
-    title: "Investor Roundtable — Q4",
-    description: "Quarterly investor meeting to discuss performance and strategy",
-    creatorId: "u_admin",
-    creatorName: "A. Manager",
-    startDate: "2025-11-12T18:00:00Z",
-    endDate: "2025-11-12T21:00:00Z",
-    venue: "Harare Conference Centre",
-    totalCost: 50000.0,
-    procurementStatus: "APPROVED",
-    rsvpRate: 64,
-    myStatus: "RSVP_YES",
-    accessList: ["u_admin", "u_finance", "u_ops"],
-    private: false,
-    procurementId: "pr_101",
-    budgetLineItems: [
-      { id: "b1", name: "Venue Hire", category: "Venue", qty: 1, unitCost: 15000, total: 15000 },
-      { id: "b2", name: "Catering", category: "F&B", qty: 120, unitCost: 35, total: 4200 },
-      { id: "b3", name: "AV Equipment", category: "A/V", qty: 1, unitCost: 2500, total: 2500 },
-    ],
-    guests: [
-      {
-        id: "g1",
-        name: "John Doe",
-        email: "john@invest.com",
-        phone: "+263771234567",
-        status: "RSVP_YES",
-        checkedIn: true,
-        feedbackRating: 5,
-        internalAttendee: true,
-      },
-      {
-        id: "g2",
-        name: "Jane Smith",
-        email: "jane@vc.com",
-        phone: "+263772345678",
-        status: "INVITED",
-        checkedIn: false,
-        internalAttendee: false,
-      },
-      { id: "g3", name: "Ali K", email: "ali@capvc.com", status: "RSVP_NO", checkedIn: false, internalAttendee: false },
-    ],
-    activity: [
-      { id: "a1", timestamp: "2025-10-20T12:00:00Z", actor: "A. Manager", action: "Created event" },
-      { id: "a2", timestamp: "2025-10-25T10:00:00Z", actor: "A. Manager", action: "Sent PR to procurement" },
-      { id: "a3", timestamp: "2025-10-28T14:30:00Z", actor: "Procurement Team", action: "Approved PR" },
-    ],
-  },
-  {
-    id: "evt_002",
-    title: "Series A Pitch Night",
-    description: "Startup pitch event for Series A funding round",
-    creatorId: "u_ops",
-    creatorName: "O. Ops",
-    startDate: "2025-12-05T17:00:00Z",
-    endDate: "2025-12-05T20:00:00Z",
-    venue: "Boardroom B",
-    totalCost: 12000.0,
-    procurementStatus: "PENDING",
-    rsvpRate: 0,
-    myStatus: "INVITED",
-    accessList: ["u_ops", "u_admin"],
-    private: true,
-    budgetLineItems: [
-      { id: "b4", name: "Venue", category: "Venue", qty: 1, unitCost: 5000, total: 5000 },
-      { id: "b5", name: "Refreshments", category: "F&B", qty: 50, unitCost: 20, total: 1000 },
-    ],
-    guests: [
-      { id: "g4", name: "Mike Chen", email: "mike@startup.com", status: "INVITED", checkedIn: false },
-      { id: "g5", name: "Sarah Lee", email: "sarah@vc.fund", status: "INVITED", checkedIn: false },
-    ],
-    activity: [{ id: "a4", timestamp: "2025-10-15T09:00:00Z", actor: "O. Ops", action: "Created event" }],
-  },
-  {
-    id: "evt_003",
-    title: "Annual Gala Dinner",
-    description: "Annual company gala dinner and awards ceremony",
-    creatorId: "u_admin",
-    creatorName: "A. Manager",
-    startDate: "2025-12-20T19:00:00Z",
-    endDate: "2025-12-20T23:00:00Z",
-    venue: "The Vault",
-    totalCost: 85000.0,
-    procurementStatus: "APPROVED",
-    rsvpRate: 78,
-    myStatus: "RSVP_YES",
-    accessList: ["u_admin"],
-    private: false,
-    budgetLineItems: [
-      { id: "b6", name: "Venue Hire", category: "Venue", qty: 1, unitCost: 25000, total: 25000 },
-      { id: "b7", name: "Catering", category: "F&B", qty: 200, unitCost: 50, total: 10000 },
-      { id: "b8", name: "Entertainment", category: "Entertainment", qty: 1, unitCost: 15000, total: 15000 },
-    ],
-    guests: [
-      {
-        id: "g6",
-        name: "Robert Brown",
-        email: "robert@company.com",
-        status: "RSVP_YES",
-        checkedIn: false,
-        internalAttendee: true,
-      },
-      {
-        id: "g7",
-        name: "Emily White",
-        email: "emily@company.com",
-        status: "RSVP_YES",
-        checkedIn: false,
-        internalAttendee: true,
-      },
-    ],
-    activity: [
-      { id: "a5", timestamp: "2025-09-01T10:00:00Z", actor: "A. Manager", action: "Created event" },
-      { id: "a6", timestamp: "2025-09-15T11:00:00Z", actor: "A. Manager", action: "Sent PR to procurement" },
-    ],
-  },
-]
 
 const initialState: EventsState = {
-  list: dummyEvents,
-  currentEventId: null,
+  events: [],
+  currentEvent: null,
+  currentEventGuests: [],
+  currentEventBudgetItems: [],
+  currentEventExpenses: [],
+  currentEventFeedback: [],
+  currentEventAnalytics: null,
+  viewMode: 'list',
   filters: {
-    search: "",
-    status: [],
-    dateRange: { start: null, end: null },
+    search: '',
+    status: 'ALL',
+    eventType: 'ALL',
+    dateRange: { start: null, end: null }
   },
-  viewMode: "list",
+  loading: false,
+  error: null,
+  guestsPagination: {
+    page: 1,
+    limit: 10,
+    total: 0,
+    pages: 0
+  }
 }
 
+// Async Thunks for API calls
+export const fetchEvents = createAsyncThunk(
+  'events/fetchEvents',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await eventsApi.getAll()
+      if (response.success) {
+        return response.data
+      }
+      throw new Error('Failed to fetch events')
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to fetch events')
+    }
+  }
+)
+
+export const fetchUpcomingEvents = createAsyncThunk(
+  'events/fetchUpcomingEvents',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await eventsApi.getUpcoming()
+      if (response.success) {
+        return response.data
+      }
+      throw new Error('Failed to fetch upcoming events')
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to fetch upcoming events')
+    }
+  }
+)
+
+export const fetchEventById = createAsyncThunk(
+  'events/fetchEventById',
+  async (eventId: string, { rejectWithValue }) => {
+    try {
+      const response = await eventsApi.getById(eventId)
+      if (response.success) {
+        return response.data
+      }
+      throw new Error('Failed to fetch event')
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to fetch event')
+    }
+  }
+)
+
+export const createEvent = createAsyncThunk(
+  'events/createEvent',
+  async (eventData: {
+    title: string
+    description: string
+    startDate: string
+    endDate: string
+    location: string
+    eventType?: EventType
+    maxAttendees?: number
+    isPublic?: boolean
+    requiresRSVP?: boolean
+    rsvpDeadline?: string
+    estimatedBudget?: number
+    checkInRequired?: boolean
+    feedbackRequired?: boolean
+  }, { rejectWithValue }) => {
+    try {
+      const response = await eventsApi.create(eventData)
+      if (response.success) {
+        return response.data
+      }
+      throw new Error('Failed to create event')
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to create event')
+    }
+  }
+)
+
+export const updateEvent = createAsyncThunk(
+  'events/updateEvent',
+  async ({ id, data }: { id: string; data: any }, { rejectWithValue }) => {
+    try {
+      const response = await eventsApi.update(id, data)
+      if (response.success) {
+        return response.data
+      }
+      throw new Error('Failed to update event')
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to update event')
+    }
+  }
+)
+
+export const deleteEvent = createAsyncThunk(
+  'events/deleteEvent',
+  async (eventId: string, { rejectWithValue }) => {
+    try {
+      await eventsApi.delete(eventId)
+      return eventId
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to delete event')
+    }
+  }
+)
+
+// Guest Management
+export const fetchEventGuests = createAsyncThunk(
+  'events/fetchEventGuests',
+  async ({ eventId, page = 1, limit = 10 }: { eventId: string; page?: number; limit?: number }, { rejectWithValue }) => {
+    try {
+      const response = await eventsApi.getGuests(eventId, page, limit)
+      if (response.success) {
+        return { guests: response.data, pagination: response.pagination }
+      }
+      throw new Error('Failed to fetch guests')
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to fetch guests')
+    }
+  }
+)
+
+export const addEventGuests = createAsyncThunk(
+  'events/addEventGuests',
+  async ({ eventId, guests }: { eventId: string; guests: any[] }, { rejectWithValue }) => {
+    try {
+      const response = await eventsApi.addGuests(eventId, guests)
+      if (response.success) {
+        return response.data
+      }
+      throw new Error('Failed to add guests')
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to add guests')
+    }
+  }
+)
+
+export const checkInGuest = createAsyncThunk(
+  'events/checkInGuest',
+  async ({ eventId, guestId, notes }: { eventId: string; guestId: string; notes?: string }, { rejectWithValue }) => {
+    try {
+      const response = await eventsApi.checkInGuest(eventId, guestId, notes)
+      if (response.success) {
+        return response.data
+      }
+      throw new Error('Failed to check in guest')
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to check in guest')
+    }
+  }
+)
+
+// Budget Management
+export const fetchBudgetItems = createAsyncThunk(
+  'events/fetchBudgetItems',
+  async (eventId: string, { rejectWithValue }) => {
+    try {
+      const response = await eventsApi.getBudgetItems(eventId)
+      if (response.success) {
+        return response.data
+      }
+      throw new Error('Failed to fetch budget items')
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to fetch budget items')
+    }
+  }
+)
+
+export const addBudgetItems = createAsyncThunk(
+  'events/addBudgetItems',
+  async ({ eventId, budgetItems }: { eventId: string; budgetItems: any[] }, { rejectWithValue }) => {
+    try {
+      const response = await eventsApi.addBudgetItems(eventId, budgetItems)
+      if (response.success) {
+        return response.data
+      }
+      throw new Error('Failed to add budget items')
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to add budget items')
+    }
+  }
+)
+
+export const approveBudget = createAsyncThunk(
+  'events/approveBudget',
+  async ({ eventId, approvedBudget, notes }: { eventId: string; approvedBudget: number; notes?: string }, { rejectWithValue }) => {
+    try {
+      const response = await eventsApi.approveBudget(eventId, approvedBudget, notes)
+      if (response.success) {
+        return response.data
+      }
+      throw new Error('Failed to approve budget')
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to approve budget')
+    }
+  }
+)
+
+// Expense Management
+export const fetchExpenses = createAsyncThunk(
+  'events/fetchExpenses',
+  async (eventId: string, { rejectWithValue }) => {
+    try {
+      const response = await eventsApi.getExpenses(eventId)
+      if (response.success) {
+        return response.data
+      }
+      throw new Error('Failed to fetch expenses')
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to fetch expenses')
+    }
+  }
+)
+
+export const addExpense = createAsyncThunk(
+  'events/addExpense',
+  async ({ eventId, data }: { eventId: string; data: any }, { rejectWithValue }) => {
+    try {
+      const response = await eventsApi.addExpense(eventId, data)
+      if (response.success) {
+        return response.data
+      }
+      throw new Error('Failed to add expense')
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to add expense')
+    }
+  }
+)
+
+// Feedback Management
+export const fetchFeedback = createAsyncThunk(
+  'events/fetchFeedback',
+  async (eventId: string, { rejectWithValue }) => {
+    try {
+      const response = await eventsApi.getFeedback(eventId)
+      if (response.success) {
+        return response.data
+      }
+      throw new Error('Failed to fetch feedback')
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to fetch feedback')
+    }
+  }
+)
+
+export const submitFeedback = createAsyncThunk(
+  'events/submitFeedback',
+  async ({ eventId, data }: { eventId: string; data: any }, { rejectWithValue }) => {
+    try {
+      const response = await eventsApi.submitFeedback(eventId, data)
+      if (response.success) {
+        return response.data
+      }
+      throw new Error('Failed to submit feedback')
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to submit feedback')
+    }
+  }
+)
+
+// Analytics & Reporting
+export const fetchAnalytics = createAsyncThunk(
+  'events/fetchAnalytics',
+  async (eventId: string, { rejectWithValue }) => {
+    try {
+      const response = await eventsApi.getAnalytics(eventId)
+      if (response.success) {
+        return response.data
+      }
+      throw new Error('Failed to fetch analytics')
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to fetch analytics')
+    }
+  }
+)
+
+export const generateReport = createAsyncThunk(
+  'events/generateReport',
+  async ({ eventId, reportType }: { eventId: string; reportType: ReportType }, { rejectWithValue }) => {
+    try {
+      const response = await eventsApi.generateReport(eventId, reportType)
+      if (response.success) {
+        return response.data
+      }
+      throw new Error('Failed to generate report')
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to generate report')
+    }
+  }
+)
+
 const eventsSlice = createSlice({
-  name: "events",
+  name: 'events',
   initialState,
   reducers: {
     setCurrentEvent: (state, action: PayloadAction<string | null>) => {
-      state.currentEventId = action.payload
+      if (action.payload) {
+        state.currentEvent = state.events.find(e => e.id === action.payload) || null
+      } else {
+        state.currentEvent = null
+      }
     },
-    setViewMode: (state, action: PayloadAction<"list" | "calendar">) => {
+    setViewMode: (state, action: PayloadAction<'list' | 'calendar' | 'grid'>) => {
       state.viewMode = action.payload
     },
     setSearchFilter: (state, action: PayloadAction<string>) => {
       state.filters.search = action.payload
     },
-    setStatusFilter: (state, action: PayloadAction<string[]>) => {
+    setStatusFilter: (state, action: PayloadAction<EventStatus | 'ALL'>) => {
       state.filters.status = action.payload
+    },
+    setEventTypeFilter: (state, action: PayloadAction<EventType | 'ALL'>) => {
+      state.filters.eventType = action.payload
     },
     setDateRangeFilter: (state, action: PayloadAction<{ start: string | null; end: string | null }>) => {
       state.filters.dateRange = action.payload
     },
-    addEvent: (state, action: PayloadAction<Event>) => {
-      state.list.push(action.payload)
+    clearFilters: (state) => {
+      state.filters = initialState.filters
     },
-    updateEvent: (state, action: PayloadAction<Event>) => {
-      const index = state.list.findIndex((e) => e.id === action.payload.id)
-      if (index !== -1) {
-        state.list[index] = action.payload
-      }
-    },
-    updateGuestStatus: (
-      state,
-      action: PayloadAction<{ eventId: string; guestId: string; status: Guest["status"] }>,
-    ) => {
-      const event = state.list.find((e) => e.id === action.payload.eventId)
-      if (event) {
-        const guest = event.guests.find((g) => g.id === action.payload.guestId)
-        if (guest) {
-          guest.status = action.payload.status
-        }
-      }
-    },
-    addGuest: (state, action: PayloadAction<{ eventId: string; guest: Guest }>) => {
-      const event = state.list.find((e) => e.id === action.payload.eventId)
-      if (event) {
-        event.guests.push(action.payload.guest)
-      }
-    },
-    addBudgetLineItem: (state, action: PayloadAction<{ eventId: string; item: BudgetLineItem }>) => {
-      const event = state.list.find((e) => e.id === action.payload.eventId)
-      if (event) {
-        event.budgetLineItems.push(action.payload.item)
-        event.totalCost = event.budgetLineItems.reduce((sum, item) => sum + item.total, 0)
-      }
-    },
-    updateBudgetLineItem: (state, action: PayloadAction<{ eventId: string; item: BudgetLineItem }>) => {
-      const event = state.list.find((e) => e.id === action.payload.eventId)
-      if (event) {
-        const index = event.budgetLineItems.findIndex((i) => i.id === action.payload.item.id)
-        if (index !== -1) {
-          event.budgetLineItems[index] = action.payload.item
-          event.totalCost = event.budgetLineItems.reduce((sum, item) => sum + item.total, 0)
-        }
-      }
-    },
-    deleteBudgetLineItem: (state, action: PayloadAction<{ eventId: string; itemId: string }>) => {
-      const event = state.list.find((e) => e.id === action.payload.eventId)
-      if (event) {
-        event.budgetLineItems = event.budgetLineItems.filter((i) => i.id !== action.payload.itemId)
-        event.totalCost = event.budgetLineItems.reduce((sum, item) => sum + item.total, 0)
-      }
-    },
+    clearError: (state) => {
+      state.error = null
+    }
   },
+  extraReducers: (builder) => {
+    // Fetch Events
+    builder
+      .addCase(fetchEvents.pending, (state) => {
+        state.loading = true
+        state.error = null
+      })
+      .addCase(fetchEvents.fulfilled, (state, action) => {
+        state.loading = false
+        state.events = action.payload
+      })
+      .addCase(fetchEvents.rejected, (state, action) => {
+        state.loading = false
+        state.error = action.payload as string
+      })
+
+    // Fetch Upcoming Events
+    builder
+      .addCase(fetchUpcomingEvents.pending, (state) => {
+        state.loading = true
+        state.error = null
+      })
+      .addCase(fetchUpcomingEvents.fulfilled, (state, action) => {
+        state.loading = false
+        state.events = action.payload
+      })
+      .addCase(fetchUpcomingEvents.rejected, (state, action) => {
+        state.loading = false
+        state.error = action.payload as string
+      })
+
+    // Fetch Event By ID
+    builder
+      .addCase(fetchEventById.pending, (state) => {
+        state.loading = true
+        state.error = null
+      })
+      .addCase(fetchEventById.fulfilled, (state, action) => {
+        state.loading = false
+        state.currentEvent = action.payload
+        const index = state.events.findIndex(e => e.id === action.payload.id)
+        if (index !== -1) {
+          state.events[index] = action.payload
+        } else {
+          state.events.push(action.payload)
+        }
+      })
+      .addCase(fetchEventById.rejected, (state, action) => {
+        state.loading = false
+        state.error = action.payload as string
+      })
+
+    // Create Event
+    builder
+      .addCase(createEvent.pending, (state) => {
+        state.loading = true
+        state.error = null
+      })
+      .addCase(createEvent.fulfilled, (state, action) => {
+        state.loading = false
+        state.events.unshift(action.payload)
+      })
+      .addCase(createEvent.rejected, (state, action) => {
+        state.loading = false
+        state.error = action.payload as string
+      })
+
+    // Update Event
+    builder
+      .addCase(updateEvent.pending, (state) => {
+        state.loading = true
+        state.error = null
+      })
+      .addCase(updateEvent.fulfilled, (state, action) => {
+        state.loading = false
+        const index = state.events.findIndex(e => e.id === action.payload.id)
+        if (index !== -1) {
+          state.events[index] = action.payload
+        }
+        if (state.currentEvent?.id === action.payload.id) {
+          state.currentEvent = action.payload
+        }
+      })
+      .addCase(updateEvent.rejected, (state, action) => {
+        state.loading = false
+        state.error = action.payload as string
+      })
+
+    // Delete Event
+    builder
+      .addCase(deleteEvent.pending, (state) => {
+        state.loading = true
+        state.error = null
+      })
+      .addCase(deleteEvent.fulfilled, (state, action) => {
+        state.loading = false
+        state.events = state.events.filter(e => e.id !== action.payload)
+        if (state.currentEvent?.id === action.payload) {
+          state.currentEvent = null
+        }
+      })
+      .addCase(deleteEvent.rejected, (state, action) => {
+        state.loading = false
+        state.error = action.payload as string
+      })
+
+    // Fetch Guests
+    builder
+      .addCase(fetchEventGuests.pending, (state) => {
+        state.loading = true
+        state.error = null
+      })
+      .addCase(fetchEventGuests.fulfilled, (state, action) => {
+        state.loading = false
+        state.currentEventGuests = action.payload.guests
+        if (action.payload.pagination) {
+          state.guestsPagination = action.payload.pagination
+        }
+      })
+      .addCase(fetchEventGuests.rejected, (state, action) => {
+        state.loading = false
+        state.error = action.payload as string
+      })
+
+    // Add Guests
+    builder
+      .addCase(addEventGuests.fulfilled, (state, action) => {
+        state.currentEventGuests = [...state.currentEventGuests, ...action.payload]
+      })
+
+    // Check In Guest
+    builder
+      .addCase(checkInGuest.fulfilled, (state, action) => {
+        const index = state.currentEventGuests.findIndex(g => g.id === action.payload.id)
+        if (index !== -1) {
+          state.currentEventGuests[index] = action.payload
+        }
+      })
+
+    // Budget Items
+    builder
+      .addCase(fetchBudgetItems.fulfilled, (state, action) => {
+        state.currentEventBudgetItems = action.payload
+      })
+      .addCase(addBudgetItems.fulfilled, (state, action) => {
+        state.currentEventBudgetItems = [...state.currentEventBudgetItems, ...action.payload]
+      })
+      .addCase(approveBudget.fulfilled, (state, action) => {
+        if (state.currentEvent) {
+          state.currentEvent = action.payload
+        }
+        const index = state.events.findIndex(e => e.id === action.payload.id)
+        if (index !== -1) {
+          state.events[index] = action.payload
+        }
+      })
+
+    // Expenses
+    builder
+      .addCase(fetchExpenses.fulfilled, (state, action) => {
+        state.currentEventExpenses = action.payload
+      })
+      .addCase(addExpense.fulfilled, (state, action) => {
+        state.currentEventExpenses.push(action.payload)
+      })
+
+    // Feedback
+    builder
+      .addCase(fetchFeedback.fulfilled, (state, action) => {
+        state.currentEventFeedback = action.payload
+      })
+      .addCase(submitFeedback.fulfilled, (state, action) => {
+        state.currentEventFeedback.push(action.payload)
+      })
+
+    // Analytics
+    builder
+      .addCase(fetchAnalytics.fulfilled, (state, action) => {
+        state.currentEventAnalytics = action.payload
+      })
+  }
 })
 
 export const {
@@ -271,14 +574,10 @@ export const {
   setViewMode,
   setSearchFilter,
   setStatusFilter,
+  setEventTypeFilter,
   setDateRangeFilter,
-  addEvent,
-  updateEvent,
-  updateGuestStatus,
-  addGuest,
-  addBudgetLineItem,
-  updateBudgetLineItem,
-  deleteBudgetLineItem,
+  clearFilters,
+  clearError
 } = eventsSlice.actions
 
 export default eventsSlice.reducer
