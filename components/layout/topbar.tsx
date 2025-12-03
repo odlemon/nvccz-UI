@@ -80,7 +80,7 @@ export function Topbar({ onModuleSelect, currentModule }: TopbarProps) {
             className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
             onClick={() => window.location.href = '/'}
           >
-            <img src="/logo.jpg" alt="Arcus" className="w-19 h-19 rounded-lg" />
+            <img src="/logo.png" height={70} width={130} alt="Arcus" className="" />
             {/* <span className="font-semibold text-lg">Arcus</span> */}
           </div>
 

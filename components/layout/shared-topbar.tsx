@@ -82,7 +82,7 @@ export function SharedTopbar({ onModuleSelect, currentModule }: SharedTopbarProp
             className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
             onClick={() => window.location.href = '/'}
           >
-            <img src="/logo.jpg" alt="Arcus" className="w-19 h-19 rounded-lg" />
+            <img src="/logo.png" alt="Arcus"height={70} width={130} className="rounded-lg" />
           </div>
         </div>
 

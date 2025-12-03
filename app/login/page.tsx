@@ -100,13 +100,13 @@ function LoginForm() {
           <div className="rounded-3xl p-8 h-full flex flex-col justify-center" style={{ backgroundColor: '#F8F8F8' }}>
             {/* Logo */}
             <div className="text-left mb-8 px-12">
-              <div className="inline-flex items-center justify-center w-20 h-20 mb-4">
+              <div className="inline-flex items-center justify-center mb-4">
                 <Image
-                  src="/logo.jpg"
+                  src="/logo.png"
                   alt="Arcus Logo"
-                  width={80}
-                  height={80}
-                  className="w-20 h-20 object-contain"
+                  width={200}
+                  height={200}
+                  className=" object-contain"
                 />
               </div>
               <h1 className="text-4xl text-gray-900 mb-2">Welcome to Arcus</h1>
