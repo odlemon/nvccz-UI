@@ -13,7 +13,7 @@ export function InvitationsPage() {
   const { list } = useAppSelector((state) => state.events)
 
   // Filter events where current user is invited
-  const myInvitations = list.filter((event) => event.myStatus)
+  const myInvitations = (list || []).filter((event) => event.myStatus)
 
   const handleRSVP = (eventId: string, status: "RSVP_YES" | "RSVP_NO") => {
     // In a real app, this would update the guest status for the current user

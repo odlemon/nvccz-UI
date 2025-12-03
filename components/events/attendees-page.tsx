@@ -14,8 +14,8 @@ export function AttendeesPage() {
   const [searchTerm, setSearchTerm] = useState("")
 
   // Flatten all guests from all events
-  const allGuests = list.flatMap((event) =>
-    event.guests.map((guest) => ({
+  const allGuests = (list || []).flatMap((event) =>
+    (event.guests || []).map((guest) => ({
       ...guest,
       eventTitle: event.title,
       eventId: event.id,

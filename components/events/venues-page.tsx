@@ -10,7 +10,7 @@ export function VenuesPage() {
   const { list } = useAppSelector((state) => state.events)
 
   // Group events by venue
-  const venueGroups = list.reduce(
+  const venueGroups = (list || []).reduce(
     (acc, event) => {
       if (!acc[event.venue]) {
         acc[event.venue] = []
@@ -25,8 +25,8 @@ export function VenuesPage() {
     name,
     events,
     totalEvents: events.length,
-    totalCost: events.reduce((sum, e) => sum + e.totalCost, 0),
-    avgCost: events.reduce((sum, e) => sum + e.totalCost, 0) / events.length,
+    totalCost: events.reduce((sum, e) => sum + (e.totalCost || 0), 0),
+    avgCost: events.reduce((sum, e) => sum + (e.totalCost || 0), 0) / events.length,
   }))
 
   return (
