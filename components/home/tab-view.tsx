@@ -25,6 +25,11 @@ const tabs = [
     icon: CiGlobe
   },
   {
+    id: "forum" as TabType,
+    label: "Forum",
+    icon: CiChat1
+  },
+  {
     id: "newsletter" as TabType,
     label: "Newsletter", 
     icon: CiMail

@@ -27,7 +27,7 @@ export function HomePageContent() {
     switch (activeTab) {
       case "news":
         return <NewsTab />;
-      case "feed":
+      case "forum":
         return <ArticlesFeed />;
       case "newsletter":
         return <NewsletterTab />;
@@ -36,7 +36,7 @@ export function HomePageContent() {
       case "dashboard":
         return <DashboardTab />;
       default:
-        return <ArticlesFeed />;
+        return <NewsTab />;
     }
   };
 
