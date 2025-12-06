@@ -25,7 +25,7 @@ const quickActions = [
     id: "performance",
     title: "Performance Management", 
     icon: CiViewTable,
-    href: "/portfolio/analytics",
+    href: "/portfolio",
     description: "Track performance",
     gradient: "from-blue-500 to-indigo-600"
   },
@@ -33,31 +33,31 @@ const quickActions = [
     id: "applications",
     title: "Applications",
     icon: CiFileOn,
-    href: "/applications",
+    href: "/portfolio/applications/dashboard",
     description: "Review applications",
     gradient: "from-purple-500 to-violet-600"
   },
   {
-    id: "companies",
-    title: "Companies",
+    id: "events",
+    title: "Events",
     icon: CiShop,
-    href: "/companies",
-    description: "Company database",
+    href: "/events",
+    description: "Upcoming events",
     gradient: "from-orange-500 to-red-500"
   },
   {
-    id: "funds",
-    title: "Funds",
+    id: "procurement",
+    title: "Procurement",
     icon: CiBank,
-    href: "/funds",
-    description: "Fund management",
+    href: "/procurement",
+    description: "Procurement",
     gradient: "from-yellow-500 to-amber-600"
   },
   {
     id: "account",
     title: "Account & Performance",
     icon: CiUser,
-    href: "/account",
+    href: "/accounting",
     description: "Account settings",
     gradient: "from-teal-500 to-cyan-600"
   }

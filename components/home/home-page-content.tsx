@@ -13,24 +13,24 @@ import { TabView, type TabType } from "./tab-view";
 import { FeedTab } from "./feed-tab";
 import { ArticlesFeed } from "./articles-feed";
 import { NewsletterTab } from "./newsletter-tab";
-// import { ForumTab } from "./forum-tab";
+import { NewsTab } from "./news-tab";
 import { EventCalendarTab } from "./event-calendar-tab";
 import { DashboardTab } from "./dashboard-tab";
 import { FinancialDataProvider } from "@/components/providers/financial-data-provider";
 
 export function HomePageContent() {
-  const [activeTab, setActiveTab] = useState<TabType>("feed");
+  const [activeTab, setActiveTab] = useState<TabType>("news");
   const [currentModule, setCurrentModule] = useState("homepage");
   const router = useRouter();
 
   const renderTabContent = () => {
     switch (activeTab) {
+      case "news":
+        return <NewsTab />;
       case "feed":
         return <ArticlesFeed />;
       case "newsletter":
         return <NewsletterTab />;
-      // case "forum":
-      //   return <ForumTab />;
       case "calendar":
         return <EventCalendarTab />;
       case "dashboard":

@@ -21,7 +21,7 @@ interface TabViewProps {
 const tabs = [
   {
     id: "feed" as TabType,
-    label: "Forum",
+    label: "News",
     icon: CiGlobe
   },
   {
