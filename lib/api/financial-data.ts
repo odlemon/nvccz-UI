@@ -4,20 +4,23 @@ const BASE_URL = 'http://ss8008o44k04k0kogoskcsg8.31.220.82.129.sslip.io/api'
 
 export interface ExchangeRate {
   currency: string
-  mid_rate: number
-  pair: string
-  we_buy: number
-  we_sell: number
+  code: string
+  rate: number
+  inverseRate: number
+  flag?: string
+}
+
+export interface CurrencyFreaksResponse {
+  date: string
+  base: string
+  rates: Record<string, string>
 }
 
 export interface ExchangeRatesResponse {
   date: string
-  date_iso: string
+  base: string
   exchange_rates: ExchangeRate[]
   source: string
-  status: string
-  timestamp: string
-  url: string
 }
 
 export interface TopGainer {
@@ -132,14 +135,51 @@ export interface WorldIndicesResponse {
   url: string
 }
 
+// Curated list of major currencies to display
+const MAJOR_CURRENCIES = [
+  { code: 'ZAR', name: 'South African Rand', flag: '🇿🇦' },
+  { code: 'GBP', name: 'British Pound', flag: '🇬🇧' },
+  { code: 'EUR', name: 'Euro', flag: '🇪🇺' },
+  { code: 'BWP', name: 'Botswana Pula', flag: '🇧🇼' },
+  { code: 'JPY', name: 'Japanese Yen', flag: '🇯🇵' },
+  { code: 'CHF', name: 'Swiss Franc', flag: '🇨🇭' },
+  { code: 'AUD', name: 'Australian Dollar', flag: '🇦🇺' },
+  { code: 'CNY', name: 'Chinese Yuan', flag: '🇨🇳' },
+  { code: 'INR', name: 'Indian Rupee', flag: '🇮🇳' },
+  { code: 'CAD', name: 'Canadian Dollar', flag: '🇨🇦' },
+  { code: 'KES', name: 'Kenyan Shilling', flag: '🇰🇪' },
+  { code: 'NGN', name: 'Nigerian Naira', flag: '🇳🇬' }
+]
+
 // API Service Functions
 export async function fetchExchangeRates(): Promise<ExchangeRatesResponse> {
   try {
-    const response = await fetch(`${BASE_URL}/rbz/exchange-rates`)
+    const response = await fetch(
+      'https://api.currencyfreaks.com/v2.0/rates/latest?apikey=953b77c417de4ecb8532656e79132541'
+    )
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`)
     }
-    return await response.json()
+    const data: CurrencyFreaksResponse = await response.json()
+    
+    // Transform the data to our format, focusing on major currencies
+    const exchangeRates: ExchangeRate[] = MAJOR_CURRENCIES.map(currency => {
+      const rate = parseFloat(data.rates[currency.code] || '0')
+      return {
+        currency: currency.name,
+        code: currency.code,
+        rate: rate,
+        inverseRate: rate > 0 ? 1 / rate : 0,
+        flag: currency.flag
+      }
+    }).filter(rate => rate.rate > 0)
+    
+    return {
+      date: data.date,
+      base: data.base,
+      exchange_rates: exchangeRates,
+      source: 'Currency Freaks API'
+    }
   } catch (error) {
     console.error('Error fetching exchange rates:', error)
     throw error

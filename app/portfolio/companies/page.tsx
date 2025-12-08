@@ -110,9 +110,9 @@ export default function CompaniesPage() {
                   <p className="text-3xl font-normal text-white">{totalCompanies}</p>
                 </div>
               </div>
-              <div className="w-full h-2 bg-white/20 rounded-full">
+              {/* <div className="w-full h-2 bg-white/20 rounded-full">
                 <div className="w-3/4 h-2 bg-white rounded-full"></div>
-              </div>
+              </div> */}
             </div>
 
             {/* Active Investments */}
@@ -126,9 +126,9 @@ export default function CompaniesPage() {
                   <p className="text-3xl font-normal text-white">{activeCompanies}</p>
                 </div>
               </div>
-              <div className="w-full h-2 bg-white/20 rounded-full">
+              {/* <div className="w-full h-2 bg-white/20 rounded-full">
                 <div className="w-4/5 h-2 bg-white rounded-full"></div>
-              </div>
+              </div> */}
             </div>
 
             {/* Total Investment */}
@@ -142,9 +142,9 @@ export default function CompaniesPage() {
                   <p className="text-3xl font-normal text-white">${(totalInvestment / 1000).toFixed(1)}K</p>
                 </div>
               </div>
-              <div className="w-full h-2 bg-white/20 rounded-full">
+              {/* <div className="w-full h-2 bg-white/20 rounded-full">
                 <div className="w-2/3 h-2 bg-white rounded-full"></div>
-              </div>
+              </div> */}
             </div>
 
             {/* Avg Investment */}
@@ -158,9 +158,9 @@ export default function CompaniesPage() {
                   <p className="text-3xl font-normal text-white">${avgPerformance.toFixed(0)}</p>
                 </div>
               </div>
-              <div className="w-full h-2 bg-white/20 rounded-full">
+              {/* <div className="w-full h-2 bg-white/20 rounded-full">
                 <div className="w-5/6 h-2 bg-white rounded-full"></div>
-              </div>
+              </div> */}
             </div>
           </div>
         )}

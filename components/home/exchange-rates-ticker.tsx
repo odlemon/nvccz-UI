@@ -32,13 +32,14 @@ export function ExchangeRatesTicker() {
   }
 
   const exchangeRates = data.exchange_rates
+  const baseRate = data.base || 'USD'
 
   return (
     <div className="bg-blue-50/80 backdrop-blur-sm border-b border-blue-100">
       {/* Title outside the ticker */}
       <div className="px-4 sm:px-6 py-1 sm:py-1.5 bg-white/90 backdrop-blur-sm border-b border-blue-100">
         <div className="flex items-center justify-between">
-          <h3 className="text-xs text-gray-600">Live Exchange Rates (RBZ Official Rates)</h3>
+          <h3 className="text-xs text-gray-600">Live Exchange Rates (Base: {baseRate})</h3>
           <div className="flex items-center gap-1">
             <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
             <span className="text-xs text-green-600">LIVE</span>
@@ -57,7 +58,7 @@ export function ExchangeRatesTicker() {
             x: {
               repeat: Infinity,
               repeatType: "loop",
-              duration: exchangeRates.length * 20, // Slower, smoother animation
+              duration: exchangeRates.length * 20,
               ease: "linear",
               repeatDelay: 0
             }
@@ -68,22 +69,12 @@ export function ExchangeRatesTicker() {
               <div className="flex items-center gap-1.5 sm:gap-2">
                 <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 flex items-center justify-center shadow-sm">
                   <span className="text-xs text-white">
-                    {rate.currency === "Zimbabwe Gold" ? "ZiG" : 
-                     rate.currency === "South African Rand" ? "ZAR" :
-                     rate.currency === "British Pound" ? "GBP" :
-                     rate.currency === "Euro" ? "EUR" :
-                     rate.currency === "Botswana Pula" ? "BWP" :
-                     rate.currency === "Japanese Yen" ? "JPY" :
-                     rate.currency === "Swiss Franc" ? "CHF" :
-                     rate.currency === "Australian Dollar" ? "AUD" :
-                     rate.currency === "Chinese Yuan" ? "CNY" :
-                     rate.currency === "Indian Rupee" ? "INR" :
-                     rate.pair.split('-')[1]?.substring(0, 3) || "USD"}
+                    {rate.flag || rate.code}
                   </span>
                 </div>
                 <div>
                   <div className="text-xs text-gray-700">{rate.currency}</div>
-                  <div className="text-xs text-gray-500">{rate.pair}</div>
+                  <div className="text-xs text-gray-500">{rate.code}</div>
                 </div>
               </div>
               
@@ -92,27 +83,15 @@ export function ExchangeRatesTicker() {
               
               <div className="flex items-center gap-2 sm:gap-4 text-xs">
                 <div className="group cursor-pointer">
-                  <div className="text-xs text-gray-500 group-hover:text-blue-600 transition-colors">BUY:</div>
+                  <div className="text-xs text-gray-500 group-hover:text-blue-600 transition-colors">{baseRate}→{rate.code}:</div>
                   <div className="text-xs text-gray-700 group-hover:text-blue-700 transition-colors">
-                    {rate.we_buy.toFixed(4)}
+                    {rate.rate.toFixed(4)}
                   </div>
                 </div>
                 <div className="group cursor-pointer">
-                  <div className="text-xs text-gray-500 group-hover:text-blue-600 transition-colors">SELL:</div>
+                  <div className="text-xs text-gray-500 group-hover:text-blue-600 transition-colors">{rate.code}→{baseRate}:</div>
                   <div className="text-xs text-gray-700 group-hover:text-blue-700 transition-colors">
-                    {rate.we_sell.toFixed(4)}
-                  </div>
-                </div>
-                <div className="group cursor-pointer">
-                  <div className="text-xs text-gray-500 group-hover:text-blue-600 transition-colors">MID:</div>
-                  <div className="text-xs text-gray-700 group-hover:text-blue-700 transition-colors">
-                    {rate.mid_rate.toFixed(4)}
-                  </div>
-                </div>
-                <div className="group cursor-pointer">
-                  <div className="text-xs text-gray-500 group-hover:text-blue-600 transition-colors">PAIR:</div>
-                  <div className="text-xs text-gray-700 group-hover:text-blue-700 transition-colors">
-                    {rate.pair}
+                    {rate.inverseRate.toFixed(4)}
                   </div>
                 </div>
               </div>

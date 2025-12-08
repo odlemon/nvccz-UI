@@ -23,7 +23,8 @@ import { useAppDispatch, useAppSelector } from "@/lib/store"
 import { usersApi } from "@/lib/api/users-api"
 import { setUsers, setUsersError, setUsersLoading } from "@/lib/store/slices/usersSlice"
 import { accountingApi } from "@/lib/api/accounting-api"
-import { setCurrencies, setCurrenciesError, setCurrenciesLoading } from "@/lib/store/slices/currenciesSlice"
+import { setCurrencies, setCurrenciesError, setCurrenciesLoading } from "@/lib/store/slices/accountingSlice"
+
 
 interface EmployeeFormProps {
   isOpen: boolean
@@ -41,7 +42,7 @@ const getDefaultCurrencyId = (currencies: { id: string; isDefault: boolean }[]) 
 export function EmployeeForm({ isOpen, onClose, onSubmit, editingEmployee, loading }: EmployeeFormProps) {
   const dispatch = useAppDispatch()
   const { items: users } = useAppSelector(state => state.users)
-  const { items: currencies, loading: currenciesLoading } = useAppSelector(state => state.currencies)
+  const { currencies, currenciesLoading } = useAppSelector(state => state.accounting)
   const [isUserOpen, setIsUserOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const {
@@ -127,11 +128,14 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, editingEmployee, loadi
       try {
         dispatch(setCurrenciesLoading(true))
         dispatch(setCurrenciesError(null))
-        const res = await accountingApi.currencies.getAll()
-        const list = res.data || []
-        dispatch(setCurrencies(list))
-        if (!editingEmployee) {
-          reset(prev => ({ ...prev, currencyId: getDefaultCurrencyId(list) }))
+        const response = await accountingApi.getCurrencies()
+        if (response.success && response.data) {
+          dispatch(setCurrencies(response.data))
+          if (!editingEmployee) {
+            reset(prev => ({ ...prev, currencyId: getDefaultCurrencyId(response.data) }))
+          }
+        } else {
+          dispatch(setCurrenciesError('Failed to load currencies'))
         }
       } catch (e: any) {
         dispatch(setCurrenciesError(e?.message || 'Failed to load currencies'))

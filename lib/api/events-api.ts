@@ -320,6 +320,27 @@ export const eventsApi = {
   
   generateReport: async (eventId: string, reportType: ReportType): Promise<ApiResponse<EventReport>> => {
     return apiClient.post<ApiResponse<EventReport>>(`/events/${eventId}/reports`, { reportType })
+  },
+
+  // RSVP Management - Public endpoint, no auth required
+  respondToRSVP: async (token: string, data: {
+    rsvpStatus: 'ACCEPTED' | 'DECLINED' | 'MAYBE'
+    notes?: string
+  }): Promise<ApiResponse<{
+    id: string
+    rsvpStatus: string
+    rsvpRespondedAt: string
+  }>> => {
+    // Direct fetch without auth for public RSVP
+    const response = await fetch(`https://nvccz-pi.vercel.app/api/events/rsvp/${token}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'accept': 'application/json'
+      },
+      body: JSON.stringify(data)
+    })
+    return response.json()
   }
 }
 
