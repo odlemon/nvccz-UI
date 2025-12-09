@@ -1,6 +1,8 @@
 import { configureStore } from "@reduxjs/toolkit"
 import { type TypedUseSelectorHook, useDispatch, useSelector } from "react-redux"
 import portfolioSlice from "./slices/portfolioSlice"
+import zseStocksReducer from "./zse-stocks-slice"
+import marketOverviewReducer from "./market-overview-slice"
 import applicationsSlice from "./slices/applicationsSlice"
 import applicationSlice from "./slices/applicationSlice"
 import companiesSlice from "./slices/companiesSlice"
@@ -60,6 +62,8 @@ export const store = configureStore({
     applicationPortal: applicationPortalReducer,
     portfolioCompanies: portfolioCompaniesReducer,
     portfolioDashboard: portfolioDashboardReducer,
+    zseStocks: zseStocksReducer,
+    marketOverview: marketOverviewReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
