@@ -113,11 +113,11 @@ export function HomePageContent() {
               className="space-y-6"
             >
               <div className="flex gap-6">
-                <div className="flex-1">
+                <div className="w-[60%]">
                   <GreetWidget />
                 </div>
                 
-                <div className="w-1/3">
+                <div className="w-[40%]">
                   <ZimbabweStockAllocation />
                 </div>
               </div>

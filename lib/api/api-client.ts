@@ -26,7 +26,7 @@ class ApiClient {
   private baseURL: string
 
   constructor(baseURL?: string) {
-    this.baseURL = baseURL || 'https://nvccz-pi.vercel.app/api'
+    this.baseURL = baseURL || process.env.NEXT_PUBLIC_API_BASE_URL || 'https://nvccz-pi.vercel.app/api'
   }
 
   // Get authentication headers
