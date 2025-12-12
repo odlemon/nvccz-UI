@@ -75,7 +75,7 @@ export function ApplicationsDashboard() {
       try {
         setLoading(true)
         setError(null)
-        const res = await fetch("https://nvccz-pi.vercel.app/api/applications", {
+        const res = await fetch("http://31.220.82.129:3010/api/applications", {
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",

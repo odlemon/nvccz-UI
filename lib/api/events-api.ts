@@ -332,7 +332,7 @@ export const eventsApi = {
     rsvpRespondedAt: string
   }>> => {
     // Direct fetch without auth for public RSVP
-    const response = await fetch(`https://nvccz-pi.vercel.app/api/events/rsvp/${token}`, {
+    const response = await fetch(`http://31.220.82.129:3010/api/events/rsvp/${token}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
