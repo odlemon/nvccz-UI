@@ -148,7 +148,7 @@ export function UserApplications() {
     if (activeTab === 'below-threshold') {
       setBelowThresholdLoading(true)
       setBelowThresholdError(null)
-      fetch('http://31.220.82.129:3010/api/applications/below-threshold?page=1&limit=10', {
+      fetch('http://31.220.82.129:3009/api/applications/below-threshold?page=1&limit=10', {
         method: 'GET',
         headers: {
           'accept': 'application/json',

@@ -40,7 +40,7 @@ export function ProcessPaymentModal({ isOpen, onClose, invoice, onSuccess }: Pro
   const loadBankAccounts = async () => {
     try {
       setLoadingAccounts(true)
-      const response = await fetch('http://31.220.82.129:3010/api/accounting/chart-of-accounts', {
+      const response = await fetch('http://31.220.82.129:3009/api/accounting/chart-of-accounts', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }

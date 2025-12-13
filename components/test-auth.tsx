@@ -60,7 +60,7 @@ export function TestAuth() {
         
         <div className="text-sm text-gray-600">
           <p><strong>Token Status:</strong> {getAuthToken() ? "✅ Present" : "❌ Not found"}</p>
-          <p><strong>Endpoint:</strong> http://31.220.82.129:3010/api/kpis</p>
+          <p><strong>Endpoint:</strong> http://31.220.82.129:3009/api/kpis</p>
         </div>
       </CardContent>
     </Card>

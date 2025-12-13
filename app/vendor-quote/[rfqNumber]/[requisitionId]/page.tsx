@@ -143,7 +143,7 @@ export default function VendorQuotationSubmissionPage() {
         }))
       }
 
-      const response = await fetch('http://31.220.82.129:3010/api/vendor-quotations/submit', {
+      const response = await fetch('http://31.220.82.129:3009/api/vendor-quotations/submit', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
