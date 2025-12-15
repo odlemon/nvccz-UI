@@ -98,7 +98,7 @@ export function RequisitionDrawer({ requisition, open, onOpenChange }: Requisiti
     
     setIsSubmitting(true)
     try {
-      await dispatch(rejectRequisition({ id: requisition.id, reason: rejectionReason })).unwrap()
+      await dispatch(rejectRequisition({ id: requisition.id, rejectionReason: rejectionReason })).unwrap()
       setShowRejectDialog(false)
       onOpenChange(false)
     } catch (error) {

@@ -8,7 +8,16 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Public routes that don't require authentication
-  const publicRoutes = ['/login', '/register', '/forgot-password', '/reset-password', '/verify-email', '/applications/form']
+  const publicRoutes = [
+    '/login', 
+    '/register', 
+    '/forgot-password', 
+    '/reset-password', 
+    '/verify-email', 
+    '/applications/form',
+    '/vendor/quotation/submit',
+    '/events/rsvp'
+  ]
   const isPublicRoute = publicRoutes.some(route => pathname.startsWith(route))
 
   // If accessing public route and authenticated, redirect to appropriate dashboard

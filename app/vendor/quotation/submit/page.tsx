@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -28,7 +28,8 @@ interface QuotationItem {
 export default function VendorQuotationSubmissionPage() {
   const params = useParams()
   const router = useRouter()
-  const rfqNumber = params.rfqNumber as string
+  const searchParams = useSearchParams()
+  const rfqNumber = searchParams.get('rfqNumber') || (params.rfqNumber as string)
   const requisitionId = params.requisitionId as string
 
   const [submitted, setSubmitted] = useState(false)
@@ -63,6 +64,21 @@ export default function VendorQuotationSubmissionPage() {
       warranty: ''
     }
   ])
+
+  // Prefill form from query parameters
+  useEffect(() => {
+    const emailParam = searchParams.get('vendorEmail')
+    const nameParam = searchParams.get('vendorName')
+    
+    if (emailParam) {
+      setVendorEmail(decodeURIComponent(emailParam))
+    }
+    if (nameParam) {
+      setVendorName(decodeURIComponent(nameParam))
+      // Also set as company name if not already set
+      setCompanyName(decodeURIComponent(nameParam))
+    }
+  }, [searchParams])
 
   const addItem = () => {
     setItems([...items, {

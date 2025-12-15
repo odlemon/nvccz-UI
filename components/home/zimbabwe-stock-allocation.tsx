@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { fetchAllCommodities, Commodity } from "@/lib/api/commodities-api"
-import { TrendingUp, TrendingDown, X } from "lucide-react"
+import { TrendingUp, TrendingDown } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -43,11 +43,11 @@ export function ZimbabweStockAllocation() {
 
   if (loading) {
     return (
-      <div className="bg-white">
-        <h2 className="text-sm sm:text-base text-gray-900 mb-3">Commodities</h2>
-        <div className="space-y-2">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <Skeleton key={i} className="h-12 w-full rounded" />
+      <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl p-4 shadow-lg h-[400px] flex flex-col">
+        <h2 className="text-base text-white mb-3 drop-shadow-sm font-medium">Commodities</h2>
+        <div className="space-y-2 flex-1 overflow-hidden">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-12 w-full rounded bg-white/20" />
           ))}
         </div>
       </div>
@@ -56,13 +56,13 @@ export function ZimbabweStockAllocation() {
 
   if (error) {
     return (
-      <div className="bg-white">
-        <h2 className="text-sm sm:text-base text-gray-900 mb-3">Commodities</h2>
-        <div className="text-center py-4 sm:py-6 text-red-600">
+      <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl p-4 shadow-lg h-[400px] flex flex-col">
+        <h2 className="text-base text-white mb-3 drop-shadow-sm font-medium">Commodities</h2>
+        <div className="text-center py-4 sm:py-6 text-white flex-1 flex flex-col items-center justify-center">
           <p className="text-xs sm:text-sm">{error}</p>
           <button
             onClick={loadCommodities}
-            className="mt-2 text-xs text-blue-600 hover:underline"
+            className="mt-2 text-xs text-white/90 hover:text-white hover:underline"
           >
             Try again
           </button>
@@ -73,11 +73,11 @@ export function ZimbabweStockAllocation() {
 
   return (
     <>
-      <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl p-4 shadow-lg">
+      <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl p-4 shadow-lg h-[400px] flex flex-col">
         <h2 className="text-base text-white mb-3 drop-shadow-sm font-medium">Commodities</h2>
-        <div className="overflow-hidden">
+        <div className="overflow-y-auto flex-1 scrollbar-thin scrollbar-thumb-white/30 scrollbar-track-transparent">
           <table className="w-full text-sm">
-            <thead>
+            <thead className="sticky top-0 bg-gradient-to-r from-blue-500 to-blue-600 z-10">
               <tr className="border-b border-white/20">
                 <th className="px-2 py-2 text-left text-white/90 font-normal">Name</th>
                 <th className="px-2 py-2 text-right text-white/90 font-normal">Price</th>
@@ -85,7 +85,7 @@ export function ZimbabweStockAllocation() {
               </tr>
             </thead>
             <tbody>
-              {commodities.map((commodity, idx) => {
+              {commodities.slice(0, 6).map((commodity) => {
                 const isPositive = commodity.change > 0
                 const isNegative = commodity.change < 0
                 const changeColor = isPositive

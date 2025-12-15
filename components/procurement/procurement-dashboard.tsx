@@ -52,7 +52,7 @@ export function ProcurementDashboard() {
     return dashboard.requisitions.byStatus.map((item: any) => ({
       status: item.status.replace(/_/g, ' '),
       count: item.count,
-      amount: parseFloat(item.totalAmount) || 0
+      items: item.totalItems || 0
     }))
   }, [dashboard])
 
@@ -129,21 +129,21 @@ export function ProcurementDashboard() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-4xl font-bold">{requisitionsSummary.total}</div>
+            <div className="text-4xl font-bold">{requisitionsSummary.total - requisitionsSummary.pending - (requisitionsSummary.draft || 0) - requisitionsSummary.rejected}</div>
             <p className="text-xs text-white/80 mt-1">
-              {requisitionsSummary.pending} pending approval
+              {requisitionsSummary.pending} pending • {requisitionsSummary.draft || 0} draft • {requisitionsSummary.rejected} rejected
             </p>
             <div className="relative mt-3 h-2 rounded-full bg-white/30 overflow-hidden">
               <div
                 className="absolute left-0 top-0 h-full rounded-full bg-white"
                 style={{ 
-                  width: `${requisitionsSummary.total > 0 ? (requisitionsSummary.approved / requisitionsSummary.total) * 100 : 0}%` 
+                  width: `${(requisitionsSummary.total - requisitionsSummary.pending - (requisitionsSummary.draft || 0) - requisitionsSummary.rejected) > 0 ? (requisitionsSummary.approved / (requisitionsSummary.total - requisitionsSummary.pending - (requisitionsSummary.draft || 0) - requisitionsSummary.rejected)) * 100 : 0}%` 
                 }}
               />
             </div>
             <div className="flex items-center justify-between mt-2 text-xs text-white/80">
               <span>{requisitionsSummary.approved} approved</span>
-              <span>{requisitionsSummary.rejected} rejected</span>
+              <span>{requisitionsSummary.total} total</span>
             </div>
           </CardContent>
         </Card>
@@ -312,13 +312,13 @@ export function ProcurementDashboard() {
                 <Tooltip 
                   contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
                   formatter={(value: any, name: string) => {
-                    if (name === 'count') return [value, 'Count']
-                    return [`$${value.toLocaleString()}`, 'Amount']
+                    if (name === 'count') return [value, 'Requisitions']
+                    return [value, 'Total Items']
                   }}
                 />
                 <Legend />
-                <Bar dataKey="count" fill="#3b82f6" name="Count" radius={[8, 8, 0, 0]} />
-                <Bar dataKey="amount" fill="#8b5cf6" name="Amount" radius={[8, 8, 0, 0]} />
+                <Bar dataKey="count" fill="#3b82f6" name="Requisitions" radius={[8, 8, 0, 0]} />
+                <Bar dataKey="items" fill="#8b5cf6" name="Total Items" radius={[8, 8, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -465,7 +465,7 @@ export function ProcurementDashboard() {
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-sm truncate">{req.title}</p>
                     <p className="text-xs text-muted-foreground">
-                      {req.requisitionNumber} • ${parseFloat(req.totalAmount).toLocaleString()}
+                      {req.requisitionNumber} • {req.items?.length || 0} items
                     </p>
                     <div className="flex items-center gap-2 mt-1">
                       <Badge variant="outline" className="text-xs">

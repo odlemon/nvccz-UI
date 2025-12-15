@@ -514,8 +514,8 @@ class ProcurementApiServiceV2 {
    * Reject a requisition
    * Required Role: Department HEAD, DEPUTY, or PROC_MGR
    */
-  async rejectRequisition(id: string, reason: string): Promise<ProcurementResponse<PurchaseRequisition>> {
-    return apiClient.post<ProcurementResponse<PurchaseRequisition>>(`/procurement/requisitions/${id}/reject`, { reason })
+  async rejectRequisition(id: string, rejectionReason: string): Promise<ProcurementResponse<PurchaseRequisition>> {
+    return apiClient.post<ProcurementResponse<PurchaseRequisition>>(`/procurement/requisitions/${id}/reject`, { rejectionReason })
   }
 
   // ============================================================================

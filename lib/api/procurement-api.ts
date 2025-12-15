@@ -302,8 +302,8 @@ class ProcurementApiService {
     return apiClient.put<ProcurementResponse<PurchaseRequisition>>(`/procurement/requisitions/${id}/approve`)
   }
 
-  async rejectRequisition(id: string, reason: string): Promise<ProcurementResponse<PurchaseRequisition>> {
-    return apiClient.put<ProcurementResponse<PurchaseRequisition>>(`/procurement/requisitions/${id}/reject`, { reason })
+  async rejectRequisition(id: string, rejectionReason: string): Promise<ProcurementResponse<PurchaseRequisition>> {
+    return apiClient.put<ProcurementResponse<PurchaseRequisition>>(`/procurement/requisitions/${id}/reject`, { rejectionReason })
   }
 
   async deleteRequisition(id: string): Promise<ProcurementResponse<any>> {
