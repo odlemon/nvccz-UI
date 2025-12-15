@@ -8,7 +8,7 @@ import { ModuleGuard } from "@/components/permissions/PermissionGuards"
 
 const performanceData = [
   {
-    fund: "Arcus Growth Fund I",
+    fund: "Kyntaro Growth Fund I",
     irr: "18.5%",
     multiple: "1.4x",
     deployed: "$32M",
@@ -17,7 +17,7 @@ const performanceData = [
     companies: 12,
   },
   {
-    fund: "Arcus Seed Fund",
+    fund: "Kyntaro Seed Fund",
     irr: "22.3%",
     multiple: "1.6x",
     deployed: "$15M",
@@ -26,7 +26,7 @@ const performanceData = [
     companies: 8,
   },
   {
-    fund: "Arcus Tech Fund",
+    fund: "Kyntaro Tech Fund",
     irr: "15.2%",
     multiple: "1.2x",
     deployed: "$68M",

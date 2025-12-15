@@ -43,7 +43,7 @@ export function ZimbabweStockAllocation() {
 
   if (loading) {
     return (
-      <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl p-4 shadow-lg h-[400px] flex flex-col">
+      <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl p-4 shadow-lg h-[320px] flex flex-col">
         <h2 className="text-base text-white mb-3 drop-shadow-sm font-medium">Commodities</h2>
         <div className="space-y-2 flex-1 overflow-hidden">
           {Array.from({ length: 6 }).map((_, i) => (
@@ -56,7 +56,7 @@ export function ZimbabweStockAllocation() {
 
   if (error) {
     return (
-      <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl p-4 shadow-lg h-[400px] flex flex-col">
+      <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl p-4 shadow-lg h-[320px] flex flex-col">
         <h2 className="text-base text-white mb-3 drop-shadow-sm font-medium">Commodities</h2>
         <div className="text-center py-4 sm:py-6 text-white flex-1 flex flex-col items-center justify-center">
           <p className="text-xs sm:text-sm">{error}</p>
@@ -73,7 +73,7 @@ export function ZimbabweStockAllocation() {
 
   return (
     <>
-      <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl p-4 shadow-lg h-[400px] flex flex-col">
+      <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-2xl p-4 shadow-lg h-[320px] flex flex-col">
         <h2 className="text-base text-white mb-3 drop-shadow-sm font-medium">Commodities</h2>
         <div className="overflow-y-auto flex-1 scrollbar-thin scrollbar-thumb-white/30 scrollbar-track-transparent">
           <table className="w-full text-sm">

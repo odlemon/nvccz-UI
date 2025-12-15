@@ -106,7 +106,7 @@ export default function ResetPasswordPage() {
               <div className="inline-flex items-center justify-center mb-4">
                 <Image
                   src="/logo.png"
-                  alt="Arcus Logo"
+                  alt="Kyntaro Logo"
                   width={200}
                   height={200}
                   className="object-contain"

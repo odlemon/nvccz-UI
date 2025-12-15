@@ -103,13 +103,13 @@ function LoginForm() {
               <div className="inline-flex items-center justify-center mb-4">
                 <Image
                   src="/logo.png"
-                  alt="Arcus Logo"
+                  alt="Kyntaro Logo"
                   width={200}
                   height={200}
                   className=" object-contain"
                 />
               </div>
-              <h1 className="text-4xl text-gray-900 mb-2">Welcome to Arcus</h1>
+              <h1 className="text-4xl text-gray-900 mb-2">Welcome to Kyntaro</h1>
               <p className="text-gray-600 text-lg">
                 Financial intelligence and portfolio management powered by AI
               </p>
@@ -272,7 +272,7 @@ function LoginForm() {
               </motion.div>
 
               {/* Sign Up Link */}
-              <motion.div
+              {/* <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.6 }}
@@ -287,7 +287,7 @@ function LoginForm() {
                 >
                   Sign up
                 </Link>
-              </motion.div>
+              </motion.div> */}
             </form>
 
             {/* Social Proof */}

@@ -17,7 +17,7 @@ const montserrat = Montserrat({
 })
 
 export const metadata: Metadata = {
-  title: "Arcus - Investment ERP",
+  title: "Kyntaro - Investment ERP",
   description: "Professional Investment Management Platform",
   generator: "v0.app",
 }

@@ -75,7 +75,7 @@ export function ZimbabweStockExchange() {
     <div className="bg-white">
       <h2 className="text-lg text-gray-900 mb-4">Market Overview</h2>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {stocks.map((stock, index) => {
+        {stocks.slice(0, 6).map((stock, index) => {
           const Icon = getChangeIcon(stock.day_change);
 
           return (
@@ -84,21 +84,21 @@ export function ZimbabweStockExchange() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.1 }}
-              className={`group bg-gradient-to-r ${getGradientColor(stock.day_change)} hover:opacity-90 rounded-2xl p-3 transition-all duration-300 cursor-pointer shadow-lg hover:shadow-xl`}
+              className={`group bg-gradient-to-r ${getGradientColor(stock.day_change)} hover:opacity-90 rounded-2xl p-3 transition-all duration-300 cursor-pointer shadow-lg hover:shadow-xl h-[120px]`}
               onClick={() => setSelectedStock(stock)}
             >
-              <div className="flex flex-col h-full">
+              <div className="flex flex-col h-full justify-between">
                 {/* Header with Change */}
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
                       <Icon className="w-4 h-4 text-white" />
                     </div>
                     <div>
-                      <h3 className="text-lg text-white drop-shadow-sm font-bold">
+                      <h3 className="text-base text-white drop-shadow-sm font-bold truncate">
                         {stock.ticker}
                       </h3>
-                      <p className="text-xs text-white/80 drop-shadow-sm">
+                      <p className="text-xs text-white/80 drop-shadow-sm truncate max-w-[120px]">
                         {stock.name}
                       </p>
                     </div>
@@ -112,7 +112,7 @@ export function ZimbabweStockExchange() {
                 </div>
 
                 {/* Price */}
-                <div className="mb-2">
+                <div>
                   <div className="text-2xl font-bold text-white drop-shadow-sm">
                     {formatPrice(stock.price)}
                   </div>
