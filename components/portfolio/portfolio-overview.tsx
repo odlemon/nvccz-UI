@@ -438,11 +438,53 @@ export function PortfolioOverview() {
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span>Diversification Score</span>
-                <span className="font-medium">{sectorDistribution.length > 3 ? '85%' : '60%'}</span>
+                <span className="font-medium">
+                  {companies.length === 0 
+                    ? '0%' 
+                    : sectorDistribution.length === 0 
+                    ? '0%'
+                    : sectorDistribution.length === 1 
+                    ? '20%'
+                    : sectorDistribution.length === 2
+                    ? '40%'
+                    : sectorDistribution.length === 3
+                    ? '65%'
+                    : sectorDistribution.length >= 4
+                    ? '85%'
+                    : '0%'
+                  }
+                </span>
               </div>
-              <Progress value={sectorDistribution.length > 3 ? 85 : 60} className="h-2" />
+              <Progress 
+                value={companies.length === 0 
+                  ? 0 
+                  : sectorDistribution.length === 0 
+                  ? 0
+                  : sectorDistribution.length === 1 
+                  ? 20
+                  : sectorDistribution.length === 2
+                  ? 40
+                  : sectorDistribution.length === 3
+                  ? 65
+                  : sectorDistribution.length >= 4
+                  ? 85
+                  : 0
+                } 
+                className="h-2" 
+              />
               <p className="text-xs text-muted-foreground">
-                {sectorDistribution.length > 3 ? 'Well diversified across sectors' : 'Consider diversifying further'}
+                {companies.length === 0 
+                  ? 'No companies in portfolio'
+                  : sectorDistribution.length === 0
+                  ? 'No sector data available'
+                  : sectorDistribution.length === 1
+                  ? 'Single sector - high concentration risk'
+                  : sectorDistribution.length === 2
+                  ? 'Limited diversification - consider expanding'
+                  : sectorDistribution.length === 3
+                  ? 'Moderate diversification'
+                  : 'Well diversified across sectors'
+                }
               </p>
             </div>
 
@@ -463,7 +505,12 @@ export function PortfolioOverview() {
                 } 
                 className="h-2" 
               />
-              <p className="text-xs text-muted-foreground">Capital deployment efficiency</p>
+              <p className="text-xs text-muted-foreground">
+                {metrics.totalInvested === 0 && metrics.totalRequested === 0
+                  ? 'No deployment activity yet'
+                  : 'Capital deployment efficiency'
+                }
+              </p>
             </div>
 
             <div className="space-y-2">
@@ -477,7 +524,12 @@ export function PortfolioOverview() {
                 value={companies.length > 0 ? (metrics.activeCompanies / companies.length) * 100 : 0} 
                 className="h-2" 
               />
-              <p className="text-xs text-muted-foreground">Active company ratio</p>
+              <p className="text-xs text-muted-foreground">
+                {companies.length === 0 
+                  ? 'No companies in portfolio'
+                  : 'Active company ratio'
+                }
+              </p>
             </div>
           </div>
         </CardContent>
