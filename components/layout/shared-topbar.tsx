@@ -134,7 +134,7 @@ export function SharedTopbar({ onModuleSelect, currentModule }: SharedTopbarProp
           )}
 
           {/* Notifications */}
-          <Tooltip>
+          {/* <Tooltip>
             <TooltipTrigger asChild>
               <div className="p-3 relative cursor-pointer h-12 w-12 flex items-center justify-center rounded-md hover:bg-accent hover:text-accent-foreground transition-colors">
                 <CiBellOn size={30} />
@@ -146,10 +146,10 @@ export function SharedTopbar({ onModuleSelect, currentModule }: SharedTopbarProp
             <TooltipContent>
               <p>Notifications (3 unread)</p>
             </TooltipContent>
-          </Tooltip>
+          </Tooltip> */}
 
           {/* Calendar */}
-          <Tooltip>
+          {/* <Tooltip>
             <TooltipTrigger asChild>
               <div className="p-3 cursor-pointer h-12 w-12 flex items-center justify-center rounded-md hover:bg-accent hover:text-accent-foreground transition-colors">
                 <CiCalendar size={30} />
@@ -158,7 +158,7 @@ export function SharedTopbar({ onModuleSelect, currentModule }: SharedTopbarProp
             <TooltipContent>
               <p>Calendar</p>
             </TooltipContent>
-          </Tooltip>
+          </Tooltip> */}
 
           {/* Profile Dropdown */}
           <DropdownMenu>
