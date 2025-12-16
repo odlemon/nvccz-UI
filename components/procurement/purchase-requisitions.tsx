@@ -247,13 +247,13 @@ export function PurchaseRequisitions() {
       )
     },
     {
-      key: 'totalAmount',
-      label: 'Total Amount',
-      sortable: true,
+      key: 'items',
+      label: 'Total Items',
+      sortable: false,
       render: (value) => (
         <div className="flex items-center gap-1">
-          <CiDollar className="w-4 h-4 text-green-600" />
-          <span className="font-medium">${parseFloat(value || '0').toLocaleString()}</span>
+          <CiFileOn className="w-4 h-4 text-green-600" />
+          <span className="font-medium">{value?.length || 0} items</span>
         </div>
       )
     },
@@ -510,6 +510,7 @@ export function PurchaseRequisitions() {
           <RequisitionTimeline
             requisitionId={viewingRequisition.id}
             onCreateRFQ={handleCreateRFQ}
+            onSuccess={loadRequisitions}
           />
         )}
       </ProcurementDrawer>

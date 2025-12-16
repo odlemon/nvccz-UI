@@ -110,7 +110,7 @@ export default function AccountSettingsPage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="company">Company</Label>
-                  <Input id="company" defaultValue="Arcus Investment" />
+                  <Input id="company" defaultValue="Kyntaro Investment" />
                 </div>
               </div>
 

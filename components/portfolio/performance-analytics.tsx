@@ -137,7 +137,7 @@ export function PerformanceAnalytics() {
                   <p className="text-xs text-gray-600">YTD Return</p>
                 </div>
                 <div className="p-4 rounded-lg bg-blue-500/20 border border-blue-300">
-                  <h4 className="font-medium text-sm text-blue-800">Arcus Portfolio</h4>
+                  <h4 className="font-medium text-sm text-blue-800">Kyntaro Portfolio</h4>
                   <div className="text-2xl font-bold mt-1 text-blue-900">+24.8%</div>
                   <p className="text-xs text-blue-700">YTD Return</p>
                 </div>

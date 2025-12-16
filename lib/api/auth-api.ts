@@ -99,6 +99,31 @@ export const authApiService = {
     const response = await apiClient.post('/auth/verify', { token })
     return response
   },
+
+  async forgotPassword(email: string): Promise<{ success: boolean; message: string }> {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://31.220.82.129:3010/api'}/auth/forgot-password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email }),
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.message || 'Failed to send reset email')
+    }
+
+    return response.json()
+  },
+
+  async resetPassword(token: string, newPassword: string): Promise<{ success: boolean; message: string }> {
+    const response = await apiClient.post('/auth/reset-password', {
+      token,
+      newPassword,
+    })
+    return response
+  },
 }
 
 export default authApiService

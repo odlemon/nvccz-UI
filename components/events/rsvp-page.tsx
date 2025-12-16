@@ -58,8 +58,8 @@ export function RSVPPage({ token, initialStatus }: RSVPPageProps) {
         throw new Error(response.message || 'Failed to submit RSVP')
       }
     } catch (err: any) {
-      toast.error('Failed to submit RSVP', { 
-        description: err.message || 'Please try again or contact the event organizer' 
+      toast.error('Failed to submit RSVP', {
+        description: err.message || 'Please try again or contact the event organizer'
       })
     } finally {
       setSubmitting(false)
@@ -110,7 +110,7 @@ export function RSVPPage({ token, initialStatus }: RSVPPageProps) {
 
   if (success && responseData) {
     const statusInfo = getStatusMessage(responseData.rsvpStatus)
-    
+
     return (
       <div className={`min-h-screen bg-gradient-to-br ${statusInfo.bgClass} flex items-center justify-center p-4`}>
         <motion.div
@@ -146,11 +146,10 @@ export function RSVPPage({ token, initialStatus }: RSVPPageProps) {
               <div className="bg-gray-50 rounded-xl p-6 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-600">Status:</span>
-                  <span className={`font-semibold ${
-                    responseData.rsvpStatus === 'ACCEPTED' ? 'text-green-700' :
-                    responseData.rsvpStatus === 'DECLINED' ? 'text-red-700' :
-                    'text-yellow-700'
-                  }`}>
+                  <span className={`font-semibold ${responseData.rsvpStatus === 'ACCEPTED' ? 'text-green-700' :
+                      responseData.rsvpStatus === 'DECLINED' ? 'text-red-700' :
+                        'text-yellow-700'
+                    }`}>
                     {responseData.rsvpStatus}
                   </span>
                 </div>
@@ -182,7 +181,7 @@ export function RSVPPage({ token, initialStatus }: RSVPPageProps) {
               )}
 
               <Button
-                onClick={() => window.location.href = 'http://app.kyntaro.com'}
+                onClick={() => window.location.href = 'http://kyntaro.com'}
                 className="w-full h-12 text-base font-semibold bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 rounded-full"
               >
                 Go to Home
@@ -230,11 +229,10 @@ export function RSVPPage({ token, initialStatus }: RSVPPageProps) {
                   <Button
                     type="button"
                     variant={selectedStatus === 'ACCEPTED' ? 'default' : 'outline'}
-                    className={`h-auto py-4 flex items-center justify-center gap-3 rounded-xl transition-all ${
-                      selectedStatus === 'ACCEPTED'
+                    className={`h-auto py-4 flex items-center justify-center gap-3 rounded-xl transition-all ${selectedStatus === 'ACCEPTED'
                         ? 'bg-green-600 hover:bg-green-700 text-white border-green-600'
                         : 'border-2 hover:border-green-500 hover:bg-green-50'
-                    }`}
+                      }`}
                     onClick={() => setSelectedStatus('ACCEPTED')}
                   >
                     <CheckCircle className="w-5 h-5" />
@@ -247,11 +245,10 @@ export function RSVPPage({ token, initialStatus }: RSVPPageProps) {
                   <Button
                     type="button"
                     variant={selectedStatus === 'MAYBE' ? 'default' : 'outline'}
-                    className={`h-auto py-4 flex items-center justify-center gap-3 rounded-xl transition-all ${
-                      selectedStatus === 'MAYBE'
+                    className={`h-auto py-4 flex items-center justify-center gap-3 rounded-xl transition-all ${selectedStatus === 'MAYBE'
                         ? 'bg-yellow-600 hover:bg-yellow-700 text-white border-yellow-600'
                         : 'border-2 hover:border-yellow-500 hover:bg-yellow-50'
-                    }`}
+                      }`}
                     onClick={() => setSelectedStatus('MAYBE')}
                   >
                     <HelpCircle className="w-5 h-5" />
@@ -264,11 +261,10 @@ export function RSVPPage({ token, initialStatus }: RSVPPageProps) {
                   <Button
                     type="button"
                     variant={selectedStatus === 'DECLINED' ? 'default' : 'outline'}
-                    className={`h-auto py-4 flex items-center justify-center gap-3 rounded-xl transition-all ${
-                      selectedStatus === 'DECLINED'
+                    className={`h-auto py-4 flex items-center justify-center gap-3 rounded-xl transition-all ${selectedStatus === 'DECLINED'
                         ? 'bg-red-600 hover:bg-red-700 text-white border-red-600'
                         : 'border-2 hover:border-red-500 hover:bg-red-50'
-                    }`}
+                      }`}
                     onClick={() => setSelectedStatus('DECLINED')}
                   >
                     <XCircle className="w-5 h-5" />
@@ -292,8 +288,8 @@ export function RSVPPage({ token, initialStatus }: RSVPPageProps) {
                     <p className="font-semibold text-gray-900">
                       You're responding: <span className={
                         selectedStatus === 'ACCEPTED' ? 'text-green-600' :
-                        selectedStatus === 'DECLINED' ? 'text-red-600' :
-                        'text-yellow-600'
+                          selectedStatus === 'DECLINED' ? 'text-red-600' :
+                            'text-yellow-600'
                       }>{selectedStatus}</span>
                     </p>
                     <p className="text-sm text-gray-600">Add an optional message below</p>

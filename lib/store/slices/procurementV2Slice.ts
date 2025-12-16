@@ -191,8 +191,8 @@ export const approveRequisition = createAsyncThunk('procurementV2/approveRequisi
 
 export const rejectRequisition = createAsyncThunk(
   'procurementV2/rejectRequisition',
-  async ({ id, reason }: { id: string; reason: string }) => {
-    const response = await procurementApiV2.rejectRequisition(id, reason)
+  async ({ id, rejectionReason }: { id: string; rejectionReason: string }) => {
+    const response = await procurementApiV2.rejectRequisition(id, rejectionReason)
     return response.data
   }
 )

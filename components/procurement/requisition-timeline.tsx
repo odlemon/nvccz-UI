@@ -48,6 +48,7 @@ import { toast } from "sonner"
 interface RequisitionTimelineProps {
   requisitionId: string
   onCreateRFQ?: (requisitionId: string) => void
+  onSuccess?: () => void
 }
 
 const stages = [
@@ -95,7 +96,8 @@ const stages = [
 
 export function RequisitionTimeline({
   requisitionId,
-  onCreateRFQ
+  onCreateRFQ,
+  onSuccess
 }: RequisitionTimelineProps) {
   const [requisition, setRequisition] = useState<PurchaseRequisition | null>(null)
   const [loading, setLoading] = useState(true)
@@ -158,6 +160,7 @@ export function RequisitionTimeline({
         setRequisition(response.data)
         toast.success('Requisition submitted for approval successfully')
         setShowSubmitDialog(false) // Only close on success
+        onSuccess?.() // Notify parent to refresh data
       } else {
         toast.error('Failed to submit requisition for approval')
         // Don't close dialog on error - user can see the error and try again
@@ -180,6 +183,7 @@ export function RequisitionTimeline({
         setRequisition(response.data)
         toast.success('Requisition approved successfully')
         setShowApproveDialog(false) // Only close on success
+        onSuccess?.() // Notify parent to refresh data
       } else {
         toast.error('Failed to approve requisition')
         // Don't close dialog on error - user can see the error and try again
@@ -207,6 +211,7 @@ export function RequisitionTimeline({
         toast.success('Requisition rejected')
         setShowRejectForm(false)
         setRejectionReason("")
+        onSuccess?.() // Notify parent to refresh data
       } else {
         toast.error('Failed to reject requisition')
       }
@@ -454,20 +459,20 @@ export function RequisitionTimeline({
           </CardContent>
         </Card>
 
-        {/* Financial Information */}
+        {/* Items Summary */}
         <Card className="border-l-4 border-l-purple-500">
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-normal flex items-center gap-2">
-              <CiDollar className="w-5 h-5 text-purple-500" />
-              Financial Information
+              <FileText className="w-5 h-5 text-purple-500" />
+              Items Summary
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-between">
               <div>
-                <label className="text-sm text-gray-500">Total Amount</label>
+                <label className="text-sm text-gray-500">Total Items</label>
                 <p className="text-xl font-normal text-purple-600">
-                  {requisition.currency?.symbol || '$'}{Number(requisition.totalAmount).toLocaleString()}
+                  {requisition.items?.length || 0} items
                 </p>
               </div>
               <div>
@@ -490,7 +495,7 @@ export function RequisitionTimeline({
             <div className="space-y-3">
               {requisition.items?.map((item, index) => (
                 <div key={item.id || index} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
                       <label className="text-xs text-gray-500">Item Name</label>
                       <p className="text-sm font-medium">{item.itemName}</p>
@@ -499,16 +504,8 @@ export function RequisitionTimeline({
                       <label className="text-xs text-gray-500">Quantity</label>
                       <p className="text-sm">{item.quantity} {item.unit}</p>
                     </div>
-                    <div>
-                      <label className="text-xs text-gray-500">Unit Price</label>
-                      <p className="text-sm">{requisition.currency?.symbol || '$'}{Number(item.unitPrice).toLocaleString()}</p>
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-500">Total</label>
-                      <p className="text-sm font-medium">{requisition.currency?.symbol || '$'}{Number(item.totalPrice || 0).toLocaleString()}</p>
-                    </div>
                     {item.description && (
-                      <div className="md:col-span-4">
+                      <div className="md:col-span-2">
                         <label className="text-xs text-gray-500">Description</label>
                         <p className="text-sm">{item.description}</p>
                       </div>

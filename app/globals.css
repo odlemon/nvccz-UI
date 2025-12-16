@@ -127,7 +127,7 @@
   }
 }
 
-/* Added custom utility classes for Arcus design system */
+/* Added custom utility classes for Kyntaro design system */
 @layer utilities {
   .glass-effect {
     @apply backdrop-blur-sm bg-white/80 border border-white/20;
