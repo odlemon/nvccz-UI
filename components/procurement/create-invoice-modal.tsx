@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -207,6 +207,9 @@ export function CreateInvoiceModal({ isOpen, onClose, onSuccess }: CreateInvoice
             <Plus className="w-6 h-6" />
             Create Invoice
           </DialogTitle>
+          <DialogDescription>
+            Upload and process vendor invoices with OCR or enter details manually
+          </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">

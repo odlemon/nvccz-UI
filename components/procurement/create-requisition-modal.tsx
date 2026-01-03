@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -204,9 +204,9 @@ export function CreateRequisitionModal({ isOpen, onClose, onSuccess, editMode = 
             <FileText className="w-5 h-5" />
             {editMode ? 'Edit Purchase Requisition' : 'Create Purchase Requisition'}
           </DialogTitle>
-          <p className="text-gray-600">
+          <DialogDescription>
             {editMode ? 'Update the purchase requisition details' : 'Create a new purchase requisition for approval'}
-          </p>
+          </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }} className="space-y-6">

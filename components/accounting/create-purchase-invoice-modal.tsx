@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useDispatch } from "react-redux"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -15,51 +14,50 @@ import { FileText, Loader2, CalendarIcon, Plus, Trash2 } from "lucide-react"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
-import { AccountingCurrency, InvoiceCustomer, CreateInvoiceRequest, Invoice, InvoiceItem, accountingApi } from "@/lib/api/accounting-api"
-import type { AppDispatch } from "@/lib/store"
+import { AccountingCurrency, Vendor, CreatePurchaseInvoiceRequest, PurchaseInvoice, PurchaseInvoiceItem, accountingApi } from "@/lib/api/accounting-api"
 
-interface CreateInvoiceModalProps {
+interface CreatePurchaseInvoiceModalProps {
   isOpen: boolean
   onClose: () => void
   onSuccess: () => void
   currencies: AccountingCurrency[]
-  customers: InvoiceCustomer[]
-  invoice?: Invoice | null // For editing
+  vendors: Vendor[]
+  invoice?: PurchaseInvoice | null
 }
 
-export function CreateInvoiceModal({ 
+export function CreatePurchaseInvoiceModal({ 
   isOpen, 
   onClose, 
   onSuccess, 
   currencies,
-  customers,
+  vendors,
   invoice 
-}: CreateInvoiceModalProps) {
-  const dispatch = useDispatch<AppDispatch>()
+}: CreatePurchaseInvoiceModalProps) {
   const isEditing = !!invoice
   
-  const [formData, setFormData] = useState<CreateInvoiceRequest>({
-    customerId: "",
-    amount: 0,
-    currencyId: "",
-    transactionDate: new Date().toISOString().split('T')[0],
-    description: "",
+  const [formData, setFormData] = useState<CreatePurchaseInvoiceRequest>({
+    vendorId: "",
     invoiceDate: new Date().toISOString().split('T')[0],
-    invoiceNumber: "",
-    isTaxable: true,
-    exchangeRateAtCreation: 1,
+    dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    currencyId: "",
+    description: "",
     items: [
       {
+        itemName: "",
         description: "",
-        amount: 0,
-        category: ""
+        quantity: 1,
+        unitPrice: 0,
+        unit: "pcs",
+        vatRate: 15
       }
-    ]
+    ],
+    isTaxable: true,
+    invoiceNumber: "",
+    notes: ""
   })
   const [isLoading, setIsLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
 
-  // Get default currency
   useEffect(() => {
     const defaultCurrency = currencies.find(c => c.isDefault) || currencies[0]
     if (defaultCurrency && !formData.currencyId) {
@@ -70,32 +68,28 @@ export function CreateInvoiceModal({
   useEffect(() => {
     if (isOpen) {
       if (isEditing && invoice) {
-        // Populate form with invoice data for editing
         setFormData({
-          customerId: invoice.customerId,
-          amount: parseFloat(invoice.amount),
+          vendorId: invoice.vendorId,
+          invoiceDate: invoice.invoiceDate.split('T')[0],
+          dueDate: invoice.dueDate.split('T')[0],
           currencyId: invoice.currencyId,
-          transactionDate: invoice.transactionDate.split('T')[0],
           description: invoice.description,
-          invoiceDate: invoice.transactionDate.split('T')[0],
-          invoiceNumber: invoice.invoiceNumber,
+          items: invoice.items.length > 0 ? invoice.items : [{ itemName: "", description: "", quantity: 1, unitPrice: 0, unit: "pcs", vatRate: 15 }],
           isTaxable: invoice.isTaxable,
-          exchangeRateAtCreation: parseFloat(invoice.exchangeRateAtCreation || "1"),
-          items: invoice.items.length > 0 ? invoice.items : [{ description: "", amount: 0, category: "" }]
+          invoiceNumber: invoice.invoiceNumber,
+          notes: invoice.notes
         })
       } else {
-        // Reset form for creating new invoice
         setFormData({
-          customerId: "",
-          amount: 0,
-          currencyId: currencies.find(c => c.isDefault)?.id || currencies[0]?.id || "",
-          transactionDate: new Date().toISOString().split('T')[0],
-          description: "",
+          vendorId: "",
           invoiceDate: new Date().toISOString().split('T')[0],
-          invoiceNumber: "",
+          dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          currencyId: currencies.find(c => c.isDefault)?.id || currencies[0]?.id || "",
+          description: "",
+          items: [{ itemName: "", description: "", quantity: 1, unitPrice: 0, unit: "pcs", vatRate: 15 }],
           isTaxable: true,
-          exchangeRateAtCreation: 1,
-          items: [{ description: "", amount: 0, category: "" }]
+          invoiceNumber: "",
+          notes: ""
         })
       }
       setErrors({})
@@ -105,28 +99,20 @@ export function CreateInvoiceModal({
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
 
-    if (!formData.customerId) {
-      newErrors.customerId = "Please select a customer"
-    }
-    
-    if (!formData.currencyId) {
-      newErrors.currencyId = "Please select a currency"
-    }
-    
-    if (!formData.description.trim()) {
-      newErrors.description = "Please enter a description"
-    }
-    
-    if (!formData.transactionDate) {
-      newErrors.transactionDate = "Please select a transaction date"
-    }
+    if (!formData.vendorId) newErrors.vendorId = "Please select a vendor"
+    if (!formData.currencyId) newErrors.currencyId = "Please select a currency"
+    if (!formData.description.trim()) newErrors.description = "Please enter a description"
+    if (!formData.invoiceDate) newErrors.invoiceDate = "Please select an invoice date"
+    if (!formData.dueDate) newErrors.dueDate = "Please select a due date"
 
     if (formData.items.length === 0) {
       newErrors.items = "Please add at least one item"
     } else {
-      const hasInvalidItems = formData.items.some(item => !item.description.trim() || (item.amount || 0) <= 0)
+      const hasInvalidItems = formData.items.some(item => 
+        !item.itemName.trim() || !item.description.trim() || item.quantity <= 0 || item.unitPrice <= 0
+      )
       if (hasInvalidItems) {
-        newErrors.items = "All items must have description and valid amount"
+        newErrors.items = "All items must have name, description, valid quantity and price"
       }
     }
 
@@ -134,8 +120,20 @@ export function CreateInvoiceModal({
     return Object.keys(newErrors).length === 0
   }
 
-  const calculateTotalAmount = () => {
-    return formData.items.reduce((total, item) => total + (item.amount || 0), 0)
+  const calculateSubtotal = () => {
+    return formData.items.reduce((total, item) => total + (item.quantity * item.unitPrice), 0)
+  }
+
+  const calculateVAT = () => {
+    if (!formData.isTaxable) return 0
+    return formData.items.reduce((total, item) => {
+      const itemTotal = item.quantity * item.unitPrice
+      return total + (itemTotal * (item.vatRate / 100))
+    }, 0)
+  }
+
+  const calculateTotal = () => {
+    return calculateSubtotal() + calculateVAT()
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -143,24 +141,18 @@ export function CreateInvoiceModal({
     
     if (!validateForm()) return
 
-    const totalAmount = calculateTotalAmount()
-    const submitData = {
-      ...formData,
-      amount: totalAmount
-    }
-
     setIsLoading(true)
     try {
       if (isEditing && invoice) {
-        await accountingApi.updateInvoice(invoice.id, submitData)
-        toast.success("Invoice updated successfully")
+        await accountingApi.updatePurchaseInvoice(invoice.id, formData)
+        toast.success("Purchase invoice updated successfully")
       } else {
-        await accountingApi.createInvoice(submitData)
-        toast.success("Invoice created successfully")
+        await accountingApi.createPurchaseInvoice(formData)
+        toast.success("Purchase invoice created successfully")
       }
       onSuccess()
     } catch (error: any) {
-      toast.error(`Failed to ${isEditing ? 'update' : 'create'} invoice`, {
+      toast.error(`Failed to ${isEditing ? 'update' : 'create'} purchase invoice`, {
         description: error.message || 'Unknown error occurred'
       })
     } finally {
@@ -168,14 +160,14 @@ export function CreateInvoiceModal({
     }
   }
 
-  const handleInputChange = (field: keyof CreateInvoiceRequest, value: any) => {
+  const handleInputChange = (field: keyof CreatePurchaseInvoiceRequest, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }))
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: "" }))
     }
   }
 
-  const handleItemChange = (index: number, field: keyof InvoiceItem, value: any) => {
+  const handleItemChange = (index: number, field: keyof PurchaseInvoiceItem, value: any) => {
     const newItems = [...formData.items]
     newItems[index] = { ...newItems[index], [field]: value }
     setFormData(prev => ({ ...prev, items: newItems }))
@@ -187,7 +179,7 @@ export function CreateInvoiceModal({
   const addItem = () => {
     setFormData(prev => ({
       ...prev,
-      items: [...prev.items, { description: "", amount: 0, category: "" }]
+      items: [...prev.items, { itemName: "", description: "", quantity: 1, unitPrice: 0, unit: "pcs", vatRate: 15 }]
     }))
   }
 
@@ -203,51 +195,47 @@ export function CreateInvoiceModal({
       <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center">
+            <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-orange-600 rounded-full flex items-center justify-center">
               <FileText className="w-5 h-5 text-white" />
             </div>
             <div>
-              <span>{isEditing ? 'Edit Invoice' : 'Create New Invoice'}</span>
+              <span>{isEditing ? 'Edit Purchase Invoice' : 'Create Purchase Invoice'}</span>
             </div>
           </DialogTitle>
           <DialogDescription>
-            {isEditing ? 'Update invoice details' : 'Create a new customer invoice'}
+            {isEditing ? 'Update purchase invoice details' : 'Create a new vendor purchase invoice'}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Customer & Currency Row */}
+          {/* Vendor & Currency Row */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="customerId">Customer *</Label>
+              <Label htmlFor="vendorId">Vendor *</Label>
               <Select
-                value={formData.customerId}
-                onValueChange={(value) => handleInputChange("customerId", value)}
-                disabled={isLoading || !customers || customers.length === 0}
+                value={formData.vendorId}
+                onValueChange={(value) => handleInputChange("vendorId", value)}
+                disabled={isLoading}
               >
-                <SelectTrigger className={errors.customerId ? "border-red-500" : ""}>
-                  <SelectValue placeholder={
-                    !customers || customers.length === 0 
-                      ? "Loading customers..." 
-                      : "Select customer"
-                  } />
+                <SelectTrigger className={errors.vendorId ? "border-red-500" : ""}>
+                  <SelectValue placeholder="Select vendor" />
                 </SelectTrigger>
                 <SelectContent>
-                  {customers && customers.length > 0 ? (
-                    customers.filter(c => c.isActive).map((customer) => (
-                      <SelectItem key={customer.id} value={customer.id}>
-                        {customer.name}
+                  {vendors && vendors.length > 0 ? (
+                    vendors.filter(v => v.isActive).map((vendor) => (
+                      <SelectItem key={vendor.id} value={vendor.id}>
+                        {vendor.name}
                       </SelectItem>
                     ))
                   ) : (
                     <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                      No customers available
+                      No vendors available
                     </div>
                   )}
                 </SelectContent>
               </Select>
-              {errors.customerId && (
-                <p className="text-sm text-red-500">{errors.customerId}</p>
+              {errors.vendorId && (
+                <p className="text-sm text-red-500">{errors.vendorId}</p>
               )}
             </div>
 
@@ -281,24 +269,24 @@ export function CreateInvoiceModal({
             </div>
           </div>
 
-          {/* Transaction Date & Invoice Number */}
-          <div className="grid grid-cols-2 gap-4">
+          {/* Invoice Date & Due Date */}
+          <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="transactionDate">Transaction Date *</Label>
+              <Label htmlFor="invoiceDate">Invoice Date *</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
                     className={cn(
                       "w-full justify-start text-left font-normal",
-                      !formData.transactionDate && "text-muted-foreground",
-                      errors.transactionDate && "border-red-500"
+                      !formData.invoiceDate && "text-muted-foreground",
+                      errors.invoiceDate && "border-red-500"
                     )}
                     disabled={isLoading}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {formData.transactionDate ? (
-                      format(new Date(formData.transactionDate), "PPP")
+                    {formData.invoiceDate ? (
+                      format(new Date(formData.invoiceDate), "PPP")
                     ) : (
                       <span>Pick a date</span>
                     )}
@@ -307,18 +295,55 @@ export function CreateInvoiceModal({
                 <PopoverContent className="w-auto p-0">
                   <Calendar
                     mode="single"
-                    selected={formData.transactionDate ? new Date(formData.transactionDate) : undefined}
+                    selected={formData.invoiceDate ? new Date(formData.invoiceDate) : undefined}
                     onSelect={(date) => {
                       if (date) {
-                        handleInputChange("transactionDate", format(date, "yyyy-MM-dd"))
+                        handleInputChange("invoiceDate", format(date, "yyyy-MM-dd"))
                       }
                     }}
-                    initialFocus
                   />
                 </PopoverContent>
               </Popover>
-              {errors.transactionDate && (
-                <p className="text-sm text-red-500">{errors.transactionDate}</p>
+              {errors.invoiceDate && (
+                <p className="text-sm text-red-500">{errors.invoiceDate}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="dueDate">Due Date *</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !formData.dueDate && "text-muted-foreground",
+                      errors.dueDate && "border-red-500"
+                    )}
+                    disabled={isLoading}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {formData.dueDate ? (
+                      format(new Date(formData.dueDate), "PPP")
+                    ) : (
+                      <span>Pick a date</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={formData.dueDate ? new Date(formData.dueDate) : undefined}
+                    onSelect={(date) => {
+                      if (date) {
+                        handleInputChange("dueDate", format(date, "yyyy-MM-dd"))
+                      }
+                    }}
+                  />
+                </PopoverContent>
+              </Popover>
+              {errors.dueDate && (
+                <p className="text-sm text-red-500">{errors.dueDate}</p>
               )}
             </div>
 
@@ -341,7 +366,7 @@ export function CreateInvoiceModal({
               id="description"
               value={formData.description}
               onChange={(e) => handleInputChange("description", e.target.value)}
-              placeholder="Describe the invoice..."
+              placeholder="Describe the purchase..."
               disabled={isLoading}
               rows={2}
               className={errors.description ? "border-red-500" : ""}
@@ -371,30 +396,49 @@ export function CreateInvoiceModal({
             <div className="space-y-3">
               {formData.items.map((item, index) => (
                 <div key={index} className="grid grid-cols-12 gap-2 p-4 border rounded-lg">
-                  <div className="col-span-5">
+                  <div className="col-span-3">
                     <Input
-                      placeholder="Item description"
+                      placeholder="Item name"
+                      value={item.itemName}
+                      onChange={(e) => handleItemChange(index, "itemName", e.target.value)}
+                      disabled={isLoading}
+                    />
+                  </div>
+                  <div className="col-span-3">
+                    <Input
+                      placeholder="Description"
                       value={item.description}
                       onChange={(e) => handleItemChange(index, "description", e.target.value)}
                       disabled={isLoading}
                     />
                   </div>
-                  <div className="col-span-3">
+                  <div className="col-span-2">
                     <Input
-                      placeholder="Category (optional)"
-                      value={item.category || ""}
-                      onChange={(e) => handleItemChange(index, "category", e.target.value)}
+                      type="number"
+                      step="1"
+                      min="1"
+                      placeholder="Qty"
+                      value={item.quantity}
+                      onChange={(e) => handleItemChange(index, "quantity", parseInt(e.target.value) || 1)}
                       disabled={isLoading}
                     />
                   </div>
-                  <div className="col-span-3">
+                  <div className="col-span-2">
                     <Input
                       type="number"
                       step="0.01"
                       min="0"
-                      placeholder="Amount"
-                      value={item.amount || ""}
-                      onChange={(e) => handleItemChange(index, "amount", parseFloat(e.target.value) || 0)}
+                      placeholder="Unit Price"
+                      value={item.unitPrice}
+                      onChange={(e) => handleItemChange(index, "unitPrice", parseFloat(e.target.value) || 0)}
+                      disabled={isLoading}
+                    />
+                  </div>
+                  <div className="col-span-1">
+                    <Input
+                      placeholder="Unit"
+                      value={item.unit}
+                      onChange={(e) => handleItemChange(index, "unit", e.target.value)}
                       disabled={isLoading}
                     />
                   </div>
@@ -421,7 +465,7 @@ export function CreateInvoiceModal({
             )}
           </div>
 
-          {/* Taxable Status & Exchange Rate */}
+          {/* Taxable Status & Notes */}
           <div className="grid grid-cols-2 gap-4">
             <div className="flex items-center justify-between">
               <div>
@@ -437,26 +481,38 @@ export function CreateInvoiceModal({
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="exchangeRate">Exchange Rate</Label>
-              <Input
-                id="exchangeRate"
-                type="number"
-                step="0.01"
-                min="0"
-                value={formData.exchangeRateAtCreation || ""}
-                onChange={(e) => handleInputChange("exchangeRateAtCreation", parseFloat(e.target.value) || 1)}
-                placeholder="1.00"
+              <Label htmlFor="notes">Notes</Label>
+              <Textarea
+                id="notes"
+                value={formData.notes}
+                onChange={(e) => handleInputChange("notes", e.target.value)}
+                placeholder="Additional notes..."
                 disabled={isLoading}
+                rows={2}
               />
             </div>
           </div>
 
           {/* Total Display */}
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <div className="flex justify-between items-center text-lg font-semibold">
+          <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+            <div className="flex justify-between items-center">
+              <span className="text-sm">Subtotal:</span>
+              <span className="font-medium">
+                {currencies.find(c => c.id === formData.currencyId)?.symbol || '$'}{calculateSubtotal().toFixed(2)}
+              </span>
+            </div>
+            {formData.isTaxable && (
+              <div className="flex justify-between items-center">
+                <span className="text-sm">VAT:</span>
+                <span className="font-medium">
+                  {currencies.find(c => c.id === formData.currencyId)?.symbol || '$'}{calculateVAT().toFixed(2)}
+                </span>
+              </div>
+            )}
+            <div className="flex justify-between items-center text-lg font-semibold pt-2 border-t">
               <span>Total Amount:</span>
               <span className="text-green-600">
-                {currencies.find(c => c.id === formData.currencyId)?.symbol || '$'}{calculateTotalAmount().toFixed(2)}
+                {currencies.find(c => c.id === formData.currencyId)?.symbol || '$'}{calculateTotal().toFixed(2)}
               </span>
             </div>
           </div>
@@ -475,7 +531,7 @@ export function CreateInvoiceModal({
             <Button
               type="submit"
               disabled={isLoading}
-              className="rounded-full px-6 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-lg transition-all duration-200"
+              className="rounded-full px-6 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-lg transition-all duration-200"
             >
               {isLoading ? (
                 <>
