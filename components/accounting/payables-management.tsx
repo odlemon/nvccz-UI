@@ -751,9 +751,12 @@ export function PayablesManagement() {
         onClose={() => setIsViewDrawerOpen(false)}
         invoice={selectedPurchaseInvoice}
         currencies={currencies}
-        onSubmit={handleSubmitPurchaseInvoice}
-        onPay={handlePayPurchaseInvoice}
-        onRefresh={refreshPurchaseInvoice}
+        vendors={vendors}
+        onEdit={(invoice) => {
+          setIsViewDrawerOpen(false)
+          // Open edit modal or navigate to edit page
+          // You can implement this based on your requirements
+        }}
       />
     </div>
   )

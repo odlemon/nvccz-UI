@@ -14,7 +14,7 @@ import { SalaryStructure, AllowanceType, allowanceTypesApi } from "@/lib/api/pay
 import { DollarSign, Calendar, AlertCircle, Loader2 } from "lucide-react"
 import { useAppSelector, useAppDispatch } from "@/lib/store"
 import { accountingApi } from "@/lib/api/accounting-api"
-import { setCurrencies, setCurrenciesError, setCurrenciesLoading } from "@/lib/store/slices/currenciesSlice"
+import { setCurrencies, setCurrenciesError, setCurrenciesLoading } from "@/lib/store/slices/accountingSlice"
 import { toast } from "sonner"
 
 interface SalaryStructureFormProps {
@@ -43,7 +43,7 @@ export function SalaryStructureForm({
   const [loadingAllowanceTypes, setLoadingAllowanceTypes] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const dispatch = useAppDispatch()
-  const { items: currencies, loading: currenciesLoading } = useAppSelector(state => state.currencies)
+  const { currencies, currenciesLoading } = useAppSelector(state => state.accounting)
 
   const {
     control,
@@ -139,12 +139,14 @@ export function SalaryStructureForm({
       try {
         dispatch(setCurrenciesLoading(true))
         dispatch(setCurrenciesError(null))
-        const res = await accountingApi.currencies.getAll()
-        const list = res.data || []
-        dispatch(setCurrencies(list))
-        if (!editingStructure) {
-          // set default
-          reset(prev => ({ ...prev, currencyId: getDefaultCurrencyId(list) }))
+        const response = await accountingApi.getCurrencies()
+        if (response.success && response.data) {
+          dispatch(setCurrencies(response.data))
+          if (!editingStructure) {
+            reset(prev => ({ ...prev, currencyId: getDefaultCurrencyId(response.data || []) }))
+          }
+        } else {
+          dispatch(setCurrenciesError('Failed to load currencies'))
         }
       } catch (e: any) {
         dispatch(setCurrenciesError(e?.message || 'Failed to load currencies'))

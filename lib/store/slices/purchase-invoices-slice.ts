@@ -78,6 +78,17 @@ export const payPurchaseInvoice = createAsyncThunk(
   }
 )
 
+export const deletePurchaseInvoice = createAsyncThunk(
+  'purchaseInvoices/deletePurchaseInvoice',
+  async (id: string) => {
+    const response = await accountingApi.deletePurchaseInvoice(id)
+    if (!response.success) {
+      throw new Error(response.error || 'Failed to delete purchase invoice')
+    }
+    return id
+  }
+)
+
 interface PurchaseInvoicesState {
   purchaseInvoices: PurchaseInvoice[]
   selectedPurchaseInvoice: PurchaseInvoice | null
@@ -291,6 +302,25 @@ const purchaseInvoicesSlice = createSlice({
       .addCase(payPurchaseInvoice.rejected, (state, action) => {
         state.loading = false
         state.error = action.error.message || 'Failed to pay purchase invoice'
+      })
+
+    // Delete purchase invoice
+    builder
+      .addCase(deletePurchaseInvoice.pending, (state) => {
+        state.loading = true
+        state.error = null
+      })
+      .addCase(deletePurchaseInvoice.fulfilled, (state, action: PayloadAction<string>) => {
+        state.loading = false
+        state.purchaseInvoices = state.purchaseInvoices.filter(i => i.id !== action.payload)
+        if (state.selectedPurchaseInvoice?.id === action.payload) {
+          state.selectedPurchaseInvoice = null
+        }
+        state.stats.total -= 1
+      })
+      .addCase(deletePurchaseInvoice.rejected, (state, action) => {
+        state.loading = false
+        state.error = action.error.message || 'Failed to delete purchase invoice'
       })
   }
 })

@@ -15,6 +15,8 @@ import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { AccountingCurrency, Vendor, CreatePurchaseInvoiceRequest, PurchaseInvoice, PurchaseInvoiceItem, accountingApi } from "@/lib/api/accounting-api"
+import { useAppDispatch } from "@/lib/store"
+import { createPurchaseInvoice, updatePurchaseInvoice } from "@/lib/store/slices/purchase-invoices-slice"
 
 interface CreatePurchaseInvoiceModalProps {
   isOpen: boolean
@@ -34,6 +36,7 @@ export function CreatePurchaseInvoiceModal({
   invoice 
 }: CreatePurchaseInvoiceModalProps) {
   const isEditing = !!invoice
+  const dispatch = useAppDispatch()
   
   const [formData, setFormData] = useState<CreatePurchaseInvoiceRequest>({
     vendorId: "",
@@ -45,10 +48,10 @@ export function CreatePurchaseInvoiceModal({
       {
         itemName: "",
         description: "",
-        quantity: 1,
-        unitPrice: 0,
-        unit: "pcs",
-        vatRate: 15
+        quantity: "" as any,
+        unitPrice: "" as any,
+        unit: "",
+        vatRate: "" as any
       }
     ],
     isTaxable: true,
@@ -86,7 +89,7 @@ export function CreatePurchaseInvoiceModal({
           dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
           currencyId: currencies.find(c => c.isDefault)?.id || currencies[0]?.id || "",
           description: "",
-          items: [{ itemName: "", description: "", quantity: 1, unitPrice: 0, unit: "pcs", vatRate: 15 }],
+          items: [{ itemName: "", description: "", quantity: "" as any, unitPrice: "" as any, unit: "", vatRate: "" as any }],
           isTaxable: true,
           invoiceNumber: "",
           notes: ""
@@ -109,10 +112,13 @@ export function CreatePurchaseInvoiceModal({
       newErrors.items = "Please add at least one item"
     } else {
       const hasInvalidItems = formData.items.some(item => 
-        !item.itemName.trim() || !item.description.trim() || item.quantity <= 0 || item.unitPrice <= 0
+        !item.itemName.trim() || !item.description.trim() || !item.unit || 
+        (item.quantity as any) === "" || Number(item.quantity) <= 0 || 
+        (item.unitPrice as any) === "" || Number(item.unitPrice) <= 0 || 
+        (item.vatRate as any) === ""
       )
       if (hasInvalidItems) {
-        newErrors.items = "All items must have name, description, valid quantity and price"
+        newErrors.items = "All items must have name, description, unit, valid quantity, price, and VAT rate"
       }
     }
 
@@ -121,14 +127,15 @@ export function CreatePurchaseInvoiceModal({
   }
 
   const calculateSubtotal = () => {
-    return formData.items.reduce((total, item) => total + (item.quantity * item.unitPrice), 0)
+    return formData.items.reduce((total, item) => total + (Number(item.quantity) * Number(item.unitPrice)), 0)
   }
 
   const calculateVAT = () => {
     if (!formData.isTaxable) return 0
     return formData.items.reduce((total, item) => {
-      const itemTotal = item.quantity * item.unitPrice
-      return total + (itemTotal * (item.vatRate / 100))
+      const itemTotal = Number(item.quantity) * Number(item.unitPrice)
+      const vatRate = Number(item.vatRate)
+      return total + (itemTotal * vatRate)
     }, 0)
   }
 
@@ -144,10 +151,10 @@ export function CreatePurchaseInvoiceModal({
     setIsLoading(true)
     try {
       if (isEditing && invoice) {
-        await accountingApi.updatePurchaseInvoice(invoice.id, formData)
+        await dispatch(updatePurchaseInvoice({ id: invoice.id, data: formData })).unwrap()
         toast.success("Purchase invoice updated successfully")
       } else {
-        await accountingApi.createPurchaseInvoice(formData)
+        await dispatch(createPurchaseInvoice(formData)).unwrap()
         toast.success("Purchase invoice created successfully")
       }
       onSuccess()
@@ -179,7 +186,7 @@ export function CreatePurchaseInvoiceModal({
   const addItem = () => {
     setFormData(prev => ({
       ...prev,
-      items: [...prev.items, { itemName: "", description: "", quantity: 1, unitPrice: 0, unit: "pcs", vatRate: 15 }]
+      items: [...prev.items, { itemName: "", description: "", quantity: "" as any, unitPrice: "" as any, unit: "", vatRate: "" as any }]
     }))
   }
 
@@ -393,6 +400,17 @@ export function CreatePurchaseInvoiceModal({
               </Button>
             </div>
             
+            {/* Table Headings */}
+            <div className="grid grid-cols-12 gap-2 px-4 py-2 bg-gray-50 rounded-lg text-sm font-medium text-gray-700">
+              <div className="col-span-3">Item Name</div>
+              <div className="col-span-2">Description</div>
+              <div className="col-span-2">Quantity</div>
+              <div className="col-span-2">Unit Price</div>
+              <div className="col-span-1">Unit</div>
+              <div className="col-span-1">VAT Rate</div>
+              <div className="col-span-1">Action</div>
+            </div>
+            
             <div className="space-y-3">
               {formData.items.map((item, index) => (
                 <div key={index} className="grid grid-cols-12 gap-2 p-4 border rounded-lg">
@@ -404,7 +422,7 @@ export function CreatePurchaseInvoiceModal({
                       disabled={isLoading}
                     />
                   </div>
-                  <div className="col-span-3">
+                  <div className="col-span-2">
                     <Input
                       placeholder="Description"
                       value={item.description}
@@ -419,7 +437,7 @@ export function CreatePurchaseInvoiceModal({
                       min="1"
                       placeholder="Qty"
                       value={item.quantity}
-                      onChange={(e) => handleItemChange(index, "quantity", parseInt(e.target.value) || 1)}
+                      onChange={(e) => handleItemChange(index, "quantity", e.target.value === "" ? "" : parseInt(e.target.value))}
                       disabled={isLoading}
                     />
                   </div>
@@ -430,15 +448,39 @@ export function CreatePurchaseInvoiceModal({
                       min="0"
                       placeholder="Unit Price"
                       value={item.unitPrice}
-                      onChange={(e) => handleItemChange(index, "unitPrice", parseFloat(e.target.value) || 0)}
+                      onChange={(e) => handleItemChange(index, "unitPrice", e.target.value === "" ? "" : parseFloat(e.target.value))}
                       disabled={isLoading}
                     />
                   </div>
                   <div className="col-span-1">
-                    <Input
-                      placeholder="Unit"
+                    <Select
                       value={item.unit}
-                      onChange={(e) => handleItemChange(index, "unit", e.target.value)}
+                      onValueChange={(value) => handleItemChange(index, "unit", value)}
+                      disabled={isLoading}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Unit" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pcs">pcs</SelectItem>
+                        <SelectItem value="kg">kg</SelectItem>
+                        <SelectItem value="m">m</SelectItem>
+                        <SelectItem value="l">l</SelectItem>
+                        <SelectItem value="box">box</SelectItem>
+                        <SelectItem value="set">set</SelectItem>
+                        <SelectItem value="unit">unit</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="col-span-1">
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max="1"
+                      placeholder="0.15"
+                      value={item.vatRate}
+                      onChange={(e) => handleItemChange(index, "vatRate", e.target.value === "" ? "" : parseFloat(e.target.value))}
                       disabled={isLoading}
                     />
                   </div>
