@@ -143,11 +143,11 @@ export function TimelineStageCard({
               <AccordionContent>
                 <TermSheetSection application={application} />
 
-                {!application?.termSheet?.applicantSignedAt && application?.termSheet?.isFinal && (
+                {!application?.termSheet?.applicantSignedAt && !application?.termSheet?.isSigned && (
                   <Button
                     onClick={() => handleSignTermSheetClick(application.termSheet)}
 
-                    className="rounded-full h-10 px-6 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+                    className="rounded-full mt-3 h-10 px-6 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white shadow-lg hover:shadow-xl transition-all duration-200"
                   >
                     <CheckCircle className="w-4 h-4 mr-2" />
                     {'Sign Term Sheet'}

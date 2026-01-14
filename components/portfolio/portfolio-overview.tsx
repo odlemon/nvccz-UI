@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useAppDispatch, useAppSelector } from "@/lib/store"
 import { fetchPortfolioDashboardData } from "@/lib/store/slices/portfolioDashboardSlice"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -23,6 +23,7 @@ import {
 } from "lucide-react"
 import { AssetAllocationChart } from "./asset-allocation-chart"
 import { PerformanceChart } from "./performance-chart"
+import { CompanyListModal } from "./company-list-modal"
 
 export function PortfolioOverview() {
   const dispatch = useAppDispatch()
@@ -68,7 +69,7 @@ export function PortfolioOverview() {
   // Get top performing sectors by investment
   const topPerformers = useMemo(() => {
     const sectorMap = new Map<string, { value: number, count: number }>()
-    
+
     companies.forEach(company => {
       const invested = Number(company.totalInvested) || 0
       const existing = sectorMap.get(company.industry) || { value: 0, count: 0 }
@@ -92,13 +93,13 @@ export function PortfolioOverview() {
 
   // Get recent disbursements across all funds
   const recentTransactions = useMemo(() => {
-    const allDisbursements = funds.flatMap(fund => 
+    const allDisbursements = funds.flatMap(fund =>
       (fund.fundDisbursements || []).map(d => ({
         ...d,
         fundName: fund.name
       }))
     )
-    
+
     return allDisbursements
       .sort((a, b) => {
         const dateA = new Date(a.disbursedAt || a.createdAt || a.disbursementDate || '').getTime()
@@ -112,7 +113,7 @@ export function PortfolioOverview() {
   const monthlyPerformanceData = useMemo(() => {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
     const currentYear = new Date().getFullYear()
-    
+
     // Initialize data structure
     const monthlyData = months.map((month, index) => ({
       month,
@@ -151,7 +152,7 @@ export function PortfolioOverview() {
     return monthlyData
   }, [funds, companies])
 
-  // Sector distribution for pie chart
+  // Sector distribution for companies (Shortlisted)
   const sectorDistribution = useMemo(() => {
     const sectorMap = new Map<string, number>()
     companies.forEach(company => {
@@ -159,6 +160,29 @@ export function PortfolioOverview() {
     })
     return Array.from(sectorMap.entries()).map(([name, value]) => ({ name, value }))
   }, [companies])
+
+  // Sector distribution for applications
+  const applicationsSectorDistribution = useMemo(() => {
+    const sectorMap = new Map<string, number>()
+    applications.forEach(app => {
+      // Use industry or default to 'Unspecified' if missing
+      const industry = app.industry || 'Unspecified'
+      sectorMap.set(industry, (sectorMap.get(industry) || 0) + 1)
+    })
+    return Array.from(sectorMap.entries()).map(([name, value]) => ({ name, value }))
+  }, [applications])
+
+  const [selectedSector, setSelectedSector] = useState<string>('')
+  const [modalType, setModalType] = useState<'APPLICATION' | 'COMPANY'>('COMPANY')
+  const [isModalOpen, setModalOpen] = useState(false)
+
+  const handleSectorClick = (data: any, type: 'APPLICATION' | 'COMPANY') => {
+    if (data && data.name) {
+      setSelectedSector(data.name)
+      setModalType(type)
+      setModalOpen(true)
+    }
+  }
 
   if (isLoading) {
     return (
@@ -259,8 +283,8 @@ export function PortfolioOverview() {
           <CardContent className="p-6">
             <h3 className="text-lg font-semibold text-red-900 mb-2">Error Loading Dashboard</h3>
             <p className="text-red-700">{error}</p>
-            <Button 
-              onClick={() => dispatch(fetchPortfolioDashboardData())} 
+            <Button
+              onClick={() => dispatch(fetchPortfolioDashboardData())}
               className="mt-4"
               variant="outline"
             >
@@ -330,23 +354,55 @@ export function PortfolioOverview() {
 
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Asset Allocation */}
+        <CompanyListModal
+          isOpen={isModalOpen}
+          onClose={() => setModalOpen(false)}
+          title={`${selectedSector} - ${modalType === 'COMPANY' ? 'Companies' : 'Applications'}`}
+          data={modalType === 'COMPANY'
+            ? companies.filter(c => c.industry === selectedSector)
+            : applications.filter(a => a.industry === selectedSector)
+          }
+          type={modalType}
+        />
+
+        {/* Applications by Sector */}
+        <div className="border border-gray-200 rounded-2xl p-3 bg-white hover:border-gray-300 transition-all duration-300">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full gradient-primary flex items-center justify-center">
+                <FileText className="w-4 h-4 text-white" />
+              </div>
+              Applications by Sector
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <AssetAllocationChart
+              data={applicationsSectorDistribution}
+              onClick={(data) => handleSectorClick(data, 'APPLICATION')}
+            />
+          </CardContent>
+        </div>
+
+        {/* Shortlisted Companies by Sector */}
         <div className="border border-gray-200 rounded-2xl p-3 bg-white hover:border-gray-300 transition-all duration-300">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-full gradient-primary flex items-center justify-center">
                 <PieChart className="w-4 h-4 text-white" />
               </div>
-              Sector Distribution
+              Shortlisted Companies by Sector
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <AssetAllocationChart data={sectorDistribution} />
+            <AssetAllocationChart
+              data={sectorDistribution}
+              onClick={(data) => handleSectorClick(data, 'COMPANY')}
+            />
           </CardContent>
         </div>
 
         {/* Performance Chart */}
-        <div className="border border-gray-200 rounded-2xl p-3 hover:border-gray-300 transition-all duration-300 gradient-primary">
+        <div className="lg:col-span-2 border border-gray-200 rounded-2xl p-3 hover:border-gray-300 transition-all duration-300 gradient-primary">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-white">
               <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
@@ -439,51 +495,51 @@ export function PortfolioOverview() {
               <div className="flex justify-between text-sm">
                 <span>Diversification Score</span>
                 <span className="font-medium">
-                  {companies.length === 0 
-                    ? '0%' 
-                    : sectorDistribution.length === 0 
+                  {companies.length === 0
                     ? '0%'
-                    : sectorDistribution.length === 1 
-                    ? '20%'
-                    : sectorDistribution.length === 2
-                    ? '40%'
-                    : sectorDistribution.length === 3
-                    ? '65%'
-                    : sectorDistribution.length >= 4
-                    ? '85%'
-                    : '0%'
+                    : sectorDistribution.length === 0
+                      ? '0%'
+                      : sectorDistribution.length === 1
+                        ? '20%'
+                        : sectorDistribution.length === 2
+                          ? '40%'
+                          : sectorDistribution.length === 3
+                            ? '65%'
+                            : sectorDistribution.length >= 4
+                              ? '85%'
+                              : '0%'
                   }
                 </span>
               </div>
-              <Progress 
-                value={companies.length === 0 
-                  ? 0 
-                  : sectorDistribution.length === 0 
+              <Progress
+                value={companies.length === 0
                   ? 0
-                  : sectorDistribution.length === 1 
-                  ? 20
-                  : sectorDistribution.length === 2
-                  ? 40
-                  : sectorDistribution.length === 3
-                  ? 65
-                  : sectorDistribution.length >= 4
-                  ? 85
-                  : 0
-                } 
-                className="h-2" 
+                  : sectorDistribution.length === 0
+                    ? 0
+                    : sectorDistribution.length === 1
+                      ? 20
+                      : sectorDistribution.length === 2
+                        ? 40
+                        : sectorDistribution.length === 3
+                          ? 65
+                          : sectorDistribution.length >= 4
+                            ? 85
+                            : 0
+                }
+                className="h-2"
               />
               <p className="text-xs text-muted-foreground">
-                {companies.length === 0 
+                {companies.length === 0
                   ? 'No companies in portfolio'
                   : sectorDistribution.length === 0
-                  ? 'No sector data available'
-                  : sectorDistribution.length === 1
-                  ? 'Single sector - high concentration risk'
-                  : sectorDistribution.length === 2
-                  ? 'Limited diversification - consider expanding'
-                  : sectorDistribution.length === 3
-                  ? 'Moderate diversification'
-                  : 'Well diversified across sectors'
+                    ? 'No sector data available'
+                    : sectorDistribution.length === 1
+                      ? 'Single sector - high concentration risk'
+                      : sectorDistribution.length === 2
+                        ? 'Limited diversification - consider expanding'
+                        : sectorDistribution.length === 3
+                          ? 'Moderate diversification'
+                          : 'Well diversified across sectors'
                 }
               </p>
             </div>
@@ -492,18 +548,18 @@ export function PortfolioOverview() {
               <div className="flex justify-between text-sm">
                 <span>Deployment Rate</span>
                 <span className="font-medium">
-                  {metrics.totalInvested > 0 && metrics.totalRequested > 0 
+                  {metrics.totalInvested > 0 && metrics.totalRequested > 0
                     ? `${Math.round((metrics.totalInvested / metrics.totalRequested) * 100)}%`
                     : '0%'
                   }
                 </span>
               </div>
-              <Progress 
-                value={metrics.totalInvested > 0 && metrics.totalRequested > 0 
+              <Progress
+                value={metrics.totalInvested > 0 && metrics.totalRequested > 0
                   ? (metrics.totalInvested / metrics.totalRequested) * 100
                   : 0
-                } 
-                className="h-2" 
+                }
+                className="h-2"
               />
               <p className="text-xs text-muted-foreground">
                 {metrics.totalInvested === 0 && metrics.totalRequested === 0
@@ -520,12 +576,12 @@ export function PortfolioOverview() {
                   {companies.length > 0 ? `${Math.round((metrics.activeCompanies / companies.length) * 100)}%` : '0%'}
                 </span>
               </div>
-              <Progress 
-                value={companies.length > 0 ? (metrics.activeCompanies / companies.length) * 100 : 0} 
-                className="h-2" 
+              <Progress
+                value={companies.length > 0 ? (metrics.activeCompanies / companies.length) * 100 : 0}
+                className="h-2"
               />
               <p className="text-xs text-muted-foreground">
-                {companies.length === 0 
+                {companies.length === 0
                   ? 'No companies in portfolio'
                   : 'Active company ratio'
                 }

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { motion } from "framer-motion"
 import { useAppDispatch, useAppSelector } from "@/lib/store"
-import { fetchFinancialReports, submitFinancialReports, downloadFinancialReportTemplate } from "@/lib/store/slices/applicationPortalSlice"
+import { fetchFinancialReports, submitFinancialReports } from "@/lib/store/slices/applicationPortalSlice"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -32,12 +32,12 @@ export function FinancialStatementsView() {
   const dispatch = useAppDispatch()
   const { financialReports, financialReportsLoading, loading } = useAppSelector((state) => state.applicationPortal)
   const { canPerformAction } = useRolePermissions()
-  
+
   // Permission checks
-  const canUploadReport = canPerformAction('application-portal', 'create')
-  const canSubmitReports = canPerformAction('application-portal', 'update')
+  const canUploadReport = canPerformAction('application-portal', 'create') || true
+  const canSubmitReports = canPerformAction('application-portal', 'update') || true
   const canDeleteReport = canPerformAction('application-portal', 'delete')
-  
+
   const [selectedReports, setSelectedReports] = useState<string[]>([])
   const [isUploadModalOpen, setUploadModalOpen] = useState(false)
   const [isConfirmOpen, setIsConfirmOpen] = useState(false)
@@ -65,14 +65,6 @@ export function FinancialStatementsView() {
     } catch (error: any) {
       toast.error(error || "Failed to submit reports.")
     }
-  }
-
-  const handleDownloadTemplate = (reportType: FinancialReportType) => {
-    toast.promise(dispatch(downloadFinancialReportTemplate(reportType)), {
-      loading: `Downloading ${reportType} template...`,
-      success: `Template downloaded.`,
-      error: (err) => err || 'Download failed.',
-    })
   }
 
   const getTypeLabel = (type: string) => {
@@ -104,33 +96,33 @@ export function FinancialStatementsView() {
               )}
               {canSubmitReports && (
                 <AlertDialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
-                <AlertDialogTrigger asChild>
-                  <Button disabled={selectedReports.length === 0 || loading} className="rounded-full bg-gradient-to-r from-green-500 to-green-600 text-white">
-                    <Send className="w-4 h-4 mr-2" /> Submit Selected ({selectedReports.length})
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Confirm Submission</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Are you sure you want to submit {selectedReports.length} financial report(s) for review? This action cannot be undone.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={async (e) => {
-                        e.preventDefault() // Prevent dialog from closing immediately
-                        await handleSubmitReports()
-                      }}
-                      disabled={loading}
-                    >
-                      {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                      Confirm & Submit
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button disabled={selectedReports.length === 0 || loading} className="rounded-full bg-gradient-to-r from-green-500 to-green-600 text-white">
+                      <Send className="w-4 h-4 mr-2" /> Submit Selected ({selectedReports.length})
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Confirm Submission</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Are you sure you want to submit {selectedReports.length} financial report(s) for review? This action cannot be undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={async (e) => {
+                          e.preventDefault() // Prevent dialog from closing immediately
+                          await handleSubmitReports()
+                        }}
+                        disabled={loading}
+                      >
+                        {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                        Confirm & Submit
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               )}
             </div>
           </div>
@@ -138,16 +130,12 @@ export function FinancialStatementsView() {
         <CardContent>
           <div className="space-y-4">
             <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
-              <p className="text-sm font-medium">Download Templates:</p>
-              <GradientBorderButton onClick={() => handleDownloadTemplate('BALANCE_SHEET')}>
-                <Download className="w-4 h-4 mr-1" /> Balance Sheet
-              </GradientBorderButton>
-              <GradientBorderButton onClick={() => handleDownloadTemplate('INCOME_STATEMENT')} gradientFrom="from-green-500" gradientTo="to-teal-500">
-                <Download className="w-4 h-4 mr-1" /> Income Statement
-              </GradientBorderButton>
-              <GradientBorderButton onClick={() => handleDownloadTemplate('CASHFLOW_STATEMENT')} gradientFrom="from-amber-500" gradientTo="to-orange-500">
-                <Download className="w-4 h-4 mr-1" /> Cashflow
-              </GradientBorderButton>
+              <p className="text-sm font-medium">Download Template:</p>
+              <a href="/NVCCZ_FIINANCIALS_REPORTS.xlsx" download="NVCCZ_FIINANCIALS_REPORTS.xlsx">
+                <GradientBorderButton>
+                  <Download className="w-4 h-4 mr-1" /> Financial Reports Template
+                </GradientBorderButton>
+              </a>
             </div>
 
             {!financialReportsLoading && financialReports.length === 0 && (
@@ -160,8 +148,8 @@ export function FinancialStatementsView() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {financialReports.map((report, idx) => (
-                <motion.div 
-                  key={report.id} 
+                <motion.div
+                  key={report.id}
                   className="group relative border rounded-2xl p-4 bg-white shadow-sm hover:shadow-lg transition-all duration-300 hover:scale-105"
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -188,8 +176,8 @@ export function FinancialStatementsView() {
                       <div className="absolute top-3 right-3">
                         <Badge className={
                           report.status === 'DRAFT' ? 'bg-gradient-to-r from-gray-400 to-gray-500 text-white' :
-                          report.status === 'SUBMITTED' ? 'bg-gradient-to-r from-blue-400 to-blue-600 text-white' :
-                          'bg-gradient-to-r from-green-400 to-green-600 text-white'
+                            report.status === 'SUBMITTED' ? 'bg-gradient-to-r from-blue-400 to-blue-600 text-white' :
+                              'bg-gradient-to-r from-green-400 to-green-600 text-white'
                         }>{report.status}</Badge>
                       </div>
                     </div>

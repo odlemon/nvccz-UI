@@ -422,7 +422,7 @@ export function TimelineStageActions({
                 Sign as Investor
               </Button>
             )}
-            {canFinalizeTermSheet && bothPartiesSigned && termSheetData.status !== 'SIGNED' && (
+            {canFinalizeTermSheet && termSheetData.status !== 'FINAL'  && (
               <Button
                 onClick={onFinalizeTermSheet}
                 className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-full"
