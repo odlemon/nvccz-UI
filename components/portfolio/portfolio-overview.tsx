@@ -305,14 +305,14 @@ export function PortfolioOverview() {
           <p className="text-muted-foreground">Comprehensive view of your investment portfolio</p>
         </div>
         <div className="flex items-center gap-3">
-          <Button variant="outline" className="bg-transparent">
+          {/* <Button variant="outline" className="bg-transparent">
             <Filter className="w-4 h-4 mr-2" />
             Filter
           </Button>
           <Button variant="outline" className="bg-transparent">
             <Calendar className="w-4 h-4 mr-2" />
             Q4 2024
-          </Button>
+          </Button> */}
           <Button className="gradient-primary text-white" onClick={() => dispatch(fetchPortfolioDashboardData())}>
             <BarChart3 className="w-4 h-4 mr-2" />
             Refresh

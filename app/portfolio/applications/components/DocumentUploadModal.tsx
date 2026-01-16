@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Upload, Link as LinkIcon } from "lucide-react"
+import { Upload, Link as LinkIcon, FileText } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -31,12 +31,38 @@ const DocumentUploadModal = ({ isOpen, onClose, onUpload, editingIndex, document
     { value: "HISTORICAL_FINANCIALS", label: "Historical Financials", required: false }
   ]
 
+  const FINANCIAL_TYPES = ["PROJECTED_CASH_FLOWS", "HISTORICAL_FINANCIALS"]
+  const FINANCIAL_EXTENSIONS = [".csv", ".xls", ".xlsx"]
+  const DEFAULT_EXTENSIONS = [".pdf", ".doc", ".docx", ".jpg", ".jpeg", ".png", ".gif", ".txt"]
+
+  const getAllowedExtensions = () => {
+    const docType = documentType || selectedType
+    return FINANCIAL_TYPES.includes(docType) ? FINANCIAL_EXTENSIONS : DEFAULT_EXTENSIONS
+  }
+
+  const validateFile = (file: File) => {
+    const extensions = getAllowedExtensions()
+    const fileName = file.name.toLowerCase()
+    const isValid = extensions.some(ext => fileName.endsWith(ext))
+
+    if (!isValid) {
+      toast.error(`Invalid file type for this document. Please upload: ${extensions.join(", ")}`)
+      return false
+    }
+    return true
+  }
+
   const finalizeUpload = (payload: { file?: File; fileUrl?: string }) => {
     const docType = documentType || selectedType
     if (!docType) {
       toast.error("Please select a document type first")
       return
     }
+
+    if (payload.file && !validateFile(payload.file)) {
+      return
+    }
+
     if (mode === "url" && !payload.fileUrl) {
       toast.error("Please paste a valid file URL")
       return
@@ -71,12 +97,14 @@ const DocumentUploadModal = ({ isOpen, onClose, onUpload, editingIndex, document
     e.preventDefault()
     e.stopPropagation()
     setDragActive(false)
-    
+
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       const file = e.dataTransfer.files[0]
       finalizeUpload({ file })
     }
   }
+
+  const isFinancial = FINANCIAL_TYPES.includes(documentType || selectedType)
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -87,7 +115,7 @@ const DocumentUploadModal = ({ isOpen, onClose, onUpload, editingIndex, document
             {editingIndex !== null ? "Attach / Replace Document" : "Attach Document"}
           </DialogTitle>
         </DialogHeader>
-        
+
         <div className="space-y-6">
           {/* Document Type */}
           <div>
@@ -118,6 +146,21 @@ const DocumentUploadModal = ({ isOpen, onClose, onUpload, editingIndex, document
             )}
           </div>
 
+          {/* Financial Document Hint */}
+          {isFinancial && (
+            <div className="p-4 bg-orange-50 border border-orange-200 rounded-xl flex items-start gap-3">
+              <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0">
+                <FileText className="w-4 h-4 text-orange-600" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-orange-800">Financial Document Restriction</p>
+                <p className="text-xs text-orange-700 mt-0.5">
+                  For financial records, only CSV or Excel files (.csv, .xls, .xlsx) are accepted for better data processing.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Attach Mode */}
           <div className="flex gap-2 text-sm">
             <Button variant={mode === 'file' ? 'gradient' : 'outline'} size="sm" onClick={() => setMode('file')}>Upload File</Button>
@@ -126,9 +169,8 @@ const DocumentUploadModal = ({ isOpen, onClose, onUpload, editingIndex, document
 
           {mode === 'file' ? (
             <div
-              className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer ${
-                dragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-blue-400 hover:bg-blue-50/50'
-              }`}
+              className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer ${dragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-blue-400 hover:bg-blue-50/50'
+                }`}
               onDragEnter={handleDrag}
               onDragLeave={handleDrag}
               onDragOver={handleDrag}
@@ -145,7 +187,7 @@ const DocumentUploadModal = ({ isOpen, onClose, onUpload, editingIndex, document
                 className="hidden"
                 id="file-upload"
                 onChange={handleFileInputChange}
-                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.txt"
+                accept={getAllowedExtensions().join(",")}
               />
               <label htmlFor="file-upload">
                 <Button variant="outline" className="cursor-pointer">
@@ -162,7 +204,11 @@ const DocumentUploadModal = ({ isOpen, onClose, onUpload, editingIndex, document
                   <LinkIcon className="w-4 h-4 mr-2" /> Attach URL
                 </Button>
               </div>
-              <p className="text-xs text-gray-500">Paste a direct link to your document (PDF, image, etc.).</p>
+              <p className="text-xs text-gray-500">
+                {isFinancial
+                  ? "Paste a direct link to your CSV or Excel file."
+                  : "Paste a direct link to your document (PDF, image, etc.)."}
+              </p>
             </div>
           )}
         </div>

@@ -7,10 +7,10 @@ import { BankTemplatesForm } from "./bank-templates-form"
 import { BankTemplateDrawer } from "./bank-template-drawer"
 import { ConfirmationDialog } from "./confirmation-dialog"
 import { BankTemplate } from "@/lib/api/payroll-api"
-import { 
-  setBankTemplates, 
-  addBankTemplate, 
-  updateBankTemplate, 
+import {
+  setBankTemplates,
+  addBankTemplate,
+  updateBankTemplate,
   removeBankTemplate,
   setBankTemplatesLoading,
   setBankTemplatesError
@@ -23,6 +23,7 @@ import { Building, CheckCircle, XCircle, FileText } from "lucide-react"
 import { toast } from "sonner"
 import { useRolePermissions } from "@/lib/hooks/useRolePermissions"
 import { PAYROLL_ACTIONS } from "@/lib/config/role-permissions"
+import { downloadAsCSV } from "@/lib/utils/export-utils"
 
 export function BankTemplatesTable() {
   const dispatch = useAppDispatch()
@@ -37,9 +38,9 @@ export function BankTemplatesTable() {
   const [isDeleting, setIsDeleting] = useState(false)
 
   // Permission checks
-  const canCreateBankTemplate = hasSpecificAction(PAYROLL_ACTIONS.CREATE_BANK_TEMPLATE)
-  const canUpdateBankTemplate = hasSpecificAction(PAYROLL_ACTIONS.UPDATE_BANK_TEMPLATE)
-  const canDeleteBankTemplate = hasSpecificAction(PAYROLL_ACTIONS.DELETE_BANK_TEMPLATE)
+  const canCreateBankTemplate = hasSpecificAction('payroll', PAYROLL_ACTIONS.CREATE_BANK_TEMPLATE)
+  const canUpdateBankTemplate = hasSpecificAction('payroll', PAYROLL_ACTIONS.UPDATE_BANK_TEMPLATE)
+  const canDeleteBankTemplate = hasSpecificAction('payroll', PAYROLL_ACTIONS.DELETE_BANK_TEMPLATE)
 
   // Load bank templates on component mount
   useEffect(() => {
@@ -90,7 +91,7 @@ export function BankTemplatesTable() {
     try {
       setIsDeleting(true)
       const response = await bankTemplatesApi.delete(deleteTemplate.id)
-      
+
       if (response.success) {
         dispatch(removeBankTemplate(deleteTemplate.id))
         toast.success("Bank template deleted successfully")
@@ -116,7 +117,7 @@ export function BankTemplatesTable() {
   const handleSubmit = async (data: any) => {
     try {
       dispatch(setBankTemplatesLoading(true))
-      
+
       if (editingTemplate) {
         // Update existing template
         const response = await bankTemplatesApi.update(editingTemplate.id, data)
@@ -136,13 +137,111 @@ export function BankTemplatesTable() {
           toast.error("Failed to create bank template")
         }
       }
-      
+
       setIsFormOpen(false)
       setEditingTemplate(null)
     } catch (error) {
       toast.error("Failed to save bank template")
     } finally {
       dispatch(setBankTemplatesLoading(false))
+    }
+  }
+
+  const handleExport = (template: BankTemplate) => {
+    try {
+      let headers: string[] = []
+      try {
+        if (typeof template.columnOrder === 'string') {
+          headers = JSON.parse(template.columnOrder)
+        } else if (Array.isArray(template.columnOrder)) {
+          headers = template.columnOrder
+        }
+      } catch (e) {
+        console.error('Error parsing column order:', e)
+      }
+
+      // If no column order is defined, use the user's requested default headers
+      if (headers.length === 0) {
+        headers = [
+          'Employee Name',
+          'Bank Name',
+          'Branch Code',
+          'Account Number',
+          'Payment Amount (Net Pay)',
+          'Payment Reference'
+        ]
+      }
+
+      const delimiter = template.delimiter || ','
+      const getDelimiterName = (d: string) => {
+        if (d === ',') return 'Comma (,)'
+        if (d === ';') return 'Semicolon (;)'
+        if (d === '|') return 'Pipe (|)'
+        if (d === '\t') return 'Tab'
+        return d
+      }
+
+      // Construct CSV content with metadata headers as requested
+      const csvRows: string[] = []
+
+      // Metadata section
+      csvRows.push(`File Format${delimiter}CSV file with header row using ${getDelimiterName(delimiter)} as delimiter`)
+      csvRows.push(`Column Order${delimiter}Columns (${headers.length})`)
+
+      // Column numbers and names
+      headers.forEach((header, index) => {
+        csvRows.push(`${index + 1}${delimiter}${header}`)
+      })
+
+      // Empty row for separation
+      csvRows.push('')
+
+      // Headers for the actual data
+      csvRows.push(headers.join(delimiter))
+
+      // Sample data mapping based on the user's requested row structure
+      const sampleValues: Record<string, string> = {
+        'Employee Name': 'John Doe',
+        'Bank Name': 'Standard Bank',
+        'Branch Code': '12345',
+        'Account Number': '1234567890',
+        'Payment Amount (Net Pay)': '2500.00',
+        'Payment Reference': 'PAY001'
+      }
+
+      const sampleRow = headers.map(header => {
+        // Try exact match or fuzzy match for sample values
+        if (sampleValues[header]) return sampleValues[header]
+
+        const h = header.toLowerCase()
+        if (h.includes('name') || h.includes('employee')) return 'John Doe'
+        if (h.includes('bank')) return 'Standard Bank'
+        if (h.includes('branch')) return '12345'
+        if (h.includes('account')) return '1234567890'
+        if (h.includes('amount') || h.includes('pay')) return '2500.00'
+        if (h.includes('reference') || h.includes('ref')) return 'PAY001'
+        return 'Sample Value'
+      })
+
+      csvRows.push(sampleRow.join(delimiter))
+
+      const csvString = csvRows.join('\n')
+      const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+
+      link.setAttribute('href', url)
+      link.setAttribute('download', `${template.name.replace(/\s+/g, '_')}.csv`)
+      link.style.visibility = 'hidden'
+
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+
+      toast.success("Bank template sample exported successfully")
+    } catch (error) {
+      console.error('Error exporting bank template:', error)
+      toast.error("Failed to export bank template")
     }
   }
 
@@ -153,9 +252,9 @@ export function BankTemplatesTable() {
       '|': { label: 'Pipe', color: 'bg-purple-100 text-purple-800' },
       '\t': { label: 'Tab', color: 'bg-orange-100 text-orange-800' }
     }
-    
+
     const config = delimiterMap[delimiter] || { label: delimiter, color: 'bg-gray-100 text-gray-800' }
-    
+
     return (
       <Badge variant="secondary" className={config.color}>
         {config.label}
@@ -270,7 +369,7 @@ export function BankTemplatesTable() {
             <p className="text-gray-600 font-normal">Manage bank file templates for different banks</p>
           </div>
           {canCreateBankTemplate && (
-            <Button 
+            <Button
               onClick={handleCreate}
               className="rounded-full gradient-primary text-white font-normal"
             >
@@ -294,6 +393,7 @@ export function BankTemplatesTable() {
           onView={handleView}
           onDelete={canDeleteBankTemplate ? handleDeleteClick : undefined}
           onBulkAction={handleBulkAction}
+          onExportRow={handleExport}
           bulkActions={bulkActions}
           loading={loading.bankTemplates}
           exportable={true}
@@ -316,6 +416,7 @@ export function BankTemplatesTable() {
         onClose={() => setIsDrawerOpen(false)}
         bankTemplate={viewingTemplate}
         onEdit={handleEdit}
+        onExport={handleExport}
       />
 
       <ConfirmationDialog

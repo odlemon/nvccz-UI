@@ -50,7 +50,7 @@ export default function VendorQuotationSubmissionPage() {
   const [deliveryTerms, setDeliveryTerms] = useState('')
   const [deliveryTime, setDeliveryTime] = useState('')
   const [notes, setNotes] = useState('')
-  
+
   const [items, setItems] = useState<QuotationItem[]>([
     {
       itemName: '',
@@ -69,7 +69,7 @@ export default function VendorQuotationSubmissionPage() {
   useEffect(() => {
     const emailParam = searchParams.get('vendorEmail')
     const nameParam = searchParams.get('vendorName')
-    
+
     if (emailParam) {
       setVendorEmail(decodeURIComponent(emailParam))
     }
@@ -120,7 +120,7 @@ export default function VendorQuotationSubmissionPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     // Validation
     if (!vendorName || !vendorEmail || !companyName || !phoneNumber || !validUntil) {
       toast.error('Please fill in all required fields')
@@ -201,7 +201,7 @@ export default function VendorQuotationSubmissionPage() {
               </div>
               <CardTitle className="text-3xl font-bold">Quotation Submitted Successfully!</CardTitle>
               <CardDescription className="text-green-50 text-lg">
-                Thank you for submitting your quotation to NVCCZ
+                Thank you for submitting your quotation to Kyntaro
               </CardDescription>
             </CardHeader>
             <CardContent className="p-8 space-y-6">
@@ -355,7 +355,7 @@ export default function VendorQuotationSubmissionPage() {
 
               {/* Action Button */}
               <div className="text-center pt-4">
-                <Button 
+                <Button
                   onClick={() => window.location.href = '/'}
                   className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-8 py-6 text-lg rounded-full"
                 >
@@ -377,7 +377,7 @@ export default function VendorQuotationSubmissionPage() {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-600 to-purple-600 rounded-full mb-4">
             <FileText className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Submit Quotation to NVCCZ</h1>
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">Submit Quotation to Kyntaro</h1>
           <p className="text-lg text-gray-600">Request for Quotation: <Badge variant="outline" className="text-base font-mono">{rfqNumber}</Badge></p>
         </div>
 
