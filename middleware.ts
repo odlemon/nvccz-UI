@@ -4,16 +4,16 @@ import type { NextRequest } from 'next/server'
 export function middleware(request: NextRequest) {
   const token = request.cookies.get(process.env.NEXT_PUBLIC_AUTH_TOKEN_KEY || 'token')
   const userProfile = request.cookies.get(process.env.NEXT_PUBLIC_AUTH_PROFILE_KEY || 'userProfile')
-  
+
   const { pathname } = request.nextUrl
 
   // Public routes that don't require authentication
   const publicRoutes = [
-    '/login', 
-    '/register', 
-    '/forgot-password', 
-    '/reset-password', 
-    '/verify-email', 
+    '/login',
+    '/register',
+    '/forgot-password',
+    '/reset-password',
+    '/verify-email',
     '/applications/form',
     '/vendor/quotation/submit',
     '/events/rsvp'
@@ -25,12 +25,12 @@ export function middleware(request: NextRequest) {
     try {
       const profile = JSON.parse(decodeURIComponent(userProfile.value))
       const roleName = profile.role?.name?.toLowerCase()
-      
+
       // Redirect applicants to their portal, everyone else to admin
       if (roleName === 'applicant') {
         return NextResponse.redirect(new URL('/application-portal', request.url))
       }
-      
+
       return NextResponse.redirect(new URL('/admin', request.url))
     } catch (error) {
       console.error('Error parsing user profile:', error)
@@ -54,7 +54,7 @@ export function middleware(request: NextRequest) {
       if (roleName === 'applicant') {
         const applicantAllowedRoutes = ['/application-portal', '/profile', '/settings', '/help', '/notifications']
         const hasAccess = applicantAllowedRoutes.some(route => pathname.startsWith(route))
-        
+
         if (!hasAccess) {
           return NextResponse.redirect(new URL('/application-portal', request.url))
         }
@@ -82,6 +82,6 @@ export const config = {
      * - favicon.ico (favicon file)
      * - public files (public folder)
      */
-    '/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|pdf)$).*)',
   ],
 }
