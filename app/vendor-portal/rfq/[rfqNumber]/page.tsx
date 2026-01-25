@@ -94,7 +94,7 @@ export default function VendorRFQDetailsPage() {
         const response = await procurementApiV2.getRFQByNumber(rfqNumber)
         if (response.success && response.data) {
           setRfqData(response.data)
-          
+
           // Initialize items from RFQ
           setItems(
             response.data.items.map((item: any) => ({
@@ -109,7 +109,7 @@ export default function VendorRFQDetailsPage() {
               specifications: item.specifications,
             }))
           )
-          
+
           // Set default valid until (30 days from now)
           const defaultValidUntil = new Date()
           defaultValidUntil.setDate(defaultValidUntil.getDate() + 30)
@@ -194,7 +194,7 @@ export default function VendorRFQDetailsPage() {
       }
 
       const response = await procurementApiV2.submitQuotation(quotationData)
-      
+
       if (response.success) {
         setSubmitted(true)
       } else {
@@ -261,7 +261,7 @@ export default function VendorRFQDetailsPage() {
               <Building2 className="h-8 w-8 text-primary" />
               <div>
                 <h1 className="text-2xl font-bold">Vendor Portal</h1>
-                <p className="text-sm text-muted-foreground">NVCCZ</p>
+                <p className="text-sm text-muted-foreground">Kyntaro</p>
               </div>
             </div>
           </div>
@@ -319,7 +319,7 @@ export default function VendorRFQDetailsPage() {
             <Building2 className="h-8 w-8 text-primary" />
             <div>
               <h1 className="text-2xl font-bold">Vendor Portal</h1>
-              <p className="text-sm text-muted-foreground">NVCCZ</p>
+              <p className="text-sm text-muted-foreground">Kyntaro</p>
             </div>
           </div>
         </div>

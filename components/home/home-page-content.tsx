@@ -17,6 +17,8 @@ import { NewsTab } from "./news-tab";
 import { EventCalendarTab } from "./event-calendar-tab";
 import { DashboardTab } from "./dashboard-tab";
 import { FinancialDataProvider } from "@/components/providers/financial-data-provider";
+import TradingViewSymbolOverview from "./trading-view-symbol-overview";
+import { TradingViewWidget } from "./trading-view";
 
 export function HomePageContent() {
   const [activeTab, setActiveTab] = useState<TabType>("news");
@@ -118,13 +120,18 @@ export function HomePageContent() {
                 </div>
                 
                 <div className="w-[40%]">
-                  <ZimbabweStockAllocation />
+                  <TradingViewWidget />
                 </div>
               </div>
 
               {/* Market Overview */}
-              <div className="w-full">
+              {/* <div className="w-full">
                 <ZimbabweStockExchange />
+              </div> */}
+
+              {/* TradingView Full Width Chart */}
+              <div className="w-full">
+                <TradingViewSymbolOverview />
               </div>
 
               {/* Sticky Tab Section - Sticks below ticker */}

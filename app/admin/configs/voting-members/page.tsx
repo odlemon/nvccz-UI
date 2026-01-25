@@ -7,9 +7,9 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Edit, Users, Shield, Loader2 } from "lucide-react"
+import { Edit, Users, Shield, Loader2, Plus, AlertTriangle } from "lucide-react"
 import { useAppDispatch, useAppSelector } from "@/lib/store"
-import { fetchBoardVotingMembers, updateVotingPower } from "@/lib/store/slices/adminSlice"
+import { fetchBoardVotingMembers, updateVotingPower, fetchUsers } from "@/lib/store/slices/adminSlice"
 import { UpdateVotingPowerDialog } from "@/components/admin/update-voting-power-dialog"
 import { toast } from "sonner"
 
@@ -62,15 +62,31 @@ function MemberCardSkeleton() {
 
 export default function VotingMembers() {
   const dispatch = useAppDispatch()
-  const { boardVotingMembers, boardVotingMembersLoading } = useAppSelector(state => state.admin)
+  const { boardVotingMembers, boardVotingMembersLoading, users } = useAppSelector(state => state.admin)
   const [showUpdateDialog, setShowUpdateDialog] = useState(false)
+  const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [selectedMember, setSelectedMember] = useState<any | null>(null)
 
   useEffect(() => {
     dispatch(fetchBoardVotingMembers())
+    dispatch(fetchUsers())
   }, [dispatch])
 
   const handleUpdateVotingPower = async (userId: string, votingPower: number) => {
+    // Calculate what the new total would be
+    const currentMember = boardVotingMembers.find(m => m.id === userId)
+    const otherMembersTotal = boardVotingMembers
+      .filter(m => m.id !== userId)
+      .reduce((sum, m) => sum + m.votingPower, 0)
+    const newTotal = otherMembersTotal + votingPower
+
+    if (newTotal > 100) {
+      toast.error('Invalid voting power distribution', {
+        description: `Total voting power cannot exceed 100%. New total would be ${newTotal}%`
+      })
+      return
+    }
+
     try {
       await dispatch(updateVotingPower({ userId, votingPower })).unwrap()
       toast.success('Voting power updated successfully')
@@ -78,6 +94,35 @@ export default function VotingMembers() {
       setSelectedMember(null)
     } catch (error: any) {
       toast.error('Failed to update voting power', {
+        description: error || 'Please try again.'
+      })
+    }
+  }
+
+  const handleCreateVotingPower = async (userId: string, votingPower: number) => {
+    // Check if user already has voting power
+    if (boardVotingMembers.find(m => m.id === userId)) {
+      toast.error('User already has voting power assigned')
+      return
+    }
+
+    // Calculate what the new total would be
+    const currentTotal = boardVotingMembers.reduce((sum, m) => sum + m.votingPower, 0)
+    const newTotal = currentTotal + votingPower
+
+    if (newTotal > 100) {
+      toast.error('Invalid voting power distribution', {
+        description: `Total voting power cannot exceed 100%. New total would be ${newTotal}%`
+      })
+      return
+    }
+
+    try {
+      await dispatch(updateVotingPower({ userId, votingPower })).unwrap()
+      toast.success('Voting power assigned successfully')
+      setShowCreateDialog(false)
+    } catch (error: any) {
+      toast.error('Failed to assign voting power', {
         description: error || 'Please try again.'
       })
     }
@@ -111,7 +156,31 @@ export default function VotingMembers() {
             <h1 className="text-3xl font-bold text-gray-900">Board Voting Members</h1>
             <p className="text-gray-600 mt-1">Manage board members and their voting powers</p>
           </div>
+          <Button
+            onClick={() => setShowCreateDialog(true)}
+            className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Assign Voting Power
+          </Button>
         </div>
+
+        {/* Validation Warning */}
+        {totalVotingPower !== 100 && !boardVotingMembersLoading && (
+          <Card className="border-orange-200 bg-orange-50">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <AlertTriangle className="w-5 h-5 text-orange-600" />
+                <div>
+                  <p className="font-semibold text-orange-900">Invalid Voting Power Distribution</p>
+                  <p className="text-sm text-orange-700">
+                    Total voting power is {totalVotingPower}%. It must equal 100% for voting to be valid.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Stats Card */}
         {boardVotingMembersLoading ? (
@@ -252,8 +321,19 @@ export default function VotingMembers() {
             }}
             member={selectedMember}
             onSubmit={handleUpdateVotingPower}
+            currentTotal={totalVotingPower}
           />
         )}
+
+        {/* Create Voting Power Dialog */}
+        <UpdateVotingPowerDialog
+          isOpen={showCreateDialog}
+          onClose={() => setShowCreateDialog(false)}
+          member={null}
+          onSubmit={handleCreateVotingPower}
+          currentTotal={totalVotingPower}
+          availableUsers={users.filter(u => !boardVotingMembers.find(m => m.id === u.id)) as any}
+        />
       </div>
     </AdminLayout>
   )

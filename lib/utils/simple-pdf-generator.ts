@@ -53,15 +53,15 @@ export const generateSimplePDF = async (
     // Header
     pdf.setFillColor(37, 99, 235) // Blue background
     pdf.rect(0, 0, 210, 35, 'F')
-    
+
     pdf.setTextColor(255, 255, 255) // White text
     pdf.setFontSize(24)
     pdf.setFont('helvetica', 'bold')
-    pdf.text('NVCCZ', 20, 18)
-    
+    pdf.text('Kyntaro', 20, 18)
+
     pdf.setFontSize(12)
     pdf.setFont('helvetica', 'normal')
-    pdf.text('National Venture Capital Company of Zimbabwe', 20, 24)
+    pdf.text('Kyntaro', 20, 24)
     pdf.text('Chisapi Cres, Harare, Zimbabwe', 20, 28)
 
     yPosition = 45

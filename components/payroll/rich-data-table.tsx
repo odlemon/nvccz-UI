@@ -8,20 +8,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { 
-  CiSearch, 
-  CiFilter, 
+import {
+  CiSearch,
+  CiFilter,
   CiEdit,
   CiTrash
 } from "react-icons/ci"
-import { 
-  ChevronUp, 
-  ChevronDown, 
-  ChevronLeft, 
-  ChevronRight, 
-  Download, 
-  Eye, 
-  MoreHorizontal 
+import {
+  ChevronUp,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  Eye,
+  MoreHorizontal
 } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 
@@ -50,6 +50,7 @@ export interface RichDataTableProps<T> {
   pageSize?: number
   exportable?: boolean
   onExport?: (data: T[]) => void
+  onExportRow?: (row: T) => void
 }
 
 export function RichDataTable<T extends { id: string }>({
@@ -67,7 +68,8 @@ export function RichDataTable<T extends { id: string }>({
   loading = false,
   pageSize = 10,
   exportable = true,
-  onExport
+  onExport,
+  onExportRow
 }: RichDataTableProps<T>) {
   const [searchTerm, setSearchTerm] = useState("")
   const [filterValue, setFilterValue] = useState("all")
@@ -117,7 +119,7 @@ export function RichDataTable<T extends { id: string }>({
               const name = (row as any).name || ''
               const nameLower = name.toLowerCase()
               let computedType = 'OTHER'
-              
+
               // Check if this is an allowance type (housing, transport, medical, short-time, leave types)
               if (nameLower.includes('housing') || nameLower.includes('house')) computedType = 'HOUSING'
               else if (nameLower.includes('transport') || nameLower.includes('travel')) computedType = 'TRANSPORT'
@@ -130,10 +132,10 @@ export function RichDataTable<T extends { id: string }>({
               else if (nameLower.includes('loan') || nameLower.includes('borrow')) computedType = 'LOAN'
               else if (nameLower.includes('pension') || nameLower.includes('retirement')) computedType = 'PENSION'
               else if (nameLower.includes('advance') || nameLower.includes('prepaid')) computedType = 'ADVANCE'
-              
+
               return computedType === filterValue
             }
-            
+
             const value: any = (row as any)[col.key as any]
             if (value == null) return false
             return value.toString() === filterValue
@@ -182,7 +184,7 @@ export function RichDataTable<T extends { id: string }>({
   const handleSort = (key: keyof T) => {
     setSortConfig(prev => {
       if (prev?.key === key) {
-        return prev.direction === 'asc' 
+        return prev.direction === 'asc'
           ? { key, direction: 'desc' }
           : null
       }
@@ -192,8 +194,8 @@ export function RichDataTable<T extends { id: string }>({
 
   // Handle row selection
   const handleSelectRow = (id: string) => {
-    setSelectedRows(prev => 
-      prev.includes(id) 
+    setSelectedRows(prev =>
+      prev.includes(id)
         ? prev.filter(rowId => rowId !== id)
         : [...prev, id]
     )
@@ -222,14 +224,14 @@ export function RichDataTable<T extends { id: string }>({
       // Default CSV export
       const csvContent = [
         columns.map(col => col.label).join(','),
-        ...sortedData.map(row => 
+        ...sortedData.map(row =>
           columns.map(col => {
             const value = row[col.key]
             return typeof value === 'string' ? `"${value}"` : value
           }).join(',')
         )
       ].join('\n')
-      
+
       const blob = new Blob([csvContent], { type: 'text/csv' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -242,7 +244,7 @@ export function RichDataTable<T extends { id: string }>({
 
   const getSortIcon = (key: keyof T) => {
     if (sortConfig?.key !== key) return null
-    return sortConfig.direction === 'asc' 
+    return sortConfig.direction === 'asc'
       ? <ChevronUp className="w-4 h-4" />
       : <ChevronDown className="w-4 h-4" />
   }
@@ -298,13 +300,13 @@ export function RichDataTable<T extends { id: string }>({
         <div className="flex items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-4 flex-1">
             <div className="relative flex-1 min-w-[200px]">
-            <CiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <Input
-              placeholder={searchPlaceholder}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 rounded-full"
-            />
+              <CiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <Input
+                placeholder={searchPlaceholder}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 rounded-full"
+              />
             </div>
             {filterOptions.length > 0 && (
               <Select value={filterValue} onValueChange={setFilterValue}>
@@ -362,16 +364,16 @@ export function RichDataTable<T extends { id: string }>({
               </div>
               <h3 className="text-lg font-medium text-gray-700 mb-2">No Data Found</h3>
               <p className="text-sm text-gray-500 mb-4">
-                {searchTerm || filterValue !== 'all' 
+                {searchTerm || filterValue !== 'all'
                   ? 'No allowance types match your current search or filter criteria.'
                   : 'No allowance types have been created yet.'
                 }
               </p>
               <div className="flex gap-2">
                 {(searchTerm || filterValue !== 'all') && (
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
+                  <Button
+                    variant="outline"
+                    size="sm"
                     className="rounded-full"
                     onClick={() => {
                       setSearchTerm('')
@@ -381,8 +383,8 @@ export function RichDataTable<T extends { id: string }>({
                     Clear Filters
                   </Button>
                 )}
-                <Button 
-                  size="sm" 
+                <Button
+                  size="sm"
                   className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-full"
                   onClick={() => window.location.reload()}
                 >
@@ -418,7 +420,7 @@ export function RichDataTable<T extends { id: string }>({
               </TableHeader>
               <TableBody>
                 {paginatedData.map(row => (
-                  <TableRow 
+                  <TableRow
                     key={row.id}
                     className="cursor-pointer hover:bg-gray-50 transition-colors duration-150"
                     onClick={() => onView?.(row)}
@@ -431,7 +433,7 @@ export function RichDataTable<T extends { id: string }>({
                     </TableCell>
                     {columns.map(column => (
                       <TableCell key={String(column.key)}>
-                        {column.render 
+                        {column.render
                           ? column.render(row[column.key], row)
                           : String(row[column.key] || '-')
                         }
@@ -451,14 +453,20 @@ export function RichDataTable<T extends { id: string }>({
                               View
                             </DropdownMenuItem>
                           )}
-                  {onEdit && (row as any).status === 'DRAFT' && (
-                    <DropdownMenuItem onClick={() => onEdit(row)}>
+                          {onExportRow && (
+                            <DropdownMenuItem onClick={() => onExportRow(row)}>
+                              <Download className="w-4 h-4 mr-2" />
+                              Export
+                            </DropdownMenuItem>
+                          )}
+                          {onEdit && (row as any).status === 'DRAFT' && (
+                            <DropdownMenuItem onClick={() => onEdit(row)}>
                               <CiEdit className="w-4 h-4 mr-2" />
                               Edit
                             </DropdownMenuItem>
                           )}
-                  {onDelete && (row as any).status !== 'COMPLETED' && (
-                            <DropdownMenuItem 
+                          {onDelete && (row as any).status !== 'COMPLETED' && (
+                            <DropdownMenuItem
                               onClick={() => onDelete(row)}
                               className="text-red-600"
                             >
@@ -492,7 +500,7 @@ export function RichDataTable<T extends { id: string }>({
               >
                 <ChevronLeft className="w-4 h-4" />
               </Button>
-              
+
               <div className="flex items-center gap-1">
                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                   const page = i + 1

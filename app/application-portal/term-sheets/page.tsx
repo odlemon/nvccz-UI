@@ -273,7 +273,7 @@ export default function TermSheetsPage() {
                           )}
                         </PDFComponents.PDFDownloadLink>
                       )}
-                      {!termSheet.applicantSignature && termSheet.isFinal && (
+                      {!termSheet.applicantSignature && !termSheet.isSigned && (
                         <Button
                           onClick={() => handleSignTermSheetClick(termSheet)}
                           disabled={signingTermSheet === termSheet.id}

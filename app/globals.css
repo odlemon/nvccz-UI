@@ -4,7 +4,7 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* NVCCZ Blue Theme - Light Mode */
+  /* Kyntaro Blue Theme - Light Mode */
   --background: oklch(1 0 0); /* Pure white main background */
   --foreground: oklch(0.20 0.02 255); /* Dark blue-tinted text */
   --card: oklch(1 0 0); /* Pure white cards */
@@ -41,7 +41,7 @@
 }
 
 .dark {
-  /* NVCCZ Blue Theme - Dark Mode */
+  /* Kyntaro Blue Theme - Dark Mode */
   --background: oklch(0.20 0.02 255); /* Dark blue background */
   --foreground: oklch(0.98 0 0); /* Near white text */
   --card: oklch(0.26 0.02 255); /* Dark blue cards */

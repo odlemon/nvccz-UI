@@ -4,7 +4,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { BankTemplate } from "@/lib/api/payroll-api"
-import { FileText, CheckCircle, XCircle, Clock, Edit, X, GripVertical } from "lucide-react"
+import { FileText, CheckCircle, XCircle, Clock, Edit, X, GripVertical, Download } from "lucide-react"
 import { useRolePermissions } from "@/lib/hooks/useRolePermissions"
 import { PAYROLL_ACTIONS } from "@/lib/config/role-permissions"
 
@@ -13,13 +13,14 @@ interface BankTemplateDrawerProps {
   onClose: () => void
   bankTemplate: BankTemplate | null
   onEdit?: (bankTemplate: BankTemplate) => void
+  onExport?: (bankTemplate: BankTemplate) => void
 }
 
-export function BankTemplateDrawer({ isOpen, onClose, bankTemplate, onEdit }: BankTemplateDrawerProps) {
+export function BankTemplateDrawer({ isOpen, onClose, bankTemplate, onEdit, onExport }: BankTemplateDrawerProps) {
   if (!bankTemplate) return null
 
   const { hasSpecificAction } = useRolePermissions()
-  const canUpdateBankTemplate = hasSpecificAction(PAYROLL_ACTIONS.UPDATE_BANK_TEMPLATE)
+  const canUpdateBankTemplate = hasSpecificAction('payroll', PAYROLL_ACTIONS.UPDATE_BANK_TEMPLATE)
 
   const handleEdit = () => {
     if (onEdit) {
@@ -34,9 +35,9 @@ export function BankTemplateDrawer({ isOpen, onClose, bankTemplate, onEdit }: Ba
       '|': { label: 'Pipe', color: 'bg-purple-100 text-purple-800' },
       '\t': { label: 'Tab', color: 'bg-orange-100 text-orange-800' }
     }
-    
+
     const config = delimiterMap[delimiter] || { label: delimiter, color: 'bg-gray-100 text-gray-800' }
-    
+
     return (
       <Badge className={config.color}>
         {config.label}
@@ -51,7 +52,7 @@ export function BankTemplateDrawer({ isOpen, onClose, bankTemplate, onEdit }: Ba
       '|': 'Pipe (|)',
       '\t': 'Tab'
     }
-    
+
     return delimiterMap[delimiter] || delimiter
   }
 
@@ -89,6 +90,17 @@ export function BankTemplateDrawer({ isOpen, onClose, bankTemplate, onEdit }: Ba
                   title="Edit Bank Template"
                 >
                   <Edit className="w-4 h-4" />
+                </Button>
+              )}
+              {onExport && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="rounded-full w-9 h-9 p-0 bg-blue-50 text-blue-600 hover:bg-blue-100"
+                  onClick={() => onExport(bankTemplate)}
+                  title="Export Bank Template"
+                >
+                  <Download className="w-4 h-4" />
                 </Button>
               )}
               <Button
@@ -155,7 +167,7 @@ export function BankTemplateDrawer({ isOpen, onClose, bankTemplate, onEdit }: Ba
               <div>
                 <label className="text-sm font-medium text-gray-500">File Format</label>
                 <div className="text-sm text-gray-900 mt-1">
-                  {bankTemplate.hasHeader 
+                  {bankTemplate.hasHeader
                     ? `CSV file with header row, using ${getDelimiterDisplay(bankTemplate.delimiter)} as delimiter`
                     : `CSV file without header row, using ${getDelimiterDisplay(bankTemplate.delimiter)} as delimiter`
                   }
@@ -176,7 +188,7 @@ export function BankTemplateDrawer({ isOpen, onClose, bankTemplate, onEdit }: Ba
               <div>
                 <label className="text-sm font-medium text-gray-500">Columns ({columnOrder.length})</label>
                 <div className="mt-2 space-y-2">
-                  {columnOrder.length > 0 ? columnOrder.map((column, index) => (
+                  {columnOrder.length > 0 ? columnOrder.map((column: string, index: number) => (
                     <div key={index} className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
                       <div className="w-6 h-6 bg-blue-100 text-blue-800 rounded-full flex items-center justify-center text-xs font-medium">
                         {index + 1}

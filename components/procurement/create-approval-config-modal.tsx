@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -213,6 +213,9 @@ export function CreateApprovalConfigModal({ isOpen, onClose, onSuccess }: Create
             <Settings className="w-6 h-6" />
             Create Approval Configuration
           </DialogTitle>
+          <DialogDescription>
+            Configure approval workflows and steps for procurement processes
+          </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">

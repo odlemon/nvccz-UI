@@ -36,7 +36,7 @@ type TabConfig = {
 const mainTabs: TabConfig[] = [
   {
     id: 'all',
-    label: 'All Requisitions',
+    label: 'My Sent requisitions',
     icon: FileText,
     gradient: 'from-blue-500 to-blue-600'
   },

@@ -20,6 +20,7 @@ import usersSlice from "./slices/usersSlice"
 import taskSlice from "./slices/taskSlice"
 import accountingReducer from "./slices/accountingSlice"
 import invoicesReducer from "./slices/invoices-slice"
+import purchaseInvoicesReducer from "./slices/purchase-invoices-slice"
 import accountingReducer2 from "./slices/accountingSlice"
 import eventsReducer from './slices/eventsSlice';
 import eventWizardReducer from './slices/eventWizardSlice'
@@ -52,6 +53,7 @@ export const store = configureStore({
     tasks: taskSlice,
     accounting: accountingReducer,
     invoices: invoicesReducer,
+    purchaseInvoices: purchaseInvoicesReducer,
     events: eventsReducer,
     eventWizard: eventWizardReducer,
     analytics: analyticsReducer,

@@ -3,10 +3,10 @@
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useAppDispatch, useAppSelector } from "@/lib/store"
-import { 
-  updateFormField, 
-  nextStep, 
-  previousStep, 
+import {
+  updateFormField,
+  nextStep,
+  previousStep,
   setCurrentStep,
   setSubmitting,
   resetForm,
@@ -22,11 +22,13 @@ import * as yup from "yup"
 // import Step3 from "../components/Step3"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
-import { Download, FileText } from "lucide-react"
+import { FileText, Download, Upload, Check, ChevronRight, ChevronLeft, Loader2, Eye } from "lucide-react"
 import Step1 from "@/app/portfolio/applications/components/Step1"
 import Step2 from "@/app/portfolio/applications/components/Step2"
 import Step3 from "@/app/portfolio/applications/components/Step3"
 import StepperProgress from "@/app/portfolio/applications/components/StepperProgress"
+import NDAModal from "@/app/portfolio/applications/components/NDAModal"
+import { Checkbox } from "@/components/ui/checkbox"
 
 // Validation schemas for each step
 const step1Schema = yup.object({
@@ -35,7 +37,8 @@ const step1Schema = yup.object({
   applicantEmail: yup.string().email("Invalid email").required("Email is required"),
   applicantPhone: yup.string().required("Phone number is required"),
   phoneCountryCode: yup.string().required("Country code is required"),
-  applicantAddress: yup.string().required("Address is required")
+  applicantAddress: yup.string().required("Address is required"),
+  agreedToNDA: yup.boolean().oneOf([true], "You must agree to the NDA terms to proceed").required()
 })
 
 const step2Schema = yup.object({
@@ -49,7 +52,7 @@ const step2Schema = yup.object({
 
 const step3Schema = yup.object({
   documents: yup.array().test('required-docs', 'Please upload all required documents with files', (docs: any) => {
-    const required = ['BUSINESS_PLAN','PROOF_OF_CONCEPT','MARKET_RESEARCH','PROJECTED_CASH_FLOWS']
+    const required = ['BUSINESS_PLAN', 'PROOF_OF_CONCEPT', 'MARKET_RESEARCH', 'PROJECTED_CASH_FLOWS']
     const uploadedDocs = (docs || []).filter((d: any) => d && d.documentType && d.file)
     const uploadedTypes = new Set(uploadedDocs.map((d: any) => d.documentType))
     return required.every(t => uploadedTypes.has(t))
@@ -61,6 +64,8 @@ export default function ApplicationFormPage() {
   const applicationState = useAppSelector(state => state.application)
   const { currentStep, isSubmitting, errors, submitError, ...formData } = applicationState
   const router = useRouter()
+
+  const [ndaModalOpen, setNdaModalOpen] = useState(false)
 
   const updateField = (field: string, value: any) => {
     dispatch(updateFormField({ field: field as any, value }))
@@ -82,7 +87,7 @@ export default function ApplicationFormPage() {
         default:
           return true
       }
-      
+
       await schema.validate(formData, { abortEarly: false })
       dispatch(clearErrors())
       return true
@@ -119,7 +124,7 @@ export default function ApplicationFormPage() {
       })
       return
     }
-    
+
     // Check if files are present
     const filesPresent = applicationState.documents.some(doc => doc.file)
     if (!filesPresent) {
@@ -128,21 +133,22 @@ export default function ApplicationFormPage() {
       })
       return
     }
-    
+
     try {
       const result = await dispatch(submitApplication(applicationState))
-      
+
       if (submitApplication.fulfilled.match(result)) {
         toast.success('Application created successfully')
         router.push('/applications/form/success')
       } else {
-        toast.error('Failed to submit application', { 
-          description: submitError || 'Please try again.' 
+        const errorMsg = (result.payload as string) || 'Please try again.'
+        toast.error('Failed to submit application', {
+          description: errorMsg
         })
       }
     } catch (error: any) {
-      toast.error('Failed to submit application', { 
-        description: error?.message || 'Please try again.' 
+      toast.error('Failed to submit application', {
+        description: error?.message || 'Please try again.'
       })
     }
   }
@@ -161,86 +167,117 @@ export default function ApplicationFormPage() {
   }
 
   return (
-      <div className="min-h-screen bg-white py-8">
-        <div className="max-w-6xl mx-auto px-12">
-          {/* Header */}
-          <div className="mb-8">
-            <div className="text-center">
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Investment Application</h1>
-              <p className="text-gray-600">Complete your application in 3 simple steps</p>
-            </div>
-            
-            {/* NDA Download Section */}
+    <div className="min-h-screen bg-white py-8">
+      <div className="max-w-6xl mx-auto px-12">
+        {/* Header */}
+        <div className="mb-8">
+          <div className="text-center">
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Investment Application</h1>
+            <p className="text-gray-600">Complete your application in 3 simple steps</p>
+          </div>
+
+          {/* NDA Agreement Section - Only show in Step 1 */}
+          {currentStep === 1 && (
             <div className="mt-6 flex justify-center">
-              <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-4 max-w-2xl w-full">
-                <div className="flex items-start gap-4">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">
-                    <FileText className="w-5 h-5 text-white" />
+              <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-2xl p-6 max-w-2xl w-full shadow-sm">
+                <div className="flex items-start gap-5">
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0 shadow-md">
+                    <FileText className="w-6 h-6 text-white" />
                   </div>
                   <div className="flex-1">
-                    <h3 className="font-semibold text-gray-900 mb-1">Required Document</h3>
-                    <p className="text-sm text-gray-700 mb-3">
-                      Please download and review our Non-Disclosure & Confidentiality Agreement before proceeding with your application.
+                    <h3 className="text-lg font-bold text-gray-900 mb-1">NDA Agreement</h3>
+                    <p className="text-sm text-gray-600 mb-4 leading-relaxed">
+                      To protect your business information and our investment process, please review and agree to our Non-Disclosure & Confidentiality Agreement.
                     </p>
-                    <a 
-                      href="/NVCCZ_ONLINE_NON_DISCLOSURE_CONFIDENTIALITY_AGREEMENT.docx" 
-                      download="NVCCZ_NDA_Agreement.docx"
-                      className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-blue-300 hover:bg-blue-50 text-blue-700 rounded-full text-sm font-medium transition-colors shadow-sm"
-                    >
-                      <Download className="w-4 h-4" />
-                      Download NDA Agreement
-                    </a>
+
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setNdaModalOpen(true)}
+                        className="rounded-full px-6 border-blue-200 hover:bg-blue-50 text-blue-700 font-semibold transition-all"
+                      >
+                        <Eye className="w-4 h-4 mr-2" />
+                        View NDA Terms
+                      </Button>
+
+                      <div className="flex items-center space-x-3 p-2 rounded-lg hover:bg-white/50 transition-colors cursor-pointer" onClick={() => updateField('agreedToNDA', !formData.agreedToNDA)}>
+                        <Checkbox
+                          id="nda-agree"
+                          checked={formData.agreedToNDA}
+                          onCheckedChange={(checked) => updateField('agreedToNDA', checked === true)}
+                          className="w-5 h-5 rounded-md border-blue-300 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                        />
+                        <label
+                          htmlFor="nda-agree"
+                          className="text-sm font-medium text-gray-700 cursor-pointer select-none"
+                        >
+                          I agree to the NDA terms
+                        </label>
+                      </div>
+                    </div>
+                    {errors.agreedToNDA && (
+                      <p className="text-red-500 text-xs mt-2 font-medium bg-red-50 p-2 rounded-md border border-red-100 flex items-center gap-2">
+                        {errors.agreedToNDA}
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
             </div>
+          )}
 
-            <div className="mt-4 flex items-center justify-center gap-4">
-              <a href="/" className="text-sm text-gray-600 hover:text-gray-800 underline-offset-4 hover:underline">Cancel application</a>
-              <span className="text-gray-300">|</span>
-              <a href="/login" className="text-sm text-blue-600 hover:text-blue-700 underline-offset-4 hover:underline">Go to login</a>
-            </div>
+          <div className="mt-4 flex items-center justify-center gap-4">
+            <a href="/" className="text-sm text-gray-600 hover:text-gray-800 underline-offset-4 hover:underline">Cancel application</a>
+            <span className="text-gray-300">|</span>
+            <a href="/login" className="text-sm text-blue-600 hover:text-blue-700 underline-offset-4 hover:underline">Go to login</a>
           </div>
+        </div>
 
-          {/* Stepper Progress */}
-          <StepperProgress currentStep={currentStep} />
+        <NDAModal
+          isOpen={ndaModalOpen}
+          onClose={() => setNdaModalOpen(false)}
+        />
 
-          {/* Form Content */}
-          <div className="bg-white rounded-xl border border-gray-200 p-8 shadow-sm">
-            <AnimatePresence mode="wait">
-              {renderStep()}
-            </AnimatePresence>
+        {/* Stepper Progress */}
+        <StepperProgress currentStep={currentStep} />
 
-            {/* Navigation Buttons */}
-            <div className="flex justify-between mt-8 pt-6 border-t border-gray-200">
+        {/* Form Content */}
+        <div className="bg-white rounded-xl border border-gray-200 p-8 shadow-sm">
+          <AnimatePresence mode="wait">
+            {renderStep()}
+          </AnimatePresence>
+
+          {/* Navigation Buttons */}
+          <div className="flex justify-between mt-8 pt-6 border-t border-gray-200">
+            <Button
+              variant="outline"
+              onClick={handlePrevious}
+              disabled={currentStep === 1}
+              className="px-6"
+            >
+              Previous
+            </Button>
+
+            {currentStep < 3 ? (
               <Button
-                variant="outline"
-                onClick={handlePrevious}
-                disabled={currentStep === 1}
-                className="px-6"
+                onClick={handleNext}
+                className="px-6 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-full"
               >
-                Previous
+                Next
               </Button>
-
-              {currentStep < 3 ? (
-                <Button
-                  onClick={handleNext}
-                  className="px-6 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-full"
-                >
-                  Next
-                </Button>
-              ) : (
-                <Button
-                  onClick={handleSubmit}
-                  disabled={isSubmitting}
-                  className="px-6 bg-gradient-to-r from-green-500 to-blue-600 hover:from-green-600 hover:to-blue-700 text-white rounded-full"
-                >
-                  {isSubmitting ? "Submitting..." : "Submit Application"}
-                </Button>
-              )}
-            </div>
+            ) : (
+              <Button
+                onClick={handleSubmit}
+                disabled={isSubmitting}
+                className="px-6 bg-gradient-to-r from-green-500 to-blue-600 hover:from-green-600 hover:to-blue-700 text-white rounded-full"
+              >
+                {isSubmitting ? "Submitting..." : "Submit Application"}
+              </Button>
+            )}
           </div>
         </div>
       </div>
+    </div>
   )
 }

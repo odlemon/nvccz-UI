@@ -19,7 +19,7 @@ export interface ApplicationFormData {
   applicantPhone: string
   phoneCountryCode: string
   applicantAddress: string
-  
+
   // Step 2: Business Information
   businessName: string
   businessDescription: string
@@ -27,17 +27,17 @@ export interface ApplicationFormData {
   businessStage: 'STARTUP' | 'GROWTH' | 'MATURE' | 'EXPANSION'
   foundingDate: string
   requestedAmount: number
-  
+
   // Step 3: Documents
   documents: Document[]
-  
+
   // Form state
   currentStep: number
   isSubmitting: boolean
   errors: Record<string, string>
   lastResponse?: any
   submitError?: string
-  
+
   // Applications list state
   applications: Application[]
   isLoading: boolean
@@ -63,6 +63,7 @@ export interface ApplicationFormData {
   investmentImplementationLoadingByApp: Record<string, boolean>
   disbursementSummaryByApp: Record<string, any>
   disbursementSummaryLoadingByApp: Record<string, boolean>
+  agreedToNDA: boolean
 }
 
 export const fetchLatestApplicationById = createAsyncThunk(
@@ -117,7 +118,8 @@ const initialState: ApplicationFormData = {
   investmentImplementationByApp: {},
   investmentImplementationLoadingByApp: {},
   disbursementSummaryByApp: {},
-  disbursementSummaryLoadingByApp: {}
+  disbursementSummaryLoadingByApp: {},
+  agreedToNDA: false
 }
 
 // Async thunk for submitting application
@@ -128,14 +130,14 @@ export const submitApplication = createAsyncThunk(
       // Extract files and document types from documents
       const files: File[] = []
       const documentTypes: string[] = []
-      
+
       formData.documents.forEach((doc) => {
         if (doc.file) {
           files.push(doc.file)
           documentTypes.push(doc.documentType)
         }
       })
-      
+
       if (files.length === 0) {
         return rejectWithValue('Please upload at least one document')
       }
@@ -158,7 +160,8 @@ export const submitApplication = createAsyncThunk(
       const response = await applicationsApi.create(payload)
       return response
     } catch (error: any) {
-      return rejectWithValue(error.message || 'Failed to submit application')
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to submit application'
+      return rejectWithValue(errorMessage)
     }
   }
 )
@@ -391,53 +394,53 @@ const applicationSlice = createSlice({
         delete state.errors[field as string];
       }
     },
-    
+
     updateDocument: (state, action: PayloadAction<{ index: number; document: Partial<Document> }>) => {
       const { index, document } = action.payload
       if (state.documents[index]) {
         state.documents[index] = { ...state.documents[index], ...document }
       }
     },
-    
+
     addDocument: (state, action: PayloadAction<Document>) => {
       state.documents.push(action.payload)
     },
-    
+
     removeDocument: (state, action: PayloadAction<number>) => {
       state.documents.splice(action.payload, 1)
     },
-    
+
     setCurrentStep: (state, action: PayloadAction<number>) => {
       state.currentStep = action.payload
     },
-    
+
     nextStep: (state) => {
       if (state.currentStep < 3) {
         state.currentStep += 1
       }
     },
-    
+
     previousStep: (state) => {
       if (state.currentStep > 1) {
         state.currentStep -= 1
       }
     },
-    
+
     setErrors: (state, action: PayloadAction<Record<string, string>>) => {
       state.errors = action.payload
     },
-    
+
     clearErrors: (state) => {
       state.errors = {}
     },
-    
+
     setSubmitting: (state, action: PayloadAction<boolean>) => {
       state.isSubmitting = action.payload
     },
     setLastResponse: (state, action: PayloadAction<any>) => {
       state.lastResponse = action.payload
     },
-    
+
     resetForm: (state) => {
       return { ...initialState }
     }

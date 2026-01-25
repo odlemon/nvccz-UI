@@ -195,6 +195,118 @@ export interface Supplier {
 
 // Removed duplicate Invoice interface - using the one above with proper types
 
+// Purchase Invoice interfaces
+export interface PurchaseInvoiceItem {
+  itemName: string
+  description: string
+  quantity: number
+  unitPrice: number
+  totalPrice?: number
+  unit: string
+  vatRate: number
+}
+
+export interface PurchaseInvoice {
+  id: string
+  invoiceNumber: string
+  vendorId: string
+  invoiceDate: string
+  dueDate: string
+  subtotal: string
+  vatAmount: string
+  totalAmount: string
+  currencyId: string
+  description: string
+  status: 'DRAFT' | 'POSTED'
+  paymentStatus: 'PENDING' | 'PAID'
+  paymentMethod: string | null
+  isTaxable: boolean
+  journalEntryId: string | null
+  paymentJournalEntryId: string | null
+  cashbookEntryId: string | null
+  paidAmount: string
+  outstandingAmount: string
+  paymentDate: string | null
+  paymentReference: string | null
+  notes: string
+  createdById: string
+  createdAt: string
+  updatedAt: string
+  vendor: {
+    id: string
+    name: string
+    taxNumber: string
+    contactPerson: string
+    email: string
+    phone: string
+    address: string
+    paymentTerms: string
+    isActive: boolean
+    createdAt: string
+    updatedAt: string
+  }
+  currency: AccountingCurrency
+  journalEntry: {
+    id: string
+    referenceNumber: string
+    status: string
+  } | null
+  paymentJournalEntry: any | null
+  items: PurchaseInvoiceItem[]
+}
+
+export interface CreatePurchaseInvoiceRequest {
+  vendorId: string
+  invoiceDate: string
+  dueDate: string
+  currencyId: string
+  description: string
+  items: PurchaseInvoiceItem[]
+  isTaxable: boolean
+  invoiceNumber?: string
+  notes?: string
+}
+
+export interface UpdatePurchaseInvoiceRequest {
+  vendorId?: string
+  invoiceDate?: string
+  dueDate?: string
+  description?: string
+  items?: PurchaseInvoiceItem[]
+  isTaxable?: boolean
+  notes?: string
+}
+
+export interface SubmitPurchaseInvoiceRequest {
+  paymentMethod: 'BANK' | 'CASH'
+  expenseAccountId: string
+  bankId: string
+}
+
+export interface PayPurchaseInvoiceRequest {
+  paymentMethod: 'BANK' | 'CASH'
+  bankId: string
+  paymentDate: string
+  paymentReference?: string
+  notes?: string
+}
+
+export interface PurchaseInvoicesResponse {
+  invoices: PurchaseInvoice[]
+  total: number
+  page: number
+  totalPages: number
+}
+
+export interface PurchaseInvoiceBank {
+  id: string
+  name: string
+  accountNumber: string
+  currency: AccountingCurrency
+  glAccount: ChartOfAccount
+  isActive: boolean
+}
+
 // Asset interfaces
 export interface Asset {
   id: string
@@ -1521,6 +1633,66 @@ class AccountingApiService {
   }
   async rejectBankReconciliationResult(resultId: string): Promise<AccountingResponse<void>> {
     return apiClient.post<AccountingResponse<void>>(`/accounting/bank-reconciliation/results/${resultId}/reject`, {})
+  }
+
+  // Purchase Invoices (Accounts Payable)
+  async getPurchaseInvoices(params?: {
+    page?: number
+    limit?: number
+    status?: 'DRAFT' | 'POSTED'
+    paymentStatus?: 'PENDING' | 'PAID'
+    search?: string
+    vendorId?: string
+    currencyId?: string
+    startDate?: string
+    endDate?: string
+  }): Promise<AccountingResponse<PurchaseInvoicesResponse>> {
+    const queryParams = new URLSearchParams()
+    
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          queryParams.append(key, String(value))
+        }
+      })
+    }
+
+    const queryString = queryParams.toString()
+    const url = queryString ? `/accounting/purchase-invoices?${queryString}` : '/accounting/purchase-invoices'
+
+    return apiClient.get<AccountingResponse<PurchaseInvoicesResponse>>(url)
+  }
+
+  async getPurchaseInvoiceById(id: string): Promise<AccountingResponse<PurchaseInvoice>> {
+    return apiClient.get<AccountingResponse<PurchaseInvoice>>(`/accounting/purchase-invoices/${id}`)
+  }
+
+  async createPurchaseInvoice(data: CreatePurchaseInvoiceRequest): Promise<AccountingResponse<PurchaseInvoice>> {
+    return apiClient.post<AccountingResponse<PurchaseInvoice>>('/accounting/purchase-invoices', data)
+  }
+
+  async updatePurchaseInvoice(id: string, data: UpdatePurchaseInvoiceRequest): Promise<AccountingResponse<PurchaseInvoice>> {
+    return apiClient.put<AccountingResponse<PurchaseInvoice>>(`/accounting/purchase-invoices/${id}`, data)
+  }
+
+  async deletePurchaseInvoice(id: string): Promise<AccountingResponse<any>> {
+    return apiClient.delete<AccountingResponse<any>>(`/accounting/purchase-invoices/${id}`)
+  }
+
+  async submitPurchaseInvoice(id: string, data: SubmitPurchaseInvoiceRequest): Promise<AccountingResponse<PurchaseInvoice>> {
+    return apiClient.post<AccountingResponse<PurchaseInvoice>>(`/accounting/purchase-invoices/${id}/submit`, data)
+  }
+
+  async payPurchaseInvoice(id: string, data: PayPurchaseInvoiceRequest): Promise<AccountingResponse<PurchaseInvoice>> {
+    return apiClient.post<AccountingResponse<PurchaseInvoice>>(`/accounting/purchase-invoices/${id}/pay`, data)
+  }
+
+  async getPurchaseInvoiceBanks(): Promise<AccountingResponse<PurchaseInvoiceBank[]>> {
+    return apiClient.get<AccountingResponse<PurchaseInvoiceBank[]>>('/accounting/purchase-invoices/banks')
+  }
+
+  async getPurchaseInvoiceExpenseAccounts(): Promise<AccountingResponse<ChartOfAccount[]>> {
+    return apiClient.get<AccountingResponse<ChartOfAccount[]>>('/accounting/purchase-invoices/expense-accounts')
   }
 
 }

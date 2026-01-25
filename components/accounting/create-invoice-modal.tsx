@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useDispatch } from "react-redux"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -208,11 +208,11 @@ export function CreateInvoiceModal({
             </div>
             <div>
               <span>{isEditing ? 'Edit Invoice' : 'Create New Invoice'}</span>
-              <p className="text-sm text-gray-500 font-normal">
-                {isEditing ? 'Update invoice details' : 'Create a new customer invoice'}
-              </p>
             </div>
           </DialogTitle>
+          <DialogDescription>
+            {isEditing ? 'Update invoice details' : 'Create a new customer invoice'}
+          </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -240,9 +240,9 @@ export function CreateInvoiceModal({
                       </SelectItem>
                     ))
                   ) : (
-                    <SelectItem value="" disabled>
+                    <div className="px-2 py-1.5 text-sm text-muted-foreground">
                       No customers available
-                    </SelectItem>
+                    </div>
                   )}
                 </SelectContent>
               </Select>
@@ -269,9 +269,9 @@ export function CreateInvoiceModal({
                       </SelectItem>
                     ))
                   ) : (
-                    <SelectItem value="" disabled>
+                    <div className="px-2 py-1.5 text-sm text-muted-foreground">
                       No currencies available
-                    </SelectItem>
+                    </div>
                   )}
                 </SelectContent>
               </Select>

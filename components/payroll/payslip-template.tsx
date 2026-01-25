@@ -30,7 +30,7 @@ export const PayslipTemplate = forwardRef<HTMLDivElement, PayslipTemplateProps>(
     }
 
     return (
-      <div ref={ref} className="bg-white p-8 max-w-4xl mx-auto" style={{ 
+      <div ref={ref} className="bg-white p-8 max-w-4xl mx-auto" style={{
         fontFamily: 'Arial, sans-serif',
         backgroundColor: '#ffffff',
         color: '#000000'
@@ -39,11 +39,11 @@ export const PayslipTemplate = forwardRef<HTMLDivElement, PayslipTemplateProps>(
         <div className="text-center mb-8">
           <div className="flex items-center justify-center mb-4">
             <div className="w-16 h-16 rounded-lg flex items-center justify-center text-white font-bold text-xl mr-4" style={{ backgroundColor: '#2563eb' }}>
-              NVCCZ
+              Kyntaro
             </div>
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">NVCCZ</h1>
-              <p className="text-gray-600">National Venture Capital Company of Zimbabwe</p>
+              <h1 className="text-3xl font-bold text-gray-900">Kyntaro</h1>
+              <p className="text-gray-600">Kyntaro</p>
               <p className="text-sm text-gray-500">Chisapi Cres, Harare, Zimbabwe</p>
             </div>
           </div>
@@ -184,9 +184,9 @@ export const PayslipTemplate = forwardRef<HTMLDivElement, PayslipTemplateProps>(
 
         {/* Net Pay */}
         <div className="text-center mb-8">
-          <div className="rounded-lg p-6" style={{ 
-            backgroundColor: '#eff6ff', 
-            border: '2px solid #dbeafe' 
+          <div className="rounded-lg p-6" style={{
+            backgroundColor: '#eff6ff',
+            border: '2px solid #dbeafe'
           }}>
             <h3 className="text-xl font-bold mb-2" style={{ color: '#1e40af' }}>Net Pay (Rounded)</h3>
             <div className="text-3xl font-bold" style={{ color: '#1e3a8a' }}>{formatCurrency(payslip.netPay)}</div>

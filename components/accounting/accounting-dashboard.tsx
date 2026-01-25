@@ -28,7 +28,7 @@ import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts"
 import { accountingApi } from "@/lib/api/accounting-api"  // Add import for accounting API
 
 interface FinancialChartPoint {
-  month: string
+  date: string
   sales: number
   credits: number
 }
@@ -37,7 +37,7 @@ interface FinancialChartProps {
   data: FinancialChartPoint[]
 }
 
-// Financial chart component matching PayrollChart exactly
+// Financial chart component matching PayrollChart exactly but with daily granularity
 function FinancialChart({ data }: FinancialChartProps) {
   const config = {
     sales: { label: "Sales Revenue", color: "#60a5fa" },
@@ -48,37 +48,52 @@ function FinancialChart({ data }: FinancialChartProps) {
     <ChartContainer config={config} className="w-full h-80">
       <AreaChart data={data} margin={{ left: 16, right: 16, top: 10, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" />
-        <XAxis 
-          dataKey="month" 
-          tickLine={false} 
-          axisLine={false} 
-          tick={{ fontSize: 14, fill: '#111827' }} 
+        <XAxis
+          dataKey="date"
+          tickLine={false}
+          axisLine={false}
+          tick={{ fontSize: 14, fill: '#111827' }}
+          tickFormatter={(value) => {
+            const date = new Date(value);
+            // Only show the tick at the 1st of each month to keep it clean
+            return date.getDate() === 1 ? format(date, "MMM") : "";
+          }}
+          interval={0} // Force evaluation for every date to catch the 1st
         />
-        <YAxis 
-          tickFormatter={(v) => `$${Number(v).toLocaleString()}`} 
-          tickLine={false} 
-          axisLine={false} 
-          width={88} 
-          tick={{ fontSize: 14, fill: '#111827' }} 
+        <YAxis
+          tickFormatter={(v) => `$${Number(v).toLocaleString()}`}
+          tickLine={false}
+          axisLine={false}
+          width={88}
+          tick={{ fontSize: 14, fill: '#111827' }}
         />
-        <ChartTooltip content={<ChartTooltipContent className="text-sm" />} />
-        <Area 
-          type="monotone" 
-          dataKey="sales" 
-          stroke="var(--color-sales)" 
-          strokeWidth={5} 
-          fill="var(--color-sales)" 
-          fillOpacity={0.2} 
-          dot={{ r: 4 }} 
+        <ChartTooltip
+          content={
+            <ChartTooltipContent
+              className="text-sm"
+              labelFormatter={(value) => format(new Date(value), "MMM dd, yyyy")}
+            />
+          }
         />
-        <Area 
-          type="monotone" 
-          dataKey="credits" 
-          stroke="var(--color-credits)" 
-          strokeWidth={5} 
-          fill="var(--color-credits)" 
-          fillOpacity={0.2} 
-          dot={{ r: 4 }} 
+        <Area
+          type="monotone"
+          dataKey="sales"
+          stroke="var(--color-sales)"
+          strokeWidth={3}
+          fill="var(--color-sales)"
+          fillOpacity={0.2}
+          dot={false}
+          activeDot={{ r: 4 }}
+        />
+        <Area
+          type="monotone"
+          dataKey="credits"
+          stroke="var(--color-credits)"
+          strokeWidth={3}
+          fill="var(--color-credits)"
+          fillOpacity={0.2}
+          dot={false}
+          activeDot={{ r: 4 }}
         />
       </AreaChart>
     </ChartContainer>
@@ -87,7 +102,7 @@ function FinancialChart({ data }: FinancialChartProps) {
 
 export function AccountingDashboard() {
   const dispatch = useDispatch<AppDispatch>()
-  
+
   const {
     dashboardStats,
     chartData,
@@ -119,7 +134,7 @@ export function AccountingDashboard() {
       icon: FileText
     },
     {
-      title: "Credit Notes", 
+      title: "Credit Notes",
       value: dashboardStats?.creditNotes.count || 0,
       amount: `$${(dashboardStats?.creditNotes.totalAmount || 0).toLocaleString()}`,
       change: `${Math.abs(dashboardStats?.creditNotes.change || 0).toFixed(1)}% from last month`,
@@ -128,7 +143,7 @@ export function AccountingDashboard() {
     },
     {
       title: "Active Customers",
-      value: dashboardStats?.customers.count || 0, 
+      value: dashboardStats?.customers.count || 0,
       amount: `$${(dashboardStats?.customers.totalValue || 0).toLocaleString()}`,
       change: `${Math.abs(dashboardStats?.customers.change || 0).toFixed(1)}% from last month`,
       trend: (dashboardStats?.customers.change || 0) >= 0 ? "up" : "down",
@@ -137,7 +152,7 @@ export function AccountingDashboard() {
     {
       title: "Expenses",
       value: dashboardStats?.expenses.count || 0,
-      amount: `$${(dashboardStats?.expenses.totalAmount || 0).toLocaleString()}`, 
+      amount: `$${(dashboardStats?.expenses.totalAmount || 0).toLocaleString()}`,
       change: `${Math.abs(dashboardStats?.expenses.change || 0).toFixed(1)}% from last month`,
       trend: (dashboardStats?.expenses.change || 0) >= 0 ? "up" : "down",
       icon: Receipt
