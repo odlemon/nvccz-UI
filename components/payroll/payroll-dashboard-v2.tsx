@@ -149,7 +149,7 @@ export function PayrollDashboardV2() {
                     <h1 className="text-xl font-bold text-foreground">Payroll Overview</h1>
                     <div className="flex flex-wrap items-center gap-3">
                         <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                            <SelectTrigger className="w-[140px] h-11 bg-white border-gray-200 rounded-full shadow-none font-bold text-xs ring-0 focus:ring-0">
+                            <SelectTrigger className="w-[140px] h-11 bg-white border-gray-200 rounded-full shadow-none font-semibold text-xs ring-0 focus:ring-0">
                                 <Calendar className="w-4 h-4 mr-2" />
                                 <SelectValue placeholder="Month" />
                             </SelectTrigger>
@@ -167,7 +167,7 @@ export function PayrollDashboardV2() {
 
                         <Popover>
                             <PopoverTrigger asChild>
-                                <Button variant="outline" className="h-11 px-5 rounded-full gap-2 border-gray-200 bg-white hover:bg-gray-50 font-bold text-xs shadow-none">
+                                <Button variant="outline" className="h-11 px-5 rounded-full gap-2 border-gray-200 bg-white hover:bg-gray-50 font-semibold text-xs shadow-none">
                                     <Calendar className="w-4 h-4 text-foreground" />
                                     {dateRange.from && dateRange.to
                                         ? `${format(dateRange.from, "dd MMM")} - ${format(dateRange.to, "dd MMM yyyy")}`
@@ -187,11 +187,11 @@ export function PayrollDashboardV2() {
                             </PopoverContent>
                         </Popover>
 
-                        <Button variant="outline" className="h-11 px-5 rounded-full gap-2 border-gray-200 bg-white hover:bg-gray-50 font-bold text-xs shadow-none group">
+                        <Button variant="outline" className="h-11 px-5 rounded-full gap-2 border-gray-200 bg-white hover:bg-gray-50 font-semibold text-xs shadow-none group">
                             <Download className="w-4 h-4 group-hover:translate-y-[-1px] transition-transform" />
                             Export Payroll
                         </Button>
-                        <Button className="h-11 px-6 rounded-full gap-2 bg-[#4f77ff] hover:bg-[#4f77ff]/90 font-bold text-xs shadow-md">
+                        <Button className="h-11 px-6 rounded-full gap-2 bg-[#4f77ff] hover:bg-[#4f77ff]/90 font-semibold text-xs shadow-md">
                             <Plus className="w-4 h-4" />
                             Add a New Payroll
                         </Button>
@@ -206,10 +206,10 @@ export function PayrollDashboardV2() {
                             <div className="flex-1 w-full p-6 py-5">
                                 <div className="flex items-center gap-2 mb-2">
                                     <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Total Payroll This Month</span>
+                                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Total Payroll This Month</span>
                                 </div>
                                 <div className="flex items-baseline gap-3">
-                                    <p className="text-3xl font-medium text-foreground">${totalPayrollValue.toLocaleString()}</p>
+                                    <p className="text-4xl font-normal text-foreground mt-1 tracking-tight">${totalPayrollValue.toLocaleString()}</p>
                                     <span className="text-xs font-bold text-emerald-600 flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded-full">
                                         <ArrowUpRight className="w-3 h-3" />
                                         +8.2%
@@ -221,10 +221,10 @@ export function PayrollDashboardV2() {
                             <div className="flex-1 w-full p-6 py-5">
                                 <div className="flex items-center gap-2 mb-2">
                                     <div className="w-2 h-2 rounded-full bg-blue-500" />
-                                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Total Employees Paid</span>
+                                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Total Employees Paid</span>
                                 </div>
                                 <div className="flex items-baseline gap-3">
-                                    <p className="text-3xl font-medium text-foreground">{totalEmployeesValue}</p>
+                                    <p className="text-4xl font-normal text-foreground mt-1 tracking-tight">{totalEmployeesValue}</p>
                                     <span className="text-xs font-bold text-emerald-600 flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded-full">
                                         <ArrowUpRight className="w-3 h-3" />
                                         +3
@@ -236,10 +236,10 @@ export function PayrollDashboardV2() {
                             <div className="flex-1 w-full p-6 py-5">
                                 <div className="flex items-center gap-2 mb-2">
                                     <div className="w-2 h-2 rounded-full bg-indigo-500" />
-                                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Average Salary</span>
+                                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Average Salary</span>
                                 </div>
                                 <div className="flex items-baseline gap-3">
-                                    <p className="text-3xl font-medium text-foreground">${Math.round(averageSalaryValue).toLocaleString()}</p>
+                                    <p className="text-4xl font-normal text-foreground mt-1 tracking-tight">${Math.round(averageSalaryValue).toLocaleString()}</p>
                                     <span className="text-xs font-bold text-emerald-600 flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded-full">
                                         <ArrowUpRight className="w-3 h-3" />
                                         +$94
@@ -257,11 +257,11 @@ export function PayrollDashboardV2() {
                         <CardHeader className="pb-0 pt-6 px-6">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <CardTitle className="text-lg font-bold text-foreground">Monthly Payroll Trend</CardTitle>
+                                    <CardTitle className="text-lg font-semibold text-foreground">Monthly Payroll Trend</CardTitle>
                                     <div className="mt-4">
-                                        <p className="text-4xl font-medium text-foreground tracking-tight">${totalPayrollValue.toLocaleString()}</p>
-                                        <p className="text-xs font-bold text-emerald-600 mt-1 flex items-center gap-1">
-                                            +2.4% <span className="text-muted-foreground font-medium">from last month</span>
+                                        <p className="text-4xl font-normal text-foreground mt-1 tracking-tight">${totalPayrollValue.toLocaleString()}</p>
+                                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mt-1">
+                                            <span className="text-emerald-600 font-bold">+2.4%</span> from last month
                                         </p>
                                     </div>
                                 </div>
@@ -284,7 +284,7 @@ export function PayrollDashboardV2() {
                                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                                     <XAxis
                                         dataKey="month"
-                                        tick={{ fontSize: 10, fontWeight: '600', fill: '#94a3b8' }}
+                                        tick={{ fontSize: 11, fontWeight: '500', fill: '#94a3b8' }}
                                         axisLine={false}
                                         tickLine={false}
                                         dy={10}
@@ -314,11 +314,11 @@ export function PayrollDashboardV2() {
                         <CardHeader className="pb-0 pt-6 px-6">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <CardTitle className="text-lg font-bold text-foreground">Department Distribution</CardTitle>
+                                    <CardTitle className="text-lg font-semibold text-foreground">Department Distribution</CardTitle>
                                     <div className="mt-4">
-                                        <p className="text-4xl font-medium text-foreground tracking-tight">${totalPayrollValue.toLocaleString()}</p>
-                                        <p className="text-xs font-bold text-emerald-600 mt-1 flex items-center gap-1">
-                                            +2.4% <span className="text-muted-foreground font-medium">from last month</span>
+                                        <p className="text-4xl font-normal text-foreground mt-1 tracking-tight">${totalPayrollValue.toLocaleString()}</p>
+                                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mt-1">
+                                            <span className="text-emerald-600 font-bold">+2.4%</span> from last month
                                         </p>
                                     </div>
                                 </div>
@@ -365,7 +365,7 @@ export function PayrollDashboardV2() {
                 <Card className="bg-white border-none rounded-xl shadow-none mt-6">
                     <CardHeader className="px-6 pt-6 pb-0">
                         <div className="flex items-center justify-between">
-                            <CardTitle className="text-lg font-bold text-foreground">Payroll List</CardTitle>
+                            <CardTitle className="text-lg font-semibold text-foreground">Payroll List</CardTitle>
                             <div className="flex items-center gap-3">
                                 <div className="relative">
                                     <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />

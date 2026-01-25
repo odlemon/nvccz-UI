@@ -240,8 +240,8 @@ export function PortfolioDashboardV2() {
                     {summaryStats.map((stat, idx) => (
                         <Card key={idx} className="bg-white border-none rounded-2xl shadow-none overflow-hidden">
                             <CardContent className="p-6">
-                                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">{stat.label}</p>
-                                <p className="text-3xl font-medium text-foreground tracking-tight">{stat.value}</p>
+                                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">{stat.label}</p>
+                                <p className="text-4xl font-normal text-foreground mt-1 tracking-tight">{stat.value}</p>
                             </CardContent>
                         </Card>
                     ))}
@@ -253,7 +253,7 @@ export function PortfolioDashboardV2() {
                     {/* Performance Overview (Waterfall Mock) */}
                     <Card className="bg-white border-none rounded-2xl shadow-none overflow-hidden">
                         <CardHeader className="p-6 pb-0">
-                            <CardTitle className="text-lg font-bold text-foreground">Performance overview</CardTitle>
+                            <CardTitle className="text-lg font-semibold text-foreground">Performance overview</CardTitle>
                         </CardHeader>
                         <CardContent className="p-6">
                             <ResponsiveContainer width="100%" height={300}>
@@ -261,16 +261,16 @@ export function PortfolioDashboardV2() {
                                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                                     <XAxis
                                         dataKey="name"
-                                        tick={{ fontSize: 10, fontWeight: '600', fill: '#94a3b8' }}
+                                        tick={{ fontSize: 11, fontWeight: '500', fill: '#94a3b8' }}
                                         axisLine={false}
                                         tickLine={false}
                                         dy={10}
                                     />
                                     <YAxis
-                                        tick={{ fontSize: 10, fontWeight: '600', fill: '#94a3b8' }}
+                                        tick={{ fontSize: 11, fontWeight: '500', fill: '#94a3b8' }}
                                         axisLine={false}
                                         tickLine={false}
-                                        label={{ value: 'USD (M)', angle: -90, position: 'insideLeft', style: { fill: '#94a3b8', fontSize: 10, fontWeight: '600' } }}
+                                        label={{ value: 'USD (M)', angle: -90, position: 'insideLeft', style: { fill: '#94a3b8', fontSize: 11, fontWeight: '500' } }}
                                     />
                                     <Tooltip
                                         cursor={{ fill: '#f8fafc' }}
@@ -291,7 +291,7 @@ export function PortfolioDashboardV2() {
                     <Card className="bg-white border-none rounded-2xl shadow-none overflow-hidden">
                         <CardHeader className="p-6 pb-0">
                             <div className="flex items-center justify-between">
-                                <CardTitle className="text-lg font-bold text-foreground">J Curve</CardTitle>
+                                <CardTitle className="text-lg font-semibold text-foreground">J Curve</CardTitle>
                                 <div className="flex items-center gap-4">
                                     <div className="flex items-center gap-1.5">
                                         <div className="w-2.5 h-2.5 rounded-sm bg-[#d1d5db]"></div>
@@ -314,16 +314,16 @@ export function PortfolioDashboardV2() {
                                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                                     <XAxis
                                         dataKey="year"
-                                        tick={{ fontSize: 10, fontWeight: '600', fill: '#94a3b8' }}
+                                        tick={{ fontSize: 11, fontWeight: '500', fill: '#94a3b8' }}
                                         axisLine={false}
                                         tickLine={false}
                                         dy={10}
                                     />
                                     <YAxis
-                                        tick={{ fontSize: 10, fontWeight: '600', fill: '#94a3b8' }}
+                                        tick={{ fontSize: 11, fontWeight: '500', fill: '#94a3b8' }}
                                         axisLine={false}
                                         tickLine={false}
-                                        label={{ value: 'USD (M)', angle: -90, position: 'insideLeft', style: { fill: '#94a3b8', fontSize: 10, fontWeight: '600' } }}
+                                        label={{ value: 'USD (M)', angle: -90, position: 'insideLeft', style: { fill: '#94a3b8', fontSize: 11, fontWeight: '500' } }}
                                     />
                                     <Tooltip
                                         contentStyle={{ backgroundColor: '#1a1a1a', border: 'none', borderRadius: '12px' }}
@@ -341,7 +341,7 @@ export function PortfolioDashboardV2() {
                     <Card className="bg-white border-none rounded-2xl shadow-none overflow-hidden">
                         <CardHeader className="p-6 pb-0">
                             <div className="flex items-center justify-between">
-                                <CardTitle className="text-lg font-bold text-foreground">Deal allocation (total investment cost)</CardTitle>
+                                <CardTitle className="text-lg font-semibold text-foreground">Deal allocation (total investment cost)</CardTitle>
                                 <div className="flex bg-gray-100 rounded-lg p-1">
                                     <button
                                         onClick={() => setAllocationType("sector")}
@@ -407,7 +407,7 @@ export function PortfolioDashboardV2() {
                     <Card className="bg-white border-none rounded-2xl shadow-none overflow-hidden">
                         <CardHeader className="p-6 pb-0">
                             <div className="flex items-center justify-between">
-                                <CardTitle className="text-lg font-bold text-foreground">IRR by quarter</CardTitle>
+                                <CardTitle className="text-lg font-semibold text-foreground">IRR by quarter</CardTitle>
                                 <div className="flex bg-gray-100 rounded-lg p-1">
                                     {["Investor Net IRR", "Fund Net IRR", "Fund Gross IRR"].map((type) => (
                                         <button
@@ -427,13 +427,13 @@ export function PortfolioDashboardV2() {
                                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                                     <XAxis
                                         dataKey="quarter"
-                                        tick={{ fontSize: 10, fontWeight: '600', fill: '#94a3b8' }}
+                                        tick={{ fontSize: 11, fontWeight: '500', fill: '#94a3b8' }}
                                         axisLine={false}
                                         tickLine={false}
                                         dy={10}
                                     />
                                     <YAxis
-                                        tick={{ fontSize: 10, fontWeight: '600', fill: '#94a3b8' }}
+                                        tick={{ fontSize: 11, fontWeight: '500', fill: '#94a3b8' }}
                                         axisLine={false}
                                         tickLine={false}
                                         domain={[-20, 60]}
@@ -463,7 +463,7 @@ export function PortfolioDashboardV2() {
                     <CardHeader className="p-6">
                         <div className="flex items-center justify-between">
                             <div>
-                                <CardTitle className="text-lg font-bold text-foreground">Portfolio summary</CardTitle>
+                                <CardTitle className="text-lg font-semibold text-foreground">Portfolio summary</CardTitle>
                                 <p className="text-xs text-muted-foreground mt-1">Realization and Portfolio Summary in USD Million unless otherwise stated</p>
                             </div>
                             <Button variant="outline" className="h-10 rounded-full gap-2 border-gray-200 font-bold text-xs">

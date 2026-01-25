@@ -171,9 +171,9 @@ export function PerformanceDashboardV2() {
                         <CardContent className="px-5 py-3">
                             <div className="flex items-start justify-between mb-3">
                                 <div>
-                                    <p className="text-sm text-muted-foreground mb-1">Pending Tasks</p>
+                                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Pending Tasks</p>
                                     <div className="flex items-baseline gap-2">
-                                        <span className="text-4xl font-bold text-foreground">{statsData.pendingTasks.value}</span>
+                                        <span className="text-4xl font-normal text-foreground tracking-tight">{statsData.pendingTasks.value}</span>
                                         <span className="text-xs text-muted-foreground flex items-center">
                                             <span className="text-foreground">↗</span> {statsData.pendingTasks.change} from last month
                                         </span>
@@ -205,9 +205,9 @@ export function PerformanceDashboardV2() {
                         <CardContent className="px-5 py-3">
                             <div className="flex items-start justify-between mb-3">
                                 <div>
-                                    <p className="text-sm text-muted-foreground mb-1">In Progress</p>
+                                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">In Progress</p>
                                     <div className="flex items-baseline gap-2">
-                                        <span className="text-4xl font-bold text-foreground">{statsData.inProgress.value}</span>
+                                        <span className="text-4xl font-normal text-foreground tracking-tight">{statsData.inProgress.value}</span>
                                         <span className="text-xs text-muted-foreground flex items-center">
                                             <span className="text-foreground">↗</span> {statsData.inProgress.change} from last month
                                         </span>
@@ -239,9 +239,9 @@ export function PerformanceDashboardV2() {
                         <CardContent className="px-5 py-3">
                             <div className="flex items-start justify-between mb-3">
                                 <div>
-                                    <p className="text-sm text-muted-foreground mb-1">Completed</p>
+                                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Completed</p>
                                     <div className="flex items-baseline gap-2">
-                                        <span className="text-4xl font-bold text-foreground">{statsData.completed.value}</span>
+                                        <span className="text-4xl font-normal text-foreground tracking-tight">{statsData.completed.value}</span>
                                         <span className="text-xs text-muted-foreground flex items-center">
                                             <span className="text-foreground">↘</span> {statsData.completed.change} from last month
                                         </span>
@@ -273,9 +273,9 @@ export function PerformanceDashboardV2() {
                         <CardContent className="p-5">
                             <div className="flex items-start justify-between mb-3">
                                 <div>
-                                    <p className="text-sm text-muted-foreground mb-1">Completion Rate</p>
+                                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Completion Rate</p>
                                     <div className="flex items-baseline gap-2">
-                                        <span className="text-4xl font-bold text-foreground">{statsData.completionRate.value}</span>
+                                        <span className="text-4xl font-normal text-foreground tracking-tight">{statsData.completionRate.value}</span>
                                         <span className="text-xs text-muted-foreground flex items-center">
                                             <span className="text-foreground">↗</span> {statsData.completionRate.change} from last month
                                         </span>
@@ -311,7 +311,7 @@ export function PerformanceDashboardV2() {
                             <div className="flex items-center justify-between">
                                 <div>
                                     <CardTitle className="text-lg font-semibold text-foreground">Monthly Productivity Overview</CardTitle>
-                                    <p className="text-sm text-muted-foreground">Track task progress and completion rates over time.</p>
+                                    <p className="text-xs text-muted-foreground mt-1">Track task progress and completion rates over time.</p>
                                 </div>
                                 <div className="flex items-center gap-3">
                                     <div className="flex items-center gap-2">
@@ -363,7 +363,7 @@ export function PerformanceDashboardV2() {
                                         height={60}
                                     />
                                     <YAxis
-                                        tick={{ fontSize: 12, fill: '#666' }}
+                                        tick={{ fontSize: 11, fill: '#94a3b8' }}
                                         axisLine={false}
                                         tickLine={false}
                                         domain={[0, 60]}
@@ -439,8 +439,8 @@ export function PerformanceDashboardV2() {
                                                 style={{ backgroundColor: item.color }}
                                             />
                                             <div className="flex flex-col">
-                                                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider leading-tight">{item.name}</p>
-                                                <p className="text-lg font-bold text-foreground leading-tight">{item.value}%</p>
+                                                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider leading-tight">{item.name}</p>
+                                                <p className="text-xl font-normal text-foreground mt-1 tracking-tight">{item.value}%</p>
                                             </div>
                                         </div>
                                     ))}
@@ -592,16 +592,16 @@ export function PerformanceDashboardV2() {
                                 {/* Stats */}
                                 <div className="grid grid-cols-3 gap-4 w-full text-center">
                                     <div>
-                                        <p className="text-xs text-muted-foreground">Total Budget</p>
-                                        <p className="font-semibold text-foreground">${BUDGET_DATA.totalBudget.toLocaleString()}</p>
+                                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Total Budget</p>
+                                        <p className="text-xl font-semibold text-foreground tracking-tight">${BUDGET_DATA.totalBudget.toLocaleString()}</p>
                                     </div>
                                     <div>
-                                        <p className="text-xs text-muted-foreground">Total Spend</p>
-                                        <p className="font-semibold text-foreground">${BUDGET_DATA.totalSpend.toLocaleString()}</p>
+                                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Total Spend</p>
+                                        <p className="text-xl font-semibold text-foreground tracking-tight">${BUDGET_DATA.totalSpend.toLocaleString()}</p>
                                     </div>
                                     <div>
-                                        <p className="text-xs text-muted-foreground">Remaining</p>
-                                        <p className="font-semibold text-foreground">${BUDGET_DATA.remaining.toLocaleString()}</p>
+                                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Remaining</p>
+                                        <p className="text-xl font-semibold text-foreground tracking-tight">${BUDGET_DATA.remaining.toLocaleString()}</p>
                                     </div>
                                 </div>
                             </div>
@@ -622,8 +622,8 @@ export function PerformanceDashboardV2() {
                                 <div className="flex-1">
                                     <div className="flex items-center justify-between">
                                         <div>
-                                            <h3 className="text-lg font-bold text-foreground leading-tight">{EMPLOYEE_OF_THE_MONTH.name}</h3>
-                                            <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">{EMPLOYEE_OF_THE_MONTH.role}</p>
+                                            <h3 className="text-xl font-normal text-foreground tracking-tight leading-tight">{EMPLOYEE_OF_THE_MONTH.name}</h3>
+                                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mt-1">{EMPLOYEE_OF_THE_MONTH.role}</p>
                                         </div>
                                         <div className="flex gap-2">
                                             <Button variant="ghost" size="icon" className="w-8 h-8 rounded-lg bg-gray-50 hover:bg-gray-100">
@@ -641,8 +641,8 @@ export function PerformanceDashboardV2() {
 
                             <div className="space-y-6">
                                 <div className="flex items-center justify-between">
-                                    <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Total time worked</span>
-                                    <span className="text-sm font-bold text-foreground">{EMPLOYEE_OF_THE_MONTH.totalTimeWorked}</span>
+                                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Total time worked</span>
+                                    <span className="text-sm font-semibold text-foreground">{EMPLOYEE_OF_THE_MONTH.totalTimeWorked}</span>
                                 </div>
 
                                 <div className="space-y-4">
