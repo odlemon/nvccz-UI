@@ -4,7 +4,7 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* Kyntaro Blue Theme - Light Mode */
+  /* Arcus Blue Theme - Light Mode */
   --background: oklch(1 0 0); /* Pure white main background */
   --foreground: oklch(0.20 0.02 255); /* Dark blue-tinted text */
   --card: oklch(1 0 0); /* Pure white cards */
@@ -41,7 +41,7 @@
 }
 
 .dark {
-  /* Kyntaro Blue Theme - Dark Mode */
+  /* Arcus Blue Theme - Dark Mode */
   --background: oklch(0.20 0.02 255); /* Dark blue background */
   --foreground: oklch(0.98 0 0); /* Near white text */
   --card: oklch(0.26 0.02 255); /* Dark blue cards */
@@ -127,7 +127,7 @@
   }
 }
 
-/* Added custom utility classes for Kyntaro design system */
+/* Added custom utility classes for Arcus design system */
 @layer utilities {
   .glass-effect {
     @apply backdrop-blur-sm bg-white/80 border border-white/20;

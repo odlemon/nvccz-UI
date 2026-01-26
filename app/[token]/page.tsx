@@ -25,7 +25,7 @@ export default function ResetPasswordPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!newPassword || !confirmPassword) {
       toast.error('Please fill in all fields')
       return
@@ -106,7 +106,7 @@ export default function ResetPasswordPage() {
               <div className="inline-flex items-center justify-center mb-4">
                 <Image
                   src="/logo.png"
-                  alt="Kyntaro Logo"
+                  alt="Arcus Logo"
                   width={200}
                   height={200}
                   className="object-contain"
@@ -135,9 +135,8 @@ export default function ResetPasswordPage() {
                   disabled={isSubmitting}
                   required
                   minLength={8}
-                  className={`block w-full pl-12 pr-12 py-3 border rounded-full bg-white text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 border-gray-300 ${
-                    isSubmitting ? 'opacity-50 cursor-not-allowed' : ''
-                  }`}
+                  className={`block w-full pl-12 pr-12 py-3 border rounded-full bg-white text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 border-gray-300 ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
                 />
                 <button
                   type="button"
@@ -163,9 +162,8 @@ export default function ResetPasswordPage() {
                   disabled={isSubmitting}
                   required
                   minLength={8}
-                  className={`block w-full pl-12 pr-12 py-3 border rounded-full bg-white text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 border-gray-300 ${
-                    isSubmitting ? 'opacity-50 cursor-not-allowed' : ''
-                  }`}
+                  className={`block w-full pl-12 pr-12 py-3 border rounded-full bg-white text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 border-gray-300 ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
                 />
                 <button
                   type="button"
@@ -249,7 +247,7 @@ export default function ResetPasswordPage() {
         >
           <div className="rounded-3xl p-8 h-full flex flex-col justify-center relative overflow-hidden" style={{ backgroundColor: '#F8F8F8' }}>
             <div className="absolute inset-0 bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600 opacity-90 rounded-3xl"></div>
-            
+
             <div className="absolute inset-0 opacity-10">
               <div className="absolute inset-0" style={{
                 backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.1'%3E%3Ccircle cx='30' cy='30' r='4'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
@@ -266,7 +264,7 @@ export default function ResetPasswordPage() {
                 <h2 className="text-3xl mb-4 leading-tight">
                   Create a Strong Password
                 </h2>
-                
+
                 <motion.div
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}

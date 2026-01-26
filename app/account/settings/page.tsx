@@ -47,9 +47,8 @@ export default function AccountSettingsPage() {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center space-x-2 px-4 py-2 rounded-md transition-colors ${
-                    activeTab === tab.id ? "bg-white text-amber-600 shadow-sm" : "text-gray-600 hover:text-gray-900"
-                  }`}
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-md transition-colors ${activeTab === tab.id ? "bg-white text-amber-600 shadow-sm" : "text-gray-600 hover:text-gray-900"
+                    }`}
                 >
                   <Icon className="w-4 h-4" />
                   <span>{tab.label}</span>
@@ -110,7 +109,7 @@ export default function AccountSettingsPage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="company">Company</Label>
-                  <Input id="company" defaultValue="Kyntaro Investment" />
+                  <Input id="company" defaultValue="Arcus Investment" />
                 </div>
               </div>
 

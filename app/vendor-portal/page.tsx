@@ -50,7 +50,7 @@ export default function VendorPortalPage() {
               <div>
                 <h1 className="text-2xl font-bold">Vendor Portal</h1>
                 <p className="text-sm text-muted-foreground">
-                  Kyntaro
+                  Arcus
                 </p>
               </div>
             </div>
@@ -69,7 +69,7 @@ export default function VendorPortalPage() {
             <CardHeader>
               <CardTitle className="text-2xl">Welcome to the Vendor Portal</CardTitle>
               <p className="text-muted-foreground">
-                Submit quotations for Request for Quotations (RFQs) sent by Kyntaro
+                Submit quotations for Request for Quotations (RFQs) sent by Arcus
               </p>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -200,7 +200,7 @@ export default function VendorPortalPage() {
 
           {/* Footer */}
           <div className="text-center text-sm text-muted-foreground">
-            <p>© 2024 Kyntaro. All rights reserved.</p>
+            <p>© 2024 Arcus. All rights reserved.</p>
             <p className="mt-1">
               This is a secure vendor portal. For security reasons, please do not share your access
               link.

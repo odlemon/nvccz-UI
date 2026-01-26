@@ -39,11 +39,11 @@ export const PayslipTemplate = forwardRef<HTMLDivElement, PayslipTemplateProps>(
         <div className="text-center mb-8">
           <div className="flex items-center justify-center mb-4">
             <div className="w-16 h-16 rounded-lg flex items-center justify-center text-white font-bold text-xl mr-4" style={{ backgroundColor: '#2563eb' }}>
-              Kyntaro
+              Arcus
             </div>
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Kyntaro</h1>
-              <p className="text-gray-600">Kyntaro</p>
+              <h1 className="text-3xl font-bold text-gray-900">Arcus</h1>
+              <p className="text-gray-600">Arcus</p>
               <p className="text-sm text-gray-500">Chisapi Cres, Harare, Zimbabwe</p>
             </div>
           </div>

@@ -185,7 +185,7 @@ export default function VendorQuotationSubmissionPage() {
               </div>
               <CardTitle className="text-3xl font-bold">Quotation Submitted Successfully!</CardTitle>
               <CardDescription className="text-green-50 text-lg">
-                Thank you for submitting your quotation to Kyntaro
+                Thank you for submitting your quotation to Arcus
               </CardDescription>
             </CardHeader>
             <CardContent className="p-8 space-y-6">
@@ -361,7 +361,7 @@ export default function VendorQuotationSubmissionPage() {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-600 to-purple-600 rounded-full mb-4">
             <FileText className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Submit Quotation to Kyntaro</h1>
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">Submit Quotation to Arcus</h1>
           <p className="text-lg text-gray-600">Request for Quotation: <Badge variant="outline" className="text-base font-mono">{rfqNumber}</Badge></p>
         </div>
 

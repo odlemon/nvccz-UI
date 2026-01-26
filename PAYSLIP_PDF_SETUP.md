@@ -34,7 +34,7 @@ yarn add -D @types/html2canvas
 
 ### 1. Payslip Template (`components/payroll/payslip-template.tsx`)
 - Professional payslip layout matching the sample design
-- Company header with Kyntaro branding
+- Company header with Arcus branding
 - Employee information section
 - Payroll information section
 - Earnings breakdown (Basic Salary, Allowances, Overtime)
@@ -70,7 +70,7 @@ yarn add -D @types/html2canvas
 - **Quality**: High resolution (2x scale)
 - **Styling**: Professional layout with proper spacing
 - **Content**: All payslip information including earnings, deductions, and net pay
-- **Branding**: Kyntaro company header and styling
+- **Branding**: Arcus company header and styling
 
 ## Troubleshooting
 
