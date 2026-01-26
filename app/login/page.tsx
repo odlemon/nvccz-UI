@@ -46,12 +46,12 @@ function LoginForm() {
   useEffect(() => {
     if (isAuthenticated && userDetails && !isFetchingDetails && isSubmitting) {
       const redirect = getRoleBasedRedirect(userDetails, userDetails.role.name.toLowerCase() === 'applicant')
-      
+
       if (redirect.shouldRedirect) {
         toast.success('Login successful!', {
           description: `Welcome back, ${userDetails.firstName}!`
         })
-        
+
         // Small delay to ensure cookies are set
         setTimeout(() => {
           window.location.href = redirect.path
@@ -62,22 +62,22 @@ function LoginForm() {
 
   const onSubmit = async (data: LoginFormData) => {
     if (isSubmitting) return // Prevent double submission
-    
+
     try {
       setIsSubmitting(true)
-      
+
       // Login will automatically trigger fetchUserDetails in the authSlice
       await dispatch(loginUser(data)).unwrap()
-      
+
       // The redirect will be handled by the useEffect above once userDetails are loaded
       // Don't redirect here, wait for userDetails to be fetched
-      
+
     } catch (error: any) {
       // Error toast
       toast.error('Login failed', {
         description: error || 'Please check your credentials and try again.'
       })
-      
+
       console.error('Login error:', error)
       setIsSubmitting(false) // Reset on error
     }
@@ -103,13 +103,13 @@ function LoginForm() {
               <div className="inline-flex items-center justify-center mb-4">
                 <Image
                   src="/logo.png"
-                  alt="Kyntaro Logo"
+                  alt="Arcus Logo"
                   width={200}
                   height={200}
                   className=" object-contain"
                 />
               </div>
-              <h1 className="text-4xl text-gray-900 mb-2">Welcome to Kyntaro</h1>
+              <h1 className="text-4xl text-gray-900 mb-2">Welcome to Arcus</h1>
               <p className="text-gray-600 text-lg">
                 Financial intelligence and portfolio management powered by AI
               </p>
@@ -158,9 +158,8 @@ function LoginForm() {
                       autoComplete="email"
                       placeholder="you@example.com"
                       disabled={isLoading}
-                      className={`block w-full pl-12 pr-4 py-3 border rounded-full bg-white text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${
-                        errors.email ? 'border-red-300' : 'border-gray-300'
-                      } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      className={`block w-full pl-12 pr-4 py-3 border rounded-full bg-white text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${errors.email ? 'border-red-300' : 'border-gray-300'
+                        } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                     />
                   )}
                 />
@@ -187,9 +186,8 @@ function LoginForm() {
                       autoComplete="current-password"
                       placeholder="••••••••"
                       disabled={isLoading}
-                      className={`block w-full pl-12 pr-12 py-3 border rounded-full bg-white text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${
-                        errors.password ? 'border-red-300' : 'border-gray-300'
-                      } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      className={`block w-full pl-12 pr-12 py-3 border rounded-full bg-white text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${errors.password ? 'border-red-300' : 'border-gray-300'
+                        } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                     />
                   )}
                 />
@@ -318,7 +316,7 @@ function LoginForm() {
         >
           <div className="rounded-3xl p-8 h-full flex flex-col justify-center relative overflow-hidden" style={{ backgroundColor: '#F8F8F8' }}>
             <div className="absolute inset-0 bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600 opacity-90 rounded-3xl"></div>
-            
+
             {/* Background Pattern */}
             <div className="absolute inset-0 opacity-10">
               <div className="absolute inset-0" style={{
@@ -336,7 +334,7 @@ function LoginForm() {
                 <h2 className="text-3xl mb-4 leading-tight">
                   AI Revolutionizing the way we create, manage, and experience financial intelligence
                 </h2>
-                
+
                 {/* 3D-like Graphic */}
                 <motion.div
                   initial={{ opacity: 0, scale: 0.8 }}

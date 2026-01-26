@@ -261,7 +261,7 @@ export default function VendorRFQDetailsPage() {
               <Building2 className="h-8 w-8 text-primary" />
               <div>
                 <h1 className="text-2xl font-bold">Vendor Portal</h1>
-                <p className="text-sm text-muted-foreground">Kyntaro</p>
+                <p className="text-sm text-muted-foreground">Arcus</p>
               </div>
             </div>
           </div>
@@ -319,7 +319,7 @@ export default function VendorRFQDetailsPage() {
             <Building2 className="h-8 w-8 text-primary" />
             <div>
               <h1 className="text-2xl font-bold">Vendor Portal</h1>
-              <p className="text-sm text-muted-foreground">Kyntaro</p>
+              <p className="text-sm text-muted-foreground">Arcus</p>
             </div>
           </div>
         </div>

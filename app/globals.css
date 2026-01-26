@@ -4,76 +4,141 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* Kyntaro Blue Theme - Light Mode */
-  --background: oklch(1 0 0); /* Pure white main background */
-  --foreground: oklch(0.20 0.02 255); /* Dark blue-tinted text */
-  --card: oklch(1 0 0); /* Pure white cards */
-  --card-foreground: oklch(0.20 0.02 255); /* Dark blue-tinted text */
-  --popover: oklch(1 0 0 / 0.95); /* Translucent white popovers */
-  --popover-foreground: oklch(0.20 0.02 255); /* Dark blue-tinted popover text */
-  --primary: oklch(0.60 0.18 252); /* Vibrant blue */
-  --primary-foreground: oklch(0.99 0 0); /* Near white */
-  --secondary: oklch(0.96 0.04 255); /* Light blue */
-  --secondary-foreground: oklch(0.24 0.03 255); /* Dark blue */
-  --muted: oklch(0.97 0 0); /* Light gray */
-  --muted-foreground: oklch(0.48 0.02 255); /* Medium blue */
-  --accent: oklch(0.965 0.06 255); /* Light blue accent */
-  --accent-foreground: oklch(0.24 0.03 255); /* Dark blue text */
-  --destructive: oklch(0.577 0.245 27.325); /* Red for destructive actions */
-  --destructive-foreground: oklch(1 0 0); /* White text on destructive */
-  --border: oklch(0.922 0 0); /* Light border */
-  --input: oklch(0.922 0 0); /* Input background */
-  --ring: oklch(0.60 0.18 252 / 0.3); /* Blue focus rings */
-  --chart-1: oklch(0.64 0.18 252); /* Primary blue for charts */
-  --chart-2: oklch(0.72 0.12 225); /* Light blue for charts */
-  --chart-3: oklch(0.58 0.09 260); /* Dark blue for charts */
-  --chart-4: oklch(0.78 0.12 190); /* Cyan for charts */
-  --chart-5: oklch(0.54 0.1 280); /* Purple for charts */
-  --radius: 0.75rem; /* Rounded corners */
-  --sidebar: oklch(1 0 0); /* Pure white sidebar */
-  --sidebar-foreground: oklch(0.145 0 0); /* Dark text */
-  --sidebar-primary: oklch(0.60 0.18 252); /* Blue primary */
-  --sidebar-primary-foreground: oklch(0.985 0 0); /* Light text */
-  --sidebar-accent: oklch(0.97 0 0); /* Light accent */
-  --sidebar-accent-foreground: oklch(0.205 0 0); /* Dark text */
-  --sidebar-border: oklch(0.922 0 0); /* Light border */
-  --sidebar-ring: oklch(0.60 0.18 252 / 0.3); /* Blue focus ring */
+  /* Arcus Blue Theme - Light Mode */
+  --background: oklch(1 0 0);
+  /* Pure white main background */
+  --foreground: oklch(0.20 0.02 255);
+  /* Dark blue-tinted text */
+  --card: oklch(1 0 0);
+  /* Pure white cards */
+  --card-foreground: oklch(0.20 0.02 255);
+  /* Dark blue-tinted text */
+  --popover: oklch(1 0 0 / 0.95);
+  /* Translucent white popovers */
+  --popover-foreground: oklch(0.20 0.02 255);
+  /* Dark blue-tinted popover text */
+  --primary: oklch(0.60 0.18 252);
+  /* Vibrant blue */
+  --primary-foreground: oklch(0.99 0 0);
+  /* Near white */
+  --secondary: oklch(0.96 0.04 255);
+  /* Light blue */
+  --secondary-foreground: oklch(0.24 0.03 255);
+  /* Dark blue */
+  --muted: oklch(0.97 0 0);
+  /* Light gray */
+  --muted-foreground: oklch(0.48 0.02 255);
+  /* Medium blue */
+  --accent: oklch(0.965 0.06 255);
+  /* Light blue accent */
+  --accent-foreground: oklch(0.24 0.03 255);
+  /* Dark blue text */
+  --destructive: oklch(0.577 0.245 27.325);
+  /* Red for destructive actions */
+  --destructive-foreground: oklch(1 0 0);
+  /* White text on destructive */
+  --border: oklch(0.922 0 0);
+  /* Light border */
+  --input: oklch(0.922 0 0);
+  /* Input background */
+  --ring: oklch(0.60 0.18 252 / 0.3);
+  /* Blue focus rings */
+  --chart-1: oklch(0.64 0.18 252);
+  /* Primary blue for charts */
+  --chart-2: oklch(0.72 0.12 225);
+  /* Light blue for charts */
+  --chart-3: oklch(0.58 0.09 260);
+  /* Dark blue for charts */
+  --chart-4: oklch(0.78 0.12 190);
+  /* Cyan for charts */
+  --chart-5: oklch(0.54 0.1 280);
+  /* Purple for charts */
+  --radius: 0.75rem;
+  /* Rounded corners */
+  --sidebar: oklch(1 0 0);
+  /* Pure white sidebar */
+  --sidebar-foreground: oklch(0.145 0 0);
+  /* Dark text */
+  --sidebar-primary: oklch(0.60 0.18 252);
+  /* Blue primary */
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  /* Light text */
+  --sidebar-accent: oklch(0.97 0 0);
+  /* Light accent */
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  /* Dark text */
+  --sidebar-border: oklch(0.922 0 0);
+  /* Light border */
+  --sidebar-ring: oklch(0.60 0.18 252 / 0.3);
+  /* Blue focus ring */
 }
 
 .dark {
-  /* Kyntaro Blue Theme - Dark Mode */
-  --background: oklch(0.20 0.02 255); /* Dark blue background */
-  --foreground: oklch(0.98 0 0); /* Near white text */
-  --card: oklch(0.26 0.02 255); /* Dark blue cards */
-  --card-foreground: oklch(0.98 0 0); /* Light text */
-  --popover: oklch(0.26 0.02 255 / 0.95); /* Dark translucent popovers */
-  --popover-foreground: oklch(0.98 0 0); /* Light popover text */
-  --primary: oklch(0.72 0.18 252); /* Bright blue */
-  --primary-foreground: oklch(0.20 0.02 255); /* Dark blue background */
-  --secondary: oklch(0.269 0 0); /* Dark gray */
-  --secondary-foreground: oklch(0.985 0 0); /* Light text */
-  --muted: oklch(0.269 0 0); /* Dark gray */
-  --muted-foreground: oklch(0.708 0 0); /* Medium light gray */
-  --accent: oklch(0.269 0 0); /* Dark gray */
-  --accent-foreground: oklch(0.985 0 0); /* Light text */
-  --destructive: oklch(0.704 0.191 22.216); /* Lighter red for dark mode */
-  --destructive-foreground: oklch(1 0 0); /* White text on destructive */
-  --border: oklch(0.269 0 0); /* Dark borders */
-  --input: oklch(0.269 0 0); /* Dark input fields */
-  --ring: oklch(0.72 0.18 252 / 0.4); /* Brighter blue focus rings in dark */
-  --chart-1: oklch(0.64 0.18 252); /* Primary blue for charts */
-  --chart-2: oklch(0.72 0.12 225); /* Light blue for charts */
-  --chart-3: oklch(0.58 0.09 260); /* Dark blue for charts */
-  --chart-4: oklch(0.78 0.12 190); /* Cyan for charts */
-  --chart-5: oklch(0.54 0.1 280); /* Purple for charts */
-  --sidebar: oklch(0.205 0 0); /* Dark sidebar */
-  --sidebar-foreground: oklch(0.985 0 0); /* Light text */
-  --sidebar-primary: oklch(0.72 0.18 252); /* Blue primary */
-  --sidebar-primary-foreground: oklch(0.985 0 0); /* Light text */
-  --sidebar-accent: oklch(0.269 0 0); /* Dark accent */
-  --sidebar-accent-foreground: oklch(0.985 0 0); /* Light text */
-  --sidebar-border: oklch(1 0 0 / 10%); /* Transparent border */
-  --sidebar-ring: oklch(0.556 0 0); /* Focus ring */
+  /* Arcus Blue Theme - Dark Mode */
+  --background: oklch(0.20 0.02 255);
+  /* Dark blue background */
+  --foreground: oklch(0.98 0 0);
+  /* Near white text */
+  --card: oklch(0.26 0.02 255);
+  /* Dark blue cards */
+  --card-foreground: oklch(0.98 0 0);
+  /* Light text */
+  --popover: oklch(0.26 0.02 255 / 0.95);
+  /* Dark translucent popovers */
+  --popover-foreground: oklch(0.98 0 0);
+  /* Light popover text */
+  --primary: oklch(0.72 0.18 252);
+  /* Bright blue */
+  --primary-foreground: oklch(0.20 0.02 255);
+  /* Dark blue background */
+  --secondary: oklch(0.269 0 0);
+  /* Dark gray */
+  --secondary-foreground: oklch(0.985 0 0);
+  /* Light text */
+  --muted: oklch(0.269 0 0);
+  /* Dark gray */
+  --muted-foreground: oklch(0.708 0 0);
+  /* Medium light gray */
+  --accent: oklch(0.269 0 0);
+  /* Dark gray */
+  --accent-foreground: oklch(0.985 0 0);
+  /* Light text */
+  --destructive: oklch(0.704 0.191 22.216);
+  /* Lighter red for dark mode */
+  --destructive-foreground: oklch(1 0 0);
+  /* White text on destructive */
+  --border: oklch(0.269 0 0);
+  /* Dark borders */
+  --input: oklch(0.269 0 0);
+  /* Dark input fields */
+  --ring: oklch(0.72 0.18 252 / 0.4);
+  /* Brighter blue focus rings in dark */
+  --chart-1: oklch(0.64 0.18 252);
+  /* Primary blue for charts */
+  --chart-2: oklch(0.72 0.12 225);
+  /* Light blue for charts */
+  --chart-3: oklch(0.58 0.09 260);
+  /* Dark blue for charts */
+  --chart-4: oklch(0.78 0.12 190);
+  /* Cyan for charts */
+  --chart-5: oklch(0.54 0.1 280);
+  /* Purple for charts */
+  --sidebar: oklch(0.205 0 0);
+  /* Dark sidebar */
+  --sidebar-foreground: oklch(0.985 0 0);
+  /* Light text */
+  --sidebar-primary: oklch(0.72 0.18 252);
+  /* Blue primary */
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  /* Light text */
+  --sidebar-accent: oklch(0.269 0 0);
+  /* Dark accent */
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  /* Light text */
+  --sidebar-border: oklch(1 0 0 / 10%);
+  /* Transparent border */
+  --sidebar-ring: oklch(0.556 0 0);
+  /* Focus ring */
 }
 
 @theme inline {
@@ -121,13 +186,14 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
     font-family: var(--font-montserrat), 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   }
 }
 
-/* Added custom utility classes for Kyntaro design system */
+/* Added custom utility classes for Arcus design system */
 @layer utilities {
   .glass-effect {
     @apply backdrop-blur-sm bg-white/80 border border-white/20;

@@ -57,11 +57,11 @@ export const generateSimplePDF = async (
     pdf.setTextColor(255, 255, 255) // White text
     pdf.setFontSize(24)
     pdf.setFont('helvetica', 'bold')
-    pdf.text('Kyntaro', 20, 18)
+    pdf.text('Arcus', 20, 18)
 
     pdf.setFontSize(12)
     pdf.setFont('helvetica', 'normal')
-    pdf.text('Kyntaro', 20, 24)
+    pdf.text('Arcus', 20, 24)
     pdf.text('Chisapi Cres, Harare, Zimbabwe', 20, 28)
 
     yPosition = 45

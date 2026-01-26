@@ -86,7 +86,7 @@ const moduleMenus = {
     { id: "fund-analytics", label: "Fund Analytics", icon: CiViewBoard },
   ],
   "account-performance": [
-    { id: "arcus-dashboard", label: "Kyntaro Dashboard", icon: CiGrid41 },
+    { id: "arcus-dashboard", label: "Arcus Dashboard", icon: CiGrid41 },
     { id: "performance-analytics", label: "Performance Analytics", icon: CiViewBoard },
     { id: "account-settings", label: "Account Settings", icon: CiSettings },
   ],
@@ -145,12 +145,12 @@ export function Sidebar({ currentModule, activeItem, onItemSelect }: SidebarProp
     <aside className="w-64 bg-white border-r border-border h-[calc(100vh-5rem)] overflow-y-auto sticky top-20 z-10">
       <div className="p-4 space-y-4">
         {/* Logo */}
-      
+
         {/* Fund Switcher */}
         {/* {showFundSwitcher && (
           <div className="space-y-2">
             <Button variant="outline" className="w-full justify-between bg-muted/40 cursor-pointer">
-              <span className="text-base">Kyntaro Growth Fund I</span>
+              <span className="text-base">Arcus Growth Fund I</span>
               <CiCircleChevDown className="w-4 h-4" />
             </Button>
           </div>
@@ -180,7 +180,7 @@ export function Sidebar({ currentModule, activeItem, onItemSelect }: SidebarProp
           })}
         </div>
 
-        
+
       </div>
     </aside>
   )

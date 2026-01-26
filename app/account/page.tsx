@@ -57,7 +57,7 @@ export default function AccountDashboardPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Kyntaro Dashboard</h1>
+          <h1 className="text-3xl font-bold text-gray-900">Arcus Dashboard</h1>
           <p className="text-gray-600 mt-1">Your investment management overview</p>
         </div>
         <div className="flex items-center space-x-3">
@@ -82,7 +82,7 @@ export default function AccountDashboardPage() {
             </Avatar>
             <div className="flex-1">
               <h2 className="text-xl font-semibold text-gray-900">Oscar Carol</h2>
-              <p className="text-gray-600">Lead Manager • Kyntaro Investment</p>
+              <p className="text-gray-600">Lead Manager • Arcus Investment</p>
               <div className="flex items-center space-x-4 mt-2">
                 <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
                   <Shield className="w-3 h-3 mr-1" />
@@ -172,13 +172,12 @@ export default function AccountDashboardPage() {
                   className="flex items-center space-x-4 p-3 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   <div
-                    className={`w-3 h-3 rounded-full ${
-                      activity.type === "investment"
+                    className={`w-3 h-3 rounded-full ${activity.type === "investment"
                         ? "bg-green-500"
                         : activity.type === "report"
                           ? "bg-blue-500"
                           : "bg-amber-500"
-                    }`}
+                      }`}
                   ></div>
                   <div className="flex-1">
                     <p className="font-medium text-gray-900">{activity.description}</p>

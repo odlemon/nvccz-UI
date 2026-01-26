@@ -60,7 +60,7 @@ export function PerformanceAnalytics() {
             </div>
           </div>
         )
-      
+
       case "sectors":
         return (
           <div className="bg-gradient-to-br from-green-50 to-emerald-100 rounded-xl border border-gray-200 p-6">
@@ -68,7 +68,7 @@ export function PerformanceAnalytics() {
             <SectorPerformanceChart />
           </div>
         )
-      
+
       case "risk":
         return (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -119,7 +119,7 @@ export function PerformanceAnalytics() {
             </div>
           </div>
         )
-      
+
       case "benchmarks":
         return (
           <div className="bg-gradient-to-br from-cyan-50 to-blue-100 rounded-xl border border-gray-200 p-6">
@@ -137,7 +137,7 @@ export function PerformanceAnalytics() {
                   <p className="text-xs text-gray-600">YTD Return</p>
                 </div>
                 <div className="p-4 rounded-lg bg-blue-500/20 border border-blue-300">
-                  <h4 className="font-medium text-sm text-blue-800">Kyntaro Portfolio</h4>
+                  <h4 className="font-medium text-sm text-blue-800">Arcus Portfolio</h4>
                   <div className="text-2xl font-bold mt-1 text-blue-900">+24.8%</div>
                   <p className="text-xs text-blue-700">YTD Return</p>
                 </div>
@@ -145,7 +145,7 @@ export function PerformanceAnalytics() {
             </div>
           </div>
         )
-      
+
       default:
         return null
     }

@@ -229,7 +229,7 @@ export default function PerformanceAnalyticsPage() {
                   <div>
                     <p className="font-medium">{item.metric}</p>
                     <p className="text-sm text-gray-600">
-                      Kyntaro: {item.arcus} | Benchmark: {item.benchmark}
+                      Arcus: {item.arcus} | Benchmark: {item.benchmark}
                     </p>
                   </div>
                   <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">

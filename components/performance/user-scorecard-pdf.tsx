@@ -243,7 +243,7 @@ export default function UserScorecardPDF({ data }: UserScorecardPDFProps) {
           <Text style={styles.footerText}>
             Generated on {new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}
           </Text>
-          <Text style={styles.footerText}>Kyntaro Performance Management System</Text>
+          <Text style={styles.footerText}>Arcus Performance Management System</Text>
         </View>
       </Page>
     </Document>
