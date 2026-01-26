@@ -102,7 +102,7 @@ function LoginForm() {
             <div className="text-left mb-8 px-12">
               <div className="inline-flex items-center justify-center mb-4">
                 <Image
-                  src="/logo.png"
+                  src="/logo_copy.png"
                   alt="Arcus Logo"
                   width={200}
                   height={200}
