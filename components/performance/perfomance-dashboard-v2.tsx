@@ -65,9 +65,9 @@ const generateDistribution = (seed: string) => {
     const hash = seed.split('').reduce((acc, char) => char.charCodeAt(0) + acc, 0)
     const baseLine = 20 + (hash % 20)
     return [
-        { name: "High Performers", value: baseLine, color: "#1a1a1a" },
-        { name: "Average", value: Math.max(10, 100 - baseLine - 30), color: "#666666" },
-        { name: "Need Improvement", value: 30, color: "#e5e5e5" },
+        { name: "High Performers", value: baseLine, color: "#4c1d95" }, // Dark Purple
+        { name: "Average", value: Math.max(10, 100 - baseLine - 30), color: "#111827" }, // Black (Gray-900)
+        { name: "Need Improvement", value: 30, color: "#e5e7eb" }, // Light Gray
     ]
 }
 
@@ -98,14 +98,13 @@ const EMPLOYEE_OF_THE_MONTH = {
 }
 
 export function PerformanceDashboardV2() {
-    const [selectedPeriod, setSelectedPeriod] = useState("This Month")
-    const [selectedEntity, setSelectedEntity] = useState("Global")
+    const [selectedWeek, setSelectedWeek] = useState("Week 1")
     const [selectedYear, setSelectedYear] = useState("2026")
     const [selectedMonth, setSelectedMonth] = useState("January")
 
-    const statsData = useMemo(() => generateStats(selectedPeriod + selectedMonth + selectedYear), [selectedPeriod, selectedMonth, selectedYear])
+    const statsData = useMemo(() => generateStats(selectedWeek + selectedMonth + selectedYear), [selectedWeek, selectedMonth, selectedYear])
     const monthlyProductivityData = useMemo(() => generateProductivityData(selectedMonth), [selectedMonth])
-    const performanceDistribution = useMemo(() => generateDistribution(selectedPeriod + selectedMonth), [selectedPeriod, selectedMonth])
+    const performanceDistribution = useMemo(() => generateDistribution(selectedWeek + selectedMonth), [selectedWeek, selectedMonth])
     const workerInsights = useMemo(() => generateWorkerInsights(), []) // Could also vary based on entity
 
     // Calculate gauge angle for budget tracker
@@ -116,53 +115,39 @@ export function PerformanceDashboardV2() {
         <div className="min-h-screen bg-[#F6F6F6] p-6 -m-6">
             <div className="space-y-4">
                 {/* Filter Bar */}
-                <div className="flex flex-wrap items-center justify-between gap-4 mb-2">
-                    <div className="flex items-center gap-2">
-                        <div className="flex bg-white rounded-full p-1 border border-gray-200">
-                            {["This Week", "This Month", "This Year"].map((p) => (
-                                <button
-                                    key={p}
-                                    onClick={() => setSelectedPeriod(p)}
-                                    className={`px-4 py-1.5 text-xs font-bold rounded-full transition-all ${selectedPeriod === p ? "bg-[#262626] text-white" : "text-muted-foreground hover:bg-gray-50"}`}
-                                >
-                                    {p}
-                                </button>
+                <div className="flex flex-wrap items-center justify-start gap-3 mb-4">
+                    <Select value={selectedWeek} onValueChange={setSelectedWeek}>
+                        <SelectTrigger className="w-[120px] h-9 bg-white border-gray-200 rounded-full shadow-none font-bold text-xs ring-0 focus:ring-0">
+                            <SelectValue placeholder="Week" />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl border-gray-200 shadow-xl">
+                            {["Week 1", "Week 2", "Week 3", "Week 4"].map(w => (
+                                <SelectItem key={w} value={w} className="font-medium text-xs">{w}</SelectItem>
                             ))}
-                        </div>
-                        <Select value={selectedEntity} onValueChange={setSelectedEntity}>
-                            <SelectTrigger className="w-[140px] h-9 bg-white border-gray-200 rounded-full shadow-none font-bold text-xs ring-0 focus:ring-0">
-                                <SelectValue placeholder="Select Entity" />
-                            </SelectTrigger>
-                            <SelectContent className="rounded-xl border-gray-200 shadow-xl">
-                                <SelectItem value="Global" className="font-medium text-xs">Global</SelectItem>
-                                <SelectItem value="TechZim" className="font-medium text-xs">TechZim HQ</SelectItem>
-                                <SelectItem value="Bulawayo" className="font-medium text-xs">Bulawayo Branch</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
+                        </SelectContent>
+                    </Select>
 
-                    <div className="flex items-center gap-2">
-                        <Select value={selectedYear} onValueChange={setSelectedYear}>
-                            <SelectTrigger className="w-[110px] h-9 bg-white border-gray-200 rounded-full shadow-none font-bold text-xs ring-0 focus:ring-0">
-                                <SelectValue placeholder="Year" />
-                            </SelectTrigger>
-                            <SelectContent className="rounded-xl border-gray-200 shadow-xl">
-                                <SelectItem value="2026" className="font-medium text-xs">2026</SelectItem>
-                                <SelectItem value="2025" className="font-medium text-xs">2025</SelectItem>
-                                <SelectItem value="2024" className="font-medium text-xs">2024</SelectItem>
-                            </SelectContent>
-                        </Select>
-                        <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                            <SelectTrigger className="w-[110px] h-9 bg-white border-gray-200 rounded-full shadow-none font-bold text-xs ring-0 focus:ring-0">
-                                <SelectValue placeholder="Month" />
-                            </SelectTrigger>
-                            <SelectContent className="rounded-xl border-gray-200 shadow-xl">
-                                {["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"].map(m => (
-                                    <SelectItem key={m} value={m} className="font-medium text-xs">{m}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
+                    <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                        <SelectTrigger className="w-[120px] h-9 bg-white border-gray-200 rounded-full shadow-none font-bold text-xs ring-0 focus:ring-0">
+                            <SelectValue placeholder="Month" />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl border-gray-200 shadow-xl">
+                            {["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"].map(m => (
+                                <SelectItem key={m} value={m} className="font-medium text-xs">{m}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+
+                    <Select value={selectedYear} onValueChange={setSelectedYear}>
+                        <SelectTrigger className="w-[110px] h-9 bg-white border-gray-200 rounded-full shadow-none font-bold text-xs ring-0 focus:ring-0">
+                            <SelectValue placeholder="Year" />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl border-gray-200 shadow-xl">
+                            <SelectItem value="2026" className="font-medium text-xs">2026</SelectItem>
+                            <SelectItem value="2025" className="font-medium text-xs">2025</SelectItem>
+                            <SelectItem value="2024" className="font-medium text-xs">2024</SelectItem>
+                        </SelectContent>
+                    </Select>
                 </div>
                 {/* Stats Row */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -192,7 +177,7 @@ export function PerformanceDashboardV2() {
                                     {Array.from({ length: 50 }).map((_, i) => (
                                         <div
                                             key={i}
-                                            className={`h-4 w-1 rounded-sm ${i < statsData.pendingTasks.progress ? "bg-foreground" : "bg-muted"}`}
+                                            className={`h-4 w-1 rounded-sm ${i < statsData.pendingTasks.progress ? "bg-[#4c1d95]" : "bg-muted"}`}
                                         />
                                     ))}
                                 </div>
@@ -226,7 +211,7 @@ export function PerformanceDashboardV2() {
                                     {Array.from({ length: 50 }).map((_, i) => (
                                         <div
                                             key={i}
-                                            className={`h-4 w-1 rounded-sm ${i < statsData.inProgress.progress ? "bg-foreground" : "bg-muted"}`}
+                                            className={`h-4 w-1 rounded-sm ${i < statsData.inProgress.progress ? "bg-[#4c1d95]" : "bg-muted"}`}
                                         />
                                     ))}
                                 </div>
@@ -260,7 +245,7 @@ export function PerformanceDashboardV2() {
                                     {Array.from({ length: 50 }).map((_, i) => (
                                         <div
                                             key={i}
-                                            className={`h-4 w-1 rounded-sm ${i < statsData.completed.progress ? "bg-foreground" : "bg-muted"}`}
+                                            className={`h-4 w-1 rounded-sm ${i < statsData.completed.progress ? "bg-[#4c1d95]" : "bg-muted"}`}
                                         />
                                     ))}
                                 </div>
@@ -294,7 +279,7 @@ export function PerformanceDashboardV2() {
                                     {Array.from({ length: 50 }).map((_, i) => (
                                         <div
                                             key={i}
-                                            className={`h-4 w-1 rounded-sm ${i < statsData.completionRate.progress / 2 ? "bg-foreground" : "bg-muted"}`}
+                                            className={`h-4 w-1 rounded-sm ${i < statsData.completionRate.progress / 2 ? "bg-[#4c1d95]" : "bg-muted"}`}
                                         />
                                     ))}
                                 </div>
@@ -315,7 +300,7 @@ export function PerformanceDashboardV2() {
                                 </div>
                                 <div className="flex items-center gap-3">
                                     <div className="flex items-center gap-2">
-                                        <div className="w-3 h-3 rounded-full bg-foreground"></div>
+                                        <div className="w-3 h-3 rounded-full bg-[#4c1d95]"></div>
                                         <span className="text-sm text-muted-foreground">Task Completed Rate</span>
                                     </div>
                                     <Button variant="ghost" size="icon" className="w-8 h-8 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
@@ -344,7 +329,7 @@ export function PerformanceDashboardV2() {
                                                         width={40}
                                                         height={22}
                                                         rx={11}
-                                                        fill={isCurrent ? "#1a1a1a" : "#F5F5F5"}
+                                                        fill={isCurrent ? "#4c1d95" : "#F5F5F5"}
                                                     />
                                                     <text
                                                         x={0}
@@ -389,7 +374,7 @@ export function PerformanceDashboardV2() {
                                         {monthlyProductivityData.map((entry, index) => (
                                             <Cell
                                                 key={`cell-${index}`}
-                                                fill={entry.isCurrent ? "#1a1a1a" : "#F5F5F5"}
+                                                fill={entry.isCurrent ? "#4c1d95" : "#ede9fe"}
                                             />
                                         ))}
                                     </Bar>
@@ -490,7 +475,7 @@ export function PerformanceDashboardV2() {
                                                         className="h-full rounded relative flex items-center px-2 min-w-[50px]"
                                                         style={{
                                                             width: `${worker.progress + 20}%`,
-                                                            backgroundColor: '#262626',
+                                                            backgroundColor: worker.id % 2 === 0 ? '#4c1d95' : '#6d28d9',
                                                             backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 8px, rgba(255,255,255,0.05) 8px, rgba(255,255,255,0.05) 16px)'
                                                         }}
                                                     >
@@ -544,9 +529,9 @@ export function PerformanceDashboardV2() {
                                         />
                                         <defs>
                                             <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                                                <stop offset="0%" stopColor="#e5e5e5" />
-                                                <stop offset="50%" stopColor="#666666" />
-                                                <stop offset="100%" stopColor="#1a1a1a" />
+                                                <stop offset="0%" stopColor="#a78bfa" />
+                                                <stop offset="50%" stopColor="#7c3aed" />
+                                                <stop offset="100%" stopColor="#4c1d95" />
                                             </linearGradient>
                                         </defs>
                                         {/* Tick marks */}
@@ -575,11 +560,11 @@ export function PerformanceDashboardV2() {
                                             y1="90"
                                             x2={100 + 55 * Math.cos(((gaugeAngle - 180) * Math.PI) / 180)}
                                             y2={90 + 55 * Math.sin(((gaugeAngle - 180) * Math.PI) / 180)}
-                                            stroke="#1a1a1a"
+                                            stroke="#4c1d95"
                                             strokeWidth="3"
                                             strokeLinecap="round"
                                         />
-                                        <circle cx="100" cy="90" r="6" fill="#1a1a1a" />
+                                        <circle cx="100" cy="90" r="6" fill="#4c1d95" />
                                     </svg>
                                     {/* Labels */}
                                     <span className="absolute -left-6 bottom-0 text-[10px] font-bold text-muted-foreground">0k</span>
@@ -652,23 +637,23 @@ export function PerformanceDashboardV2() {
                                             className="h-full rounded-lg"
                                             style={{
                                                 width: `${EMPLOYEE_OF_THE_MONTH.activeTime}%`,
-                                                backgroundColor: '#262626',
+                                                backgroundColor: '#4c1d95',
                                                 backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 8px, rgba(255,255,255,0.05) 8px, rgba(255,255,255,0.05) 16px)'
                                             }}
                                         />
                                         <div
-                                            className="h-full rounded-lg opacity-40"
+                                            className="h-full rounded-lg opacity-60"
                                             style={{
                                                 width: `${EMPLOYEE_OF_THE_MONTH.extraTime}%`,
-                                                backgroundColor: '#262626',
+                                                backgroundColor: '#6d28d9',
                                                 backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 8px, rgba(255,255,255,0.05) 8px, rgba(255,255,255,0.05) 16px)'
                                             }}
                                         />
                                         <div
-                                            className="h-full rounded-lg opacity-10"
+                                            className="h-full rounded-lg opacity-30"
                                             style={{
                                                 width: `${EMPLOYEE_OF_THE_MONTH.pauseTime}%`,
-                                                backgroundColor: '#262626',
+                                                backgroundColor: '#8b5cf6',
                                                 backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 8px, rgba(255,255,255,0.05) 8px, rgba(255,255,255,0.05) 16px)'
                                             }}
                                         />
@@ -676,15 +661,15 @@ export function PerformanceDashboardV2() {
 
                                     <div className="flex items-center gap-6">
                                         <div className="flex items-center gap-2">
-                                            <div className="w-2.5 h-2.5 rounded-full bg-[#262626]" />
+                                            <div className="w-2.5 h-2.5 rounded-full bg-[#4c1d95]" />
                                             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Active Time</span>
                                         </div>
                                         <div className="flex items-center gap-2">
-                                            <div className="w-2.5 h-2.5 rounded-full bg-gray-400" />
+                                            <div className="w-2.5 h-2.5 rounded-full bg-[#6d28d9]" />
                                             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Extra Time</span>
                                         </div>
                                         <div className="flex items-center gap-2">
-                                            <div className="w-2.5 h-2.5 rounded-full bg-gray-200" />
+                                            <div className="w-2.5 h-2.5 rounded-full bg-[#8b5cf6]" />
                                             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Pause Time</span>
                                         </div>
                                     </div>

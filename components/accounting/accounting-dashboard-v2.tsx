@@ -497,12 +497,16 @@ export function AccountingDashboardV2() {
                                 <CardTitle className="text-lg font-semibold text-foreground">Net Profit</CardTitle>
                                 <div className="flex items-center gap-4 text-[10px] text-muted-foreground font-bold uppercase tracking-wider">
                                     <div className="flex items-center gap-1.5">
-                                        <div className="w-2 h-2 rounded-full bg-[#10b981]"></div>
+                                        <div className="w-2 h-2 rounded-full bg-[#065f46]"></div>
                                         <span>Net Profit</span>
                                     </div>
                                     <div className="flex items-center gap-1.5">
-                                        <div className="w-2 h-2 rounded-full bg-[#fbbf24]"></div>
-                                        <span>Gross Profit (%)</span>
+                                        <div className="w-2 h-2 rounded-full bg-[#10b981]"></div>
+                                        <span>Gross Profit</span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                        <div className="w-2 h-2 rounded-full bg-[#facc15]"></div>
+                                        <span>Growth (%)</span>
                                     </div>
                                 </div>
                             </div>
@@ -534,10 +538,10 @@ export function AccountingDashboardV2() {
                                             return [formatCurrency(value), name === "netProfit" ? "Net Profit" : "Gross Profit"]
                                         }}
                                     />
-                                    <Area yAxisId="left" type="monotone" dataKey="netProfit" fill="#10b981" fillOpacity={0.1} stroke="#10b981" strokeWidth={3} />
-                                    <Area yAxisId="left" type="monotone" dataKey="grossProfit" fill="#fbbf24" fillOpacity={0.05} stroke="#fbbf24" strokeWidth={3} />
-                                    <Line yAxisId="right" type="monotone" dataKey="netPercent" stroke="#10b981" strokeWidth={2} dot={{ fill: '#10b981', r: 3 }} />
-                                    <Line yAxisId="right" type="monotone" dataKey="grossPercent" stroke="#fbbf24" strokeWidth={2} dot={{ fill: '#fbbf24', r: 3 }} />
+                                    <Bar yAxisId="left" dataKey="netProfit" fill="#065f46" radius={[4, 4, 0, 0]} barSize={10} />
+                                    <Bar yAxisId="left" dataKey="grossProfit" fill="#10b981" radius={[4, 4, 0, 0]} barSize={10} />
+                                    <Line yAxisId="right" type="monotone" dataKey="netPercent" stroke="#facc15" strokeWidth={2} dot={{ fill: '#facc15', r: 3 }} />
+                                    <Line yAxisId="right" type="monotone" dataKey="grossPercent" stroke="#facc15" strokeWidth={2} dot={{ fill: '#facc15', r: 3 }} strokeDasharray="5 5" />
                                 </ComposedChart>
                             </ResponsiveContainer>
                         </CardContent>
@@ -624,7 +628,7 @@ export function AccountingDashboardV2() {
                         <CardHeader className="p-5 pb-2">
                             <div className="flex items-center justify-between">
                                 <CardTitle className="text-lg font-semibold text-foreground">Expenses</CardTitle>
-                                <span className="text-sm font-bold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full">Active</span>
+                                <span className="text-sm font-medium text-muted-foreground bg-gray-50 px-3 py-1 rounded-full">3.5M Total</span>
                             </div>
                         </CardHeader>
                         <CardContent className="p-5">
