@@ -5,6 +5,8 @@ import portfolioDashboardReducer from './slices/portfolioDashboardSlice'
 import procurementV2Reducer from './slices/procurementV2Slice'
 import invoicesReducer from './slices/invoices-slice'
 import purchaseInvoicesReducer from './slices/purchase-invoices-slice'
+import payrollReducer from './slices/payrollSlice'
+import performanceReducer from './slices/performanceSlice'
 
 export const store = configureStore({
   reducer: {
@@ -14,6 +16,8 @@ export const store = configureStore({
     procurementV2: procurementV2Reducer,
     invoices: invoicesReducer,
     purchaseInvoices: purchaseInvoicesReducer,
+    payroll: payrollReducer,
+    performance: performanceReducer,
   },
   // ...existing middleware...
 })

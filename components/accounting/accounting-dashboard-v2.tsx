@@ -1,6 +1,10 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
+import { useSelector, useDispatch } from "react-redux"
+import { AppDispatch, RootState } from "@/lib/store/store"
+import { fetchAccountingDashboard, fetchCurrencies } from "@/lib/store/slices/accountingSlice"
+import { AccountingDashboardSkeleton } from "./accounting-dashboard-skeleton"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -33,77 +37,6 @@ import {
     Cell,
 } from "recharts"
 
-// Dummy data for the dashboard
-const statsData = {
-    revenue: { value: 1500000, change: 130000, percent: 4.5 },
-    cogs: { value: 1300000, change: -650000, percent: -4.5 },
-    grossProfit: { value: 1000000, change: 110000, percent: 4.5 },
-    netProfit: { value: 800000, change: -22000, percent: -4.5 },
-}
-
-const operatingProfitData = [
-    { month: "Jan", value: 2800000, cogs: 1400000, percent: 8 },
-    { month: "Feb", value: 3200000, cogs: 1600000, percent: 12 },
-    { month: "Mar", value: 4800000, cogs: 2400000, percent: 18 },
-    { month: "Apr", value: 5200000, cogs: 2600000, percent: 22 },
-    { month: "May", value: 6800000, cogs: 3400000, percent: 28 },
-    { month: "Jun", value: 7200000, cogs: 3600000, percent: 32 },
-    { month: "Jul", value: 6400000, cogs: 3200000, percent: 25 },
-    { month: "Aug", value: 5800000, cogs: 2900000, percent: 20 },
-    { month: "Sep", value: 4200000, cogs: 2100000, percent: 15 },
-    { month: "Oct", value: 3800000, cogs: 1900000, percent: 12 },
-    { month: "Nov", value: 4600000, cogs: 2300000, percent: 18 },
-    { month: "Dec", value: 5200000, cogs: 2600000, percent: 22 },
-]
-
-const netProfitData = [
-    { month: "Jan", netProfit: 180000, grossProfit: 320000, netPercent: 12, grossPercent: 22 },
-    { month: "Feb", netProfit: 220000, grossProfit: 380000, netPercent: 15, grossPercent: 25 },
-    { month: "Mar", netProfit: 350000, grossProfit: 520000, netPercent: 22, grossPercent: 32 },
-    { month: "Apr", netProfit: 480000, grossProfit: 650000, netPercent: 28, grossPercent: 38 },
-    { month: "May", netProfit: 620000, grossProfit: 780000, netPercent: 35, grossPercent: 45 },
-    { month: "Jun", netProfit: 750000, grossProfit: 850000, netPercent: 42, grossPercent: 48 },
-    { month: "Jul", netProfit: 680000, grossProfit: 820000, netPercent: 38, grossPercent: 45 },
-    { month: "Aug", netProfit: 580000, grossProfit: 720000, netPercent: 32, grossPercent: 40 },
-    { month: "Sep", netProfit: 450000, grossProfit: 580000, netPercent: 25, grossPercent: 32 },
-    { month: "Oct", netProfit: 380000, grossProfit: 480000, netPercent: 20, grossPercent: 26 },
-    { month: "Nov", netProfit: 420000, grossProfit: 550000, netPercent: 23, grossPercent: 30 },
-    { month: "Dec", netProfit: 520000, grossProfit: 680000, netPercent: 28, grossPercent: 38 },
-]
-
-const assetsData = {
-    currentAssets: 23450000,
-    fixedAsset: 20325000,
-    cashAndBank: 795404,
-    deposits: 600000,
-    inventory: 220324,
-    accountsReceivable: 1200000,
-    shortTermInvest: 500000,
-    prepaidExpenses: 150000,
-}
-
-const assetsTreemapData = [
-    { name: "Liabilities & Equ.", value: 20438000, displayValue: "$20,438,000" },
-    { name: "Current Liabili.", value: 20438233, displayValue: "$20,438,233" },
-    { name: "Non Current", value: 1546654, displayValue: "-$1,546,654" },
-    { name: "Equity", value: 6171030, displayValue: "$6,171,030" },
-    { name: "Prov & Accrual", value: 2432546, displayValue: "$2,432,546" },
-    { name: "Related Party", value: 13970814, displayValue: "$13,970,814" },
-    { name: "Long Term Debt", value: 5000000, displayValue: "$5,000,000" },
-    { name: "Other Assets", value: 1200000, displayValue: "$1,200,000" },
-]
-
-const expensesData = [
-    { name: "Salaries & Benefit", value: 504435 },
-    { name: "General Expenses", value: 500000 },
-    { name: "Insurance Expenses", value: 490749 },
-    { name: "Repair & Maintenance", value: 480123 },
-    { name: "Vehicle Cost", value: 450888 },
-    { name: "Communication", value: 420890 },
-    { name: "Trade License", value: 400111 },
-    { name: "Financial Costs", value: 382123 },
-]
-
 const ASSET_GRID_COLORS = [
     '#4db6ac', // Row 1 Left (Teal)
     '#00897b', // Row 1 Right (Dark Teal)
@@ -115,113 +48,47 @@ const ASSET_GRID_COLORS = [
     '#2d4a6f', // Row 4 Right
 ]
 
-const DATA_SCENARIOS: any = {
-    'all': {
-        '2025': {
-            'mtd': {
-                stats: { revenue: 23150000, cogs: 10450000, gross: 12700000, net: 2345432 },
-                operatingProfit: [
-                    { month: "Jan", value: 1800000, cogs: 900000, percent: 45 },
-                    { month: "Feb", value: 2100000, cogs: 1050000, percent: 48 },
-                    { month: "Mar", value: 1950000, cogs: 975000, percent: 46 },
-                    { month: "Apr", value: 2345000, cogs: 1172500, percent: 52 },
-                ],
-                assets: [
-                    { name: "Liabilities & Equ.", displayValue: "$20,438,000" },
-                    { name: "Current Liabili.", displayValue: "$20,438,233" },
-                    { name: "Non Current", displayValue: "-$1,546,654" },
-                    { name: "Equity", displayValue: "$6,171,030" },
-                    { name: "Prov & Accrual", displayValue: "$2,432,546" },
-                    { name: "Related Party", displayValue: "$13,970,814" },
-                    { name: "Long Term Debt", displayValue: "$5,000,000" },
-                    { name: "Other Assets", displayValue: "$1,200,000" },
-                ]
-            },
-            'ytd': {
-                stats: { revenue: 95400000, cogs: 42000000, gross: 53400000, net: 12450000 },
-                operatingProfit: [
-                    { month: "Q1", value: 5800000, cogs: 2900000, percent: 45 },
-                    { month: "Q2", value: 7100000, cogs: 3550000, percent: 48 },
-                    { month: "Q3", value: 6950000, cogs: 3475000, percent: 46 },
-                    { month: "Q4", value: 8345000, cogs: 4172500, percent: 52 },
-                ],
-                assets: [
-                    { name: "Liabilities & Equ.", displayValue: "$85,438,000" },
-                    { name: "Current Liabili.", displayValue: "$85,438,233" },
-                    { name: "Non Current", displayValue: "-$5,546,654" },
-                    { name: "Equity", displayValue: "$25,171,030" },
-                    { name: "Prov & Accrual", displayValue: "$12,432,546" },
-                    { name: "Related Party", displayValue: "$45,970,814" },
-                    { name: "Long Term Debt", displayValue: "$20,000,000" },
-                    { name: "Other Assets", displayValue: "$5,200,000" },
-                ]
-            }
-        },
-        '2024': {
-            'mtd': {
-                stats: { revenue: 19150000, cogs: 9450000, gross: 9700000, net: 1845432 },
-                operatingProfit: [
-                    { month: "Jan", value: 1600000, cogs: 800000, percent: 42 },
-                    { month: "Feb", value: 1800000, cogs: 900000, percent: 44 },
-                    { month: "Mar", value: 1750000, cogs: 875000, percent: 43 },
-                    { month: "Apr", value: 1945000, cogs: 972500, percent: 48 },
-                ],
-                assets: [
-                    { name: "Liabilities & Equ.", displayValue: "$18,438,000" },
-                    { name: "Current Liabili.", displayValue: "$18,438,233" },
-                    { name: "Non Current", displayValue: "-$1,246,654" },
-                    { name: "Equity", displayValue: "$5,171,030" },
-                    { name: "Prov & Accrual", displayValue: "$2,132,546" },
-                    { name: "Related Party", displayValue: "$11,970,814" },
-                    { name: "Long Term Debt", displayValue: "$4,000,000" },
-                    { name: "Other Assets", displayValue: "$1,100,000" },
-                ]
-            }
-        }
-    },
-    'entity1': {
-        '2025': {
-            'mtd': {
-                stats: { revenue: 12150000, cogs: 5450000, gross: 6700000, net: 1145432 },
-                operatingProfit: [
-                    { month: "Jan", value: 900000, cogs: 450000, percent: 42 },
-                    { month: "Feb", value: 1100000, cogs: 550000, percent: 44 },
-                    { month: "Mar", value: 1050000, cogs: 525000, percent: 43 },
-                    { month: "Apr", value: 1145000, cogs: 572500, percent: 48 },
-                ],
-                assets: [
-                    { name: "Liabilities & Equ.", displayValue: "$10,438,000" },
-                    { name: "Current Liabili.", displayValue: "$10,438,233" },
-                    { name: "Non Current", displayValue: "-$846,654" },
-                    { name: "Equity", displayValue: "$3,171,030" },
-                    { name: "Prov & Accrual", displayValue: "$1,432,546" },
-                    { name: "Related Party", displayValue: "$6,970,814" },
-                    { name: "Long Term Debt", displayValue: "$2,000,000" },
-                    { name: "Other Assets", displayValue: "$800,000" },
-                ]
-            }
-        }
-    }
-}
 export function AccountingDashboardV2() {
-    const [period, setPeriod] = useState<"mtd" | "ytd">("mtd")
-    const [benchmark, setBenchmark] = useState<"lastYear" | "lastMonth">("lastYear")
-    const [entity, setEntity] = useState("all")
+    const dispatch = useDispatch<AppDispatch>()
+    const { dashboardData, dashboardLoading, dashboardError, currencies } = useSelector((state: RootState) => state.accounting)
+    
+    const [period, setPeriod] = useState<"MTD" | "YTD" | "QTD">("MTD")
+    const [benchmark, setBenchmark] = useState<"LAST_MONTH" | "LAST_QUARTER" | "LAST_YEAR">("LAST_YEAR")
+    const [selectedCurrency, setSelectedCurrency] = useState("")
     const [financialYear, setFinancialYear] = useState("2026")
     const [selectedMonths, setSelectedMonths] = useState("all")
 
-    // Dynamic data selection
-    const activeData = useMemo(() => {
-        const entityData = DATA_SCENARIOS[entity] || DATA_SCENARIOS['all']
-        const yearData = entityData[financialYear] || entityData['2025'] || DATA_SCENARIOS['all']['2025']
-        return yearData[period] || yearData['mtd']
-    }, [entity, financialYear, period])
+    // Fetch currencies on mount
+    useEffect(() => {
+        dispatch(fetchCurrencies())
+    }, [dispatch])
 
-    // Derived values for components
-    const stats = activeData.stats
-    const opProfitData = activeData.operatingProfit
-    const assetsGridData = activeData.assets
-    const totalAssetsLabel = period === 'ytd' ? '95M in Total' : '23M in Total'
+    // Fetch dashboard data on mount and when filters change
+    useEffect(() => {
+        dispatch(fetchAccountingDashboard({
+            period,
+            benchmark,
+            currencyId: selectedCurrency
+        }))
+    }, [dispatch, period, benchmark, selectedCurrency])
+
+    // Use only API data - these hooks must be called before any conditional returns
+    const stats = {
+        revenue: dashboardData?.metrics?.revenue?.value || 0,
+        revenueChange: dashboardData?.metrics?.revenue?.changePercent || 0,
+        cogs: dashboardData?.metrics?.cogs?.value || 0,
+        cogsChange: dashboardData?.metrics?.cogs?.changePercent || 0,
+        gross: dashboardData?.metrics?.grossProfit?.value || 0,
+        grossChange: dashboardData?.metrics?.grossProfit?.changePercent || 0,
+        net: dashboardData?.metrics?.netProfit?.value || 0,
+        netChange: dashboardData?.metrics?.netProfit?.changePercent || 0,
+    }
+
+    const opProfitData = dashboardData?.monthlyData || []
+    const assetsGridData = dashboardData?.assets?.detailed || []
+    const assetsDetailedData = dashboardData?.assets?.detailed || []
+    const liabilitiesEquityData = dashboardData?.liabilitiesEquity?.summary || []
+    const expensesChartData = dashboardData?.expenses || []
 
     const formatCurrency = (value: number) => {
         if (value >= 1000000) {
@@ -232,6 +99,22 @@ export function AccountingDashboardV2() {
 
     const formatLargeCurrency = (value: number) => {
         return `$${value.toLocaleString()}`
+    }
+
+    // Calculate total assets for display
+    const totalAssets = dashboardData?.assets?.total || assetsGridData.reduce((sum: number, asset: any) => sum + (asset.amount || 0), 0)
+    const totalAssetsLabel = formatCurrency(totalAssets)
+
+    // Calculate total liabilities & equity
+    const totalLiabilitiesEquity = dashboardData?.liabilitiesEquity?.total || liabilitiesEquityData.reduce((sum: number, item: any) => sum + (item.amount || 0), 0)
+    
+    // Calculate total expenses from API
+    const totalExpenses = expensesChartData.reduce((sum: number, expense: any) => sum + (expense.amount || 0), 0)
+    const totalExpensesLabel = formatCurrency(totalExpenses)
+
+    // Show skeleton while loading - AFTER all hooks
+    if (dashboardLoading) {
+        return <AccountingDashboardSkeleton />
     }
 
     return (
@@ -247,16 +130,16 @@ export function AccountingDashboardV2() {
                                 <Button
                                     variant="ghost"
                                     size="sm"
-                                    className={`rounded-full h-8 px-4 text-xs font-semibold ${period === "mtd" ? "bg-[#1a3a4a] text-white hover:bg-[#1a3a4a]/90" : "text-muted-foreground hover:bg-gray-50"}`}
-                                    onClick={() => setPeriod("mtd")}
+                                    className={`rounded-full h-8 px-4 text-xs font-semibold ${period === "MTD" ? "bg-[#1a3a4a] text-white hover:bg-[#1a3a4a]/90" : "text-muted-foreground hover:bg-gray-50"}`}
+                                    onClick={() => setPeriod("MTD")}
                                 >
                                     MTD
                                 </Button>
                                 <Button
                                     variant="ghost"
                                     size="sm"
-                                    className={`rounded-full h-8 px-4 text-xs font-semibold ${period === "ytd" ? "bg-[#1a3a4a] text-white hover:bg-[#1a3a4a]/90" : "text-muted-foreground hover:bg-gray-50"}`}
-                                    onClick={() => setPeriod("ytd")}
+                                    className={`rounded-full h-8 px-4 text-xs font-semibold ${period === "YTD" ? "bg-[#1a3a4a] text-white hover:bg-[#1a3a4a]/90" : "text-muted-foreground hover:bg-gray-50"}`}
+                                    onClick={() => setPeriod("YTD")}
                                 >
                                     YTD
                                 </Button>
@@ -269,16 +152,16 @@ export function AccountingDashboardV2() {
                                 <Button
                                     variant="ghost"
                                     size="sm"
-                                    className={`rounded-full h-8 px-4 text-xs font-semibold ${benchmark === "lastYear" ? "bg-[#1a3a4a] text-white hover:bg-[#1a3a4a]/90" : "text-muted-foreground hover:bg-gray-50"}`}
-                                    onClick={() => setBenchmark("lastYear")}
+                                    className={`rounded-full h-8 px-4 text-xs font-semibold ${benchmark === "LAST_YEAR" ? "bg-[#1a3a4a] text-white hover:bg-[#1a3a4a]/90" : "text-muted-foreground hover:bg-gray-50"}`}
+                                    onClick={() => setBenchmark("LAST_YEAR")}
                                 >
                                     Last Year
                                 </Button>
                                 <Button
                                     variant="ghost"
                                     size="sm"
-                                    className={`rounded-full h-8 px-4 text-xs font-semibold ${benchmark === "lastMonth" ? "bg-[#1a3a4a] text-white hover:bg-[#1a3a4a]/90" : "text-muted-foreground hover:bg-gray-50"}`}
-                                    onClick={() => setBenchmark("lastMonth")}
+                                    className={`rounded-full h-8 px-4 text-xs font-semibold ${benchmark === "LAST_MONTH" ? "bg-[#1a3a4a] text-white hover:bg-[#1a3a4a]/90" : "text-muted-foreground hover:bg-gray-50"}`}
+                                    onClick={() => setBenchmark("LAST_MONTH")}
                                 >
                                     Last Month
                                 </Button>
@@ -288,15 +171,17 @@ export function AccountingDashboardV2() {
 
                     <div className="flex flex-wrap items-center gap-6">
                         <div className="flex flex-col gap-1.5">
-                            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Entity</span>
-                            <Select value={entity} onValueChange={setEntity}>
+                            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Currency</span>
+                            <Select value={selectedCurrency} onValueChange={setSelectedCurrency}>
                                 <SelectTrigger className="w-[140px] bg-white border border-gray-200 rounded-full h-10 text-xs font-semibold shadow-none ring-0 focus:ring-0">
-                                    <SelectValue placeholder="All" />
+                                    <SelectValue placeholder="USD" />
                                 </SelectTrigger>
                                 <SelectContent className="rounded-xl border-gray-200 shadow-xl">
-                                    <SelectItem value="all">All Entities</SelectItem>
-                                    <SelectItem value="entity1">Entity 1</SelectItem>
-                                    <SelectItem value="entity2">Entity 2</SelectItem>
+                                    {currencies.map((currency) => (
+                                        <SelectItem key={currency.id} value={currency.id}>
+                                            {currency.code} - {currency.name}
+                                        </SelectItem>
+                                    ))}
                                 </SelectContent>
                             </Select>
                         </div>
@@ -350,11 +235,13 @@ export function AccountingDashboardV2() {
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2 text-xs">
-                                    <span className="text-rose-600 flex items-center gap-1 font-medium bg-rose-50 px-2 py-0.5 rounded-full">
-                                        <ArrowDownRight className="w-3 h-3" />
-                                        8.2%
-                                    </span>
-                                    <span className="text-muted-foreground">vs {benchmark === "lastYear" ? "last year" : "last month"}</span>
+                                    {stats.revenueChange !== 0 && (
+                                        <span className={`flex items-center gap-1 font-medium px-2 py-0.5 rounded-full ${stats.revenueChange > 0 ? 'text-emerald-600 bg-emerald-50' : 'text-rose-600 bg-rose-50'}`}>
+                                            {stats.revenueChange > 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+                                            {stats.revenueChange > 0 ? '+' : ''}{stats.revenueChange.toFixed(1)}%
+                                        </span>
+                                    )}
+                                    <span className="text-muted-foreground">vs {benchmark === "LAST_YEAR" ? "last year" : "last month"}</span>
                                 </div>
                             </div>
                         </CardContent>
@@ -374,11 +261,13 @@ export function AccountingDashboardV2() {
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2 text-xs">
-                                    <span className="text-emerald-600 flex items-center gap-1 font-medium bg-emerald-50 px-2 py-0.5 rounded-full">
-                                        <ArrowUpRight className="w-3 h-3" />
-                                        12.5%
-                                    </span>
-                                    <span className="text-muted-foreground">vs {benchmark === "lastYear" ? "last year" : "last month"}</span>
+                                    {stats.cogsChange !== 0 && (
+                                        <span className={`flex items-center gap-1 font-medium px-2 py-0.5 rounded-full ${stats.cogsChange > 0 ? 'text-emerald-600 bg-emerald-50' : 'text-rose-600 bg-rose-50'}`}>
+                                            {stats.cogsChange > 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+                                            {stats.cogsChange > 0 ? '+' : ''}{stats.cogsChange.toFixed(1)}%
+                                        </span>
+                                    )}
+                                    <span className="text-muted-foreground">vs {benchmark === "LAST_YEAR" ? "last year" : "last month"}</span>
                                 </div>
                             </div>
                         </CardContent>
@@ -398,11 +287,13 @@ export function AccountingDashboardV2() {
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2 text-xs">
-                                    <span className="text-emerald-600 flex items-center gap-1 font-medium bg-emerald-50 px-2 py-0.5 rounded-full">
-                                        <ArrowUpRight className="w-3 h-3" />
-                                        4.1%
-                                    </span>
-                                    <span className="text-muted-foreground">vs {benchmark === "lastYear" ? "last year" : "last month"}</span>
+                                    {stats.grossChange !== 0 && (
+                                        <span className={`flex items-center gap-1 font-medium px-2 py-0.5 rounded-full ${stats.grossChange > 0 ? 'text-emerald-600 bg-emerald-50' : 'text-rose-600 bg-rose-50'}`}>
+                                            {stats.grossChange > 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+                                            {stats.grossChange > 0 ? '+' : ''}{stats.grossChange.toFixed(1)}%
+                                        </span>
+                                    )}
+                                    <span className="text-muted-foreground">vs {benchmark === "LAST_YEAR" ? "last year" : "last month"}</span>
                                 </div>
                             </div>
                         </CardContent>
@@ -422,11 +313,13 @@ export function AccountingDashboardV2() {
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2 text-xs">
-                                    <span className="text-rose-600 flex items-center gap-1 font-medium bg-rose-50 px-2 py-0.5 rounded-full">
-                                        <ArrowDownRight className="w-3 h-3" />
-                                        2.3%
-                                    </span>
-                                    <span className="text-muted-foreground">vs {benchmark === "lastYear" ? "last year" : "last month"}</span>
+                                    {stats.netChange !== 0 && (
+                                        <span className={`flex items-center gap-1 font-medium px-2 py-0.5 rounded-full ${stats.netChange > 0 ? 'text-emerald-600 bg-emerald-50' : 'text-rose-600 bg-rose-50'}`}>
+                                            {stats.netChange > 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+                                            {stats.netChange > 0 ? '+' : ''}{stats.netChange.toFixed(1)}%
+                                        </span>
+                                    )}
+                                    <span className="text-muted-foreground">vs {benchmark === "LAST_YEAR" ? "last year" : "last month"}</span>
                                 </div>
                             </div>
                         </CardContent>
@@ -457,6 +350,7 @@ export function AccountingDashboardV2() {
                             </div>
                         </CardHeader>
                         <CardContent className="p-5 pt-2">
+                            {opProfitData.length > 0 ? (
                             <ResponsiveContainer width="100%" height={300}>
                                 <ComposedChart data={opProfitData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
@@ -478,9 +372,9 @@ export function AccountingDashboardV2() {
                                     />
                                     <Tooltip
                                         contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                        formatter={(value: number, name: string) => {
+                                        formatter={(value: number | undefined, name: string | undefined) => {
                                             if (name === 'percent') return [`${value}%`, 'Margin']
-                                            return [`$${(value / 1000000).toFixed(1)}M`, name === 'value' ? 'Profit' : 'COGS']
+                                            return [`$${((value || 0) / 1000000).toFixed(1)}M`, name === 'value' ? 'Profit' : 'COGS']
                                         }}
                                     />
                                     <Bar yAxisId="left" dataKey="value" fill="#fbbf24" radius={[6, 6, 0, 0]} barSize={12} />
@@ -488,6 +382,15 @@ export function AccountingDashboardV2() {
                                     <Line yAxisId="right" type="monotone" dataKey="percent" stroke="#10b981" strokeWidth={3} dot={{ fill: '#10b981', r: 4, strokeWidth: 0 }} activeDot={{ r: 6 }} />
                                 </ComposedChart>
                             </ResponsiveContainer>
+                            ) : (
+                                <div className="flex flex-col items-center justify-center h-[300px] text-center">
+                                    <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+                                        <TrendingUp className="w-8 h-8 text-gray-400" />
+                                    </div>
+                                    <p className="text-sm font-medium text-muted-foreground">No operating profit data available</p>
+                                    <p className="text-xs text-muted-foreground mt-1">Operating profit data will appear here when available</p>
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
 
@@ -513,8 +416,9 @@ export function AccountingDashboardV2() {
                             </div>
                         </CardHeader>
                         <CardContent className="p-5 pt-2">
+                            {opProfitData.length > 0 ? (
                             <ResponsiveContainer width="100%" height={300}>
-                                <ComposedChart data={netProfitData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                                <ComposedChart data={opProfitData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                                     <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} dy={10} />
                                     <YAxis
@@ -534,9 +438,9 @@ export function AccountingDashboardV2() {
                                     />
                                     <Tooltip
                                         contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                        formatter={(value: number, name: string) => {
+                                        formatter={(value: number | undefined, name: string | undefined) => {
                                             if (name === "netPercent" || name === "grossPercent") return [`${value}%`, name === "netPercent" ? "Net Profit %" : "Gross Profit %"]
-                                            return [formatCurrency(value), name === "netProfit" ? "Net Profit" : "Gross Profit"]
+                                            return [formatCurrency(value || 0), name === "netProfit" ? "Net Profit" : "Gross Profit"]
                                         }}
                                     />
                                     <Bar yAxisId="left" dataKey="netProfit" fill="#065f46" radius={[4, 4, 0, 0]} barSize={10} />
@@ -545,6 +449,15 @@ export function AccountingDashboardV2() {
                                     <Line yAxisId="right" type="monotone" dataKey="grossPercent" stroke="#facc15" strokeWidth={2} dot={{ fill: '#facc15', r: 3 }} strokeDasharray="5 5" />
                                 </ComposedChart>
                             </ResponsiveContainer>
+                            ) : (
+                                <div className="flex flex-col items-center justify-center h-[300px] text-center">
+                                    <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+                                        <DollarSign className="w-8 h-8 text-gray-400" />
+                                    </div>
+                                    <p className="text-sm font-medium text-muted-foreground">No net profit data available</p>
+                                    <p className="text-xs text-muted-foreground mt-1">Net profit data will appear here when available</p>
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
                 </div>
@@ -556,20 +469,30 @@ export function AccountingDashboardV2() {
                         <CardHeader className="p-5 pb-2">
                             <div className="flex items-center justify-between">
                                 <CardTitle className="text-lg font-semibold text-foreground">Assets</CardTitle>
-                                <span className="text-sm font-medium text-muted-foreground bg-gray-50 px-3 py-1 rounded-full">25M Total</span>
+                                <span className="text-sm font-medium text-muted-foreground bg-gray-50 px-3 py-1 rounded-full">{totalAssetsLabel} Total</span>
                             </div>
                         </CardHeader>
                         <CardContent className="p-5">
                             <div className="space-y-6">
-                                {assetsGridData.slice(0, 5).map((asset, index) => (
-                                    <div key={index} className="flex items-center gap-4">
-                                        <div className="w-1.5 h-10 rounded-full" style={{ backgroundColor: ASSET_GRID_COLORS[index % ASSET_GRID_COLORS.length] }}></div>
-                                        <div className="flex-1">
-                                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{asset.name}</p>
-                                            <p className="text-xl font-normal text-foreground mt-1 tracking-tight">{asset.displayValue}</p>
+                                {assetsGridData.length > 0 ? (
+                                    assetsGridData.slice(0, 5).map((asset: any, index: number) => (
+                                        <div key={index} className="flex items-center gap-4">
+                                            <div className="w-1.5 h-10 rounded-full" style={{ backgroundColor: ASSET_GRID_COLORS[index % ASSET_GRID_COLORS.length] }}></div>
+                                            <div className="flex-1">
+                                                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{asset.category}</p>
+                                                <p className="text-xl font-normal text-foreground mt-1 tracking-tight">${asset.amount.toLocaleString()}</p>
+                                            </div>
                                         </div>
+                                    ))
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center py-12 text-center">
+                                        <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+                                            <ArrowUpRight className="w-8 h-8 text-gray-400" />
+                                        </div>
+                                        <p className="text-sm font-medium text-muted-foreground">No asset data available</p>
+                                        <p className="text-xs text-muted-foreground mt-1">Asset information will appear here when available</p>
                                     </div>
-                                ))}
+                                )}
                             </div>
                         </CardContent>
                     </Card>
@@ -583,44 +506,54 @@ export function AccountingDashboardV2() {
                             </div>
                         </CardHeader>
                         <CardContent className="p-5">
-                            <div className="flex flex-col h-[450px] overflow-hidden rounded-md">
-                                {[0, 1, 2, 3].map((rowIdx) => {
-                                    const rowWidths = [
-                                        ['55%', '45%'],
-                                        ['42%', '58%'],
-                                        ['60%', '40%'],
-                                        ['48%', '52%']
-                                    ][rowIdx];
+                            {assetsGridData.length > 0 ? (
+                                <div className="flex flex-col h-[450px] overflow-hidden rounded-md">
+                                    {[0, 1, 2, 3].map((rowIdx) => {
+                                        const rowWidths = [
+                                            ['55%', '45%'],
+                                            ['42%', '58%'],
+                                            ['60%', '40%'],
+                                            ['48%', '52%']
+                                        ][rowIdx];
 
-                                    return (
-                                        <div key={rowIdx} className={`flex flex-1 ${rowIdx !== 3 ? 'border-b border-white/20' : ''}`}>
-                                            {[0, 1].map((colIdx) => {
-                                                const dataIdx = rowIdx * 2 + colIdx;
-                                                const item = assetsGridData[dataIdx];
-                                                if (!item) return null;
+                                        return (
+                                            <div key={rowIdx} className={`flex flex-1 ${rowIdx !== 3 ? 'border-b border-white/20' : ''}`}>
+                                                {[0, 1].map((colIdx) => {
+                                                    const dataIdx = rowIdx * 2 + colIdx;
+                                                    const item = assetsGridData[dataIdx];
+                                                    if (!item) return null;
 
-                                                return (
-                                                    <div
-                                                        key={colIdx}
-                                                        className="flex flex-col items-center justify-center p-3 transition-colors"
-                                                        style={{
-                                                            backgroundColor: ASSET_GRID_COLORS[dataIdx % ASSET_GRID_COLORS.length],
-                                                            width: rowWidths[colIdx]
-                                                        }}
-                                                    >
-                                                        <span className="text-[10px] font-medium text-white/90 uppercase tracking-wider text-center leading-tight mb-1">
-                                                            {item.name}
-                                                        </span>
-                                                        <span className="text-xl font-light text-white tracking-tight">
-                                                            {item.displayValue}
-                                                        </span>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    );
-                                })}
-                            </div>
+                                                    return (
+                                                        <div
+                                                            key={colIdx}
+                                                            className="flex flex-col items-center justify-center p-3 transition-colors"
+                                                            style={{
+                                                                backgroundColor: ASSET_GRID_COLORS[dataIdx % ASSET_GRID_COLORS.length],
+                                                                width: rowWidths[colIdx]
+                                                            }}
+                                                        >
+                                                            <span className="text-[10px] font-medium text-white/90 uppercase tracking-wider text-center leading-tight mb-1">
+                                                                {item.category}
+                                                            </span>
+                                                            <span className="text-xl font-light text-white tracking-tight">
+                                                                ${item.amount.toLocaleString()}
+                                                            </span>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            ) : (
+                                <div className="flex flex-col items-center justify-center h-[450px] text-center">
+                                    <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+                                        <ArrowUpRight className="w-8 h-8 text-gray-400" />
+                                    </div>
+                                    <p className="text-sm font-medium text-muted-foreground">No distribution data available</p>
+                                    <p className="text-xs text-muted-foreground mt-1">Asset distribution will appear here when available</p>
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
 
@@ -629,25 +562,35 @@ export function AccountingDashboardV2() {
                         <CardHeader className="p-5 pb-2">
                             <div className="flex items-center justify-between">
                                 <CardTitle className="text-lg font-semibold text-foreground">Expenses</CardTitle>
-                                <span className="text-sm font-medium text-muted-foreground bg-gray-50 px-3 py-1 rounded-full">3.5M Total</span>
+                                <span className="text-sm font-medium text-muted-foreground bg-gray-50 px-3 py-1 rounded-full">{totalExpensesLabel} Total</span>
                             </div>
                         </CardHeader>
                         <CardContent className="p-5">
                             <div className="space-y-4">
-                                {expensesData.map((expense, index) => (
-                                    <div key={index} className="space-y-1.5">
-                                        <div className="flex items-center justify-between text-xs font-medium px-1">
-                                            <span className="text-muted-foreground uppercase tracking-wider">{expense.name}</span>
-                                            <span className="text-foreground">{expense.value.toLocaleString()}</span>
+                                {expensesChartData.length > 0 ? (
+                                    expensesChartData.map((expense: any, index: number) => (
+                                        <div key={index} className="space-y-1.5">
+                                            <div className="flex items-center justify-between text-xs font-medium px-1">
+                                                <span className="text-muted-foreground uppercase tracking-wider">{expense.category}</span>
+                                                <span className="text-foreground">{(expense.amount || 0).toLocaleString()}</span>
+                                            </div>
+                                            <div className="h-4 w-full bg-gray-50 rounded-full overflow-hidden">
+                                                <div
+                                                    className="h-full bg-emerald-400 rounded-full transition-all duration-500"
+                                                    style={{ width: `${expensesChartData.length > 0 ? ((expense.amount || 0) / Math.max(...expensesChartData.map((e: any) => e.amount || 0))) * 100 : 0}%` }}
+                                                />
+                                            </div>
                                         </div>
-                                        <div className="h-4 w-full bg-gray-50 rounded-full overflow-hidden">
-                                            <div
-                                                className="h-full bg-emerald-400 rounded-full transition-all duration-500"
-                                                style={{ width: `${(expense.value / 504435) * 100}%` }}
-                                            />
+                                    ))
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center py-12 text-center">
+                                        <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+                                            <ArrowUpRight className="w-8 h-8 text-gray-400" />
                                         </div>
+                                        <p className="text-sm font-medium text-muted-foreground">No expense data available</p>
+                                        <p className="text-xs text-muted-foreground mt-1">Expense breakdown will appear here when available</p>
                                     </div>
-                                ))}
+                                )}
                             </div>
                         </CardContent>
                     </Card>

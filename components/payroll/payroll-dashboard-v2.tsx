@@ -1,6 +1,10 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
+import { useSelector, useDispatch } from "react-redux"
+import { AppDispatch, RootState } from "@/lib/store/store"
+import { fetchPayrollDashboard } from "@/lib/store/slices/payrollSlice"
+import { PayrollDashboardSkeleton } from "./payroll-dashboard-skeleton"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -35,47 +39,47 @@ import {
     ArrowUpRight,
 } from "lucide-react"
 
-// Enhanced Dummy Data for Dynamic Filtering
-const generatePayrollData = () => {
-    const departments = ["Marketing", "Engineering", "Finance", "HR", "IT", "Operations"]
-    const statuses = ["Paid", "Pending", "Processing"]
-    const data = []
-
-    // Generate data for 2025 and 2026
-    for (let i = 1; i <= 50; i++) {
-        const dept = departments[i % departments.length]
-        const status = statuses[i % statuses.length]
-        const year = i % 2 === 0 ? 2026 : 2025
-        const month = (i % 12) + 1
-        const baseSalary = 3000 + Math.floor(Math.random() * 4000)
-        const bonuses = Math.floor(Math.random() * 1000)
-
-        data.push({
-            id: i,
-            name: `Employee ${i}`,
-            department: dept,
-            payDate: `${month < 10 ? '0' + month : month}/25/${year}`,
-            month: month,
-            year: year,
-            status: status,
-            baseSalary: baseSalary,
-            bonuses: bonuses,
-            totalSalary: baseSalary + bonuses,
-            avatar: ""
-        })
-    }
-    return data
-}
-
-const payrollList = generatePayrollData()
-
 export function PayrollDashboardV2() {
+    const dispatch = useDispatch<AppDispatch>()
+    const { dashboardData, dashboardLoading } = useSelector((state: RootState) => state.payroll)
+    
     const [showAlert, setShowAlert] = useState(true)
     const [searchQuery, setSearchQuery] = useState("")
     const [selectedDepartment, setSelectedDepartment] = useState("all")
     const [selectedStatus, setSelectedStatus] = useState("all")
-    const [selectedMonth, setSelectedMonth] = useState("all") // Default to All Months
+    const [selectedMonth, setSelectedMonth] = useState("all")
     const [selectedYear, setSelectedYear] = useState("2026")
+
+    // Fetch dashboard data on mount and when filters change
+    useEffect(() => {
+        dispatch(fetchPayrollDashboard({
+            month: selectedMonth !== "all" ? parseInt(selectedMonth) : undefined,
+            year: parseInt(selectedYear),
+            currencyId: 'USD'
+        }))
+    }, [dispatch, selectedMonth, selectedYear])
+
+    // Use only API data - Define all hooks BEFORE conditional returns
+    const totalPayrollValue = dashboardData?.metrics?.totalPayrollThisMonth?.value || 0
+    const totalPayrollChange = dashboardData?.metrics?.totalPayrollThisMonth?.changePercent || 0
+    const totalEmployeesValue = dashboardData?.metrics?.totalEmployeesPaid?.value || 0
+    const totalEmployeesChange = dashboardData?.metrics?.totalEmployeesPaid?.change || 0
+    const averageSalaryValue = dashboardData?.metrics?.averageSalary?.value || 0
+    const averageSalaryChange = dashboardData?.metrics?.averageSalary?.change || 0
+    const monthlyTrendData = dashboardData?.monthlyTrend?.map((item: any) => ({
+        month: item.month,
+        value: item.totalPayroll
+    })) || []
+    const deptDistribution = dashboardData?.departmentDistribution || []
+    const payrollList = dashboardData?.payrollList || []
+
+    // Filter payroll list based on search and filters
+    const filteredPayroll = payrollList.filter((item: any) => {
+        const matchesSearch = searchQuery === "" || item.name?.toLowerCase().includes(searchQuery.toLowerCase())
+        const matchesDepartment = selectedDepartment === "all" || item.department?.toLowerCase() === selectedDepartment.toLowerCase()
+        const matchesStatus = selectedStatus === "all" || item.status?.toLowerCase() === selectedStatus.toLowerCase()
+        return matchesSearch && matchesDepartment && matchesStatus
+    })
 
     const getStatusBadge = (status: string) => {
         switch (status) {
@@ -90,55 +94,10 @@ export function PayrollDashboardV2() {
         }
     }
 
-    const filteredPayroll = payrollList.filter((item) => {
-        const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase())
-        const matchesDepartment = selectedDepartment === "all" || item.department.toLowerCase() === selectedDepartment.toLowerCase()
-        const matchesStatus = selectedStatus === "all" || item.status.toLowerCase() === selectedStatus.toLowerCase()
-        const matchesMonth = selectedMonth === "all" || item.month.toString() === selectedMonth
-        const matchesYear = selectedYear === "all" || item.year.toString() === selectedYear
-        return matchesSearch && matchesDepartment && matchesStatus && matchesMonth && matchesYear
-    })
-
-    // Dynamic Stats Calculation
-    const totalPayrollValue = filteredPayroll.reduce((acc, curr) => acc + curr.totalSalary, 0)
-    const totalEmployeesValue = filteredPayroll.length
-    const averageSalaryValue = totalEmployeesValue > 0 ? totalPayrollValue / totalEmployeesValue : 0
-
-    // Dynamic Chart Data
-    const monthlyTrendData = useMemo(() => {
-        const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-        
-        // If specific month is selected, show only that month
-        if (selectedMonth !== "all") {
-            const monthIdx = parseInt(selectedMonth) - 1
-            return [{ month: monthNames[monthIdx], value: totalPayrollValue > 0 ? totalPayrollValue : 295000 }]
-        }
-        
-        // Show all months of the selected year
-        return monthNames.map((m, idx) => {
-            const monthNum = idx + 1
-            const monthData = payrollList.filter(p => 
-                p.month === monthNum && 
-                (selectedYear === "all" || p.year.toString() === selectedYear) &&
-                (selectedDepartment === "all" || p.department.toLowerCase() === selectedDepartment.toLowerCase()) &&
-                (selectedStatus === "all" || p.status.toLowerCase() === selectedStatus.toLowerCase())
-            )
-            const value = monthData.reduce((acc, curr) => acc + curr.totalSalary, 0)
-            return { month: m, value: value || 0 }
-        })
-    }, [selectedMonth, selectedYear, selectedDepartment, selectedStatus, payrollList, totalPayrollValue])
-
-    const deptDistribution = useMemo(() => {
-        const departments = ["Marketing", "Engineering", "Finance", "HR", "IT", "Operations"]
-        return departments.map(d => {
-            const deptItems = filteredPayroll.filter(p => p.department === d)
-            return {
-                department: d,
-                salary: deptItems.reduce((acc, curr) => acc + curr.baseSalary, 0),
-                bonus: deptItems.reduce((acc, curr) => acc + curr.bonuses, 0)
-            }
-        })
-    }, [filteredPayroll])
+    // Show skeleton while loading - AFTER all hooks
+    if (dashboardLoading) {
+        return <PayrollDashboardSkeleton />
+    }
 
     return (
         <div className="min-h-screen bg-[#F6F6F6] p-6 -m-6">
@@ -200,10 +159,12 @@ export function PayrollDashboardV2() {
                                 </div>
                                 <div className="flex items-baseline gap-3">
                                     <p className="text-4xl font-normal text-foreground mt-1 tracking-tight">${totalPayrollValue.toLocaleString()}</p>
-                                    <span className="text-xs font-bold text-emerald-600 flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded-full">
-                                        <ArrowUpRight className="w-3 h-3" />
-                                        +8.2%
-                                    </span>
+                                    {totalPayrollChange !== 0 && (
+                                        <span className={`text-xs font-bold flex items-center gap-1 px-2 py-0.5 rounded-full ${totalPayrollChange > 0 ? 'text-emerald-600 bg-emerald-50' : 'text-red-600 bg-red-50'}`}>
+                                            <ArrowUpRight className={`w-3 h-3 ${totalPayrollChange < 0 ? 'rotate-90' : ''}`} />
+                                            {totalPayrollChange > 0 ? '+' : ''}{totalPayrollChange.toFixed(1)}%
+                                        </span>
+                                    )}
                                 </div>
                             </div>
 
@@ -215,10 +176,12 @@ export function PayrollDashboardV2() {
                                 </div>
                                 <div className="flex items-baseline gap-3">
                                     <p className="text-4xl font-normal text-foreground mt-1 tracking-tight">{totalEmployeesValue}</p>
-                                    <span className="text-xs font-bold text-emerald-600 flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded-full">
-                                        <ArrowUpRight className="w-3 h-3" />
-                                        +3
-                                    </span>
+                                    {totalEmployeesChange !== 0 && (
+                                        <span className={`text-xs font-bold flex items-center gap-1 px-2 py-0.5 rounded-full ${totalEmployeesChange > 0 ? 'text-emerald-600 bg-emerald-50' : 'text-red-600 bg-red-50'}`}>
+                                            <ArrowUpRight className={`w-3 h-3 ${totalEmployeesChange < 0 ? 'rotate-90' : ''}`} />
+                                            {totalEmployeesChange > 0 ? '+' : ''}{totalEmployeesChange}
+                                        </span>
+                                    )}
                                 </div>
                             </div>
 
@@ -230,10 +193,12 @@ export function PayrollDashboardV2() {
                                 </div>
                                 <div className="flex items-baseline gap-3">
                                     <p className="text-4xl font-normal text-foreground mt-1 tracking-tight">${Math.round(averageSalaryValue).toLocaleString()}</p>
-                                    <span className="text-xs font-bold text-emerald-600 flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded-full">
-                                        <ArrowUpRight className="w-3 h-3" />
-                                        +$94
-                                    </span>
+                                    {averageSalaryChange !== 0 && (
+                                        <span className={`text-xs font-bold flex items-center gap-1 px-2 py-0.5 rounded-full ${averageSalaryChange > 0 ? 'text-emerald-600 bg-emerald-50' : 'text-red-600 bg-red-50'}`}>
+                                            <ArrowUpRight className={`w-3 h-3 ${averageSalaryChange < 0 ? 'rotate-90' : ''}`} />
+                                            {averageSalaryChange > 0 ? '+' : ''}${Math.round(averageSalaryChange).toLocaleString()}
+                                        </span>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -251,40 +216,58 @@ export function PayrollDashboardV2() {
                                     <div className="mt-4">
                                         <p className="text-4xl font-normal text-foreground mt-1 tracking-tight">${totalPayrollValue.toLocaleString()}</p>
                                         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mt-1">
-                                            <span className="text-emerald-600 font-bold">+2.4%</span> from last month
+                                            {totalPayrollChange !== 0 ? (
+                                                <>
+                                                    <span className={`font-bold ${totalPayrollChange > 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                                        {totalPayrollChange > 0 ? '+' : ''}{totalPayrollChange.toFixed(1)}%
+                                                    </span> from last month
+                                                </>
+                                            ) : (
+                                                'No change from last month'
+                                            )}
                                         </p>
                                     </div>
                                 </div>
                             </div>
                         </CardHeader>
                         <CardContent className="p-6">
-                            <ResponsiveContainer width="100%" height={220}>
-                                <LineChart data={monthlyTrendData} margin={{ top: 5, right: 10, left: 10, bottom: 0 }}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                                    <XAxis
-                                        dataKey="month"
-                                        tick={{ fontSize: 11, fontWeight: '500', fill: '#94a3b8' }}
-                                        axisLine={false}
-                                        tickLine={false}
-                                        dy={10}
-                                    />
-                                    <YAxis hide domain={['dataMin - 20000', 'dataMax + 20000']} />
-                                    <Tooltip
-                                        contentStyle={{ backgroundColor: '#1a1a1a', border: 'none', borderRadius: '12px' }}
-                                        itemStyle={{ color: '#fff', fontSize: '12px', fontWeight: 'bold' }}
-                                        labelStyle={{ display: 'none' }}
-                                        formatter={(v?: number) => v ? [`$${v.toLocaleString()}`, 'Payroll'] : ['', '']}
-                                    />
-                                    <Line
-                                        type="monotone"
-                                        dataKey="value"
-                                        stroke="#262626"
-                                        strokeWidth={3}
-                                        dot={{ fill: 'white', stroke: '#262626', strokeWidth: 2, r: 4 }}
-                                        activeDot={{ r: 6, strokeWidth: 0, fill: '#262626' }}
-                                    />
-                                </LineChart>
-                            </ResponsiveContainer>
+                            {monthlyTrendData.length > 0 && monthlyTrendData.some((d: any) => d.value > 0) ? (
+                                <ResponsiveContainer width="100%" height={220}>
+                                    <LineChart data={monthlyTrendData} margin={{ top: 5, right: 10, left: 10, bottom: 0 }}>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                                        <XAxis
+                                            dataKey="month"
+                                            tick={{ fontSize: 11, fontWeight: '500', fill: '#94a3b8' }}
+                                            axisLine={false}
+                                            tickLine={false}
+                                            dy={10}
+                                        />
+                                        <YAxis hide domain={['dataMin - 20000', 'dataMax + 20000']} />
+                                        <Tooltip
+                                            contentStyle={{ backgroundColor: '#1a1a1a', border: 'none', borderRadius: '12px' }}
+                                            itemStyle={{ color: '#fff', fontSize: '12px', fontWeight: 'bold' }}
+                                            labelStyle={{ display: 'none' }}
+                                            formatter={(v?: number) => v ? [`$${v.toLocaleString()}`, 'Payroll'] : ['', '']}
+                                        />
+                                        <Line
+                                            type="monotone"
+                                            dataKey="value"
+                                            stroke="#262626"
+                                            strokeWidth={3}
+                                            dot={{ fill: 'white', stroke: '#262626', strokeWidth: 2, r: 4 }}
+                                            activeDot={{ r: 6, strokeWidth: 0, fill: '#262626' }}
+                                        />
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            ) : (
+                                <div className="flex flex-col items-center justify-center h-[220px] text-center">
+                                    <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+                                        <LineChart className="w-8 h-8 text-gray-400" />
+                                    </div>
+                                    <p className="text-sm font-medium text-muted-foreground">No payroll trend data available</p>
+                                    <p className="text-xs text-muted-foreground mt-1">Monthly payroll trends will appear here when available</p>
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
 
@@ -297,45 +280,65 @@ export function PayrollDashboardV2() {
                                     <div className="mt-4">
                                         <p className="text-4xl font-normal text-foreground mt-1 tracking-tight">${totalPayrollValue.toLocaleString()}</p>
                                         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mt-1">
-                                            <span className="text-emerald-600 font-bold">+2.4%</span> from last month
+                                            {totalPayrollChange !== 0 ? (
+                                                <>
+                                                    <span className={`font-bold ${totalPayrollChange > 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                                        {totalPayrollChange > 0 ? '+' : ''}{totalPayrollChange.toFixed(1)}%
+                                                    </span> from last month
+                                                </>
+                                            ) : (
+                                                'No change from last month'
+                                            )}
                                         </p>
                                     </div>
                                 </div>
-                                <div className="flex flex-col items-end gap-3">
-                                    <div className="flex items-center gap-4">
-                                        <div className="flex items-center gap-1.5">
-                                            <div className="w-2.5 h-2.5 rounded-full bg-[#4f77ff]"></div>
-                                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Salary</span>
-                                        </div>
-                                        <div className="flex items-center gap-1.5">
-                                            <div className="w-2.5 h-2.5 rounded-full bg-[#4f77ff]/20"></div>
-                                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Bonus</span>
+                                {deptDistribution.length > 0 && (
+                                    <div className="flex flex-col items-end gap-3">
+                                        <div className="flex items-center gap-4">
+                                            <div className="flex items-center gap-1.5">
+                                                <div className="w-2.5 h-2.5 rounded-full bg-[#4f77ff]"></div>
+                                                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Salary</span>
+                                            </div>
+                                            <div className="flex items-center gap-1.5">
+                                                <div className="w-2.5 h-2.5 rounded-full bg-[#4f77ff]/20"></div>
+                                                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Bonus</span>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
+                                )}
                             </div>
                         </CardHeader>
                         <CardContent className="p-6">
-                            <ResponsiveContainer width="100%" height={220}>
-                                <BarChart data={deptDistribution} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                                    <XAxis
-                                        dataKey="department"
-                                        tick={{ fontSize: 10, fontWeight: '600', fill: '#94a3b8' }}
-                                        axisLine={false}
-                                        tickLine={false}
-                                        dy={10}
-                                    />
-                                    <YAxis hide />
-                                    <Tooltip
-                                        cursor={{ fill: '#f8fafc' }}
-                                        contentStyle={{ backgroundColor: '#1a1a1a', border: 'none', borderRadius: '12px' }}
-                                        itemStyle={{ color: '#fff', fontSize: '11px', fontWeight: 'bold' }}
-                                    />
-                                    <Bar dataKey="salary" fill="#4f77ff" radius={[10, 10, 10, 10]} maxBarSize={48} />
-                                    <Bar dataKey="bonus" fill="#4f77ff20" radius={[10, 10, 10, 10]} maxBarSize={48} />
-                                </BarChart>
-                            </ResponsiveContainer>
+                            {deptDistribution.length > 0 ? (
+                                <ResponsiveContainer width="100%" height={220}>
+                                    <BarChart data={deptDistribution} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                                        <XAxis
+                                            dataKey="department"
+                                            tick={{ fontSize: 10, fontWeight: '600', fill: '#94a3b8' }}
+                                            axisLine={false}
+                                            tickLine={false}
+                                            dy={10}
+                                        />
+                                        <YAxis hide />
+                                        <Tooltip
+                                            cursor={{ fill: '#f8fafc' }}
+                                            contentStyle={{ backgroundColor: '#1a1a1a', border: 'none', borderRadius: '12px' }}
+                                            itemStyle={{ color: '#fff', fontSize: '11px', fontWeight: 'bold' }}
+                                        />
+                                        <Bar dataKey="salary" fill="#4f77ff" radius={[10, 10, 10, 10]} maxBarSize={48} />
+                                        <Bar dataKey="bonus" fill="#4f77ff20" radius={[10, 10, 10, 10]} maxBarSize={48} />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            ) : (
+                                <div className="flex flex-col items-center justify-center h-[220px] text-center">
+                                    <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+                                        <BarChart className="w-8 h-8 text-gray-400" />
+                                    </div>
+                                    <p className="text-sm font-medium text-muted-foreground">No department distribution data available</p>
+                                    <p className="text-xs text-muted-foreground mt-1">Department payroll distribution will appear here when available</p>
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
                 </div>
@@ -401,35 +404,42 @@ export function PayrollDashboardV2() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {filteredPayroll.map((employee) => (
-                                    <TableRow key={employee.id} className="border-border">
-                                        <TableCell>
-                                            <input type="checkbox" className="rounded border-border" />
-                                        </TableCell>
-                                        <TableCell>
-                                            <div className="flex items-center gap-3">
-                                                <Avatar className="w-8 h-8">
-                                                    <AvatarImage src={employee.avatar || "/placeholder.svg"} />
-                                                    <AvatarFallback className="bg-muted text-foreground text-xs">
-                                                        {employee.name.split(' ').map(n => n[0]).join('')}
-                                                    </AvatarFallback>
-                                                </Avatar>
-                                                <span className="font-medium text-foreground">{employee.name}</span>
-                                            </div>
-                                        </TableCell>
-                                        <TableCell className="text-muted-foreground">{employee.department}</TableCell>
-                                        <TableCell className="text-muted-foreground">{employee.payDate}</TableCell>
-                                        <TableCell>{getStatusBadge(employee.status)}</TableCell>
-                                        <TableCell className="text-foreground">${employee.baseSalary.toLocaleString()}</TableCell>
-                                        <TableCell className="text-foreground">${employee.bonuses.toLocaleString()}</TableCell>
-                                        <TableCell className="font-semibold text-foreground">${employee.totalSalary.toLocaleString()}</TableCell>
-                                        <TableCell>
-                                            <Button variant="ghost" size="icon" className="w-8 h-8 rounded-lg">
-                                                <MoreVertical className="w-4 h-4" />
-                                            </Button>
+                                {filteredPayroll.length > 0 ? (
+                                    filteredPayroll.map((employee: any) => (
+                                        <TableRow key={employee.employeeId} className="border-border">
+                                            <TableCell>
+                                                <input type="checkbox" className="rounded border-border" />
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="flex items-center gap-3">
+                                                    <Avatar className="w-8 h-8">
+                                                        <AvatarFallback className="bg-muted text-foreground text-xs">
+                                                            {employee.name?.substring(0, 2).toUpperCase() || 'EM'}
+                                                        </AvatarFallback>
+                                                    </Avatar>
+                                                    <span className="font-medium text-foreground">{employee.name}</span>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="text-muted-foreground">{employee.department}</TableCell>
+                                            <TableCell className="text-muted-foreground">{employee.payDate || '-'}</TableCell>
+                                            <TableCell>{getStatusBadge(employee.status)}</TableCell>
+                                            <TableCell className="text-foreground">${employee.baseSalary?.toLocaleString() || 0}</TableCell>
+                                            <TableCell className="text-foreground">${employee.bonuses?.toLocaleString() || 0}</TableCell>
+                                            <TableCell className="font-semibold text-foreground">${employee.totalSalary?.toLocaleString() || 0}</TableCell>
+                                            <TableCell>
+                                                <Button variant="ghost" size="icon" className="w-8 h-8 rounded-lg">
+                                                    <MoreVertical className="w-4 h-4" />
+                                                </Button>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
+                                ) : (
+                                    <TableRow>
+                                        <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                                            No payroll records found
                                         </TableCell>
                                     </TableRow>
-                                ))}
+                                )}
                             </TableBody>
                         </Table>
                     </CardContent>

@@ -2,6 +2,7 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
 import { applicationsApi, Application } from '@/lib/api/applications-api'
 import { fundsApi, Fund } from '@/lib/api/funds-api'
 import { portfolioCompaniesApi, PortfolioCompany } from '@/lib/api/portfolio-companies-api'
+import { portfolioApi, type PortfolioDashboardData, type PortfolioDashboardParams } from '@/lib/api/portfolio-api'
 
 export interface PortfolioDashboardState {
   applications: Application[]
@@ -16,6 +17,10 @@ export interface PortfolioDashboardState {
     totalApplications: number
     totalDisbursed: number
   }
+  // Dashboard V2
+  dashboardData: PortfolioDashboardData | null
+  dashboardLoading: boolean
+  dashboardError: string | null
 }
 
 const initialState: PortfolioDashboardState = {
@@ -30,7 +35,11 @@ const initialState: PortfolioDashboardState = {
     activeCompanies: 0,
     totalApplications: 0,
     totalDisbursed: 0
-  }
+  },
+  // Dashboard V2
+  dashboardData: null,
+  dashboardLoading: false,
+  dashboardError: null,
 }
 
 export const fetchPortfolioDashboardData = createAsyncThunk(
@@ -50,6 +59,22 @@ export const fetchPortfolioDashboardData = createAsyncThunk(
       }
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to fetch dashboard data')
+    }
+  }
+)
+
+// Dashboard V2 thunk
+export const fetchPortfolioDashboard = createAsyncThunk(
+  'portfolioDashboard/fetchPortfolioDashboard',
+  async (params: PortfolioDashboardParams = {}, { rejectWithValue }) => {
+    try {
+      const response = await portfolioApi.getDashboard(params)
+      if (!response.success) {
+        return rejectWithValue(response.message || 'Failed to fetch portfolio dashboard')
+      }
+      return response.data
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to fetch portfolio dashboard')
     }
   }
 )
@@ -105,6 +130,19 @@ const portfolioDashboardSlice = createSlice({
       .addCase(fetchPortfolioDashboardData.rejected, (state, action) => {
         state.isLoading = false
         state.error = action.payload as string
+      })
+      // Dashboard V2
+      .addCase(fetchPortfolioDashboard.pending, (state) => {
+        state.dashboardLoading = true
+        state.dashboardError = null
+      })
+      .addCase(fetchPortfolioDashboard.fulfilled, (state, action) => {
+        state.dashboardLoading = false
+        state.dashboardData = action.payload
+      })
+      .addCase(fetchPortfolioDashboard.rejected, (state, action) => {
+        state.dashboardLoading = false
+        state.dashboardError = action.payload as string
       })
   }
 })

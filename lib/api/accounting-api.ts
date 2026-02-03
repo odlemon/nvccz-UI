@@ -493,6 +493,93 @@ export interface DashboardStats {
   }
 }
 
+// New Dashboard V2 Types
+export interface MetricValue {
+  value: number
+  change: number
+  changePercent: number
+}
+
+export interface GrossProfitMetric extends MetricValue {
+  grossProfitPercent: number
+}
+
+export interface AccountingDashboardMetrics {
+  revenue: MetricValue
+  cogs: MetricValue
+  grossProfit: GrossProfitMetric
+  netProfit: MetricValue
+}
+
+export interface MonthlyDataPoint {
+  month: string
+  monthNumber: number
+  revenue: number
+  cogs: number
+  grossProfit: number
+  grossProfitPercent: number
+  netProfit: number
+}
+
+export interface ExpenseBreakdown {
+  category: string
+  amount: number
+  percentage?: number
+  change?: number
+}
+
+export interface AssetBreakdown {
+  category: string
+  amount: number
+  percent: number
+}
+
+export interface AssetsData {
+  summary: AssetBreakdown[]
+  detailed: AssetBreakdown[]
+  total: number
+}
+
+export interface LiabilityEquityItem {
+  category: string
+  amount: number
+  percent: number
+}
+
+export interface LiabilitiesEquityData {
+  summary: LiabilityEquityItem[]
+  detailed: LiabilityEquityItem[]
+  total: number
+}
+
+export interface AccountingDashboardData {
+  metrics: AccountingDashboardMetrics
+  monthlyData: MonthlyDataPoint[]
+  expenses: ExpenseBreakdown[]
+  assets: AssetsData
+  liabilitiesEquity: LiabilitiesEquityData
+  period?: {
+    startDate: string
+    endDate: string
+    periodType: string
+    benchmarkType: string
+  }
+  currency?: {
+    id: string
+    code: string
+    name: string
+  }
+  generatedAt?: string
+}
+
+export interface AccountingDashboardParams {
+  period?: 'MTD' | 'QTD' | 'YTD' | 'CUSTOM'
+  benchmark?: 'LAST_MONTH' | 'LAST_QUARTER' | 'LAST_YEAR'
+  startDate?: string
+  endDate?: string
+  currencyId?: string
+}
+
 export interface ChartData {
   labels: string[]
   datasets: {
@@ -1244,6 +1331,20 @@ class AccountingApiService {
 
   async getCreditNotesChart(currencyId: string): Promise<AccountingResponse<ChartData>> {
     return apiClient.get<AccountingResponse<ChartData>>(`/accounting/dashboard/credit-notes-chart?currencyId=${currencyId}`)
+  }
+
+  async getDashboard(params: AccountingDashboardParams = {}): Promise<AccountingResponse<AccountingDashboardData>> {
+    const queryParams = new URLSearchParams()
+    if (params.period) queryParams.append('period', params.period)
+    if (params.benchmark) queryParams.append('benchmark', params.benchmark)
+    if (params.startDate) queryParams.append('startDate', params.startDate)
+    if (params.endDate) queryParams.append('endDate', params.endDate)
+    if (params.currencyId) queryParams.append('currencyId', params.currencyId)
+    
+    const queryString = queryParams.toString()
+    return apiClient.get<AccountingResponse<AccountingDashboardData>>(
+      `/accounting/dashboard${queryString ? `?${queryString}` : ''}`
+    )
   }
 
   async getRecentExpenses(limit: number = 10, currencyId: string): Promise<AccountingResponse<Expense[]>> {

@@ -652,6 +652,78 @@ export const allowanceTypesApi = {
   }
 }
 
+// Payroll Dashboard Types
+export interface PayrollAlert {
+  type: 'warning' | 'info' | 'error'
+  message: string
+}
+
+export interface PayrollMetricValue {
+  value: number
+  change: number
+  changePercent?: number
+}
+
+export interface PayrollMetrics {
+  totalPayrollThisMonth: PayrollMetricValue
+  totalEmployeesPaid: PayrollMetricValue
+  averageSalary: PayrollMetricValue
+}
+
+export interface MonthlyTrendPoint {
+  month: string
+  monthNumber: number
+  year: number
+  totalPayroll: number
+}
+
+export interface DepartmentPayroll {
+  department: string
+  amount: number
+  employees: number
+}
+
+export interface PayrollListItem {
+  id?: string
+  employeeId: string
+  name: string
+  department: string
+  baseSalary: number
+  bonuses: number
+  totalSalary: number
+  status: string
+  payDate?: string
+}
+
+export interface PayrollDashboardData {
+  alert?: PayrollAlert | null
+  metrics: PayrollMetrics
+  monthlyTrend: MonthlyTrendPoint[]
+  departmentDistribution?: DepartmentPayroll[]
+  payrollList: PayrollListItem[]
+}
+
+export interface PayrollDashboardParams {
+  month?: number
+  year?: number
+  currencyId?: string
+}
+
+// Dashboard API
+export const payrollDashboardApi = {
+  getDashboard: async (params: PayrollDashboardParams = {}): Promise<ApiResponse<PayrollDashboardData>> => {
+    const queryParams = new URLSearchParams()
+    if (params.month) queryParams.append('month', params.month.toString())
+    if (params.year) queryParams.append('year', params.year.toString())
+    if (params.currencyId) queryParams.append('currencyId', params.currencyId)
+
+    const queryString = queryParams.toString()
+    return apiClient.get<ApiResponse<PayrollDashboardData>>(
+      `/payroll/dashboard${queryString ? `?${queryString}` : ''}`
+    )
+  }
+}
+
 
 // Leave Balances API
 export const leaveBalancesApi = {

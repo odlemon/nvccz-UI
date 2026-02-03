@@ -6,6 +6,9 @@ import { ROLE_PERMISSIONS_MAP, type RoleCode } from '@/lib/config/role-permissio
 function hasModuleAccess(roleCode: RoleCode | null, moduleId: string): boolean {
   if (!roleCode) return false
   
+  // Admin role has access to everything
+  if (roleCode === 'OPS_MGR') return true
+  
   const permissions = ROLE_PERMISSIONS_MAP[roleCode]
   if (!permissions) return false
   
@@ -16,6 +19,9 @@ function hasModuleAccess(roleCode: RoleCode | null, moduleId: string): boolean {
 // Helper function to check sub-module access
 function hasSubModuleAccess(roleCode: RoleCode | null, moduleId: string, subModuleId: string): boolean {
   if (!roleCode) return false
+  
+  // Admin role has access to everything
+  if (roleCode === 'OPS_MGR') return true
   
   const permissions = ROLE_PERMISSIONS_MAP[roleCode]
   if (!permissions) return false

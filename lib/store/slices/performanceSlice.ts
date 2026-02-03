@@ -2,6 +2,7 @@ import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit"
 import { departmentApiService } from "@/lib/api/department-api"
 import { kpiApiService } from '@/lib/api/kpi-api'
 import { goalApiService, type GoalActivity, type GoalRollupData } from "@/lib/api/goal-api"
+import { performanceApi, type PerformanceDashboardData, type PerformanceDashboardParams } from "@/lib/api/performance-api"
 
 // KPI Types
 export interface KPI {
@@ -201,6 +202,11 @@ interface PerformanceState {
   departmentComparison: any | null
   dashboardLoading: boolean
   departmentComparisonLoading: boolean
+
+  // Dashboard V2
+  performanceDashboardData: PerformanceDashboardData | null
+  performanceDashboardLoading: boolean
+  performanceDashboardError: string | null
 }
 
 const initialState: PerformanceState = {
@@ -279,6 +285,11 @@ const initialState: PerformanceState = {
   departmentComparison: null,
   dashboardLoading: false,
   departmentComparisonLoading: false,
+
+  // Dashboard V2
+  performanceDashboardData: null,
+  performanceDashboardLoading: false,
+  performanceDashboardError: null,
 }
 
 // Async thunks
@@ -526,6 +537,27 @@ export const fetchDepartmentComparison = createAsyncThunk(
       return data
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || 'Failed to fetch department comparison')
+    }
+  }
+)
+
+// Dashboard V2 thunk
+export const fetchPerformanceDashboard = createAsyncThunk(
+  'performance/fetchPerformanceDashboard',
+  async (params: PerformanceDashboardParams = {}, { rejectWithValue }) => {
+    try {
+      console.log('Thunk: Calling performanceApi.getDashboard with params:', params)
+      const response = await performanceApi.getDashboard(params)
+      console.log('Thunk: API response received:', response)
+      if (!response.success) {
+        console.log('Thunk: Response not successful, rejecting')
+        return rejectWithValue(response.message || 'Failed to fetch performance dashboard')
+      }
+      console.log('Thunk: Returning response.data:', response.data)
+      return response.data
+    } catch (error: any) {
+      console.error('Thunk: Error caught:', error)
+      return rejectWithValue(error.message || 'Failed to fetch performance dashboard')
     }
   }
 )
@@ -925,6 +957,22 @@ const performanceSlice = createSlice({
       .addCase(fetchDepartmentComparison.rejected, (state, action) => {
         state.departmentComparisonLoading = false
         state.error = action.payload as string
+      })
+      // Fetch performance dashboard V2
+      .addCase(fetchPerformanceDashboard.pending, (state) => {
+        console.log('Reducer: fetchPerformanceDashboard.pending')
+        state.performanceDashboardLoading = true
+        state.performanceDashboardError = null
+      })
+      .addCase(fetchPerformanceDashboard.fulfilled, (state, action) => {
+        console.log('Reducer: fetchPerformanceDashboard.fulfilled with payload:', action.payload)
+        state.performanceDashboardLoading = false
+        state.performanceDashboardData = action.payload
+      })
+      .addCase(fetchPerformanceDashboard.rejected, (state, action) => {
+        console.log('Reducer: fetchPerformanceDashboard.rejected with error:', action.payload)
+        state.performanceDashboardLoading = false
+        state.performanceDashboardError = action.payload as string
       })
   },
 })

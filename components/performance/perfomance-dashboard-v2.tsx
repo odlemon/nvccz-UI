@@ -1,7 +1,10 @@
 "use client"
 
-import { useState, useMemo } from "react"
-
+import { useState, useMemo, useEffect } from "react"
+import { useSelector, useDispatch } from "react-redux"
+import { AppDispatch, RootState } from "@/lib/store/store"
+import { fetchPerformanceDashboard } from "@/lib/store/slices/performanceSlice"
+import { PerformanceDashboardSkeleton } from "./performance-dashboard-skeleton"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -37,79 +40,129 @@ import {
 } from "@/components/ui/select"
 import { HiDivide } from "react-icons/hi2"
 
-// Localized Dummy Data Generator
-const ZIM_NAMES = ["Tendai Makoni", "Rumbidzai Moyo", "Tinashe Chigumba", "Farai Mutasa", "Nomsa Sibanda", "Blessing Shumba", "Chipo Gumbo", "Kudakwashe Zhou"]
-const ZIM_ROLES = ["IT Specialist", "Operations Manager", "HR Analyst", "Finance Lead", "UI/UX Designer", "Software Engineer", "Marketing Lead"]
-
-const generateStats = (seed: string) => {
-    // Deterministic random behavior based on filter seed
-    const hash = seed.split('').reduce((acc, char) => char.charCodeAt(0) + acc, 0)
-    return {
-        pendingTasks: { value: 15 + (hash % 20), change: "+11%", progress: 15 + (hash % 15), total: 50 },
-        inProgress: { value: 10 + (hash % 15), change: "+9%", progress: 10 + (hash % 10), total: 50 },
-        completed: { value: 25 + (hash % 25), change: "-16%", progress: 25 + (hash % 15), total: 50 },
-        completionRate: { value: `${20 + (hash % 40)}%`, change: "+12%", progress: 20 + (hash % 40), total: 100 },
-    }
-}
-
-const generateProductivityData = (monthSeed: string) => {
-    const months = ["Jan", "Feb", "Mar", "Apl", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-    return months.map(m => ({
-        month: m,
-        tasks: 20 + Math.floor(Math.random() * 30),
-        isCurrent: m === monthSeed.substring(0, 3)
-    }))
-}
-
-const generateDistribution = (seed: string) => {
-    const hash = seed.split('').reduce((acc, char) => char.charCodeAt(0) + acc, 0)
-    const baseLine = 20 + (hash % 20)
-    return [
-        { name: "High Performers", value: baseLine, color: "#4c1d95" }, // Dark Purple
-        { name: "Average", value: Math.max(10, 100 - baseLine - 30), color: "#111827" }, // Black (Gray-900)
-        { name: "Need Improvement", value: 30, color: "#e5e7eb" }, // Light Gray
-    ]
-}
-
-const generateWorkerInsights = () => {
-    return [
-        { id: 1, name: "Tendai Makoni", type: "Full Time", role: "IT Specialist", progress: 75, tasks: 42 },
-        { id: 2, name: "Rumbidzai Moyo", type: "Remote", role: "HR Analyst", progress: 65, tasks: 32 },
-        { id: 3, name: "Tinashe Chigumba", type: "Full Time", role: "Operations Manager", progress: 85, tasks: 27 },
-        { id: 4, name: "Farai Mutasa", type: "Part Time", role: "Finance Lead", progress: 55, tasks: 14 },
-    ]
-}
-
-const BUDGET_DATA = {
-    totalBudget: 120000,
-    totalSpend: 95000,
-    remaining: 25000,
-}
-
-const EMPLOYEE_OF_THE_MONTH = {
-    name: "Nomsa Sibanda",
-    role: "Senior UI/UX Designer",
-    totalTimeWorked: "14 hours 15 minutes",
-    activeTime: 80,
-    extraTime: 12,
-    pauseTime: 8,
-    email: "nomsa.sibanda@techzim.co.zw",
-    phone: "+263 77 123 4567",
-}
-
 export function PerformanceDashboardV2() {
+    const dispatch = useDispatch<AppDispatch>()
+    const { performanceDashboardData, performanceDashboardLoading } = useSelector((state: RootState) => state.performance)
+    
+    console.log('Redux State - Performance:', { performanceDashboardData, performanceDashboardLoading })
+    
     const [selectedWeek, setSelectedWeek] = useState("Week 1")
     const [selectedYear, setSelectedYear] = useState("2026")
     const [selectedMonth, setSelectedMonth] = useState("January")
 
-    const statsData = useMemo(() => generateStats(selectedWeek + selectedMonth + selectedYear), [selectedWeek, selectedMonth, selectedYear])
-    const monthlyProductivityData = useMemo(() => generateProductivityData(selectedMonth), [selectedMonth])
-    const performanceDistribution = useMemo(() => generateDistribution(selectedWeek + selectedMonth), [selectedWeek, selectedMonth])
-    const workerInsights = useMemo(() => generateWorkerInsights(), []) // Could also vary based on entity
+    // Fetch dashboard data on mount and when filters change
+    useEffect(() => {
+        const monthNum = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"].indexOf(selectedMonth) + 1
+        console.log('Dispatching fetchPerformanceDashboard with:', { month: monthNum, year: parseInt(selectedYear) })
+        dispatch(fetchPerformanceDashboard({
+            month: monthNum,
+            year: parseInt(selectedYear)
+        }))
+    }, [dispatch, selectedMonth, selectedYear])
 
-    // Calculate gauge angle for budget tracker
-    const budgetPercentage = (BUDGET_DATA.totalSpend / BUDGET_DATA.totalBudget) * 100
+    // Use only API data - Define all before conditional returns
+    // Handle both direct data and nested data structure
+    const rawData = performanceDashboardData as any
+    const dashboardData = rawData?.data || rawData
+    
+    // Debug logging
+    console.log('Performance Dashboard Debug:', {
+        hasRawData: !!rawData,
+        hasData: !!dashboardData,
+        rawDataKeys: rawData ? Object.keys(rawData) : [],
+        summaryCardsValue: rawData?.summaryCards,
+        nestedSummaryCards: rawData?.data?.summaryCards
+    })
+    
+    // Extract summary cards data
+    const summaryCards = dashboardData?.summaryCards || {}
+    const statsData = {
+        pendingTasks: { 
+            value: summaryCards?.pendingTasks?.value || 0, 
+            change: summaryCards?.pendingTasks?.changePercent ? `${summaryCards.pendingTasks.changePercent > 0 ? '+' : ''}${summaryCards.pendingTasks.changePercent}%` : "+0%", 
+            progress: summaryCards?.pendingTasks?.progress ? summaryCards.pendingTasks.progress * 100 : 0, 
+            total: summaryCards?.pendingTasks?.total || 50 
+        },
+        inProgress: { 
+            value: summaryCards?.inProgress?.value || 0, 
+            change: summaryCards?.inProgress?.changePercent ? `${summaryCards.inProgress.changePercent > 0 ? '+' : ''}${summaryCards.inProgress.changePercent}%` : "+0%", 
+            progress: summaryCards?.inProgress?.progress ? summaryCards.inProgress.progress * 100 : 0, 
+            total: summaryCards?.inProgress?.total || 50 
+        },
+        completed: { 
+            value: summaryCards?.completed?.value || 0, 
+            change: summaryCards?.completed?.changePercent ? `${summaryCards.completed.changePercent > 0 ? '+' : ''}${summaryCards.completed.changePercent}%` : "-0%", 
+            progress: summaryCards?.completed?.progress ? summaryCards.completed.progress * 100 : 0, 
+            total: summaryCards?.completed?.total || 50 
+        },
+        completionRate: { 
+            value: `${summaryCards?.completionRate?.value || 0}%`, 
+            change: summaryCards?.completionRate?.changePercent ? `${summaryCards.completionRate.changePercent > 0 ? '+' : ''}${summaryCards.completionRate.changePercent}%` : "+0%", 
+            progress: summaryCards?.completionRate?.value || 0, 
+            total: 100 
+        },
+    }
+
+    // Extract monthly productivity data and mark current month
+    const currentMonth = dashboardData?.period?.currentMonth || new Date().getMonth() + 1
+    const currentYear = dashboardData?.period?.currentYear || new Date().getFullYear()
+    const monthlyProductivityData = (dashboardData?.monthlyProductivity?.data || []).map((item: any) => ({
+        ...item,
+        tasks: item.taskCompletedRate || 0,
+        isCurrent: item.monthNumber === currentMonth && item.year === currentYear
+    }))
+
+    // Extract performance distribution and convert to array format for pie chart
+    const perfDist = dashboardData?.performanceDistribution || {}
+    const performanceDistribution = [
+        { name: 'High Performers', value: perfDist.highPerformers || 0, color: '#4c1d95' },
+        { name: 'Average', value: perfDist.average || 0, color: '#8b5cf6' },
+        { name: 'Need Improvement', value: perfDist.needImprovement || 0, color: '#c4b5fd' }
+    ].filter(item => item.value > 0)
+
+    // Extract worker performance
+    const workerInsights = (dashboardData?.workerPerformance || []).slice(0, 5).map((worker: any, index: number) => ({
+        id: worker.userId || index,
+        name: worker.name || 'Unknown',
+        role: worker.department || worker.role || 'N/A',
+        tasks: worker.taskCount || 0,
+        progress: worker.progressPercentage || 0
+    }))
+
+    // Extract budget data
+    const budgetTracker = dashboardData?.budgetTracker || {}
+    const budgetData = {
+        totalBudget: budgetTracker.totalBudget || 0,
+        totalSpend: budgetTracker.totalSpend || 0,
+        remaining: budgetTracker.remaining || 0
+    }
+
+    // Extract employee of the month
+    const eotm = dashboardData?.employeeOfTheMonth || {}
+    const employeeOfMonth = {
+        name: eotm.name || "",
+        role: eotm.department || eotm.role || "",
+        totalTimeWorked: eotm.totalTimeWorked ? `${eotm.totalTimeWorked} hours` : "0 hours",
+        activeTime: eotm.timeBreakdown?.activeTime || 0,
+        extraTime: eotm.timeBreakdown?.extraTime || 0,
+        pauseTime: eotm.timeBreakdown?.pauseTime || 0,
+        email: eotm.email || "",
+        phone: eotm.phone || ""
+    }
+
+    // Calculate time percentages for employee of the month
+    const totalTime = employeeOfMonth.activeTime + employeeOfMonth.extraTime + employeeOfMonth.pauseTime
+    const activeTimePercent = totalTime > 0 ? (employeeOfMonth.activeTime / totalTime) * 100 : 0
+    const extraTimePercent = totalTime > 0 ? (employeeOfMonth.extraTime / totalTime) * 100 : 0
+    const pauseTimePercent = totalTime > 0 ? (employeeOfMonth.pauseTime / totalTime) * 100 : 0
+
+    const budgetPercentage = budgetData.totalBudget > 0 ? (budgetData.totalSpend / budgetData.totalBudget) * 100 : 0
     const gaugeAngle = (budgetPercentage / 100) * 180
+
+    // Show skeleton while loading - AFTER all hooks
+    if (performanceDashboardLoading) {
+        return <PerformanceDashboardSkeleton />
+    }
 
     return (
         <div className="min-h-screen bg-[#F6F6F6] p-6 -m-6">
@@ -177,7 +230,7 @@ export function PerformanceDashboardV2() {
                                     {Array.from({ length: 50 }).map((_, i) => (
                                         <div
                                             key={i}
-                                            className={`h-4 w-1 rounded-sm ${i < statsData.pendingTasks.progress ? "bg-[#4c1d95]" : "bg-muted"}`}
+                                            className={`h-4 w-1 rounded-sm ${i < (statsData.pendingTasks.progress / 2) ? "bg-[#4c1d95]" : "bg-muted"}`}
                                         />
                                     ))}
                                 </div>
@@ -211,7 +264,7 @@ export function PerformanceDashboardV2() {
                                     {Array.from({ length: 50 }).map((_, i) => (
                                         <div
                                             key={i}
-                                            className={`h-4 w-1 rounded-sm ${i < statsData.inProgress.progress ? "bg-[#4c1d95]" : "bg-muted"}`}
+                                            className={`h-4 w-1 rounded-sm ${i < (statsData.inProgress.progress / 2) ? "bg-[#4c1d95]" : "bg-muted"}`}
                                         />
                                     ))}
                                 </div>
@@ -245,7 +298,7 @@ export function PerformanceDashboardV2() {
                                     {Array.from({ length: 50 }).map((_, i) => (
                                         <div
                                             key={i}
-                                            className={`h-4 w-1 rounded-sm ${i < statsData.completed.progress ? "bg-[#4c1d95]" : "bg-muted"}`}
+                                            className={`h-4 w-1 rounded-sm ${i < (statsData.completed.progress / 2) ? "bg-[#4c1d95]" : "bg-muted"}`}
                                         />
                                     ))}
                                 </div>
@@ -313,13 +366,14 @@ export function PerformanceDashboardV2() {
                             </div>
                         </CardHeader>
                         <CardContent>
+                            {monthlyProductivityData.length > 0 ? (
                             <ResponsiveContainer width="100%" height={300}>
                                 <BarChart data={monthlyProductivityData}>
                                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" vertical={false} />
                                     <XAxis
                                         dataKey="month"
                                         tick={({ x, y, payload }) => {
-                                            const entry = monthlyProductivityData.find(m => m.month === payload.value);
+                                            const entry = monthlyProductivityData.find((m: any) => m.month === payload.value);
                                             const isCurrent = entry?.isCurrent;
                                             return (
                                                 <g transform={`translate(${x},${y})`}>
@@ -371,7 +425,7 @@ export function PerformanceDashboardV2() {
                                         radius={[6, 6, 6, 6]}
                                         maxBarSize={32}
                                     >
-                                        {monthlyProductivityData.map((entry, index) => (
+                                        {monthlyProductivityData.map((entry: any, index: number) => (
                                             <Cell
                                                 key={`cell-${index}`}
                                                 fill={entry.isCurrent ? "#4c1d95" : "#ede9fe"}
@@ -379,8 +433,15 @@ export function PerformanceDashboardV2() {
                                         ))}
                                     </Bar>
                                 </BarChart>
-                            </ResponsiveContainer>
-                        </CardContent>
+                            </ResponsiveContainer>                            ) : (
+                                <div className="flex flex-col items-center justify-center h-[300px] text-center">
+                                    <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+                                        <BarChart3 className="w-8 h-8 text-gray-400" />
+                                    </div>
+                                    <p className="text-sm font-medium text-muted-foreground">No productivity data available</p>
+                                    <p className="text-xs text-muted-foreground mt-1">Monthly productivity data will appear here when available</p>
+                                </div>
+                            )}                        </CardContent>
                     </div>
 
                     {/* Performance Distribution */}
@@ -394,6 +455,7 @@ export function PerformanceDashboardV2() {
                             </div>
                         </CardHeader>
                         <CardContent>
+                            {performanceDistribution.some((item: any) => item.value > 0) ? (
                             <div className="flex flex-col items-center py-4">
                                 <div className="relative w-48 h-48 mb-6">
                                     <ResponsiveContainer width="100%" height="100%">
@@ -409,7 +471,7 @@ export function PerformanceDashboardV2() {
                                                 startAngle={90}
                                                 endAngle={-270}
                                             >
-                                                {performanceDistribution.map((entry, index) => (
+                                                {performanceDistribution.map((entry: any, index: number) => (
                                                     <Cell key={`cell-${index}`} fill={entry.color} />
                                                 ))}
                                             </Pie>
@@ -417,7 +479,7 @@ export function PerformanceDashboardV2() {
                                     </ResponsiveContainer>
                                 </div>
                                 <div className="flex flex-row justify-center gap-8 w-full">
-                                    {performanceDistribution.map((item) => (
+                                    {performanceDistribution.map((item: any) => (
                                         <div key={item.name} className="flex items-center gap-3">
                                             <div
                                                 className="w-2.5 h-2.5 rounded-full flex-shrink-0"
@@ -431,6 +493,15 @@ export function PerformanceDashboardV2() {
                                     ))}
                                 </div>
                             </div>
+                            ) : (
+                                <div className="flex flex-col items-center justify-center h-[300px] text-center">
+                                    <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+                                        <Circle className="w-8 h-8 text-gray-400" />
+                                    </div>
+                                    <p className="text-sm font-medium text-muted-foreground">No performance distribution data available</p>
+                                    <p className="text-xs text-muted-foreground mt-1">Performance distribution will appear here when available</p>
+                                </div>
+                            )}
                         </CardContent>
                     </div>
                 </div>
@@ -448,14 +519,15 @@ export function PerformanceDashboardV2() {
                             </div>
                         </CardHeader>
                         <CardContent>
+                            {workerInsights.length > 0 ? (
                             <div className="space-y-4">
-                                {workerInsights.map((worker) => (
+                                {workerInsights.map((worker: any) => (
                                     <div key={worker.id} className="flex items-center gap-3">
                                         <div className="relative">
                                             <Avatar className="w-10 h-10 rounded-xl overflow-hidden border border-gray-100">
                                                 <AvatarImage src="/blank-profile-picture-973460_1280.webp" />
                                                 <AvatarFallback className="bg-muted text-foreground text-sm rounded-none">
-                                                    {worker.name.split(' ').map(n => n[0]).join('')}
+                                                    {worker.name.split(' ').map((n: string) => n[0]).join('')}
                                                 </AvatarFallback>
                                             </Avatar>
                                             <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-white rounded-full flex items-center justify-center">
@@ -492,6 +564,15 @@ export function PerformanceDashboardV2() {
                                     </div>
                                 ))}
                             </div>
+                            ) : (
+                                <div className="flex flex-col items-center justify-center py-12 text-center">
+                                    <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+                                        <CheckSquare className="w-8 h-8 text-gray-400" />
+                                    </div>
+                                    <p className="text-sm font-medium text-muted-foreground">No worker data available</p>
+                                    <p className="text-xs text-muted-foreground mt-1">Worker performance insights will appear here when available</p>
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
 
@@ -578,15 +659,15 @@ export function PerformanceDashboardV2() {
                                 <div className="grid grid-cols-3 gap-4 w-full text-center">
                                     <div>
                                         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Total Budget</p>
-                                        <p className="text-xl font-semibold text-foreground tracking-tight">${BUDGET_DATA.totalBudget.toLocaleString()}</p>
+                                        <p className="text-xl font-semibold text-foreground tracking-tight">${budgetData.totalBudget.toLocaleString()}</p>
                                     </div>
                                     <div>
                                         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Total Spend</p>
-                                        <p className="text-xl font-semibold text-foreground tracking-tight">${BUDGET_DATA.totalSpend.toLocaleString()}</p>
+                                        <p className="text-xl font-semibold text-foreground tracking-tight">${budgetData.totalSpend.toLocaleString()}</p>
                                     </div>
                                     <div>
                                         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Remaining</p>
-                                        <p className="text-xl font-semibold text-foreground tracking-tight">${BUDGET_DATA.remaining.toLocaleString()}</p>
+                                        <p className="text-xl font-semibold text-foreground tracking-tight">${budgetData.remaining.toLocaleString()}</p>
                                     </div>
                                 </div>
                             </div>
@@ -607,8 +688,8 @@ export function PerformanceDashboardV2() {
                                 <div className="flex-1">
                                     <div className="flex items-center justify-between">
                                         <div>
-                                            <h3 className="text-xl font-normal text-foreground tracking-tight leading-tight">{EMPLOYEE_OF_THE_MONTH.name}</h3>
-                                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mt-1">{EMPLOYEE_OF_THE_MONTH.role}</p>
+                                            <h3 className="text-xl font-normal text-foreground tracking-tight leading-tight">{employeeOfMonth.name}</h3>
+                                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mt-1">{employeeOfMonth.role}</p>
                                         </div>
                                         <div className="flex gap-2">
                                             <Button variant="ghost" size="icon" className="w-8 h-8 rounded-lg bg-gray-50 hover:bg-gray-100">
@@ -627,7 +708,7 @@ export function PerformanceDashboardV2() {
                             <div className="space-y-6">
                                 <div className="flex items-center justify-between">
                                     <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Total time worked</span>
-                                    <span className="text-sm font-semibold text-foreground">{EMPLOYEE_OF_THE_MONTH.totalTimeWorked}</span>
+                                    <span className="text-sm font-semibold text-foreground">{employeeOfMonth.totalTimeWorked}</span>
                                 </div>
 
                                 <div className="space-y-4">
@@ -636,7 +717,7 @@ export function PerformanceDashboardV2() {
                                         <div
                                             className="h-full rounded-lg"
                                             style={{
-                                                width: `${EMPLOYEE_OF_THE_MONTH.activeTime}%`,
+                                                width: `${activeTimePercent}%`,
                                                 backgroundColor: '#4c1d95',
                                                 backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 8px, rgba(255,255,255,0.05) 8px, rgba(255,255,255,0.05) 16px)'
                                             }}
@@ -644,7 +725,7 @@ export function PerformanceDashboardV2() {
                                         <div
                                             className="h-full rounded-lg opacity-60"
                                             style={{
-                                                width: `${EMPLOYEE_OF_THE_MONTH.extraTime}%`,
+                                                width: `${extraTimePercent}%`,
                                                 backgroundColor: '#6d28d9',
                                                 backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 8px, rgba(255,255,255,0.05) 8px, rgba(255,255,255,0.05) 16px)'
                                             }}
@@ -652,7 +733,7 @@ export function PerformanceDashboardV2() {
                                         <div
                                             className="h-full rounded-lg opacity-30"
                                             style={{
-                                                width: `${EMPLOYEE_OF_THE_MONTH.pauseTime}%`,
+                                                width: `${pauseTimePercent}%`,
                                                 backgroundColor: '#8b5cf6',
                                                 backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 8px, rgba(255,255,255,0.05) 8px, rgba(255,255,255,0.05) 16px)'
                                             }}
@@ -678,11 +759,11 @@ export function PerformanceDashboardV2() {
                                 <div className="space-y-2 pt-2 border-t border-gray-50">
                                     <div className="flex items-center gap-2">
                                         <span className="text-[10px] font-bold text-muted-foreground w-12 uppercase">Email</span>
-                                        <span className="text-xs font-bold text-foreground">{EMPLOYEE_OF_THE_MONTH.email}</span>
+                                        <span className="text-xs font-bold text-foreground">{employeeOfMonth.email}</span>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        <span className="text-[10px] font-bold text-muted-foreground w-12 uppercase">Phone</span>
-                                        <span className="text-xs font-bold text-foreground">{EMPLOYEE_OF_THE_MONTH.phone}</span>
+                                        <span className="text-xs font-medium text-muted-foreground">Phone:</span>
+                                        <span className="text-xs font-bold text-foreground">{employeeOfMonth.phone}</span>
                                     </div>
                                 </div>
                             </div>

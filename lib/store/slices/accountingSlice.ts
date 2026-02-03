@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit'
-import { accountingApi, AccountingCurrency, ChartOfAccount, Customer, Vendor, ExpenseCategory, Expense, TrialBalanceData, TrialBalanceSummary, IncomeStatementData, Asset, CreditNote, CreateCreditNoteRequest, InventoryItem, InventoryListResponse, CreateInventoryRequest, UpdateInventoryRequest, StockMovement, CreateStockMovementRequest, InventoryValuationResponse, ReorderAlertItem, CogsRequest, CogsResponse, StockAdjustmentRequest, StockAdjustmentResponse, ExchangeRate, CreateExchangeRateRequest, UpdateExchangeRateRequest, BalanceSheetResponse, CashFlowResponse, CashbookBank, CashbookEntry, Invoice, InvoiceCustomer } from '@/lib/api/accounting-api'
+import { accountingApi, AccountingCurrency, ChartOfAccount, Customer, Vendor, ExpenseCategory, Expense, TrialBalanceData, TrialBalanceSummary, IncomeStatementData, Asset, CreditNote, CreateCreditNoteRequest, InventoryItem, InventoryListResponse, CreateInventoryRequest, UpdateInventoryRequest, StockMovement, CreateStockMovementRequest, InventoryValuationResponse, ReorderAlertItem, CogsRequest, CogsResponse, StockAdjustmentRequest, StockAdjustmentResponse, ExchangeRate, CreateExchangeRateRequest, UpdateExchangeRateRequest, BalanceSheetResponse, CashFlowResponse, CashbookBank, CashbookEntry, Invoice, InvoiceCustomer, AccountingDashboardData, AccountingDashboardParams } from '@/lib/api/accounting-api'
 import {
   BankReconciliation,
   BankTransaction,
@@ -690,6 +690,18 @@ export const fetchCashbookBalanceCheck = createAsyncThunk(
   }
 )
 
+// Dashboard V2 thunk
+export const fetchAccountingDashboard = createAsyncThunk(
+  'accounting/fetchAccountingDashboard',
+  async (params: AccountingDashboardParams = {}) => {
+    const response = await accountingApi.getDashboard(params)
+    if (!response.success) {
+      throw new Error(response.error || 'Failed to fetch accounting dashboard')
+    }
+    return response.data
+  }
+)
+
 interface AccountingState {
   // Expenses
   expenses: Expense[]
@@ -856,6 +868,11 @@ interface AccountingState {
 
   // Selected currency for management
   selectedCurrency: AccountingCurrency | null
+
+  // Dashboard V2
+  dashboardData: AccountingDashboardData | null
+  dashboardLoading: boolean
+  dashboardError: string | null
 }
 
 const initialState: AccountingState = {
@@ -1025,6 +1042,11 @@ const initialState: AccountingState = {
 
   // Selected currency for management
   selectedCurrency: null,
+
+  // Dashboard V2
+  dashboardData: null,
+  dashboardLoading: false,
+  dashboardError: null,
 }
 
 const accountingSlice = createSlice({
@@ -1855,6 +1877,21 @@ const accountingSlice = createSlice({
       .addCase(fetchCashbookBalanceCheck.rejected, (state, action) => {
         state.cashbookBalanceCheckReportLoading = false
         state.cashbookBalanceCheckReportError = action.error.message || 'Failed to fetch balance check'
+      })
+
+    // Dashboard V2
+    builder
+      .addCase(fetchAccountingDashboard.pending, (state) => {
+        state.dashboardLoading = true
+        state.dashboardError = null
+      })
+      .addCase(fetchAccountingDashboard.fulfilled, (state, action) => {
+        state.dashboardLoading = false
+        state.dashboardData = action.payload
+      })
+      .addCase(fetchAccountingDashboard.rejected, (state, action) => {
+        state.dashboardLoading = false
+        state.dashboardError = action.error.message || 'Failed to fetch dashboard'
       })
   }
 })
