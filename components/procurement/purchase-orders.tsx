@@ -6,6 +6,7 @@ import { ProcurementDataTable, Column } from "./procurement-data-table"
 import { ProcurementDrawer } from "./procurement-drawer"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { useProcurementPermissions } from "@/lib/hooks/useProcurementPermissions"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { 
   setPurchaseOrders, 
@@ -25,6 +26,7 @@ import { ApprovalDialog } from "./approval-dialog"
 
 export function PurchaseOrders() {
   const dispatch = useAppDispatch()
+  const { permissions } = useProcurementPermissions()
   const { purchaseOrders, purchaseOrdersLoading } = useAppSelector(state => state.procurement)
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   const [viewingOrder, setViewingOrder] = useState<PurchaseOrder | null>(null)
@@ -250,9 +252,9 @@ export function PurchaseOrders() {
         searchPlaceholder="Search purchase orders..."
         filterOptions={filterOptions}
         onView={handleView}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-        onCreate={handleCreate}
+        onEdit={permissions.canUpdatePurchaseOrder ? handleEdit : undefined}
+        onDelete={permissions.canDeletePurchaseOrder ? handleDelete : undefined}
+        onCreate={permissions.canCreatePurchaseOrder ? handleCreate : undefined}
         onBulkAction={handleBulkAction}
         bulkActions={bulkActions}
         loading={purchaseOrdersLoading}

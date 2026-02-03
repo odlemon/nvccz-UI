@@ -6,6 +6,7 @@ import { ProcurementDataTable, Column } from "./procurement-data-table"
 import { ProcurementDrawer } from "./procurement-drawer"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { useProcurementPermissions } from "@/lib/hooks/useProcurementPermissions"
 import { Progress } from "@/components/ui/progress"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -56,6 +57,7 @@ const mainTabs: TabConfig[] = [
 
 export function PurchaseRequisitions() {
   const dispatch = useAppDispatch()
+  const { permissions } = useProcurementPermissions()
   const {
     requisitions,
     myRequisitions,
@@ -307,13 +309,15 @@ export function PurchaseRequisitions() {
           <h1 className="text-3xl font-normal">Purchase Requisitions</h1>
           <p className="text-muted-foreground">Create and manage purchase requisitions with approval workflow</p>
         </div>
-        <Button
-          onClick={handleCreate}
-          className="rounded-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Create New Requisition
-        </Button>
+        {permissions.canCreatePurchaseRequisition && (
+          <Button
+            onClick={handleCreate}
+            className="rounded-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Create New Requisition
+          </Button>
+        )}
       </div>
 
       {/* Tabs with new styling */}
@@ -454,8 +458,8 @@ export function PurchaseRequisitions() {
             columns={columns}
             title=""
             onView={handleView}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
+            onEdit={permissions.canUpdatePurchaseRequisition ? handleEdit : undefined}
+            onDelete={permissions.canDeletePurchaseRequisition ? handleDelete : undefined}
             onBulkAction={handleBulkAction}
             bulkActions={bulkActions}
             loading={requisitionsLoading}
@@ -483,7 +487,7 @@ export function PurchaseRequisitions() {
         size="xl"
         headerActions={
           <>
-            {viewingRequisition?.status === 'DRAFT' && (
+            {viewingRequisition?.status === 'DRAFT' && permissions.canUpdatePurchaseRequisition && (
               <Button
                 variant="outline"
                 size="sm"

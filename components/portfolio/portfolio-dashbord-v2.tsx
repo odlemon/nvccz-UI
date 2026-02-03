@@ -100,7 +100,7 @@ const IRR_QUARTER_DATA = [
 
 export function PortfolioDashboardV2() {
     const [searchQuery, setSearchQuery] = useState("")
-    const [selectedFund, setSelectedFund] = useState("usd-fund-i")
+    const [selectedFund, setSelectedFund] = useState("all")
     const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({
         from: new Date(2016, 0, 1),
         to: new Date(2025, 11, 31)
@@ -112,7 +112,7 @@ export function PortfolioDashboardV2() {
         return ZIM_PORTFOLIO_DATA.filter((item: any) => {
             const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 item.industry.toLowerCase().includes(searchQuery.toLowerCase())
-            const matchesFund = item.fund === selectedFund
+            const matchesFund = selectedFund === "all" || item.fund === selectedFund
 
             // Basic date filter (by investment month/year)
             const [month, year] = item.date.split("-").map(Number)
@@ -187,7 +187,7 @@ export function PortfolioDashboardV2() {
                             <div className="w-8 h-8 rounded-lg bg-[#4f77ff] flex items-center justify-center">
                                 <Plus className="w-5 h-5 text-white" />
                             </div>
-                            <h1 className="text-xl font-bold text-foreground">Dashboard - {selectedFund === 'usd-fund-i' ? 'USD Fund I' : selectedFund === 'eur-fund-ii' ? 'EUR Fund II' : 'Global Growth'}</h1>
+                            <h1 className="text-xl font-bold text-foreground">Dashboard - {selectedFund === 'all' ? 'All Funds' : selectedFund === 'usd-fund-i' ? 'USD Fund I' : selectedFund === 'eur-fund-ii' ? 'EUR Fund II' : 'Global Growth'}</h1>
                         </div>
                     </div>
 
@@ -207,6 +207,7 @@ export function PortfolioDashboardV2() {
                                 <SelectValue placeholder="Select Fund" />
                             </SelectTrigger>
                             <SelectContent className="rounded-2xl border-gray-200 shadow-xl">
+                                <SelectItem value="all">All Funds</SelectItem>
                                 <SelectItem value="usd-fund-i">USD Fund I</SelectItem>
                                 <SelectItem value="eur-fund-ii">EUR Fund II</SelectItem>
                                 <SelectItem value="global-growth">Global Growth</SelectItem>
@@ -279,7 +280,7 @@ export function PortfolioDashboardV2() {
                                     />
                                     <Bar dataKey="value" radius={[6, 6, 0, 0]} maxBarSize={45}>
                                         {PERFORMANCE_DATA.map((entry, index) => (
-                                            <Cell key={`cell-${index}`} fill={entry.value > 0 ? "#74b9a8" : "#2e5b8a"} />
+                                            <Cell key={`cell-${index}`} fill={entry.value > 0 ? "#10b981" : "#4f77ff"} />
                                         ))}
                                     </Bar>
                                 </BarChart>
@@ -294,11 +295,11 @@ export function PortfolioDashboardV2() {
                                 <CardTitle className="text-lg font-semibold text-foreground">J Curve</CardTitle>
                                 <div className="flex items-center gap-4">
                                     <div className="flex items-center gap-1.5">
-                                        <div className="w-2.5 h-2.5 rounded-sm bg-[#d1d5db]"></div>
+                                        <div className="w-2.5 h-2.5 rounded-sm bg-[#4f77ff]"></div>
                                         <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Contribution</span>
                                     </div>
                                     <div className="flex items-center gap-1.5">
-                                        <div className="w-2.5 h-2.5 rounded-sm bg-[#74b9a8]"></div>
+                                        <div className="w-2.5 h-2.5 rounded-sm bg-[#10b981]"></div>
                                         <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Distribution</span>
                                     </div>
                                     <div className="flex items-center gap-1.5">
@@ -329,8 +330,8 @@ export function PortfolioDashboardV2() {
                                         contentStyle={{ backgroundColor: '#1a1a1a', border: 'none', borderRadius: '12px' }}
                                         itemStyle={{ color: '#fff', fontSize: '11px', fontWeight: 'bold' }}
                                     />
-                                    <Bar dataKey="contribution" stackId="a" fill="#d1d5db" radius={[0, 0, 4, 4]} maxBarSize={30} />
-                                    <Bar dataKey="distribution" stackId="a" fill="#74b9a8" radius={[4, 4, 0, 0]} maxBarSize={30} />
+                                    <Bar dataKey="contribution" stackId="a" fill="#4f77ff" radius={[0, 0, 4, 4]} maxBarSize={30} />
+                                    <Bar dataKey="distribution" stackId="a" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={30} />
                                     <Line type="monotone" dataKey="cumulative" stroke="#3a4a6e" strokeWidth={2} dot={false} />
                                 </ComposedChart>
                             </ResponsiveContainer>

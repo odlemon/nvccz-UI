@@ -12,6 +12,8 @@ import { ProcurementDrawer } from "@/components/procurement/procurement-drawer"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { useProcurementPermissions } from '@/lib/hooks/useProcurementPermissions'
+import { ModuleGuard } from '@/lib/permissions'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { fetchRfqs, selectAllRFQs, selectRFQsState } from '@/lib/store/slices/procurementV2Slice'
@@ -57,6 +59,7 @@ export default function RFQPage() {
   const dispatch = useAppDispatch()
   const rfqs = useAppSelector(selectAllRFQs)
   const { rfqsLoading: loading, rfqsCount } = useAppSelector(selectRFQsState)
+  const { permissions, moduleAccess, isLoading: permissionsLoading } = useProcurementPermissions()
   
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   const [viewingRFQ, setViewingRFQ] = useState<RFQ | null>(null)
@@ -220,7 +223,30 @@ export default function RFQPage() {
     }
   ]
 
+  if (permissionsLoading) {
+    return (
+      <ProcurementLayout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <div className="w-8 h-8 border-4 border-gray-200 border-t-blue-500 rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-sm text-gray-500">Loading permissions...</p>
+          </div>
+        </div>
+      </ProcurementLayout>
+    )
+  }
+
   return (
+    <ModuleGuard moduleId="procurement" subModule="rfq" fallback={
+      <ProcurementLayout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <p className="text-lg font-semibold text-gray-900 mb-2">Access Denied</p>
+            <p className="text-sm text-gray-500">You don't have permission to view RFQs.</p>
+          </div>
+        </div>
+      </ProcurementLayout>
+    }>
     <ProcurementLayout>
       <div className="space-y-6">
         {/* Header */}
@@ -389,5 +415,6 @@ export default function RFQPage() {
         />
       </div>
     </ProcurementLayout>
+    </ModuleGuard>
   )
 }

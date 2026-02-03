@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import { format } from "date-fns"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -16,8 +15,6 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import {
     LineChart,
     Line,
@@ -31,12 +28,10 @@ import {
 } from "recharts"
 import {
     Calendar,
-    X,
     MoreVertical,
     Download,
     Plus,
     Search,
-    ChevronDown,
     ArrowUpRight,
 } from "lucide-react"
 
@@ -80,11 +75,7 @@ export function PayrollDashboardV2() {
     const [selectedDepartment, setSelectedDepartment] = useState("all")
     const [selectedStatus, setSelectedStatus] = useState("all")
     const [selectedMonth, setSelectedMonth] = useState("all") // Default to All Months
-    const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({
-        from: new Date(2025, 1, 27),
-        to: new Date(2025, 2, 27)
-    })
-    const [trendTimeframe, setTrendTimeframe] = useState("6months")
+    const [selectedYear, setSelectedYear] = useState("2026")
 
     const getStatusBadge = (status: string) => {
         switch (status) {
@@ -104,7 +95,8 @@ export function PayrollDashboardV2() {
         const matchesDepartment = selectedDepartment === "all" || item.department.toLowerCase() === selectedDepartment.toLowerCase()
         const matchesStatus = selectedStatus === "all" || item.status.toLowerCase() === selectedStatus.toLowerCase()
         const matchesMonth = selectedMonth === "all" || item.month.toString() === selectedMonth
-        return matchesSearch && matchesDepartment && matchesStatus && matchesMonth
+        const matchesYear = selectedYear === "all" || item.year.toString() === selectedYear
+        return matchesSearch && matchesDepartment && matchesStatus && matchesMonth && matchesYear
     })
 
     // Dynamic Stats Calculation
@@ -114,20 +106,27 @@ export function PayrollDashboardV2() {
 
     // Dynamic Chart Data
     const monthlyTrendData = useMemo(() => {
-        const months = ["Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar"]
-        const count = trendTimeframe === "6months" ? 6 : 12
-        const selectedMonths = months.slice(-count)
-
-        return selectedMonths.map((m, idx) => {
-            if (m === "Mar") {
-                return { month: m, value: totalPayrollValue > 0 ? totalPayrollValue : 295000 }
-            }
-            // Generate deterministic but "real" looking history
-            const seed = m.charCodeAt(0) + m.charCodeAt(1)
-            const baseValue = 270000 + (seed % 50) * 1000
-            return { month: m, value: baseValue }
+        const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+        
+        // If specific month is selected, show only that month
+        if (selectedMonth !== "all") {
+            const monthIdx = parseInt(selectedMonth) - 1
+            return [{ month: monthNames[monthIdx], value: totalPayrollValue > 0 ? totalPayrollValue : 295000 }]
+        }
+        
+        // Show all months of the selected year
+        return monthNames.map((m, idx) => {
+            const monthNum = idx + 1
+            const monthData = payrollList.filter(p => 
+                p.month === monthNum && 
+                (selectedYear === "all" || p.year.toString() === selectedYear) &&
+                (selectedDepartment === "all" || p.department.toLowerCase() === selectedDepartment.toLowerCase()) &&
+                (selectedStatus === "all" || p.status.toLowerCase() === selectedStatus.toLowerCase())
+            )
+            const value = monthData.reduce((acc, curr) => acc + curr.totalSalary, 0)
+            return { month: m, value: value || 0 }
         })
-    }, [trendTimeframe, totalPayrollValue])
+    }, [selectedMonth, selectedYear, selectedDepartment, selectedStatus, payrollList, totalPayrollValue])
 
     const deptDistribution = useMemo(() => {
         const departments = ["Marketing", "Engineering", "Finance", "HR", "IT", "Operations"]
@@ -165,27 +164,18 @@ export function PayrollDashboardV2() {
                             </SelectContent>
                         </Select>
 
-                        <Popover>
-                            <PopoverTrigger asChild>
-                                <Button variant="outline" className="h-11 px-5 rounded-full gap-2 border-gray-200 bg-white hover:bg-gray-50 font-semibold text-xs shadow-none">
-                                    <Calendar className="w-4 h-4 text-foreground" />
-                                    {dateRange.from && dateRange.to
-                                        ? `${format(dateRange.from, "dd MMM")} - ${format(dateRange.to, "dd MMM yyyy")}`
-                                        : "Select Date Range"}
-                                    <ChevronDown className="w-4 h-4 text-muted-foreground ml-1" />
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0 rounded-2xl border-none shadow-2xl" align="start">
-                                <CalendarComponent
-                                    initialFocus
-                                    mode="range"
-                                    defaultMonth={dateRange.from}
-                                    selected={{ from: dateRange.from, to: dateRange.to }}
-                                    onSelect={(range: any) => setDateRange(range || { from: undefined, to: undefined })}
-                                    numberOfMonths={1}
-                                />
-                            </PopoverContent>
-                        </Popover>
+                        <Select value={selectedYear} onValueChange={setSelectedYear}>
+                            <SelectTrigger className="w-[120px] h-11 bg-white border-gray-200 rounded-full shadow-none font-semibold text-xs ring-0 focus:ring-0">
+                                <Calendar className="w-4 h-4 mr-2" />
+                                <SelectValue placeholder="Year" />
+                            </SelectTrigger>
+                            <SelectContent className="rounded-2xl border-gray-200 shadow-xl">
+                                <SelectItem value="all">All Years</SelectItem>
+                                <SelectItem value="2026">2026</SelectItem>
+                                <SelectItem value="2025">2025</SelectItem>
+                                <SelectItem value="2024">2024</SelectItem>
+                            </SelectContent>
+                        </Select>
 
                         <Button variant="outline" className="h-11 px-5 rounded-full gap-2 border-gray-200 bg-white hover:bg-gray-50 font-semibold text-xs shadow-none group">
                             <Download className="w-4 h-4 group-hover:translate-y-[-1px] transition-transform" />
@@ -264,17 +254,6 @@ export function PayrollDashboardV2() {
                                             <span className="text-emerald-600 font-bold">+2.4%</span> from last month
                                         </p>
                                     </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <Select value={trendTimeframe} onValueChange={setTrendTimeframe}>
-                                        <SelectTrigger className="w-32 h-8 text-[10px] font-bold rounded-full border-gray-200 shadow-none ring-0 focus:ring-0 bg-gray-50/50">
-                                            <SelectValue placeholder="Last 6 months" />
-                                        </SelectTrigger>
-                                        <SelectContent className="rounded-xl border-gray-200 shadow-xl">
-                                            <SelectItem value="6months">Last 6 months</SelectItem>
-                                            <SelectItem value="12months">Last 12 months</SelectItem>
-                                        </SelectContent>
-                                    </Select>
                                 </div>
                             </div>
                         </CardHeader>

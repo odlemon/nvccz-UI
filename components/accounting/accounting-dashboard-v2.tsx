@@ -42,18 +42,18 @@ const statsData = {
 }
 
 const operatingProfitData = [
-    { month: "Jan", value: 2800000, percent: 8 },
-    { month: "Feb", value: 3200000, percent: 12 },
-    { month: "Mar", value: 4800000, percent: 18 },
-    { month: "Apr", value: 5200000, percent: 22 },
-    { month: "May", value: 6800000, percent: 28 },
-    { month: "Jun", value: 7200000, percent: 32 },
-    { month: "Jul", value: 6400000, percent: 25 },
-    { month: "Aug", value: 5800000, percent: 20 },
-    { month: "Sep", value: 4200000, percent: 15 },
-    { month: "Oct", value: 3800000, percent: 12 },
-    { month: "Nov", value: 4600000, percent: 18 },
-    { month: "Dec", value: 5200000, percent: 22 },
+    { month: "Jan", value: 2800000, cogs: 1400000, percent: 8 },
+    { month: "Feb", value: 3200000, cogs: 1600000, percent: 12 },
+    { month: "Mar", value: 4800000, cogs: 2400000, percent: 18 },
+    { month: "Apr", value: 5200000, cogs: 2600000, percent: 22 },
+    { month: "May", value: 6800000, cogs: 3400000, percent: 28 },
+    { month: "Jun", value: 7200000, cogs: 3600000, percent: 32 },
+    { month: "Jul", value: 6400000, cogs: 3200000, percent: 25 },
+    { month: "Aug", value: 5800000, cogs: 2900000, percent: 20 },
+    { month: "Sep", value: 4200000, cogs: 2100000, percent: 15 },
+    { month: "Oct", value: 3800000, cogs: 1900000, percent: 12 },
+    { month: "Nov", value: 4600000, cogs: 2300000, percent: 18 },
+    { month: "Dec", value: 5200000, cogs: 2600000, percent: 22 },
 ]
 
 const netProfitData = [
@@ -121,10 +121,10 @@ const DATA_SCENARIOS: any = {
             'mtd': {
                 stats: { revenue: 23150000, cogs: 10450000, gross: 12700000, net: 2345432 },
                 operatingProfit: [
-                    { month: "Jan", value: 1800000, percent: 45 },
-                    { month: "Feb", value: 2100000, percent: 48 },
-                    { month: "Mar", value: 1950000, percent: 46 },
-                    { month: "Apr", value: 2345000, percent: 52 },
+                    { month: "Jan", value: 1800000, cogs: 900000, percent: 45 },
+                    { month: "Feb", value: 2100000, cogs: 1050000, percent: 48 },
+                    { month: "Mar", value: 1950000, cogs: 975000, percent: 46 },
+                    { month: "Apr", value: 2345000, cogs: 1172500, percent: 52 },
                 ],
                 assets: [
                     { name: "Liabilities & Equ.", displayValue: "$20,438,000" },
@@ -140,10 +140,10 @@ const DATA_SCENARIOS: any = {
             'ytd': {
                 stats: { revenue: 95400000, cogs: 42000000, gross: 53400000, net: 12450000 },
                 operatingProfit: [
-                    { month: "Q1", value: 5800000, percent: 45 },
-                    { month: "Q2", value: 7100000, percent: 48 },
-                    { month: "Q3", value: 6950000, percent: 46 },
-                    { month: "Q4", value: 8345000, percent: 52 },
+                    { month: "Q1", value: 5800000, cogs: 2900000, percent: 45 },
+                    { month: "Q2", value: 7100000, cogs: 3550000, percent: 48 },
+                    { month: "Q3", value: 6950000, cogs: 3475000, percent: 46 },
+                    { month: "Q4", value: 8345000, cogs: 4172500, percent: 52 },
                 ],
                 assets: [
                     { name: "Liabilities & Equ.", displayValue: "$85,438,000" },
@@ -161,10 +161,10 @@ const DATA_SCENARIOS: any = {
             'mtd': {
                 stats: { revenue: 19150000, cogs: 9450000, gross: 9700000, net: 1845432 },
                 operatingProfit: [
-                    { month: "Jan", value: 1600000, percent: 42 },
-                    { month: "Feb", value: 1800000, percent: 44 },
-                    { month: "Mar", value: 1750000, percent: 43 },
-                    { month: "Apr", value: 1945000, percent: 48 },
+                    { month: "Jan", value: 1600000, cogs: 800000, percent: 42 },
+                    { month: "Feb", value: 1800000, cogs: 900000, percent: 44 },
+                    { month: "Mar", value: 1750000, cogs: 875000, percent: 43 },
+                    { month: "Apr", value: 1945000, cogs: 972500, percent: 48 },
                 ],
                 assets: [
                     { name: "Liabilities & Equ.", displayValue: "$18,438,000" },
@@ -184,10 +184,10 @@ const DATA_SCENARIOS: any = {
             'mtd': {
                 stats: { revenue: 12150000, cogs: 5450000, gross: 6700000, net: 1145432 },
                 operatingProfit: [
-                    { month: "Jan", value: 900000, percent: 42 },
-                    { month: "Feb", value: 1100000, percent: 44 },
-                    { month: "Mar", value: 1050000, percent: 43 },
-                    { month: "Apr", value: 1145000, percent: 48 },
+                    { month: "Jan", value: 900000, cogs: 450000, percent: 42 },
+                    { month: "Feb", value: 1100000, cogs: 550000, percent: 44 },
+                    { month: "Mar", value: 1050000, cogs: 525000, percent: 43 },
+                    { month: "Apr", value: 1145000, cogs: 572500, percent: 48 },
                 ],
                 assets: [
                     { name: "Liabilities & Equ.", displayValue: "$10,438,000" },
@@ -442,16 +442,16 @@ export function AccountingDashboardV2() {
                                 <CardTitle className="text-lg font-semibold text-foreground">Operating Profit</CardTitle>
                                 <div className="flex items-center gap-4 text-[10px] text-muted-foreground font-bold uppercase tracking-wider">
                                     <div className="flex items-center gap-1.5">
-                                        <div className="w-2 h-2 rounded-full bg-[#fbbf24]"></div>
-                                        <span>Revenue</span>
+                                        <div className="w-2.5 h-2.5 rounded-full bg-[#fbbf24]"></div>
+                                        <span>Profit</span>
                                     </div>
                                     <div className="flex items-center gap-1.5">
-                                        <div className="w-2 h-2 rounded-full bg-[#10b981]"></div>
+                                        <div className="w-2.5 h-2.5 rounded-full bg-[#ef4444]"></div>
                                         <span>COGS</span>
                                     </div>
                                     <div className="flex items-center gap-1.5">
-                                        <div className="w-2 h-2 rounded-full bg-[#10b981]"></div>
-                                        <span>Gross Profit (%)</span>
+                                        <div className="w-2.5 h-2.5 rounded-full bg-[#10b981]"></div>
+                                        <span>Margin %</span>
                                     </div>
                                 </div>
                             </div>
@@ -479,11 +479,12 @@ export function AccountingDashboardV2() {
                                     <Tooltip
                                         contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                                         formatter={(value: number, name: string) => {
-                                            if (name === "percent") return [`${value}%`, "Gross Profit %"]
-                                            return [formatCurrency(value), "Value"]
+                                            if (name === 'percent') return [`${value}%`, 'Margin']
+                                            return [`$${(value / 1000000).toFixed(1)}M`, name === 'value' ? 'Profit' : 'COGS']
                                         }}
                                     />
                                     <Bar yAxisId="left" dataKey="value" fill="#fbbf24" radius={[6, 6, 0, 0]} barSize={12} />
+                                    <Bar yAxisId="left" dataKey="cogs" fill="#ef4444" radius={[6, 6, 0, 0]} barSize={12} />
                                     <Line yAxisId="right" type="monotone" dataKey="percent" stroke="#10b981" strokeWidth={3} dot={{ fill: '#10b981', r: 4, strokeWidth: 0 }} activeDot={{ r: 6 }} />
                                 </ComposedChart>
                             </ResponsiveContainer>

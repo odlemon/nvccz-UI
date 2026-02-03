@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { useProcurementPermissions } from "@/lib/hooks/useProcurementPermissions"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
@@ -99,6 +100,7 @@ export function RequisitionTimeline({
   onCreateRFQ,
   onSuccess
 }: RequisitionTimelineProps) {
+  const { permissions } = useProcurementPermissions()
   const [requisition, setRequisition] = useState<PurchaseRequisition | null>(null)
   const [loading, setLoading] = useState(true)
   const [currentStageIndex, setCurrentStageIndex] = useState(0)
@@ -227,7 +229,7 @@ export function RequisitionTimeline({
 
     switch (stageId) {
       case "DRAFT":
-        return (
+        return permissions.canUpdatePurchaseRequisition ? (
           <div className="flex gap-2">
             <Button
               onClick={() => setShowSubmitDialog(true)}
@@ -237,29 +239,33 @@ export function RequisitionTimeline({
               Submit for Approval
             </Button>
           </div>
-        )
+        ) : null
       case "PENDING_APPROVAL":
         return (
           <div className="space-y-4">
             <div className="flex gap-2">
-              <Button
-                onClick={() => setShowApproveDialog(true)}
-                className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-full"
-              >
-                <CheckCircle className="w-4 h-4 mr-2" />
-                Approve
-              </Button>
-              <Button
-                onClick={() => setShowRejectForm(true)}
-                variant="outline"
-                className="border-red-500 text-red-600 hover:bg-red-50 rounded-full"
-              >
-                <X className="w-4 h-4 mr-2" />
-                Reject
-              </Button>
+              {permissions.canApprovePurchaseRequisition && (
+                <Button
+                  onClick={() => setShowApproveDialog(true)}
+                  className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-full"
+                >
+                  <CheckCircle className="w-4 h-4 mr-2" />
+                  Approve
+                </Button>
+              )}
+              {permissions.canRejectPurchaseRequisition && (
+                <Button
+                  onClick={() => setShowRejectForm(true)}
+                  variant="outline"
+                  className="border-red-500 text-red-600 hover:bg-red-50 rounded-full"
+                >
+                  <X className="w-4 h-4 mr-2" />
+                  Reject
+                </Button>
+              )}
             </div>
             
-            {showRejectForm && (
+            {showRejectForm && permissions.canRejectPurchaseRequisition && (
               <Card className="border-red-200">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base font-normal text-red-600">Reject Requisition</CardTitle>

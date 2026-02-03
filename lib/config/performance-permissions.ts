@@ -1,0 +1,397 @@
+/**
+ * Performance Management Module Specific Permissions
+ * Based on the permissions matrix from CSV
+ */
+
+export const PERFORMANCE_ACTIONS = {
+  // Dashboard Actions
+  VIEW_DASHBOARD: 'view-performance-dashboard',
+  VIEW_ALL_DEPARTMENTS_PERFORMANCE: 'view-all-departments-performance',
+  VIEW_OWN_DEPARTMENT_PERFORMANCE: 'view-own-department-performance',
+  VIEW_ALL_EMPLOYEES_PERFORMANCE: 'view-all-employees-performance',
+  VIEW_OWN_PERFORMANCE: 'view-own-performance',
+  
+  // KPI Management Actions
+  CREATE_KPI: 'create-kpi',
+  VIEW_KPI: 'view-kpi',
+  UPDATE_KPI: 'update-kpi',
+  DELETE_KPI: 'delete-kpi',
+  ASSIGN_KPI: 'assign-kpi',
+  VIEW_ALL_KPIS: 'view-all-kpis',
+  VIEW_DEPARTMENT_KPIS: 'view-department-kpis',
+  
+  // Goals Management Actions
+  CREATE_COMPANY_GOAL: 'create-company-goal',
+  CREATE_DEPARTMENT_GOAL: 'create-department-goal',
+  CREATE_INDIVIDUAL_GOAL: 'create-individual-goal',
+  VIEW_COMPANY_GOALS: 'view-company-goals',
+  VIEW_DEPARTMENT_GOALS: 'view-department-goals',
+  VIEW_OWN_DEPARTMENT_GOALS: 'view-own-department-goals',
+  VIEW_INDIVIDUAL_GOALS: 'view-individual-goals',
+  VIEW_OWN_GOALS: 'view-own-goals',
+  UPDATE_COMPANY_GOAL: 'update-company-goal',
+  UPDATE_DEPARTMENT_GOAL: 'update-department-goal',
+  UPDATE_OWN_DEPARTMENT_GOAL: 'update-own-department-goal',
+  UPDATE_INDIVIDUAL_GOAL: 'update-individual-goal',
+  UPDATE_OWN_GOAL: 'update-own-goal',
+  DELETE_COMPANY_GOAL: 'delete-company-goal',
+  DELETE_DEPARTMENT_GOAL: 'delete-department-goal',
+  DELETE_OWN_DEPARTMENT_GOAL: 'delete-own-department-goal',
+  DELETE_INDIVIDUAL_GOAL: 'delete-individual-goal',
+  DELETE_OWN_GOAL: 'delete-own-goal',
+  
+  // Task Management Actions
+  CREATE_TASK: 'create-task',
+  VIEW_OWN_TASKS: 'view-own-tasks',
+  VIEW_DEPARTMENT_TASKS: 'view-department-tasks',
+  VIEW_ALL_TASKS: 'view-all-tasks',
+  UPDATE_OWN_TASK: 'update-own-task',
+  UPDATE_DEPARTMENT_TASK: 'update-department-task',
+  UPDATE_ANY_TASK: 'update-any-task',
+  DELETE_OWN_TASK: 'delete-own-task',
+  DELETE_DEPARTMENT_TASK: 'delete-department-task',
+  DELETE_ANY_TASK: 'delete-any-task',
+  ASSIGN_TASK: 'assign-task',
+  
+  // Scorecards Actions
+  VIEW_OWN_SCORECARD: 'view-own-scorecard',
+  VIEW_DEPARTMENT_SCORECARD: 'view-department-scorecard',
+  VIEW_ALL_SCORECARDS: 'view-all-scorecards',
+  VIEW_USER_SCORECARDS: 'view-user-scorecards',
+  UPDATE_SCORECARD: 'update-scorecard',
+  
+  // Review & Evaluation Actions
+  CONDUCT_PERFORMANCE_REVIEW: 'conduct-performance-review',
+  VIEW_PERFORMANCE_REVIEWS: 'view-performance-reviews',
+  APPROVE_PERFORMANCE_REVIEW: 'approve-performance-review',
+} as const;
+
+/**
+ * Performance Role Permissions Map
+ * Based on CSV data analysis:
+ * 
+ * CEO: Full access to all performance data across all departments
+ * CFO: Full access
+ * CIO: Full access
+ * HODs (Department Heads): Full access to their department only
+ * HR Manager: Full access to manage performance
+ * Everyone: Can view own performance, create own goals and tasks
+ */
+export const PERFORMANCE_ROLE_PERMISSIONS = {
+  // C-Level Executives
+  CEO: {
+    dashboard: 'full',
+    kpiManagement: 'full',
+    goalsManagement: 'full',
+    taskManagement: 'full',
+    departmentScorecard: 'read', // Can view all departments
+    userScorecard: 'full',
+    actions: [
+      PERFORMANCE_ACTIONS.VIEW_DASHBOARD,
+      PERFORMANCE_ACTIONS.VIEW_ALL_DEPARTMENTS_PERFORMANCE,
+      PERFORMANCE_ACTIONS.VIEW_ALL_EMPLOYEES_PERFORMANCE,
+      PERFORMANCE_ACTIONS.CREATE_KPI,
+      PERFORMANCE_ACTIONS.VIEW_KPI,
+      PERFORMANCE_ACTIONS.UPDATE_KPI,
+      PERFORMANCE_ACTIONS.DELETE_KPI,
+      PERFORMANCE_ACTIONS.ASSIGN_KPI,
+      PERFORMANCE_ACTIONS.VIEW_ALL_KPIS,
+      PERFORMANCE_ACTIONS.CREATE_COMPANY_GOAL,
+      PERFORMANCE_ACTIONS.CREATE_DEPARTMENT_GOAL,
+      PERFORMANCE_ACTIONS.VIEW_COMPANY_GOALS,
+      PERFORMANCE_ACTIONS.VIEW_DEPARTMENT_GOALS,
+      PERFORMANCE_ACTIONS.VIEW_INDIVIDUAL_GOALS,
+      PERFORMANCE_ACTIONS.UPDATE_COMPANY_GOAL,
+      PERFORMANCE_ACTIONS.UPDATE_DEPARTMENT_GOAL,
+      PERFORMANCE_ACTIONS.DELETE_COMPANY_GOAL,
+      PERFORMANCE_ACTIONS.DELETE_DEPARTMENT_GOAL,
+      PERFORMANCE_ACTIONS.VIEW_ALL_TASKS,
+      PERFORMANCE_ACTIONS.VIEW_DEPARTMENT_TASKS,
+      PERFORMANCE_ACTIONS.UPDATE_ANY_TASK,
+      PERFORMANCE_ACTIONS.DELETE_ANY_TASK,
+      PERFORMANCE_ACTIONS.ASSIGN_TASK,
+      PERFORMANCE_ACTIONS.VIEW_ALL_SCORECARDS,
+      PERFORMANCE_ACTIONS.VIEW_DEPARTMENT_SCORECARD,
+      PERFORMANCE_ACTIONS.VIEW_USER_SCORECARDS,
+      PERFORMANCE_ACTIONS.CONDUCT_PERFORMANCE_REVIEW,
+      PERFORMANCE_ACTIONS.VIEW_PERFORMANCE_REVIEWS,
+      PERFORMANCE_ACTIONS.APPROVE_PERFORMANCE_REVIEW,
+    ]
+  },
+  
+  CFO: {
+    dashboard: 'full',
+    kpiManagement: 'full',
+    goalsManagement: 'full',
+    taskManagement: 'full',
+    departmentScorecard: 'full',
+    userScorecard: 'full',
+    actions: [
+      PERFORMANCE_ACTIONS.VIEW_DASHBOARD,
+      PERFORMANCE_ACTIONS.VIEW_ALL_DEPARTMENTS_PERFORMANCE,
+      PERFORMANCE_ACTIONS.VIEW_ALL_EMPLOYEES_PERFORMANCE,
+      PERFORMANCE_ACTIONS.CREATE_KPI,
+      PERFORMANCE_ACTIONS.VIEW_KPI,
+      PERFORMANCE_ACTIONS.UPDATE_KPI,
+      PERFORMANCE_ACTIONS.DELETE_KPI,
+      PERFORMANCE_ACTIONS.ASSIGN_KPI,
+      PERFORMANCE_ACTIONS.VIEW_ALL_KPIS,
+      PERFORMANCE_ACTIONS.CREATE_COMPANY_GOAL,
+      PERFORMANCE_ACTIONS.CREATE_DEPARTMENT_GOAL,
+      PERFORMANCE_ACTIONS.VIEW_COMPANY_GOALS,
+      PERFORMANCE_ACTIONS.VIEW_DEPARTMENT_GOALS,
+      PERFORMANCE_ACTIONS.VIEW_INDIVIDUAL_GOALS,
+      PERFORMANCE_ACTIONS.UPDATE_COMPANY_GOAL,
+      PERFORMANCE_ACTIONS.UPDATE_DEPARTMENT_GOAL,
+      PERFORMANCE_ACTIONS.DELETE_COMPANY_GOAL,
+      PERFORMANCE_ACTIONS.DELETE_DEPARTMENT_GOAL,
+      PERFORMANCE_ACTIONS.VIEW_ALL_TASKS,
+      PERFORMANCE_ACTIONS.VIEW_DEPARTMENT_TASKS,
+      PERFORMANCE_ACTIONS.UPDATE_ANY_TASK,
+      PERFORMANCE_ACTIONS.DELETE_ANY_TASK,
+      PERFORMANCE_ACTIONS.ASSIGN_TASK,
+      PERFORMANCE_ACTIONS.VIEW_ALL_SCORECARDS,
+      PERFORMANCE_ACTIONS.VIEW_DEPARTMENT_SCORECARD,
+      PERFORMANCE_ACTIONS.VIEW_USER_SCORECARDS,
+      PERFORMANCE_ACTIONS.CONDUCT_PERFORMANCE_REVIEW,
+      PERFORMANCE_ACTIONS.VIEW_PERFORMANCE_REVIEWS,
+      PERFORMANCE_ACTIONS.APPROVE_PERFORMANCE_REVIEW,
+    ]
+  },
+  
+  CIO: {
+    dashboard: 'full',
+    kpiManagement: 'full',
+    goalsManagement: 'full',
+    taskManagement: 'full',
+    departmentScorecard: 'full',
+    userScorecard: 'full',
+    actions: [
+      PERFORMANCE_ACTIONS.VIEW_DASHBOARD,
+      PERFORMANCE_ACTIONS.VIEW_ALL_DEPARTMENTS_PERFORMANCE,
+      PERFORMANCE_ACTIONS.VIEW_ALL_EMPLOYEES_PERFORMANCE,
+      PERFORMANCE_ACTIONS.CREATE_KPI,
+      PERFORMANCE_ACTIONS.VIEW_KPI,
+      PERFORMANCE_ACTIONS.UPDATE_KPI,
+      PERFORMANCE_ACTIONS.DELETE_KPI,
+      PERFORMANCE_ACTIONS.ASSIGN_KPI,
+      PERFORMANCE_ACTIONS.VIEW_ALL_KPIS,
+      PERFORMANCE_ACTIONS.CREATE_COMPANY_GOAL,
+      PERFORMANCE_ACTIONS.CREATE_DEPARTMENT_GOAL,
+      PERFORMANCE_ACTIONS.VIEW_COMPANY_GOALS,
+      PERFORMANCE_ACTIONS.VIEW_DEPARTMENT_GOALS,
+      PERFORMANCE_ACTIONS.VIEW_INDIVIDUAL_GOALS,
+      PERFORMANCE_ACTIONS.UPDATE_COMPANY_GOAL,
+      PERFORMANCE_ACTIONS.UPDATE_DEPARTMENT_GOAL,
+      PERFORMANCE_ACTIONS.DELETE_COMPANY_GOAL,
+      PERFORMANCE_ACTIONS.DELETE_DEPARTMENT_GOAL,
+      PERFORMANCE_ACTIONS.VIEW_ALL_TASKS,
+      PERFORMANCE_ACTIONS.VIEW_DEPARTMENT_TASKS,
+      PERFORMANCE_ACTIONS.UPDATE_ANY_TASK,
+      PERFORMANCE_ACTIONS.DELETE_ANY_TASK,
+      PERFORMANCE_ACTIONS.ASSIGN_TASK,
+      PERFORMANCE_ACTIONS.VIEW_ALL_SCORECARDS,
+      PERFORMANCE_ACTIONS.VIEW_DEPARTMENT_SCORECARD,
+      PERFORMANCE_ACTIONS.VIEW_USER_SCORECARDS,
+      PERFORMANCE_ACTIONS.CONDUCT_PERFORMANCE_REVIEW,
+      PERFORMANCE_ACTIONS.VIEW_PERFORMANCE_REVIEWS,
+      PERFORMANCE_ACTIONS.APPROVE_PERFORMANCE_REVIEW,
+    ]
+  },
+  
+  // Department Heads (HODs) - All Managers
+  HOD: {
+    dashboard: 'read', // Own department only
+    kpiManagement: 'write', // Department only
+    goalsManagement: 'write', // Department only
+    taskManagement: 'write', // Department only
+    departmentScorecard: 'read', // Own department only
+    userScorecard: 'full',
+    actions: [
+      PERFORMANCE_ACTIONS.VIEW_DASHBOARD,
+      PERFORMANCE_ACTIONS.VIEW_OWN_DEPARTMENT_PERFORMANCE,
+      PERFORMANCE_ACTIONS.VIEW_KPI,
+      PERFORMANCE_ACTIONS.VIEW_DEPARTMENT_KPIS,
+      PERFORMANCE_ACTIONS.CREATE_DEPARTMENT_GOAL,
+      PERFORMANCE_ACTIONS.VIEW_COMPANY_GOALS,
+      PERFORMANCE_ACTIONS.VIEW_OWN_DEPARTMENT_GOALS,
+      PERFORMANCE_ACTIONS.UPDATE_OWN_DEPARTMENT_GOAL,
+      PERFORMANCE_ACTIONS.DELETE_OWN_DEPARTMENT_GOAL,
+      PERFORMANCE_ACTIONS.CREATE_TASK,
+      PERFORMANCE_ACTIONS.VIEW_OWN_TASKS,
+      PERFORMANCE_ACTIONS.VIEW_DEPARTMENT_TASKS,
+      PERFORMANCE_ACTIONS.UPDATE_DEPARTMENT_TASK,
+      PERFORMANCE_ACTIONS.DELETE_DEPARTMENT_TASK,
+      PERFORMANCE_ACTIONS.ASSIGN_TASK,
+      PERFORMANCE_ACTIONS.VIEW_OWN_SCORECARD,
+      PERFORMANCE_ACTIONS.VIEW_DEPARTMENT_SCORECARD,
+      PERFORMANCE_ACTIONS.VIEW_USER_SCORECARDS,
+      PERFORMANCE_ACTIONS.CONDUCT_PERFORMANCE_REVIEW,
+      PERFORMANCE_ACTIONS.VIEW_PERFORMANCE_REVIEWS,
+    ]
+  },
+  
+  // HR Manager
+  HR_MGR: {
+    dashboard: 'full',
+    kpiManagement: 'full',
+    goalsManagement: 'full',
+    taskManagement: 'full',
+    departmentScorecard: 'full',
+    userScorecard: 'full',
+    actions: [
+      PERFORMANCE_ACTIONS.VIEW_DASHBOARD,
+      PERFORMANCE_ACTIONS.VIEW_ALL_DEPARTMENTS_PERFORMANCE,
+      PERFORMANCE_ACTIONS.VIEW_ALL_EMPLOYEES_PERFORMANCE,
+      PERFORMANCE_ACTIONS.CREATE_KPI,
+      PERFORMANCE_ACTIONS.VIEW_KPI,
+      PERFORMANCE_ACTIONS.UPDATE_KPI,
+      PERFORMANCE_ACTIONS.DELETE_KPI,
+      PERFORMANCE_ACTIONS.ASSIGN_KPI,
+      PERFORMANCE_ACTIONS.VIEW_ALL_KPIS,
+      PERFORMANCE_ACTIONS.CREATE_COMPANY_GOAL,
+      PERFORMANCE_ACTIONS.CREATE_DEPARTMENT_GOAL,
+      PERFORMANCE_ACTIONS.VIEW_COMPANY_GOALS,
+      PERFORMANCE_ACTIONS.VIEW_DEPARTMENT_GOALS,
+      PERFORMANCE_ACTIONS.VIEW_INDIVIDUAL_GOALS,
+      PERFORMANCE_ACTIONS.UPDATE_COMPANY_GOAL,
+      PERFORMANCE_ACTIONS.UPDATE_DEPARTMENT_GOAL,
+      PERFORMANCE_ACTIONS.DELETE_COMPANY_GOAL,
+      PERFORMANCE_ACTIONS.DELETE_DEPARTMENT_GOAL,
+      PERFORMANCE_ACTIONS.VIEW_ALL_TASKS,
+      PERFORMANCE_ACTIONS.VIEW_DEPARTMENT_TASKS,
+      PERFORMANCE_ACTIONS.UPDATE_ANY_TASK,
+      PERFORMANCE_ACTIONS.DELETE_ANY_TASK,
+      PERFORMANCE_ACTIONS.ASSIGN_TASK,
+      PERFORMANCE_ACTIONS.VIEW_ALL_SCORECARDS,
+      PERFORMANCE_ACTIONS.VIEW_DEPARTMENT_SCORECARD,
+      PERFORMANCE_ACTIONS.VIEW_USER_SCORECARDS,
+      PERFORMANCE_ACTIONS.UPDATE_SCORECARD,
+      PERFORMANCE_ACTIONS.CONDUCT_PERFORMANCE_REVIEW,
+      PERFORMANCE_ACTIONS.VIEW_PERFORMANCE_REVIEWS,
+      PERFORMANCE_ACTIONS.APPROVE_PERFORMANCE_REVIEW,
+    ]
+  },
+  
+  // HR Officer
+  HR_OFF: {
+    dashboard: 'read',
+    kpiManagement: 'write',
+    goalsManagement: 'write',
+    taskManagement: 'write',
+    departmentScorecard: 'read',
+    userScorecard: 'full',
+    actions: [
+      PERFORMANCE_ACTIONS.VIEW_DASHBOARD,
+      PERFORMANCE_ACTIONS.VIEW_ALL_EMPLOYEES_PERFORMANCE,
+      PERFORMANCE_ACTIONS.VIEW_KPI,
+      PERFORMANCE_ACTIONS.VIEW_ALL_KPIS,
+      PERFORMANCE_ACTIONS.VIEW_COMPANY_GOALS,
+      PERFORMANCE_ACTIONS.VIEW_DEPARTMENT_GOALS,
+      PERFORMANCE_ACTIONS.VIEW_INDIVIDUAL_GOALS,
+      PERFORMANCE_ACTIONS.CREATE_INDIVIDUAL_GOAL,
+      PERFORMANCE_ACTIONS.UPDATE_INDIVIDUAL_GOAL,
+      PERFORMANCE_ACTIONS.CREATE_TASK,
+      PERFORMANCE_ACTIONS.VIEW_OWN_TASKS,
+      PERFORMANCE_ACTIONS.VIEW_DEPARTMENT_TASKS,
+      PERFORMANCE_ACTIONS.UPDATE_OWN_TASK,
+      PERFORMANCE_ACTIONS.VIEW_OWN_SCORECARD,
+      PERFORMANCE_ACTIONS.VIEW_USER_SCORECARDS,
+      PERFORMANCE_ACTIONS.CONDUCT_PERFORMANCE_REVIEW,
+      PERFORMANCE_ACTIONS.VIEW_PERFORMANCE_REVIEWS,
+    ]
+  },
+  
+  // Investment Analyst
+  INV_ANALYST: {
+    dashboard: 'read',
+    kpiManagement: 'none',
+    goalsManagement: 'write', // Individual goals
+    taskManagement: 'write', // Own tasks
+    departmentScorecard: 'read',
+    userScorecard: 'full',
+    actions: [
+      PERFORMANCE_ACTIONS.VIEW_DASHBOARD,
+      PERFORMANCE_ACTIONS.VIEW_OWN_PERFORMANCE,
+      PERFORMANCE_ACTIONS.CREATE_INDIVIDUAL_GOAL,
+      PERFORMANCE_ACTIONS.VIEW_COMPANY_GOALS,
+      PERFORMANCE_ACTIONS.VIEW_OWN_GOALS,
+      PERFORMANCE_ACTIONS.UPDATE_OWN_GOAL,
+      PERFORMANCE_ACTIONS.DELETE_OWN_GOAL,
+      PERFORMANCE_ACTIONS.CREATE_TASK,
+      PERFORMANCE_ACTIONS.VIEW_OWN_TASKS,
+      PERFORMANCE_ACTIONS.UPDATE_OWN_TASK,
+      PERFORMANCE_ACTIONS.DELETE_OWN_TASK,
+      PERFORMANCE_ACTIONS.VIEW_OWN_SCORECARD,
+      PERFORMANCE_ACTIONS.VIEW_USER_SCORECARDS,
+    ]
+  },
+  
+  // All other employees
+  EVERYONE: {
+    dashboard: 'read', // Own performance only
+    kpiManagement: 'none',
+    goalsManagement: 'write', // Individual goals only
+    taskManagement: 'write', // Own tasks only
+    departmentScorecard: 'none',
+    userScorecard: 'read', // Own scorecard only
+    actions: [
+      PERFORMANCE_ACTIONS.VIEW_DASHBOARD,
+      PERFORMANCE_ACTIONS.VIEW_OWN_PERFORMANCE,
+      PERFORMANCE_ACTIONS.CREATE_INDIVIDUAL_GOAL,
+      PERFORMANCE_ACTIONS.VIEW_COMPANY_GOALS,
+      PERFORMANCE_ACTIONS.VIEW_OWN_GOALS,
+      PERFORMANCE_ACTIONS.UPDATE_OWN_GOAL,
+      PERFORMANCE_ACTIONS.DELETE_OWN_GOAL,
+      PERFORMANCE_ACTIONS.CREATE_TASK,
+      PERFORMANCE_ACTIONS.VIEW_OWN_TASKS,
+      PERFORMANCE_ACTIONS.UPDATE_OWN_TASK,
+      PERFORMANCE_ACTIONS.DELETE_OWN_TASK,
+      PERFORMANCE_ACTIONS.VIEW_OWN_SCORECARD,
+    ]
+  },
+} as const;
+
+/**
+ * Check if a role has specific performance action permission
+ */
+export function canPerformPerformanceAction(
+  roleCode: string, 
+  action: string
+): boolean {
+  const rolePerms = PERFORMANCE_ROLE_PERMISSIONS[roleCode as keyof typeof PERFORMANCE_ROLE_PERMISSIONS] 
+    || PERFORMANCE_ROLE_PERMISSIONS.EVERYONE;
+  
+  return (rolePerms.actions as readonly string[]).includes(action);
+}
+
+/**
+ * Get performance sub-module access level
+ */
+export function getPerformanceModuleAccess(
+  roleCode: string,
+  subModule: keyof typeof PERFORMANCE_ROLE_PERMISSIONS.CEO
+): 'full' | 'read' | 'write' | 'none' {
+  const rolePerms = PERFORMANCE_ROLE_PERMISSIONS[roleCode as keyof typeof PERFORMANCE_ROLE_PERMISSIONS] 
+    || PERFORMANCE_ROLE_PERMISSIONS.EVERYONE;
+  
+  const access = rolePerms[subModule];
+  
+  if (typeof access === 'string' && (access === 'full' || access === 'read' || access === 'write' || access === 'none')) {
+    return access;
+  }
+  
+  return 'none';
+}
+
+/**
+ * Check if user is a department head (HOD)
+ * HODs have special department-scoped permissions
+ */
+export function isDepartmentHead(roleCode: string): boolean {
+  const hodRoles = [
+    'FIN_MGR', 'PROC_MGR', 'HR_MGR', 'MKT_MGR', 'IT_MGR', 
+    'SALES_MGR', 'OPS_MGR', 'LEGAL_MGR'
+  ];
+  return hodRoles.includes(roleCode);
+}
