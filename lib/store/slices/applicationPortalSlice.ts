@@ -15,6 +15,7 @@ import applicationPortalApiService, {
   FinancialReport,
   UploadFinancialReportRequest,
   SubmitFinancialReportsRequest,
+  SubmitPeriodKPIsRequest,
   FinancialReportType,
 } from "@/lib/api/application-portal-api"
 
@@ -350,6 +351,18 @@ export const submitFinancialReports = createAsyncThunk(
   }
 )
 
+export const submitPeriodKPIs = createAsyncThunk(
+  'applicationPortal/submitPeriodKPIs',
+  async (data: SubmitPeriodKPIsRequest, { rejectWithValue }) => {
+    try {
+      const response = await applicationPortalApiService.submitPeriodKPIs(data)
+      return response
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to submit period KPIs')
+    }
+  }
+)
+
 // Slice
 const applicationPortalSlice = createSlice({
   name: 'applicationPortal',
@@ -595,6 +608,16 @@ const applicationPortalSlice = createSlice({
         state.loading = false
       })
       .addCase(submitFinancialReports.rejected, (state, action) => {
+        state.loading = false
+        state.error = action.payload as string
+      })
+      .addCase(submitPeriodKPIs.pending, (state) => {
+        state.loading = true
+      })
+      .addCase(submitPeriodKPIs.fulfilled, (state) => {
+        state.loading = false
+      })
+      .addCase(submitPeriodKPIs.rejected, (state, action) => {
         state.loading = false
         state.error = action.payload as string
       })

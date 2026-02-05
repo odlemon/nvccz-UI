@@ -5,6 +5,8 @@ import { format } from "date-fns"
 import { useSelector, useDispatch } from "react-redux"
 import { AppDispatch, RootState } from "@/lib/store/store"
 import { fetchPortfolioDashboard } from "@/lib/store/slices/portfolioDashboardSlice"
+import { fetchFunds } from "@/lib/store/slices/fundsSlice"
+import { formatCompactNumber } from "@/lib/utils/number-formatting"
 import { PortfolioDashboardSkeleton } from "./portfolio-dashboard-skeleton"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -45,13 +47,18 @@ import {
 export function PortfolioDashboardV2() {
     const dispatch = useDispatch<AppDispatch>()
     const { dashboardData, dashboardLoading } = useSelector((state: RootState) => state.portfolioDashboard)
-    
+    const { funds, loading: fundsLoading } = useSelector((state: any) => state.funds)
+
     const [searchQuery, setSearchQuery] = useState("")
     const [selectedFund, setSelectedFund] = useState("all")
     const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({
         from: new Date(2016, 0, 1),
         to: new Date(2025, 11, 31)
     })
+
+    useEffect(() => {
+        dispatch(fetchFunds())
+    }, [dispatch])
 
     // Fetch dashboard data on mount and when filters change
     useEffect(() => {
@@ -77,8 +84,8 @@ export function PortfolioDashboardV2() {
 
     // Summary stats from API
     const summaryStats = useMemo(() => [
-        { label: "Total invested", value: `$${(metrics.totalInvested || 0).toFixed(1)}m` },
-        { label: "Available for Drawdown", value: `$${(metrics.availableForDrawdown || 0).toFixed(1)}m` },
+        { label: "Total invested", value: formatCompactNumber(metrics.totalInvested, { style: 'currency' }) },
+        { label: "Available for Drawdown", value: formatCompactNumber(metrics.availableForDrawdown, { style: 'currency' }) },
         { label: "Fund Gross IRR", value: `${(metrics.fundGrossIRR || 0).toFixed(1)}%` },
         { label: "LP Net IRR", value: `${(metrics.lpNetIRR || 0).toFixed(1)}%` },
         { label: "TVPI", value: `${(metrics.tvpi || 0).toFixed(2)}x` },
@@ -114,6 +121,12 @@ export function PortfolioDashboardV2() {
         })
     }, [portfolioSummaryData, searchQuery])
 
+    const selectedFundName = useMemo(() => {
+        if (selectedFund === 'all') return 'All Funds'
+        const fund = funds.find((f: any) => f.id === selectedFund)
+        return fund ? fund.name : 'Unknown Fund'
+    }, [selectedFund, funds])
+
     // Show skeleton while loading - AFTER all hooks
     if (dashboardLoading) {
         return <PortfolioDashboardSkeleton />
@@ -130,7 +143,7 @@ export function PortfolioDashboardV2() {
                             <div className="w-8 h-8 rounded-lg bg-[#4f77ff] flex items-center justify-center">
                                 <Plus className="w-5 h-5 text-white" />
                             </div>
-                            <h1 className="text-xl font-bold text-foreground">Dashboard - {selectedFund === 'all' ? 'All Funds' : selectedFund === 'usd-fund-i' ? 'USD Fund I' : selectedFund === 'eur-fund-ii' ? 'EUR Fund II' : 'Global Growth'}</h1>
+                            <h1 className="text-xl font-bold text-foreground">Dashboard - {selectedFundName}</h1>
                         </div>
                     </div>
 
@@ -151,9 +164,9 @@ export function PortfolioDashboardV2() {
                             </SelectTrigger>
                             <SelectContent className="rounded-2xl border-gray-200 shadow-xl">
                                 <SelectItem value="all">All Funds</SelectItem>
-                                <SelectItem value="usd-fund-i">USD Fund I</SelectItem>
-                                <SelectItem value="eur-fund-ii">EUR Fund II</SelectItem>
-                                <SelectItem value="global-growth">Global Growth</SelectItem>
+                                {funds.map((fund: any) => (
+                                    <SelectItem key={fund.id} value={fund.id}>{fund.name}</SelectItem>
+                                ))}
                             </SelectContent>
                         </Select>
 
@@ -202,7 +215,7 @@ export function PortfolioDashboardV2() {
                         <CardContent className="p-6">
                             {performanceChartData.some((d: any) => d.value !== 0) ? (
                                 <ResponsiveContainer width="100%" height={300}>
-                                    <BarChart data={performanceChartData} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
+                                    <BarChart data={performanceChartData} margin={{ top: 20, right: 30, left: 20, bottom: 0 }}>
                                         <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                                         <XAxis
                                             dataKey="name"
@@ -212,10 +225,8 @@ export function PortfolioDashboardV2() {
                                             dy={10}
                                         />
                                         <YAxis
-                                            tick={{ fontSize: 11, fontWeight: '500', fill: '#94a3b8' }}
-                                            axisLine={false}
-                                            tickLine={false}
-                                            label={{ value: 'USD (M)', angle: -90, position: 'insideLeft', style: { fill: '#94a3b8', fontSize: 11, fontWeight: '500' } }}
+                                            tickFormatter={(value) => formatCompactNumber(value)}
+                                            label={{ value: 'USD (M)', angle: -90, position: 'insideLeft', style: { fill: '#94a3b8', fontSize: 11, fontWeight: '500' }, offset: 10 }}
                                         />
                                         <Tooltip
                                             cursor={{ fill: '#f8fafc' }}
@@ -249,7 +260,7 @@ export function PortfolioDashboardV2() {
                         <CardContent className="p-6">
                             {jCurveData.length > 0 ? (
                                 <ResponsiveContainer width="100%" height={300}>
-                                    <LineChart data={jCurveData} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
+                                    <LineChart data={jCurveData} margin={{ top: 20, right: 30, left: 20, bottom: 0 }}>
                                         <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                                         <XAxis
                                             dataKey="year"
@@ -259,10 +270,8 @@ export function PortfolioDashboardV2() {
                                             dy={10}
                                         />
                                         <YAxis
-                                            tick={{ fontSize: 11, fontWeight: '500', fill: '#94a3b8' }}
-                                            axisLine={false}
-                                            tickLine={false}
-                                            label={{ value: 'USD (M)', angle: -90, position: 'insideLeft', style: { fill: '#94a3b8', fontSize: 11, fontWeight: '500' } }}
+                                            tickFormatter={(value) => formatCompactNumber(value)}
+                                            label={{ value: 'USD (M)', angle: -90, position: 'insideLeft', style: { fill: '#94a3b8', fontSize: 11, fontWeight: '500' }, offset: 10 }}
                                         />
                                         <Tooltip
                                             contentStyle={{ backgroundColor: '#1a1a1a', border: 'none', borderRadius: '12px' }}

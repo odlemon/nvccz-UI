@@ -174,6 +174,7 @@ export function PerformanceDashboardV2() {
                             <SelectValue placeholder="Week" />
                         </SelectTrigger>
                         <SelectContent className="rounded-xl border-gray-200 shadow-xl">
+                            <SelectItem value="All" className="font-medium text-xs">All Weeks</SelectItem>
                             {["Week 1", "Week 2", "Week 3", "Week 4"].map(w => (
                                 <SelectItem key={w} value={w} className="font-medium text-xs">{w}</SelectItem>
                             ))}
@@ -185,6 +186,7 @@ export function PerformanceDashboardV2() {
                             <SelectValue placeholder="Month" />
                         </SelectTrigger>
                         <SelectContent className="rounded-xl border-gray-200 shadow-xl">
+                            <SelectItem value="All" className="font-medium text-xs">All Months</SelectItem>
                             {["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"].map(m => (
                                 <SelectItem key={m} value={m} className="font-medium text-xs">{m}</SelectItem>
                             ))}

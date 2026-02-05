@@ -7,10 +7,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { 
-  CiFileOn, 
-  CiShop, 
-  CiDollar, 
+import {
+  CiFileOn,
+  CiShop,
+  CiDollar,
   CiCircleCheck,
   CiCalendar,
   CiTrophy,
@@ -98,7 +98,7 @@ export function ApplicationPortalDashboard() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
         <Card className="card-shadow hover:card-shadow-hover transition-all duration-300 gradient-primary">
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
@@ -156,7 +156,23 @@ export function ApplicationPortalDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl text-white">
-              ${dashboard.application ? Number(dashboard.application.requestedAmount).toLocaleString() : '0'}
+              ${(dashboard.summary.requestedAmount || 0).toLocaleString()}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="card-shadow hover:card-shadow-hover transition-all duration-300 bg-emerald-600">
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2">
+              <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+                <CiDollar size={20} className="text-white" />
+              </div>
+              <CardTitle className="text-sm font-medium text-white">Approved Amount</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl text-white">
+              ${(dashboard.summary.approvedAmount || 0).toLocaleString()}
             </div>
           </CardContent>
         </Card>
@@ -192,7 +208,7 @@ export function ApplicationPortalDashboard() {
                 </div>
                 <CardTitle>Your Application</CardTitle>
               </div>
-              <Button 
+              <Button
                 variant="outline"
                 onClick={() => router.push('/application-portal/applications')}
               >
@@ -242,7 +258,7 @@ export function ApplicationPortalDashboard() {
                 </div>
                 <CardTitle>Portfolio Company</CardTitle>
               </div>
-              <Button 
+              <Button
                 variant="outline"
                 onClick={() => router.push('/application-portal/portfolio-company')}
               >
@@ -273,7 +289,7 @@ export function ApplicationPortalDashboard() {
                   <span>Status</span>
                 </div>
                 <Badge className={
-                  dashboard.portfolioCompany.status === 'ACTIVE' 
+                  dashboard.portfolioCompany.status === 'ACTIVE'
                     ? 'bg-green-100 text-green-800'
                     : 'bg-yellow-100 text-yellow-800'
                 }>
@@ -297,7 +313,7 @@ export function ApplicationPortalDashboard() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Button 
+            <Button
               className="h-auto py-6 flex-col gap-2"
               variant="outline"
               onClick={() => router.push('/application-portal/applications')}
@@ -305,7 +321,7 @@ export function ApplicationPortalDashboard() {
               <CiFileOn className="w-8 h-8" />
               <span>View Application</span>
             </Button>
-            <Button 
+            <Button
               className="h-auto py-6 flex-col gap-2"
               variant="outline"
               onClick={() => router.push('/application-portal/term-sheets')}
@@ -313,7 +329,7 @@ export function ApplicationPortalDashboard() {
               <CiFileOn className="w-8 h-8" />
               <span>Term Sheets</span>
             </Button>
-            <Button 
+            <Button
               className="h-auto py-6 flex-col gap-2"
               variant="outline"
               onClick={() => router.push('/application-portal/reports')}

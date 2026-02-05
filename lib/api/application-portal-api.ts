@@ -241,6 +241,8 @@ export interface DashboardSummary {
   hasPortfolioCompany: boolean
   applicationStage: string
   companyStatus: string
+  requestedAmount: number
+  approvedAmount: number
 }
 
 export interface Dashboard {
@@ -470,6 +472,14 @@ export interface SubmitFinancialReportsRequest {
   reportIds: string[]
 }
 
+export interface SubmitPeriodKPIsRequest {
+  periodStart: string
+  periodEnd: string
+  totalRevenue: number
+  netProfit: number
+  cashFlowNet: number
+}
+
 export interface FinancialReportsResponse extends ApiResponse {
   data: FinancialReport[]
 }
@@ -583,6 +593,10 @@ export const applicationPortalApiService = {
 
   async submitFinancialReports(data: SubmitFinancialReportsRequest): Promise<ApiResponse> {
     return apiClient.post<ApiResponse>('/applicant/financial-reports/submit', data)
+  },
+
+  async submitPeriodKPIs(data: SubmitPeriodKPIsRequest): Promise<ApiResponse> {
+    return apiClient.post<ApiResponse>('/applicant/financial-reports/period-kpis', data)
   },
 }
 
