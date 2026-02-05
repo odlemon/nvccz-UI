@@ -27,51 +27,82 @@ export interface ReviewFinancialReportRequest {
 }
 
 // Portfolio Dashboard Types
-export interface PortfolioMetric {
-  title: string
-  value: number | string
-  change: number
-  trend: 'up' | 'down' | 'neutral'
+export interface PortfolioMetrics {
+  totalInvested: number
+  availableForDrawdown: number
+  fundGrossIRR: number
+  lpNetIRR: number
+  tvpi: number
 }
 
-export interface PerformanceOverviewPoint {
-  period: string
-  value: number
+export interface PerformanceOverview {
+  paidIn: number
+  totalInvestment: number
+  managementExpenses: number
+  otherExpenses: number
+  realizedProceedsAndIncome: number
+  fmvUnrealizedPortfolio: number
 }
 
 export interface JCurvePoint {
   year: number
-  value: number
+  contribution: number
+  distribution: number
+  cumulativeAmount: number
 }
 
 export interface DealAllocation {
   sector: string
-  amount: number
+  investmentCost: number
   percentage: number
 }
 
 export interface IrrByQuarter {
   quarter: string
-  irr: number
+  quarterNumber: number
+  year: number
+  investorNetIRR: number
+  fundNetIRR: number
+  fundGrossIRR: number
 }
 
 export interface PortfolioSummaryItem {
-  id: string
-  company: string
-  sector: string
-  invested: number
-  currentValue: number
-  irr: number
-  status: 'ACTIVE' | 'EXITED' | 'WRITTEN_OFF'
+  companyId: string
+  name: string
+  initialInvestment: string
+  mainIndustry: string
+  commitReserves: number
+  currentOwnership: number | null
+  totalInvestmentCost: number
+  currentInvestmentCost: number
+  realized: number
+  fairMarketValue: number
+  totalValue: number
+  multiplesOfCost: number
+  grossIRR: number
+  totalRevenue: number
+  netProfit: number
+  cashFlowNet: number
+}
+
+export interface PortfolioTotals {
+  totalInvestmentCost: number
+  currentInvestmentCost: number
+  realized: number
+  fairMarketValue: number
+  totalValue: number
+  multiplesOfCost: number
+  grossIRR: number
 }
 
 export interface PortfolioDashboardData {
-  metrics: PortfolioMetric[]
-  performanceOverview: PerformanceOverviewPoint[]
+  metrics: PortfolioMetrics
+  performanceOverview: PerformanceOverview
   jCurve: JCurvePoint[]
   dealAllocation: DealAllocation[]
   irrByQuarter: IrrByQuarter[]
   portfolioSummary: PortfolioSummaryItem[]
+  totals: PortfolioTotals
 }
 
 export interface PortfolioDashboardParams {

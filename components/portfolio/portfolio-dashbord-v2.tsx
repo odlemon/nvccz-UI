@@ -107,7 +107,7 @@ export function PortfolioDashboardV2() {
         return dealAllocationData.map((item: any, idx: number) => ({
             name: item.sector || item.name || "Other",
             value: item.percentage || 0,
-            raw: item.amount || 0,
+            raw: item.investmentCost || 0,
             color: colors[idx % colors.length]
         }))
     }, [dealAllocationData])
@@ -277,7 +277,7 @@ export function PortfolioDashboardV2() {
                                             contentStyle={{ backgroundColor: '#1a1a1a', border: 'none', borderRadius: '12px' }}
                                             itemStyle={{ color: '#fff', fontSize: '11px', fontWeight: 'bold' }}
                                         />
-                                        <Line type="monotone" dataKey="value" stroke="#4f77ff" strokeWidth={2} dot={{ r: 4, fill: "#4f77ff" }} />
+                                        <Line type="monotone" dataKey="cumulativeAmount" stroke="#4f77ff" strokeWidth={2} dot={{ r: 4, fill: "#4f77ff" }} />
                                     </LineChart>
                                 </ResponsiveContainer>
                             ) : (
@@ -381,7 +381,7 @@ export function PortfolioDashboardV2() {
                                         />
                                         <Line
                                             type="monotone"
-                                            dataKey="irr"
+                                            dataKey="fundGrossIRR"
                                             stroke="#4f77ff"
                                             strokeWidth={3}
                                             dot={{ r: 4, fill: "#4f77ff", strokeWidth: 2, stroke: "#fff" }}
@@ -437,14 +437,14 @@ export function PortfolioDashboardV2() {
                                         <>
                                             {filteredPortfolio.map((item: any, idx: number) => (
                                                 <TableRow key={idx} className="hover:bg-gray-50/50 border-gray-100 h-14">
-                                                    <TableCell className="text-xs font-bold text-[#2e5b8a]">{item.company || 'N/A'}</TableCell>
-                                                    <TableCell className="text-xs font-medium text-muted-foreground">{item.sector || 'N/A'}</TableCell>
-                                                    <TableCell className="text-xs font-bold text-foreground text-right">${(item.invested || 0).toFixed(2)}</TableCell>
-                                                    <TableCell className="text-xs font-bold text-foreground text-right">${(item.realized || 0).toFixed(2)}</TableCell>
-                                                    <TableCell className="text-xs font-bold text-foreground text-right">${(item.currentValue || 0).toFixed(2)}</TableCell>
-                                                    <TableCell className="text-xs font-bold text-foreground text-right">${((item.currentValue || 0) + (item.realized || 0)).toFixed(2)}</TableCell>
-                                                    <TableCell className="text-xs font-bold text-foreground text-right">{((item.currentValue || 0) / (item.invested || 1)).toFixed(2)}x</TableCell>
-                                                    <TableCell className="text-xs font-bold text-foreground text-right">{(item.irr || 0).toFixed(2)}%</TableCell>
+                                                    <TableCell className="text-xs font-bold text-[#2e5b8a]">{item.name || 'N/A'}</TableCell>
+                                                    <TableCell className="text-xs font-medium text-muted-foreground">{item.mainIndustry || 'N/A'}</TableCell>
+                                                    <TableCell className="text-xs font-bold text-foreground text-right">${formatCompactNumber(item.totalInvestmentCost || 0)}</TableCell>
+                                                    <TableCell className="text-xs font-bold text-foreground text-right">${formatCompactNumber(item.realized || 0)}</TableCell>
+                                                    <TableCell className="text-xs font-bold text-foreground text-right">${formatCompactNumber(item.fairMarketValue || 0)}</TableCell>
+                                                    <TableCell className="text-xs font-bold text-foreground text-right">${formatCompactNumber(item.totalValue || 0)}</TableCell>
+                                                    <TableCell className="text-xs font-bold text-foreground text-right">{(item.multiplesOfCost || 0).toFixed(2)}x</TableCell>
+                                                    <TableCell className="text-xs font-bold text-foreground text-right">{(item.grossIRR || 0).toFixed(2)}%</TableCell>
                                                 </TableRow>
                                             ))}
                                             {/* Table Footer - Totals Row */}
