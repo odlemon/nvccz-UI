@@ -1,5 +1,5 @@
-import { createSlice, type PayloadAction } from "@reduxjs/toolkit"
-import { TaxRule, AllowanceType, DeductionType, BankTemplate, Employee as ApiEmployee, PayrollRun, Payslip as ApiPayslip } from "@/lib/api/payroll-api"
+import { createSlice, createAsyncThunk, type PayloadAction } from "@reduxjs/toolkit"
+import { TaxRule, AllowanceType, DeductionType, BankTemplate, Employee as ApiEmployee, PayrollRun, Payslip as ApiPayslip, payrollDashboardApi, type PayrollDashboardData, type PayrollDashboardParams } from "@/lib/api/payroll-api"
 
 export type PayrollSettings = {
   id: string
@@ -139,6 +139,10 @@ type PayrollState = {
     payrollRuns: string | null
     payslips: string | null
   }
+  // Dashboard V2
+  dashboardData: PayrollDashboardData | null
+  dashboardLoading: boolean
+  dashboardError: string | null
 }
 
 const initialState: PayrollState = {
@@ -253,7 +257,23 @@ const initialState: PayrollState = {
   timeSheets: [
     { id: "ts-2025-08-emp-1001", employeeId: "emp-1001", periodStart: "2025-08-01", periodEnd: "2025-08-31", status: "APPROVED", entries: [ { date: "2025-08-12", hours: 3.0, type: "OVERTIME", componentId: "comp-ot150" } ] },
   ],
+  // Dashboard V2
+  dashboardData: null,
+  dashboardLoading: false,
+  dashboardError: null,
 }
+
+// Dashboard V2 thunk
+export const fetchPayrollDashboard = createAsyncThunk(
+  'payroll/fetchPayrollDashboard',
+  async (params: PayrollDashboardParams = {}) => {
+    const response = await payrollDashboardApi.getDashboard(params)
+    if (!response.success) {
+      throw new Error(response.message || 'Failed to fetch payroll dashboard')
+    }
+    return response.data
+  }
+)
 
 const payrollSlice = createSlice({
   name: "payroll",
@@ -420,6 +440,21 @@ const payrollSlice = createSlice({
     setPayslipsError(state, action: PayloadAction<string | null>) {
       state.errors.payslips = action.payload
     },
+  },
+  extraReducers: (builder) => {
+    builder
+      .addCase(fetchPayrollDashboard.pending, (state) => {
+        state.dashboardLoading = true
+        state.dashboardError = null
+      })
+      .addCase(fetchPayrollDashboard.fulfilled, (state, action) => {
+        state.dashboardLoading = false
+        state.dashboardData = action.payload
+      })
+      .addCase(fetchPayrollDashboard.rejected, (state, action) => {
+        state.dashboardLoading = false
+        state.dashboardError = action.error.message || 'Failed to fetch payroll dashboard'
+      })
   },
 })
 

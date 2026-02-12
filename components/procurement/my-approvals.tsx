@@ -7,6 +7,7 @@ import { ProcurementDrawer } from "./procurement-drawer"
 import { DigitalSignature } from "./digital-signature"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { useProcurementPermissions } from "@/lib/hooks/useProcurementPermissions"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { 
@@ -25,6 +26,7 @@ import { ApprovalDialog } from "./approval-dialog"
 
 export function MyApprovals() {
   const dispatch = useAppDispatch()
+  const { permissions } = useProcurementPermissions()
   const { approvalRequests, approvalRequestsLoading } = useAppSelector(state => state.procurement)
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   const [viewingRequest, setViewingRequest] = useState<ApprovalRequest | null>(null)
@@ -235,7 +237,7 @@ export function MyApprovals() {
           return <span className="text-gray-500 text-sm">No action required</span>
         }
 
-        return (
+        return permissions.canApproveRequest ? (
           <div className="flex items-center gap-2">
             <Button
               size="sm"
@@ -250,6 +252,8 @@ export function MyApprovals() {
               Sign & Approve
             </Button>
           </div>
+        ) : (
+          <span className="text-gray-500 text-sm">No permission</span>
         )
       }
     }

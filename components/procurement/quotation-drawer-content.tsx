@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { useProcurementPermissions } from "@/lib/hooks/useProcurementPermissions"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Separator } from "@/components/ui/separator"
@@ -40,6 +41,7 @@ interface QuotationDrawerContentProps {
 }
 
 export function QuotationDrawerContent({ quotation, onUpdate }: QuotationDrawerContentProps) {
+  const { permissions } = useProcurementPermissions()
   const [showAcceptDialog, setShowAcceptDialog] = useState(false)
   const [showRejectDialog, setShowRejectDialog] = useState(false)
   const [rejectionReason, setRejectionReason] = useState('')
@@ -107,7 +109,7 @@ export function QuotationDrawerContent({ quotation, onUpdate }: QuotationDrawerC
               </h3>
               <p className="text-sm text-gray-500 mt-1">RFQ: {quotation.rfqNumber}</p>
             </div>
-            <Badge className={getStatusColor(quotation.status)} className="text-base px-4 py-2">
+            <Badge className={`${getStatusColor(quotation.status)} text-base px-4 py-2`}>
               {quotation.status.replace('_', ' ')}
             </Badge>
           </div>
@@ -115,21 +117,25 @@ export function QuotationDrawerContent({ quotation, onUpdate }: QuotationDrawerC
           {/* Action Buttons */}
           {canReview && (
             <div className="flex gap-3 pt-4 border-t">
-              <Button
-                onClick={() => setShowAcceptDialog(true)}
-                className="flex-1 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-full"
-              >
-                <CheckCircle className="w-4 h-4 mr-2" />
-                Accept Quotation
-              </Button>
-              <Button
-                onClick={() => setShowRejectDialog(true)}
-                variant="outline"
-                className="flex-1 border-red-300 text-red-600 hover:bg-red-50 rounded-full"
-              >
-                <XCircle className="w-4 h-4 mr-2" />
-                Reject
-              </Button>
+              {permissions.canAcceptQuotation && (
+                <Button
+                  onClick={() => setShowAcceptDialog(true)}
+                  className="flex-1 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-full"
+                >
+                  <CheckCircle className="w-4 h-4 mr-2" />
+                  Accept Quotation
+                </Button>
+              )}
+              {permissions.canRejectQuotation && (
+                <Button
+                  onClick={() => setShowRejectDialog(true)}
+                  variant="outline"
+                  className="flex-1 border-red-300 text-red-600 hover:bg-red-50 rounded-full"
+                >
+                  <XCircle className="w-4 h-4 mr-2" />
+                  Reject
+                </Button>
+              )}
             </div>
           )}
 

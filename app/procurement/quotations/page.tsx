@@ -23,6 +23,8 @@ import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
 import { ProcurementLayout } from "@/components/layout/procurement-layout"
+import { useProcurementPermissions } from "@/lib/hooks/useProcurementPermissions"
+import { ModuleGuard } from "@/lib/permissions"
 
 type TabConfig = {
   id: 'all' | 'submitted' | 'reviewed'
@@ -56,6 +58,7 @@ export default function QuotationsPage() {
   const dispatch = useAppDispatch()
   const quotations = useAppSelector(selectAllQuotations)
   const { quotationsLoading: loading, quotationsCount } = useAppSelector(selectQuotationsState)
+  const { permissions, moduleAccess, isLoading: permissionsLoading } = useProcurementPermissions()
   
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   const [viewingQuotation, setViewingQuotation] = useState<Quotation | null>(null)
@@ -213,7 +216,30 @@ export default function QuotationsPage() {
     }
   ]
 
+  if (permissionsLoading) {
+    return (
+      <ProcurementLayout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <div className="w-8 h-8 border-4 border-gray-200 border-t-blue-500 rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-sm text-gray-500">Loading permissions...</p>
+          </div>
+        </div>
+      </ProcurementLayout>
+    )
+  }
+
   return (
+    <ModuleGuard moduleId="procurement" subModule="quotations" fallback={
+      <ProcurementLayout>
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <p className="text-lg font-semibold text-gray-900 mb-2">Access Denied</p>
+            <p className="text-sm text-gray-500">You don't have permission to view quotations.</p>
+          </div>
+        </div>
+      </ProcurementLayout>
+    }>
     <ProcurementLayout>
       <div className="space-y-6">
         {/* Header */}
@@ -373,5 +399,6 @@ export default function QuotationsPage() {
         </ProcurementDrawer>
       </div>
     </ProcurementLayout>
+    </ModuleGuard>
   )
 }

@@ -13,7 +13,7 @@ import type { Application } from '@/lib/api/applications-api'
 
 import { useEffect, useMemo, useState } from "react"
 import { useAppSelector, useAppDispatch } from "@/lib/store"
-import { fetchApplications } from "@/lib/store/slices/applicationSlice"
+import { fetchApplications, fetchBelowThresholdApplications } from "@/lib/store/slices/applicationSlice"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -93,7 +93,13 @@ const getStageIcon = (stage: string) => {
 
 export function UserApplications() {
   const dispatch = useAppDispatch()
-  const { applications: apps, isLoading: loading, fetchError: error } = useAppSelector((s) => s.application)
+  const {
+    applications: apps,
+    isLoading: loading,
+    fetchError: error,
+    belowThresholdApplications,
+    belowThresholdLoading
+  } = useAppSelector((s) => s.application)
   const [query, setQuery] = useState("")
   const [selectedStage, setSelectedStage] = useState<string>("all")
   const [currentPage, setCurrentPage] = useState(1)
@@ -113,9 +119,7 @@ export function UserApplications() {
   const [finalizeTermSheetConfirmationOpen, setFinalizeTermSheetConfirmationOpen] = useState(false)
   const [refreshTrigger, setRefreshTrigger] = useState(0)
   const [activeTab, setActiveTab] = useState<'all' | 'below-threshold'>('all')
-  const [belowThresholdApps, setBelowThresholdApps] = useState<Application[]>([])
-  const [belowThresholdLoading, setBelowThresholdLoading] = useState(false)
-  const [belowThresholdError, setBelowThresholdError] = useState<string | null>(null)
+  // Local state for below threshold apps removed in favor of Redux state
 
   const fetchApps = async () => {
     const result = await dispatch(fetchApplications())
@@ -146,36 +150,19 @@ export function UserApplications() {
 
   useEffect(() => {
     if (activeTab === 'below-threshold') {
-      setBelowThresholdLoading(true)
-      setBelowThresholdError(null)
-      fetch('http://31.220.82.129:3009/api/applications/below-threshold?page=1&limit=10', {
-        method: 'GET',
-        headers: {
-          'accept': 'application/json',
-          'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJjbWlmdDI1eDgwMDA3anIwNDFja2diN2VkIiwicm9sZUlkIjoiY21oM2JjbmVwMDAwMnVudW95aWNmcHlrdSIsInJvbGVOYW1lIjoiUFJPQ19NR1IiLCJlbWFpbCI6ImJsZXNzaW5nbXdhbGVpbis1MEBnbWFpbC5jb20iLCJmaXJzdE5hbWUiOiJQcm9jIiwibGFzdE5hbWUiOiJNYW5hZ2VyIiwiZGVwYXJ0bWVudCI6IlByb2N1cmVtZW50Iiwicm9sZUNvZGUiOiJQUk9DX01HUiIsImlhdCI6MTc2NDE1MDQ0MSwiZXhwIjoxNzY0NzU1MjQxfQ.xqBqw4-9lBmE6kuGpsf3cPM_vtjebcj9_e4AUcSDA9g'
-        }
-      })
-        .then(res => res.json())
-        .then(data => {
-          setBelowThresholdApps(data?.data?.applications || [])
-          setBelowThresholdLoading(false)
-        })
-        .catch(err => {
-          setBelowThresholdError('Failed to fetch below-threshold applications')
-          setBelowThresholdLoading(false)
-        })
+      dispatch(fetchBelowThresholdApplications({ page: 1, limit: 10 }))
     }
-  }, [activeTab])
+  }, [activeTab, dispatch])
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase()
-    const source = activeTab === 'below-threshold' ? belowThresholdApps : apps
+    const source = activeTab === 'below-threshold' ? belowThresholdApplications : apps
     return source.filter((a) => {
       const matchesQuery = !q || a.businessName.toLowerCase().includes(q) || a.applicantName.toLowerCase().includes(q)
       const matchesStage = selectedStage === 'all' || a.currentStage === selectedStage
       return matchesQuery && matchesStage
     })
-  }, [apps, belowThresholdApps, query, selectedStage, activeTab])
+  }, [apps, belowThresholdApplications, query, selectedStage, activeTab])
 
   const totalPages = Math.ceil(filtered.length / itemsPerPage) || 1
   const startIndex = (currentPage - 1) * itemsPerPage
@@ -401,8 +388,8 @@ export function UserApplications() {
       ) : filtered.length === 0 ? (
         <>
           <EmptyStateWidget stage={selectedStage} />
-          {activeTab === 'below-threshold' && belowThresholdError && (
-            <div className="text-red-500 text-center mt-2">{belowThresholdError}</div>
+          {activeTab === 'below-threshold' && !belowThresholdLoading && belowThresholdApplications.length === 0 && (
+            <div className="text-gray-500 text-center mt-2">No below threshold applications found.</div>
           )}
         </>
       ) : (
@@ -440,9 +427,9 @@ export function UserApplications() {
                 <div className="mb-4">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm font-medium text-gray-700">Application Progress</span>
-                    <span className="text-sm text-gray-500">{getStageProgress(app.currentStage)}%</span>
+                    <span className="text-sm text-gray-500">{app.applicationProgress}%</span>
                   </div>
-                  <Progress value={getStageProgress(app.currentStage)} className="h-2" />
+                  <Progress value={app.applicationProgress} className="h-2" />
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

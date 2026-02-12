@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { useAppDispatch, useAppSelector } from "@/lib/store"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { useProcurementPermissions } from "@/lib/hooks/useProcurementPermissions"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
@@ -52,6 +53,7 @@ interface ApprovalStageForm {
 
 export function ApprovalConfigurations() {
   const dispatch = useAppDispatch()
+  const { permissions } = useProcurementPermissions()
   const { approvalConfigs, approvalConfigsLoading } = useAppSelector(state => state.procurementV2)
   const { availableDepartments, loading: departmentsLoading } = useAppSelector(state => state.performance)
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false)
@@ -147,27 +149,31 @@ export function ApprovalConfigurations() {
                         </Badge>
                       ))}
                     </div>
-                    <Button 
-                      variant="outline" 
-                      className="w-full mt-2 rounded-full"
-                      onClick={() => handleConfigure(department, config)}
-                    >
-                      <Edit className="w-4 h-4 mr-2" />
-                      Update Configuration
-                    </Button>
+                    {permissions.canUpdateApprovalConfig && (
+                      <Button 
+                        variant="outline" 
+                        className="w-full mt-2 rounded-full"
+                        onClick={() => handleConfigure(department, config)}
+                      >
+                        <Edit className="w-4 h-4 mr-2" />
+                        Update Configuration
+                      </Button>
+                    )}
                   </div>
                 ) : (
                   <div className="space-y-3">
                     <p className="text-sm text-muted-foreground">
                       No approval workflow configured for this department yet.
                     </p>
-                    <Button 
-                      className="w-full rounded-full"
-                      onClick={() => handleConfigure(department)}
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      Configure Approval Flow
-                    </Button>
+                    {permissions.canCreateApprovalConfig && (
+                      <Button 
+                        className="w-full rounded-full"
+                        onClick={() => handleConfigure(department)}
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Configure Approval Flow
+                      </Button>
+                    )}
                   </div>
                 )}
               </CardContent>

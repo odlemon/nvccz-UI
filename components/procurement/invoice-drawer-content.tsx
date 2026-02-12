@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { useProcurementPermissions } from '@/lib/hooks/useProcurementPermissions'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -23,6 +24,7 @@ interface InvoiceDrawerContentProps {
 }
 
 export function InvoiceDrawerContent({ invoice, onUpdate, onProcessPayment, onClose, actionButtons }: InvoiceDrawerContentProps) {
+  const { permissions } = useProcurementPermissions()
   const [showApproveDialog, setShowApproveDialog] = useState(false)
   const [isTaxable, setIsTaxable] = useState(true)
   const [approving, setApproving] = useState(false)

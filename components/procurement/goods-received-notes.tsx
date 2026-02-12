@@ -6,6 +6,7 @@ import { ProcurementDataTable, Column } from "./procurement-data-table"
 import { ProcurementDrawer } from "./procurement-drawer"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { useProcurementPermissions } from "@/lib/hooks/useProcurementPermissions"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { 
   setGoodsReceivedNotes, 
@@ -25,6 +26,7 @@ import { ApprovalDialog } from "./approval-dialog"
 
 export function GoodsReceivedNotes() {
   const dispatch = useAppDispatch()
+  const { permissions } = useProcurementPermissions()
   const { goodsReceivedNotes, grnLoading } = useAppSelector(state => state.procurement)
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   const [viewingGRN, setViewingGRN] = useState<GoodsReceivedNote | null>(null)
@@ -233,9 +235,9 @@ export function GoodsReceivedNotes() {
         searchPlaceholder="Search GRNs..."
         filterOptions={filterOptions}
         onView={handleView}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-        onCreate={handleCreate}
+        onEdit={permissions.canUpdateGRN ? handleEdit : undefined}
+        onDelete={permissions.canDeleteGRN ? handleDelete : undefined}
+        onCreate={permissions.canCreateGRN ? handleCreate : undefined}
         onBulkAction={handleBulkAction}
         bulkActions={bulkActions}
         loading={grnLoading}

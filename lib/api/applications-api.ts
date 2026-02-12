@@ -40,6 +40,7 @@ export interface Application {
   submittedAt: string | null
   updatedAt: string
   createdAt: string
+  applicationProgress: number
   documents: Array<{
     id: string
     documentType: string
@@ -189,7 +190,7 @@ class ApplicationsApiService {
   // Create a new application with FormData
   async create(applicationData: ApplicationCreateRequest): Promise<ApplicationCreateResponse> {
     const formData = new FormData()
-    
+
     // Append text fields
     formData.append('applicantName', applicationData.applicantName)
     formData.append('applicantEmail', applicationData.applicantEmail)
@@ -201,19 +202,19 @@ class ApplicationsApiService {
     formData.append('businessStage', applicationData.businessStage)
     formData.append('foundingDate', applicationData.foundingDate)
     formData.append('requestedAmount', applicationData.requestedAmount.toString())
-    
+
     if (applicationData.fundId) {
       formData.append('fundId', applicationData.fundId)
     }
-    
+
     // Append files
     applicationData.files.forEach((file) => {
       formData.append('files', file)
     })
-    
+
     // Append document types as JSON string
     formData.append('documentTypes', JSON.stringify(applicationData.documentTypes))
-    
+
     // Don't set Content-Type header - let browser set it automatically with boundary
     return apiClient.post<ApplicationCreateResponse>('/applications', formData)
   }
@@ -251,20 +252,20 @@ class ApplicationsApiService {
   // Create activity for a task
   async createTaskActivity(taskId: string, activityData: TaskActivityRequest): Promise<TaskActivityResponse> {
     const formData = new FormData()
-    
+
     formData.append('title', activityData.title)
     formData.append('description', activityData.description)
-    
+
     if (activityData.valueCollected !== undefined) {
       formData.append('valueCollected', activityData.valueCollected.toString())
     }
-    
+
     if (activityData.documents && activityData.documents.length > 0) {
       activityData.documents.forEach((file) => {
         formData.append('documents', file)
       })
     }
-    
+
     return apiClient.post<TaskActivityResponse>(`/activities/task/${taskId}`, formData)
   }
 

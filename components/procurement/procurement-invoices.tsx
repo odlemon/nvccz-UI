@@ -5,6 +5,7 @@ import { ProcurementDataTable, Column } from './procurement-data-table'
 import { ProcurementDrawer } from './procurement-drawer'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { useProcurementPermissions } from '@/lib/hooks/useProcurementPermissions'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
@@ -54,6 +55,7 @@ const mainTabs: TabConfig[] = [
 ]
 
 export function ProcurementInvoices() {
+  const { permissions } = useProcurementPermissions()
   const [invoices, setInvoices] = useState<ProcurementInvoice[]>([])
   const [loading, setLoading] = useState(false)
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
@@ -294,13 +296,15 @@ export function ProcurementInvoices() {
           <h1 className="text-3xl font-normal">Procurement Invoices</h1>
           <p className="text-muted-foreground">Process and manage procurement invoices with OCR and AI matching</p>
         </div>
-        <Button
-          onClick={handleCreate}
-          className="rounded-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Create New Invoice
-        </Button>
+        {permissions.canCreateInvoice && (
+          <Button
+            onClick={handleCreate}
+            className="rounded-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Create New Invoice
+          </Button>
+        )}
       </div>
 
       {/* Tabs with new styling */}
@@ -496,7 +500,7 @@ export function ProcurementInvoices() {
                 )}
               </PDFComponents.PDFDownloadLink>
             )}
-            {viewingInvoice && (viewingInvoice.status === 'RECEIVED' || viewingInvoice.status === 'MATCHED') && (
+            {viewingInvoice && permissions.canApproveInvoice && (viewingInvoice.status === 'RECEIVED' || viewingInvoice.status === 'MATCHED') && (
               <Button
                 size="sm"
                 onClick={() => {
@@ -509,7 +513,7 @@ export function ProcurementInvoices() {
                 Approve
               </Button>
             )}
-            {viewingInvoice && viewingInvoice.status === 'APPROVED' && (
+            {viewingInvoice && permissions.canProcessPayment && viewingInvoice.status === 'APPROVED' && (
               <Button
                 size="sm"
                 onClick={() => handleProcessPayment(viewingInvoice)}
