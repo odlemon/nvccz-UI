@@ -93,6 +93,11 @@ export function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl
 
+  // Completely bypass middleware for the permissions matrix tool
+  if (pathname.startsWith('/permissions-matrix')) {
+    return NextResponse.next()
+  }
+
   // Public routes that don't require authentication
   const publicRoutes = [
     '/login',

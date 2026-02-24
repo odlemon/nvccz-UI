@@ -83,6 +83,7 @@ export default function PermissionsMatrix() {
     const [matrix, setMatrix] = useState<Record<string, Record<string, boolean>>>({});
     const [searchTerm, setSearchTerm] = useState('');
     const [isLoaded, setIsLoaded] = useState(false);
+    const [scrollPos, setScrollPos] = useState({ current: 1, total: 1 });
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 
     // Load from localStorage
@@ -97,6 +98,21 @@ export default function PermissionsMatrix() {
         }
         setIsLoaded(true);
     }, []);
+
+    // Update scroll info
+    const handleScroll = () => {
+        if (scrollContainerRef.current) {
+            const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current;
+            // Calculate 'pages' based on clientWidth (roughly how many roles fit in view)
+            const pageCount = Math.ceil(scrollWidth / clientWidth);
+            const currentPage = Math.round(scrollLeft / clientWidth) + 1;
+            setScrollPos({ current: currentPage, total: pageCount });
+        }
+    };
+
+    useEffect(() => {
+        handleScroll(); // Initialize
+    }, [isLoaded]);
 
     // Save to localStorage
     useEffect(() => {
@@ -239,51 +255,57 @@ export default function PermissionsMatrix() {
                             </div>
                         </div>
 
-                        <div className="flex items-center gap-1">
-                            <button
-                                onClick={() => scroll('left')}
-                                className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-indigo-600 transition-colors"
-                                title="Scroll Roles Left"
-                            >
-                                <ChevronLeft className="w-4 h-4" />
-                            </button>
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Navigate Roles</span>
-                            <button
-                                onClick={() => scroll('right')}
-                                className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-indigo-600 transition-colors"
-                                title="Scroll Roles Right"
-                            >
-                                <ChevronRight className="w-4 h-4" />
-                            </button>
+                        <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-1">
+                                <button
+                                    onClick={() => scroll('left')}
+                                    className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-indigo-600 transition-colors"
+                                    title="Scroll Roles Left"
+                                >
+                                    <ChevronLeft className="w-4 h-4" />
+                                </button>
+                                <div className="flex flex-col items-center min-w-[80px]">
+                                    <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-tighter">Navigate Roles</span>
+                                    <span className="text-[10px] font-black text-indigo-600 tabular-nums">Page {scrollPos.current} of {scrollPos.total}</span>
+                                </div>
+                                <button
+                                    onClick={() => scroll('right')}
+                                    className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-indigo-600 transition-colors"
+                                    title="Scroll Roles Right"
+                                >
+                                    <ChevronRight className="w-4 h-4" />
+                                </button>
+                            </div>
                         </div>
                     </div>
 
                     <div
                         ref={scrollContainerRef}
+                        onScroll={handleScroll}
                         className="overflow-x-auto overflow-y-auto flex-1 custom-scrollbar scroll-smooth"
                     >
                         <table className="w-full border-collapse text-[11px] text-left">
                             <thead className="sticky top-0 z-30">
                                 <tr className="bg-slate-50 border-b border-slate-200">
-                                    <th className="sticky left-0 z-40 bg-slate-50 px-4 py-3 font-bold text-slate-900 min-w-[120px] shadow-[2px_0_10px_rgba(0,0,0,0.02)]">Module</th>
+                                    <th className="sticky left-0 z-40 bg-slate-50 px-4 py-3 font-bold text-slate-900 min-w-[120px] shadow-[2px_0_10px_rgba(0,0,0,0.02)] border-r border-slate-200">Module</th>
                                     <th className="sticky left-[120px] z-40 bg-slate-50 px-4 py-3 font-bold text-slate-900 min-w-[160px] shadow-[2px_0_10px_rgba(0,0,0,0.02)] border-r border-slate-200">
                                         <div className="flex items-center justify-between gap-2">
                                             <span>Page / Action</span>
                                         </div>
                                     </th>
                                     {ROLES.map(role => (
-                                        <th key={role} className="px-3 py-3 font-mono font-bold text-indigo-700 text-center min-w-[100px] hover:bg-slate-100 transition-colors tracking-tighter border-r border-slate-100">
+                                        <th key={role} className="px-3 py-3 font-mono font-bold text-indigo-700 text-center min-w-[100px] hover:bg-slate-100 transition-colors tracking-tighter border-r border-slate-200">
                                             {role}
                                         </th>
                                     ))}
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-100">
+                            <tbody className="divide-y divide-slate-200">
                                 {filteredRows.map((row) => {
                                     const rowId = `${row.module}-${row.page}-${row.action}`;
                                     return (
                                         <tr key={rowId} className="hover:bg-slate-50/80 transition-colors group">
-                                            <td className="sticky left-0 z-10 bg-white px-4 py-2.5 font-bold text-slate-500 group-hover:bg-slate-50 transition-colors whitespace-nowrap">{row.module}</td>
+                                            <td className="sticky left-0 z-10 bg-white px-4 py-2.5 font-bold text-slate-500 group-hover:bg-slate-50 transition-colors whitespace-nowrap border-r border-slate-100">{row.module}</td>
                                             <td className="sticky left-[120px] z-10 bg-white px-4 py-2.5 border-r border-slate-200 group-hover:bg-slate-50 transition-colors shadow-[2px_0_10px_rgba(0,0,0,0.02)]">
                                                 <div className="font-extrabold text-slate-900 group-hover:text-indigo-900 truncate">{row.page}</div>
                                                 <div className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-0.5 truncate">{row.action}</div>
@@ -293,14 +315,14 @@ export default function PermissionsMatrix() {
                                                 return (
                                                     <td
                                                         key={role}
-                                                        className="p-1 cursor-pointer transition-all hover:bg-indigo-50/30 border-r border-slate-50"
+                                                        className="p-1 cursor-pointer transition-all hover:bg-indigo-50/30 border-r border-slate-200"
                                                         onClick={() => togglePermission(rowId, role)}
                                                     >
                                                         <div className={`mx-auto w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-200 ${isGranted
-                                                                ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20 scale-100'
-                                                                : 'bg-transparent text-slate-200 hover:text-slate-400 scale-90 group-hover:scale-95'
+                                                            ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20 scale-100 font-bold border border-emerald-600'
+                                                            : 'bg-white text-slate-200 hover:text-slate-400 scale-90 group-hover:scale-95 border border-slate-100'
                                                             }`}>
-                                                            {isGranted ? <Check className="w-4 h-4 stroke-[3px]" /> : <X className="w-3 h-3 opacity-30" />}
+                                                            {isGranted ? <Check className="w-4 h-4 stroke-[4px]" /> : <X className="w-3 h-3 opacity-30" />}
                                                         </div>
                                                     </td>
                                                 );
