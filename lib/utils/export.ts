@@ -37,11 +37,11 @@ export const exportTrialBalanceToCSV = (data: TrialBalanceData) => {
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
   const link = document.createElement('a')
   const url = URL.createObjectURL(blob)
-  
+
   link.setAttribute('href', url)
   link.setAttribute('download', `trial-balance-${data.date}.csv`)
   link.style.visibility = 'hidden'
-  
+
   document.body.appendChild(link)
   link.click()
   document.body.removeChild(link)
@@ -94,10 +94,10 @@ export const exportTrialBalanceToPDF = async (data: TrialBalanceData) => {
           border-radius: 20px;
           font-weight: bold;
           font-size: 14px;
-          ${data.totals.isBalanced 
-            ? 'background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb;'
-            : 'background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb;'
-          }
+          ${data.totals.isBalanced
+      ? 'background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb;'
+      : 'background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb;'
+    }
         }
         .table-container {
           margin-top: 20px;
@@ -405,7 +405,7 @@ export const exportIncomeStatementToPDF = async (data: IncomeStatementData) => {
     </head>
     <body>
       <div class="header">
-        <h1>Your Company Name</h1>
+        <h1>National venture capital company of Zimbabwe</h1>
         <h2>Income Statement</h2>
         <p>For the Period from ${startDate} to ${endDate}</p>
       </div>

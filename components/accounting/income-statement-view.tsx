@@ -12,11 +12,11 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
-import { 
-  CalendarIcon, 
-  RefreshCw, 
-  TrendingUp, 
-  TrendingDown, 
+import {
+  CalendarIcon,
+  RefreshCw,
+  TrendingUp,
+  TrendingDown,
   DollarSign,
   FileText,
   AlertCircle,
@@ -62,7 +62,7 @@ export function IncomeStatementView() {
   const getPeriodOptions = () => {
     const currentYear = new Date().getFullYear()
     const options: { label: string; value: string }[] = []
-    
+
     if (periodType === 'month') {
       // Generate last 24 months
       for (let i = 0; i < 24; i++) {
@@ -91,7 +91,7 @@ export function IncomeStatementView() {
         })
       }
     }
-    
+
     return options
   }
 
@@ -100,7 +100,7 @@ export function IncomeStatementView() {
     if (periodType !== 'custom') {
       const currentYear = new Date().getFullYear()
       const currentMonth = new Date().getMonth()
-      
+
       if (periodType === 'month') {
         const newValue = format(new Date(), 'yyyy-MM')
         setPeriodValue(newValue)
@@ -126,7 +126,7 @@ export function IncomeStatementView() {
         (periodType === 'month' && /^\d{4}-\d{2}$/.test(periodValue)) ||
         (periodType === 'quarter' && /^\d{4}-Q\d$/.test(periodValue)) ||
         (periodType === 'year' && /^\d{4}$/.test(periodValue))
-      
+
       if (isValidPeriodValue) {
         loadIncomeStatement()
       }
@@ -139,9 +139,9 @@ export function IncomeStatementView() {
         // Use date range for custom period
         const startDateString = format(startDate, 'yyyy-MM-dd')
         const endDateString = format(endDate, 'yyyy-MM-dd')
-        
+
         await dispatch(fetchIncomeStatement({
-          startDate: startDateString, 
+          startDate: startDateString,
           endDate: endDateString,
           currencyId
         }))
@@ -228,7 +228,7 @@ export function IncomeStatementView() {
 
       // Prepare rows for PDF
       const rows: any[] = []
-      const pushSection = (label: string) => rows.push([{ content: label, colSpan: 2, styles: { fontStyle: 'bold', fillColor: [240,240,240] } }])
+      const pushSection = (label: string) => rows.push([{ content: label, colSpan: 2, styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } }])
       const pushItem = (label: string, value: number | null) => rows.push([label, value !== null ? new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value) : ""])
       const pushTotal = (label: string, value: number | null, color?: string) => rows.push([
         { content: label, styles: { fontStyle: 'bold', textColor: color ? color : undefined } },
@@ -323,7 +323,7 @@ export function IncomeStatementView() {
         <div>
           <h2 className="text-2xl font-semibold text-gray-900">Income Statement</h2>
           <p className="text-gray-600">
-            {periodType === 'custom' 
+            {periodType === 'custom'
               ? `For the period ${format(startDate, 'MMM d, yyyy')} to ${format(endDate, 'MMM d, yyyy')}`
               : `Period: ${getPeriodOptions().find(opt => opt.value === periodValue)?.label || periodValue}`
             }
@@ -342,7 +342,7 @@ export function IncomeStatementView() {
               <SelectItem value="custom">Custom Range</SelectItem>
             </SelectContent>
           </Select>
-          
+
           {periodType !== 'custom' ? (
             /* Period Value Selector */
             <Select value={periodValue} onValueChange={setPeriodValue}>
@@ -379,7 +379,7 @@ export function IncomeStatementView() {
                   </PopoverContent>
                 </Popover>
               </div>
-              
+
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-600">To:</span>
                 <Popover>
@@ -401,17 +401,17 @@ export function IncomeStatementView() {
               </div>
             </>
           )}
-          
+
           {/* Currency Selector */}
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-600">Currency:</span>
             {currencyDropdown}
           </div>
-          
+
           {/* Export PDF Button */}
-          <Button 
+          <Button
             onClick={handleExportPDF}
-            variant="outline" 
+            variant="outline"
             className="rounded-full"
             disabled={!incomeStatement || generatingPDF}
           >
@@ -427,9 +427,9 @@ export function IncomeStatementView() {
               </>
             )}
           </Button>
-          
-          <Button 
-            onClick={loadIncomeStatement} 
+
+          <Button
+            onClick={loadIncomeStatement}
             disabled={incomeStatementLoading}
             className="rounded-full"
           >
@@ -454,16 +454,16 @@ export function IncomeStatementView() {
               {incomeStatement && (
                 <Badge className={cn(
                   "text-sm",
-                  incomeStatement.totals.netIncome >= 0 
-                    ? "bg-green-100 text-green-800" 
+                  incomeStatement.totals.netIncome >= 0
+                    ? "bg-green-100 text-green-800"
                     : "bg-red-100 text-red-800"
                 )}>
                   {incomeStatement.totals.netIncome >= 0 ? "Profitable" : "Loss"}
                 </Badge>
               )}
-              
+
               {/* Quick Export Button in Table Header */}
-              <Button 
+              <Button
                 size="sm"
                 variant="ghost"
                 onClick={handleExportPDF}
@@ -487,7 +487,7 @@ export function IncomeStatementView() {
             <div className="max-w-6xl mx-auto">
               {/* Company Header */}
               <div className="text-center mb-8 border-b-2 border-gray-300 pb-4">
-                <h1 className="text-2xl font-bold text-gray-900 mb-1">Your Company Name</h1>
+                <h1 className="text-2xl font-bold text-gray-900 mb-1">National venture capital company of Zimbabwe</h1>
                 <h2 className="text-xl font-semibold text-gray-700 mb-2">Income Statement</h2>
                 <p className="text-gray-600">
                   For the Period from {format(new Date(incomeStatement.period.startDate), 'MMMM d, yyyy')} to {format(new Date(incomeStatement.period.endDate), 'MMMM d, yyyy')}
@@ -502,15 +502,15 @@ export function IncomeStatementView() {
                       {incomeStatement.sections.revenue.label}
                     </h3>
                   </div>
-                  
+
                   <div className="ml-8 space-y-1">
                     {incomeStatement.sections.revenue.accounts.map((account: any) => {
                       const isExpanded = expandedAccounts.has(account.accountId)
                       const hasTransactions = account.transactions && account.transactions.length > 0
-                      
+
                       return (
                         <div key={account.accountId} className="space-y-2">
-                          <div 
+                          <div
                             className={cn(
                               "flex justify-between py-1 rounded-md px-2 -mx-2",
                               hasTransactions && "cursor-pointer hover:bg-gray-100 transition-colors"
@@ -538,7 +538,7 @@ export function IncomeStatementView() {
                               {formatCurrency(account.amount || account.netAmount)}
                             </span>
                           </div>
-                          
+
                           {/* Expandable Transactions */}
                           {isExpanded && hasTransactions && (
                             <div className="ml-8 my-2 p-4 bg-gray-50 rounded-lg border border-gray-200">
@@ -559,7 +559,7 @@ export function IncomeStatementView() {
                       </div>
                     )}
                   </div>
-                  
+
                   {/* Total Revenue with underline */}
                   <div className="flex justify-between py-2 border-t border-b-2 border-gray-800 ml-8 font-semibold">
                     <span className="text-gray-900">Total Revenue</span>
@@ -576,15 +576,15 @@ export function IncomeStatementView() {
                       {incomeStatement.sections.operatingExpenses.label}
                     </h3>
                   </div>
-                  
+
                   <div className="ml-8 space-y-1">
                     {incomeStatement.sections.operatingExpenses.accounts.map((account: any) => {
                       const isExpanded = expandedAccounts.has(account.accountId)
                       const hasTransactions = account.transactions && account.transactions.length > 0
-                      
+
                       return (
                         <div key={account.accountId} className="space-y-2">
-                          <div 
+                          <div
                             className={cn(
                               "flex justify-between py-1 rounded-md px-2 -mx-2",
                               hasTransactions && "cursor-pointer hover:bg-red-50 transition-colors"
@@ -612,7 +612,7 @@ export function IncomeStatementView() {
                               {formatCurrency(account.amount || account.netAmount)}
                             </span>
                           </div>
-                          
+
                           {/* Expandable Transactions */}
                           {isExpanded && hasTransactions && (
                             <div className="ml-8 my-2 p-4 bg-red-50 rounded-lg border border-red-200">
@@ -633,7 +633,7 @@ export function IncomeStatementView() {
                       </div>
                     )}
                   </div>
-                  
+
                   {/* Total Operating Expenses with underline */}
                   <div className="flex justify-between py-2 border-t border-b-2 border-gray-800 ml-8 font-semibold">
                     <span className="text-gray-900">Total Operating Expenses</span>
@@ -662,15 +662,15 @@ export function IncomeStatementView() {
                         {incomeStatement.sections.incomeTax.label}
                       </h3>
                     </div>
-                    
+
                     <div className="ml-8 space-y-1">
                       {incomeStatement.sections.incomeTax.accounts.map((account: any) => {
                         const isExpanded = expandedAccounts.has(account.accountId)
                         const hasTransactions = account.transactions && account.transactions.length > 0
-                        
+
                         return (
                           <div key={account.accountId} className="space-y-2">
-                            <div 
+                            <div
                               className={cn(
                                 "flex justify-between py-1 rounded-md px-2 -mx-2",
                                 hasTransactions && "cursor-pointer hover:bg-amber-50 transition-colors"
@@ -698,7 +698,7 @@ export function IncomeStatementView() {
                                 {formatCurrency(account.amount || account.netAmount)}
                               </span>
                             </div>
-                            
+
                             {/* Expandable Transactions */}
                             {isExpanded && hasTransactions && (
                               <div className="ml-8 my-2 p-4 bg-amber-50 rounded-lg border border-amber-200">
@@ -713,7 +713,7 @@ export function IncomeStatementView() {
                         )
                       })}
                     </div>
-                    
+
                     <div className="flex justify-between py-2 border-t border-b-2 border-gray-800 ml-8 font-semibold">
                       <span className="text-gray-900">Total Income Tax Expense</span>
                       <span className="font-mono text-right w-32 text-red-700">
@@ -731,15 +731,15 @@ export function IncomeStatementView() {
                         {incomeStatement.sections.belowTheLine.label}
                       </h3>
                     </div>
-                    
+
                     <div className="ml-8 space-y-1">
                       {incomeStatement.sections.belowTheLine.accounts.map((account: any) => {
                         const isExpanded = expandedAccounts.has(account.accountId)
                         const hasTransactions = account.transactions && account.transactions.length > 0
-                        
+
                         return (
                           <div key={account.accountId} className="space-y-2">
-                            <div 
+                            <div
                               className={cn(
                                 "flex justify-between py-1 rounded-md px-2 -mx-2",
                                 hasTransactions && "cursor-pointer hover:bg-purple-50 transition-colors"
@@ -767,7 +767,7 @@ export function IncomeStatementView() {
                                 {formatCurrency(account.amount || account.netAmount)}
                               </span>
                             </div>
-                            
+
                             {/* Expandable Transactions */}
                             {isExpanded && hasTransactions && (
                               <div className="ml-8 my-2 p-4 bg-purple-50 rounded-lg border border-purple-200">
@@ -782,7 +782,7 @@ export function IncomeStatementView() {
                         )
                       })}
                     </div>
-                    
+
                     <div className="flex justify-between py-2 border-t border-b-2 border-gray-800 ml-8 font-semibold">
                       <span className="text-gray-900">Total Below-the-Line</span>
                       <span className="font-mono text-right w-32">
@@ -841,7 +841,7 @@ export function IncomeStatementView() {
                         "text-2xl font-bold",
                         incomeStatement.totals.netIncome >= 0 ? "text-green-700" : "text-red-700"
                       )}>
-                        {incomeStatement.sections.revenue.total > 0 
+                        {incomeStatement.sections.revenue.total > 0
                           ? `${((incomeStatement.totals.netIncome / incomeStatement.sections.revenue.total) * 100).toFixed(1)}%`
                           : '0%'
                         }
@@ -890,7 +890,7 @@ function IncomeStatementSkeleton() {
           <div className="h-4 w-24 bg-gray-200 rounded ml-auto mt-2"></div>
         </div>
       </div>
-      
+
       <div className="border rounded-lg p-6">
         <div className="flex justify-between items-center mb-4">
           <div className="h-6 w-32 bg-gray-200 rounded"></div>
@@ -901,7 +901,7 @@ function IncomeStatementSkeleton() {
           <div className="h-4 w-24 bg-gray-200 rounded ml-auto mt-2"></div>
         </div>
       </div>
-      
+
       <div className="border-2 rounded-lg p-6">
         <div className="flex justify-between items-center">
           <div className="h-6 w-32 bg-gray-200 rounded"></div>

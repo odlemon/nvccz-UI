@@ -69,12 +69,12 @@ function CashFlowSkeleton() {
 export function CashFlowView() {
   const dispatch = useDispatch<AppDispatch>()
   const { cashFlow, cashFlowLoading, cashFlowError, currencies } = useSelector((s: RootState) => s.accounting)
-  
+
   const now = new Date()
   const startOfYear = new Date(now.getFullYear(), 0, 1)
   const endOfYear = new Date(now.getFullYear(), 11, 31)
   const defaultCurrencyId = currencies.find(c => c.code === "USD")?.id || currencies[0]?.id || ""
-  
+
   const [periodType, setPeriodType] = useState<'month' | 'quarter' | 'year' | 'custom'>('month')
   const [periodValue, setPeriodValue] = useState<string>(format(new Date(), 'yyyy-MM'))
   const [startDate, setStartDate] = useState<Date>(startOfYear)
@@ -89,7 +89,7 @@ export function CashFlowView() {
   const getPeriodOptions = () => {
     const currentYear = new Date().getFullYear()
     const options: { label: string; value: string }[] = []
-    
+
     if (periodType === 'month') {
       // Generate last 24 months
       for (let i = 0; i < 24; i++) {
@@ -118,7 +118,7 @@ export function CashFlowView() {
         })
       }
     }
-    
+
     return options
   }
 
@@ -127,7 +127,7 @@ export function CashFlowView() {
     if (periodType !== 'custom') {
       const currentYear = new Date().getFullYear()
       const currentMonth = new Date().getMonth()
-      
+
       if (periodType === 'month') {
         const newValue = format(new Date(), 'yyyy-MM')
         setPeriodValue(newValue)
@@ -153,7 +153,7 @@ export function CashFlowView() {
         (periodType === 'month' && /^\d{4}-\d{2}$/.test(periodValue)) ||
         (periodType === 'quarter' && /^\d{4}-Q\d$/.test(periodValue)) ||
         (periodType === 'year' && /^\d{4}$/.test(periodValue))
-      
+
       if (isValidPeriodValue) {
         loadCashFlow()
       }
@@ -241,7 +241,7 @@ export function CashFlowView() {
     setGeneratingPDF(true)
     try {
       const doc = new jsPDF()
-      
+
       doc.setFontSize(16)
       doc.text("Cash Flow Statement", 14, 18)
       doc.setFontSize(11)
@@ -252,27 +252,27 @@ export function CashFlowView() {
       doc.text(`Currency: ${cashFlow.currency.name}`, 14, 32)
 
       const rows: any[] = []
-      const pushSection = (label: string) => rows.push([{ content: label, colSpan: 2, styles: { fontStyle: 'bold', fillColor: [240,240,240] } }])
+      const pushSection = (label: string) => rows.push([{ content: label, colSpan: 2, styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } }])
       const pushItem = (label: string, value: number) => rows.push([`  ${label}`, value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })])
       const pushTotal = (label: string, value: number) => rows.push([{ content: label, styles: { fontStyle: 'bold' } }, { content: value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), styles: { fontStyle: 'bold' } }])
 
       // Operating Activities
       pushSection("Operating Activities")
-      cashFlow.operatingActivities.accounts?.forEach((account: any) => 
+      cashFlow.operatingActivities.accounts?.forEach((account: any) =>
         pushItem(`${account.accountNo} - ${account.accountName}`, account.netAmount)
       )
       pushTotal("Total Operating Activities", cashFlow.operatingActivities.total)
 
       // Investing Activities
       pushSection("Investing Activities")
-      cashFlow.investingActivities.accounts?.forEach((account: any) => 
+      cashFlow.investingActivities.accounts?.forEach((account: any) =>
         pushItem(`${account.accountNo} - ${account.accountName}`, account.netAmount)
       )
       pushTotal("Total Investing Activities", cashFlow.investingActivities.total)
 
       // Financing Activities
       pushSection("Financing Activities")
-      cashFlow.financingActivities.accounts?.forEach((account: any) => 
+      cashFlow.financingActivities.accounts?.forEach((account: any) =>
         pushItem(`${account.accountNo} - ${account.accountName}`, account.netAmount)
       )
       pushTotal("Total Financing Activities", cashFlow.financingActivities.total)
@@ -323,7 +323,7 @@ export function CashFlowView() {
       <div className="max-w-6xl mx-auto space-y-6">
         {/* Company Header */}
         <div className="text-center mb-8 border-b-2 border-gray-300 pb-4">
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">Your Company Name</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-1">National venture capital company of Zimbabwe</h1>
           <h2 className="text-xl font-semibold text-gray-700 mb-2">Cash Flow Statement</h2>
           <p className="text-gray-600">
             For the period {format(new Date(cashFlow.period.startDate), "MMMM d, yyyy")} to {format(new Date(cashFlow.period.endDate), "MMMM d, yyyy")}
@@ -343,7 +343,7 @@ export function CashFlowView() {
 
               return (
                 <div key={account.accountId} className="space-y-2">
-                  <div 
+                  <div
                     className={cn(
                       "flex items-center justify-between py-2 rounded-lg px-2",
                       hasTransactions && "cursor-pointer hover:bg-blue-50 transition-colors"
@@ -417,7 +417,7 @@ export function CashFlowView() {
 
               return (
                 <div key={account.accountId} className="space-y-2">
-                  <div 
+                  <div
                     className={cn(
                       "flex items-center justify-between py-2 rounded-lg px-2",
                       hasTransactions && "cursor-pointer hover:bg-green-50 transition-colors"
@@ -491,7 +491,7 @@ export function CashFlowView() {
 
               return (
                 <div key={account.accountId} className="space-y-2">
-                  <div 
+                  <div
                     className={cn(
                       "flex items-center justify-between py-2 rounded-lg px-2",
                       hasTransactions && "cursor-pointer hover:bg-amber-50 transition-colors"
@@ -590,7 +590,7 @@ export function CashFlowView() {
         <div>
           <h2 className="text-2xl font-semibold text-gray-900">Cash Flow Statement</h2>
           <p className="text-gray-600">
-            {periodType === 'custom' 
+            {periodType === 'custom'
               ? `For the period ${format(startDate, 'MMM d, yyyy')} to ${format(endDate, 'MMM d, yyyy')}`
               : `Period: ${getPeriodOptions().find(opt => opt.value === periodValue)?.label || periodValue}`
             }
@@ -609,7 +609,7 @@ export function CashFlowView() {
               <SelectItem value="custom">Custom Range</SelectItem>
             </SelectContent>
           </Select>
-          
+
           {periodType !== 'custom' ? (
             /* Period Value Selector */
             <Select value={periodValue} onValueChange={setPeriodValue}>
@@ -646,7 +646,7 @@ export function CashFlowView() {
                   </PopoverContent>
                 </Popover>
               </div>
-              
+
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-600">To:</span>
                 <Popover>
