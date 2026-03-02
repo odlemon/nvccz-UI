@@ -78,6 +78,8 @@ export function FundDisbursementSection({
   const { hasSpecificAction } = useRolePermissions()
   const canCreateMilestone = hasSpecificAction('application-portal', APPLICATION_PORTAL_ACTIONS.CREATE_MILESTONE)
   const canUpdateChecklist = hasSpecificAction('application-portal', APPLICATION_PORTAL_ACTIONS.UPDATE_CHECKLIST)
+  const canApproveDisbursement = hasSpecificAction('application-portal', APPLICATION_PORTAL_ACTIONS.APPROVE_DISBURSEMENT)
+  const canDisburseFund = hasSpecificAction('application-portal', APPLICATION_PORTAL_ACTIONS.DISBURSE_FUND)
 
   const handleApprove = async (e: React.MouseEvent) => {
     e.preventDefault()
@@ -388,7 +390,7 @@ export function FundDisbursementSection({
 
               {/* Action Buttons based on status */}
               <div className="mt-3 flex gap-2">
-                {disbursement.status === 'PENDING' && (
+                {canApproveDisbursement && disbursement.status === 'PENDING' && (
                   <Button
                     size="sm"
                     onClick={() => onSetApprovingId(disbursement.id)}
@@ -399,7 +401,7 @@ export function FundDisbursementSection({
                   </Button>
                 )}
 
-                {disbursement.status === 'APPROVED' && (
+                {canDisburseFund && disbursement.status === 'APPROVED' && (
                   <Button
                     size="sm"
                     onClick={() => onSetDisbursingId(disbursement.id)}

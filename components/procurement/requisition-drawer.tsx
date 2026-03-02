@@ -12,6 +12,7 @@ import {
   approveRequisition,
   rejectRequisition,
 } from '@/lib/store/slices/procurementV2Slice'
+import { useProcurementPermissions } from '@/lib/hooks/useProcurementPermissions'
 import {
   Sheet,
   SheetContent,
@@ -37,11 +38,11 @@ import {
 import { UserAvatarWithName } from '@/components/procurement/user-avatar'
 import { CopyText } from '@/components/procurement/copy-helper'
 import { format } from 'date-fns'
-import { 
-  CheckCircle2, 
-  XCircle, 
-  Clock, 
-  Package, 
+import {
+  CheckCircle2,
+  XCircle,
+  Clock,
+  Package,
   FileText,
   Send,
   Calendar,
@@ -60,6 +61,7 @@ export function RequisitionDrawer({ requisition, open, onOpenChange }: Requisiti
   const dispatch = useAppDispatch()
   const [showRejectDialog, setShowRejectDialog] = useState(false)
   const [showApproveDialog, setShowApproveDialog] = useState(false)
+  const { permissions } = useProcurementPermissions()
   const [rejectionReason, setRejectionReason] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -69,6 +71,9 @@ export function RequisitionDrawer({ requisition, open, onOpenChange }: Requisiti
   const isRejected = requisition.status === 'REJECTED'
 
   const handleSubmit = async () => {
+    if (!permissions.canCreatePurchaseRequisition && !permissions.canUpdatePurchaseRequisition) {
+      return
+    }
     setIsSubmitting(true)
     try {
       await dispatch(submitRequisition(requisition.id)).unwrap()
@@ -81,6 +86,9 @@ export function RequisitionDrawer({ requisition, open, onOpenChange }: Requisiti
   }
 
   const handleApprove = async () => {
+    if (!permissions.canApprovePurchaseRequisition) {
+      return
+    }
     setIsSubmitting(true)
     try {
       await dispatch(approveRequisition(requisition.id)).unwrap()
@@ -95,7 +103,10 @@ export function RequisitionDrawer({ requisition, open, onOpenChange }: Requisiti
 
   const handleReject = async () => {
     if (!rejectionReason.trim()) return
-    
+    if (!permissions.canRejectPurchaseRequisition) {
+      return
+    }
+
     setIsSubmitting(true)
     try {
       await dispatch(rejectRequisition({ id: requisition.id, rejectionReason: rejectionReason })).unwrap()
@@ -388,7 +399,7 @@ export function RequisitionDrawer({ requisition, open, onOpenChange }: Requisiti
             {/* Actions */}
             <Separator />
             <div className="flex gap-2">
-              {canSubmit && (
+              {canSubmit && (permissions.canCreatePurchaseRequisition || permissions.canUpdatePurchaseRequisition) && (
                 <Button onClick={handleSubmit} disabled={isSubmitting} className="flex-1">
                   <Send className="mr-2 h-4 w-4" />
                   Submit for Approval
@@ -417,7 +428,7 @@ export function RequisitionDrawer({ requisition, open, onOpenChange }: Requisiti
                 </>
               )}
 
-              {isApproved && (
+              {isApproved && permissions.canCreateRFQ && (
                 <Button className="flex-1" variant="outline">
                   Create RFQ
                 </Button>

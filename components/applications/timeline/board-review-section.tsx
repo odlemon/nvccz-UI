@@ -8,6 +8,8 @@ import type { BoardReviewData, VoteSummaryData } from "@/lib/api/board-review-ap
 import { Progress } from "@/components/ui/progress"
 import { BoardReviewSkeleton } from "@/components/ui/skeleton-loader"
 import { format } from 'date-fns'
+import { useRolePermissions } from "@/lib/hooks/useRolePermissions"
+import { APPLICATION_PORTAL_ACTIONS } from "@/lib/config/role-permissions"
 
 interface BoardReviewSectionProps {
   data: BoardReviewData | null
@@ -28,8 +30,12 @@ export function BoardReviewSection({
   voteSummary,
   voteSummaryLoading,
   onRefresh,
+  onRefresh,
   onInitiate
 }: BoardReviewSectionProps) {
+  const { hasSpecificAction } = useRolePermissions();
+  const canInitiate = hasSpecificAction('application-portal', APPLICATION_PORTAL_ACTIONS.INITIATE_BOARD_REVIEW);
+
   if (loading) {
     return <BoardReviewSkeleton />
   }
@@ -54,7 +60,7 @@ export function BoardReviewSection({
           Board review has not been initiated for this application yet.
         </p>
         <div className="flex gap-2 justify-center">
-          {currentStage === "UNDER_DUE_DILIGENCE" && onInitiate && (
+          {canInitiate && currentStage === "UNDER_DUE_DILIGENCE" && onInitiate && (
             <Button
               onClick={onInitiate}
               className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white rounded-full"
@@ -102,18 +108,16 @@ export function BoardReviewSection({
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Majority Decision</p>
-                  <Badge className={`mt-1 ${
-                    voteSummary.majorityDecision === 'APPROVE' ? 'bg-green-100 text-green-800' :
-                    voteSummary.majorityDecision === 'REJECT' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'
-                  }`}>
+                  <Badge className={`mt-1 ${voteSummary.majorityDecision === 'APPROVE' ? 'bg-green-100 text-green-800' :
+                      voteSummary.majorityDecision === 'REJECT' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'
+                    }`}>
                     {voteSummary.majorityDecision || 'Pending'}
                   </Badge>
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Voting Status</p>
-                  <Badge className={`mt-1 ${
-                    voteSummary.isVotingComplete ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                  }`}>
+                  <Badge className={`mt-1 ${voteSummary.isVotingComplete ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                    }`}>
                     {voteSummary.isVotingComplete ? 'Complete' : 'In Progress'}
                   </Badge>
                 </div>
@@ -122,7 +126,7 @@ export function BoardReviewSection({
               <div className="flex justify-between items-center text-xs text-gray-500">
                 <span>{voteSummary.totalCastPower}% of {voteSummary.totalConfiguredPower}% power cast</span>
               </div>
-              
+
               {voteSummary.votesVisible && voteSummary.votes.length > 0 && (
                 <div className="space-y-3 pt-4 border-t">
                   <h4 className="text-sm font-medium">Individual Votes</h4>
@@ -176,11 +180,10 @@ export function BoardReviewSection({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="text-sm text-gray-500">Status</label>
-              <Badge className={`mt-1 ${
-                data.status === 'COMPLETED' 
-                  ? 'bg-green-100 text-green-800' 
+              <Badge className={`mt-1 ${data.status === 'COMPLETED'
+                  ? 'bg-green-100 text-green-800'
                   : 'bg-purple-100 text-purple-800'
-              }`}>
+                }`}>
                 {data.status}
               </Badge>
             </div>
@@ -190,23 +193,22 @@ export function BoardReviewSection({
             </div>
             <div>
               <label className="text-sm text-gray-500">Investment Decision</label>
-              <Badge className={`mt-1 ${
-                data.investmentApproved 
+              <Badge className={`mt-1 ${data.investmentApproved
                   ? 'bg-green-100 text-green-800'
                   : data.investmentRejected
-                  ? 'bg-red-100 text-red-800'
-                  : 'bg-yellow-100 text-yellow-800'
-              }`}>
-                {data.investmentApproved ? 'Approved' : 
-                 data.investmentRejected ? 'Rejected' : 
-                 data.conditionalApproval ? 'Conditional' : 'Pending'}
+                    ? 'bg-red-100 text-red-800'
+                    : 'bg-yellow-100 text-yellow-800'
+                }`}>
+                {data.investmentApproved ? 'Approved' :
+                  data.investmentRejected ? 'Rejected' :
+                    data.conditionalApproval ? 'Conditional' : 'Pending'}
               </Badge>
             </div>
             <div>
               <label className="text-sm text-gray-500">Reviewer</label>
               <p className="text-sm font-medium">
-                {data.reviewer ? 
-                  `${data.reviewer.firstName} ${data.reviewer.lastName}` : 
+                {data.reviewer ?
+                  `${data.reviewer.firstName} ${data.reviewer.lastName}` :
                   'Not assigned'
                 }
               </p>

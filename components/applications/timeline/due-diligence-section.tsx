@@ -11,6 +11,8 @@ import { CheckCircle, XCircle, AlertCircle, RefreshCw, Calendar, User, DollarSig
 import { format } from "date-fns"
 import { DueDiligenceSkeleton } from "@/components/ui/skeleton-loader"
 import type { DueDiligenceData, DueDiligenceTask } from "@/lib/api/due-diligence-api"
+import { useRolePermissions } from "@/lib/hooks/useRolePermissions"
+import { APPLICATION_PORTAL_ACTIONS } from "@/lib/config/role-permissions"
 
 interface DueDiligenceSectionProps {
   data: DueDiligenceData | null
@@ -35,6 +37,11 @@ export function DueDiligenceSection({
   onCreateTask,
   onApproveActivity
 }: DueDiligenceSectionProps) {
+  const { hasSpecificAction } = useRolePermissions();
+  const canInitiate = hasSpecificAction('application-portal', APPLICATION_PORTAL_ACTIONS.INITIATE_DUE_DILIGENCE);
+  const canCreateTask = hasSpecificAction('application-portal', APPLICATION_PORTAL_ACTIONS.CREATE_DD_TASK);
+  const canApproveActivity = hasSpecificAction('application-portal', APPLICATION_PORTAL_ACTIONS.APPROVE_DD_ACTIVITY);
+
   if (loading) {
     return <DueDiligenceSkeleton />
   }
@@ -62,7 +69,7 @@ export function DueDiligenceSection({
           Due diligence has not been initiated for this application yet.
         </p>
         <div className="flex gap-2 justify-center">
-          {currentStage === "SHORTLISTED" && onInitiate && (
+          {canInitiate && currentStage === "SHORTLISTED" && onInitiate && (
             <Button
               onClick={onInitiate}
               className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white rounded-full"
@@ -152,7 +159,7 @@ export function DueDiligenceSection({
                   <Badge className={`mt-1 ${data.status === 'COMPLETED'
                     ? 'bg-green-100 text-green-800'
                     : 'bg-amber-100 text-amber-800'
-                  }`}>
+                    }`}>
                     {data.status}
                   </Badge>
                 </div>
@@ -167,7 +174,7 @@ export function DueDiligenceSection({
                     : data.recommendation === 'REJECT'
                       ? 'bg-red-100 text-red-800'
                       : 'bg-yellow-100 text-yellow-800'
-                  }`}>
+                    }`}>
                     {data.recommendation || 'Pending'}
                   </Badge>
                 </div>
@@ -195,7 +202,7 @@ export function DueDiligenceSection({
                   <Badge className={`mt-1 ${data.status === 'COMPLETED'
                     ? 'bg-green-100 text-green-800'
                     : 'bg-amber-100 text-amber-800'
-                  }`}>
+                    }`}>
                     {data.status}
                   </Badge>
                 </div>
@@ -210,7 +217,7 @@ export function DueDiligenceSection({
                     : data.recommendation === 'REJECT'
                       ? 'bg-red-100 text-red-800'
                       : 'bg-yellow-100 text-yellow-800'
-                  }`}>
+                    }`}>
                     {data.recommendation || 'Pending'}
                   </Badge>
                 </div>
@@ -319,8 +326,8 @@ export function DueDiligenceSection({
                   <Badge
                     variant={activeArea === area.key ? 'secondary' : 'default'}
                     className={`text-xs px-1.5 py-0.5 h-5 min-w-[20px] flex items-center justify-center ${activeArea === area.key
-                        ? 'bg-white/20 text-white border-white/30'
-                        : 'bg-blue-100 text-blue-800'
+                      ? 'bg-white/20 text-white border-white/30'
+                      : 'bg-blue-100 text-blue-800'
                       }`}
                   >
                     {taskCount}
@@ -343,7 +350,7 @@ export function DueDiligenceSection({
                 </div>
                 Market Research
               </CardTitle>
-              {onCreateTask && (
+              {canCreateTask && onCreateTask && (
                 <Button
                   onClick={() => onCreateTask('Market Research')}
                   size="sm"
@@ -397,14 +404,14 @@ export function DueDiligenceSection({
                           )}
                           <div className="flex items-center gap-2 mt-2">
                             <Badge className={`text-xs ${task.priority === 'high' ? 'bg-red-100 text-red-800' :
-                                task.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                                  'bg-green-100 text-green-800'
+                              task.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-green-100 text-green-800'
                               }`}>
                               {task.priority}
                             </Badge>
                             <Badge className={`text-xs ${task.stage === 'completed' ? 'bg-green-100 text-green-800' :
-                                task.stage === 'in_progress' ? 'bg-blue-100 text-blue-800' :
-                                  'bg-gray-100 text-gray-800'
+                              task.stage === 'in_progress' ? 'bg-blue-100 text-blue-800' :
+                                'bg-gray-100 text-gray-800'
                               }`}>
                               {task.stage.replace('_', ' ')}
                             </Badge>
@@ -453,8 +460,8 @@ export function DueDiligenceSection({
                                     <div className="flex items-center gap-2 mb-1">
                                       <span className="text-sm font-medium text-gray-900">{log.title}</span>
                                       <Badge className={`text-xs ${log.activityType === 'task_completion' ? 'bg-green-100 text-green-800' :
-                                          log.activityType === 'task_update' ? 'bg-blue-100 text-blue-800' :
-                                            'bg-gray-100 text-gray-800'
+                                        log.activityType === 'task_update' ? 'bg-blue-100 text-blue-800' :
+                                          'bg-gray-100 text-gray-800'
                                         }`}>
                                         {log.activityType.replace('_', ' ')}
                                       </Badge>
@@ -490,7 +497,7 @@ export function DueDiligenceSection({
                                       </div>
                                     )}
                                     {/* Single Review Activity Button for all areas */}
-                                    {onApproveActivity && (
+                                    {canApproveActivity && onApproveActivity && (
                                       <div className="mt-3">
                                         <Button
                                           onClick={e => {
@@ -538,7 +545,7 @@ export function DueDiligenceSection({
                 </div>
                 Financial Assessment
               </CardTitle>
-              {onCreateTask && (
+              {canCreateTask && onCreateTask && (
                 <Button
                   onClick={() => onCreateTask('Financial Assessment')}
                   size="sm"
@@ -592,14 +599,14 @@ export function DueDiligenceSection({
                           )}
                           <div className="flex items-center gap-2 mt-2">
                             <Badge className={`text-xs ${task.priority === 'high' ? 'bg-red-100 text-red-800' :
-                                task.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                                  'bg-green-100 text-green-800'
+                              task.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-green-100 text-green-800'
                               }`}>
                               {task.priority}
                             </Badge>
                             <Badge className={`text-xs ${task.stage === 'completed' ? 'bg-green-100 text-green-800' :
-                                task.stage === 'in_progress' ? 'bg-blue-100 text-blue-800' :
-                                  'bg-gray-100 text-gray-800'
+                              task.stage === 'in_progress' ? 'bg-blue-100 text-blue-800' :
+                                'bg-gray-100 text-gray-800'
                               }`}>
                               {task.stage.replace('_', ' ')}
                             </Badge>
@@ -648,8 +655,8 @@ export function DueDiligenceSection({
                                     <div className="flex items-center gap-2 mb-1">
                                       <span className="text-sm font-medium text-gray-900">{log.title}</span>
                                       <Badge className={`text-xs ${log.activityType === 'task_completion' ? 'bg-green-100 text-green-800' :
-                                          log.activityType === 'task_update' ? 'bg-blue-100 text-blue-800' :
-                                            'bg-gray-100 text-gray-800'
+                                        log.activityType === 'task_update' ? 'bg-blue-100 text-blue-800' :
+                                          'bg-gray-100 text-gray-800'
                                         }`}>
                                         {log.activityType.replace('_', ' ')}
                                       </Badge>
@@ -684,7 +691,7 @@ export function DueDiligenceSection({
                                         ))}
                                       </div>
                                     )}
-                                    {onApproveActivity && (
+                                    {canApproveActivity && onApproveActivity && (
                                       <div className="mt-3">
                                         <Button
                                           onClick={e => {
@@ -733,7 +740,7 @@ export function DueDiligenceSection({
                 </div>
                 Competitive Analysis
               </CardTitle>
-              {onCreateTask && (
+              {canCreateTask && onCreateTask && (
                 <Button
                   onClick={() => onCreateTask('Competitive Analysis')}
                   size="sm"
@@ -787,14 +794,14 @@ export function DueDiligenceSection({
                           )}
                           <div className="flex items-center gap-2 mt-2">
                             <Badge className={`text-xs ${task.priority === 'high' ? 'bg-red-100 text-red-800' :
-                                task.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                                  'bg-green-100 text-green-800'
+                              task.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-green-100 text-green-800'
                               }`}>
                               {task.priority}
                             </Badge>
                             <Badge className={`text-xs ${task.stage === 'completed' ? 'bg-green-100 text-green-800' :
-                                task.stage === 'in_progress' ? 'bg-blue-100 text-blue-800' :
-                                  'bg-gray-100 text-gray-800'
+                              task.stage === 'in_progress' ? 'bg-blue-100 text-blue-800' :
+                                'bg-gray-100 text-gray-800'
                               }`}>
                               {task.stage.replace('_', ' ')}
                             </Badge>
@@ -843,8 +850,8 @@ export function DueDiligenceSection({
                                     <div className="flex items-center gap-2 mb-1">
                                       <span className="text-sm font-medium text-gray-900">{log.title}</span>
                                       <Badge className={`text-xs ${log.activityType === 'task_completion' ? 'bg-green-100 text-green-800' :
-                                          log.activityType === 'task_update' ? 'bg-blue-100 text-blue-800' :
-                                            'bg-gray-100 text-gray-800'
+                                        log.activityType === 'task_update' ? 'bg-blue-100 text-blue-800' :
+                                          'bg-gray-100 text-gray-800'
                                         }`}>
                                         {log.activityType.replace('_', ' ')}
                                       </Badge>
@@ -880,7 +887,7 @@ export function DueDiligenceSection({
                                       </div>
                                     )}
 
-                                    {onApproveActivity && (
+                                    {canApproveActivity && onApproveActivity && (
                                       <div className="mt-3">
                                         <Button
                                           onClick={e => {
@@ -929,7 +936,7 @@ export function DueDiligenceSection({
                 </div>
                 Management Team Evaluation
               </CardTitle>
-              {onCreateTask && (
+              {canCreateTask && onCreateTask && (
                 <Button
                   onClick={() => onCreateTask('Management Team Evaluation')}
                   size="sm"
@@ -983,14 +990,14 @@ export function DueDiligenceSection({
                           )}
                           <div className="flex items-center gap-2 mt-2">
                             <Badge className={`text-xs ${task.priority === 'high' ? 'bg-red-100 text-red-800' :
-                                task.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                                  'bg-green-100 text-green-800'
+                              task.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-green-100 text-green-800'
                               }`}>
                               {task.priority}
                             </Badge>
                             <Badge className={`text-xs ${task.stage === 'completed' ? 'bg-green-100 text-green-800' :
-                                task.stage === 'in_progress' ? 'bg-blue-100 text-blue-800' :
-                                  'bg-gray-100 text-gray-800'
+                              task.stage === 'in_progress' ? 'bg-blue-100 text-blue-800' :
+                                'bg-gray-100 text-gray-800'
                               }`}>
                               {task.stage.replace('_', ' ')}
                             </Badge>
@@ -1039,8 +1046,8 @@ export function DueDiligenceSection({
                                     <div className="flex items-center gap-2 mb-1">
                                       <span className="text-sm font-medium text-gray-900">{log.title}</span>
                                       <Badge className={`text-xs ${log.activityType === 'task_completion' ? 'bg-green-100 text-green-800' :
-                                          log.activityType === 'task_update' ? 'bg-blue-100 text-blue-800' :
-                                            'bg-gray-100 text-gray-800'
+                                        log.activityType === 'task_update' ? 'bg-blue-100 text-blue-800' :
+                                          'bg-gray-100 text-gray-800'
                                         }`}>
                                         {log.activityType.replace('_', ' ')}
                                       </Badge>
@@ -1076,7 +1083,7 @@ export function DueDiligenceSection({
                                       </div>
                                     )}
 
-                                    {onApproveActivity && (
+                                    {canApproveActivity && onApproveActivity && (
                                       <div className="mt-3">
                                         <Button
                                           onClick={e => {
@@ -1125,7 +1132,7 @@ export function DueDiligenceSection({
                 </div>
                 Legal Compliance
               </CardTitle>
-              {onCreateTask && (
+              {canCreateTask && onCreateTask && (
                 <Button
                   onClick={() => onCreateTask('Legal Compliance')}
                   size="sm"
@@ -1179,14 +1186,14 @@ export function DueDiligenceSection({
                           )}
                           <div className="flex items-center gap-2 mt-2">
                             <Badge className={`text-xs ${task.priority === 'high' ? 'bg-red-100 text-red-800' :
-                                task.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                                  'bg-green-100 text-green-800'
+                              task.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-green-100 text-green-800'
                               }`}>
                               {task.priority}
                             </Badge>
                             <Badge className={`text-xs ${task.stage === 'completed' ? 'bg-green-100 text-green-800' :
-                                task.stage === 'in_progress' ? 'bg-blue-100 text-blue-800' :
-                                  'bg-gray-100 text-gray-800'
+                              task.stage === 'in_progress' ? 'bg-blue-100 text-blue-800' :
+                                'bg-gray-100 text-gray-800'
                               }`}>
                               {task.stage.replace('_', ' ')}
                             </Badge>
@@ -1235,8 +1242,8 @@ export function DueDiligenceSection({
                                     <div className="flex items-center gap-2 mb-1">
                                       <span className="text-sm font-medium text-gray-900">{log.title}</span>
                                       <Badge className={`text-xs ${log.activityType === 'task_completion' ? 'bg-green-100 text-green-800' :
-                                          log.activityType === 'task_update' ? 'bg-blue-100 text-blue-800' :
-                                            'bg-gray-100 text-gray-800'
+                                        log.activityType === 'task_update' ? 'bg-blue-100 text-blue-800' :
+                                          'bg-gray-100 text-gray-800'
                                         }`}>
                                         {log.activityType.replace('_', ' ')}
                                       </Badge>
@@ -1272,7 +1279,7 @@ export function DueDiligenceSection({
                                       </div>
                                     )}
 
-                                    {onApproveActivity && (
+                                    {canApproveActivity && onApproveActivity && (
                                       <div className="mt-3">
                                         <Button
                                           onClick={e => {
@@ -1321,7 +1328,7 @@ export function DueDiligenceSection({
                 </div>
                 Risk Assessment
               </CardTitle>
-              {onCreateTask && (
+              {canCreateTask && onCreateTask && (
                 <Button
                   onClick={() => onCreateTask('Risk Assessment')}
                   size="sm"
@@ -1375,14 +1382,14 @@ export function DueDiligenceSection({
                           )}
                           <div className="flex items-center gap-2 mt-2">
                             <Badge className={`text-xs ${task.priority === 'high' ? 'bg-red-100 text-red-800' :
-                                task.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                                  'bg-green-100 text-green-800'
+                              task.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-green-100 text-green-800'
                               }`}>
                               {task.priority}
                             </Badge>
                             <Badge className={`text-xs ${task.stage === 'completed' ? 'bg-green-100 text-green-800' :
-                                task.stage === 'in_progress' ? 'bg-blue-100 text-blue-800' :
-                                  'bg-gray-100 text-gray-800'
+                              task.stage === 'in_progress' ? 'bg-blue-100 text-blue-800' :
+                                'bg-gray-100 text-gray-800'
                               }`}>
                               {task.stage.replace('_', ' ')}
                             </Badge>
@@ -1431,8 +1438,8 @@ export function DueDiligenceSection({
                                     <div className="flex items-center gap-2 mb-1">
                                       <span className="text-sm font-medium text-gray-900">{log.title}</span>
                                       <Badge className={`text-xs ${log.activityType === 'task_completion' ? 'bg-green-100 text-green-800' :
-                                          log.activityType === 'task_update' ? 'bg-blue-100 text-blue-800' :
-                                            'bg-gray-100 text-gray-800'
+                                        log.activityType === 'task_update' ? 'bg-blue-100 text-blue-800' :
+                                          'bg-gray-100 text-gray-800'
                                         }`}>
                                         {log.activityType.replace('_', ' ')}
                                       </Badge>
@@ -1467,7 +1474,7 @@ export function DueDiligenceSection({
                                         ))}
                                       </div>
                                     )}
-                                    {onApproveActivity && (
+                                    {canApproveActivity && onApproveActivity && (
                                       <div className="mt-3">
                                         <Button
                                           onClick={e => {

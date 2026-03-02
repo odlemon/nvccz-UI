@@ -1,30 +1,24 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useMemo } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { getModuleById } from "@/lib/config/modules"
-import { 
-  CiGrid41
-} from "react-icons/ci"
+import { useRolePermissions } from "@/lib/hooks/useRolePermissions"
 
 export function ProcurementSidebar() {
   const pathname = usePathname()
   const router = useRouter()
+  const { canAccessSubModule } = useRolePermissions()
 
   const module = getModuleById("procurement")
 
-  // navigate to submodule path
-  const handleItemClick = (path: string) => {
-    if (!path) return
-    router.push(path)
-  }
-
- const activeSubModuleId = useMemo(() => {
-    if (!pathname || !module?.subModules) return null
+  const activeSubModuleId = useMemo(() => {
+    if (!module || !pathname) return null
     let bestId: string | null = null
     let bestScore = -1
+
     for (const subModule of module.subModules) {
       const path = subModule.path || ''
       if (path.includes("?")) {
@@ -43,9 +37,27 @@ export function ProcurementSidebar() {
       }
     }
     return bestId
-  }, [pathname, module])
+  }, [module, pathname])
+
+  // Filter subModules based on permissions
+  const filteredSubModules = useMemo(() => {
+    if (!module?.subModules) return []
+    return module.subModules.filter(subModule =>
+      canAccessSubModule('procurement', subModule.id)
+    )
+  }, [module, canAccessSubModule])
+
+  const handleItemClick = (path: string) => {
+    if (!path) return
+    router.push(path)
+  }
 
   if (!module) {
+    return null
+  }
+
+  // Don't render sidebar if user has no access to any sub-modules
+  if (filteredSubModules.length === 0) {
     return null
   }
 
@@ -54,7 +66,7 @@ export function ProcurementSidebar() {
       <div className="p-4 space-y-4">
         {/* Module Header */}
         <div className="flex items-center gap-3 p-3 rounded-lg bg-gradient-to-r from-orange-50 to-orange-100">
-          <div 
+          <div
             className="w-10 h-10 rounded-lg flex items-center justify-center"
             style={{ backgroundColor: module.color }}
           >
@@ -67,7 +79,7 @@ export function ProcurementSidebar() {
 
         {/* Navigation Items */}
         <div className="space-y-1">
-          {module.subModules.map((subModule) => {
+          {filteredSubModules.map((subModule) => {
             const Icon = subModule.icon
             const active = activeSubModuleId === subModule.id
             return (

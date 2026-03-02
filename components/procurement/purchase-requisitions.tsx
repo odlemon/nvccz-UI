@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useAppDispatch, useAppSelector } from "@/lib/store"
 import { ProcurementDataTable, Column } from "./procurement-data-table"
 import { ProcurementDrawer } from "./procurement-drawer"
@@ -148,11 +148,19 @@ export function PurchaseRequisitions() {
   }
 
   const handleEdit = (requisition: PurchaseRequisition) => {
+    if (!permissions.canUpdatePurchaseRequisition) {
+      toast.error("You do not have permission to edit requisitions")
+      return
+    }
     setViewingRequisition(requisition)
     setIsEditModalOpen(true)
   }
 
   const handleDelete = async (requisition: PurchaseRequisition) => {
+    if (!permissions.canDeletePurchaseRequisition) {
+      toast.error("You do not have permission to delete requisitions")
+      return
+    }
     if (!confirm(`Are you sure you want to delete requisition ${requisition.requisitionNumber}?`)) {
       return
     }
@@ -167,6 +175,10 @@ export function PurchaseRequisitions() {
   }
 
   const handleCreateRFQ = async (requisitionId: string) => {
+    if (!permissions.canCreateRFQ) {
+      toast.error("You do not have permission to create RFQs")
+      return
+    }
     setSelectedRequisitionForRFQ(requisitionId)
     setIsCreateRFQModalOpen(true)
   }
@@ -280,18 +292,22 @@ export function PurchaseRequisitions() {
     { label: 'Cancelled', value: 'CANCELLED' }
   ]
 
-  const bulkActions = [
-    {
-      label: 'Submit for Approval',
-      value: 'submit',
-      icon: <Send className="w-4 h-4 mr-1" />
-    },
-    {
-      label: 'Approve',
-      value: 'approve',
-      icon: <CheckCircle className="w-4 h-4 mr-1" />
-    }
-  ]
+  const filteredBulkActions = useMemo(() => {
+    return [
+      {
+        label: 'Submit for Approval',
+        value: 'submit',
+        icon: <Send className="w-4 h-4 mr-1" />,
+        show: permissions.canUpdatePurchaseRequisition
+      },
+      {
+        label: 'Approve',
+        value: 'approve',
+        icon: <CheckCircle className="w-4 h-4 mr-1" />,
+        show: permissions.canApprovePurchaseRequisition
+      }
+    ].filter(action => action.show)
+  }, [permissions])
 
   const handleBulkAction = (selectedRequisitions: PurchaseRequisition[], action: string) => {
     toast.info(`Bulk action: ${action} on ${selectedRequisitions.length} requisitions`)
@@ -461,7 +477,7 @@ export function PurchaseRequisitions() {
             onEdit={permissions.canUpdatePurchaseRequisition ? handleEdit : undefined}
             onDelete={permissions.canDeletePurchaseRequisition ? handleDelete : undefined}
             onBulkAction={handleBulkAction}
-            bulkActions={bulkActions}
+            bulkActions={filteredBulkActions}
             loading={requisitionsLoading}
             onExport={handleExport}
             emptyMessage="No requisitions found. Create your first purchase requisition to get started."

@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Plus, Save, X, Package, CheckCircle, XCircle, FileText } from "lucide-react"
 import { toast } from "sonner"
+import { useProcurementPermissions } from "@/lib/hooks/useProcurementPermissions"
 import { procurementApi, PurchaseOrder } from "@/lib/api/procurement-api"
 
 interface CreateGRNModalProps {
@@ -34,16 +35,17 @@ export function CreateGRNModal({ isOpen, onClose, onSuccess }: CreateGRNModalPro
   const [loading, setLoading] = useState(false)
   const [loadingData, setLoadingData] = useState(false)
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([])
-  
+  const { permissions } = useProcurementPermissions()
+
   const [formData, setFormData] = useState({
     purchaseOrderId: "",
     receivedBy: "",
     receivedDate: new Date().toISOString().split('T')[0],
     notes: ""
   })
-  
+
   const [items, setItems] = useState<GRNItem[]>([
-    { 
+    {
       purchaseOrderItemId: "",
       itemName: "",
       quantityOrdered: 0,
@@ -64,11 +66,11 @@ export function CreateGRNModal({ isOpen, onClose, onSuccess }: CreateGRNModalPro
   const loadInitialData = async () => {
     try {
       setLoadingData(true)
-      
+
       // Load purchase orders (sent/acknowledged ones that can receive goods)
       const poResponse = await procurementApi.getPurchaseOrders()
       if (poResponse.success && poResponse.data) {
-        setPurchaseOrders(poResponse.data.filter(po => 
+        setPurchaseOrders(poResponse.data.filter(po =>
           po.status === 'SENT' || po.status === 'ACKNOWLEDGED' || po.status === 'PARTIALLY_RECEIVED'
         ))
       }
@@ -87,14 +89,14 @@ export function CreateGRNModal({ isOpen, onClose, onSuccess }: CreateGRNModalPro
   const handleItemChange = (index: number, field: keyof GRNItem, value: string | number) => {
     const updatedItems = [...items]
     updatedItems[index] = { ...updatedItems[index], [field]: value }
-    
+
     // Auto-calculate accepted/rejected quantities
     if (field === 'quantityReceived' || field === 'quantityRejected') {
       const received = field === 'quantityReceived' ? value as number : updatedItems[index].quantityReceived
       const rejected = field === 'quantityRejected' ? value as number : updatedItems[index].quantityRejected
       updatedItems[index].quantityAccepted = Math.max(0, received - rejected)
     }
-    
+
     setItems(updatedItems)
   }
 
@@ -147,7 +149,7 @@ export function CreateGRNModal({ isOpen, onClose, onSuccess }: CreateGRNModalPro
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!formData.purchaseOrderId || !formData.receivedBy) {
       toast.error("Please fill in all required fields")
       return
@@ -155,6 +157,12 @@ export function CreateGRNModal({ isOpen, onClose, onSuccess }: CreateGRNModalPro
 
     if (items.some(item => item.quantityReceived <= 0)) {
       toast.error("All items must have a received quantity greater than 0")
+      return
+    }
+
+    // Check permissions
+    if (!permissions.canCreateGRN) {
+      toast.error('You do not have permission to create GRNs')
       return
     }
 
@@ -167,7 +175,7 @@ export function CreateGRNModal({ isOpen, onClose, onSuccess }: CreateGRNModalPro
       }
 
       const response = await procurementApi.createGRN(grnData)
-      
+
       if (response.success) {
         toast.success("Goods Received Note created successfully!")
         onSuccess()
@@ -189,7 +197,7 @@ export function CreateGRNModal({ isOpen, onClose, onSuccess }: CreateGRNModalPro
       receivedDate: new Date().toISOString().split('T')[0],
       notes: ""
     })
-    setItems([{ 
+    setItems([{
       purchaseOrderItemId: "",
       itemName: "",
       quantityOrdered: 0,
@@ -221,8 +229,8 @@ export function CreateGRNModal({ isOpen, onClose, onSuccess }: CreateGRNModalPro
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="purchaseOrderId">Purchase Order *</Label>
-                <Select 
-                  value={formData.purchaseOrderId} 
+                <Select
+                  value={formData.purchaseOrderId}
                   onValueChange={(value) => {
                     handleInputChange("purchaseOrderId", value)
                     loadPurchaseOrderItems(value)
@@ -244,7 +252,7 @@ export function CreateGRNModal({ isOpen, onClose, onSuccess }: CreateGRNModalPro
                   </SelectContent>
                 </Select>
               </div>
-              
+
               <div>
                 <Label htmlFor="receivedBy">Received By *</Label>
                 <Input
@@ -287,7 +295,7 @@ export function CreateGRNModal({ isOpen, onClose, onSuccess }: CreateGRNModalPro
                       {item.qualityStatus}
                     </Badge>
                   </div>
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div>
                       <Label>Quantity Ordered</Label>
@@ -295,7 +303,7 @@ export function CreateGRNModal({ isOpen, onClose, onSuccess }: CreateGRNModalPro
                         <span className="font-medium">{item.quantityOrdered}</span>
                       </div>
                     </div>
-                    
+
                     <div>
                       <Label>Quantity Received *</Label>
                       <Input
@@ -306,7 +314,7 @@ export function CreateGRNModal({ isOpen, onClose, onSuccess }: CreateGRNModalPro
                         onChange={(e) => handleItemChange(index, "quantityReceived", parseInt(e.target.value) || 0)}
                       />
                     </div>
-                    
+
                     <div>
                       <Label>Quantity Rejected</Label>
                       <Input
@@ -317,7 +325,7 @@ export function CreateGRNModal({ isOpen, onClose, onSuccess }: CreateGRNModalPro
                         onChange={(e) => handleItemChange(index, "quantityRejected", parseInt(e.target.value) || 0)}
                       />
                     </div>
-                    
+
                     <div>
                       <Label>Quantity Accepted</Label>
                       <div className="flex items-center h-10 px-3 border rounded-md bg-green-50">
@@ -329,8 +337,8 @@ export function CreateGRNModal({ isOpen, onClose, onSuccess }: CreateGRNModalPro
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label>Quality Status</Label>
-                      <Select 
-                        value={item.qualityStatus} 
+                      <Select
+                        value={item.qualityStatus}
                         onValueChange={(value: 'PASSED' | 'FAILED' | 'PENDING') => handleItemChange(index, "qualityStatus", value)}
                       >
                         <SelectTrigger>
@@ -343,7 +351,7 @@ export function CreateGRNModal({ isOpen, onClose, onSuccess }: CreateGRNModalPro
                         </SelectContent>
                       </Select>
                     </div>
-                    
+
                     <div>
                       <Label>Quality Notes</Label>
                       <Textarea
@@ -356,7 +364,7 @@ export function CreateGRNModal({ isOpen, onClose, onSuccess }: CreateGRNModalPro
                   </div>
                 </div>
               ))}
-              
+
               {/* Summary */}
               <div className="bg-gray-50 rounded-lg p-4">
                 <h4 className="font-medium mb-3">Receipt Summary</h4>
@@ -409,7 +417,7 @@ export function CreateGRNModal({ isOpen, onClose, onSuccess }: CreateGRNModalPro
               <X className="w-4 h-4 mr-2" />
               Cancel
             </Button>
-            <Button type="submit" disabled={loading} className="gradient-primary text-white">
+            <Button type="submit" disabled={loading || !permissions.canCreateGRN} className="gradient-primary text-white">
               {loading ? (
                 <>
                   <div className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin" />

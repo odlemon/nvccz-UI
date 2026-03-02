@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import { useAppDispatch, useAppSelector } from "@/lib/store"
 import { ProcurementDataTable, Column } from "./procurement-data-table"
 import { ProcurementDrawer } from "./procurement-drawer"
@@ -10,10 +10,10 @@ import { Button } from "@/components/ui/button"
 import { useProcurementPermissions } from "@/lib/hooks/useProcurementPermissions"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
-import { 
-  setApprovalRequests, 
-  addApprovalRequest, 
-  updateApprovalRequest, 
+import {
+  setApprovalRequests,
+  addApprovalRequest,
+  updateApprovalRequest,
   removeApprovalRequest,
   setApprovalRequestsLoading,
   setApprovalRequestsError
@@ -104,7 +104,7 @@ export function MyApprovals() {
       const currentApproval = viewingRequest.approvals.find(
         approval => approval.status === 'PENDING'
       )
-      
+
       if (!currentApproval) {
         toast.error("No pending approval found")
         return
@@ -266,9 +266,16 @@ export function MyApprovals() {
     { label: 'Cancelled', value: 'CANCELLED' }
   ]
 
-  const bulkActions = [
-    { label: 'Bulk Approve', value: 'approve', icon: <CheckCircle className="w-4 h-4 mr-1" /> }
-  ]
+  const filteredBulkActions = useMemo(() => {
+    return [
+      {
+        label: 'Bulk Approve',
+        value: 'approve',
+        icon: <CheckCircle className="w-4 h-4 mr-1" />,
+        show: permissions.canApproveRequest
+      }
+    ].filter(action => action.show)
+  }, [permissions])
 
   const handleBulkAction = (selectedRequests: ApprovalRequest[], action: string) => {
     switch (action) {
@@ -303,7 +310,7 @@ export function MyApprovals() {
         filterOptions={filterOptions}
         onView={handleView}
         onBulkAction={handleBulkAction}
-        bulkActions={bulkActions}
+        bulkActions={filteredBulkActions}
         loading={approvalRequestsLoading}
         onExport={handleExport}
         emptyMessage="No approval requests found. All caught up!"
@@ -375,14 +382,13 @@ export function MyApprovals() {
                   {viewingRequest.approvals.map((approval, index) => (
                     <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
                       <div className="flex items-center gap-3">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                          approval.status === 'APPROVED' ? 'bg-green-100 text-green-600' :
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${approval.status === 'APPROVED' ? 'bg-green-100 text-green-600' :
                           approval.status === 'REJECTED' ? 'bg-red-100 text-red-600' :
-                          'bg-yellow-100 text-yellow-600'
-                        }`}>
+                            'bg-yellow-100 text-yellow-600'
+                          }`}>
                           {approval.status === 'APPROVED' ? <CheckCircle className="w-4 h-4" /> :
-                           approval.status === 'REJECTED' ? <AlertCircle className="w-4 h-4" /> :
-                           <Clock className="w-4 h-4" />}
+                            approval.status === 'REJECTED' ? <AlertCircle className="w-4 h-4" /> :
+                              <Clock className="w-4 h-4" />}
                         </div>
                         <div>
                           <p className="font-medium text-sm">{approval.stage.stepName}</p>
@@ -414,23 +420,27 @@ export function MyApprovals() {
               </Button>
               {viewingRequest.status === 'PENDING' && (
                 <>
-                  <Button 
-                    variant="outline" 
-                    onClick={() => handleReject(viewingRequest)}
-                    className="text-red-600 border-red-200 hover:bg-red-50"
-                    disabled={processingApproval}
-                  >
-                    <AlertCircle className="w-4 h-4 mr-2" />
-                    Reject
-                  </Button>
-                  <Button 
-                    onClick={() => handleApprove(viewingRequest)}
-                    className="gradient-primary text-white"
-                    disabled={processingApproval}
-                  >
-                    <Pen className="w-4 h-4 mr-2" />
-                    Sign & Approve
-                  </Button>
+                  {permissions.canRejectRequest && (
+                    <Button
+                      variant="outline"
+                      onClick={() => handleReject(viewingRequest)}
+                      className="text-red-600 border-red-200 hover:bg-red-50"
+                      disabled={processingApproval}
+                    >
+                      <AlertCircle className="w-4 h-4 mr-2" />
+                      Reject
+                    </Button>
+                  )}
+                  {permissions.canApproveRequest && (
+                    <Button
+                      onClick={() => handleApprove(viewingRequest)}
+                      className="gradient-primary text-white"
+                      disabled={processingApproval}
+                    >
+                      <Pen className="w-4 h-4 mr-2" />
+                      Sign & Approve
+                    </Button>
+                  )}
                 </>
               )}
             </div>

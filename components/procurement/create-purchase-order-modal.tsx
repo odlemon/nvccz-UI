@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { DatePicker } from "@/components/ui/date-picker"
 import { Plus, Trash2, Save, X, Building, FileText, Calendar } from "lucide-react"
 import { toast } from "sonner"
+import { useProcurementPermissions } from "@/lib/hooks/useProcurementPermissions"
 import { procurementApi, PurchaseRequisition } from "@/lib/api/procurement-api"
 import { accountingApi, Vendor } from "@/lib/api/accounting-api"
 import { useAppDispatch, useAppSelector } from "@/lib/store"
@@ -39,6 +40,7 @@ export function CreatePurchaseOrderModal({ isOpen, onClose, onSuccess, preSelect
   const [vendors, setVendors] = useState<Vendor[]>([])
   const [requisitions, setRequisitions] = useState<PurchaseRequisition[]>([])
   const { availableDepartments, loading: perfomanceLoading, error } = useAppSelector((state) => state.performance)
+  const { permissions } = useProcurementPermissions()
 
   const [formData, setFormData] = useState({
     requisitionId: "",
@@ -51,7 +53,7 @@ export function CreatePurchaseOrderModal({ isOpen, onClose, onSuccess, preSelect
     notes: ""
   })
 
- 
+
 
 
   const [deliveryDate, setDeliveryDate] = useState<Date | undefined>(new Date())
@@ -184,6 +186,12 @@ export function CreatePurchaseOrderModal({ isOpen, onClose, onSuccess, preSelect
 
     if (!formData.vendorId || items.some(item => !item.itemName || item.quantity <= 0)) {
       toast.error("Please fill in all required fields")
+      return
+    }
+
+    // Check permissions
+    if (!permissions.canCreatePurchaseOrder) {
+      toast.error('You do not have permission to create purchase orders')
       return
     }
 
@@ -467,7 +475,7 @@ export function CreatePurchaseOrderModal({ isOpen, onClose, onSuccess, preSelect
               <X className="w-4 h-4 mr-2" />
               Cancel
             </Button>
-            <Button type="submit" disabled={loading} className="gradient-primary text-white">
+            <Button type="submit" disabled={loading || !permissions.canCreatePurchaseOrder} className="gradient-primary text-white">
               {loading ? (
                 <>
                   <div className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin" />

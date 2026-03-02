@@ -11,14 +11,14 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Skeleton } from "@/components/ui/skeleton"
-import { 
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { 
+import {
   fetchApprovalConfigs,
   updateApprovalConfig as updateApprovalConfigThunk,
   createApprovalConfig as createApprovalConfigThunk
@@ -108,7 +108,7 @@ export function ApprovalConfigurations() {
         {departments.map((department) => {
           const config = getDepartmentConfig(department.name)
           const isConfigured = !!config
-          
+
           return (
             <Card key={department.id} className={`hover:shadow-lg transition-shadow ${isConfigured ? 'border-green-200' : 'border-orange-200'}`}>
               <CardHeader>
@@ -150,8 +150,8 @@ export function ApprovalConfigurations() {
                       ))}
                     </div>
                     {permissions.canUpdateApprovalConfig && (
-                      <Button 
-                        variant="outline" 
+                      <Button
+                        variant="outline"
                         className="w-full mt-2 rounded-full"
                         onClick={() => handleConfigure(department, config)}
                       >
@@ -166,7 +166,7 @@ export function ApprovalConfigurations() {
                       No approval workflow configured for this department yet.
                     </p>
                     {permissions.canCreateApprovalConfig && (
-                      <Button 
+                      <Button
                         className="w-full rounded-full"
                         onClick={() => handleConfigure(department)}
                       >
@@ -229,6 +229,7 @@ interface ConfigurationModalProps {
 }
 
 function ConfigurationModal({ open, onOpenChange, department, existingConfig, onSuccess }: ConfigurationModalProps) {
+  const { permissions } = useProcurementPermissions()
   const dispatch = useAppDispatch()
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
@@ -236,7 +237,7 @@ function ConfigurationModal({ open, onOpenChange, department, existingConfig, on
     description: existingConfig?.description || '',
     department: department.name,
   })
-  
+
   const [stages, setStages] = useState<ApprovalStageForm[]>(() => {
     if (existingConfig && existingConfig.stages.length > 0) {
       // Group existing stages by stageType
@@ -256,13 +257,13 @@ function ConfigurationModal({ open, onOpenChange, department, existingConfig, on
         })
         return acc
       }, {} as Record<string, ApprovalStep[]>)
-      
+
       return Object.entries(grouped).map(([stageType, steps]) => ({
         stageType: stageType as 'PURCHASE_REQUISITION' | 'PURCHASE_ORDER' | 'INVOICE' | 'GRN',
         steps: steps.sort((a, b) => a.stepNumber - b.stepNumber)
       }))
     }
-    
+
     // Default: one stage for Purchase Requisition with one step
     return [{
       stageType: 'PURCHASE_REQUISITION' as const,
@@ -286,7 +287,7 @@ function ConfigurationModal({ open, onOpenChange, department, existingConfig, on
     ]
     const usedTypes = stages.map(s => s.stageType)
     const nextType = availableTypes.find(type => !usedTypes.includes(type))
-    
+
     if (nextType) {
       setStages([...stages, {
         stageType: nextType,
@@ -349,25 +350,35 @@ function ConfigurationModal({ open, onOpenChange, department, existingConfig, on
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (stages.length === 0) {
       toast.error("Please add at least one approval stage")
       return
     }
-    
+
     if (stages.some(stage => stage.steps.length === 0)) {
       toast.error("Each stage must have at least one approval step")
       return
     }
-    
+
+    // Check permissions
+    if (existingConfig && !permissions.canUpdateApprovalConfig) {
+      toast.error('You do not have permission to update approval configurations')
+      return
+    }
+    if (!existingConfig && !permissions.canCreateApprovalConfig) {
+      toast.error('You do not have permission to create approval configurations')
+      return
+    }
+
     try {
       setLoading(true)
-      
+
       const payload: CreateApprovalConfigRequest = {
         ...formData,
         stages: stages
       }
-      
+
       if (existingConfig) {
         await dispatch(updateApprovalConfigThunk({
           id: existingConfig.id,
@@ -378,7 +389,7 @@ function ConfigurationModal({ open, onOpenChange, department, existingConfig, on
         await dispatch(createApprovalConfigThunk(payload)).unwrap()
         toast.success("Approval configuration created successfully")
       }
-      
+
       onSuccess()
       onOpenChange(false)
     } catch (error: any) {
@@ -415,7 +426,7 @@ function ConfigurationModal({ open, onOpenChange, department, existingConfig, on
             Set up the approval stages and steps for procurement processes in this department
           </DialogDescription>
         </DialogHeader>
-        
+
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-4">
             <div className="space-y-2">
@@ -612,7 +623,11 @@ function ConfigurationModal({ open, onOpenChange, department, existingConfig, on
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="rounded-full">
               Cancel
             </Button>
-            <Button type="submit" disabled={loading} className="rounded-full">
+            <Button
+              type="submit"
+              disabled={loading || (existingConfig ? !permissions.canUpdateApprovalConfig : !permissions.canCreateApprovalConfig)}
+              className="rounded-full"
+            >
               {loading ? 'Saving...' : existingConfig ? 'Update Configuration' : 'Create Configuration'}
             </Button>
           </div>

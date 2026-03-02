@@ -12,11 +12,12 @@ import { FundDrawer } from "./fund-drawer"
 import { toast } from "sonner"
 import { Progress } from "@/components/ui/progress"
 import { useRolePermissions } from "@/lib/hooks/useRolePermissions"
+import { PORTFOLIO_ACTIONS } from "@/lib/config/role-permissions"
 
 export function FundsList() {
-  const { canPerformAction } = useRolePermissions()
-  const canCreateFund = canPerformAction('portfolio-management', 'create')
-  
+  const { hasSpecificAction } = useRolePermissions()
+  const canCreateFund = hasSpecificAction('portfolio-management', PORTFOLIO_ACTIONS.CREATE_FUND)
+
   const [funds, setFunds] = useState<Fund[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -166,7 +167,7 @@ export function FundsList() {
           const totalDisbursed = (f.fundDisbursements || [])
             .filter(d => d.status === 'DISBURSED')
             .reduce((sum, d) => sum + Number(d.amount), 0)
-          
+
           return (
             <div
               key={f.id}

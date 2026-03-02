@@ -4,7 +4,7 @@ import { ModuleGuard } from "@/components/permissions/PermissionGuards"
 
 export default function BoardReviewPage() {
   return (
-    <ModuleGuard moduleId="portfolio-management" subModuleId="applications-all">
+    <ModuleGuard moduleId="portfolio-management" subModuleId="applications">
       <PortfolioLayout>
         <BoardReview />
       </PortfolioLayout>

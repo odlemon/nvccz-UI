@@ -8,7 +8,7 @@
 import { PROCUREMENT_ACTIONS } from './procurement-permissions';
 import { PERFORMANCE_ACTIONS } from './performance-permissions';
 
-export type RoleCode = 
+export type RoleCode =
   // Finance Roles
   | 'FIN_MGR' | 'CFO' | 'FIN_OFF' | 'ACCOUNTANT' | 'FIN_ASST' | 'FIN_MEM'
   // Sales Roles
@@ -26,8 +26,8 @@ export type RoleCode =
   // IT Roles
   | 'IT_MGR' | 'SYSADMIN' | 'DEVELOPER' | 'IT_SUPPORT' | 'IT_MEM'
   // Investment Roles
-  | 'CEO' | 'CIO' | 'BOARD_CHAIR' | 'INV_ANALYST' | 'BOARD_MEMBER' 
-  | 'INV_COMM_MEM' | 'COMPLIANCE_OFF_INV' | 'FUND_MGR' | 'PORTFOLIO_MGR' 
+  | 'CEO' | 'CIO' | 'BOARD_CHAIR' | 'INV_ANALYST' | 'BOARD_MEMBER'
+  | 'INV_COMM_MEM' | 'COMPLIANCE_OFF_INV' | 'FUND_MGR' | 'PORTFOLIO_MGR'
   | 'LIMITED_PARTNER' | 'EXT_AUDITOR';
 
 export interface ModulePermission {
@@ -57,7 +57,7 @@ export const PAYROLL_ACTIONS = {
   DELETE_EMPLOYEE: 'delete-employee',
   VIEW_EMPLOYEE_DETAILS: 'view-employee-details',
   MANAGE_EMPLOYEE_SALARY: 'manage-employee-salary',
-  
+
   // Payroll Run Management
   CREATE_PAYROLL_RUN: 'create-payroll-run',
   UPDATE_PAYROLL_RUN: 'update-payroll-run',
@@ -65,34 +65,34 @@ export const PAYROLL_ACTIONS = {
   PROCESS_PAYROLL_RUN: 'process-payroll-run',
   APPROVE_PAYROLL_RUN: 'approve-payroll-run',
   COMPLETE_PAYROLL_RUN: 'complete-payroll-run',
-  
+
   // Payslip Management
   VIEW_PAYSLIPS: 'view-payslips',
   GENERATE_PAYSLIP: 'generate-payslip',
   DOWNLOAD_PAYSLIP: 'download-payslip',
   VIEW_ALL_PAYSLIPS: 'view-all-payslips',
-  
+
   // Tax Rules Management
   CREATE_TAX_RULE: 'create-tax-rule',
   UPDATE_TAX_RULE: 'update-tax-rule',
   DELETE_TAX_RULE: 'delete-tax-rule',
-  
+
   // Allowance Types Management
   CREATE_ALLOWANCE_TYPE: 'create-allowance-type',
   UPDATE_ALLOWANCE_TYPE: 'update-allowance-type',
   DELETE_ALLOWANCE_TYPE: 'delete-allowance-type',
-  
+
   // Deduction Types Management
   CREATE_DEDUCTION_TYPE: 'create-deduction-type',
   UPDATE_DEDUCTION_TYPE: 'update-deduction-type',
   DELETE_DEDUCTION_TYPE: 'delete-deduction-type',
-  
+
   // Bank Template Management
   CREATE_BANK_TEMPLATE: 'create-bank-template',
   UPDATE_BANK_TEMPLATE: 'update-bank-template',
   DELETE_BANK_TEMPLATE: 'delete-bank-template',
   GENERATE_BANK_FILE: 'generate-bank-file',
-  
+
   // Payment Management
   VIEW_PAYMENTS: 'view-payments',
   APPROVE_PAYMENT: 'approve-payment',
@@ -110,18 +110,19 @@ export const APPLICATION_PORTAL_ACTIONS = {
   UPDATE_DUE_DILIGENCE: 'update-due-diligence',
   COMPLETE_DUE_DILIGENCE: 'complete-due-diligence',
   APPROVE_DD_ACTIVITY: 'approve-dd-activity',
-  
+
   // Board Review Actions
   INITIATE_BOARD_REVIEW: 'initiate-board-review',
   UPDATE_BOARD_REVIEW: 'update-board-review',
   COMPLETE_BOARD_REVIEW: 'complete-board-review',
   CAST_VOTE: 'cast-vote',
-  
+
   // Term Sheet Actions
   CREATE_TERM_SHEET: 'create-term-sheet',
   UPDATE_TERM_SHEET: 'update-term-sheet',
+  SIGN_TERM_SHEET: 'sign-term-sheet',
   FINALIZE_TERM_SHEET: 'finalize-term-sheet',
-  
+
   // Fund Disbursement Actions
   INITIATE_FUND_DISBURSEMENT: 'initiate-fund-disbursement',
   CREATE_DISBURSEMENT: 'create-disbursement',
@@ -153,8 +154,8 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
     department: 'Finance',
     modules: [
       { moduleId: 'homepage', access: 'full' },
-      { 
-        moduleId: 'accounting', 
+      {
+        moduleId: 'accounting',
         access: 'full',
         subModules: {
           'accounting-dashboard': 'full',
@@ -169,8 +170,8 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'accounting-settings': 'full',
         }
       },
-      { 
-        moduleId: 'payroll', 
+      {
+        moduleId: 'payroll',
         access: 'full',
         actions: Object.values(PAYROLL_ACTIONS),
         subModules: {
@@ -184,8 +185,8 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'payroll-bank-templates': 'full',
         }
       },
-      { 
-        moduleId: 'procurement', 
+      {
+        moduleId: 'procurement',
         access: 'full',
         actions: Object.values(PROCUREMENT_ACTIONS),
         subModules: {
@@ -201,17 +202,26 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'my-approvals': 'full',
         }
       },
-      { 
-        moduleId: 'portfolio-management', 
+      {
+        moduleId: 'portfolio-management',
         access: 'read',
         subModules: {
           'Dashboard': 'read',
           'funds': 'read',
           'companies': 'read',
+          'applications-dashboard': 'read',
+          'applications-all': 'read',
         }
       },
-      { 
-        moduleId: 'performance-management', 
+      {
+        moduleId: 'application-portal',
+        access: 'write',
+        actions: [
+          APPLICATION_PORTAL_ACTIONS.DISBURSE_FUND,
+        ]
+      },
+      {
+        moduleId: 'performance-management',
         access: 'full',
         actions: [
           PERFORMANCE_ACTIONS.VIEW_DASHBOARD,
@@ -253,12 +263,12 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'userScorecard': 'full',
         }
       },
-      { 
-        moduleId: 'events-management', 
+      {
+        moduleId: 'events-management',
         access: 'read',
       },
-      { 
-        moduleId: 'admin-management', 
+      {
+        moduleId: 'admin-management',
         access: 'read',
       },
     ]
@@ -270,8 +280,8 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
     department: 'Finance',
     modules: [
       { moduleId: 'homepage', access: 'full' },
-      { 
-        moduleId: 'accounting', 
+      {
+        moduleId: 'accounting',
         access: 'full',
         subModules: {
           'accounting-dashboard': 'full',
@@ -286,13 +296,13 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'accounting-settings': 'write',
         }
       },
-      { 
-        moduleId: 'payroll', 
+      {
+        moduleId: 'payroll',
         access: 'full',
         actions: Object.values(PAYROLL_ACTIONS),
       },
-      { 
-        moduleId: 'procurement', 
+      {
+        moduleId: 'procurement',
         access: 'full',
         actions: [
           PROCUREMENT_ACTIONS.VIEW_DASHBOARD,
@@ -327,8 +337,8 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'my-approvals': 'full',
         }
       },
-      { 
-        moduleId: 'performance-management', 
+      {
+        moduleId: 'performance-management',
         access: 'full',
         actions: [
           PERFORMANCE_ACTIONS.VIEW_DASHBOARD,
@@ -370,8 +380,8 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
     department: 'Finance',
     modules: [
       { moduleId: 'homepage', access: 'full' },
-      { 
-        moduleId: 'accounting', 
+      {
+        moduleId: 'accounting',
         access: 'write',
         subModules: {
           'accounting-dashboard': 'read',
@@ -386,8 +396,8 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'accounting-settings': 'read',
         }
       },
-      { 
-        moduleId: 'payroll', 
+      {
+        moduleId: 'payroll',
         access: 'write',
         actions: [
           PAYROLL_ACTIONS.VIEW_EMPLOYEE_DETAILS,
@@ -410,6 +420,29 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'payroll-payslips': 'read',
         }
       },
+      {
+        moduleId: 'procurement',
+        access: 'write',
+        actions: [
+          PROCUREMENT_ACTIONS.VIEW_DASHBOARD,
+          PROCUREMENT_ACTIONS.CREATE_PURCHASE_REQUISITION,
+          PROCUREMENT_ACTIONS.VIEW_OWN_PURCHASE_REQUISITION,
+          PROCUREMENT_ACTIONS.CREATE_PURCHASE_ORDER,
+          PROCUREMENT_ACTIONS.VIEW_PURCHASE_ORDER,
+          PROCUREMENT_ACTIONS.CREATE_INVOICE,
+          PROCUREMENT_ACTIONS.VIEW_INVOICE,
+          PROCUREMENT_ACTIONS.DELETE_GRN,
+          PROCUREMENT_ACTIONS.VIEW_PAYMENT,
+        ],
+        subModules: {
+          'procurement-dashboard': 'read',
+          'purchase-requisitions': 'write',
+          'purchase-orders': 'write',
+          'procurement-invoices': 'write',
+          'goods-received-notes': 'read',
+          'payments': 'read',
+        }
+      },
     ]
   },
 
@@ -419,8 +452,8 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
     department: 'Finance',
     modules: [
       { moduleId: 'homepage', access: 'full' },
-      { 
-        moduleId: 'accounting', 
+      {
+        moduleId: 'accounting',
         access: 'write',
         subModules: {
           'accounting-dashboard': 'read',
@@ -435,6 +468,17 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'accounting-settings': 'read',
         }
       },
+      {
+        moduleId: 'procurement',
+        access: 'write',
+        actions: [
+          PROCUREMENT_ACTIONS.CREATE_PURCHASE_REQUISITION,
+          PROCUREMENT_ACTIONS.VIEW_OWN_PURCHASE_REQUISITION,
+        ],
+        subModules: {
+          'purchase-requisitions': 'write',
+        }
+      },
     ]
   },
 
@@ -444,8 +488,8 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
     department: 'Finance',
     modules: [
       { moduleId: 'homepage', access: 'full' },
-      { 
-        moduleId: 'accounting', 
+      {
+        moduleId: 'accounting',
         access: 'write',
         subModules: {
           'accounting-dashboard': 'read',
@@ -454,6 +498,17 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'invoices': 'write',
           'expenses': 'write',
           'financial-reports': 'read',
+        }
+      },
+      {
+        moduleId: 'procurement',
+        access: 'write',
+        actions: [
+          PROCUREMENT_ACTIONS.CREATE_PURCHASE_REQUISITION,
+          PROCUREMENT_ACTIONS.VIEW_OWN_PURCHASE_REQUISITION,
+        ],
+        subModules: {
+          'purchase-requisitions': 'write',
         }
       },
     ]
@@ -465,13 +520,24 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
     department: 'Finance',
     modules: [
       { moduleId: 'homepage', access: 'full' },
-      { 
-        moduleId: 'accounting', 
+      {
+        moduleId: 'accounting',
         access: 'read',
         subModules: {
           'accounting-dashboard': 'read',
           'general-ledger': 'read',
           'financial-reports': 'read',
+        }
+      },
+      {
+        moduleId: 'procurement',
+        access: 'write',
+        actions: [
+          PROCUREMENT_ACTIONS.CREATE_PURCHASE_REQUISITION,
+          PROCUREMENT_ACTIONS.VIEW_OWN_PURCHASE_REQUISITION,
+        ],
+        subModules: {
+          'purchase-requisitions': 'write',
         }
       },
     ]
@@ -484,16 +550,27 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
     department: 'Sales',
     modules: [
       { moduleId: 'homepage', access: 'full' },
-      { 
-        moduleId: 'accounting', 
+      {
+        moduleId: 'accounting',
         access: 'read',
         subModules: {
           'invoices': 'full',
           'financial-reports': 'read',
         }
       },
-      { 
-        moduleId: 'performance-management', 
+      {
+        moduleId: 'procurement',
+        access: 'write',
+        actions: [
+          PROCUREMENT_ACTIONS.CREATE_PURCHASE_REQUISITION,
+          PROCUREMENT_ACTIONS.VIEW_OWN_PURCHASE_REQUISITION,
+        ],
+        subModules: {
+          'purchase-requisitions': 'write',
+        }
+      },
+      {
+        moduleId: 'performance-management',
         access: 'full',
       },
     ]
@@ -505,15 +582,26 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
     department: 'Sales',
     modules: [
       { moduleId: 'homepage', access: 'full' },
-      { 
-        moduleId: 'accounting', 
+      {
+        moduleId: 'accounting',
         access: 'read',
         subModules: {
           'invoices': 'write',
         }
       },
-      { 
-        moduleId: 'performance-management', 
+      {
+        moduleId: 'procurement',
+        access: 'write',
+        actions: [
+          PROCUREMENT_ACTIONS.CREATE_PURCHASE_REQUISITION,
+          PROCUREMENT_ACTIONS.VIEW_OWN_PURCHASE_REQUISITION,
+        ],
+        subModules: {
+          'purchase-requisitions': 'write',
+        }
+      },
+      {
+        moduleId: 'performance-management',
         access: 'write',
       },
     ]
@@ -525,15 +613,26 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
     department: 'Sales',
     modules: [
       { moduleId: 'homepage', access: 'full' },
-      { 
-        moduleId: 'accounting', 
+      {
+        moduleId: 'accounting',
         access: 'read',
         subModules: {
           'invoices': 'write',
         }
       },
-      { 
-        moduleId: 'performance-management', 
+      {
+        moduleId: 'procurement',
+        access: 'write',
+        actions: [
+          PROCUREMENT_ACTIONS.CREATE_PURCHASE_REQUISITION,
+          PROCUREMENT_ACTIONS.VIEW_OWN_PURCHASE_REQUISITION,
+        ],
+        subModules: {
+          'purchase-requisitions': 'write',
+        }
+      },
+      {
+        moduleId: 'performance-management',
         access: 'read',
       },
     ]
@@ -545,11 +644,22 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
     department: 'Sales',
     modules: [
       { moduleId: 'homepage', access: 'full' },
-      { 
-        moduleId: 'accounting', 
+      {
+        moduleId: 'accounting',
         access: 'read',
         subModules: {
           'invoices': 'read',
+        }
+      },
+      {
+        moduleId: 'procurement',
+        access: 'write',
+        actions: [
+          PROCUREMENT_ACTIONS.CREATE_PURCHASE_REQUISITION,
+          PROCUREMENT_ACTIONS.VIEW_OWN_PURCHASE_REQUISITION,
+        ],
+        subModules: {
+          'purchase-requisitions': 'write',
         }
       },
     ]
@@ -561,6 +671,17 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
     department: 'Sales',
     modules: [
       { moduleId: 'homepage', access: 'full' },
+      {
+        moduleId: 'procurement',
+        access: 'write',
+        actions: [
+          PROCUREMENT_ACTIONS.CREATE_PURCHASE_REQUISITION,
+          PROCUREMENT_ACTIONS.VIEW_OWN_PURCHASE_REQUISITION,
+        ],
+        subModules: {
+          'purchase-requisitions': 'write',
+        }
+      },
     ]
   },
 
@@ -574,8 +695,8 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
       { moduleId: 'procurement', access: 'full' },
       { moduleId: 'performance-management', access: 'full' },
       { moduleId: 'events-management', access: 'full' },
-      { 
-        moduleId: 'accounting', 
+      {
+        moduleId: 'accounting',
         access: 'read',
         subModules: {
           'expenses': 'write',
@@ -594,8 +715,8 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
       { moduleId: 'procurement', access: 'write' },
       { moduleId: 'performance-management', access: 'write' },
       { moduleId: 'events-management', access: 'write' },
-      { 
-        moduleId: 'accounting', 
+      {
+        moduleId: 'accounting',
         access: 'read',
         subModules: {
           'expenses': 'write',
@@ -621,6 +742,17 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
     department: 'Operations',
     modules: [
       { moduleId: 'homepage', access: 'full' },
+      {
+        moduleId: 'procurement',
+        access: 'write',
+        actions: [
+          PROCUREMENT_ACTIONS.CREATE_PURCHASE_REQUISITION,
+          PROCUREMENT_ACTIONS.VIEW_OWN_PURCHASE_REQUISITION,
+        ],
+        subModules: {
+          'purchase-requisitions': 'write',
+        }
+      },
       { moduleId: 'performance-management', access: 'full' },
     ]
   },
@@ -631,6 +763,17 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
     department: 'Operations',
     modules: [
       { moduleId: 'homepage', access: 'full' },
+      {
+        moduleId: 'procurement',
+        access: 'write',
+        actions: [
+          PROCUREMENT_ACTIONS.CREATE_PURCHASE_REQUISITION,
+          PROCUREMENT_ACTIONS.VIEW_OWN_PURCHASE_REQUISITION,
+        ],
+        subModules: {
+          'purchase-requisitions': 'write',
+        }
+      },
     ]
   },
 
@@ -641,8 +784,8 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
     department: 'Procurement',
     modules: [
       { moduleId: 'homepage', access: 'full' },
-      { 
-        moduleId: 'procurement', 
+      {
+        moduleId: 'procurement',
         access: 'full',
         actions: [
           PROCUREMENT_ACTIONS.VIEW_DASHBOARD,
@@ -702,8 +845,8 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'my-approvals': 'full',
         }
       },
-      { 
-        moduleId: 'accounting', 
+      {
+        moduleId: 'accounting',
         access: 'read',
         subModules: {
           'expenses': 'write',
@@ -719,8 +862,8 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
     department: 'Procurement',
     modules: [
       { moduleId: 'homepage', access: 'full' },
-      { 
-        moduleId: 'procurement', 
+      {
+        moduleId: 'procurement',
         access: 'full',
         actions: [
           PROCUREMENT_ACTIONS.VIEW_DASHBOARD,
@@ -783,8 +926,8 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
     department: 'Procurement',
     modules: [
       { moduleId: 'homepage', access: 'full' },
-      { 
-        moduleId: 'procurement', 
+      {
+        moduleId: 'procurement',
         access: 'write',
         actions: [
           PROCUREMENT_ACTIONS.VIEW_DASHBOARD,
@@ -829,8 +972,8 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
     department: 'Procurement',
     modules: [
       { moduleId: 'homepage', access: 'full' },
-      { 
-        moduleId: 'procurement', 
+      {
+        moduleId: 'procurement',
         access: 'write',
         subModules: {
           'purchase-requisitions': 'write',
@@ -846,8 +989,8 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
     department: 'Procurement',
     modules: [
       { moduleId: 'homepage', access: 'full' },
-      { 
-        moduleId: 'procurement', 
+      {
+        moduleId: 'procurement',
         access: 'read',
       },
     ]
@@ -860,13 +1003,13 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
     department: 'Human Resources',
     modules: [
       { moduleId: 'homepage', access: 'full' },
-      { 
-        moduleId: 'payroll', 
+      {
+        moduleId: 'payroll',
         access: 'full',
         actions: Object.values(PAYROLL_ACTIONS),
       },
-      { 
-        moduleId: 'performance-management', 
+      {
+        moduleId: 'performance-management',
         access: 'full',
         actions: [
           PERFORMANCE_ACTIONS.VIEW_DASHBOARD,
@@ -909,12 +1052,23 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'userScorecard': 'full',
         }
       },
-      { 
-        moduleId: 'admin-management', 
+      {
+        moduleId: 'admin-management',
         access: 'write',
         subModules: {
           'user-management': 'write',
           'role-management': 'read',
+        }
+      },
+      {
+        moduleId: 'procurement',
+        access: 'write',
+        actions: [
+          PROCUREMENT_ACTIONS.CREATE_PURCHASE_REQUISITION,
+          PROCUREMENT_ACTIONS.VIEW_OWN_PURCHASE_REQUISITION,
+        ],
+        subModules: {
+          'purchase-requisitions': 'write',
         }
       },
     ]
@@ -926,8 +1080,8 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
     department: 'Human Resources',
     modules: [
       { moduleId: 'homepage', access: 'full' },
-      { 
-        moduleId: 'payroll', 
+      {
+        moduleId: 'payroll',
         access: 'write',
         actions: [
           PAYROLL_ACTIONS.CREATE_EMPLOYEE,
@@ -949,8 +1103,8 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           PAYROLL_ACTIONS.DELETE_DEDUCTION_TYPE,
         ],
       },
-      { 
-        moduleId: 'performance-management', 
+      {
+        moduleId: 'performance-management',
         access: 'write',
         actions: [
           PERFORMANCE_ACTIONS.VIEW_DASHBOARD,
@@ -980,11 +1134,22 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'userScorecard': 'full',
         }
       },
-      { 
-        moduleId: 'admin-management', 
+      {
+        moduleId: 'admin-management',
         access: 'read',
         subModules: {
           'user-management': 'write',
+        }
+      },
+      {
+        moduleId: 'procurement',
+        access: 'write',
+        actions: [
+          PROCUREMENT_ACTIONS.CREATE_PURCHASE_REQUISITION,
+          PROCUREMENT_ACTIONS.VIEW_OWN_PURCHASE_REQUISITION,
+        ],
+        subModules: {
+          'purchase-requisitions': 'write',
         }
       },
     ]
@@ -996,11 +1161,22 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
     department: 'Human Resources',
     modules: [
       { moduleId: 'homepage', access: 'full' },
-      { 
-        moduleId: 'admin-management', 
+      {
+        moduleId: 'admin-management',
         access: 'read',
         subModules: {
           'user-management': 'write',
+        }
+      },
+      {
+        moduleId: 'procurement',
+        access: 'write',
+        actions: [
+          PROCUREMENT_ACTIONS.CREATE_PURCHASE_REQUISITION,
+          PROCUREMENT_ACTIONS.VIEW_OWN_PURCHASE_REQUISITION,
+        ],
+        subModules: {
+          'purchase-requisitions': 'write',
         }
       },
     ]
@@ -1012,14 +1188,25 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
     department: 'Human Resources',
     modules: [
       { moduleId: 'homepage', access: 'full' },
-      { 
-        moduleId: 'payroll', 
+      {
+        moduleId: 'payroll',
         access: 'read',
         actions: [
           PAYROLL_ACTIONS.VIEW_EMPLOYEE_DETAILS,
           PAYROLL_ACTIONS.VIEW_PAYSLIPS,
           PAYROLL_ACTIONS.VIEW_ALL_PAYSLIPS,
         ],
+      },
+      {
+        moduleId: 'procurement',
+        access: 'write',
+        actions: [
+          PROCUREMENT_ACTIONS.CREATE_PURCHASE_REQUISITION,
+          PROCUREMENT_ACTIONS.VIEW_OWN_PURCHASE_REQUISITION,
+        ],
+        subModules: {
+          'purchase-requisitions': 'write',
+        }
       },
     ]
   },
@@ -1030,6 +1217,17 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
     department: 'Human Resources',
     modules: [
       { moduleId: 'homepage', access: 'full' },
+      {
+        moduleId: 'procurement',
+        access: 'write',
+        actions: [
+          PROCUREMENT_ACTIONS.CREATE_PURCHASE_REQUISITION,
+          PROCUREMENT_ACTIONS.VIEW_OWN_PURCHASE_REQUISITION,
+        ],
+        subModules: {
+          'purchase-requisitions': 'write',
+        }
+      },
     ]
   },
 
@@ -1040,15 +1238,26 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
     department: 'Marketing',
     modules: [
       { moduleId: 'homepage', access: 'full' },
-      { 
-        moduleId: 'events-management', 
+      {
+        moduleId: 'events-management',
         access: 'full',
       },
-      { 
-        moduleId: 'accounting', 
+      {
+        moduleId: 'accounting',
         access: 'read',
         subModules: {
           'expenses': 'write',
+        }
+      },
+      {
+        moduleId: 'procurement',
+        access: 'write',
+        actions: [
+          PROCUREMENT_ACTIONS.CREATE_PURCHASE_REQUISITION,
+          PROCUREMENT_ACTIONS.VIEW_OWN_PURCHASE_REQUISITION,
+        ],
+        subModules: {
+          'purchase-requisitions': 'write',
         }
       },
     ]
@@ -1060,9 +1269,20 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
     department: 'Marketing',
     modules: [
       { moduleId: 'homepage', access: 'full' },
-      { 
-        moduleId: 'events-management', 
+      {
+        moduleId: 'events-management',
         access: 'write',
+      },
+      {
+        moduleId: 'procurement',
+        access: 'write',
+        actions: [
+          PROCUREMENT_ACTIONS.CREATE_PURCHASE_REQUISITION,
+          PROCUREMENT_ACTIONS.VIEW_OWN_PURCHASE_REQUISITION,
+        ],
+        subModules: {
+          'purchase-requisitions': 'write',
+        }
       },
     ]
   },
@@ -1073,9 +1293,20 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
     department: 'Marketing',
     modules: [
       { moduleId: 'homepage', access: 'full' },
-      { 
-        moduleId: 'events-management', 
+      {
+        moduleId: 'events-management',
         access: 'write',
+      },
+      {
+        moduleId: 'procurement',
+        access: 'write',
+        actions: [
+          PROCUREMENT_ACTIONS.CREATE_PURCHASE_REQUISITION,
+          PROCUREMENT_ACTIONS.VIEW_OWN_PURCHASE_REQUISITION,
+        ],
+        subModules: {
+          'purchase-requisitions': 'write',
+        }
       },
     ]
   },
@@ -1086,9 +1317,20 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
     department: 'Marketing',
     modules: [
       { moduleId: 'homepage', access: 'full' },
-      { 
-        moduleId: 'events-management', 
+      {
+        moduleId: 'events-management',
         access: 'write',
+      },
+      {
+        moduleId: 'procurement',
+        access: 'write',
+        actions: [
+          PROCUREMENT_ACTIONS.CREATE_PURCHASE_REQUISITION,
+          PROCUREMENT_ACTIONS.VIEW_OWN_PURCHASE_REQUISITION,
+        ],
+        subModules: {
+          'purchase-requisitions': 'write',
+        }
       },
     ]
   },
@@ -1099,6 +1341,17 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
     department: 'Marketing',
     modules: [
       { moduleId: 'homepage', access: 'full' },
+      {
+        moduleId: 'procurement',
+        access: 'write',
+        actions: [
+          PROCUREMENT_ACTIONS.CREATE_PURCHASE_REQUISITION,
+          PROCUREMENT_ACTIONS.VIEW_OWN_PURCHASE_REQUISITION,
+        ],
+        subModules: {
+          'purchase-requisitions': 'write',
+        }
+      },
     ]
   },
 
@@ -1109,19 +1362,28 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
     department: 'Legal',
     modules: [
       { moduleId: 'homepage', access: 'full' },
-      { 
-        moduleId: 'portfolio-management', 
+      {
+        moduleId: 'portfolio-management',
         access: 'read',
       },
-      { 
-        moduleId: 'application-portal', 
-        access: 'read',
+      {
+        moduleId: 'application-portal',
+        access: 'write',
+        actions: [
+          APPLICATION_PORTAL_ACTIONS.SIGN_TERM_SHEET,
+          APPLICATION_PORTAL_ACTIONS.FINALIZE_TERM_SHEET,
+          APPLICATION_PORTAL_ACTIONS.UPDATE_CHECKLIST,
+        ]
       },
-      { 
-        moduleId: 'procurement', 
-        access: 'read',
+      {
+        moduleId: 'procurement',
+        access: 'write',
+        actions: [
+          PROCUREMENT_ACTIONS.CREATE_PURCHASE_REQUISITION,
+          PROCUREMENT_ACTIONS.VIEW_OWN_PURCHASE_REQUISITION,
+        ],
         subModules: {
-          'approval-requests': 'write',
+          'purchase-requisitions': 'write',
         }
       },
     ]
@@ -1133,13 +1395,29 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
     department: 'Legal',
     modules: [
       { moduleId: 'homepage', access: 'full' },
-      { 
-        moduleId: 'portfolio-management', 
+      {
+        moduleId: 'portfolio-management',
         access: 'read',
       },
-      { 
-        moduleId: 'procurement', 
-        access: 'read',
+      {
+        moduleId: 'application-portal',
+        access: 'write',
+        actions: [
+          APPLICATION_PORTAL_ACTIONS.SIGN_TERM_SHEET,
+          APPLICATION_PORTAL_ACTIONS.FINALIZE_TERM_SHEET,
+          APPLICATION_PORTAL_ACTIONS.UPDATE_CHECKLIST,
+        ]
+      },
+      {
+        moduleId: 'procurement',
+        access: 'write',
+        actions: [
+          PROCUREMENT_ACTIONS.CREATE_PURCHASE_REQUISITION,
+          PROCUREMENT_ACTIONS.VIEW_OWN_PURCHASE_REQUISITION,
+        ],
+        subModules: {
+          'purchase-requisitions': 'write',
+        }
       },
     ]
   },
@@ -1150,13 +1428,29 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
     department: 'Legal',
     modules: [
       { moduleId: 'homepage', access: 'full' },
-      { 
-        moduleId: 'portfolio-management', 
+      {
+        moduleId: 'portfolio-management',
         access: 'read',
       },
-      { 
-        moduleId: 'application-portal', 
-        access: 'read',
+      {
+        moduleId: 'application-portal',
+        access: 'write',
+        actions: [
+          APPLICATION_PORTAL_ACTIONS.SIGN_TERM_SHEET,
+          APPLICATION_PORTAL_ACTIONS.FINALIZE_TERM_SHEET,
+          APPLICATION_PORTAL_ACTIONS.UPDATE_CHECKLIST,
+        ]
+      },
+      {
+        moduleId: 'procurement',
+        access: 'write',
+        actions: [
+          PROCUREMENT_ACTIONS.CREATE_PURCHASE_REQUISITION,
+          PROCUREMENT_ACTIONS.VIEW_OWN_PURCHASE_REQUISITION,
+        ],
+        subModules: {
+          'purchase-requisitions': 'write',
+        }
       },
     ]
   },
@@ -1166,7 +1460,30 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
     level: 2,
     department: 'Legal',
     modules: [
-      { moduleId: 'homepage', access: 'full' },
+      {
+        moduleId: 'homepage',
+        access: 'full'
+      },
+      {
+        moduleId: 'application-portal',
+        access: 'write',
+        actions: [
+          APPLICATION_PORTAL_ACTIONS.SIGN_TERM_SHEET,
+          APPLICATION_PORTAL_ACTIONS.FINALIZE_TERM_SHEET,
+          APPLICATION_PORTAL_ACTIONS.UPDATE_CHECKLIST,
+        ]
+      },
+      {
+        moduleId: 'procurement',
+        access: 'write',
+        actions: [
+          PROCUREMENT_ACTIONS.CREATE_PURCHASE_REQUISITION,
+          PROCUREMENT_ACTIONS.VIEW_OWN_PURCHASE_REQUISITION,
+        ],
+        subModules: {
+          'purchase-requisitions': 'write',
+        }
+      },
     ]
   },
 
@@ -1175,7 +1492,30 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
     level: 1,
     department: 'Legal',
     modules: [
-      { moduleId: 'homepage', access: 'full' },
+      {
+        moduleId: 'homepage',
+        access: 'full'
+      },
+      {
+        moduleId: 'application-portal',
+        access: 'write',
+        actions: [
+          APPLICATION_PORTAL_ACTIONS.SIGN_TERM_SHEET,
+          APPLICATION_PORTAL_ACTIONS.FINALIZE_TERM_SHEET,
+          APPLICATION_PORTAL_ACTIONS.UPDATE_CHECKLIST,
+        ]
+      },
+      {
+        moduleId: 'procurement',
+        access: 'write',
+        actions: [
+          PROCUREMENT_ACTIONS.CREATE_PURCHASE_REQUISITION,
+          PROCUREMENT_ACTIONS.VIEW_OWN_PURCHASE_REQUISITION,
+        ],
+        subModules: {
+          'purchase-requisitions': 'write',
+        }
+      },
     ]
   },
 
@@ -1186,8 +1526,34 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
     department: 'IT',
     modules: [
       { moduleId: 'homepage', access: 'full' },
-      { 
-        moduleId: 'admin-management', 
+      {
+        moduleId: 'portfolio-management',
+        access: 'full',
+        actions: Object.values(PORTFOLIO_ACTIONS)
+      },
+      {
+        moduleId: 'application-portal',
+        access: 'full',
+        actions: Object.values(APPLICATION_PORTAL_ACTIONS)
+      },
+      {
+        moduleId: 'procurement',
+        access: 'full',
+        actions: Object.values(PROCUREMENT_ACTIONS),
+        subModules: {
+          'procurement-dashboard': 'full',
+          'purchase-requisitions': 'full',
+          'rfq': 'full',
+          'quotations': 'full',
+          'purchase-orders': 'full',
+          'procurement-invoices': 'full',
+          'goods-received-notes': 'full',
+          'payments': 'full',
+          'approval-configurations': 'full',
+        }
+      },
+      {
+        moduleId: 'admin-management',
         access: 'full',
       },
     ]
@@ -1199,8 +1565,34 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
     department: 'IT',
     modules: [
       { moduleId: 'homepage', access: 'full' },
-      { 
-        moduleId: 'admin-management', 
+      {
+        moduleId: 'portfolio-management',
+        access: 'full',
+        actions: Object.values(PORTFOLIO_ACTIONS)
+      },
+      {
+        moduleId: 'application-portal',
+        access: 'full',
+        actions: Object.values(APPLICATION_PORTAL_ACTIONS)
+      },
+      {
+        moduleId: 'procurement',
+        access: 'full',
+        actions: Object.values(PROCUREMENT_ACTIONS),
+        subModules: {
+          'procurement-dashboard': 'full',
+          'purchase-requisitions': 'full',
+          'rfq': 'full',
+          'quotations': 'full',
+          'purchase-orders': 'full',
+          'procurement-invoices': 'full',
+          'goods-received-notes': 'full',
+          'payments': 'full',
+          'approval-configurations': 'full',
+        }
+      },
+      {
+        moduleId: 'admin-management',
         access: 'full',
       },
     ]
@@ -1212,9 +1604,27 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
     department: 'IT',
     modules: [
       { moduleId: 'homepage', access: 'full' },
-      { 
-        moduleId: 'admin-management', 
-        access: 'read',
+      // {
+      //   moduleId: 'admin-management',
+      //   access: 'read',
+      //   subModules: {
+      //     'admin-dashboard': 'read',
+      //     'user-management': 'read',
+      //     'role-management': 'read',
+      //   }
+      // },
+      {
+        moduleId: 'procurement',
+        access: 'write',
+        actions: [
+          PROCUREMENT_ACTIONS.VIEW_DASHBOARD,
+          PROCUREMENT_ACTIONS.CREATE_PURCHASE_REQUISITION,
+          PROCUREMENT_ACTIONS.VIEW_OWN_PURCHASE_REQUISITION,
+        ],
+        subModules: {
+          'procurement-dashboard': 'read',
+          'purchase-requisitions': 'write',
+        }
       },
     ]
   },
@@ -1225,11 +1635,24 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
     department: 'IT',
     modules: [
       { moduleId: 'homepage', access: 'full' },
-      { 
-        moduleId: 'admin-management', 
+      {
+        moduleId: 'admin-management',
         access: 'read',
         subModules: {
           'user-management': 'read',
+        }
+      },
+      {
+        moduleId: 'procurement',
+        access: 'write',
+        actions: [
+          PROCUREMENT_ACTIONS.VIEW_DASHBOARD,
+          PROCUREMENT_ACTIONS.CREATE_PURCHASE_REQUISITION,
+          PROCUREMENT_ACTIONS.VIEW_OWN_PURCHASE_REQUISITION,
+        ],
+        subModules: {
+          'procurement-dashboard': 'read',
+          'purchase-requisitions': 'write',
         }
       },
     ]
@@ -1241,6 +1664,17 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
     department: 'IT',
     modules: [
       { moduleId: 'homepage', access: 'full' },
+      {
+        moduleId: 'procurement',
+        access: 'write',
+        actions: [
+          PROCUREMENT_ACTIONS.CREATE_PURCHASE_REQUISITION,
+          PROCUREMENT_ACTIONS.VIEW_OWN_PURCHASE_REQUISITION,
+        ],
+        subModules: {
+          'purchase-requisitions': 'write',
+        }
+      },
     ]
   },
 
@@ -1251,20 +1685,20 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
     department: 'Investments',
     modules: [
       { moduleId: 'homepage', access: 'full' },
-      { 
-        moduleId: 'portfolio-management', 
+      {
+        moduleId: 'portfolio-management',
         access: 'full',
         actions: Object.values(PORTFOLIO_ACTIONS)
       },
-      { 
-        moduleId: 'application-portal', 
+      {
+        moduleId: 'application-portal',
         access: 'full',
         actions: Object.values(APPLICATION_PORTAL_ACTIONS)
       },
       { moduleId: 'accounting', access: 'read' },
       { moduleId: 'payroll', access: 'read' },
-      { 
-        moduleId: 'procurement', 
+      {
+        moduleId: 'procurement',
         access: 'full',
         actions: [
           PROCUREMENT_ACTIONS.VIEW_DASHBOARD,
@@ -1297,8 +1731,8 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'my-approvals': 'full',
         }
       },
-      { 
-        moduleId: 'performance-management', 
+      {
+        moduleId: 'performance-management',
         access: 'full',
         actions: [
           PERFORMANCE_ACTIONS.VIEW_DASHBOARD,
@@ -1351,25 +1785,25 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
     department: 'Investments',
     modules: [
       { moduleId: 'homepage', access: 'full' },
-      { 
-        moduleId: 'portfolio-management', 
+      {
+        moduleId: 'portfolio-management',
         access: 'full',
         actions: Object.values(PORTFOLIO_ACTIONS)
       },
-      { 
-        moduleId: 'application-portal', 
+      {
+        moduleId: 'application-portal',
         access: 'full',
         actions: Object.values(APPLICATION_PORTAL_ACTIONS)
       },
-      { 
-        moduleId: 'accounting', 
+      {
+        moduleId: 'accounting',
         access: 'read',
         subModules: {
           'financial-reports': 'read',
         }
       },
-      { 
-        moduleId: 'procurement', 
+      {
+        moduleId: 'procurement',
         access: 'read',
         actions: [
           PROCUREMENT_ACTIONS.VIEW_DASHBOARD,
@@ -1388,8 +1822,8 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'my-approvals': 'read',
         }
       },
-      { 
-        moduleId: 'performance-management', 
+      {
+        moduleId: 'performance-management',
         access: 'full',
         actions: [
           PERFORMANCE_ACTIONS.VIEW_DASHBOARD,
@@ -1441,18 +1875,18 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
     department: 'Investments',
     modules: [
       { moduleId: 'homepage', access: 'full' },
-      { 
-        moduleId: 'portfolio-management', 
+      {
+        moduleId: 'portfolio-management',
         access: 'full',
         actions: Object.values(PORTFOLIO_ACTIONS)
       },
-      { 
-        moduleId: 'application-portal', 
+      {
+        moduleId: 'application-portal',
         access: 'full',
         actions: Object.values(APPLICATION_PORTAL_ACTIONS)
       },
-      { 
-        moduleId: 'accounting', 
+      {
+        moduleId: 'accounting',
         access: 'read',
         subModules: {
           'financial-reports': 'read',
@@ -1468,15 +1902,17 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
     modules: [
       { moduleId: 'homepage', access: 'full' },
       { moduleId: 'portfolio-management', access: 'read' },
-      { 
-        moduleId: 'application-portal', 
+      {
+        moduleId: 'application-portal',
         access: 'read',
         actions: [
           APPLICATION_PORTAL_ACTIONS.CAST_VOTE,
+          APPLICATION_PORTAL_ACTIONS.UPDATE_BOARD_REVIEW,
+          APPLICATION_PORTAL_ACTIONS.COMPLETE_BOARD_REVIEW,
         ]
       },
-      { 
-        moduleId: 'accounting', 
+      {
+        moduleId: 'accounting',
         access: 'read',
         subModules: {
           'financial-reports': 'read',
@@ -1492,12 +1928,13 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
     modules: [
       { moduleId: 'homepage', access: 'full' },
       { moduleId: 'portfolio-management', access: 'write' },
-      { 
-        moduleId: 'application-portal', 
+      {
+        moduleId: 'application-portal',
         access: 'write',
         actions: [
           APPLICATION_PORTAL_ACTIONS.CAST_VOTE,
           APPLICATION_PORTAL_ACTIONS.UPDATE_BOARD_REVIEW,
+          APPLICATION_PORTAL_ACTIONS.COMPLETE_BOARD_REVIEW,
           APPLICATION_PORTAL_ACTIONS.APPROVE_DD_ACTIVITY,
         ]
       },
@@ -1510,31 +1947,44 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
     department: 'Investments',
     modules: [
       { moduleId: 'homepage', access: 'full' },
-      { 
-        moduleId: 'portfolio-management', 
+      {
+        moduleId: 'portfolio-management',
         access: 'full',
         actions: Object.values(PORTFOLIO_ACTIONS)
       },
-      { 
-        moduleId: 'application-portal', 
+      {
+        moduleId: 'application-portal',
         access: 'write',
         actions: [
+          APPLICATION_PORTAL_ACTIONS.UPDATE_DUE_DILIGENCE,
+          APPLICATION_PORTAL_ACTIONS.CREATE_DD_TASK,
+          APPLICATION_PORTAL_ACTIONS.CREATE_TERM_SHEET,
+          APPLICATION_PORTAL_ACTIONS.UPDATE_TERM_SHEET,
+          APPLICATION_PORTAL_ACTIONS.FINALIZE_TERM_SHEET,
           APPLICATION_PORTAL_ACTIONS.INITIATE_FUND_DISBURSEMENT,
           APPLICATION_PORTAL_ACTIONS.CREATE_DISBURSEMENT,
           APPLICATION_PORTAL_ACTIONS.APPROVE_DISBURSEMENT,
           APPLICATION_PORTAL_ACTIONS.DISBURSE_FUND,
           APPLICATION_PORTAL_ACTIONS.CREATE_MILESTONE,
           APPLICATION_PORTAL_ACTIONS.UPDATE_CHECKLIST,
-          APPLICATION_PORTAL_ACTIONS.CREATE_TERM_SHEET,
-          APPLICATION_PORTAL_ACTIONS.UPDATE_TERM_SHEET,
-          // APPLICATION_PORTAL_ACTIONS.FINALIZE_TERM_SHEET,
         ]
       },
-      { 
-        moduleId: 'accounting', 
+      {
+        moduleId: 'accounting',
         access: 'read',
         subModules: {
           'financial-reports': 'read',
+        }
+      },
+      {
+        moduleId: 'procurement',
+        access: 'write',
+        actions: [
+          PROCUREMENT_ACTIONS.CREATE_PURCHASE_REQUISITION,
+          PROCUREMENT_ACTIONS.VIEW_OWN_PURCHASE_REQUISITION,
+        ],
+        subModules: {
+          'purchase-requisitions': 'write',
         }
       },
     ]
@@ -1546,26 +1996,44 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
     department: 'Investments',
     modules: [
       { moduleId: 'homepage', access: 'full' },
-      { 
-        moduleId: 'portfolio-management', 
+      {
+        moduleId: 'portfolio-management',
         access: 'full',
         actions: Object.values(PORTFOLIO_ACTIONS)
       },
-      { 
-        moduleId: 'application-portal', 
+      {
+        moduleId: 'application-portal',
         access: 'write',
         actions: [
+          APPLICATION_PORTAL_ACTIONS.INITIATE_DUE_DILIGENCE,
+          APPLICATION_PORTAL_ACTIONS.CREATE_DD_TASK,
           APPLICATION_PORTAL_ACTIONS.UPDATE_DUE_DILIGENCE,
           APPLICATION_PORTAL_ACTIONS.APPROVE_DD_ACTIVITY,
-          APPLICATION_PORTAL_ACTIONS.UPDATE_BOARD_REVIEW,
+          APPLICATION_PORTAL_ACTIONS.CREATE_TERM_SHEET,
           APPLICATION_PORTAL_ACTIONS.UPDATE_TERM_SHEET,
+          APPLICATION_PORTAL_ACTIONS.FINALIZE_TERM_SHEET,
+          APPLICATION_PORTAL_ACTIONS.INITIATE_FUND_DISBURSEMENT,
+          APPLICATION_PORTAL_ACTIONS.CREATE_DISBURSEMENT,
+          APPLICATION_PORTAL_ACTIONS.DISBURSE_FUND,
+          APPLICATION_PORTAL_ACTIONS.UPDATE_CHECKLIST,
         ]
       },
-      { 
-        moduleId: 'accounting', 
+      {
+        moduleId: 'accounting',
         access: 'read',
         subModules: {
           'financial-reports': 'read',
+        }
+      },
+      {
+        moduleId: 'procurement',
+        access: 'write',
+        actions: [
+          PROCUREMENT_ACTIONS.CREATE_PURCHASE_REQUISITION,
+          PROCUREMENT_ACTIONS.VIEW_OWN_PURCHASE_REQUISITION,
+        ],
+        subModules: {
+          'purchase-requisitions': 'write',
         }
       },
     ]
@@ -1579,18 +2047,25 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
       { moduleId: 'homepage', access: 'full' },
       { moduleId: 'portfolio-management', access: 'write' },
       { moduleId: 'performance-management', access: 'full' },
-      { 
-        moduleId: 'application-portal', 
+      {
+        moduleId: 'application-portal',
         access: 'write',
         actions: [
-          APPLICATION_PORTAL_ACTIONS.INITIATE_DUE_DILIGENCE,
-          APPLICATION_PORTAL_ACTIONS.CREATE_DD_TASK,
-          APPLICATION_PORTAL_ACTIONS.UPDATE_DUE_DILIGENCE,
           APPLICATION_PORTAL_ACTIONS.COMPLETE_DUE_DILIGENCE,
-          APPLICATION_PORTAL_ACTIONS.APPROVE_DD_ACTIVITY,
-          APPLICATION_PORTAL_ACTIONS.UPDATE_BOARD_REVIEW,
+          APPLICATION_PORTAL_ACTIONS.CREATE_TERM_SHEET,
           APPLICATION_PORTAL_ACTIONS.UPDATE_TERM_SHEET,
         ]
+      },
+      {
+        moduleId: 'procurement',
+        access: 'write',
+        actions: [
+          PROCUREMENT_ACTIONS.CREATE_PURCHASE_REQUISITION,
+          PROCUREMENT_ACTIONS.VIEW_OWN_PURCHASE_REQUISITION,
+        ],
+        subModules: {
+          'purchase-requisitions': 'write',
+        }
       },
     ]
   },
@@ -1603,11 +2078,22 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
       { moduleId: 'homepage', access: 'full' },
       { moduleId: 'portfolio-management', access: 'read' },
       { moduleId: 'application-portal', access: 'read' },
-      { 
-        moduleId: 'accounting', 
+      {
+        moduleId: 'accounting',
         access: 'read',
         subModules: {
           'financial-reports': 'read',
+        }
+      },
+      {
+        moduleId: 'procurement',
+        access: 'write',
+        actions: [
+          PROCUREMENT_ACTIONS.CREATE_PURCHASE_REQUISITION,
+          PROCUREMENT_ACTIONS.VIEW_OWN_PURCHASE_REQUISITION,
+        ],
+        subModules: {
+          'purchase-requisitions': 'write',
         }
       },
     ]
@@ -1619,12 +2105,14 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
     department: 'Investments',
     modules: [
       { moduleId: 'homepage', access: 'full' },
-      { 
-        moduleId: 'portfolio-management', 
+      {
+        moduleId: 'portfolio-management',
         access: 'read',
         subModules: {
           'Dashboard': 'read',
           'funds': 'read',
+          'applications-dashboard': 'read',
+          'applications-all': 'read',
         }
       },
     ]
@@ -1636,16 +2124,16 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
     department: 'Investments',
     modules: [
       { moduleId: 'homepage', access: 'full' },
-      { 
-        moduleId: 'accounting', 
+      {
+        moduleId: 'accounting',
         access: 'read',
         subModules: {
           'general-ledger': 'read',
           'financial-reports': 'read',
         }
       },
-      { 
-        moduleId: 'portfolio-management', 
+      {
+        moduleId: 'portfolio-management',
         access: 'read',
       },
     ]
@@ -1663,7 +2151,7 @@ export function getRolePermissions(roleCode: RoleCode): RolePermissions | null {
  * Check if a role has access to a specific module
  */
 export function hasModuleAccess(
-  roleCode: RoleCode, 
+  roleCode: RoleCode,
   moduleId: string
 ): boolean {
   const permissions = getRolePermissions(roleCode);
@@ -1677,7 +2165,7 @@ export function hasModuleAccess(
  * Get access level for a specific module
  */
 export function getModuleAccessLevel(
-  roleCode: RoleCode, 
+  roleCode: RoleCode,
   moduleId: string
 ): 'full' | 'read' | 'write' | 'none' {
   const permissions = getRolePermissions(roleCode);
@@ -1691,8 +2179,8 @@ export function getModuleAccessLevel(
  * Check if a role has access to a specific sub-module
  */
 export function hasSubModuleAccess(
-  roleCode: RoleCode, 
-  moduleId: string, 
+  roleCode: RoleCode,
+  moduleId: string,
   subModuleId: string
 ): boolean {
   const permissions = getRolePermissions(roleCode);
@@ -1731,14 +2219,14 @@ export function canPerformAction(
 ): boolean {
   if (accessLevel === 'none') return false;
   if (accessLevel === 'full') return true;
-  
+
   if (accessLevel === 'read') {
     return action === 'read';
   }
-  
+
   if (accessLevel === 'write') {
     return action === 'create' || action === 'read' || action === 'update';
   }
-  
+
   return false;
 }

@@ -66,7 +66,7 @@ export function ProcurementInvoices() {
   const [activeTab, setActiveTab] = useState<'all' | 'received' | 'approved' | 'paid'>('all')
   const [totalCount, setTotalCount] = useState(0)
   const [PDFComponents, setPDFComponents] = useState<any>(null)
-  
+
   // Filter states
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -119,7 +119,7 @@ export function ProcurementInvoices() {
       if (vendorFilter !== 'all') params.vendorId = vendorFilter
 
       const response = await procurementApi.getInvoices(params)
-      
+
       if (response.success && response.data) {
         setInvoices(Array.isArray(response.data) ? response.data : [])
         setTotalCount((response as any).total || response.data.length)
@@ -161,10 +161,18 @@ export function ProcurementInvoices() {
   }
 
   const handleCreate = () => {
+    if (!permissions.canCreateInvoice) {
+      toast.error("You do not have permission to create invoices")
+      return
+    }
     setIsCreateModalOpen(true)
   }
 
   const handleProcessPayment = (invoice: ProcurementInvoice) => {
+    if (!permissions.canProcessPayment) {
+      toast.error("You do not have permission to process payments")
+      return
+    }
     setSelectedInvoiceForPayment(invoice)
     setIsPaymentModalOpen(true)
   }

@@ -7,6 +7,8 @@ import { FileText, DollarSign, Eye, PenLine } from "lucide-react"
 import { TermSheetSkeleton } from "@/components/ui/skeleton-loader"
 import type { TermSheetData } from "@/lib/api/term-sheet-api"
 import { SignatureView } from "@/components/application-portal/signature-view"
+import { useRolePermissions } from "@/lib/hooks/useRolePermissions"
+import { APPLICATION_PORTAL_ACTIONS } from "@/lib/config/role-permissions"
 
 interface TermSheetSectionProps {
   data: TermSheetData | null
@@ -27,13 +29,16 @@ export function TermSheetSection({
   onRefresh,
   onCreate,
   onInvestorSign,
+  onInvestorSign,
   applicationData
 }: TermSheetSectionProps) {
-  
+  const { hasSpecificAction } = useRolePermissions();
+  const canCreate = hasSpecificAction('application-portal', APPLICATION_PORTAL_ACTIONS.CREATE_TERM_SHEET);
+
   // Debug logging
   console.log('TermSheetSection - data:', data);
   console.log('TermSheetSection - applicationData:', applicationData);
-  
+
   if (loading) {
     return <TermSheetSkeleton />
   }
@@ -58,7 +63,7 @@ export function TermSheetSection({
           Term sheet has not been created for this application yet.
         </p>
         <div className="flex gap-2 justify-center">
-          {currentStage === "UNDER_BOARD_REVIEW" && onCreate && (
+          {canCreate && currentStage === "UNDER_BOARD_REVIEW" && onCreate && (
             <Button
               onClick={onCreate}
               className="bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white rounded-full"
@@ -99,21 +104,20 @@ export function TermSheetSection({
             </div>
             <div>
               <label className="text-sm text-gray-500">Status</label>
-              <Badge className={`mt-1 ${
-                data.status === 'SIGNED' 
-                  ? 'bg-green-100 text-green-800' 
+              <Badge className={`mt-1 ${data.status === 'SIGNED'
+                  ? 'bg-green-100 text-green-800'
                   : data.status === 'FINAL'
-                  ? 'bg-blue-100 text-blue-800'
-                  : 'bg-yellow-100 text-yellow-800'
-              }`}>
+                    ? 'bg-blue-100 text-blue-800'
+                    : 'bg-yellow-100 text-yellow-800'
+                }`}>
                 {data.status}
               </Badge>
             </div>
             <div>
               <label className="text-sm text-gray-500">Created By</label>
               <p className="text-sm font-medium">
-                {data.createdBy ? 
-                  `${data.createdBy.firstName} ${data.createdBy.lastName}` : 
+                {data.createdBy ?
+                  `${data.createdBy.firstName} ${data.createdBy.lastName}` :
                   'Not assigned'
                 }
               </p>
@@ -236,7 +240,7 @@ export function TermSheetSection({
               signerName={data.createdBy ? `${data.createdBy.firstName} ${data.createdBy.lastName}` : 'Investor'}
             />
           </div>
-          
+
           {/* Investor Sign Button */}
           {/* {data.applicantSignedAt && !data.investorSignedAt && onInvestorSign && (
             <div className="flex justify-center pt-4">

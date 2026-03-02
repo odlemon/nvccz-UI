@@ -34,6 +34,7 @@ import {
 import { CheckCircle2, XCircle, DollarSign, TrendingUp, TrendingDown } from 'lucide-react'
 import type { Quotation } from '@/lib/api/procurement-api-v2'
 import { useAppDispatch, useAppSelector } from '@/lib/store'
+import { useProcurementPermissions } from '@/lib/hooks/useProcurementPermissions'
 
 interface QuotationComparisonModalProps {
   rfqNumber: string
@@ -50,6 +51,7 @@ export function QuotationComparisonModal({
   const quotations = useAppSelector((state) =>
     state.procurementV2.quotations.filter((q) => q.rfqNumber === rfqNumber)
   )
+  const { permissions } = useProcurementPermissions()
 
   useEffect(() => {
     if (open && rfqNumber) {
@@ -75,6 +77,7 @@ export function QuotationComparisonModal({
   const sortedItemNames = Array.from(allItemNames).sort()
 
   const handleAccept = async (quotationId: string) => {
+    if (!permissions.canAcceptQuotation) return
     try {
       await dispatch(acceptQuotation(quotationId)).unwrap()
     } catch (error) {
@@ -83,11 +86,12 @@ export function QuotationComparisonModal({
   }
 
   const handleReject = async (quotationId: string) => {
+    if (!permissions.canRejectQuotation) return
     try {
-      await dispatch(rejectQuotation({ 
-        id: quotationId, 
-        rejectionReason: 'Not selected', 
-        reviewNotes: 'Price not competitive' 
+      await dispatch(rejectQuotation({
+        id: quotationId,
+        rejectionReason: 'Not selected',
+        reviewNotes: 'Price not competitive'
       })).unwrap()
     } catch (error) {
       console.error('Failed to reject quotation:', error)
@@ -147,11 +151,10 @@ export function QuotationComparisonModal({
               {quotations.map((quotation) => (
                 <Card
                   key={quotation.id}
-                  className={`${
-                    Number(quotation.totalAmount) === minAmount
+                  className={`${Number(quotation.totalAmount) === minAmount
                       ? 'border-green-500 border-2'
                       : ''
-                  }`}
+                    }`}
                 >
                   <CardContent className="pt-6 space-y-3">
                     <div className="flex items-start justify-between">
@@ -195,23 +198,27 @@ export function QuotationComparisonModal({
 
                     {quotation.status === 'SUBMITTED' && (
                       <div className="flex gap-2 pt-2">
-                        <Button
-                          size="sm"
-                          className="flex-1 bg-green-600 hover:bg-green-700"
-                          onClick={() => handleAccept(quotation.id)}
-                        >
-                          <CheckCircle2 className="mr-1 h-3 w-3" />
-                          Accept
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          className="flex-1"
-                          onClick={() => handleReject(quotation.id)}
-                        >
-                          <XCircle className="mr-1 h-3 w-3" />
-                          Reject
-                        </Button>
+                        {permissions.canAcceptQuotation && (
+                          <Button
+                            size="sm"
+                            className="flex-1 bg-green-600 hover:bg-green-700"
+                            onClick={() => handleAccept(quotationId)}
+                          >
+                            <CheckCircle2 className="mr-1 h-3 w-3" />
+                            Accept
+                          </Button>
+                        )}
+                        {permissions.canRejectQuotation && (
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            className="flex-1"
+                            onClick={() => handleReject(quotationId)}
+                          >
+                            <XCircle className="mr-1 h-3 w-3" />
+                            Reject
+                          </Button>
+                        )}
                       </div>
                     )}
                   </CardContent>
@@ -247,11 +254,11 @@ export function QuotationComparisonModal({
                       const item = q.items.find((i) => i.itemName === itemName)
                       return item
                         ? {
-                            unitPrice: Number(item.unitPrice),
-                            totalPrice: Number(item.totalPrice),
-                            quantity: item.quantity,
-                            unit: item.unit,
-                          }
+                          unitPrice: Number(item.unitPrice),
+                          totalPrice: Number(item.totalPrice),
+                          quantity: item.quantity,
+                          unit: item.unit,
+                        }
                         : null
                     })
 
@@ -277,9 +284,8 @@ export function QuotationComparisonModal({
                           return (
                             <TableCell
                               key={index}
-                              className={`text-center ${
-                                isLowest ? 'bg-green-50 font-semibold text-green-700' : ''
-                              }`}
+                              className={`text-center ${isLowest ? 'bg-green-50 font-semibold text-green-700' : ''
+                                }`}
                             >
                               <div className="space-y-1">
                                 <div className="flex items-center justify-center gap-1">
@@ -308,9 +314,8 @@ export function QuotationComparisonModal({
                       return (
                         <TableCell
                           key={quotation.id}
-                          className={`text-center text-lg ${
-                            isLowest ? 'bg-green-100 text-green-700' : ''
-                          }`}
+                          className={`text-center text-lg ${isLowest ? 'bg-green-100 text-green-700' : ''
+                            }`}
                         >
                           <div className="flex items-center justify-center gap-1">
                             <span>${Number(quotation.totalAmount).toFixed(2)}</span>

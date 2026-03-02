@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { FileText, DollarSign, Plus, Trash2, Building2, AlertCircle } from "lucide-react"
 import { toast } from "sonner"
+import { useProcurementPermissions } from "@/lib/hooks/useProcurementPermissions"
 import { procurementApi, CreateRequisitionRequest, PurchaseRequisition } from "@/lib/api/procurement-api"
 import { departmentApiService, Department } from "@/lib/api/department-api"
 import { useAppDispatch, useAppSelector } from "@/lib/store"
@@ -38,9 +39,10 @@ export function CreateRequisitionModal({ isOpen, onClose, onSuccess, editMode = 
   const dispatch = useAppDispatch()
   const [loading, setLoading] = useState(false)
   const [loadingData, setLoadingData] = useState(false)
-  
+
   // Get departments from Redux
   const { availableDepartments, loading: departmentsLoading } = useAppSelector((state) => state.performance)
+  const { permissions } = useProcurementPermissions()
 
   const [formData, setFormData] = useState<CreateRequisitionRequest>({
     title: '',
@@ -161,6 +163,16 @@ export function CreateRequisitionModal({ isOpen, onClose, onSuccess, editMode = 
         toast.error(`Please enter valid quantity for item ${i + 1}`)
         return
       }
+    }
+
+    // Check permissions
+    if (editMode && !permissions.canUpdatePurchaseRequisition) {
+      toast.error('You do not have permission to update purchase requisitions')
+      return
+    }
+    if (!editMode && !permissions.canCreatePurchaseRequisition) {
+      toast.error('You do not have permission to create purchase requisitions')
+      return
     }
 
     try {
@@ -441,7 +453,7 @@ export function CreateRequisitionModal({ isOpen, onClose, onSuccess, editMode = 
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={loading}
+            disabled={loading || (editMode ? !permissions.canUpdatePurchaseRequisition : !permissions.canCreatePurchaseRequisition)}
             className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-full"
           >
             {loading ? (editMode ? 'Updating...' : 'Creating...') : (editMode ? 'Update Requisition' : 'Create Requisition')}

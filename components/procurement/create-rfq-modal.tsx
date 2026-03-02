@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { FileText, DollarSign, Plus, Trash2, Building2, Calendar, Users } from "lucide-react"
 import { toast } from "sonner"
+import { useProcurementPermissions } from "@/lib/hooks/useProcurementPermissions"
 import { procurementApiV2, CreateRFQRequest } from "@/lib/api/procurement-api-v2"
 import { accountingApi, Vendor } from "@/lib/api/accounting-api"
 import { useAppDispatch, useAppSelector } from "@/lib/store"
@@ -35,8 +36,9 @@ export function CreateRFQModal({ isOpen, onClose, onSuccess, preSelectedRequisit
   const dispatch = useAppDispatch()
   const [loading, setLoading] = useState(false)
   const [loadingData, setLoadingData] = useState(false)
-  
+
   const { requisitions } = useAppSelector((state) => state.procurementV2)
+  const { permissions } = useProcurementPermissions()
   const [vendors, setVendors] = useState<Vendor[]>([])
   const [selectedVendorIds, setSelectedVendorIds] = useState<string[]>([])
 
@@ -191,6 +193,12 @@ export function CreateRFQModal({ isOpen, onClose, onSuccess, preSelectedRequisit
         toast.error(`Please enter valid quantity for item ${i + 1}`)
         return
       }
+    }
+
+    // Check permissions
+    if (!permissions.canCreateRFQ) {
+      toast.error('You do not have permission to create RFQs')
+      return
     }
 
     try {
@@ -402,11 +410,10 @@ export function CreateRFQModal({ isOpen, onClose, onSuccess, preSelectedRequisit
                     <div
                       key={vendor.id}
                       onClick={() => toggleVendor(vendor.id)}
-                      className={`p-3 border rounded-lg cursor-pointer transition-all ${
-                        selectedVendorIds.includes(vendor.id)
-                          ? 'border-purple-500 bg-purple-50'
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
+                      className={`p-3 border rounded-lg cursor-pointer transition-all ${selectedVendorIds.includes(vendor.id)
+                        ? 'border-purple-500 bg-purple-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                        }`}
                     >
                       <div className="flex items-center justify-between">
                         <div>
@@ -535,7 +542,7 @@ export function CreateRFQModal({ isOpen, onClose, onSuccess, preSelectedRequisit
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={loading}
+            disabled={loading || !permissions.canCreateRFQ}
             className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-full"
           >
             {loading ? 'Creating...' : 'Create RFQ'}

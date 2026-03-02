@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import { useAppDispatch, useAppSelector } from "@/lib/store"
 import { ProcurementDataTable, Column } from "./procurement-data-table"
 import { ProcurementDrawer } from "./procurement-drawer"
@@ -8,10 +8,10 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { useProcurementPermissions } from "@/lib/hooks/useProcurementPermissions"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { 
-  setGoodsReceivedNotes, 
-  addGoodsReceivedNote, 
-  updateGoodsReceivedNote, 
+import {
+  setGoodsReceivedNotes,
+  addGoodsReceivedNote,
+  updateGoodsReceivedNote,
   removeGoodsReceivedNote,
   setGRNLoading,
   setGRNError,
@@ -156,11 +156,11 @@ export function GoodsReceivedNotes() {
       label: 'Items Summary',
       render: (items) => {
         if (!items || items.length === 0) return <span className="text-gray-500">No items</span>
-        
+
         const totalReceived = items.reduce((sum: number, item: any) => sum + item.quantityReceived, 0)
         const totalAccepted = items.reduce((sum: number, item: any) => sum + item.quantityAccepted, 0)
         const totalRejected = items.reduce((sum: number, item: any) => sum + item.quantityRejected, 0)
-        
+
         return (
           <div className="space-y-1">
             <div className="flex items-center gap-2 text-sm">
@@ -194,10 +194,22 @@ export function GoodsReceivedNotes() {
     { label: 'Rejected', value: 'REJECTED' }
   ]
 
-  const bulkActions = [
-    { label: 'Approve', value: 'approve', icon: <CheckCircle className="w-4 h-4 mr-1" /> },
-    { label: 'Reject', value: 'reject', icon: <XCircle className="w-4 h-4 mr-1" /> }
-  ]
+  const filteredBulkActions = useMemo(() => {
+    return [
+      {
+        label: 'Approve',
+        value: 'approve',
+        icon: <CheckCircle className="w-4 h-4 mr-1" />,
+        show: permissions.canApproveGRN
+      },
+      {
+        label: 'Reject',
+        value: 'reject',
+        icon: <XCircle className="w-4 h-4 mr-1" />,
+        show: permissions.canApproveGRN
+      }
+    ].filter(action => action.show)
+  }, [permissions])
 
   const handleBulkAction = (selectedGRNs: GoodsReceivedNote[], action: string) => {
     switch (action) {
@@ -239,7 +251,7 @@ export function GoodsReceivedNotes() {
         onDelete={permissions.canDeleteGRN ? handleDelete : undefined}
         onCreate={permissions.canCreateGRN ? handleCreate : undefined}
         onBulkAction={handleBulkAction}
-        bulkActions={bulkActions}
+        bulkActions={filteredBulkActions}
         loading={grnLoading}
         onExport={handleExport}
         emptyMessage="No goods received notes found. Create your first GRN to get started."
@@ -307,7 +319,7 @@ export function GoodsReceivedNotes() {
                           {item.qualityStatus}
                         </Badge>
                       </div>
-                      
+
                       <div className="grid grid-cols-3 gap-4 text-sm">
                         <div>
                           <label className="text-gray-600">Quantity Received</label>
@@ -331,8 +343,8 @@ export function GoodsReceivedNotes() {
                       )}
                     </div>
                   )) || (
-                    <p className="text-gray-500 text-center py-4">No items found</p>
-                  )}
+                      <p className="text-gray-500 text-center py-4">No items found</p>
+                    )}
                 </div>
               </CardContent>
             </Card>
@@ -342,10 +354,10 @@ export function GoodsReceivedNotes() {
               <Button variant="outline" onClick={() => setIsDrawerOpen(false)}>
                 Close
               </Button>
-              {viewingGRN.status === 'PENDING_APPROVAL' && (
+              {viewingGRN.status === 'PENDING_APPROVAL' && permissions.canApproveGRN && (
                 <>
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     className="text-red-600 border-red-200 hover:bg-red-50"
                     onClick={() => {
                       setSelectedGRNForApproval(viewingGRN)
@@ -355,7 +367,7 @@ export function GoodsReceivedNotes() {
                     <XCircle className="w-4 h-4 mr-2" />
                     Reject
                   </Button>
-                  <Button 
+                  <Button
                     className="gradient-primary text-white"
                     onClick={() => {
                       setSelectedGRNForApproval(viewingGRN)

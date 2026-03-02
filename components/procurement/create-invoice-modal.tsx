@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { DatePicker } from "@/components/ui/date-picker"
 import { Plus, Trash2, Save, X, Upload, Zap, Building, FileText, Calendar } from "lucide-react"
 import { toast } from "sonner"
+import { useProcurementPermissions } from "@/lib/hooks/useProcurementPermissions"
 import { procurementApi, PurchaseOrder } from "@/lib/api/procurement-api"
 import { accountingApi, Vendor } from "@/lib/api/accounting-api"
 
@@ -35,7 +36,8 @@ export function CreateInvoiceModal({ isOpen, onClose, onSuccess }: CreateInvoice
   const [loadingData, setLoadingData] = useState(false)
   const [vendors, setVendors] = useState<Vendor[]>([])
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([])
-  
+  const { permissions } = useProcurementPermissions()
+
   const [formData, setFormData] = useState({
     invoiceNumber: "",
     purchaseOrderId: "",
@@ -45,10 +47,10 @@ export function CreateInvoiceModal({ isOpen, onClose, onSuccess }: CreateInvoice
     documentPath: "",
     notes: ""
   })
-  
+
   const [invoiceDate, setInvoiceDate] = useState<Date | undefined>(new Date())
   const [dueDate, setDueDate] = useState<Date | undefined>(new Date())
-  
+
   const [items, setItems] = useState<InvoiceItem[]>([
     { itemName: "", description: "", quantity: 1, unit: "pcs", unitPrice: 0, totalPrice: 0 }
   ])
@@ -64,7 +66,7 @@ export function CreateInvoiceModal({ isOpen, onClose, onSuccess }: CreateInvoice
   const loadInitialData = async () => {
     try {
       setLoadingData(true)
-      
+
       // Load vendors
       const vendorsResponse = await accountingApi.vendors.getAll()
       if (vendorsResponse.success && vendorsResponse.data) {
@@ -91,12 +93,12 @@ export function CreateInvoiceModal({ isOpen, onClose, onSuccess }: CreateInvoice
   const handleItemChange = (index: number, field: keyof InvoiceItem, value: string | number) => {
     const updatedItems = [...items]
     updatedItems[index] = { ...updatedItems[index], [field]: value }
-    
+
     // Recalculate total price for this item
     if (field === 'quantity' || field === 'unitPrice') {
       updatedItems[index].totalPrice = updatedItems[index].quantity * updatedItems[index].unitPrice
     }
-    
+
     setItems(updatedItems)
   }
 
@@ -129,7 +131,7 @@ export function CreateInvoiceModal({ isOpen, onClose, onSuccess }: CreateInvoice
     }
 
     toast.info("Processing OCR... This may take a few moments")
-    
+
     // Simulate OCR processing
     setTimeout(() => {
       // Mock OCR data extraction
@@ -139,21 +141,27 @@ export function CreateInvoiceModal({ isOpen, onClose, onSuccess }: CreateInvoice
         invoiceDate: new Date().toISOString().split('T')[0],
         vendorId: "vendor-1"
       }))
-      
+
       setItems([
         { itemName: "Office Supplies", description: "Stationery items", quantity: 10, unit: "pcs", unitPrice: 25.50, totalPrice: 255.00 },
         { itemName: "Printer Paper", description: "A4 white paper", quantity: 5, unit: "boxes", unitPrice: 45.00, totalPrice: 225.00 }
       ])
-      
+
       toast.success("OCR processing completed! Invoice data extracted successfully")
     }, 3000)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!formData.invoiceNumber || !formData.vendorId || items.some(item => !item.itemName || item.quantity <= 0)) {
       toast.error("Please fill in all required fields")
+      return
+    }
+
+    // Check permissions
+    if (!permissions.canCreateInvoice) {
+      toast.error('You do not have permission to create invoices')
       return
     }
 
@@ -169,7 +177,7 @@ export function CreateInvoiceModal({ isOpen, onClose, onSuccess }: CreateInvoice
       }
 
       const response = await procurementApi.createInvoice(invoiceData)
-      
+
       if (response.success) {
         toast.success("Invoice created successfully!")
         onSuccess()
@@ -268,11 +276,11 @@ export function CreateInvoiceModal({ isOpen, onClose, onSuccess }: CreateInvoice
                   required
                 />
               </div>
-              
+
               <div>
                 <Label htmlFor="purchaseOrderId">Purchase Order (Optional)</Label>
-                <Select 
-                  value={formData.purchaseOrderId} 
+                <Select
+                  value={formData.purchaseOrderId}
                   onValueChange={(value) => handleInputChange("purchaseOrderId", value)}
                   disabled={loadingData}
                 >
@@ -294,8 +302,8 @@ export function CreateInvoiceModal({ isOpen, onClose, onSuccess }: CreateInvoice
 
               <div>
                 <Label htmlFor="vendorId">Vendor *</Label>
-                <Select 
-                  value={formData.vendorId} 
+                <Select
+                  value={formData.vendorId}
                   onValueChange={(value) => handleInputChange("vendorId", value)}
                   disabled={loadingData}
                 >
@@ -321,9 +329,9 @@ export function CreateInvoiceModal({ isOpen, onClose, onSuccess }: CreateInvoice
                   value={invoiceDate}
                   onChange={(date) => {
                     setInvoiceDate(date)
-                    setFormData(prev => ({ 
-                      ...prev, 
-                      invoiceDate: date ? date.toISOString().split('T')[0] : "" 
+                    setFormData(prev => ({
+                      ...prev,
+                      invoiceDate: date ? date.toISOString().split('T')[0] : ""
                     }))
                   }}
                   placeholder="Select invoice date"
@@ -336,9 +344,9 @@ export function CreateInvoiceModal({ isOpen, onClose, onSuccess }: CreateInvoice
                   value={dueDate}
                   onChange={(date) => {
                     setDueDate(date)
-                    setFormData(prev => ({ 
-                      ...prev, 
-                      dueDate: date ? date.toISOString().split('T')[0] : "" 
+                    setFormData(prev => ({
+                      ...prev,
+                      dueDate: date ? date.toISOString().split('T')[0] : ""
                     }))
                   }}
                   placeholder="Select due date"
@@ -374,7 +382,7 @@ export function CreateInvoiceModal({ isOpen, onClose, onSuccess }: CreateInvoice
                       </Button>
                     )}
                   </div>
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
                     <div className="lg:col-span-2">
                       <Label>Item Name *</Label>
@@ -384,7 +392,7 @@ export function CreateInvoiceModal({ isOpen, onClose, onSuccess }: CreateInvoice
                         placeholder="Enter item name"
                       />
                     </div>
-                    
+
                     <div className="lg:col-span-2">
                       <Label>Description</Label>
                       <Input
@@ -393,7 +401,7 @@ export function CreateInvoiceModal({ isOpen, onClose, onSuccess }: CreateInvoice
                         placeholder="Item description"
                       />
                     </div>
-                    
+
                     <div>
                       <Label>Quantity *</Label>
                       <Input
@@ -403,7 +411,7 @@ export function CreateInvoiceModal({ isOpen, onClose, onSuccess }: CreateInvoice
                         onChange={(e) => handleItemChange(index, "quantity", parseInt(e.target.value) || 1)}
                       />
                     </div>
-                    
+
                     <div>
                       <Label>Unit</Label>
                       <Select value={item.unit} onValueChange={(value) => handleItemChange(index, "unit", value)}>
@@ -419,7 +427,7 @@ export function CreateInvoiceModal({ isOpen, onClose, onSuccess }: CreateInvoice
                         </SelectContent>
                       </Select>
                     </div>
-                    
+
                     <div>
                       <Label>Unit Price ($)</Label>
                       <Input
@@ -430,7 +438,7 @@ export function CreateInvoiceModal({ isOpen, onClose, onSuccess }: CreateInvoice
                         onChange={(e) => handleItemChange(index, "unitPrice", parseFloat(e.target.value) || 0)}
                       />
                     </div>
-                    
+
                     <div>
                       <Label>Total Price</Label>
                       <div className="flex items-center h-10 px-3 border rounded-md bg-gray-50">
@@ -440,7 +448,7 @@ export function CreateInvoiceModal({ isOpen, onClose, onSuccess }: CreateInvoice
                   </div>
                 </div>
               ))}
-              
+
               <div className="flex justify-end pt-4 border-t">
                 <div className="text-right">
                   <p className="text-sm text-gray-600">Total Amount</p>
@@ -475,7 +483,7 @@ export function CreateInvoiceModal({ isOpen, onClose, onSuccess }: CreateInvoice
               <X className="w-4 h-4 mr-2" />
               Cancel
             </Button>
-            <Button type="submit" disabled={loading} className="gradient-primary text-white">
+            <Button type="submit" disabled={loading || !permissions.canCreateInvoice} className="gradient-primary text-white">
               {loading ? (
                 <>
                   <div className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin" />

@@ -19,12 +19,12 @@ import {
 } from "@/components/ui/dialog"
 import { Quotation } from "@/lib/api/procurement-api-v2"
 import { procurementApiV2 } from "@/lib/api/procurement-api-v2"
-import { 
-  Building2, 
-  Mail, 
-  Phone, 
-  MapPin, 
-  Calendar, 
+import {
+  Building2,
+  Mail,
+  Phone,
+  MapPin,
+  Calendar,
   DollarSign,
   FileText,
   CheckCircle,
@@ -59,6 +59,10 @@ export function QuotationDrawerContent({ quotation, onUpdate }: QuotationDrawerC
   }
 
   const handleAccept = async () => {
+    if (!permissions.canAcceptQuotation) {
+      toast.error('You do not have permission to accept quotations')
+      return
+    }
     try {
       setProcessing(true)
       await procurementApiV2.acceptQuotation(quotation.id)
@@ -75,6 +79,11 @@ export function QuotationDrawerContent({ quotation, onUpdate }: QuotationDrawerC
   const handleReject = async () => {
     if (!rejectionReason.trim()) {
       toast.error('Please provide a rejection reason')
+      return
+    }
+
+    if (!permissions.canRejectQuotation) {
+      toast.error('You do not have permission to reject quotations')
       return
     }
 

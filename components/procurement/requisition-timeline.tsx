@@ -19,12 +19,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { 
-  CheckCircle, 
-  Circle, 
-  Clock, 
-  FileText, 
-  Users, 
+import {
+  CheckCircle,
+  Circle,
+  Clock,
+  FileText,
+  Users,
   DollarSign,
   ChevronRight,
   Eye,
@@ -142,11 +142,11 @@ export function RequisitionTimeline({
 
   const getStageStatus = (index: number) => {
     if (!requisition) return "upcoming"
-    
+
     if (requisition.status === "REJECTED" || requisition.status === "CANCELLED") {
       return index === 0 ? "completed" : "cancelled"
     }
-    
+
     if (index < currentStageIndex) return "completed"
     if (index === currentStageIndex) return "current"
     return "upcoming"
@@ -154,7 +154,7 @@ export function RequisitionTimeline({
 
   const handleSubmitForApproval = async () => {
     if (!requisition) return
-    
+
     try {
       setSubmitting(true)
       const response = await procurementApi.submitRequisition(requisition.id)
@@ -177,7 +177,7 @@ export function RequisitionTimeline({
 
   const handleApprove = async () => {
     if (!requisition) return
-    
+
     try {
       setApproving(true)
       const response = await procurementApi.approveRequisition(requisition.id)
@@ -200,12 +200,12 @@ export function RequisitionTimeline({
 
   const handleReject = async () => {
     if (!requisition) return
-    
+
     if (!rejectionReason.trim()) {
       toast.error("Please provide a rejection reason")
       return
     }
-    
+
     try {
       const response = await procurementApi.rejectRequisition(requisition.id, rejectionReason)
       if (response.success && response.data) {
@@ -264,7 +264,7 @@ export function RequisitionTimeline({
                 </Button>
               )}
             </div>
-            
+
             {showRejectForm && permissions.canRejectPurchaseRequisition && (
               <Card className="border-red-200">
                 <CardHeader className="pb-3">
@@ -305,7 +305,7 @@ export function RequisitionTimeline({
           </div>
         )
       case "APPROVED":
-        return (
+        return permissions.canCreateRFQ ? (
           <div className="flex gap-2">
             <Button
               onClick={() => onCreateRFQ?.(requisition.id)}
@@ -315,7 +315,7 @@ export function RequisitionTimeline({
               Create RFQ
             </Button>
           </div>
-        )
+        ) : null
       case "CONVERTED_TO_PO":
         return (
           <div className="space-y-4">
@@ -346,12 +346,11 @@ export function RequisitionTimeline({
                               </div>
                               <div>
                                 <label className="text-xs text-gray-500">Status</label>
-                                <Badge className={`ml-1 ${
-                                  po.status === 'DRAFT' ? 'bg-gray-100 text-gray-800' :
-                                  po.status === 'SENT' ? 'bg-blue-100 text-blue-800' :
-                                  po.status === 'APPROVED' ? 'bg-green-100 text-green-800' :
-                                  'bg-gray-100 text-gray-800'
-                                }`}>
+                                <Badge className={`ml-1 ${po.status === 'DRAFT' ? 'bg-gray-100 text-gray-800' :
+                                    po.status === 'SENT' ? 'bg-blue-100 text-blue-800' :
+                                      po.status === 'APPROVED' ? 'bg-green-100 text-green-800' :
+                                        'bg-gray-100 text-gray-800'
+                                  }`}>
                                   {po.status}
                                 </Badge>
                               </div>
@@ -396,7 +395,7 @@ export function RequisitionTimeline({
 
   const renderRequisitionData = () => {
     if (!requisition) return null
-    
+
     return (
       <div className="space-y-4">
         {/* Basic Information */}
@@ -415,13 +414,12 @@ export function RequisitionTimeline({
               </div>
               <div>
                 <label className="text-sm text-gray-500">Priority</label>
-                <Badge className={`ml-2 ${
-                  requisition.priority === 'HIGH' || requisition.priority === 'URGENT' 
+                <Badge className={`ml-2 ${requisition.priority === 'HIGH' || requisition.priority === 'URGENT'
                     ? 'bg-red-100 text-red-800'
                     : requisition.priority === 'MEDIUM'
-                    ? 'bg-amber-100 text-amber-800'
-                    : 'bg-green-100 text-green-800'
-                }`}>
+                      ? 'bg-amber-100 text-amber-800'
+                      : 'bg-green-100 text-green-800'
+                  }`}>
                   {requisition.priority}
                 </Badge>
               </div>
@@ -538,8 +536,8 @@ export function RequisitionTimeline({
         {/* Timeline Steps Skeleton */}
         <div className="relative">
           {[1, 2, 3, 4, 5].map((index) => (
-            <motion.div 
-              key={index} 
+            <motion.div
+              key={index}
               className="relative flex items-start"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -578,7 +576,7 @@ export function RequisitionTimeline({
                             <Skeleton className="h-4 w-40" />
                             <Skeleton className="w-4 h-4 ml-auto" />
                           </div>
-                          
+
                           {/* Expanded Accordion Content Skeleton */}
                           <div className="mt-4 space-y-4">
                             {/* Basic Information Card Skeleton */}
@@ -762,9 +760,8 @@ export function RequisitionTimeline({
               <div key={stage.id} className="relative flex items-start">
                 {/* Timeline Line */}
                 {index < stages.length - 1 && (
-                  <div className={`absolute left-6 top-12 w-0.5 h-full ${
-                    isCancelled ? 'bg-red-200' : 'bg-gray-200'
-                  }`} />
+                  <div className={`absolute left-6 top-12 w-0.5 h-full ${isCancelled ? 'bg-red-200' : 'bg-gray-200'
+                    }`} />
                 )}
 
                 {/* Timeline Icon */}
@@ -784,23 +781,21 @@ export function RequisitionTimeline({
 
                 {/* Stage Content */}
                 <div className="ml-6 flex-1 pb-8">
-                  <Card className={`transition-all duration-300 ${
-                    isCurrent 
-                      ? 'border-2 border-blue-500 shadow-lg bg-white' 
-                      : isCompleted 
-                      ? 'border-green-200 bg-white' 
-                      : isCancelled
-                      ? 'border-red-200 bg-red-50'
-                      : isUpcoming
-                      ? 'border-gray-200 bg-gray-50 opacity-60 cursor-not-allowed'
-                      : 'border-gray-200 bg-white'
-                  }`}>
+                  <Card className={`transition-all duration-300 ${isCurrent
+                      ? 'border-2 border-blue-500 shadow-lg bg-white'
+                      : isCompleted
+                        ? 'border-green-200 bg-white'
+                        : isCancelled
+                          ? 'border-red-200 bg-red-50'
+                          : isUpcoming
+                            ? 'border-gray-200 bg-gray-50 opacity-60 cursor-not-allowed'
+                            : 'border-gray-200 bg-white'
+                    }`}>
                     <CardHeader className="pb-3">
                       <div className="flex items-center justify-between">
                         <div>
-                          <CardTitle className={`text-base font-normal ${
-                            isCurrent ? 'text-blue-600' : isCompleted ? 'text-green-600' : isCancelled ? 'text-red-600' : 'text-gray-600'
-                          }`}>
+                          <CardTitle className={`text-base font-normal ${isCurrent ? 'text-blue-600' : isCompleted ? 'text-green-600' : isCancelled ? 'text-red-600' : 'text-gray-600'
+                            }`}>
                             {stage.title}
                           </CardTitle>
                           <p className="text-sm text-gray-500 mt-1">{stage.description}</p>
@@ -929,7 +924,7 @@ export function RequisitionTimeline({
           <AlertDialogHeader>
             <AlertDialogTitle>Submit Requisition for Approval</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to submit requisition <strong>{requisition?.requisitionNumber}</strong> for approval? 
+              Are you sure you want to submit requisition <strong>{requisition?.requisitionNumber}</strong> for approval?
               Once submitted, you will not be able to make changes until it's processed.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -958,7 +953,7 @@ export function RequisitionTimeline({
           <AlertDialogHeader>
             <AlertDialogTitle>Approve Requisition</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to approve requisition <strong>{requisition?.requisitionNumber}</strong>? 
+              Are you sure you want to approve requisition <strong>{requisition?.requisitionNumber}</strong>?
               This will allow the creation of purchase orders based on this requisition.
             </AlertDialogDescription>
           </AlertDialogHeader>

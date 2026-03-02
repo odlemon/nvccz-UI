@@ -11,6 +11,7 @@ import { DatePicker } from '@/components/ui/date-picker'
 import { procurementApi, ProcurementInvoice } from '@/lib/api/procurement-api'
 import { DollarSign, Upload, X } from 'lucide-react'
 import { toast } from 'sonner'
+import { useProcurementPermissions } from '@/lib/hooks/useProcurementPermissions'
 
 interface ProcessPaymentModalProps {
   isOpen: boolean
@@ -30,6 +31,7 @@ export function ProcessPaymentModal({ isOpen, onClose, invoice, onSuccess }: Pro
   const [submitting, setSubmitting] = useState(false)
   const [bankAccounts, setBankAccounts] = useState<any[]>([])
   const [loadingAccounts, setLoadingAccounts] = useState(false)
+  const { permissions } = useProcurementPermissions()
 
   useEffect(() => {
     if (isOpen) {
@@ -45,11 +47,11 @@ export function ProcessPaymentModal({ isOpen, onClose, invoice, onSuccess }: Pro
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
       })
-      
+
       if (response.ok) {
         const data = await response.json()
         // Filter for bank/cash accounts
-        const accounts = (data.data || []).filter((account: any) => 
+        const accounts = (data.data || []).filter((account: any) =>
           account.type === 'ASSET' && (
             account.name.toLowerCase().includes('bank') ||
             account.name.toLowerCase().includes('cash')
@@ -95,9 +97,14 @@ export function ProcessPaymentModal({ isOpen, onClose, invoice, onSuccess }: Pro
       return
     }
 
+    if (!permissions.canProcessPayment) {
+      toast.error('You do not have permission to process payments')
+      return
+    }
+
     try {
       setSubmitting(true)
-      
+
       const formData = new FormData()
       formData.append('paymentAmount', paymentAmount)
       formData.append('paymentDate', paymentDate.toISOString())
@@ -114,7 +121,7 @@ export function ProcessPaymentModal({ isOpen, onClose, invoice, onSuccess }: Pro
       }
 
       await procurementApi.processInvoicePayment(invoice.id, formData)
-      
+
       toast.success('Payment processed successfully')
       onSuccess()
     } catch (error: any) {
@@ -312,7 +319,7 @@ export function ProcessPaymentModal({ isOpen, onClose, invoice, onSuccess }: Pro
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={submitting}
+            disabled={submitting || !permissions.canProcessPayment}
             className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white"
           >
             {submitting ? 'Processing...' : 'Process Payment'}

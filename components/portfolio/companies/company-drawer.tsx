@@ -14,11 +14,12 @@ import { PortfolioFinancialReport } from "@/lib/api/portfolio-api"
 import { format } from "date-fns"
 import { FinancialReportsSkeleton } from "./financial-reports-skeleton"
 import { useRolePermissions } from "@/lib/hooks/useRolePermissions"
+import { PORTFOLIO_ACTIONS } from "@/lib/config/role-permissions"
 
 export function CompanyDrawer() {
-  const { canPerformAction } = useRolePermissions()
-  const canReviewReports = canPerformAction('portfolio-management', 'update')
-  
+  const { hasSpecificAction } = useRolePermissions()
+  const canReviewReports = hasSpecificAction('portfolio-management', PORTFOLIO_ACTIONS.REVIEW_FINANCIAL_REPORT)
+
   const dispatch = useAppDispatch()
   const { selectedCompany, financialReports, financialReportsLoading } = useAppSelector(state => state.portfolioCompanies)
   const [activeTab, setActiveTab] = useState<'overview' | 'disbursements' | 'financials'>('overview')
@@ -54,7 +55,7 @@ export function CompanyDrawer() {
       default: return 'bg-gray-100 text-gray-700'
     }
   }
-  
+
   const getReportStatusColor = (status: string) => {
     switch (status) {
       case 'PENDING': return 'bg-yellow-100 text-yellow-800'
@@ -83,7 +84,7 @@ export function CompanyDrawer() {
     <>
       <FinancialReportReviewModal isOpen={isReviewModalOpen} onClose={() => setReviewModalOpen(false)} report={reportToReview} />
       <Sheet open={!!selectedCompany} onOpenChange={(open) => !open && dispatch({ type: 'portfolioCompanies/setSelectedCompany', payload: null })}>
-              <SheetContent className="w-[50vw] min-w-[1000px] max-w-[1600px] overflow-y-auto p-5 [&>button[aria-label='Close']]:hidden">
+        <SheetContent className="w-[50vw] min-w-[1000px] max-w-[1600px] overflow-y-auto p-5 [&>button[aria-label='Close']]:hidden">
           {selectedCompany && (
             <>
               <SheetHeader className="p-6 bg-gray-50 border-b">
@@ -94,7 +95,7 @@ export function CompanyDrawer() {
                   </Button>
                 </div>
               </SheetHeader>
-                        {/* <SheetHeader>
+              {/* <SheetHeader>
                           <SheetTitle className="text-2xl font-normal flex items-center gap-2">
                             <CiFileOn className="w-6 h-6" /> {selected?.businessName}
                           </SheetTitle>
@@ -152,8 +153,8 @@ export function CompanyDrawer() {
                     {financialReportsLoading ? <FinancialReportsSkeleton /> : (
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {financialReports.map((report, idx) => (
-                          <motion.div 
-                            key={report.id} 
+                          <motion.div
+                            key={report.id}
                             className="group relative border rounded-xl p-3 bg-white shadow-sm hover:shadow-md transition-all duration-300"
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}

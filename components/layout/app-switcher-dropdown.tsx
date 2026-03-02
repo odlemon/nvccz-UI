@@ -20,22 +20,18 @@ export function AppSwitcherDropdown({ isOpen, onClose, onModuleSelect, currentMo
   // Filter modules based on user's role permissions
   // Must be called before any conditional returns
   const modulesToDisplay = useMemo(() => {
-    if (!isAuthenticated) {
-      // If not authenticated, show no modules or only public ones
+    if (!isAuthenticated || isLoading) {
+      // If not authenticated or still loading, show no modules
       return []
-    }
-
-    if (isLoading) {
-      // While loading permissions, show all modules temporarily
-      return MODULE_CONFIG
     }
 
     // Filter modules based on accessible modules from role permissions
     return MODULE_CONFIG.filter((module) => {
       // Check if module ID is in accessible modules
-      return accessibleModules.includes(module.id) || hasModuleAccess(module.id)
+      // We use hasModuleAccess which is already reactive to the user's role
+      return hasModuleAccess(module.id)
     })
-  }, [isAuthenticated, isLoading, accessibleModules, hasModuleAccess])
+  }, [isAuthenticated, isLoading, hasModuleAccess])
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -59,8 +55,8 @@ export function AppSwitcherDropdown({ isOpen, onClose, onModuleSelect, currentMo
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-20">
       {/* Background Blur Overlay - starts below topbar */}
       <div className="absolute top-20 left-0 right-0 bottom-0 bg-black/20 backdrop-blur-sm" />
-      
-      <div 
+
+      <div
         ref={dropdownRef}
         className="relative bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-2xl p-6 w-[90vw] max-w-4xl mx-4"
       >
@@ -100,26 +96,26 @@ export function AppSwitcherDropdown({ isOpen, onClose, onModuleSelect, currentMo
                   className={`
                     group relative p-4 rounded-xl cursor-pointer transition-all duration-200
                     hover:shadow-lg hover:scale-105 hover:bg-gray-50 dark:hover:bg-gray-800
-                    ${isActive 
-                      ? 'bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-500 shadow-md' 
+                    ${isActive
+                      ? 'bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-500 shadow-md'
                       : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
                     }
                   `}
                 >
                   {/* Icon Container */}
-                  <div 
+                  <div
                     className="w-16 h-16 mx-auto mb-3 rounded-xl flex items-center justify-center shadow-sm group-hover:shadow-md transition-all duration-200 relative overflow-hidden"
-                    style={{ 
+                    style={{
                       background: `linear-gradient(135deg, ${module.color} 0%, ${module.color}CC 100%)`,
                       border: `2px solid ${module.color}`
                     }}
                   >
-                    <Icon 
-                      size={32} 
-                      style={{ 
+                    <Icon
+                      size={32}
+                      style={{
                         color: module.color,
                         filter: `drop-shadow(0 0 0 ${module.color})`
-                      }} 
+                      }}
                     />
                   </div>
 

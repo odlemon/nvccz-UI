@@ -26,6 +26,7 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts'
+import { useProcurementPermissions } from '@/lib/hooks/useProcurementPermissions'
 import { toast } from 'sonner'
 
 const COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444']
@@ -33,6 +34,7 @@ const COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444']
 export function ProcurementDashboard() {
   const dispatch = useAppDispatch()
   const { dashboard, dashboardLoading } = useAppSelector((state) => state.procurementV2)
+  const { permissions, moduleAccess } = useProcurementPermissions()
 
   useEffect(() => {
     const fetchData = async () => {
@@ -104,8 +106,8 @@ export function ProcurementDashboard() {
 
   const totalPendingAmount = invoicesAmounts.pendingPaymentAmount || 0
   const totalPaidAmount = invoicesAmounts.paidAmount || 0
-  const paymentProgress = invoicesAmounts.totalAmount > 0 
-    ? (totalPaidAmount / invoicesAmounts.totalAmount) * 100 
+  const paymentProgress = invoicesAmounts.totalAmount > 0
+    ? (totalPaidAmount / invoicesAmounts.totalAmount) * 100
     : 0
 
   return (
@@ -121,114 +123,122 @@ export function ProcurementDashboard() {
       {/* Main Stats Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {/* Requisitions Card */}
-        <Card className="rounded-2xl gradient-primary text-white hover:shadow-xl transition-all duration-300">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-white">Purchase Requisitions</CardTitle>
-            <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
-              <FileText className="h-4 w-4 text-white" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-4xl font-bold">{requisitionsSummary.total - requisitionsSummary.pending - (requisitionsSummary.draft || 0) - requisitionsSummary.rejected}</div>
-            <p className="text-xs text-white/80 mt-1">
-              {requisitionsSummary.pending} pending • {requisitionsSummary.draft || 0} draft • {requisitionsSummary.rejected} rejected
-            </p>
-            <div className="relative mt-3 h-2 rounded-full bg-white/30 overflow-hidden">
-              <div
-                className="absolute left-0 top-0 h-full rounded-full bg-white"
-                style={{ 
-                  width: `${(requisitionsSummary.total - requisitionsSummary.pending - (requisitionsSummary.draft || 0) - requisitionsSummary.rejected) > 0 ? (requisitionsSummary.approved / (requisitionsSummary.total - requisitionsSummary.pending - (requisitionsSummary.draft || 0) - requisitionsSummary.rejected)) * 100 : 0}%` 
-                }}
-              />
-            </div>
-            <div className="flex items-center justify-between mt-2 text-xs text-white/80">
-              <span>{requisitionsSummary.approved} approved</span>
-              <span>{requisitionsSummary.total} total</span>
-            </div>
-          </CardContent>
-        </Card>
+        {moduleAccess.purchaseRequisitions !== 'none' && (
+          <Card className="rounded-2xl gradient-primary text-white hover:shadow-xl transition-all duration-300">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-white">Purchase Requisitions</CardTitle>
+              <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
+                <FileText className="h-4 w-4 text-white" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-4xl font-bold">{requisitionsSummary.total - requisitionsSummary.pending - (requisitionsSummary.draft || 0) - requisitionsSummary.rejected}</div>
+              <p className="text-xs text-white/80 mt-1">
+                {requisitionsSummary.pending} pending • {requisitionsSummary.draft || 0} draft • {requisitionsSummary.rejected} rejected
+              </p>
+              <div className="relative mt-3 h-2 rounded-full bg-white/30 overflow-hidden">
+                <div
+                  className="absolute left-0 top-0 h-full rounded-full bg-white"
+                  style={{
+                    width: `${(requisitionsSummary.total - requisitionsSummary.pending - (requisitionsSummary.draft || 0) - requisitionsSummary.rejected) > 0 ? (requisitionsSummary.approved / (requisitionsSummary.total - requisitionsSummary.pending - (requisitionsSummary.draft || 0) - requisitionsSummary.rejected)) * 100 : 0}%`
+                  }}
+                />
+              </div>
+              <div className="flex items-center justify-between mt-2 text-xs text-white/80">
+                <span>{requisitionsSummary.approved} approved</span>
+                <span>{requisitionsSummary.total} total</span>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* RFQs Card */}
-        <Card className="bg-white rounded-2xl hover:shadow-xl transition-all duration-300">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Request for Quotations</CardTitle>
-            <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center">
-              <ShoppingCart className="h-4 w-4 text-indigo-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-4xl font-bold">{rfqsSummary.total}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {rfqsSummary.active} active RFQs
-            </p>
-            <div className="relative mt-3 h-2 rounded-full bg-gray-200 overflow-hidden">
-              <div
-                className="absolute left-0 top-0 h-full rounded-full bg-gradient-to-r from-indigo-500 to-purple-500"
-                style={{ 
-                  width: `${rfqsSummary.total > 0 ? (rfqsSummary.active / rfqsSummary.total) * 100 : 0}%` 
-                }}
-              />
-            </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              Awaiting vendor responses
-            </p>
-          </CardContent>
-        </Card>
+        {moduleAccess.rfq !== 'none' && (
+          <Card className="bg-white rounded-2xl hover:shadow-xl transition-all duration-300">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Request for Quotations</CardTitle>
+              <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center">
+                <ShoppingCart className="h-4 w-4 text-indigo-600" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-4xl font-bold">{rfqsSummary.total}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {rfqsSummary.active} active RFQs
+              </p>
+              <div className="relative mt-3 h-2 rounded-full bg-gray-200 overflow-hidden">
+                <div
+                  className="absolute left-0 top-0 h-full rounded-full bg-gradient-to-r from-indigo-500 to-purple-500"
+                  style={{
+                    width: `${rfqsSummary.total > 0 ? (rfqsSummary.active / rfqsSummary.total) * 100 : 0}%`
+                  }}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Awaiting vendor responses
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Quotations Card */}
-        <Card className="rounded-2xl gradient-primary text-white hover:shadow-xl transition-all duration-300">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-white">Quotations</CardTitle>
-            <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
-              <FileCheck className="h-4 w-4 text-white" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-4xl font-bold">{quotationsSummary.total}</div>
-            <p className="text-xs text-white/80 mt-1">
-              {quotationsSummary.pending} pending review
-            </p>
-            <div className="relative mt-3 h-2 rounded-full bg-white/30 overflow-hidden">
-              <div
-                className="absolute left-0 top-0 h-full rounded-full bg-white"
-                style={{ 
-                  width: `${quotationsSummary.total > 0 ? (quotationsSummary.accepted / quotationsSummary.total) * 100 : 0}%` 
-                }}
-              />
-            </div>
-            <div className="flex items-center justify-between mt-2 text-xs text-white/80">
-              <span>{quotationsSummary.accepted} accepted</span>
-              <span>{quotationsSummary.rejected} rejected</span>
-            </div>
-          </CardContent>
-        </Card>
+        {moduleAccess.quotations !== 'none' && (
+          <Card className="rounded-2xl gradient-primary text-white hover:shadow-xl transition-all duration-300">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-white">Quotations</CardTitle>
+              <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
+                <FileCheck className="h-4 w-4 text-white" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-4xl font-bold">{quotationsSummary.total}</div>
+              <p className="text-xs text-white/80 mt-1">
+                {quotationsSummary.pending} pending review
+              </p>
+              <div className="relative mt-3 h-2 rounded-full bg-white/30 overflow-hidden">
+                <div
+                  className="absolute left-0 top-0 h-full rounded-full bg-white"
+                  style={{
+                    width: `${quotationsSummary.total > 0 ? (quotationsSummary.accepted / quotationsSummary.total) * 100 : 0}%`
+                  }}
+                />
+              </div>
+              <div className="flex items-center justify-between mt-2 text-xs text-white/80">
+                <span>{quotationsSummary.accepted} accepted</span>
+                <span>{quotationsSummary.rejected} rejected</span>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Invoices Card */}
-        <Card className="bg-white rounded-2xl hover:shadow-xl transition-all duration-300">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Invoices</CardTitle>
-            <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
-              <Package className="h-4 w-4 text-green-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-4xl font-bold">{invoicesSummary.total}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {invoicesSummary.paid} paid • {invoicesSummary.pending} pending
-            </p>
-            <div className="relative mt-3 h-2 rounded-full bg-gray-200 overflow-hidden">
-              <div
-                className="absolute left-0 top-0 h-full rounded-full bg-gradient-to-r from-green-500 to-emerald-500"
-                style={{ 
-                  width: `${invoicesSummary.total > 0 ? (invoicesSummary.paid / invoicesSummary.total) * 100 : 0}%` 
-                }}
-              />
-            </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              {invoicesSummary.approved} approved for payment
-            </p>
-          </CardContent>
-        </Card>
+        {moduleAccess.invoices !== 'none' && (
+          <Card className="bg-white rounded-2xl hover:shadow-xl transition-all duration-300">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Invoices</CardTitle>
+              <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
+                <Package className="h-4 w-4 text-green-600" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-4xl font-bold">{invoicesSummary.total}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {invoicesSummary.paid} paid • {invoicesSummary.pending} pending
+              </p>
+              <div className="relative mt-3 h-2 rounded-full bg-gray-200 overflow-hidden">
+                <div
+                  className="absolute left-0 top-0 h-full rounded-full bg-gradient-to-r from-green-500 to-emerald-500"
+                  style={{
+                    width: `${invoicesSummary.total > 0 ? (invoicesSummary.paid / invoicesSummary.total) * 100 : 0}%`
+                  }}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                {invoicesSummary.approved} approved for payment
+              </p>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Financial Overview Card */}
@@ -309,7 +319,7 @@ export function ProcurementDashboard() {
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                 <XAxis dataKey="status" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 12 }} />
-                <Tooltip 
+                <Tooltip
                   contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
                   formatter={(value: any, name: string) => {
                     if (name === 'count') return [value, 'Requisitions']
@@ -350,7 +360,7 @@ export function ProcurementDashboard() {
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip 
+                <Tooltip
                   contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
                   formatter={(value: any, name: string, props: any) => [
                     `${value} invoices ($${props.payload.amount.toLocaleString()})`,
@@ -380,7 +390,7 @@ export function ProcurementDashboard() {
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                 <XAxis type="number" tick={{ fontSize: 12 }} />
                 <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 11 }} />
-                <Tooltip 
+                <Tooltip
                   contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
                   formatter={(value: any, name: string) => {
                     if (name === 'invoices') return [value, 'Invoices']
@@ -409,7 +419,7 @@ export function ProcurementDashboard() {
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                 <XAxis dataKey="status" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 12 }} />
-                <Tooltip 
+                <Tooltip
                   contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
                   formatter={(value: any, name: string) => {
                     if (name === 'count') return [value, 'Count']
@@ -417,18 +427,18 @@ export function ProcurementDashboard() {
                   }}
                 />
                 <Legend />
-                <Line 
-                  type="monotone" 
-                  dataKey="count" 
-                  stroke="#6366f1" 
+                <Line
+                  type="monotone"
+                  dataKey="count"
+                  stroke="#6366f1"
                   strokeWidth={3}
                   name="Count"
                   dot={{ r: 6 }}
                 />
-                <Line 
-                  type="monotone" 
-                  dataKey="amount" 
-                  stroke="#8b5cf6" 
+                <Line
+                  type="monotone"
+                  dataKey="amount"
+                  stroke="#8b5cf6"
                   strokeWidth={3}
                   name="Amount"
                   dot={{ r: 6 }}
@@ -534,30 +544,38 @@ export function ProcurementDashboard() {
             Quick Actions
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-            <Link href="/procurement/requisitions">
-              <Button variant="outline" className="w-full rounded-full bg-white hover:bg-gray-50 h-11">
-                <FileText className="w-4 h-4 mr-2" />
-                New Requisition
-              </Button>
-            </Link>
-            <Link href="/procurement/rfq">
-              <Button variant="outline" className="w-full rounded-full bg-white hover:bg-gray-50 h-11">
-                <ShoppingCart className="w-4 h-4 mr-2" />
-                Manage RFQs
-              </Button>
-            </Link>
-            <Link href="/procurement/quotations">
-              <Button variant="outline" className="w-full rounded-full bg-white hover:bg-gray-50 h-11">
-                <FileCheck className="w-4 h-4 mr-2" />
-                Review Quotations
-              </Button>
-            </Link>
-            <Link href="/procurement/invoices">
-              <Button variant="outline" className="w-full rounded-full bg-white hover:bg-gray-50 h-11">
-                <Package className="w-4 h-4 mr-2" />
-                Process Invoices
-              </Button>
-            </Link>
+            {permissions.canCreatePurchaseRequisition && (
+              <Link href="/procurement/requisitions">
+                <Button variant="outline" className="w-full rounded-full bg-white hover:bg-gray-50 h-11">
+                  <FileText className="w-4 h-4 mr-2" />
+                  New Requisition
+                </Button>
+              </Link>
+            )}
+            {moduleAccess.rfq !== 'none' && (
+              <Link href="/procurement/rfq">
+                <Button variant="outline" className="w-full rounded-full bg-white hover:bg-gray-50 h-11">
+                  <ShoppingCart className="w-4 h-4 mr-2" />
+                  Manage RFQs
+                </Button>
+              </Link>
+            )}
+            {moduleAccess.quotations !== 'none' && (
+              <Link href="/procurement/quotations">
+                <Button variant="outline" className="w-full rounded-full bg-white hover:bg-gray-50 h-11">
+                  <FileCheck className="w-4 h-4 mr-2" />
+                  Review Quotations
+                </Button>
+              </Link>
+            )}
+            {moduleAccess.invoices !== 'none' && (
+              <Link href="/procurement/invoices">
+                <Button variant="outline" className="w-full rounded-full bg-white hover:bg-gray-50 h-11">
+                  <Package className="w-4 h-4 mr-2" />
+                  Process Invoices
+                </Button>
+              </Link>
+            )}
           </div>
         </CardContent>
       </Card>

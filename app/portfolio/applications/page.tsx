@@ -8,7 +8,7 @@ import { ModuleGuard } from "@/components/permissions/PermissionGuards"
 
 export default function ApplicationsPage() {
   return (
-    <ModuleGuard moduleId="portfolio-management" subModuleId="applications-all">
+    <ModuleGuard moduleId="portfolio-management" subModuleId="applications">
       <PortfolioLayout>
         <UserApplications />
       </PortfolioLayout>

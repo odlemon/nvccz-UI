@@ -3,7 +3,9 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { X } from "lucide-react"
-import { MODULE_CONFIG } from "@/lib/config/modules"
+import { useRolePermissions } from "@/lib/hooks/useRolePermissions"
+import { useMemo } from "react"
+import { useRouter } from "next/navigation"
 
 interface AppSwitcherProps {
   isOpen: boolean
@@ -13,6 +15,19 @@ interface AppSwitcherProps {
 }
 
 export function AppSwitcher({ isOpen, onClose, onModuleSelect, currentModule }: AppSwitcherProps) {
+  const router = useRouter()
+  const { hasModuleAccess, isLoading, isAuthenticated } = useRolePermissions()
+
+  const modulesToDisplay = useMemo(() => {
+    if (!isAuthenticated || isLoading) {
+      return []
+    }
+
+    return MODULE_CONFIG.filter((module) => hasModuleAccess(module.id))
+  }, [isAuthenticated, isLoading, hasModuleAccess])
+
+  if (!isOpen) return null
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose} >
       <DialogContent className="w-[80vw] max-w-9xl" hideCloseButton>
@@ -32,7 +47,13 @@ export function AppSwitcher({ isOpen, onClose, onModuleSelect, currentModule }: 
         </DialogHeader>
 
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-x-10 gap-y-8 p-8">
-          {MODULE_CONFIG.map((module) => {
+          {isLoading && (
+            <div className="col-span-full py-12 flex justify-center">
+              <div className="w-8 h-8 border-4 border-gray-200 border-t-blue-500 rounded-full animate-spin" />
+            </div>
+          )}
+
+          {!isLoading && modulesToDisplay.map((module) => {
             const Icon = module.icon
             const isActive = currentModule === module.id
 
@@ -40,12 +61,14 @@ export function AppSwitcher({ isOpen, onClose, onModuleSelect, currentModule }: 
               <Button
                 key={module.id}
                 variant="ghost"
-                className={`h-auto p-6 flex flex-col items-center gap-5 hover:bg-accent transition-all duration-200 ${
-                  isActive ? "bg-accent border-2 border-primary shadow-lg" : ""
-                }`}
-                onClick={() => onModuleSelect(module.id)}
+                className={`h-auto p-6 flex flex-col items-center gap-5 hover:bg-accent transition-all duration-200 ${isActive ? "bg-accent border-2 border-primary shadow-lg" : ""
+                  }`}
+                onClick={() => {
+                  window.location.href = module.path
+                  onModuleSelect(module.id)
+                }}
               >
-                <div 
+                <div
                   className="w-20 h-20 rounded-2xl flex items-center justify-center shadow-md"
                   style={{ backgroundColor: module.color }}
                 >

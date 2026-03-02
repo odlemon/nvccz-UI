@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Plus, Trash2, Save, X, Settings, Users, Building, User } from "lucide-react"
 import { toast } from "sonner"
+import { useProcurementPermissions } from "@/lib/hooks/useProcurementPermissions"
 import { procurementApi } from "@/lib/api/procurement-api"
 
 interface CreateApprovalConfigModalProps {
@@ -39,12 +40,13 @@ interface ApprovalStage {
 
 export function CreateApprovalConfigModal({ isOpen, onClose, onSuccess }: CreateApprovalConfigModalProps) {
   const [loading, setLoading] = useState(false)
+  const { permissions } = useProcurementPermissions()
   const [formData, setFormData] = useState({
     name: "",
     description: "",
     isActive: false
   })
-  
+
   const [stages, setStages] = useState<ApprovalStage[]>([
     {
       stageType: 'PURCHASE_REQUISITION',
@@ -124,9 +126,9 @@ export function CreateApprovalConfigModal({ isOpen, onClose, onSuccess }: Create
 
   const updateStep = (stageIndex: number, stepIndex: number, field: keyof ApprovalStep, value: any) => {
     const updatedStages = [...stages]
-    updatedStages[stageIndex].steps[stepIndex] = { 
-      ...updatedStages[stageIndex].steps[stepIndex], 
-      [field]: value 
+    updatedStages[stageIndex].steps[stepIndex] = {
+      ...updatedStages[stageIndex].steps[stepIndex],
+      [field]: value
     }
     setStages(updatedStages)
   }
@@ -151,9 +153,15 @@ export function CreateApprovalConfigModal({ isOpen, onClose, onSuccess }: Create
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!formData.name || stages.some(stage => stage.steps.some(step => !step.stepName))) {
       toast.error("Please fill in all required fields")
+      return
+    }
+
+    // Check permissions
+    if (!permissions.canManageApprovalConfigs) {
+      toast.error('You do not have permission to manage approval configurations')
       return
     }
 
@@ -165,7 +173,7 @@ export function CreateApprovalConfigModal({ isOpen, onClose, onSuccess }: Create
       }
 
       const response = await procurementApi.createApprovalConfig(configData)
-      
+
       if (response.success) {
         toast.success("Approval configuration created successfully!")
         onSuccess()
@@ -235,7 +243,7 @@ export function CreateApprovalConfigModal({ isOpen, onClose, onSuccess }: Create
                   required
                 />
               </div>
-              
+
               <div>
                 <Label htmlFor="description">Description</Label>
                 <Textarea
@@ -287,9 +295,9 @@ export function CreateApprovalConfigModal({ isOpen, onClose, onSuccess }: Create
 
                   <div>
                     <Label>Stage Type</Label>
-                    <Select 
-                      value={stage.stageType} 
-                      onValueChange={(value: 'PURCHASE_REQUISITION' | 'PURCHASE_ORDER' | 'INVOICE' | 'GRN') => 
+                    <Select
+                      value={stage.stageType}
+                      onValueChange={(value: 'PURCHASE_REQUISITION' | 'PURCHASE_ORDER' | 'INVOICE' | 'GRN') =>
                         updateStage(stageIndex, 'stageType', value)
                       }
                     >
@@ -309,10 +317,10 @@ export function CreateApprovalConfigModal({ isOpen, onClose, onSuccess }: Create
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <h5 className="font-medium">Approval Steps</h5>
-                      <Button 
-                        type="button" 
-                        onClick={() => addStep(stageIndex)} 
-                        variant="outline" 
+                      <Button
+                        type="button"
+                        onClick={() => addStep(stageIndex)}
+                        variant="outline"
                         size="sm"
                       >
                         <Plus className="w-3 h-3 mr-1" />
@@ -355,9 +363,9 @@ export function CreateApprovalConfigModal({ isOpen, onClose, onSuccess }: Create
 
                           <div>
                             <Label>Step Type</Label>
-                            <Select 
-                              value={step.stepType} 
-                              onValueChange={(value: 'USER' | 'ROLE' | 'DEPARTMENT') => 
+                            <Select
+                              value={step.stepType}
+                              onValueChange={(value: 'USER' | 'ROLE' | 'DEPARTMENT') =>
                                 updateStep(stageIndex, stepIndex, 'stepType', value)
                               }
                             >
@@ -375,8 +383,8 @@ export function CreateApprovalConfigModal({ isOpen, onClose, onSuccess }: Create
                           {step.stepType === 'USER' && (
                             <div>
                               <Label>Select User</Label>
-                              <Select 
-                                value={step.userId || ""} 
+                              <Select
+                                value={step.userId || ""}
                                 onValueChange={(value) => updateStep(stageIndex, stepIndex, 'userId', value)}
                               >
                                 <SelectTrigger>
@@ -394,8 +402,8 @@ export function CreateApprovalConfigModal({ isOpen, onClose, onSuccess }: Create
                           {step.stepType === 'ROLE' && (
                             <div>
                               <Label>Select Role</Label>
-                              <Select 
-                                value={step.roleId || ""} 
+                              <Select
+                                value={step.roleId || ""}
                                 onValueChange={(value) => updateStep(stageIndex, stepIndex, 'roleId', value)}
                               >
                                 <SelectTrigger>
@@ -413,8 +421,8 @@ export function CreateApprovalConfigModal({ isOpen, onClose, onSuccess }: Create
                           {step.stepType === 'DEPARTMENT' && (
                             <div>
                               <Label>Select Department</Label>
-                              <Select 
-                                value={step.departmentId || ""} 
+                              <Select
+                                value={step.departmentId || ""}
                                 onValueChange={(value) => updateStep(stageIndex, stepIndex, 'departmentId', value)}
                               >
                                 <SelectTrigger>
@@ -463,7 +471,7 @@ export function CreateApprovalConfigModal({ isOpen, onClose, onSuccess }: Create
               <X className="w-4 h-4 mr-2" />
               Cancel
             </Button>
-            <Button type="submit" disabled={loading} className="gradient-primary text-white">
+            <Button type="submit" disabled={loading || !permissions.canManageApprovalConfigs} className="gradient-primary text-white">
               {loading ? (
                 <>
                   <div className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin" />

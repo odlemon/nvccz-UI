@@ -1,0 +1,976 @@
+[
+  {
+    "module": "Portfolio",
+    "page": "Dashboard",
+    "action": "View",
+    "roles": [
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO",
+      "CIO",
+      "COMPLIANCE_OFF_INV",
+      "PORTFOLIO_MGR"
+    ]
+  },
+  {
+    "module": "Portfolio",
+    "page": "Applications",
+    "action": "View",
+    "roles": [
+      "LEGAL_MGR",
+      "LEGAL_OFF",
+      "COMPLIANCE_OFF",
+      "LEGAL_ADVISOR",
+      "LEGAL_MEM",
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO",
+      "CIO",
+      "INV_ANALYST",
+      "COMPLIANCE_OFF_INV",
+      "PORTFOLIO_MGR"
+    ]
+  },
+  {
+    "module": "Portfolio",
+    "page": "Applications",
+    "action": "Initiate Due Diligence",
+    "roles": [
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO",
+      "CIO",
+      "PORTFOLIO_MGR"
+    ]
+  },
+  {
+    "module": "Portfolio",
+    "page": "Applications",
+    "action": "Create/Update Due Diligence",
+    "roles": [
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO",
+      "CIO",
+      "PORTFOLIO_MGR"
+    ]
+  },
+  {
+    "module": "Portfolio",
+    "page": "Applications",
+    "action": "Create DueDiligence Task",
+    "roles": [
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO",
+      "CIO",
+      "PORTFOLIO_MGR"
+    ]
+  },
+  {
+    "module": "Portfolio",
+    "page": "Applications",
+    "action": "Complete Due Diligence",
+    "roles": [
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO",
+      "CIO",
+      "INV_ANALYST"
+    ]
+  },
+  {
+    "module": "Portfolio",
+    "page": "Applications",
+    "action": "Create/Update Termsheet",
+    "roles": [
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO",
+      "CIO",
+      "INV_ANALYST",
+      "PORTFOLIO_MGR"
+    ]
+  },
+  {
+    "module": "Portfolio",
+    "page": "Applications",
+    "action": "Sign Termsheet",
+    "roles": [
+      "LEGAL_MGR",
+      "LEGAL_OFF",
+      "COMPLIANCE_OFF",
+      "LEGAL_ADVISOR",
+      "LEGAL_MEM",
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO",
+      "CIO"
+    ]
+  },
+  {
+    "module": "Portfolio",
+    "page": "Applications",
+    "action": "Finalize Termsheet",
+    "roles": [
+      "LEGAL_MGR",
+      "LEGAL_OFF",
+      "COMPLIANCE_OFF",
+      "LEGAL_ADVISOR",
+      "LEGAL_MEM",
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO",
+      "CIO",
+      "PORTFOLIO_MGR"
+    ]
+  },
+  {
+    "module": "Portfolio",
+    "page": "Applications",
+    "action": "Initiate Fund Disbursement",
+    "roles": [
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO",
+      "CIO",
+      "PORTFOLIO_MGR"
+    ]
+  },
+  {
+    "module": "Portfolio",
+    "page": "Applications",
+    "action": "Create Disbursement",
+    "roles": [
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO",
+      "CIO",
+      "PORTFOLIO_MGR"
+    ]
+  },
+  {
+    "module": "Portfolio",
+    "page": "Applications",
+    "action": "Update Checklist",
+    "roles": [
+      "LEGAL_MGR",
+      "LEGAL_OFF",
+      "COMPLIANCE_OFF",
+      "LEGAL_ADVISOR",
+      "LEGAL_MEM",
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO",
+      "CIO",
+      "PORTFOLIO_MGR"
+    ]
+  },
+  {
+    "module": "Portfolio",
+    "page": "Applications",
+    "action": "Create Fund Disbursement",
+    "roles": [
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO",
+      "CIO",
+      "PORTFOLIO_MGR"
+    ]
+  },
+  {
+    "module": "Portfolio",
+    "page": "Applications",
+    "action": "Board Review: Cast Vote",
+    "roles": [
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO",
+      "BOARD_CHAIR",
+      "BOARD_MEMBER",
+      "INV_COMM_MEM"
+    ]
+  },
+  {
+    "module": "Portfolio",
+    "page": "Applications",
+    "action": "Board Review: Create/Update",
+    "roles": [
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO",
+      "BOARD_CHAIR",
+      "BOARD_MEMBER",
+      "INV_COMM_MEM"
+    ]
+  },
+  {
+    "module": "Portfolio",
+    "page": "Applications",
+    "action": "Board Review: Complete",
+    "roles": [
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO",
+      "BOARD_CHAIR",
+      "BOARD_MEMBER",
+      "INV_COMM_MEM"
+    ]
+  },
+  {
+    "module": "Portfolio",
+    "page": "Applications",
+    "action": "Disburse Funds",
+    "roles": [
+      "CFO",
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO",
+      "CIO",
+      "PORTFOLIO_MGR"
+    ]
+  },
+  {
+    "module": "Portfolio",
+    "page": "Funds",
+    "action": "Create",
+    "roles": [
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO",
+      "CIO",
+      "PORTFOLIO_MGR"
+    ]
+  },
+  {
+    "module": "Portfolio",
+    "page": "Funds",
+    "action": "Read",
+    "roles": [
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO",
+      "CIO",
+      "INV_ANALYST",
+      "PORTFOLIO_MGR"
+    ]
+  },
+  {
+    "module": "Portfolio",
+    "page": "Funds",
+    "action": "Update",
+    "roles": [
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO",
+      "CIO",
+      "PORTFOLIO_MGR"
+    ]
+  },
+  {
+    "module": "Portfolio",
+    "page": "Funds",
+    "action": "Delete",
+    "roles": [
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO",
+      "CIO",
+      "PORTFOLIO_MGR"
+    ]
+  },
+  {
+    "module": "Portfolio",
+    "page": "Companies",
+    "action": "View",
+    "roles": [
+      "PROC_MGR",
+      "PROC_OFF",
+      "BUYER",
+      "PROC_COORD",
+      "PROC_MEM",
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO",
+      "CIO",
+      "INV_ANALYST",
+      "PORTFOLIO_MGR",
+      "EXT_AUDITOR"
+    ]
+  },
+  {
+    "module": "Procurement",
+    "page": "Dashboard",
+    "action": "View",
+    "roles": [
+      "FIN_MGR",
+      "CFO",
+      "FIN_OFF",
+      "PROC_MGR",
+      "PROC_OFF",
+      "BUYER",
+      "PROC_COORD",
+      "PROC_MEM",
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO"
+    ]
+  },
+  {
+    "module": "Procurement",
+    "page": "Purchase Requisitions",
+    "action": "Create",
+    "roles": [
+      "FIN_MGR",
+      "CFO",
+      "FIN_OFF",
+      "ACCOUNTANT",
+      "FIN_ASST",
+      "FIN_MEM",
+      "SALES_MGR",
+      "SALES_OFF",
+      "SALES_REP",
+      "SALES_COORD",
+      "SALES_MEM",
+      "OPS_MGR",
+      "OPS_OFF",
+      "OPS_COORD",
+      "OPS_ANALYST",
+      "OPS_MEM",
+      "PROC_MGR",
+      "PROC_OFF",
+      "BUYER",
+      "PROC_COORD",
+      "PROC_MEM",
+      "HR_MGR",
+      "HR_OFF",
+      "RECRUITER",
+      "HR_COORD",
+      "HR_MEM",
+      "MKT_MGR",
+      "MKT_OFF",
+      "CONTENT_CREATOR",
+      "SOCIAL_MEDIA_MGR",
+      "MKT_MEM",
+      "LEGAL_MGR",
+      "LEGAL_OFF",
+      "COMPLIANCE_OFF",
+      "LEGAL_ADVISOR",
+      "LEGAL_MEM",
+      "IT_MGR",
+      "SYSADMIN",
+      "DEVELOPER",
+      "IT_SUPPORT",
+      "IT_MEM",
+      "CEO",
+      "CIO",
+      "INV_ANALYST",
+      "COMPLIANCE_OFF_INV",
+      "FUND_MGR",
+      "PORTFOLIO_MGR"
+    ]
+  },
+  {
+    "module": "Procurement",
+    "page": "Purchase Requisitions",
+    "action": "Read",
+    "roles": [
+      "FIN_MGR",
+      "CFO",
+      "PROC_MGR",
+      "PROC_OFF",
+      "BUYER",
+      "PROC_COORD",
+      "PROC_MEM",
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO"
+    ]
+  },
+  {
+    "module": "Procurement",
+    "page": "Purchase Requisitions",
+    "action": "Update",
+    "roles": [
+      "FIN_MGR",
+      "CFO",
+      "PROC_MGR",
+      "PROC_OFF",
+      "BUYER",
+      "PROC_COORD",
+      "PROC_MEM",
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO"
+    ]
+  },
+  {
+    "module": "Procurement",
+    "page": "Purchase Requisitions",
+    "action": "Delete",
+    "roles": [
+      "FIN_MGR",
+      "CFO",
+      "PROC_MGR",
+      "PROC_OFF",
+      "BUYER",
+      "PROC_COORD",
+      "PROC_MEM",
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO"
+    ]
+  },
+  {
+    "module": "Procurement",
+    "page": "Purchase Requisitions",
+    "action": "Submit Approval",
+    "roles": [
+      "FIN_MGR",
+      "CFO",
+      "FIN_OFF",
+      "SALES_MGR",
+      "SALES_OFF",
+      "SALES_REP",
+      "SALES_COORD",
+      "SALES_MEM",
+      "OPS_MGR",
+      "OPS_OFF",
+      "OPS_COORD",
+      "OPS_ANALYST",
+      "OPS_MEM",
+      "PROC_MGR",
+      "PROC_OFF",
+      "BUYER",
+      "PROC_COORD",
+      "PROC_MEM",
+      "HR_MGR",
+      "HR_OFF",
+      "RECRUITER",
+      "HR_COORD",
+      "HR_MEM",
+      "MKT_MGR",
+      "MKT_OFF",
+      "CONTENT_CREATOR",
+      "SOCIAL_MEDIA_MGR",
+      "MKT_MEM",
+      "LEGAL_MGR",
+      "LEGAL_OFF",
+      "COMPLIANCE_OFF",
+      "LEGAL_ADVISOR",
+      "LEGAL_MEM",
+      "IT_MGR",
+      "SYSADMIN",
+      "DEVELOPER",
+      "IT_SUPPORT",
+      "IT_MEM",
+      "CEO",
+      "CIO",
+      "INV_ANALYST",
+      "COMPLIANCE_OFF_INV",
+      "FUND_MGR",
+      "PORTFOLIO_MGR"
+    ]
+  },
+  {
+    "module": "Procurement",
+    "page": "Purchase Requisitions",
+    "action": "Approve",
+    "roles": [
+      "FIN_MGR",
+      "CFO",
+      "PROC_MGR",
+      "PROC_OFF",
+      "BUYER",
+      "PROC_COORD",
+      "PROC_MEM",
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO"
+    ]
+  },
+  {
+    "module": "Procurement",
+    "page": "Purchase Requisitions",
+    "action": "Convert to Purchase Order",
+    "roles": [
+      "FIN_MGR",
+      "CFO",
+      "PROC_MGR",
+      "PROC_OFF",
+      "BUYER",
+      "PROC_COORD",
+      "PROC_MEM",
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO"
+    ]
+  },
+  {
+    "module": "Procurement",
+    "page": "RFQ",
+    "action": "Create",
+    "roles": [
+      "FIN_MGR",
+      "CFO",
+      "PROC_MGR",
+      "PROC_OFF",
+      "BUYER",
+      "PROC_COORD",
+      "PROC_MEM",
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO"
+    ]
+  },
+  {
+    "module": "Procurement",
+    "page": "RFQ",
+    "action": "Read",
+    "roles": [
+      "FIN_MGR",
+      "CFO",
+      "PROC_MGR",
+      "PROC_OFF",
+      "BUYER",
+      "PROC_COORD",
+      "PROC_MEM",
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO"
+    ]
+  },
+  {
+    "module": "Procurement",
+    "page": "RFQ",
+    "action": "Update",
+    "roles": [
+      "FIN_MGR",
+      "CFO",
+      "PROC_MGR",
+      "PROC_OFF",
+      "BUYER",
+      "PROC_COORD",
+      "PROC_MEM",
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO"
+    ]
+  },
+  {
+    "module": "Procurement",
+    "page": "RFQ",
+    "action": "Delete",
+    "roles": [
+      "FIN_MGR",
+      "CFO",
+      "PROC_MGR",
+      "PROC_OFF",
+      "BUYER",
+      "PROC_COORD",
+      "PROC_MEM",
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO"
+    ]
+  },
+  {
+    "module": "Procurement",
+    "page": "RFQ",
+    "action": "Send RFQ",
+    "roles": [
+      "FIN_MGR",
+      "CFO",
+      "PROC_MGR",
+      "PROC_OFF",
+      "BUYER",
+      "PROC_COORD",
+      "PROC_MEM",
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO"
+    ]
+  },
+  {
+    "module": "Procurement",
+    "page": "Quotations",
+    "action": "Create",
+    "roles": [
+      "FIN_MGR",
+      "CFO",
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO"
+    ]
+  },
+  {
+    "module": "Procurement",
+    "page": "Quotations",
+    "action": "Read",
+    "roles": [
+      "FIN_MGR",
+      "CFO",
+      "PROC_MGR",
+      "PROC_OFF",
+      "BUYER",
+      "PROC_COORD",
+      "PROC_MEM",
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO"
+    ]
+  },
+  {
+    "module": "Procurement",
+    "page": "Quotations",
+    "action": "Update",
+    "roles": [
+      "FIN_MGR",
+      "CFO",
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO"
+    ]
+  },
+  {
+    "module": "Procurement",
+    "page": "Quotations",
+    "action": "Delete",
+    "roles": [
+      "FIN_MGR",
+      "CFO",
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO"
+    ]
+  },
+  {
+    "module": "Procurement",
+    "page": "Quotations",
+    "action": "Accept Quote",
+    "roles": [
+      "FIN_MGR",
+      "CFO",
+      "PROC_MGR",
+      "PROC_OFF",
+      "BUYER",
+      "PROC_COORD",
+      "PROC_MEM",
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO"
+    ]
+  },
+  {
+    "module": "Procurement",
+    "page": "Purchase Orders",
+    "action": "View",
+    "roles": [
+      "FIN_MGR",
+      "CFO",
+      "PROC_MGR",
+      "PROC_OFF",
+      "BUYER",
+      "PROC_COORD",
+      "PROC_MEM",
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO"
+    ]
+  },
+  {
+    "module": "Procurement",
+    "page": "Purchase Orders",
+    "action": "Create",
+    "roles": [
+      "FIN_MGR",
+      "CFO",
+      "FIN_OFF",
+      "PROC_MGR",
+      "PROC_OFF",
+      "BUYER",
+      "PROC_COORD",
+      "PROC_MEM",
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO"
+    ]
+  },
+  {
+    "module": "Procurement",
+    "page": "Purchase Orders",
+    "action": "Read",
+    "roles": [
+      "FIN_MGR",
+      "CFO",
+      "FIN_OFF",
+      "PROC_MGR",
+      "PROC_OFF",
+      "BUYER",
+      "PROC_COORD",
+      "PROC_MEM",
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO"
+    ]
+  },
+  {
+    "module": "Procurement",
+    "page": "Purchase Orders",
+    "action": "Update",
+    "roles": [
+      "FIN_MGR",
+      "CFO",
+      "PROC_MGR",
+      "PROC_OFF",
+      "BUYER",
+      "PROC_COORD",
+      "PROC_MEM",
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO"
+    ]
+  },
+  {
+    "module": "Procurement",
+    "page": "Purchase Orders",
+    "action": "Delete",
+    "roles": [
+      "FIN_MGR",
+      "CFO",
+      "PROC_MGR",
+      "PROC_OFF",
+      "BUYER",
+      "PROC_COORD",
+      "PROC_MEM",
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO"
+    ]
+  },
+  {
+    "module": "Procurement",
+    "page": "Invoices",
+    "action": "View",
+    "roles": [
+      "FIN_MGR",
+      "CFO",
+      "FIN_OFF",
+      "PROC_MGR",
+      "PROC_OFF",
+      "BUYER",
+      "PROC_COORD",
+      "PROC_MEM",
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO"
+    ]
+  },
+  {
+    "module": "Procurement",
+    "page": "Invoices",
+    "action": "Create",
+    "roles": [
+      "FIN_MGR",
+      "CFO",
+      "FIN_OFF",
+      "PROC_MGR",
+      "PROC_OFF",
+      "BUYER",
+      "PROC_COORD",
+      "PROC_MEM",
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO"
+    ]
+  },
+  {
+    "module": "Procurement",
+    "page": "Invoices",
+    "action": "Update",
+    "roles": [
+      "FIN_MGR",
+      "CFO",
+      "PROC_MGR",
+      "PROC_OFF",
+      "BUYER",
+      "PROC_COORD",
+      "PROC_MEM",
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO"
+    ]
+  },
+  {
+    "module": "Procurement",
+    "page": "Invoices",
+    "action": "Delete",
+    "roles": [
+      "FIN_MGR",
+      "CFO",
+      "PROC_MGR",
+      "PROC_OFF",
+      "BUYER",
+      "PROC_COORD",
+      "PROC_MEM",
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO"
+    ]
+  },
+  {
+    "module": "Procurement",
+    "page": "Goods Received Notes",
+    "action": "View",
+    "roles": [
+      "FIN_MGR",
+      "CFO",
+      "PROC_MGR",
+      "PROC_OFF",
+      "BUYER",
+      "PROC_COORD",
+      "PROC_MEM",
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO"
+    ]
+  },
+  {
+    "module": "Procurement",
+    "page": "Goods Received Notes",
+    "action": "Create",
+    "roles": [
+      "FIN_MGR",
+      "CFO",
+      "PROC_MGR",
+      "PROC_OFF",
+      "BUYER",
+      "PROC_COORD",
+      "PROC_MEM",
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO"
+    ]
+  },
+  {
+    "module": "Procurement",
+    "page": "Goods Received Notes",
+    "action": "Update",
+    "roles": [
+      "FIN_MGR",
+      "CFO",
+      "PROC_MGR",
+      "PROC_OFF",
+      "BUYER",
+      "PROC_COORD",
+      "PROC_MEM",
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO"
+    ]
+  },
+  {
+    "module": "Procurement",
+    "page": "Goods Received Notes",
+    "action": "Delete",
+    "roles": [
+      "FIN_MGR",
+      "CFO",
+      "FIN_OFF",
+      "PROC_MGR",
+      "PROC_OFF",
+      "BUYER",
+      "PROC_COORD",
+      "PROC_MEM",
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO"
+    ]
+  },
+  {
+    "module": "Procurement",
+    "page": "Payments",
+    "action": "View",
+    "roles": [
+      "FIN_MGR",
+      "CFO",
+      "FIN_OFF",
+      "PROC_MGR",
+      "PROC_OFF",
+      "BUYER",
+      "PROC_COORD",
+      "PROC_MEM",
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO"
+    ]
+  },
+  {
+    "module": "Procurement",
+    "page": "Approval Configurations",
+    "action": "Create",
+    "roles": [
+      "FIN_MGR",
+      "CFO",
+      "PROC_MGR",
+      "PROC_OFF",
+      "BUYER",
+      "PROC_COORD",
+      "PROC_MEM",
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO"
+    ]
+  },
+  {
+    "module": "Procurement",
+    "page": "Approval Configurations",
+    "action": "Read",
+    "roles": [
+      "FIN_MGR",
+      "CFO",
+      "PROC_MGR",
+      "PROC_OFF",
+      "BUYER",
+      "PROC_COORD",
+      "PROC_MEM",
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO"
+    ]
+  },
+  {
+    "module": "Procurement",
+    "page": "Approval Configurations",
+    "action": "Update",
+    "roles": [
+      "FIN_MGR",
+      "CFO",
+      "PROC_MGR",
+      "PROC_OFF",
+      "BUYER",
+      "PROC_COORD",
+      "PROC_MEM",
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO"
+    ]
+  },
+  {
+    "module": "Procurement",
+    "page": "Approval Configurations",
+    "action": "Delete",
+    "roles": [
+      "FIN_MGR",
+      "CFO",
+      "PROC_MGR",
+      "PROC_OFF",
+      "BUYER",
+      "PROC_COORD",
+      "PROC_MEM",
+      "IT_MGR",
+      "SYSADMIN",
+      "CEO"
+    ]
+  }
+]

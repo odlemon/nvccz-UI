@@ -8,10 +8,10 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { useProcurementPermissions } from "@/lib/hooks/useProcurementPermissions"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { 
-  setPurchaseOrders, 
-  addPurchaseOrder, 
-  updatePurchaseOrder, 
+import {
+  setPurchaseOrders,
+  addPurchaseOrder,
+  updatePurchaseOrder,
   removePurchaseOrder,
   setPurchaseOrdersLoading,
   setPurchaseOrdersError,
@@ -211,10 +211,22 @@ export function PurchaseOrders() {
     { label: 'Cancelled', value: 'CANCELLED' }
   ]
 
-  const bulkActions = [
-    { label: 'Send to Vendor', value: 'send', icon: <Truck className="w-4 h-4 mr-1" /> },
-    { label: 'Cancel Orders', value: 'cancel', icon: <AlertCircle className="w-4 h-4 mr-1" /> }
-  ]
+  const filteredBulkActions = useMemo(() => {
+    return [
+      {
+        label: 'Send to Vendor',
+        value: 'send',
+        icon: <Truck className="w-4 h-4 mr-1" />,
+        show: permissions.canSendPurchaseOrder
+      },
+      {
+        label: 'Cancel Orders',
+        value: 'cancel',
+        icon: <AlertCircle className="w-4 h-4 mr-1" />,
+        show: permissions.canUpdatePurchaseOrder // Using Update for Cancel as it's not explicitly defined
+      }
+    ].filter(action => action.show)
+  }, [permissions])
 
   const handleBulkAction = (selectedOrders: PurchaseOrder[], action: string) => {
     switch (action) {
@@ -256,7 +268,7 @@ export function PurchaseOrders() {
         onDelete={permissions.canDeletePurchaseOrder ? handleDelete : undefined}
         onCreate={permissions.canCreatePurchaseOrder ? handleCreate : undefined}
         onBulkAction={handleBulkAction}
-        bulkActions={bulkActions}
+        bulkActions={filteredBulkActions}
         loading={purchaseOrdersLoading}
         onExport={handleExport}
         emptyMessage="No purchase orders found. Create your first purchase order to get started."
@@ -346,8 +358,8 @@ export function PurchaseOrders() {
                       </div>
                     </div>
                   )) || (
-                    <p className="text-gray-500 text-center py-4">No items found</p>
-                  )}
+                      <p className="text-gray-500 text-center py-4">No items found</p>
+                    )}
                 </div>
               </CardContent>
             </Card>
@@ -357,11 +369,13 @@ export function PurchaseOrders() {
               <Button variant="outline" onClick={() => setIsDrawerOpen(false)}>
                 Close
               </Button>
-              <Button className="gradient-primary text-white">
-                Edit Order
-              </Button>
-              {viewingOrder?.status === 'DRAFT' && (
-                <Button 
+              {permissions.canUpdatePurchaseOrder && (
+                <Button className="gradient-primary text-white">
+                  Edit Order
+                </Button>
+              )}
+              {viewingOrder?.status === 'DRAFT' && permissions.canApprovePurchaseOrder && (
+                <Button
                   className="bg-green-600 hover:bg-green-700 text-white"
                   onClick={() => {
                     setSelectedOrderForApproval(viewingOrder)
