@@ -29,7 +29,6 @@ export function TermSheetSection({
   onRefresh,
   onCreate,
   onInvestorSign,
-  onInvestorSign,
   applicationData
 }: TermSheetSectionProps) {
   const { hasSpecificAction } = useRolePermissions();

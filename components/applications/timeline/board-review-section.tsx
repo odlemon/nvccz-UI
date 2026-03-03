@@ -30,7 +30,6 @@ export function BoardReviewSection({
   voteSummary,
   voteSummaryLoading,
   onRefresh,
-  onRefresh,
   onInitiate
 }: BoardReviewSectionProps) {
   const { hasSpecificAction } = useRolePermissions();
