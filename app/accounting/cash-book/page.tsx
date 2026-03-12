@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react"
 import { useDispatch, useSelector } from "react-redux"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Plus, FileText, BarChart3, TrendingUp, BookOpen, Settings, Lock, FileSignature } from "lucide-react"
+import { Plus, FileText, BarChart3, TrendingUp, BookOpen, Settings, Lock, FileSignature, Download } from "lucide-react"
 import { format, startOfWeek, endOfWeek } from "date-fns"
 import { cn } from "@/lib/utils"
 import type { RootState, AppDispatch } from "@/lib/store/store"
@@ -37,6 +37,7 @@ import { CashbookTransferViewDrawer } from "@/components/accounting/cashbook-tra
 import { EntryTypesTab } from "@/components/accounting/tabs/entry-types-tab"
 import { PeriodLockoutTab } from "@/components/accounting/tabs/period-lockout-tab"
 import { ContraEntriesTab } from "@/components/accounting/tabs/contra-entries-tab"
+import { ExportCashbookAuditModal } from "@/components/accounting/export-cashbook-audit-modal"
 
 function getWeekRange() {
   const now = new Date()
@@ -63,6 +64,7 @@ function CashbookPage() {
   const dispatch = useDispatch<AppDispatch>()
   const [activeTab, setActiveTab] = useState<'single' | 'batch' | 'transfers' | 'entry-types' | 'period-lockout' | 'contra-entries'>('single')
   const [isProcessCashbookOpen, setIsProcessCashbookOpen] = useState(false)
+  const [isExportAuditModalOpen, setIsExportAuditModalOpen] = useState(false)
   const [singleSubTab, setSingleSubTab] = useState<'receipts' | 'payments'>('receipts')
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false)
 
@@ -110,7 +112,7 @@ function CashbookPage() {
 
   useEffect(() => {
     if (isFetchingRef.current) return
-    
+
     isFetchingRef.current = true
     dispatch(fetchCashbookBanks()).finally(() => {
       isFetchingRef.current = false
@@ -120,7 +122,7 @@ function CashbookPage() {
   useEffect(() => {
     if (activeTab === 'single') {
       const timeoutId = setTimeout(() => {
-        dispatch(fetchCashbookEntries({ 
+        dispatch(fetchCashbookEntries({
           bankId: filters.bankId || '',
           type: filters.type,
           status: filters.status,
@@ -159,7 +161,7 @@ function CashbookPage() {
           setTransfersLoading(false)
         }
       }
-      
+
       const timeoutId = setTimeout(fetchTransfers, 300) // Debounce
       return () => clearTimeout(timeoutId)
     }
@@ -272,12 +274,20 @@ function CashbookPage() {
           </div>
           <div className="flex gap-3 items-center">
             <Button
+              onClick={() => setIsExportAuditModalOpen(true)}
+              variant="outline"
+              className="rounded-full"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Export Cashbook Audit
+            </Button>
+            `<Button
               onClick={() => setIsProcessCashbookOpen(true)}
               className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-full hover:from-blue-700 hover:to-blue-800"
             >
               <BookOpen className="w-4 h-4 mr-2" />
               Process Cashbook
-            </Button>
+            </Button>`
           </div>
         </div>
 
@@ -588,6 +598,12 @@ function CashbookPage() {
           }}
           transfer={selectedTransfer}
           onTransferUpdate={handleTransferUpdate}
+        />
+
+        <ExportCashbookAuditModal
+          isOpen={isExportAuditModalOpen}
+          onClose={() => setIsExportAuditModalOpen(false)}
+          banks={cashbookBanks}
         />
       </div>
     </AccountingLayout>

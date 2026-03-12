@@ -1239,7 +1239,7 @@ class AccountingApiService {
     isActive?: boolean
   }): Promise<AccountingResponse<InvoicesResponse>> {
     const queryParams = new URLSearchParams()
-    
+
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
         if (value !== undefined && value !== null && value !== '') {
@@ -1283,8 +1283,27 @@ class AccountingApiService {
   }
 
   // Assets
-  async getAssets(): Promise<AccountingResponse<{ assets: Asset[], total: number, page: number, totalPages: number }>> {
-    return apiClient.get<AccountingResponse<{ assets: Asset[], total: number, page: number, totalPages: number }>>('/accounting/assets')
+  async getAssets(params?: {
+    page?: number
+    limit?: number
+    search?: string
+    status?: string
+    isActive?: boolean
+  }): Promise<AccountingResponse<{ assets: Asset[], total: number, page: number, limit: number, totalPages: number }>> {
+    const queryParams = new URLSearchParams()
+
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          queryParams.append(key, String(value))
+        }
+      })
+    }
+
+    const queryString = queryParams.toString()
+    const url = queryString ? `/accounting/assets?${queryString}` : '/accounting/assets'
+
+    return apiClient.get<AccountingResponse<{ assets: Asset[], total: number, page: number, limit: number, totalPages: number }>>(url)
   }
 
   async getAsset(id: string): Promise<AccountingResponse<Asset>> {
@@ -1340,7 +1359,7 @@ class AccountingApiService {
     if (params.startDate) queryParams.append('startDate', params.startDate)
     if (params.endDate) queryParams.append('endDate', params.endDate)
     if (params.currencyId) queryParams.append('currencyId', params.currencyId)
-    
+
     const queryString = queryParams.toString()
     return apiClient.get<AccountingResponse<AccountingDashboardData>>(
       `/accounting/dashboard${queryString ? `?${queryString}` : ''}`
@@ -1716,9 +1735,7 @@ class AccountingApiService {
   async uploadBankReconciliationFile(file: File): Promise<AccountingResponse<BankReconciliationUploadResponse>> {
     const formData = new FormData()
     formData.append('file', file)
-    return apiClient.post<AccountingResponse<BankReconciliationUploadResponse>>('/accounting/bank-reconciliation/upload', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    })
+    return apiClient.post<AccountingResponse<BankReconciliationUploadResponse>>('/accounting/bank-reconciliation/upload', formData)
   }
   async getBankReconciliationAuditTrail(id: string): Promise<AccountingResponse<BankReconciliationAuditTrail[]>> {
     return apiClient.get<AccountingResponse<BankReconciliationAuditTrail[]>>(`/accounting/bank-reconciliation/${id}/audit-trail`)
@@ -1749,7 +1766,7 @@ class AccountingApiService {
     endDate?: string
   }): Promise<AccountingResponse<PurchaseInvoicesResponse>> {
     const queryParams = new URLSearchParams()
-    
+
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
         if (value !== undefined && value !== null && value !== '') {

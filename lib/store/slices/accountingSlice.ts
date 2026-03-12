@@ -210,8 +210,8 @@ export const fetchIncomeStatement = createAsyncThunk(
 // Assets thunks
 export const fetchAssets = createAsyncThunk(
   'accounting/fetchAssets',
-  async () => {
-    const response = await accountingApi.getAssets()
+  async (params?: { page?: number; limit?: number; search?: string; status?: string }) => {
+    const response = await accountingApi.getAssets(params)
     if (!response.success) {
       throw new Error(response.error || 'Failed to fetch assets')
     }
@@ -713,19 +713,19 @@ interface AccountingState {
   expensesError: string | null
   expensesTotalPages: number
   expensesCurrentPage: number
-  
+
   // Reference data
   currencies: AccountingCurrency[]
   customers: Customer[]
   vendors: Vendor[]
   expenseCategories: ExpenseCategory[]
-  
+
   // Loading states for reference data
   currenciesLoading: boolean
   customersLoading: boolean
   vendorsLoading: boolean
   categoriesLoading: boolean
-  
+
   // Error states for reference data
   currenciesError: string | null
   customersError: string | null
@@ -763,6 +763,10 @@ interface AccountingState {
   assets: Asset[]
   assetsLoading: boolean
   assetsError: string | null
+  assetsTotal: number
+  assetsPage: number
+  assetsLimit: number
+  assetsTotalPages: number
   selectedAsset: Asset | null
   selectedAssetLoading: boolean
   selectedAssetError: string | null
@@ -883,19 +887,19 @@ const initialState: AccountingState = {
   expensesError: null,
   expensesTotalPages: 0,
   expensesCurrentPage: 1,
-  
+
   // Reference data
   currencies: [],
   customers: [],
   vendors: [],
   expenseCategories: [],
-  
+
   // Loading states
   currenciesLoading: false,
   customersLoading: false,
   vendorsLoading: false,
   categoriesLoading: false,
-  
+
   // Error states
   currenciesError: null,
   customersError: null,
@@ -933,6 +937,10 @@ const initialState: AccountingState = {
   assets: [],
   assetsLoading: false,
   assetsError: null,
+  assetsTotal: 0,
+  assetsPage: 1,
+  assetsLimit: 10,
+  assetsTotalPages: 1,
   selectedAsset: null,
   selectedAssetLoading: false,
   selectedAssetError: null,
@@ -1265,7 +1273,7 @@ const accountingSlice = createSlice({
       .addCase(postJournalEntry.rejected, (state) => {
         state.isPostingJournalEntry = false
       })
-      
+
       // Void journal entry
       .addCase(voidJournalEntry.pending, (state) => {
         state.isVoidingJournalEntry = true
@@ -1310,7 +1318,7 @@ const accountingSlice = createSlice({
         state.trialBalanceLoading = false
         state.trialBalanceError = action.error.message || 'Failed to fetch trial balance'
       })
-      
+
       // Fetch trial balance summary
       .addCase(fetchTrialBalanceSummary.pending, (state) => {
         state.trialBalanceSummaryLoading = true
@@ -1347,12 +1355,16 @@ const accountingSlice = createSlice({
       .addCase(fetchAssets.fulfilled, (state, action) => {
         state.assetsLoading = false
         state.assets = action.payload.assets
+        state.assetsTotal = action.payload.total
+        state.assetsPage = action.payload.page
+        state.assetsLimit = action.payload.limit || 10
+        state.assetsTotalPages = action.payload.totalPages
       })
       .addCase(fetchAssets.rejected, (state, action) => {
         state.assetsLoading = false
         state.assetsError = action.error.message || 'Failed to fetch assets'
       })
-      
+
       // Fetch asset
       .addCase(fetchAsset.pending, (state) => {
         state.selectedAssetLoading = true
@@ -1380,7 +1392,7 @@ const accountingSlice = createSlice({
         state.creditNotesLoading = false
         state.creditNotesError = action.error.message || 'Failed to fetch credit notes'
       })
-      
+
       // Fetch single credit note
       .addCase(fetchCreditNote.pending, (state) => {
         state.selectedCreditNoteLoading = true
@@ -1394,7 +1406,7 @@ const accountingSlice = createSlice({
         state.selectedCreditNoteLoading = false
         state.selectedCreditNoteError = action.error.message || 'Failed to fetch credit note'
       })
-      
+
       // Create credit note
       .addCase(createCreditNote.pending, (state) => {
         state.creditNotesLoading = true
@@ -1408,7 +1420,7 @@ const accountingSlice = createSlice({
         state.creditNotesLoading = false
         state.creditNotesError = action.error.message || 'Failed to create credit note'
       })
-      
+
       // Send credit note
       .addCase(sendCreditNote.fulfilled, (state, action) => {
         const index = state.creditNotes.findIndex(cn => cn.id === action.payload.id)
@@ -1419,7 +1431,7 @@ const accountingSlice = createSlice({
           state.selectedCreditNote = action.payload
         }
       })
-      
+
       // Apply credit note
       .addCase(applyCreditNote.fulfilled, (state, action) => {
         const index = state.creditNotes.findIndex(cn => cn.id === action.payload.id)
@@ -1427,7 +1439,7 @@ const accountingSlice = createSlice({
           state.creditNotes[index].status = 'APPLIED'
         }
       })
-      
+
       // Delete credit note
       .addCase(deleteCreditNote.fulfilled, (state, action) => {
         state.creditNotes = state.creditNotes.filter(cn => cn.id !== action.payload)
@@ -1822,11 +1834,11 @@ const accountingSlice = createSlice({
         state.cashbookBankPositionError = action.error.message || 'Failed to fetch bank position'
       })
 
-      //customers, chart of accounts, vendors
-      builder.addCase(fetchCustomers.pending, (state) => {
-        state.customersLoading = true
-        state.customersError = null
-      })
+    //customers, chart of accounts, vendors
+    builder.addCase(fetchCustomers.pending, (state) => {
+      state.customersLoading = true
+      state.customersError = null
+    })
       .addCase(fetchCustomers.fulfilled, (state, action) => {
         state.customersLoading = false
         state.customers = action.payload?.customers ?? []
@@ -1836,11 +1848,11 @@ const accountingSlice = createSlice({
         state.customersError = action.error.message || 'Failed to fetch customers'
       })
 
-      //createCashbookReceipt
-      builder.addCase(createCashbookReceipt.pending, (state) => {
-        state.cashbookReceiptLoading = true
-        state.cashbookReceiptError = null
-      })
+    //createCashbookReceipt
+    builder.addCase(createCashbookReceipt.pending, (state) => {
+      state.cashbookReceiptLoading = true
+      state.cashbookReceiptError = null
+    })
       .addCase(createCashbookReceipt.fulfilled, (state, action) => {
         state.cashbookReceiptLoading = false
         state.cashbookReceipts.push(action.payload)
@@ -1896,10 +1908,10 @@ const accountingSlice = createSlice({
   }
 })
 
-export const { 
-  setSelectedExpense, 
-  clearExpensesError, 
-  clearTrialBalanceError, 
+export const {
+  setSelectedExpense,
+  clearExpensesError,
+  clearTrialBalanceError,
   clearTrialBalanceSummaryError,
   clearIncomeStatementError,
   clearAssetsError,

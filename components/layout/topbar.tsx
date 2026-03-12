@@ -163,15 +163,15 @@ export function Topbar({ onModuleSelect, currentModule }: TopbarProps) {
               <DropdownMenuTrigger asChild>
                 <div className="p-2 h-auto cursor-pointer flex items-center justify-center rounded-md hover:bg-accent hover:text-accent-foreground transition-colors">
                   <Avatar className="w-10 h-10">
-                    <AvatarImage src="/professional-avatar.png" />
-                    <AvatarFallback className="bg-primary text-primary-foreground text-base">JD</AvatarFallback>
+                    <AvatarFallback className="bg-primary text-primary-foreground text-base">
+                      {getUserInitials()}
+                    </AvatarFallback>
                   </Avatar>
                 </div>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
                 <div className="flex items-center gap-2 p-2">
                   <Avatar className="w-10 h-10">
-                    <AvatarImage src="/professional-avatar.png" />
                     <AvatarFallback className="bg-primary text-primary-foreground text-base">
                       {getUserInitials()}
                     </AvatarFallback>

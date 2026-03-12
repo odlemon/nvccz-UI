@@ -4,10 +4,35 @@ import * as Tabs from "@radix-ui/react-tabs"
 import { BankReconciliationRecords } from "./bank-reconciliation-records"
 import { BankReconciliationAuditTrail } from "./bank-reconciliation-audit-trail"
 import { BankReconciliationUploadModal } from "./bank-reconciliation-upload-modal"
+import { accountingApi } from "@/lib/api/accounting-api"
+import { toast } from "sonner"
+
+import { useDispatch } from "react-redux"
+import { fetchBankReconciliations, fetchBankReconciliationSummary } from "@/lib/store/slices/accountingSlice"
+import type { AppDispatch } from "@/lib/store/store"
 
 export function BankReconciliationManagement() {
   const [uploadModalOpen, setUploadModalOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("records")
+  const [uploadFile, setUploadFile] = useState<File | null>(null)
+  const [loading, setLoading] = useState(false)
+  const dispatch = useDispatch<AppDispatch>()
+
+  const handleUpload = async (file: File) => {
+    setLoading(true)
+    try {
+      const response = await accountingApi.uploadBankReconciliationFile(file)
+      if (!response.success) {
+        throw new Error(response.message || 'Failed to upload bank statement')
+      }
+
+      // Refresh the data after successful upload
+      dispatch(fetchBankReconciliations())
+      dispatch(fetchBankReconciliationSummary())
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
     <div>
@@ -29,7 +54,14 @@ export function BankReconciliationManagement() {
           <BankReconciliationAuditTrail />
         </Tabs.Content>
       </Tabs.Root>
-      <BankReconciliationUploadModal open={uploadModalOpen} onClose={() => setUploadModalOpen(false)} />
+      <BankReconciliationUploadModal
+        open={uploadModalOpen}
+        onClose={() => setUploadModalOpen(false)}
+        onUpload={handleUpload}
+        uploadFile={uploadFile}
+        setUploadFile={setUploadFile}
+        loading={loading}
+      />
     </div>
   )
 }

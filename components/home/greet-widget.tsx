@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import { CiLocationOn, CiSun, CiCloud, CiCloudDrizzle } from "react-icons/ci";
 import { useState, useEffect } from "react";
+import { useAppSelector } from "@/lib/store";
 
 export function GreetWidget() {
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -13,6 +14,8 @@ export function GreetWidget() {
     humidity: "65%",
     wind: "12 km/h",
   });
+
+  const { user } = useAppSelector((state) => state.auth);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -161,7 +164,7 @@ export function GreetWidget() {
           <div className="flex justify-between items-start">
             {/* Left: Greeting, Location & Time/Date */}
             <div className="flex-1">
-              <h1 className="text-4xl drop-shadow-lg">{getGreeting()}, John</h1>
+              <h1 className="text-4xl drop-shadow-lg">{getGreeting()}, {user?.firstName || 'User'}</h1>
               <div className="flex items-center gap-2 mt-1 mb-8">
                 <CiLocationOn className="w-4 h-4 text-white/80 drop-shadow-md" />
                 <span className="text-sm text-white/80 drop-shadow-md">

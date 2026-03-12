@@ -7,11 +7,11 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { 
-  Plus, 
-  Search, 
-  Eye, 
-  Edit2, 
+import {
+  Plus,
+  Search,
+  Eye,
+  Edit2,
   Trash2,
   Building2,
   Calendar,
@@ -35,22 +35,51 @@ import { useRolePermissions } from "@/lib/hooks/useRolePermissions"
 
 export function AssetsManagement() {
   const dispatch = useDispatch<AppDispatch>()
-  const { assets, assetsLoading, assetsError } = useSelector((state: RootState) => state.accounting)
   const { canPerformAction } = useRolePermissions()
-  
+
   // Permission checks
   const canCreateAsset = canPerformAction('accounting', 'create')
   const canEditAsset = canPerformAction('accounting', 'update')
   const canDeleteAsset = canPerformAction('accounting', 'delete')
-  
+
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null)
   const [isViewDrawerOpen, setIsViewDrawerOpen] = useState(false)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
 
+  // Pagination state
+  const {
+    assets,
+    assetsLoading,
+    assetsError,
+    assetsTotal,
+    assetsPage,
+    assetsLimit,
+    assetsTotalPages
+  } = useSelector((state: RootState) => state.accounting)
+
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 10
+  })
+
   useEffect(() => {
-    dispatch(fetchAssets())
+    dispatch(fetchAssets({
+      page: pagination.page,
+      limit: pagination.limit
+    }))
+  }, [dispatch, pagination])
+
+  useEffect(() => {
     dispatch(fetchChartOfAccounts({ isActive: true }))
   }, [dispatch])
+
+  const handlePageChange = (page: number) => {
+    setPagination(prev => ({ ...prev, page }))
+  }
+
+  const handlePageSizeChange = (limit: number) => {
+    setPagination({ page: 1, limit })
+  }
 
   const handleViewAsset = (asset: Asset) => {
     setSelectedAsset(asset)
@@ -348,21 +377,30 @@ export function AssetsManagement() {
       </div>
 
       {/* Assets Data Table */}
-       <ProcurementDataTable
-            data={assets}
-            columns={columns}
-            title="Assets"
-            searchPlaceholder="Search assets..."
-            filterOptions={filterOptions}
-            onView={handleViewAsset}
-            onEdit={canEditAsset ? handleEditAsset : undefined}
-            onDelete={canDeleteAsset ? handleDeleteAsset : undefined}
-            onBulkAction={handleBulkAction}
-            bulkActions={bulkActions}
-            loading={assetsLoading}
-            onExport={handleExport}
-            emptyMessage="No assets found. Create your first asset to get started."
-          />
+      <ProcurementDataTable
+        data={assets}
+        columns={columns}
+        title="Assets"
+        searchPlaceholder="Search assets..."
+        filterOptions={filterOptions}
+        onView={handleViewAsset}
+        onEdit={canEditAsset ? handleEditAsset : undefined}
+        onDelete={canDeleteAsset ? handleDeleteAsset : undefined}
+        onBulkAction={handleBulkAction}
+        bulkActions={bulkActions}
+        loading={assetsLoading}
+        onExport={handleExport}
+        emptyMessage="No assets found. Create your first asset to get started."
+        usePagination="backend"
+        paginationData={{
+          total: assetsTotal,
+          page: assetsPage,
+          limit: assetsLimit,
+          totalPages: assetsTotalPages
+        }}
+        onPageChange={handlePageChange}
+        onPageSizeChange={handlePageSizeChange}
+      />
 
       {/* Asset View Drawer */}
       <AssetViewDrawer

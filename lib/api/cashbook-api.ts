@@ -346,7 +346,7 @@ class CashbookApiService {
         if (params?.bankId) queryParams.append('bankId', params.bankId)
         if (params?.page) queryParams.append('page', params.page.toString())
         if (params?.limit) queryParams.append('limit', params.limit.toString())
-        
+
         return apiClient.get<AccountingResponse<{ reversals: CashbookTransaction[]; pagination: any }>>(`/cashbook/transactions?${queryParams.toString()}`)
     }
 
@@ -450,6 +450,22 @@ class CashbookApiService {
     // Generate Contra Entry
     async generateContraEntry(cashbookEntryId: string): Promise<AccountingResponse<any>> {
         return apiClient.post<AccountingResponse<any>>('/cashbook/contra/generate', { cashbookEntryId })
+    }
+
+    // Export Cashbook Audit
+    async exportCashbookAudit(params: { year: number; month: number; bankId?: string | null }): Promise<Blob> {
+        const queryParams = new URLSearchParams()
+        queryParams.append('year', params.year.toString())
+        queryParams.append('month', params.month.toString())
+        if (params.bankId) {
+            queryParams.append('bankId', params.bankId)
+        } else {
+            queryParams.append('bankId', 'null')
+        }
+
+        return apiClient.get<Blob>(`/cashbook/export-audit?${queryParams.toString()}`, {
+            responseType: 'blob'
+        })
     }
 }
 
