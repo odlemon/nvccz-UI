@@ -39,6 +39,7 @@ import { RevalueAssetModal } from "./revalue-asset-modal"
 import { ConfirmationDialog } from "../ui/confirmation-drawer"
 import type { AppDispatch } from "@/lib/store"
 import { postDepreciation } from "@/lib/store/slices/accountingSlice"
+import { useAccountingPermissions } from "@/lib/hooks/useAccountingPermissions"
 
 interface AssetViewDrawerProps {
   isOpen: boolean
@@ -55,6 +56,7 @@ const tabs = [
 
 export function AssetViewDrawer({ isOpen, onClose, asset, onAssetUpdated }: AssetViewDrawerProps) {
   const dispatch = useDispatch<AppDispatch>()
+  const { permissions } = useAccountingPermissions()
   const [activeTab, setActiveTab] = useState("overview")
   const [isEditing, setIsEditing] = useState(false)
   const [editForm, setEditForm] = useState({
@@ -182,6 +184,7 @@ export function AssetViewDrawer({ isOpen, onClose, asset, onAssetUpdated }: Asse
 
           {/* Action Buttons - Top Right */}
           <div className="mt-4 flex justify-end gap-3">
+            {permissions.canCalcDepreciation && (
             <Button 
               onClick={() => setIsCalculateModalOpen(true)}
               className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-full shadow-sm"
@@ -190,6 +193,8 @@ export function AssetViewDrawer({ isOpen, onClose, asset, onAssetUpdated }: Asse
               <Calculator className="w-4 h-4 mr-2" />
               Calculate Depreciation
             </Button>
+            )}
+            {permissions.canRevalueAsset && (
             <Button 
               onClick={() => setIsRevalueModalOpen(true)}
               className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-full shadow-sm"
@@ -198,6 +203,8 @@ export function AssetViewDrawer({ isOpen, onClose, asset, onAssetUpdated }: Asse
               <TrendingUp className="w-4 h-4 mr-2" />
               Revalue Asset
             </Button>
+            )}
+            {permissions.canDisposeAsset && (
             <Button 
               variant="outline" 
               onClick={() => setIsDisposeModalOpen(true)}
@@ -207,6 +214,7 @@ export function AssetViewDrawer({ isOpen, onClose, asset, onAssetUpdated }: Asse
               <Trash2 className="w-4 h-4 mr-2" />
               Dispose Asset
             </Button>
+            )}
           </div>
 
           {/* Tab Navigation */}

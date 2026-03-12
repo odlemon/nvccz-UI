@@ -8,7 +8,7 @@ export default function PayablesPage() {
   return (
 
 
-    <ModuleGuard moduleId="accounting" subModuleId="invoices">
+    <ModuleGuard moduleId="accounting" subModuleId="payables">
       <AccountingLayout>
         <div className="p-6">
           <PayablesManagement />

@@ -300,6 +300,14 @@ export {
   isDepartmentHead,
 } from './config/performance-permissions';
 
+// Accounting Permissions
+export {
+  ACCOUNTING_ACTIONS,
+  ACCOUNTING_ROLE_PERMISSIONS,
+  canPerformAccountingAction,
+  hasAccountingSubModuleAccess,
+} from './config/accounting-permissions';
+
 // Hooks
 export {
   useRolePermissions,
@@ -316,6 +324,10 @@ export {
   usePerformancePermissions,
   useHasPerformanceAccess,
 } from './hooks/usePerformancePermissions';
+
+export {
+  useAccountingPermissions,
+} from './hooks/useAccountingPermissions';
 
 // Components
 export {

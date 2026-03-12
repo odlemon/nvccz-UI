@@ -17,18 +17,18 @@ import { CreateVendorModal } from "./create-vendor-modal"
 import { ViewVendorModal } from "./view-vendor-modal"
 import { ConfirmationDialog } from "../ui/confirmation-drawer"
 import { accountingApi, Vendor, CreateVendorRequest } from "@/lib/api/accounting-api"
-import { useRolePermissions } from "@/lib/hooks/useRolePermissions"
+import { useAccountingPermissions } from "@/lib/hooks/useAccountingPermissions"
 
 // Export the type for use in other components
 export type { Vendor }
 
 export function VendorsManagement() {
-  const { canPerformAction } = useRolePermissions()
+  const { permissions } = useAccountingPermissions()
   
   // Permission checks
-  const canCreateVendor = canPerformAction('accounting', 'create')
-  const canEditVendor = canPerformAction('accounting', 'update')
-  const canDeleteVendor = canPerformAction('accounting', 'delete')
+  const canCreateVendor = permissions.canCreateVendor
+  const canEditVendor = permissions.canUpdateVendor
+  const canDeleteVendor = permissions.canDeleteVendor
   
   const [vendors, setVendors] = useState<Vendor[]>([])
   const [vendorsLoading, setVendorsLoading] = useState(false)

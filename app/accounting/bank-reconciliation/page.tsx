@@ -31,9 +31,11 @@ import { fetchBankReconciliations, fetchBankReconciliationSummary, fetchBankReco
 import { ProcurementDataTable, Column } from "@/components/procurement/procurement-data-table"
 import { BankReconciliationViewDrawer } from "@/components/accounting/bank-reconciliation-view-drawer"
 import { BankReconciliationUploadModal } from "@/components/accounting/bank-reconciliation-upload-modal"
+import { useAccountingPermissions } from "@/lib/hooks/useAccountingPermissions"
 
 function BankReconciliationPage() {
   const dispatch = useDispatch<AppDispatch>()
+  const { permissions: acctPerms } = useAccountingPermissions()
   const {
     bankReconciliations,
     bankReconciliationLoading,
@@ -206,9 +208,11 @@ function BankReconciliationPage() {
             <p className="text-muted-foreground">Manage bank statement uploads, matches, and audit trail</p>
           </div>
           <div className="flex gap-3">
+            {acctPerms.canUploadBankStatement && (
             <Button onClick={() => setUploadModalOpen(true)} className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-full px-6">
               <Plus className="w-4 h-4 mr-2" /> Upload Statement
             </Button>
+            )}
           </div>
         </div>
 

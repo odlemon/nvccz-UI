@@ -10,17 +10,17 @@ import { toast } from "sonner"
 import { CreateExchangeRateModal, ViewExchangeRateModal } from "./exchange-rate-modals"
 import { fetchExchangeRates, createExchangeRate, updateExchangeRate, deleteExchangeRate } from "@/lib/store/slices/accountingSlice"
 import { accountingApi, ExchangeRate } from "@/lib/api/accounting-api"
-import { useRolePermissions } from "@/lib/hooks/useRolePermissions"
+import { useAccountingPermissions } from "@/lib/hooks/useAccountingPermissions"
 
 export function ExchangeRatesManagement() {
   const dispatch = useAppDispatch()
   const { exchangeRates, exchangeRatesLoading } = useAppSelector(s => s.accounting)
-  const { canPerformAction } = useRolePermissions()
+  const { permissions } = useAccountingPermissions()
   
   // Permission checks
-  const canCreateRate = canPerformAction('accounting', 'create')
-  const canEditRate = canPerformAction('accounting', 'update')
-  const canDeleteRate = canPerformAction('accounting', 'delete')
+  const canCreateRate = permissions.canCreateExchangeRate
+  const canEditRate = permissions.canUpdateExchangeRate
+  const canDeleteRate = permissions.canDeleteExchangeRate
   
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [isViewOpen, setIsViewOpen] = useState(false)

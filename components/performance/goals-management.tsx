@@ -36,6 +36,7 @@ import { IndividualBreakdownModal } from "./individual-breakdown-modal"
 import { AnimatePresence, motion } from "framer-motion"
 import { cn } from "@/lib/utils"
 import { ChevronDown } from "lucide-react"
+import { usePerformancePermissions } from "@/lib/hooks/usePerformancePermissions"
 
 const CollapsibleSection = ({
   title,
@@ -88,6 +89,7 @@ const CollapsibleSection = ({
 
 export function GoalsManagement() {
   const dispatch = useAppDispatch()
+  const { permissions } = usePerformancePermissions()
   const { goals, goalsLoading, goalError, availableDepartments, availableKPIs } = useAppSelector(
     (state) => state.performance,
   )
@@ -259,6 +261,7 @@ export function GoalsManagement() {
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg font-normal">{goal.title}</CardTitle>
             <div className="flex items-center gap-1">
+              {(permissions.canUpdateCompanyGoal || permissions.canUpdateDepartmentGoal || permissions.canUpdateOwnDepartmentGoal) && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -271,6 +274,7 @@ export function GoalsManagement() {
               >
                 <CiEdit className="w-5 h-5" />
               </Button>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
@@ -363,6 +367,7 @@ export function GoalsManagement() {
             <CiRedo className={`w-4 h-4 mr-2 ${goalsLoading ? "animate-spin" : ""}`} />
             Refresh
           </Button>
+          {(permissions.canCreateCompanyGoal || permissions.canCreateDepartmentGoal || permissions.canCreateIndividualGoal) && (
           <Button
             onClick={handleCreateGoal}
             className="rounded-full bg-gradient-to-br from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
@@ -370,6 +375,7 @@ export function GoalsManagement() {
             <CiPlus className="w-4 h-4 mr-2" />
             Create Goal
           </Button>
+          )}
         </div>
       </div>
 
@@ -473,15 +479,24 @@ export function GoalsManagement() {
               ? "No goals match your current search. Try adjusting your search criteria."
               : "Get started by creating your first goal to track performance objectives."}
           </p>
+          {(permissions.canCreateCompanyGoal || permissions.canCreateDepartmentGoal || permissions.canCreateIndividualGoal) && (
           <Button onClick={handleCreateGoal}>
             <CiPlus className="w-4 h-4 mr-2" />
             Create Your First Goal
           </Button>
+          )}
         </div>
       )}
 
       {viewingGoal && (
-        <GoalViewDrawer isOpen={!!viewingGoal} onClose={() => setViewingGoal(null)} goal={viewingGoal} onBreakdown={handleBreakdown} />
+        <GoalViewDrawer 
+          isOpen={!!viewingGoal} 
+          onClose={() => setViewingGoal(null)} 
+          goal={viewingGoal} 
+          onEdit={(permissions.canUpdateCompanyGoal || permissions.canUpdateDepartmentGoal || permissions.canUpdateOwnDepartmentGoal) ? (goal) => handleEditGoal(goal) : undefined}
+          onDelete={(permissions.canDeleteCompanyGoal || permissions.canDeleteDepartmentGoal || permissions.canDeleteOwnDepartmentGoal) ? (goal) => handleDeleteGoal(goal.id) : undefined}
+          onBreakdown={handleBreakdown} 
+        />
       )}
 
       {showCreateModal && (

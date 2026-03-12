@@ -29,11 +29,11 @@ import { ProcurementDataTable, Column } from "../procurement/procurement-data-ta
 import { InventoryViewDrawer } from "./inventory-view-drawer"
 import { CreateInventoryModal } from "./create-inventory-modal"
 import { accountingApi } from "@/lib/api/accounting-api"
-import { useRolePermissions } from "@/lib/hooks/useRolePermissions"
+import { useAccountingPermissions } from "@/lib/hooks/useAccountingPermissions"
 
 export function InventoryManagement() {
   const dispatch = useDispatch<AppDispatch>()
-  const { canPerformAction } = useRolePermissions()
+  const { permissions } = useAccountingPermissions()
   
   const {
     inventoryItems,
@@ -43,9 +43,9 @@ export function InventoryManagement() {
   } = useSelector((state: RootState) => state.accounting)
 
   // Permission checks
-  const canCreateInventory = canPerformAction('accounting', 'create')
-  const canEditInventory = canPerformAction('accounting', 'update')
-  const canDeleteInventory = canPerformAction('accounting', 'delete')
+  const canCreateInventory = permissions.canCreateInventory
+  const canEditInventory = permissions.canUpdateInventory
+  const canDeleteInventory = permissions.canDeleteInventory
 
   // Local state for Valuation & Reorder (avoid relying on thunk that caused runtime error)
   const [inventoryValuation, setInventoryValuation] = useState<InventoryValuationResponse | null>(null)

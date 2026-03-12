@@ -40,6 +40,7 @@ import { CreatePurchaseInvoiceModal } from "./create-purchase-invoice-modal"
 import { PurchaseInvoiceViewDrawer } from "./purchase-invoice-view-drawer"
 import { fetchCurrencies, fetchVendors } from "@/lib/store/slices/accountingSlice"
 import { usePurchaseInvoices } from "@/lib/hooks/use-purchase-invoices"
+import { useAccountingPermissions } from "@/lib/hooks/useAccountingPermissions"
 import type { RootState, AppDispatch } from "@/lib/store"
 import { PurchaseInvoice } from "@/lib/api/accounting-api"
 
@@ -93,6 +94,7 @@ const tabs = [
 
 export function PayablesManagement() {
   const dispatch = useDispatch<AppDispatch>()
+  const { permissions } = useAccountingPermissions()
   
   const {
     purchaseInvoices,
@@ -577,6 +579,7 @@ export function PayablesManagement() {
           <h2 className="text-2xl font-bold">Accounts Payable</h2>
           <p className="text-gray-500">Manage vendor purchase invoices</p>
         </div>
+{permissions.canCreatePayable && (
         <Button
           onClick={handleCreateInvoiceClick}
           className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 rounded-full px-6"
@@ -584,6 +587,7 @@ export function PayablesManagement() {
           <Plus className="w-4 h-4 mr-2" />
           Create Purchase Invoice
         </Button>
+        )}
       </div>
 
       {/* Tab Navigation */}
@@ -752,11 +756,10 @@ export function PayablesManagement() {
         invoice={selectedPurchaseInvoice}
         currencies={currencies}
         vendors={vendors}
-        onEdit={(invoice) => {
+        onEdit={permissions.canEditPayable ? (invoice) => {
           setIsViewDrawerOpen(false)
           // Open edit modal or navigate to edit page
-          // You can implement this based on your requirements
-        }}
+        } : undefined}
       />
     </div>
   )

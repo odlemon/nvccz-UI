@@ -16,18 +16,18 @@ import { CreateExpenseCategoryModal } from "./create-expense-category-modal"
 import { ViewExpenseCategoryModal } from "./view-expense-category-modal"
 import { ConfirmationDialog } from "../ui/confirmation-drawer"
 import { accountingApi, ExpenseCategory, CreateExpenseCategoryRequest } from "@/lib/api/accounting-api"
-import { useRolePermissions } from "@/lib/hooks/useRolePermissions"
+import { useAccountingPermissions } from "@/lib/hooks/useAccountingPermissions"
 
 // Export the type for use in other components
 export type { ExpenseCategory }
 
 export function ExpenseCategoriesManagement() {
-  const { canPerformAction } = useRolePermissions()
+  const { permissions } = useAccountingPermissions()
   
   // Permission checks
-  const canCreateCategory = canPerformAction('accounting', 'create')
-  const canEditCategory = canPerformAction('accounting', 'update')
-  const canDeleteCategory = canPerformAction('accounting', 'delete')
+  const canCreateCategory = permissions.canCreateExpenseCategory
+  const canEditCategory = permissions.canUpdateExpenseCategory
+  const canDeleteCategory = permissions.canDeleteExpenseCategory
   
   const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([])
   const [expenseCategoriesLoading, setExpenseCategoriesLoading] = useState(false)

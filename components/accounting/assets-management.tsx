@@ -31,17 +31,20 @@ import { ProcurementDataTable, Column } from "../procurement/procurement-data-ta
 import { AssetViewDrawer } from "./asset-view-drawer"
 import { CreateAssetModal } from "./create-asset-modal"
 import { accountingApi } from "@/lib/api/accounting-api"
-import { useRolePermissions } from "@/lib/hooks/useRolePermissions"
+import { useAccountingPermissions } from "@/lib/hooks/useAccountingPermissions"
 
 export function AssetsManagement() {
   const dispatch = useDispatch<AppDispatch>()
   const { assets, assetsLoading, assetsError } = useSelector((state: RootState) => state.accounting)
-  const { canPerformAction } = useRolePermissions()
+  const { permissions } = useAccountingPermissions()
   
   // Permission checks
-  const canCreateAsset = canPerformAction('accounting', 'create')
-  const canEditAsset = canPerformAction('accounting', 'update')
-  const canDeleteAsset = canPerformAction('accounting', 'delete')
+  const canCreateAsset = permissions.canCreateAsset
+  const canEditAsset = permissions.canUpdateAsset
+  const canDeleteAsset = permissions.canDeleteAsset
+  const canDisposeAsset = permissions.canDisposeAsset
+  const canRevalueAsset = permissions.canRevalueAsset
+  const canCalcDepreciation = permissions.canCalcDepreciation
   
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null)
   const [isViewDrawerOpen, setIsViewDrawerOpen] = useState(false)

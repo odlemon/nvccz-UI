@@ -49,7 +49,7 @@ import {
 } from "@/lib/store/slices/accountingSlice"
 import type { RootState, AppDispatch } from "@/lib/store"
 import { Expense } from "@/lib/api/accounting-api"
-import { useRolePermissions } from "@/lib/hooks/useRolePermissions"
+import { useAccountingPermissions } from "@/lib/hooks/useAccountingPermissions"
 
 const tabs = [
   {
@@ -88,7 +88,7 @@ const tabs = [
 
 export function ExpensesManagement() {
   const dispatch = useDispatch<AppDispatch>()
-  const { canPerformAction } = useRolePermissions()
+  const { permissions } = useAccountingPermissions()
   
   const { 
     expenses = [], 
@@ -100,9 +100,9 @@ export function ExpensesManagement() {
   } = useSelector((state: RootState) => state.accounting)
   
   // Permission checks
-  const canCreateExpense = canPerformAction('accounting', 'create')
-  const canEditExpense = canPerformAction('accounting', 'update')
-  const canDeleteExpense = canPerformAction('accounting', 'delete')
+  const canCreateExpense = permissions.canCreateExpense
+  const canEditExpense = permissions.canUpdateExpense
+  const canDeleteExpense = permissions.canDeleteExpense
   
   const [activeTab, setActiveTab] = useState("all")
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)

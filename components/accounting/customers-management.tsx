@@ -20,18 +20,18 @@ import { ViewCustomerModal } from "./view-customer-modal"
 import { ConfirmationDialog } from "../ui/confirmation-drawer"
 import { accountingApi, Customer, CreateCustomerRequest } from "@/lib/api/accounting-api"
 import { CustomerViewDrawer } from "./customer-view-drawer"
-import { useRolePermissions } from "@/lib/hooks/useRolePermissions"
+import { useAccountingPermissions } from "@/lib/hooks/useAccountingPermissions"
 
 // Export the type for use in other components
 export type { Customer }
 
 export function CustomersManagement() {
-  const { canPerformAction } = useRolePermissions()
+  const { permissions } = useAccountingPermissions()
   
   // Permission checks
-  const canCreateCustomer = canPerformAction('accounting', 'create')
-  const canEditCustomer = canPerformAction('accounting', 'update')
-  const canDeleteCustomer = canPerformAction('accounting', 'delete')
+  const canCreateCustomer = permissions.canCreateCustomer
+  const canEditCustomer = permissions.canUpdateCustomer
+  const canDeleteCustomer = permissions.canDeleteCustomer
   
   const [customers, setCustomers] = useState<Customer[]>([])
   const [customersLoading, setCustomersLoading] = useState(false)
