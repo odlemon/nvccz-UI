@@ -19,7 +19,7 @@ import { fetchCustomers, fetchVendors, fetchChartOfAccounts } from "@/lib/store/
 import type { RootState, AppDispatch } from "@/lib/store"
 import { accountingApi } from "@/lib/api/accounting-api"
 import { cashbookApi, OpenItem, Allocation } from "@/lib/api/cashbook-api"
-import { useRolePermissions } from "@/lib/hooks/useRolePermissions"
+import { useAccountingPermissions } from "@/lib/hooks/useAccountingPermissions"
 
 const entrySchema = yup.object({
   period: yup.string().required("Period is required"),
@@ -65,11 +65,11 @@ export function ProcessCashbookModal({
   onSuccess,
 }: ProcessCashbookModalProps) {
   const dispatch = useDispatch<AppDispatch>()
-  const { canPerformAction } = useRolePermissions()
+  const { permissions } = useAccountingPermissions()
   
   // Permission checks
-  const canCreateCashbook = canPerformAction('accounting', 'create')
-  const canEditCashbook = canPerformAction('accounting', 'update')
+  const canCreateCashbook = permissions.canProcessCashbook
+  const canEditCashbook = permissions.canProcessCashbook
   
   const customers = useSelector((state: RootState) => state.accounting.customers)
   const vendors = useSelector((state: RootState) => state.accounting.vendors)

@@ -162,6 +162,7 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'general-ledger': 'full',
           'cash-book': 'full',
           'invoices': 'full',
+          'payables': 'full',
           'bank-reconciliation': 'full',
           'expenses': 'full',
           'inventory-accounting': 'full',
@@ -288,6 +289,7 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'general-ledger': 'full',
           'cash-book': 'full',
           'invoices': 'full',
+          'payables': 'full',
           'bank-reconciliation': 'full',
           'expenses': 'full',
           'inventory-accounting': 'full',
@@ -364,11 +366,11 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
         ],
         subModules: {
           'dashboard': 'read',
-          'kpiManagement': 'write',
-          'goalsManagement': 'write',
-          'taskManagement': 'write',
-          'departmentScorecard': 'read',
-          'userScorecard': 'full',
+          'kpi-management': 'write',
+          'goals-management': 'write',
+          'task-management': 'write',
+          'department-scorecard': 'read',
+          'user-scorecard': 'full',
         }
       },
     ]
@@ -388,6 +390,7 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'general-ledger': 'write',
           'cash-book': 'write',
           'invoices': 'write',
+          'payables': 'write',
           'bank-reconciliation': 'write',
           'expenses': 'write',
           'inventory-accounting': 'write',
@@ -460,6 +463,7 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'general-ledger': 'write',
           'cash-book': 'write',
           'invoices': 'write',
+          'payables': 'write',
           'bank-reconciliation': 'read',
           'expenses': 'write',
           'inventory-accounting': 'write',
@@ -496,6 +500,7 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'general-ledger': 'write',
           'cash-book': 'write',
           'invoices': 'write',
+          'payables': 'write',
           'expenses': 'write',
           'financial-reports': 'read',
         }
@@ -693,7 +698,33 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
     modules: [
       { moduleId: 'homepage', access: 'full' },
       { moduleId: 'procurement', access: 'full' },
-      { moduleId: 'performance-management', access: 'full' },
+      {
+        moduleId: 'performance-management',
+        access: 'full',
+        actions: [
+          PERFORMANCE_ACTIONS.VIEW_KPI,
+          PERFORMANCE_ACTIONS.VIEW_DEPARTMENT_KPIS,
+          PERFORMANCE_ACTIONS.VIEW_DEPARTMENT_GOALS,
+          PERFORMANCE_ACTIONS.VIEW_OWN_DEPARTMENT_GOALS,
+          PERFORMANCE_ACTIONS.UPDATE_OWN_DEPARTMENT_GOAL,
+          PERFORMANCE_ACTIONS.CREATE_TASK,
+          PERFORMANCE_ACTIONS.VIEW_OWN_TASKS,
+          PERFORMANCE_ACTIONS.VIEW_DEPARTMENT_TASKS,
+          PERFORMANCE_ACTIONS.UPDATE_DEPARTMENT_TASK,
+          PERFORMANCE_ACTIONS.ASSIGN_TASK,
+          PERFORMANCE_ACTIONS.VIEW_DEPARTMENT_SCORECARD,
+          PERFORMANCE_ACTIONS.VIEW_USER_SCORECARDS,
+          PERFORMANCE_ACTIONS.CONDUCT_PERFORMANCE_REVIEW,
+          PERFORMANCE_ACTIONS.VIEW_PERFORMANCE_REVIEWS,
+        ],
+        subModules: {
+          'kpi-management': 'read',
+          'goals-management': 'write',
+          'task-management': 'write',
+          'department-scorecard': 'read',
+          'user-scorecard': 'full',
+        }
+      },
       { moduleId: 'events-management', access: 'full' },
       {
         moduleId: 'accounting',
@@ -851,6 +882,33 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
         subModules: {
           'expenses': 'write',
           'inventory-accounting': 'read',
+        }
+      },
+      {
+        moduleId: 'performance-management',
+        access: 'write',
+        actions: [
+          PERFORMANCE_ACTIONS.VIEW_KPI,
+          PERFORMANCE_ACTIONS.VIEW_DEPARTMENT_KPIS,
+          PERFORMANCE_ACTIONS.VIEW_DEPARTMENT_GOALS,
+          PERFORMANCE_ACTIONS.VIEW_OWN_DEPARTMENT_GOALS,
+          PERFORMANCE_ACTIONS.UPDATE_OWN_DEPARTMENT_GOAL,
+          PERFORMANCE_ACTIONS.CREATE_TASK,
+          PERFORMANCE_ACTIONS.VIEW_OWN_TASKS,
+          PERFORMANCE_ACTIONS.VIEW_DEPARTMENT_TASKS,
+          PERFORMANCE_ACTIONS.UPDATE_DEPARTMENT_TASK,
+          PERFORMANCE_ACTIONS.ASSIGN_TASK,
+          PERFORMANCE_ACTIONS.VIEW_DEPARTMENT_SCORECARD,
+          PERFORMANCE_ACTIONS.VIEW_USER_SCORECARDS,
+          PERFORMANCE_ACTIONS.CONDUCT_PERFORMANCE_REVIEW,
+          PERFORMANCE_ACTIONS.VIEW_PERFORMANCE_REVIEWS,
+        ],
+        subModules: {
+          'kpi-management': 'read',
+          'goals-management': 'write',
+          'task-management': 'write',
+          'department-scorecard': 'read',
+          'user-scorecard': 'full',
         }
       },
     ]
@@ -1576,6 +1634,23 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
         actions: Object.values(APPLICATION_PORTAL_ACTIONS)
       },
       {
+        moduleId: 'accounting',
+        access: 'full',
+        subModules: {
+          'accounting-dashboard': 'full',
+          'general-ledger': 'full',
+          'cash-book': 'full',
+          'invoices': 'full',
+          'payables': 'full',
+          'bank-reconciliation': 'full',
+          'expenses': 'full',
+          'inventory-accounting': 'full',
+          'asset-management': 'full',
+          'financial-reports': 'full',
+          'accounting-settings': 'full',
+        }
+      },
+      {
         moduleId: 'procurement',
         access: 'full',
         actions: Object.values(PROCUREMENT_ACTIONS),
@@ -1589,6 +1664,50 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'goods-received-notes': 'full',
           'payments': 'full',
           'approval-configurations': 'full',
+        }
+      },
+      {
+        moduleId: 'performance-management',
+        access: 'full',
+        actions: [
+          PERFORMANCE_ACTIONS.VIEW_DASHBOARD,
+          PERFORMANCE_ACTIONS.VIEW_ALL_DEPARTMENTS_PERFORMANCE,
+          PERFORMANCE_ACTIONS.VIEW_ALL_EMPLOYEES_PERFORMANCE,
+          PERFORMANCE_ACTIONS.CREATE_KPI,
+          PERFORMANCE_ACTIONS.VIEW_KPI,
+          PERFORMANCE_ACTIONS.UPDATE_KPI,
+          PERFORMANCE_ACTIONS.DELETE_KPI,
+          PERFORMANCE_ACTIONS.ASSIGN_KPI,
+          PERFORMANCE_ACTIONS.VIEW_ALL_KPIS,
+          PERFORMANCE_ACTIONS.CREATE_COMPANY_GOAL,
+          PERFORMANCE_ACTIONS.CREATE_DEPARTMENT_GOAL,
+          PERFORMANCE_ACTIONS.VIEW_COMPANY_GOALS,
+          PERFORMANCE_ACTIONS.VIEW_DEPARTMENT_GOALS,
+          PERFORMANCE_ACTIONS.VIEW_INDIVIDUAL_GOALS,
+          PERFORMANCE_ACTIONS.UPDATE_COMPANY_GOAL,
+          PERFORMANCE_ACTIONS.UPDATE_DEPARTMENT_GOAL,
+          PERFORMANCE_ACTIONS.DELETE_COMPANY_GOAL,
+          PERFORMANCE_ACTIONS.DELETE_DEPARTMENT_GOAL,
+          PERFORMANCE_ACTIONS.VIEW_ALL_TASKS,
+          PERFORMANCE_ACTIONS.VIEW_DEPARTMENT_TASKS,
+          PERFORMANCE_ACTIONS.UPDATE_ANY_TASK,
+          PERFORMANCE_ACTIONS.DELETE_ANY_TASK,
+          PERFORMANCE_ACTIONS.ASSIGN_TASK,
+          PERFORMANCE_ACTIONS.VIEW_ALL_SCORECARDS,
+          PERFORMANCE_ACTIONS.VIEW_DEPARTMENT_SCORECARD,
+          PERFORMANCE_ACTIONS.VIEW_USER_SCORECARDS,
+          PERFORMANCE_ACTIONS.CONDUCT_PERFORMANCE_REVIEW,
+          PERFORMANCE_ACTIONS.VIEW_PERFORMANCE_REVIEWS,
+          PERFORMANCE_ACTIONS.APPROVE_PERFORMANCE_REVIEW,
+        ],
+        subModules: {
+          'performance-dashboard': 'full',
+          'departments': 'full',
+          'kpi-management': 'full',
+          'goals-management': 'full',
+          'task-management': 'full',
+          'department-scorecard': 'full',
+          'user-scorecard': 'full',
         }
       },
       {
@@ -1695,7 +1814,23 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
         access: 'full',
         actions: Object.values(APPLICATION_PORTAL_ACTIONS)
       },
-      { moduleId: 'accounting', access: 'read' },
+      {
+        moduleId: 'accounting',
+        access: 'full',
+        subModules: {
+          'accounting-dashboard': 'full',
+          'general-ledger': 'full',
+          'cash-book': 'full',
+          'invoices': 'full',
+          'payables': 'full',
+          'bank-reconciliation': 'full',
+          'expenses': 'full',
+          'inventory-accounting': 'full',
+          'asset-management': 'full',
+          'financial-reports': 'full',
+          'accounting-settings': 'full',
+        }
+      },
       { moduleId: 'payroll', access: 'read' },
       {
         moduleId: 'procurement',
@@ -1858,11 +1993,11 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
         ],
         subModules: {
           'dashboard': 'full',
-          'kpiManagement': 'full',
-          'goalsManagement': 'full',
-          'taskManagement': 'full',
-          'departmentScorecard': 'full',
-          'userScorecard': 'full',
+          'kpi-management': 'full',
+          'goals-management': 'full',
+          'task-management': 'full',
+          'department-scorecard': 'full',
+          'user-scorecard': 'full',
         }
       },
       { moduleId: 'admin-management', access: 'read' },
@@ -1987,6 +2122,19 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'purchase-requisitions': 'write',
         }
       },
+      {
+        moduleId: 'performance-management',
+        access: 'read',
+        actions: [
+          PERFORMANCE_ACTIONS.VIEW_DEPARTMENT_SCORECARD,
+          PERFORMANCE_ACTIONS.VIEW_USER_SCORECARDS,
+          PERFORMANCE_ACTIONS.VIEW_OWN_SCORECARD,
+        ],
+        subModules: {
+          'department-scorecard': 'read',
+          'user-scorecard': 'read',
+        }
+      },
     ]
   },
 
@@ -2036,6 +2184,24 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'purchase-requisitions': 'write',
         }
       },
+      {
+        moduleId: 'performance-management',
+        access: 'read',
+        actions: [
+          PERFORMANCE_ACTIONS.VIEW_KPI,
+          PERFORMANCE_ACTIONS.VIEW_DEPARTMENT_KPIS,
+          PERFORMANCE_ACTIONS.VIEW_DEPARTMENT_GOALS,
+          PERFORMANCE_ACTIONS.VIEW_DEPARTMENT_SCORECARD,
+          PERFORMANCE_ACTIONS.VIEW_USER_SCORECARDS,
+          PERFORMANCE_ACTIONS.VIEW_OWN_SCORECARD,
+        ],
+        subModules: {
+          'kpi-management': 'read',
+          'goals-management': 'read',
+          'department-scorecard': 'read',
+          'user-scorecard': 'read',
+        }
+      },
     ]
   },
 
@@ -2082,7 +2248,41 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
         moduleId: 'accounting',
         access: 'read',
         subModules: {
-          'financial-reports': 'read',
+          'accounting-dashboard': 'read',
+          'cash-book': 'read',
+          'invoices': 'read',
+          'payables': 'read',
+          'bank-reconciliation': 'read',
+          'expenses': 'read',
+          'inventory-accounting': 'read',
+          'asset-management': 'read',
+          'accounting-settings': 'read',
+        }
+      },
+      {
+        moduleId: 'performance-management',
+        access: 'read',
+        actions: [
+          PERFORMANCE_ACTIONS.VIEW_DASHBOARD,
+          PERFORMANCE_ACTIONS.VIEW_ALL_DEPARTMENTS_PERFORMANCE,
+          PERFORMANCE_ACTIONS.VIEW_KPI,
+          PERFORMANCE_ACTIONS.VIEW_ALL_KPIS,
+          PERFORMANCE_ACTIONS.VIEW_COMPANY_GOALS,
+          PERFORMANCE_ACTIONS.VIEW_DEPARTMENT_GOALS,
+          PERFORMANCE_ACTIONS.VIEW_ALL_TASKS,
+          PERFORMANCE_ACTIONS.VIEW_DEPARTMENT_TASKS,
+          PERFORMANCE_ACTIONS.VIEW_ALL_SCORECARDS,
+          PERFORMANCE_ACTIONS.VIEW_DEPARTMENT_SCORECARD,
+          PERFORMANCE_ACTIONS.VIEW_USER_SCORECARDS,
+        ],
+        subModules: {
+          'performance-dashboard': 'read',
+          'departments': 'read',
+          'kpi-management': 'read',
+          'goals-management': 'read',
+          'task-management': 'read',
+          'department-scorecard': 'read',
+          'user-scorecard': 'read',
         }
       },
       {
@@ -2099,7 +2299,7 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
     ]
   },
 
-  LIMITED_PARTNER: {
+  LIMITED_PARTNER: { 
     roleCode: 'LIMITED_PARTNER',
     level: 2,
     department: 'Investments',
@@ -2128,7 +2328,14 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
         moduleId: 'accounting',
         access: 'read',
         subModules: {
+          'accounting-dashboard': 'read',
           'general-ledger': 'read',
+          'cash-book': 'read',
+          'invoices': 'read',
+          'bank-reconciliation': 'read',
+          'expenses': 'read',
+          'inventory-accounting': 'read',
+          'asset-management': 'read',
           'financial-reports': 'read',
         }
       },

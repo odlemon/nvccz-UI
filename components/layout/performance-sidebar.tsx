@@ -1,12 +1,15 @@
 "use client"
 
+import { useMemo } from "react"
 import { usePathname } from "next/navigation"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { getModuleById } from "@/lib/config/modules"
+import { useRolePermissions } from "@/lib/hooks/useRolePermissions"
 
 export function PerformanceSidebar() {
   const pathname = usePathname()
+  const { hasSubModuleAccess, isLoading } = useRolePermissions()
 
   const module = getModuleById("performance-management")
 
@@ -17,6 +20,15 @@ export function PerformanceSidebar() {
   if (!module) {
     return null
   }
+
+  // Filter sub-modules based on user permissions
+  const accessibleSubModules = useMemo(() => {
+    if (isLoading) return module.subModules; // Show all while loading
+    
+    return module.subModules.filter((subModule) => {
+      return hasSubModuleAccess('performance-management', subModule.id)
+    })
+  }, [module.subModules, hasSubModuleAccess, isLoading])
 
   return (
     <aside className="w-64 bg-white border-r border-border h-[calc(100vh-5rem)] overflow-y-auto sticky top-20 z-10">
@@ -34,9 +46,9 @@ export function PerformanceSidebar() {
           </div>
         </div>
 
-        {/* Navigation Items */}
+        {/* Navigation Items - Only show accessible sub-modules */}
         <div className="space-y-1">
-          {module.subModules.map((subModule) => {
+          {accessibleSubModules.map((subModule) => {
             const Icon = subModule.icon
             const active = isPathActive(subModule.path)
             return (

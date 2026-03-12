@@ -26,7 +26,7 @@ import {
   setSelectedCurrency
 } from "@/lib/store/slices/accountingSlice"
 import { accountingApi, AccountingCurrency, CreateCurrencyRequest } from "@/lib/api/accounting-api"
-import { useRolePermissions } from "@/lib/hooks/useRolePermissions"
+import { useAccountingPermissions } from "@/lib/hooks/useAccountingPermissions"
 
 // Export the type for use in other components
 export type { AccountingCurrency as Currency }
@@ -34,12 +34,12 @@ export type { AccountingCurrency as Currency }
 export function CurrenciesManagement() {
   const dispatch = useAppDispatch()
   const { currencies, currenciesLoading } = useAppSelector(state => state.accounting)
-  const { canPerformAction } = useRolePermissions()
+  const { permissions } = useAccountingPermissions()
   
   // Permission checks
-  const canCreateCurrency = canPerformAction('accounting', 'create')
-  const canEditCurrency = canPerformAction('accounting', 'update')
-  const canDeleteCurrency = canPerformAction('accounting', 'delete')
+  const canCreateCurrency = permissions.canCreateCurrency
+  const canEditCurrency = permissions.canUpdateCurrency
+  const canDeleteCurrency = permissions.canDeleteCurrency
   
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [isViewModalOpen, setIsViewModalOpen] = useState(false)

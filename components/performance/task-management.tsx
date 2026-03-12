@@ -16,6 +16,7 @@ import { TaskCard } from "./task-card"
 import { TaskDrawerView } from "./task-drawer-view"
 import { GoalHierarchyInfo } from "./goal-hierarchy-info"
 import { TaskBoardView } from "./task-board-view"
+import { usePerformancePermissions } from "@/lib/hooks/usePerformancePermissions"
 
 type TaskView = "my-tasks" | "department-tasks"
 type ViewMode = "list" | "kanban"
@@ -43,6 +44,7 @@ const TaskPageSkeleton = () => (
 
 export function TaskManagement() {
   const dispatch = useAppDispatch()
+  const { permissions } = usePerformancePermissions()
   const { tasks, loading: isLoading, error } = useAppSelector((state) => state.tasks)
   const { availableDepartments } = useAppSelector((state) => state.performance)
 
@@ -129,6 +131,7 @@ export function TaskManagement() {
             <List className="w-4 h-4" />
             Your Tasks
           </button>
+          {permissions.canViewDepartmentTasks && (
           <button
             onClick={() => setActiveTab("department-tasks")}
             className={`relative flex items-center gap-2 py-3 px-1 text-sm font-normal transition-colors cursor-pointer ${
@@ -140,6 +143,7 @@ export function TaskManagement() {
             <Kanban className="w-4 h-4" />
             Department Tasks
           </button>
+          )}
         </nav>
       </div>
 
@@ -239,8 +243,8 @@ export function TaskManagement() {
             tasks={filteredTasks}
             loading={isLoading}
             onUpdateStage={handleUpdateStage}
-            onEditTask={handleEditTask}
-            onDeleteTask={handleDeleteTask}
+            onEditTask={permissions.canUpdateDepartmentTask || permissions.canUpdateAnyTask ? handleEditTask : undefined}
+            onDeleteTask={permissions.canDeleteDepartmentTask || permissions.canDeleteAnyTask ? handleDeleteTask : undefined}
             onViewTask={(task) => setSelectedTaskId(task.id)}
           />
         )

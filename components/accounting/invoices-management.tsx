@@ -52,7 +52,7 @@ import { fetchCurrencies, fetchCreditNotes } from "@/lib/store/slices/accounting
 import type { RootState, AppDispatch } from "@/lib/store"
 import { Invoice } from "@/lib/api/accounting-api"
 import { CreditNotesManagement } from "./credit-notes-management"
-import { useRolePermissions } from "@/lib/hooks/useRolePermissions"
+import { useAccountingPermissions } from "@/lib/hooks/useAccountingPermissions"
 
 interface MockInvoice {
   id: string
@@ -176,7 +176,7 @@ const tabs = [
 
 export function InvoicesManagement() {
   const dispatch = useDispatch<AppDispatch>()
-  const { canPerformAction } = useRolePermissions()
+  const { permissions } = useAccountingPermissions()
   
   // Use the custom hook for invoices management
   const {
@@ -204,9 +204,10 @@ export function InvoicesManagement() {
   } = useInvoices()
 
   // Check permissions
-  const canCreateInvoice = canPerformAction('accounting', 'create')
-  const canEditInvoice = canPerformAction('accounting', 'update')
-  const canDeleteInvoice = canPerformAction('accounting', 'delete')
+  const canCreateInvoice = permissions.canCreateInvoice
+  const canEditInvoice = permissions.canUpdateInvoice
+  const canDeleteInvoice = permissions.canDeleteInvoice
+  const canMarkPaid = permissions.canMarkInvoicePaid
 
   // Get currencies from accounting slice
   const currencies = useSelector((state: RootState) => state.accounting.currencies || [])

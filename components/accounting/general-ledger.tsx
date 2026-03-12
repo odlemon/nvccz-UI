@@ -35,7 +35,7 @@ import { CreateJournalEntryModal } from "./create-journal-entry-modal"
 import { JournalEntryViewDrawer } from "./journal-entry-view-drawer"
 import { TrialBalanceView } from "./trial-balance-view"
 import { accountingApi, JournalEntryFilters } from "@/lib/api/accounting-api"
-import { useRolePermissions } from "@/lib/hooks/useRolePermissions"
+import { useAccountingPermissions } from "@/lib/hooks/useAccountingPermissions"
 
 // Helper function to trim spaces
 const cleanString = (value: any): string => {
@@ -173,12 +173,12 @@ const statusOptions = [
 ]
 
 export function GeneralLedger() {
-  const { canPerformAction } = useRolePermissions()
+  const { permissions } = useAccountingPermissions()
   
   // Permission checks
-  const canCreateJournal = canPerformAction('accounting', 'create')
-  const canEditJournal = canPerformAction('accounting', 'update')
-  const canDeleteJournal = canPerformAction('accounting', 'delete')
+  const canCreateJournal = permissions.canCreateJournalEntry
+  const canEditJournal = permissions.canCreateJournalEntry // Journal entries: create-only per matrix
+  const canDeleteJournal = permissions.canCreateJournalEntry
   
   const [activeTab, setActiveTab] = useState("journal")
   const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([])

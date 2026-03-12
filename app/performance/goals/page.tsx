@@ -2,6 +2,7 @@
 
 import { PerformanceLayout } from "@/components/layout/performance-layout"
 import { GoalsManagement } from "@/components/performance/goals-management"
+import { ModuleGuard } from "@/lib/permissions"
 import { useEffect } from "react"
 import { useAppDispatch } from "@/lib/store"
 import { fetchAvailableDepartments } from "@/lib/store/slices/performanceSlice"
@@ -27,10 +28,12 @@ export default function GoalsPage() {
   }, [dispatch])
 
   return (
-    <PerformanceLayout>
-      <div className="p-6">
-        <GoalsManagement />
-      </div>
-    </PerformanceLayout>
+    <ModuleGuard moduleId="performance-management" subModuleId="goals-management">
+      <PerformanceLayout>
+        <div className="p-6">
+          <GoalsManagement />
+        </div>
+      </PerformanceLayout>
+    </ModuleGuard>
   )
 }

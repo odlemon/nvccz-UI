@@ -25,7 +25,7 @@ import { ConfirmationDialog } from "../ui/confirmation-drawer"
 //   removeChartOfAccount
 // } from "@/lib/store/slices/accountingSlice"
 import { accountingApi, ChartOfAccount, CreateChartOfAccountRequest } from "@/lib/api/accounting-api"
-import { useRolePermissions } from "@/lib/hooks/useRolePermissions"
+import { useAccountingPermissions } from "@/lib/hooks/useAccountingPermissions"
 
 // Export the type for use in other components
 export type { ChartOfAccount as Account }
@@ -33,12 +33,12 @@ export type { ChartOfAccount as Account }
 export function ChartOfAccountsManagement() {
   // const dispatch = useAppDispatch()
   // const { chartOfAccounts, chartOfAccountsLoading } = useAppSelector(state => state.accounting)
-  const { canPerformAction } = useRolePermissions()
+  const { permissions } = useAccountingPermissions()
   
   // Permission checks
-  const canCreateAccount = canPerformAction('accounting', 'create')
-  const canEditAccount = canPerformAction('accounting', 'update')
-  const canDeleteAccount = canPerformAction('accounting', 'delete')
+  const canCreateAccount = permissions.canCreateCOA
+  const canEditAccount = permissions.canUpdateCOA
+  const canDeleteAccount = permissions.canDeleteCOA
   
   const [chartOfAccounts, setChartOfAccounts] = useState<ChartOfAccount[]>([])
   const [chartOfAccountsLoading, setChartOfAccountsLoading] = useState(false)
