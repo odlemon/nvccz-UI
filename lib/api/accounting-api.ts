@@ -1,10 +1,39 @@
-import { Vendor } from '@/components/accounting/vendors-management'
 import { apiClient } from './api-client'
 import { AccountingResponse, ChartOfAccount, CreateChartOfAccountRequest } from './chart-of-accounts-api'
-import { ExpenseCategory } from '@/components/accounting/expense-categories-management'
 
-// Re-export Vendor type for use in other modules
-export type { Vendor }
+export interface Vendor {
+  id: string
+  name: string
+  taxNumber?: string
+  contactPerson?: string
+  email?: string
+  phone?: string
+  address?: string
+  paymentTerms?: string
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ExpenseCategory {
+  id: string
+  name: string
+  code: string
+  description?: string
+  parentId?: string
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+  subCategories?: ExpenseCategory[]
+}
+
+export interface CreateExpenseCategoryRequest {
+  name: string
+  code: string
+  description?: string
+  parentId?: string
+  isActive?: boolean
+}
 
 // Types matching accounting entities
 export interface AccountingCurrency {
@@ -728,6 +757,35 @@ export interface StockAdjustmentResponse {
   createdAt: string
 }
 
+export interface Expense {
+  id: string
+  expenseNumber: string
+  description: string
+  amount: string
+  currencyId: string
+  transactionDate: string
+  status: 'DRAFT' | 'POSTED' | 'VOID'
+  categoryId: string
+  vendorId?: string
+  journalEntryId?: string
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+  category?: ExpenseCategory
+  vendor?: Vendor
+  currency?: AccountingCurrency
+}
+
+export interface CreateExpenseRequest {
+  description: string
+  amount: number
+  currencyId: string
+  transactionDate: string
+  categoryId: string
+  vendorId?: string
+  status?: 'DRAFT' | 'POSTED'
+}
+
 // Exchange Rates types
 export interface ExchangeRate {
   id: string
@@ -1079,6 +1137,7 @@ export interface CashbookBalanceCheckReport {
 export interface JournalEntryFilters {
   search?: string
   status?: 'PENDING' | 'POSTED' | 'VOID'
+  currencyId?: string
   page?: number
   limit?: number
 }
@@ -1137,6 +1196,10 @@ class AccountingApiService {
 
     if (filters?.status) {
       params.append('status', filters.status)
+    }
+
+    if (filters?.currencyId) {
+      params.append('currencyId', filters.currencyId)
     }
 
     if (filters?.page) {
@@ -1553,6 +1616,7 @@ class AccountingApiService {
     search?: string
     isActive?: boolean
     status?: 'DRAFT' | 'POSTED' | 'VOID'
+    currencyId?: string
   }): Promise<AccountingResponse<Expense[]>> {
     const queryString = params ? `?${new URLSearchParams(
       Object.entries(params).filter(([_, value]) => value !== undefined).map(([key, value]) => [key, String(value)])
@@ -1603,8 +1667,24 @@ class AccountingApiService {
   }
 
   // Credit Notes
-  async getCreditNotes(): Promise<AccountingResponse<{ creditNotes: CreditNote[], total: number, page: number, totalPages: number }>> {
-    return apiClient.get<AccountingResponse<{ creditNotes: CreditNote[], total: number, page: number, totalPages: number }>>('/accounting/credit-notes')
+  async getCreditNotes(params?: {
+    page?: number
+    limit?: number
+    status?: string
+    currencyId?: string
+  }): Promise<AccountingResponse<{ creditNotes: CreditNote[], total: number, page: number, totalPages: number }>> {
+    const queryParams = new URLSearchParams()
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          queryParams.append(key, String(value))
+        }
+      })
+    }
+    const queryString = queryParams.toString()
+    return apiClient.get<AccountingResponse<{ creditNotes: CreditNote[], total: number, page: number, totalPages: number }>>(
+      queryString ? `/accounting/credit-notes?${queryString}` : '/accounting/credit-notes'
+    )
   }
 
   async getCreditNote(id: string): Promise<AccountingResponse<CreditNote>> {
@@ -1636,8 +1716,24 @@ class AccountingApiService {
   }
 
   // Inventory endpoints
-  async getInventoryItems(): Promise<AccountingResponse<InventoryListResponse>> {
-    return apiClient.get<AccountingResponse<InventoryListResponse>>('/accounting/inventory/items')
+  async getInventoryItems(params?: { 
+    page?: number; 
+    limit?: number; 
+    search?: string; 
+    currencyId?: string;
+  }): Promise<AccountingResponse<InventoryListResponse>> {
+    const queryParams = new URLSearchParams()
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          queryParams.append(key, String(value))
+        }
+      })
+    }
+    const queryString = queryParams.toString()
+    return apiClient.get<AccountingResponse<InventoryListResponse>>(
+      queryString ? `/accounting/inventory/items?${queryString}` : '/accounting/inventory/items'
+    )
   }
 
   async getInventoryItem(id: string): Promise<AccountingResponse<InventoryItem>> {
@@ -1665,12 +1761,14 @@ class AccountingApiService {
   }
 
   // Inventory valuation/reorder/cogs/adjustments
-  async getInventoryValuation(): Promise<AccountingResponse<InventoryValuationResponse>> {
-    return apiClient.get<AccountingResponse<InventoryValuationResponse>>('/accounting/inventory/valuation')
+  async getInventoryValuation(params?: { currencyId?: string }): Promise<AccountingResponse<InventoryValuationResponse>> {
+    const queryString = params?.currencyId ? `?currencyId=${params.currencyId}` : ''
+    return apiClient.get<AccountingResponse<InventoryValuationResponse>>(`/accounting/inventory/valuation${queryString}`)
   }
 
-  async getReorderAlerts(): Promise<AccountingResponse<ReorderAlertItem[]>> {
-    return apiClient.get<AccountingResponse<ReorderAlertItem[]>>('/accounting/inventory/reorder-alerts')
+  async getReorderAlerts(params?: { currencyId?: string }): Promise<AccountingResponse<ReorderAlertItem[]>> {
+    const queryString = params?.currencyId ? `?currencyId=${params.currencyId}` : ''
+    return apiClient.get<AccountingResponse<ReorderAlertItem[]>>(`/accounting/inventory/reorder-alerts${queryString}`)
   }
 
   async calculateCogs(data: CogsRequest): Promise<AccountingResponse<CogsResponse>> {
@@ -1720,8 +1818,9 @@ class AccountingApiService {
   }
 
   // Bank Reconciliation CRUD
-  async getBankReconciliations(): Promise<any> {
-    return apiClient.get<any>('/accounting/bank-reconciliation')
+  async getBankReconciliations(params?: { currencyId?: string }): Promise<any> {
+    const queryString = params?.currencyId ? `?currencyId=${params.currencyId}` : ''
+    return apiClient.get<any>(`/accounting/bank-reconciliation${queryString}`)
   }
   async getBankReconciliation(id: string): Promise<AccountingResponse<BankReconciliation>> {
     return apiClient.get<AccountingResponse<BankReconciliation>>(`/accounting/bank-reconciliation/${id}`)
@@ -1729,13 +1828,12 @@ class AccountingApiService {
   async deleteBankReconciliation(id: string): Promise<AccountingResponse<void>> {
     return apiClient.delete<AccountingResponse<void>>(`/accounting/bank-reconciliation/${id}`)
   }
-  async getBankReconciliationSummary(): Promise<AccountingResponse<BankReconciliationSummary>> {
-    return apiClient.get<AccountingResponse<BankReconciliationSummary>>('/accounting/bank-reconciliation/summary')
+  async getBankReconciliationSummary(params?: { currencyId?: string }): Promise<AccountingResponse<BankReconciliationSummary>> {
+    const queryString = params?.currencyId ? `?currencyId=${params.currencyId}` : ''
+    return apiClient.get<AccountingResponse<BankReconciliationSummary>>(`/accounting/bank-reconciliation/summary${queryString}`)
   }
-  async uploadBankReconciliationFile(file: File): Promise<AccountingResponse<BankReconciliationUploadResponse>> {
-    const formData = new FormData()
-    formData.append('file', file)
-    return apiClient.post<AccountingResponse<BankReconciliationUploadResponse>>('/accounting/bank-reconciliation/upload', formData)
+  async uploadBankReconciliationFile(data: any): Promise<AccountingResponse<BankReconciliationUploadResponse>> {
+    return apiClient.post<AccountingResponse<BankReconciliationUploadResponse>>('/accounting/bank-reconciliation/upload', data)
   }
   async getBankReconciliationAuditTrail(id: string): Promise<AccountingResponse<BankReconciliationAuditTrail[]>> {
     return apiClient.get<AccountingResponse<BankReconciliationAuditTrail[]>>(`/accounting/bank-reconciliation/${id}/audit-trail`)

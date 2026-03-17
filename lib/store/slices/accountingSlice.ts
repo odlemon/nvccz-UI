@@ -18,7 +18,14 @@ import { cashbookApi } from '@/lib/api/cashbook-api'
 // Async thunks for expenses
 export const fetchExpenses = createAsyncThunk(
   'accounting/fetchExpenses',
-  async (params?: { page?: number; limit?: number; search?: string; isActive?: boolean; status?: 'DRAFT' | 'POSTED' | 'VOID' }) => {
+  async (params?: { 
+    page?: number; 
+    limit?: number; 
+    search?: string; 
+    isActive?: boolean; 
+    status?: 'DRAFT' | 'POSTED' | 'VOID';
+    currencyId?: string;
+  }) => {
     const response = await accountingApi.getExpenses(params)
     if (!response.success) {
       throw new Error(response.error || 'Failed to fetch expenses')
@@ -245,8 +252,13 @@ export const postDepreciation = createAsyncThunk(
 // Credit Notes thunks
 export const fetchCreditNotes = createAsyncThunk(
   'accounting/fetchCreditNotes',
-  async (filters?: { status?: string }) => {
-    const response = await accountingApi.getCreditNotes()
+  async (params?: { 
+    page?: number; 
+    limit?: number; 
+    status?: string;
+    currencyId?: string;
+  }) => {
+    const response = await accountingApi.getCreditNotes(params)
     if (!response.success) {
       throw new Error(response.error || 'Failed to fetch credit notes')
     }
@@ -326,8 +338,13 @@ export const fetchCustomers = createAsyncThunk(
 // Inventory thunks
 export const fetchInventoryItems = createAsyncThunk(
   'accounting/fetchInventoryItems',
-  async () => {
-    const response = await accountingApi.getInventoryItems()
+  async (params?: { 
+    page?: number; 
+    limit?: number; 
+    search?: string; 
+    currencyId?: string;
+  }) => {
+    const response = await accountingApi.getInventoryItems(params)
     if (!response.success) {
       throw new Error(response.error || 'Failed to fetch inventory items')
     }
@@ -393,8 +410,8 @@ export const fetchStockMovements = createAsyncThunk(
 // Valuation & reorder thunks
 export const fetchInventoryValuation = createAsyncThunk(
   'accounting/fetchInventoryValuation',
-  async () => {
-    const response = await accountingApi.getInventoryValuation()
+  async (params?: { currencyId?: string }) => {
+    const response = await accountingApi.getInventoryValuation(params)
     if (!response.success) {
       throw new Error(response.error || 'Failed to fetch inventory valuation')
     }
@@ -404,8 +421,8 @@ export const fetchInventoryValuation = createAsyncThunk(
 
 export const fetchReorderAlerts = createAsyncThunk(
   'accounting/fetchReorderAlerts',
-  async () => {
-    const response = await accountingApi.getReorderAlerts()
+  async (params?: { currencyId?: string }) => {
+    const response = await accountingApi.getReorderAlerts(params)
     if (!response.success) {
       throw new Error(response.error || 'Failed to fetch reorder alerts')
     }
@@ -534,8 +551,8 @@ export const fetchCashFlow = createAsyncThunk(
 // --- BANK RECONCILIATION THUNKS ---
 export const fetchBankReconciliations = createAsyncThunk(
   'accounting/fetchBankReconciliations',
-  async () => {
-    const response = await accountingApi.getBankReconciliations()
+  async (params?: { currencyId?: string }) => {
+    const response = await accountingApi.getBankReconciliations(params)
     if (!response.success) throw new Error(response.error || 'Failed to fetch bank reconciliations')
     return response.data
   }
@@ -558,18 +575,18 @@ export const deleteBankReconciliation = createAsyncThunk(
 )
 export const fetchBankReconciliationSummary = createAsyncThunk(
   'accounting/fetchBankReconciliationSummary',
-  async () => {
-    const response = await accountingApi.getBankReconciliationSummary()
+  async (params?: { currencyId?: string }) => {
+    const response = await accountingApi.getBankReconciliationSummary(params)
     if (!response.success) throw new Error(response.error || 'Failed to fetch summary')
     return response.data
   }
 )
 export const uploadBankReconciliationFile = createAsyncThunk(
   'accounting/uploadBankReconciliationFile',
-  async (file: File, { rejectWithValue }) => {
+  async (data: any, { rejectWithValue }) => {
     try {
-      const response = await accountingApi.uploadBankReconciliationFile(file)
-      if (!response.success) return rejectWithValue(response.error || 'Failed to upload file')
+      const response = await accountingApi.uploadBankReconciliationFile(data)
+      if (!response.success) return rejectWithValue(response.error || 'Failed to upload and process items')
       return response.data
     } catch (err: any) {
       return rejectWithValue(err.message)
@@ -628,8 +645,8 @@ export const rejectBankReconciliationResult = createAsyncThunk(
 // --- Cashbook async thunks ---
 export const fetchCashbookBanks = createAsyncThunk(
   'accounting/fetchCashbookBanks',
-  async () => {
-    const response = await cashbookApi.getCashbookBanks()
+  async (params?: { currencyId?: string }) => {
+    const response = await cashbookApi.getCashbookBanks(params)
     if (!response.success) throw new Error(response.error || 'Failed to fetch banks')
     return response.data
   }
@@ -637,7 +654,14 @@ export const fetchCashbookBanks = createAsyncThunk(
 
 export const fetchCashbookEntries = createAsyncThunk(
   'accounting/fetchCashbookEntries',
-  async (params: { bankId: string }) => {
+  async (params: { 
+    bankId: string 
+    type?: 'RECEIPT' | 'PAYMENT'
+    status?: string
+    startDate?: string
+    endDate?: string
+    currencyId?: string
+  }) => {
     const response = await cashbookApi.getCashbookEntries(params)
     if (!response.success) throw new Error(response.error || 'Failed to fetch entries')
     return response.data
@@ -872,6 +896,7 @@ interface AccountingState {
 
   // Selected currency for management
   selectedCurrency: AccountingCurrency | null
+  selectedCurrencyId: string | null
 
   // Dashboard V2
   dashboardData: AccountingDashboardData | null
@@ -1050,6 +1075,7 @@ const initialState: AccountingState = {
 
   // Selected currency for management
   selectedCurrency: null,
+  selectedCurrencyId: null,
 
   // Dashboard V2
   dashboardData: null,
@@ -1158,6 +1184,9 @@ const accountingSlice = createSlice({
     setSelectedCurrency: (state, action: PayloadAction<AccountingCurrency | null>) => {
       state.selectedCurrency = action.payload
     },
+    setSelectedCurrencyId: (state, action: PayloadAction<string | null>) => {
+      state.selectedCurrencyId = action.payload
+    },
   },
   extraReducers: (builder) => {
     // Fetch expenses
@@ -1220,7 +1249,14 @@ const accountingSlice = createSlice({
       })
       .addCase(fetchCurrencies.fulfilled, (state, action) => {
         state.currenciesLoading = false
-        state.currencies = action.payload
+        state.currencies = action.payload || []
+        
+        // Set default currency if not set
+        if (!state.selectedCurrencyId && state.currencies.length > 0) {
+          const usd = state.currencies.find(c => c.code === 'USD')
+          const default_ = state.currencies.find(c => c.isDefault)
+          state.selectedCurrencyId = usd?.id || default_?.id || state.currencies[0].id
+        }
       })
       .addCase(fetchCurrencies.rejected, (state, action) => {
         state.currenciesLoading = false
@@ -1704,7 +1740,7 @@ const accountingSlice = createSlice({
       })
       .addCase(fetchBankReconciliations.fulfilled, (state, action) => {
         state.bankReconciliationLoading = false
-        state.bankReconciliations = action.payload.banks || []
+        state.bankReconciliations = action.payload.reconciliations || []
       })
       .addCase(fetchBankReconciliations.rejected, (state, action) => {
         state.bankReconciliationLoading = false
@@ -1940,6 +1976,7 @@ export const {
   removeCurrency,
   updateCurrency,
   setSelectedCurrency,
+  setSelectedCurrencyId,
 } = accountingSlice.actions
 
 export default accountingSlice.reducer

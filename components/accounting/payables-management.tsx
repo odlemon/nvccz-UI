@@ -41,6 +41,7 @@ import { PurchaseInvoiceViewDrawer } from "./purchase-invoice-view-drawer"
 import { fetchCurrencies, fetchVendors } from "@/lib/store/slices/accountingSlice"
 import { usePurchaseInvoices } from "@/lib/hooks/use-purchase-invoices"
 import { useAccountingPermissions } from "@/lib/hooks/useAccountingPermissions"
+import { CurrencyFilter } from "./CurrencyFilter"
 import type { RootState, AppDispatch } from "@/lib/store"
 import { PurchaseInvoice } from "@/lib/api/accounting-api"
 
@@ -116,6 +117,7 @@ export function PayablesManagement() {
 
   const currencies = useSelector((state: RootState) => state.accounting.currencies || [])
   const vendors = useSelector((state: RootState) => state.accounting.vendors || [])
+  const selectedCurrencyId = useSelector((state: RootState) => state.accounting.selectedCurrencyId)
 
   const [activeTab, setActiveTab] = useState("all")
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
@@ -141,6 +143,7 @@ export function PayablesManagement() {
         await loadPurchaseInvoices({ 
           status: statusFilter,
           paymentStatus: paymentStatusFilter,
+          currencyId: selectedCurrencyId || undefined,
           page: 1,
           limit: 10
         })
@@ -150,7 +153,7 @@ export function PayablesManagement() {
     }
 
     loadData()
-  }, [dispatch, currencies.length, vendors.length, activeTab, loadPurchaseInvoices])
+  }, [dispatch, currencies.length, vendors.length, activeTab, loadPurchaseInvoices, selectedCurrencyId])
 
   const handleTabChange = (tabId: string) => {
     setActiveTab(tabId)
@@ -579,15 +582,18 @@ export function PayablesManagement() {
           <h2 className="text-2xl font-bold">Accounts Payable</h2>
           <p className="text-gray-500">Manage vendor purchase invoices</p>
         </div>
-{permissions.canCreatePayable && (
-        <Button
-          onClick={handleCreateInvoiceClick}
-          className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 rounded-full px-6"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Create Purchase Invoice
-        </Button>
-        )}
+        <div className="flex items-center gap-3">
+          <CurrencyFilter />
+          {permissions.canCreatePayable && (
+            <Button
+              onClick={handleCreateInvoiceClick}
+              className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 rounded-full px-6"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Create Purchase Invoice
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Tab Navigation */}

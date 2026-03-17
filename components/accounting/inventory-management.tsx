@@ -30,6 +30,7 @@ import { InventoryViewDrawer } from "./inventory-view-drawer"
 import { CreateInventoryModal } from "./create-inventory-modal"
 import { accountingApi } from "@/lib/api/accounting-api"
 import { useAccountingPermissions } from "@/lib/hooks/useAccountingPermissions"
+import { CurrencyFilter } from "./CurrencyFilter"
 
 export function InventoryManagement() {
   const dispatch = useDispatch<AppDispatch>()
@@ -39,7 +40,9 @@ export function InventoryManagement() {
     inventoryItems,
     inventoryLoading,
     vendors,
-    chartOfAccounts
+    chartOfAccounts,
+    selectedCurrencyId,
+    currencies
   } = useSelector((state: RootState) => state.accounting)
 
   // Permission checks
@@ -80,13 +83,13 @@ export function InventoryManagement() {
   }
 
   useEffect(() => {
-    dispatch(fetchInventoryItems())
+    dispatch(fetchInventoryItems({ currencyId: selectedCurrencyId || undefined }))
     dispatch(fetchVendors())
     dispatch(fetchChartOfAccounts({ isActive: true }))
     // Fetch valuation and reorder alerts on initial load
     loadValuation()
     loadReorderAlerts()
-  }, [dispatch])
+  }, [dispatch, selectedCurrencyId])
 
   useEffect(() => {
     if (activeTab === 'valuation') {
@@ -100,9 +103,9 @@ export function InventoryManagement() {
   const loadValuation = async () => {
     try {
       setValuationLoading(true)
-      const res = await accountingApi.getInventoryValuation()
+      const res = await accountingApi.getInventoryValuation({ currencyId: selectedCurrencyId || undefined })
       if (res.success) {
-        setInventoryValuation(res.data)
+        setInventoryValuation(res.data || null)
       } else {
         toast.error(res.error || 'Failed to fetch valuation')
       }
@@ -116,7 +119,7 @@ export function InventoryManagement() {
   const loadReorderAlerts = async () => {
     try {
       setReorderLoading(true)
-      const res = await accountingApi.getReorderAlerts()
+      const res = await accountingApi.getReorderAlerts({ currencyId: selectedCurrencyId || undefined })
       if (res.success) {
         setReorderAlerts(res.data || [])
       } else {
@@ -150,9 +153,14 @@ export function InventoryManagement() {
     console.log('Delete inventory item (confirm):', item.id)
   }
 
-  const formatCurrency = (amount: string | number) =>
-    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 })
-      .format(typeof amount === 'string' ? parseFloat(amount) : amount)
+  const formatCurrency = (amount: string | number) => {
+    const currencyCode = currencies.find(c => c.id === selectedCurrencyId)?.code || 'USD'
+    return new Intl.NumberFormat('en-US', { 
+      style: 'currency', 
+      currency: currencyCode, 
+      minimumFractionDigits: 2 
+    }).format(typeof amount === 'string' ? parseFloat(amount) : amount)
+  }
 
   const getInitials = (name: string) =>
     name
@@ -438,7 +446,8 @@ export function InventoryManagement() {
           <h1 className="text-3xl font-normal">Inventory</h1>
           <p className="text-muted-foreground">Manage inventory items, stock movements and accounts</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex items-center gap-3">
+          <CurrencyFilter />
           {canCreateInventory && (
             <Button onClick={openCreateModal} className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-full px-6">
               <Plus className="w-4 h-4 mr-2" /> New Item
@@ -482,7 +491,7 @@ export function InventoryManagement() {
           columns={columns}
           title="Inventory Items"
           filterOptions={filterOptions}
-          onView={openView}
+          onView={(row: InventoryItem) => openView(row.id)}
           onEdit={openEditModal}
           onDelete={handleDeleteItem}
           onBulkAction={handleBulkAction}
@@ -499,7 +508,7 @@ export function InventoryManagement() {
       {activeTab === 'levels' && (
         <>
           <ProcurementDataTable
-            data={reorderAlerts}
+            data={reorderAlerts.map(item => ({ ...item, id: item.itemId }))}
             columns={reorderColumns}
             title="Reorder Alerts"
             searchPlaceholder="Search reorder alerts..."
@@ -514,7 +523,7 @@ export function InventoryManagement() {
 
       {activeTab === 'valuation' && (
         <ProcurementDataTable
-          data={inventoryValuation ? inventoryValuation.valuation : []}
+          data={(inventoryValuation ? inventoryValuation.valuation : []).map(item => ({ ...item, id: item.itemId }))}
           columns={valuationColumns}
           title="Inventory Valuation"
           searchPlaceholder="Search valuation..."

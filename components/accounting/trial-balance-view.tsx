@@ -36,6 +36,7 @@ import { ChevronDown, ChevronUp } from "lucide-react"
 import { CiSearch, CiFilter, CiReceipt } from "react-icons/ci"
 import { TransactionsDataTable } from "./transactions-data-table"
 import { TransactionViewDrawer } from "./transaction-view-drawer"
+import { CurrencyFilter } from "./CurrencyFilter"
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
 import { toast } from "sonner"
@@ -120,7 +121,9 @@ export function TrialBalanceView() {
     trialBalanceLoading,
     trialBalanceSummaryLoading,
     trialBalanceError,
-    trialBalanceSummaryError
+    trialBalanceSummaryError,
+    selectedCurrencyId,
+    currencies
   } = useSelector((state: RootState) => state.accounting)
 
   const [periodType, setPeriodType] = useState<'month' | 'quarter' | 'year'>('month')
@@ -201,18 +204,20 @@ export function TrialBalanceView() {
     if (isValidPeriodValue) {
       loadTrialBalanceData()
     }
-  }, [periodType, periodValue])
+  }, [periodType, periodValue, selectedCurrencyId])
 
   const loadTrialBalanceData = async () => {
     try {
       await Promise.all([
         dispatch(fetchTrialBalance({ 
           periodType, 
-          periodValue
+          periodValue,
+          currencyId: selectedCurrencyId || undefined
         })),
         dispatch(fetchTrialBalanceSummary({ 
           periodType, 
-          periodValue
+          periodValue,
+          currencyId: selectedCurrencyId || undefined
         }))
       ])
     } catch (error: any) {
@@ -223,9 +228,10 @@ export function TrialBalanceView() {
   }
 
   const formatCurrency = (amount: number) => {
+    const currencyCode = currencies.find(c => c.id === selectedCurrencyId)?.code || 'USD'
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD',
+      currency: currencyCode,
       minimumFractionDigits: 2
     }).format(amount)
   }
@@ -342,7 +348,7 @@ export function TrialBalanceView() {
         <div>
           <h2 className="text-2xl font-semibold text-gray-900">Trial Balance</h2>
           <p className="text-gray-600">
-            Period: {getPeriodOptions().find(opt => opt.value === periodValue)?.label || periodValue} - Currency: USD
+            Period: {getPeriodOptions().find(opt => opt.value === periodValue)?.label || periodValue} - Currency: {currencies.find(c => c.id === selectedCurrencyId)?.code || 'USD'}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -372,6 +378,7 @@ export function TrialBalanceView() {
             </SelectContent>
           </Select>
           
+          <CurrencyFilter />
           {/* Export Buttons */}
           <Button 
             onClick={handleExportCSV}

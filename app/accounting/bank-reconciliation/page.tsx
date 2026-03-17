@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { useSelector, useDispatch } from "react-redux"
 import { AccountingLayout } from "@/components/layout/accounting-layout"
+import { CurrencyFilter } from "@/components/accounting/CurrencyFilter"
 import { ModuleGuard } from "@/components/permissions/PermissionGuards"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -42,19 +43,19 @@ function BankReconciliationPage() {
     bankReconciliationSummary,
     bankReconciliationAuditTrail,
     bankReconciliationAuditTrailLoading,
-    bankReconciliationUploadLoading
+    bankReconciliationUploadLoading,
+    selectedCurrencyId
   } = useSelector((state: RootState) => state.accounting)
 
   const [activeTab, setActiveTab] = useState<'records'|'audit'>('records')
   const [uploadModalOpen, setUploadModalOpen] = useState(false)
-  const [uploadFile, setUploadFile] = useState<File | null>(null)
   const [selectedReconciliation, setSelectedReconciliation] = useState<any | null>(null)
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
 
   useEffect(() => {
-    dispatch(fetchBankReconciliations())
-    dispatch(fetchBankReconciliationSummary())
-  }, [dispatch])
+    dispatch(fetchBankReconciliations({ currencyId: selectedCurrencyId || undefined }))
+    dispatch(fetchBankReconciliationSummary({ currencyId: selectedCurrencyId || undefined }))
+  }, [dispatch, selectedCurrencyId])
 
   useEffect(() => {
     if (activeTab === 'audit' && bankReconciliations.length > 0) {
@@ -78,13 +79,11 @@ function BankReconciliationPage() {
   }
 
   // Updated upload handler: keep modal open during upload, close only on success, show error on failure
-  const handleUpload = async () => {
-    if (!uploadFile) return
+  const handleUpload = async (payload: any) => {
     try {
-      await dispatch(uploadBankReconciliationFile(uploadFile)).unwrap()
+      await dispatch(uploadBankReconciliationFile(payload)).unwrap()
       toast.success("Bank statement uploaded successfully")
       setUploadModalOpen(false)
-      setUploadFile(null)
       // Optionally refresh data
       dispatch(fetchBankReconciliations())
       dispatch(fetchBankReconciliationSummary())
@@ -97,19 +96,19 @@ function BankReconciliationPage() {
         "Failed to upload file"
       toast.error(msg)
       // Do NOT close modal or clear file on error
-      return
+      throw err // Pass back to modal for local loading state handling
     }
   }
 
   // DataTable columns for reconciliation records
   const columns: Column<any>[] = [
     {
-      key: 'bankName',
-      label: 'Bank Name',
+      key: 'fileName',
+      label: 'Batch / File Name',
       sortable: true,
       render: (value, row) => (
         <div className="flex items-center gap-2 min-w-0">
-          <span className="truncate max-w-[180px]" title={value}>{value}</span>
+          <span className="truncate max-w-[180px]" title={value || row.accountNumber}>{value || row.accountNumber}</span>
         </div>
       )
     },
@@ -135,35 +134,40 @@ function BankReconciliationPage() {
       render: (value) => <Badge>{value}</Badge>
     },
     {
-      key: 'isReconciled',
-      label: 'Is Reconciled',
+      key: 'status',
+      label: 'Status',
       sortable: true,
-      render: (value) => <Badge>{value ?'Yes':'No'}</Badge>
+      render: (value) => (
+        <Badge className={cn(
+          value === 'COMPLETED' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+        )}>
+          {value === 'COMPLETED' ? 'Reconciled' : 'Pending'}
+        </Badge>
+      )
     },
     {
-      key: 'pendingTransactions',
-      label: 'Pending Transactions',
+      key: 'unmatchedCount',
+      label: 'Pending',
       sortable: true,
-      render: (value) => <span>{value}</span>
+      render: (value) => <span>{value || 0}</span>
     },
     {
-      key: 'matchedTransactions',
-      label: 'Matched Transaction',
+      key: 'matchedCount',
+      label: 'Matched',
       sortable: true,
-      render: (value) => <span>{value}</span>
+      render: (value) => <span>{value || 0}</span>
     },
     {
-      key: 'discrepancies',
+      key: 'unmatchedCount',
       label: 'Discrepancies',
       sortable: true,
-      render: (value) => <span>{value}</span>
+      render: (value) => <span>{value || 0}</span>
     },
     {
-      key: 'unreconciledEntries',
-      label: 'Unreconciled Entries',
+      key: 'totalTransactions',
+      label: 'Total Txns',
       sortable: true,
-          render: (value,row) => <span>{row.unreconciledEntries?.length}</span>
-
+          render: (value) => <span>{value || 0}</span>
     }
     
   ]
@@ -207,7 +211,8 @@ function BankReconciliationPage() {
             <h1 className="text-3xl font-normal">Bank Reconciliation</h1>
             <p className="text-muted-foreground">Manage bank statement uploads, matches, and audit trail</p>
           </div>
-          <div className="flex gap-3">
+          <div className="flex items-center gap-3">
+            <CurrencyFilter />
             {acctPerms.canUploadBankStatement && (
             <Button onClick={() => setUploadModalOpen(true)} className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-full px-6">
               <Plus className="w-4 h-4 mr-2" /> Upload Statement
@@ -221,8 +226,6 @@ function BankReconciliationPage() {
           open={uploadModalOpen}
           onClose={() => setUploadModalOpen(false)}
           onUpload={handleUpload}
-          uploadFile={uploadFile}
-          setUploadFile={setUploadFile}
           loading={bankReconciliationUploadLoading}
         />
 

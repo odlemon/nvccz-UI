@@ -53,6 +53,7 @@ import type { RootState, AppDispatch } from "@/lib/store"
 import { Invoice } from "@/lib/api/accounting-api"
 import { CreditNotesManagement } from "./credit-notes-management"
 import { useAccountingPermissions } from "@/lib/hooks/useAccountingPermissions"
+import { CurrencyFilter } from "./CurrencyFilter"
 
 interface MockInvoice {
   id: string
@@ -218,6 +219,7 @@ export function InvoicesManagement() {
     creditNotesLoading: state.accounting.creditNotesLoading || false,
     creditNotesError: state.accounting.creditNotesError || null
   }))
+  const selectedCurrencyId = useSelector((state: RootState) => state.accounting.selectedCurrencyId)
 
   const [activeMainTab, setActiveMainTab] = useState("invoices")
   const [activeTab, setActiveTab] = useState("all")
@@ -245,13 +247,14 @@ export function InvoicesManagement() {
         const statusFilter = activeTab !== 'all' ? tabs.find(t => t.id === activeTab)?.status : undefined
         await loadInvoices({ 
           status: statusFilter,
+          currencyId: selectedCurrencyId || undefined,
           page: 1,
           limit: 10
         })
 
         // Load credit notes when on credit notes tab
         if (activeMainTab === 'credit-notes') {
-          dispatch(fetchCreditNotes())
+          dispatch(fetchCreditNotes({ currencyId: selectedCurrencyId || undefined }))
         }
       } catch (error) {
         console.error('Failed to load data:', error)
@@ -259,14 +262,14 @@ export function InvoicesManagement() {
     }
 
     loadData()
-  }, [dispatch, currencies.length, activeTab, activeMainTab, loadCustomers, loadInvoices])
+  }, [dispatch, currencies.length, activeTab, activeMainTab, loadCustomers, loadInvoices, selectedCurrencyId])
 
   // Load credit notes when switching to credit notes tab
   useEffect(() => {
     if (activeMainTab === 'credit-notes') {
-      dispatch(fetchCreditNotes())
+      dispatch(fetchCreditNotes({ currencyId: selectedCurrencyId || undefined }))
     }
-  }, [activeMainTab, dispatch])
+  }, [activeMainTab, dispatch, selectedCurrencyId])
 
   // Handle tab change and filter by status
   const handleTabChange = (tabId: string) => {
@@ -803,7 +806,8 @@ export function InvoicesManagement() {
         <div>
           {/* Tab-specific content */}
         </div>
-        <div className="flex gap-3">
+        <div className="flex items-center gap-3">
+          <CurrencyFilter />
           {activeMainTab === "invoices" && canCreateInvoice && (
             <Button
               onClick={handleCreateInvoiceClick}

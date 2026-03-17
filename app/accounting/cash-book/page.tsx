@@ -16,6 +16,7 @@ import {
 import { CreateCashbookReceiptModal } from "@/components/accounting/create-cashbook-receipt-modal"
 import { CreateCashbookPaymentModal } from "@/components/accounting/create-cashbook-payment-modal"
 import { CashbookEntryViewDrawer } from "@/components/accounting/cashbook-entry-view-drawer"
+import { CurrencyFilter } from "@/components/accounting/CurrencyFilter"
 import { AccountingLayout } from "@/components/layout/accounting-layout"
 import { ModuleGuard } from "@/components/permissions/PermissionGuards"
 import {
@@ -28,7 +29,7 @@ import {
 import { DatePicker } from "@/components/ui/date-picker"
 import { CashbookDataTable } from "@/components/accounting/CashbookDataTable"
 import { ProcessCashbookModal } from "@/components/accounting/process-cashbook"
-import { cashbookApi } from "@/lib/api/cashbook-api"
+import { cashbookApi, CashbookEntry } from "@/lib/api/cashbook-api"
 import { Skeleton } from "@/components/ui/skeleton"
 import { CreateCashbookTransferModal } from "@/components/accounting/create-cashbook-transfer-modal"
 import { ProcurementDataTable } from "@/components/procurement/procurement-data-table"
@@ -49,6 +50,10 @@ function getWeekRange() {
 
 const formatCurrency = (amount: number, currencyCode: string = 'USD') => {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: currencyCode }).format(amount)
+}
+
+const currentCurrencyCode = (currencies: any[], id: string | null) => {
+  return currencies.find(c => c.id === id)?.code || 'USD'
 }
 
 const mainTabs = [
@@ -73,14 +78,16 @@ function CashbookPage() {
   const selectedCashbookBank = useSelector((state: RootState) => state.accounting.selectedCashbookBank)
   const cashbookEntries = useSelector((state: RootState) => state.accounting.cashbookEntries)
   const cashbookEntriesLoading = useSelector((state: RootState) => state.accounting.cashbookEntriesLoading)
+  const selectedCurrencyId = useSelector((state: RootState) => state.accounting.selectedCurrencyId)
+  const currencies = useSelector((state: RootState) => state.accounting.currencies)
 
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false)
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
-  const [selectedEntry, setSelectedEntry] = useState(null)
+  const [selectedEntry, setSelectedEntry] = useState<CashbookEntry | null>(null)
   const [isViewDrawerOpen, setIsViewDrawerOpen] = useState(false)
   const [batches, setBatches] = useState<any[]>([])
   const [batchesLoading, setBatchesLoading] = useState(false)
-  const [selectedBatch, setSelectedBatch] = useState(null)
+  const [selectedBatch, setSelectedBatch] = useState<any | null>(null)
   const [isBatchDrawerOpen, setIsBatchDrawerOpen] = useState(false)
   const [transfers, setTransfers] = useState<any[]>([])
   const [transfersLoading, setTransfersLoading] = useState(false)
@@ -88,13 +95,19 @@ function CashbookPage() {
     const { startDate, endDate } = getWeekRange()
     return { fromBankId: "", toBankId: "", dateFrom: startDate, dateTo: endDate, page: 1, limit: 50 }
   })
-  const [selectedTransfer, setSelectedTransfer] = useState(null)
+  const [selectedTransfer, setSelectedTransfer] = useState<any | null>(null)
   const [isTransferDrawerOpen, setIsTransferDrawerOpen] = useState(false)
 
   const [entriesStartDate, setEntriesStartDate] = useState<Date | undefined>(new Date(getWeekRange().startDate))
   const [entriesEndDate, setEntriesEndDate] = useState<Date | undefined>(new Date(getWeekRange().endDate))
 
-  const [filters, setFilters] = useState(() => {
+  const [filters, setFilters] = useState<{
+    type: "RECEIPT" | "PAYMENT" | "";
+    status: string;
+    startDate: string;
+    endDate: string;
+    bankId: string;
+  }>(() => {
     const { startDate, endDate } = getWeekRange()
     return { type: "", status: "", startDate, endDate, bankId: "" }
   })
@@ -114,21 +127,22 @@ function CashbookPage() {
     if (isFetchingRef.current) return
 
     isFetchingRef.current = true
-    dispatch(fetchCashbookBanks()).finally(() => {
+    dispatch(fetchCashbookBanks({ currencyId: selectedCurrencyId || undefined })).finally(() => {
       isFetchingRef.current = false
     })
-  }, [dispatch])
+  }, [dispatch, selectedCurrencyId])
 
   useEffect(() => {
     if (activeTab === 'single') {
       const timeoutId = setTimeout(() => {
-        dispatch(fetchCashbookEntries({
-          bankId: filters.bankId || '',
-          type: filters.type,
-          status: filters.status,
-          startDate: filters.startDate,
-          endDate: filters.endDate
-        }))
+          dispatch(fetchCashbookEntries({
+            bankId: filters.bankId || '',
+            type: filters.type === "" ? undefined : filters.type as "RECEIPT" | "PAYMENT",
+            status: filters.status,
+            startDate: filters.startDate,
+            endDate: filters.endDate,
+            currencyId: selectedCurrencyId || undefined
+          }))
       }, 300) // Debounce to prevent rapid re-fetches
 
       return () => clearTimeout(timeoutId)
@@ -136,9 +150,9 @@ function CashbookPage() {
       const fetchBatches = async () => {
         setBatchesLoading(true)
         try {
-          const res = await cashbookApi.getCashbookBatches()
+          const res = await cashbookApi.getCashbookBatches({ currencyId: selectedCurrencyId || undefined })
           if (res.success) {
-            setBatches(res.data?.batches)
+            setBatches(res.data?.batches || res.data || [])
           }
         } catch (error) {
           console.error("Failed to fetch batches", error)
@@ -151,9 +165,12 @@ function CashbookPage() {
       const fetchTransfers = async () => {
         setTransfersLoading(true)
         try {
-          const res = await cashbookApi.getCashbookTransfers(transferFilters)
+          const res = await cashbookApi.getCashbookTransfers({
+            ...transferFilters,
+            currencyId: selectedCurrencyId || undefined
+          })
           if (res.success) {
-            setTransfers(res.data?.transfers || res.message || [])
+            setTransfers(res.data?.transfers || res.data || [])
           }
         } catch (error) {
           console.error("Failed to fetch transfers", error)
@@ -165,7 +182,7 @@ function CashbookPage() {
       const timeoutId = setTimeout(fetchTransfers, 300) // Debounce
       return () => clearTimeout(timeoutId)
     }
-  }, [dispatch, activeTab, filters, transferFilters])
+  }, [dispatch, activeTab, filters, transferFilters, selectedCurrencyId])
 
   const exportToCSV = (data: any[], filename: string) => {
     const headers = ["Date", "Description", "Reference", "Receipts (Dr)", "Payments (Cr)", "Balance", "Status"]
@@ -223,7 +240,7 @@ function CashbookPage() {
         </Badge>
       ),
     },
-    { key: "totalAmount", label: "Total Amount", render: (value: number) => formatCurrency(value), sortable: true },
+    { key: "totalAmount", label: "Total Amount", render: (value: number) => formatCurrency(value, currentCurrencyCode(currencies, selectedCurrencyId)), sortable: true },
     { key: "createdAt", label: "Created At", render: (value: string) => format(new Date(value), "yyyy-MM-dd"), sortable: true },
   ]
 
@@ -231,7 +248,7 @@ function CashbookPage() {
     { key: "transferDate", label: "Transfer Date", render: (value: string) => format(new Date(value), "yyyy-MM-dd"), sortable: true },
     { key: "fromBank", label: "From Bank", render: (value: any) => value?.name || "N/A", sortable: true },
     { key: "toBank", label: "To Bank", render: (value: any) => value?.name || "N/A", sortable: true },
-    { key: "amount", label: "Amount", render: (value: number) => formatCurrency(value), sortable: true },
+    { key: "amount", label: "Amount", render: (value: number) => formatCurrency(value, currentCurrencyCode(currencies, selectedCurrencyId)), sortable: true },
     { key: "description", label: "Description", sortable: true },
     { key: "reference", label: "Reference", sortable: true },
     {
@@ -360,6 +377,7 @@ function CashbookPage() {
                   <SelectItem value="PAYMENT">Payments</SelectItem>
                 </SelectContent>
               </Select>
+              <CurrencyFilter />
               <Select
                 value={filters.status || "all"}
                 onValueChange={status => setFilters(f => ({ ...f, status: status === "all" ? "" : status }))}
@@ -395,7 +413,7 @@ function CashbookPage() {
               loading={cashbookEntriesLoading}
               onAddReceipt={() => setIsReceiptModalOpen(true)}
               onAddPayment={() => setIsPaymentModalOpen(true)}
-              onViewEntry={(entry) => {
+              onViewEntry={(entry: any) => {
                 setSelectedEntry(entry)
                 setIsViewDrawerOpen(true)
               }}
@@ -543,7 +561,7 @@ function CashbookPage() {
                 try {
                   const res = await cashbookApi.getCashbookBatches()
                   if (res.success) {
-                    setBatches(res.data?.batches)
+                    setBatches(res.data?.batches || res.data || [])
                   }
                 } catch (error) {
                   console.error("Failed to fetch batches", error)
@@ -578,7 +596,7 @@ function CashbookPage() {
               try {
                 const res = await cashbookApi.getCashbookTransfers(transferFilters)
                 if (res.success) {
-                  setTransfers(res.data?.transfers || res.message || [])
+                  setTransfers(res.data?.transfers || res.data || [])
                 }
               } catch (error) {
                 console.error("Failed to fetch transfers", error)

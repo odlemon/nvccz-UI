@@ -9,6 +9,7 @@ import { MODULE_CONFIG, getModuleByPath } from "@/lib/config/modules"
 import { useDispatch } from "react-redux"
 import { fetchCurrencies } from "@/lib/store/slices/accountingSlice"
 import type { AppDispatch } from "@/lib/store/store"
+import { CurrencyFilter } from "../accounting/CurrencyFilter"
 
 interface AccountingLayoutProps {
   children: React.ReactNode
@@ -44,6 +45,7 @@ export function AccountingLayout({ children }: AccountingLayoutProps) {
   return (
     <div className="min-h-screen bg-background">
       <SharedTopbar onModuleSelect={handleModuleSelect} currentModule={currentModule} />
+
 
       <div className="flex">
         <AccountingSidebar />

@@ -44,8 +44,9 @@ export function CashbookDataTable({
   const itemsPerPage = 10
 
   const sortedEntries = useMemo(() => {
-    if (!sortColumn) return entries
-    return [...entries].sort((a, b) => {
+    if (!sortColumn) return Array.isArray(entries) ? entries : []
+    const safeEntries = Array.isArray(entries) ? entries : []
+    return [...safeEntries].sort((a, b) => {
       const aValue = a[sortColumn as keyof CashbookEntry]
       const bValue = b[sortColumn as keyof CashbookEntry]
       if (aValue < bValue) return sortDirection === "asc" ? -1 : 1
@@ -59,7 +60,7 @@ export function CashbookDataTable({
     return sortedEntries.slice(start, start + itemsPerPage)
   }, [sortedEntries, currentPage])
 
-  const totalPages = Math.ceil(sortedEntries.length / itemsPerPage)
+  const totalPages = Math.ceil((Array.isArray(sortedEntries) ? sortedEntries.length : 0) / itemsPerPage)
 
   const handleSort = (column: string) => {
     if (sortColumn === column) {

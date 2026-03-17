@@ -45,7 +45,6 @@ export function CreateInvoiceModal({
     transactionDate: new Date().toISOString().split('T')[0],
     description: "",
     invoiceDate: new Date().toISOString().split('T')[0],
-    invoiceNumber: "",
     isTaxable: true,
     exchangeRateAtCreation: 1,
     items: [
@@ -78,7 +77,6 @@ export function CreateInvoiceModal({
           transactionDate: invoice.transactionDate.split('T')[0],
           description: invoice.description,
           invoiceDate: invoice.transactionDate.split('T')[0],
-          invoiceNumber: invoice.invoiceNumber,
           isTaxable: invoice.isTaxable,
           exchangeRateAtCreation: parseFloat(invoice.exchangeRateAtCreation || "1"),
           items: invoice.items.length > 0 ? invoice.items : [{ description: "", amount: 0, category: "" }]
@@ -92,7 +90,6 @@ export function CreateInvoiceModal({
           transactionDate: new Date().toISOString().split('T')[0],
           description: "",
           invoiceDate: new Date().toISOString().split('T')[0],
-          invoiceNumber: "",
           isTaxable: true,
           exchangeRateAtCreation: 1,
           items: [{ description: "", amount: 0, category: "" }]
@@ -282,7 +279,7 @@ export function CreateInvoiceModal({
           </div>
 
           {/* Transaction Date & Invoice Number */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4">
             <div className="space-y-2">
               <Label htmlFor="transactionDate">Transaction Date *</Label>
               <Popover>
@@ -320,17 +317,6 @@ export function CreateInvoiceModal({
               {errors.transactionDate && (
                 <p className="text-sm text-red-500">{errors.transactionDate}</p>
               )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="invoiceNumber">Invoice Number</Label>
-              <Input
-                id="invoiceNumber"
-                value={formData.invoiceNumber}
-                onChange={(e) => handleInputChange("invoiceNumber", e.target.value)}
-                placeholder="Auto-generated if empty"
-                disabled={isLoading}
-              />
             </div>
           </div>
 

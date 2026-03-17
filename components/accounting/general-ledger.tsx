@@ -33,9 +33,12 @@ import { toast } from "sonner"
 import { format } from "date-fns"
 import { CreateJournalEntryModal } from "./create-journal-entry-modal"
 import { JournalEntryViewDrawer } from "./journal-entry-view-drawer"
+import { CurrencyFilter } from "./CurrencyFilter"
 import { TrialBalanceView } from "./trial-balance-view"
 import { accountingApi, JournalEntryFilters } from "@/lib/api/accounting-api"
 import { useAccountingPermissions } from "@/lib/hooks/useAccountingPermissions"
+import { useSelector } from "react-redux"
+import { RootState } from "@/lib/store/store"
 
 // Helper function to trim spaces
 const cleanString = (value: any): string => {
@@ -46,6 +49,17 @@ const cleanString = (value: any): string => {
 const cleanNumber = (value: any, defaultValue: number = 0): number => {
   const parsed = parseFloat(value);
   return isNaN(parsed) ? defaultValue : parsed;
+}
+
+const formatWithCurrencyCode = (amount: number | string, currencyCode: string = 'USD') => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: currencyCode,
+  }).format(typeof amount === 'string' ? parseFloat(amount) : amount)
+}
+
+const currentCurrencyCode = (currencies: any[], id: string | null) => {
+  return currencies.find(c => c.id === id)?.code || 'USD'
 }
 
 // CSV Export utility function
@@ -174,6 +188,7 @@ const statusOptions = [
 
 export function GeneralLedger() {
   const { permissions } = useAccountingPermissions()
+  const { selectedCurrencyId, currencies } = useSelector((state: RootState) => state.accounting)
   
   // Permission checks
   const canCreateJournal = permissions.canCreateJournalEntry
@@ -209,7 +224,7 @@ export function GeneralLedger() {
     if (activeTab === "journal") {
       loadJournalEntries()
     }
-  }, [activeTab, debouncedSearch, statusFilter])
+  }, [activeTab, debouncedSearch, statusFilter, selectedCurrencyId])
 
   const loadJournalEntries = useCallback(async () => {
     setLoading(true)
@@ -230,10 +245,13 @@ export function GeneralLedger() {
 
       console.log('Loading journal entries with filters:', filters)
 
-      const response = await accountingApi.getJournalEntries(filters)
+      const response = await accountingApi.getJournalEntries({
+        ...filters,
+        currencyId: selectedCurrencyId || undefined
+      })
       
       if (response.success) {
-        setJournalEntries(response.data || [])
+        setJournalEntries((response.data as any) || [])
         // toast.success(`Loaded ${response.data?.length || 0} journal entries`)
       } else {
         toast.error("Failed to load journal entries", {
@@ -304,15 +322,16 @@ export function GeneralLedger() {
 
   const formatCurrency = (amount: string | number) => {
     const numAmount = cleanNumber(amount)
+    const currencyCode = currencies.find(c => c.id === selectedCurrencyId)?.code || 'USD'
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD',
+      currency: currencyCode,
       minimumFractionDigits: 2
     }).format(numAmount)
   }
 
   const handleViewEntry = (entry: JournalEntry) => {
-    setSelectedEntry(entry)
+    setSelectedEntry(entry as any)
     setIsViewDrawerOpen(true)
   }
 
@@ -361,7 +380,8 @@ export function GeneralLedger() {
           <h1 className="text-3xl font-normal">General Ledger</h1>
           <p className="text-muted-foreground">Manage journal entries and view trial balance</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex items-center gap-3">
+          <CurrencyFilter />
           <Button 
             variant="outline" 
             onClick={() => loadJournalEntries()}
@@ -565,7 +585,7 @@ export function GeneralLedger() {
                         key={group.date}
                         group={group}
                         onViewEntry={handleViewEntry}
-                        formatCurrency={formatCurrency}
+                        formatCurrency={(amount) => formatWithCurrencyCode(amount, currentCurrencyCode(currencies, selectedCurrencyId))}
                         getStatusIcon={getStatusIcon}
                         getStatusColor={getStatusColor}
                       />

@@ -214,8 +214,9 @@ export interface Allocation {
 // --- CASHBOOK API ---
 class CashbookApiService {
     // Cashbook Banks
-    async getCashbookBanks(): Promise<AccountingResponse<CashbookBank[]>> {
-        return apiClient.get<AccountingResponse<CashbookBank[]>>('/cashbook/banks')
+    async getCashbookBanks(params?: { currencyId?: string }): Promise<AccountingResponse<CashbookBank[]>> {
+        const query = params?.currencyId ? `?currencyId=${params.currencyId}` : ''
+        return apiClient.get<AccountingResponse<CashbookBank[]>>(`/cashbook/banks${query}`)
     }
 
     // Cashbook Entries
@@ -225,6 +226,7 @@ class CashbookApiService {
         status?: string
         startDate?: string
         endDate?: string
+        currencyId?: string
     }): Promise<AccountingResponse<CashbookEntry[]>> {
         const { bankId, ...query } = params
         const queryString = Object.keys(query).length
@@ -264,8 +266,9 @@ class CashbookApiService {
     }
 
     // Cashbook Batches
-    async getCashbookBatches(): Promise<AccountingResponse<any[]>> {
-        return apiClient.get<AccountingResponse<any[]>>('/cashbook/batches')
+    async getCashbookBatches(params?: { currencyId?: string }): Promise<AccountingResponse<any[]>> {
+        const query = params?.currencyId ? `?currencyId=${params.currencyId}` : ''
+        return apiClient.get<AccountingResponse<any[]>>(`/cashbook/batches${query}`)
     }
 
     async postCashbookBatch(batchId: string): Promise<AccountingResponse<any>> {
@@ -310,6 +313,7 @@ class CashbookApiService {
         toBankId?: string
         dateFrom?: string
         dateTo?: string
+        currencyId?: string
     }): Promise<AccountingResponse<any[]>> {
         const queryString = new URLSearchParams(
             Object.entries(params)

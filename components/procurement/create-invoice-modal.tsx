@@ -39,7 +39,6 @@ export function CreateInvoiceModal({ isOpen, onClose, onSuccess }: CreateInvoice
   const { permissions } = useProcurementPermissions()
 
   const [formData, setFormData] = useState({
-    invoiceNumber: "",
     purchaseOrderId: "",
     vendorId: "",
     invoiceDate: "",
@@ -68,9 +67,9 @@ export function CreateInvoiceModal({ isOpen, onClose, onSuccess }: CreateInvoice
       setLoadingData(true)
 
       // Load vendors
-      const vendorsResponse = await accountingApi.vendors.getAll()
+      const vendorsResponse = await accountingApi.getVendors()
       if (vendorsResponse.success && vendorsResponse.data) {
-        setVendors(vendorsResponse.data.filter(v => v.isActive))
+        setVendors(vendorsResponse.data.filter((v: Vendor) => v.isActive))
       }
 
       // Load purchase orders (draft, sent, or acknowledged)
@@ -137,7 +136,6 @@ export function CreateInvoiceModal({ isOpen, onClose, onSuccess }: CreateInvoice
       // Mock OCR data extraction
       setFormData(prev => ({
         ...prev,
-        invoiceNumber: "INV-2024-" + Math.floor(Math.random() * 1000),
         invoiceDate: new Date().toISOString().split('T')[0],
         vendorId: "vendor-1"
       }))
@@ -154,7 +152,7 @@ export function CreateInvoiceModal({ isOpen, onClose, onSuccess }: CreateInvoice
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!formData.invoiceNumber || !formData.vendorId || items.some(item => !item.itemName || item.quantity <= 0)) {
+    if (!formData.vendorId || items.some(item => !item.itemName || item.quantity <= 0)) {
       toast.error("Please fill in all required fields")
       return
     }
@@ -194,7 +192,6 @@ export function CreateInvoiceModal({ isOpen, onClose, onSuccess }: CreateInvoice
 
   const handleClose = () => {
     setFormData({
-      invoiceNumber: "",
       purchaseOrderId: "",
       vendorId: "",
       invoiceDate: "",
@@ -266,17 +263,6 @@ export function CreateInvoiceModal({ isOpen, onClose, onSuccess }: CreateInvoice
               <CardTitle className="text-lg">Invoice Information</CardTitle>
             </CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="invoiceNumber">Invoice Number *</Label>
-                <Input
-                  id="invoiceNumber"
-                  value={formData.invoiceNumber}
-                  onChange={(e) => handleInputChange("invoiceNumber", e.target.value)}
-                  placeholder="INV-2024-001"
-                  required
-                />
-              </div>
-
               <div>
                 <Label htmlFor="purchaseOrderId">Purchase Order (Optional)</Label>
                 <Select

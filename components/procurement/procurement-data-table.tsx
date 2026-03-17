@@ -106,16 +106,16 @@ export function ProcurementDataTable<T extends { id: string }>({
 
   // Use backend pagination data if available, otherwise calculate frontend pagination
   const isBackendPagination = usePagination === 'backend' && paginationData
-  const totalEntries = isBackendPagination ? paginationData.total : data.length
+  const totalEntries = isBackendPagination ? paginationData.total : (Array.isArray(data) ? data.length : 0)
   const currentPageNumber = isBackendPagination ? paginationData.page : currentPage
   const currentLimit = isBackendPagination ? paginationData.limit : currentPageSize
-  const totalPages = isBackendPagination ? paginationData.totalPages : Math.ceil(data.length / currentPageSize)
+  const totalPages = isBackendPagination ? paginationData.totalPages : Math.ceil((Array.isArray(data) ? data.length : 0) / currentPageSize)
 
   // Filter and search data (only for frontend pagination)
   const filteredData = useMemo(() => {
     if (isBackendPagination) return data // Backend handles filtering
 
-    let filtered = data
+    let filtered = Array.isArray(data) ? data : []
     // Apply search
     if (searchTerm) {
       filtered = filtered.filter(row =>

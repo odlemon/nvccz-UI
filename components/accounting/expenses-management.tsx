@@ -50,6 +50,7 @@ import {
 import type { RootState, AppDispatch } from "@/lib/store"
 import { Expense } from "@/lib/api/accounting-api"
 import { useAccountingPermissions } from "@/lib/hooks/useAccountingPermissions"
+import { CurrencyFilter } from "./CurrencyFilter"
 
 const tabs = [
   {
@@ -96,7 +97,8 @@ export function ExpensesManagement() {
     selectedExpense = null,
     currencies = [],
     vendors = [],
-    expenseCategories = []
+    expenseCategories = [],
+    selectedCurrencyId
   } = useSelector((state: RootState) => state.accounting)
   
   // Permission checks
@@ -116,19 +118,22 @@ export function ExpensesManagement() {
 
   useEffect(() => {
     // Load initial data
-    dispatch(fetchExpenses())
+    dispatch(fetchExpenses({ currencyId: selectedCurrencyId || undefined }))
     dispatch(fetchCurrencies())
     dispatch(fetchVendors())
     dispatch(fetchExpenseCategories())
-  }, [dispatch])
+  }, [dispatch, selectedCurrencyId])
 
   useEffect(() => {
-    // Fetch expenses when tab changes
+    // Fetch expenses when tab changes or currency changes
     const activeTabData = tabs.find(tab => tab.id === activeTab)
     if (activeTabData) {
-      dispatch(fetchExpenses({ status: activeTabData.status as any }))
+      dispatch(fetchExpenses({ 
+        status: activeTabData.status as any,
+        currencyId: selectedCurrencyId || undefined
+      }))
     }
-  }, [activeTab, dispatch])
+  }, [activeTab, dispatch, selectedCurrencyId])
 
   const handleCreateExpense = () => {
     setIsCreateModalOpen(true)
@@ -631,15 +636,18 @@ export function ExpensesManagement() {
           <h1 className="text-3xl font-normal">Expenses</h1>
           <p className="text-muted-foreground">Manage and track your business expenses</p>
         </div>
-        {canCreateExpense && (
-          <Button 
-            onClick={handleCreateExpense}
-            className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-full px-6"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Create Expense
-          </Button>
-        )}
+        <div className="flex items-center gap-3">
+          <CurrencyFilter />
+          {canCreateExpense && (
+            <Button 
+                onClick={handleCreateExpense}
+                className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-full px-6"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Create Expense
+            </Button>
+          )}
+        </div>
       </div>
 
 
