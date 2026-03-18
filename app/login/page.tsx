@@ -87,7 +87,7 @@ function LoginForm() {
   const isLoading = isSubmitting || (isAuthenticated && isFetchingDetails)
 
   return (
-    <div className="h-screen bg-white flex overflow-hidden gap-4 p-4">
+    <div className="min-h-screen bg-white flex gap-4 p-4 md:p-8">
       {/* Left Section - Login Form */}
       <div className="flex-1 flex items-center justify-center">
         <motion.div
@@ -97,9 +97,9 @@ function LoginForm() {
           className="w-full h-full max-w-2xl"
         >
           {/* Form Card */}
-          <div className="rounded-3xl p-8 h-full flex flex-col justify-center" style={{ backgroundColor: '#F8F8F8' }}>
+          <div className="rounded-3xl p-6 md:p-8 h-full flex flex-col justify-center" style={{ backgroundColor: '#F8F8F8' }}>
             {/* Logo */}
-            <div className="text-left mb-8 px-12">
+            <div className="text-left mb-8 px-4 md:px-12">
               <div className="inline-flex items-center justify-center mb-4">
                 <Image
                   src="/logo_copy.png"
@@ -120,7 +120,7 @@ function LoginForm() {
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm mx-12"
+                className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm mx-4 md:mx-12"
               >
                 {error}
               </motion.div>
@@ -131,7 +131,7 @@ function LoginForm() {
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl text-blue-700 text-sm mx-12 flex items-center"
+                className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl text-blue-700 text-sm mx-4 md:mx-12 flex items-center"
               >
                 <Loader2 className="animate-spin mr-2 h-4 w-4" />
                 Loading your profile...
@@ -139,7 +139,7 @@ function LoginForm() {
             )}
 
             {/* Login Form */}
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 px-12">
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 px-4 md:px-12">
               {/* Email Field */}
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
@@ -293,7 +293,7 @@ function LoginForm() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.6 }}
-              className="mt-6 px-12 flex items-center justify-center space-x-2 text-sm text-gray-500"
+              className="mt-6 px-4 md:px-12 flex flex-col sm:flex-row items-center justify-center gap-2 sm:space-x-2 text-sm text-gray-500"
             >
               <div className="flex -space-x-2">
                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 border-2 border-white"></div>

@@ -168,10 +168,13 @@ export default function ApplicationFormPage() {
 
   return (
     <div className="min-h-screen bg-white py-8">
-      <div className="max-w-6xl mx-auto px-12">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 md:px-12">
         {/* Header */}
         <div className="mb-8">
           <div className="text-center">
+            <div className="flex justify-center mb-6">
+              <img src="/logo_copy.png" alt="Arcus Logo" className="h-24 sm:h-28 object-contain" />
+            </div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Investment Application</h1>
             <p className="text-gray-600">Complete your application in 3 simple steps</p>
           </div>
@@ -179,18 +182,18 @@ export default function ApplicationFormPage() {
           {/* NDA Agreement Section - Only show in Step 1 */}
           {currentStep === 1 && (
             <div className="mt-6 flex justify-center">
-              <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-2xl p-6 max-w-2xl w-full shadow-sm">
-                <div className="flex items-start gap-5">
+              <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-2xl p-4 sm:p-6 max-w-2xl w-full shadow-sm">
+                <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-5 text-center sm:text-left">
                   <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0 shadow-md">
                     <FileText className="w-6 h-6 text-white" />
                   </div>
-                  <div className="flex-1">
+                  <div className="flex-1 w-full">
                     <h3 className="text-lg font-bold text-gray-900 mb-1">NDA Agreement</h3>
                     <p className="text-sm text-gray-600 mb-4 leading-relaxed">
                       To protect your business information and our investment process, please review and agree to our Non-Disclosure & Confidentiality Agreement.
                     </p>
 
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                    <div className="flex flex-col sm:flex-row items-center sm:items-center justify-center sm:justify-start gap-4">
                       <Button
                         type="button"
                         variant="outline"
@@ -243,7 +246,7 @@ export default function ApplicationFormPage() {
         <StepperProgress currentStep={currentStep} />
 
         {/* Form Content */}
-        <div className="bg-white rounded-xl border border-gray-200 p-8 shadow-sm">
+        <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-6 md:p-8 shadow-sm">
           <AnimatePresence mode="wait">
             {renderStep()}
           </AnimatePresence>

@@ -1,7 +1,7 @@
 "use client"
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
-import { FileText, X } from "lucide-react"
+import { FileText } from "lucide-react"
 
 interface NDAModalProps {
     isOpen: boolean
@@ -11,8 +11,8 @@ interface NDAModalProps {
 const NDAModal = ({ isOpen, onClose }: NDAModalProps) => {
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="max-w-6xl md:max-w-full w-[80vw] h-[95vh] flex flex-col p-0 overflow-hidden">
-                <DialogHeader className="p-6 border-b flex flex-row items-center justify-between">
+            <DialogContent className="max-w-[95vw] md:max-w-6xl w-[95vw] md:w-[80vw] h-[95vh] flex flex-col p-0 overflow-hidden">
+                <DialogHeader className="p-4 sm:p-6 border-b flex flex-row items-center justify-between">
                     <div>
                         <DialogTitle className="flex items-center gap-2 text-xl font-bold">
                             <FileText className="w-6 h-6 text-blue-600" />
