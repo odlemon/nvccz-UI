@@ -46,7 +46,6 @@ export function CreateInvoiceModal({
     description: "",
     invoiceDate: new Date().toISOString().split('T')[0],
     isTaxable: true,
-    exchangeRateAtCreation: 1,
     items: [
       {
         description: "",
@@ -78,8 +77,13 @@ export function CreateInvoiceModal({
           description: invoice.description,
           invoiceDate: invoice.transactionDate.split('T')[0],
           isTaxable: invoice.isTaxable,
-          exchangeRateAtCreation: parseFloat(invoice.exchangeRateAtCreation || "1"),
-          items: invoice.items.length > 0 ? invoice.items : [{ description: "", amount: 0, category: "" }]
+          items: invoice.items.length > 0 ? invoice.items.map(i => ({
+            description: i.description || "",
+            amount: i.amount || 0,
+            category: i.category || "",
+            quantity: i.quantity || 1,
+            unitPrice: i.unitPrice || 0,
+          })) : [{ description: "", amount: 0, category: "", quantity: 1, unitPrice: 0 }]
         })
       } else {
         // Reset form for creating new invoice
@@ -91,8 +95,7 @@ export function CreateInvoiceModal({
           description: "",
           invoiceDate: new Date().toISOString().split('T')[0],
           isTaxable: true,
-          exchangeRateAtCreation: 1,
-          items: [{ description: "", amount: 0, category: "" }]
+          items: [{ description: "", amount: 0, category: "", quantity: 1, unitPrice: 0 }]
         })
       }
       setErrors({})
@@ -184,7 +187,7 @@ export function CreateInvoiceModal({
   const addItem = () => {
     setFormData(prev => ({
       ...prev,
-      items: [...prev.items, { description: "", amount: 0, category: "" }]
+      items: [...prev.items, { description: "", amount: 0, category: "", quantity: 1, unitPrice: 0 }]
     }))
   }
 
@@ -357,7 +360,7 @@ export function CreateInvoiceModal({
             <div className="space-y-3">
               {formData.items.map((item, index) => (
                 <div key={index} className="grid grid-cols-12 gap-2 p-4 border rounded-lg">
-                  <div className="col-span-5">
+                  <div className="col-span-4">
                     <Input
                       placeholder="Item description"
                       value={item.description}
@@ -365,15 +368,46 @@ export function CreateInvoiceModal({
                       disabled={isLoading}
                     />
                   </div>
-                  <div className="col-span-3">
+                  <div className="col-span-2">
                     <Input
-                      placeholder="Category (optional)"
+                      placeholder="Category"
                       value={item.category || ""}
                       onChange={(e) => handleItemChange(index, "category", e.target.value)}
                       disabled={isLoading}
                     />
                   </div>
-                  <div className="col-span-3">
+                  <div className="col-span-1">
+                    <Input
+                      type="number"
+                      min="1"
+                      placeholder="Qty"
+                      value={item.quantity || 1}
+                      onChange={(e) => {
+                        const qty = parseInt(e.target.value) || 1
+                        const newItems = [...formData.items]
+                        newItems[index] = { ...newItems[index], quantity: qty, amount: qty * (item.unitPrice || 0) }
+                        setFormData(prev => ({ ...prev, items: newItems }))
+                      }}
+                      disabled={isLoading}
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="Unit Price"
+                      value={item.unitPrice || ""}
+                      onChange={(e) => {
+                        const price = parseFloat(e.target.value) || 0
+                        const newItems = [...formData.items]
+                        newItems[index] = { ...newItems[index], unitPrice: price, amount: (item.quantity || 1) * price }
+                        setFormData(prev => ({ ...prev, items: newItems }))
+                      }}
+                      disabled={isLoading}
+                    />
+                  </div>
+                  <div className="col-span-2">
                     <Input
                       type="number"
                       step="0.01"
@@ -382,6 +416,7 @@ export function CreateInvoiceModal({
                       value={item.amount || ""}
                       onChange={(e) => handleItemChange(index, "amount", parseFloat(e.target.value) || 0)}
                       disabled={isLoading}
+                      className="bg-gray-50"
                     />
                   </div>
                   <div className="col-span-1 flex items-center">
@@ -407,34 +442,18 @@ export function CreateInvoiceModal({
             )}
           </div>
 
-          {/* Taxable Status & Exchange Rate */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <Label htmlFor="isTaxable">Taxable Invoice</Label>
-                <p className="text-sm text-gray-500">Include VAT/Tax calculations</p>
-              </div>
-              <Switch
-                id="isTaxable"
-                checked={formData.isTaxable}
-                onCheckedChange={(checked) => handleInputChange("isTaxable", checked)}
-                disabled={isLoading}
-              />
+          {/* Taxable Status */}
+          <div className="flex items-center justify-between">
+            <div>
+              <Label htmlFor="isTaxable">Taxable Invoice</Label>
+              <p className="text-sm text-gray-500">Include VAT/Tax calculations</p>
             </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="exchangeRate">Exchange Rate</Label>
-              <Input
-                id="exchangeRate"
-                type="number"
-                step="0.01"
-                min="0"
-                value={formData.exchangeRateAtCreation || ""}
-                onChange={(e) => handleInputChange("exchangeRateAtCreation", parseFloat(e.target.value) || 1)}
-                placeholder="1.00"
-                disabled={isLoading}
-              />
-            </div>
+            <Switch
+              id="isTaxable"
+              checked={formData.isTaxable}
+              onCheckedChange={(checked) => handleInputChange("isTaxable", checked)}
+              disabled={isLoading}
+            />
           </div>
 
           {/* Total Display */}

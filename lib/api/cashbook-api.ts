@@ -211,31 +211,90 @@ export interface Allocation {
     description: string
 }
 
+// --- BANK CRUD TYPES ---
+export interface CreateCashbookBankRequest {
+    name: string
+    accountNumber: string
+    currencyId: string
+    glAccountId: string
+    bankCode?: string
+    branchCode?: string
+    isActive?: boolean
+}
+
+export interface UpdateCashbookBankRequest {
+    name?: string
+    accountNumber?: string
+    currencyId?: string
+    glAccountId?: string
+    bankCode?: string
+    branchCode?: string
+    isActive?: boolean
+}
+
+export interface GlAccountForBank {
+    id: string
+    accountNo: string
+    accountName: string
+    accountType: string
+    financialStatement: string
+    notes?: string | null
+    parentId?: string | null
+    isActive: boolean
+}
+
 // --- CASHBOOK API ---
 class CashbookApiService {
     // Cashbook Banks
-    async getCashbookBanks(params?: { currencyId?: string }): Promise<AccountingResponse<CashbookBank[]>> {
-        const query = params?.currencyId ? `?currencyId=${params.currencyId}` : ''
+    async getCashbookBanks(params?: { currencyId?: string; includeInactive?: boolean }): Promise<AccountingResponse<CashbookBank[]>> {
+        const queryParams = new URLSearchParams()
+        if (params?.currencyId) queryParams.append('currencyId', params.currencyId)
+        if (params?.includeInactive) queryParams.append('includeInactive', 'true')
+        const query = queryParams.toString() ? `?${queryParams.toString()}` : ''
         return apiClient.get<AccountingResponse<CashbookBank[]>>(`/cashbook/banks${query}`)
+    }
+
+    async getCashbookBankById(id: string): Promise<AccountingResponse<CashbookBank>> {
+        return apiClient.get<AccountingResponse<CashbookBank>>(`/cashbook/banks/${id}`)
+    }
+
+    async createCashbookBank(data: CreateCashbookBankRequest): Promise<AccountingResponse<CashbookBank>> {
+        return apiClient.post<AccountingResponse<CashbookBank>>('/cashbook/banks', data)
+    }
+
+    async updateCashbookBank(id: string, data: UpdateCashbookBankRequest): Promise<AccountingResponse<CashbookBank>> {
+        return apiClient.put<AccountingResponse<CashbookBank>>(`/cashbook/banks/${id}`, data)
+    }
+
+    async deleteCashbookBank(id: string): Promise<AccountingResponse<any>> {
+        return apiClient.delete<AccountingResponse<any>>(`/cashbook/banks/${id}`)
+    }
+
+    async getGlAccountsForBank(): Promise<AccountingResponse<GlAccountForBank[]>> {
+        return apiClient.get<AccountingResponse<GlAccountForBank[]>>('/cashbook/gl-accounts?availableForBank=true')
     }
 
     // Cashbook Entries
     async getCashbookEntries(params: {
-        bankId: string
+        bankId?: string
         type?: 'RECEIPT' | 'PAYMENT'
         status?: string
         startDate?: string
         endDate?: string
         currencyId?: string
+        search?: string
+        minAmount?: number
+        maxAmount?: number
+        page?: number
+        limit?: number
     }): Promise<AccountingResponse<CashbookEntry[]>> {
-        const { bankId, ...query } = params
-        const queryString = Object.keys(query).length
-            ? '?' + new URLSearchParams(
-                Object.entries(query)
-                    .filter(([_, v]) => v !== undefined)
-                    .map(([k, v]) => [k, String(v)])
-            ).toString()
-            : ''
+        const queryParams = new URLSearchParams()
+        Object.entries(params).forEach(([k, v]) => {
+            if (v !== undefined && v !== null && v !== '') {
+                queryParams.append(k, String(v))
+            }
+        })
+        const queryString = queryParams.toString() ? `?${queryParams.toString()}` : ''
         return apiClient.get<AccountingResponse<CashbookEntry[]>>(`/cashbook/entries${queryString}`)
     }
 
@@ -454,6 +513,13 @@ class CashbookApiService {
     // Generate Contra Entry
     async generateContraEntry(cashbookEntryId: string): Promise<AccountingResponse<any>> {
         return apiClient.post<AccountingResponse<any>>('/cashbook/contra/generate', { cashbookEntryId })
+    }
+
+    // Receipt Attachment
+    async uploadReceiptAttachment(entryId: string, file: File): Promise<AccountingResponse<any>> {
+        const formData = new FormData()
+        formData.append('file', file)
+        return apiClient.post<AccountingResponse<any>>(`/cashbook/entries/${entryId}/receipt-attachment`, formData)
     }
 
     // Export Cashbook Audit

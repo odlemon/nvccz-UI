@@ -11,11 +11,13 @@ import applicationReducer from './slices/applicationSlice'
 import authReducer from './slices/authSlice'
 import uiReducer from './slices/uiSlice'
 import fundsReducer from './slices/fundsSlice'
+import reconciliationReducer from './slices/reconciliationSlice'
 
 export const store = configureStore({
   reducer: {
     accounting: accountingReducer,
     cashbook: cashbookReducer,
+    reconciliation: reconciliationReducer,
     portfolioDashboard: portfolioDashboardReducer,
     procurementV2: procurementV2Reducer,
     invoices: invoicesReducer,

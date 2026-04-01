@@ -18,6 +18,8 @@ import type { RootState, AppDispatch } from "@/lib/store/store"
 import { generateBalanceSheet } from "@/lib/store/slices/accountingSlice"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
 import { TransactionsDataTable } from "./transactions-data-table"
@@ -76,6 +78,7 @@ export function BalanceSheetView() {
   const [asOfDate, setAsOfDate] = useState<Date>(new Date())
   const [currencyId, setCurrencyId] = useState(defaultCurrencyId)
   const [periodType, setPeriodType] = useState<'month' | 'quarter' | 'year' | 'custom'>('custom')
+  const [hideZeroBalances, setHideZeroBalances] = useState(true)
   const [generatingPDF, setGeneratingPDF] = useState(false)
   const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set())
   const [selectedTransaction, setSelectedTransaction] = useState<any | null>(null)
@@ -92,7 +95,7 @@ export function BalanceSheetView() {
       const year = new Date().getFullYear()
       const defaultDate = new Date(year, 11, 31) // Dec 31
       setAsOfDate(defaultDate)
-      dispatch(generateBalanceSheet({ asOfDate: format(defaultDate, "yyyy-MM-dd"), currencyId }) as any)
+      dispatch(generateBalanceSheet({ asOfDate: format(defaultDate, "yyyy-MM-dd"), currencyId, hideZeroBalances }) as any)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currencyId])
@@ -100,7 +103,7 @@ export function BalanceSheetView() {
   const handleGenerate = async () => {
     if (asOfDate && currencyId) {
       try {
-        await dispatch(generateBalanceSheet({ asOfDate: format(asOfDate, "yyyy-MM-dd"), currencyId }) as any)
+        await dispatch(generateBalanceSheet({ asOfDate: format(asOfDate, "yyyy-MM-dd"), currencyId, hideZeroBalances }) as any)
       } catch (error: any) {
         toast.error("Failed to generate balance sheet", { description: error.message })
       }
@@ -338,6 +341,14 @@ export function BalanceSheetView() {
           {/* Custom currency dropdown */}
           <div>
             {currencyDropdown}
+          </div>
+          <div className="flex items-center gap-2">
+            <Switch
+              id="hideZeroBalances"
+              checked={hideZeroBalances}
+              onCheckedChange={setHideZeroBalances}
+            />
+            <Label htmlFor="hideZeroBalances" className="text-sm whitespace-nowrap">Hide zero balances</Label>
           </div>
           <Button
             onClick={handleGenerate}

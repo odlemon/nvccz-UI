@@ -3,13 +3,14 @@
 import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { 
-  DollarSign, 
-  TrendingUp, 
-  Calculator, 
-  Users, 
-  Building, 
-  Tag
+import {
+  DollarSign,
+  TrendingUp,
+  Calculator,
+  Users,
+  Building,
+  Tag,
+  Landmark
 } from "lucide-react"
 import { ExchangeRatesManagement } from "./exchange-rates-management"
 import { cn } from "@/lib/utils"
@@ -18,6 +19,7 @@ import { ChartOfAccountsManagement } from "./chart-of-accounts-management"
 import { CustomersManagement } from "./customers-management"
 import { VendorsManagement } from "./vendors-management"
 import { ExpenseCategoriesManagement } from "./expense-categories-management"
+import { BankAccountsManagement } from "./bank-accounts-management"
 import { AccountingSettingsSkeleton } from "./accounting-settings-skeleton"
 
 const tabs = [
@@ -62,6 +64,13 @@ const tabs = [
     icon: Tag,
     description: "Configure expense categories",
     gradient: "from-yellow-400 to-yellow-600"
+  },
+  {
+    id: "bank-accounts",
+    label: "Bank Accounts",
+    icon: Landmark,
+    description: "Manage bank accounts",
+    gradient: "from-teal-400 to-teal-600"
   }
 ]
 
@@ -87,6 +96,8 @@ export function AccountingSettings() {
         return <VendorsManagement />
       case "expense-categories":
         return <ExpenseCategoriesManagement />
+      case "bank-accounts":
+        return <BankAccountsManagement />
       default:
         return <CurrenciesManagement />
     }

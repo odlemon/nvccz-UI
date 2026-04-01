@@ -3,18 +3,24 @@
 import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { 
-  FileText, 
-  TrendingUp, 
-  BarChart3, 
-  DollarSign, 
-  Wallet, 
-  Calculator
+import {
+  FileText,
+  TrendingUp,
+  BarChart3,
+  DollarSign,
+  Wallet,
+  Calculator,
+  Users,
+  Receipt,
+  ArrowRightLeft
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { IncomeStatementView } from "./income-statement-view"
 import { BalanceSheetView } from "./balance-sheet-view"
 import { CashFlowView } from "./cash-flow-view"
+import { CreditorsAgeAnalysis } from "./creditors-age-analysis"
+import { VatReportView } from "./vat-report-view"
+import { UnrealizedFxGainsView } from "./unrealized-fx-gains-view"
 
 const tabs = [
   {
@@ -37,6 +43,27 @@ const tabs = [
     icon: DollarSign,
     description: "Cash Inflows and Outflows",
     gradient: "from-purple-400 to-purple-600"
+  },
+  {
+    id: "creditors-age",
+    label: "Creditors Age Analysis",
+    icon: Users,
+    description: "Accounts Payable Aging",
+    gradient: "from-orange-400 to-orange-600"
+  },
+  {
+    id: "vat-report",
+    label: "VAT Report",
+    icon: Receipt,
+    description: "Output Tax Audit",
+    gradient: "from-red-400 to-red-600"
+  },
+  {
+    id: "unrealized-fx",
+    label: "Unrealized FX Gains",
+    icon: ArrowRightLeft,
+    description: "Foreign Exchange Gains/Losses",
+    gradient: "from-teal-400 to-teal-600"
   }
 ]
 
@@ -51,6 +78,12 @@ export function FinancialReports() {
         return <BalanceSheetView />
       case "cash-flow":
         return <CashFlowView />
+      case "creditors-age":
+        return <CreditorsAgeAnalysis />
+      case "vat-report":
+        return <VatReportView />
+      case "unrealized-fx":
+        return <UnrealizedFxGainsView />
       default:
         return <IncomeStatementView />
     }

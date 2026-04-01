@@ -16,7 +16,8 @@ import {
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { format } from "date-fns"
-import { Banknote, Package, User, Building, Calculator, Copy, FileSignature, Loader2 } from "lucide-react"
+import { Banknote, Package, User, Building, Calculator, Copy, FileSignature, Loader2, Upload, Paperclip } from "lucide-react"
+import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import { useToast } from "@/components/ui/use-toast"
 import { cashbookApi } from "@/lib/api/cashbook-api"
@@ -25,6 +26,7 @@ export function CashbookEntryViewDrawer({ isOpen, onClose, entry }) {
 	const { toast } = useToast()
 	const [showContraDialog, setShowContraDialog] = useState(false)
 	const [generatingContra, setGeneratingContra] = useState(false)
+	const [uploadingAttachment, setUploadingAttachment] = useState(false)
 
 	const getRelevantTabs = () => {
 		const baseTabs = [
@@ -390,6 +392,58 @@ export function CashbookEntryViewDrawer({ isOpen, onClose, entry }) {
 							</CardContent>
 						</Card>
 					)}
+
+				{/* Receipt Attachment */}
+				<Card className="mt-4">
+					<CardHeader className="pb-3">
+						<CardTitle className="text-sm font-medium flex items-center gap-2">
+							<Paperclip className="w-4 h-4" />
+							Receipt Attachment
+						</CardTitle>
+					</CardHeader>
+					<CardContent>
+						{entry.receiptAttachment || entry.attachmentUrl ? (
+							<div className="flex items-center gap-2 text-sm">
+								<Paperclip className="w-4 h-4 text-blue-600" />
+								<a
+									href={entry.receiptAttachment || entry.attachmentUrl}
+									target="_blank"
+									rel="noopener noreferrer"
+									className="text-blue-600 hover:underline"
+								>
+									View Attachment
+								</a>
+							</div>
+						) : (
+							<div className="flex items-center gap-3">
+								<Input
+									type="file"
+									id="receipt-upload"
+									className="text-sm"
+									disabled={uploadingAttachment}
+									onChange={async (e) => {
+										const file = e.target.files?.[0]
+										if (!file) return
+										setUploadingAttachment(true)
+										try {
+											const response = await cashbookApi.uploadReceiptAttachment(entry.id, file)
+											if (response.success) {
+												toast({ title: "Receipt attached successfully" })
+											} else {
+												throw new Error(response.error || "Upload failed")
+											}
+										} catch (error: any) {
+											toast({ title: "Upload failed", description: error.message, variant: "destructive" })
+										} finally {
+											setUploadingAttachment(false)
+										}
+									}}
+								/>
+								{uploadingAttachment && <Loader2 className="w-4 h-4 animate-spin" />}
+							</div>
+						)}
+					</CardContent>
+				</Card>
 				</div>
 			</SheetContent>
 

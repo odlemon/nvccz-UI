@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { HiPhone } from "react-icons/hi2"
 
 interface PhoneInputProps {
   value: string
@@ -33,11 +34,11 @@ const countryCodes = [
   { code: "+91", country: "India", flag: "🇮🇳" },
 ]
 
-export function PhoneInput({ 
-  value, 
-  onChange, 
-  countryCode, 
-  onCountryCodeChange, 
+export function PhoneInput({
+  value,
+  onChange,
+  countryCode,
+  onCountryCodeChange,
   placeholder = "Enter phone number",
   className = "",
   error
@@ -46,26 +47,21 @@ export function PhoneInput({
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     // Only allow digits, spaces, and hyphens
-    const phoneValue = e.target.value.replace(/[^\d\s-]/g, '')
+    const phoneValue = e.target.value.replace(/[^\d\s\-]/g, '')
     onChange(phoneValue)
   }
 
   const selectedCountry = countryCodes.find(country => country.code === countryCode)
 
-  let wrapperClasses = 'border-gray-300'
-  if (error) {
-    wrapperClasses = 'border-red-500 focus-within:ring-red-500 focus-within:border-red-500'
-  } else if (isFocused) {
-    wrapperClasses = 'border-blue-500'
-  }
-
   return (
     <div className="space-y-2">
       <div className="relative">
-        <div className={`flex items-center h-12 rounded-full border bg-white focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500 transition-all ${wrapperClasses}`}>
+        {/* <HiPhone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" /> */}
+
+        <div className="flex">
           {/* Country Code Selector */}
           <Select value={countryCode} onValueChange={onCountryCodeChange}>
-            <SelectTrigger className="w-36 h-full border-0 bg-transparent rounded-l-full focus:ring-0 focus:ring-offset-0 hover:bg-gray-50 flex items-center py-0 shadow-none">
+            <SelectTrigger className={`w-36 h-12 rounded-l-full border-r-0 border-gray-300 focus:border-blue-500 focus:ring-blue-500 flex items-center py-0 ${isFocused ? 'border-blue-500' : ''}`}>
               <SelectValue>
                 <div className="flex items-center gap-1.5 px-1">
                   <span className="text-base">{selectedCountry?.flag}</span>
@@ -86,9 +82,6 @@ export function PhoneInput({
             </SelectContent>
           </Select>
 
-          {/* Divider */}
-          <div className="h-6 w-px bg-gray-200"></div>
-
           {/* Phone Number Input */}
           <Input
             type="tel"
@@ -97,7 +90,7 @@ export function PhoneInput({
             onChange={handlePhoneChange}
             onFocus={() => setIsFocused(true)}
             onBlur={() => setIsFocused(false)}
-            className={`pl-3 h-full border-0 bg-transparent rounded-r-full focus-visible:ring-0 focus-visible:ring-offset-0 flex-1 shadow-none ${className}`}
+            className={`pl-10 h-12 rounded-r-full border-l-0 border-gray-300 focus:border-blue-500 focus:ring-blue-500 flex-1 ${isFocused ? 'border-blue-500' : ''} ${className}`}
           />
         </div>
       </div>

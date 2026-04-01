@@ -5,12 +5,13 @@ import { useAppDispatch, useAppSelector } from "@/lib/store"
 import { ProcurementDataTable, Column } from "../procurement/procurement-data-table"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { 
-  Calculator, 
-  CheckCircle, 
-  Clock, 
+import {
+  Calculator,
+  CheckCircle,
+  Clock,
   FileText,
-  Hash
+  Hash,
+  Upload
 } from "lucide-react"
 import { toast } from "sonner"
 import { CreateAccountModal } from "./create-account-modal"
@@ -26,6 +27,7 @@ import { ConfirmationDialog } from "../ui/confirmation-drawer"
 // } from "@/lib/store/slices/accountingSlice"
 import { accountingApi, ChartOfAccount, CreateChartOfAccountRequest } from "@/lib/api/accounting-api"
 import { useAccountingPermissions } from "@/lib/hooks/useAccountingPermissions"
+import { BulkImportCoaModal } from "./bulk-import-coa-modal"
 
 // Export the type for use in other components
 export type { ChartOfAccount as Account }
@@ -44,6 +46,7 @@ export function ChartOfAccountsManagement() {
   const [chartOfAccountsLoading, setChartOfAccountsLoading] = useState(false)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [isViewModalOpen, setIsViewModalOpen] = useState(false)
+  const [isBulkImportOpen, setIsBulkImportOpen] = useState(false)
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false)
   const [selectedAccountForEdit, setSelectedAccountForEdit] = useState<ChartOfAccount | null>(null)
   const [selectedAccountForView, setSelectedAccountForView] = useState<ChartOfAccount | null>(null)
@@ -273,6 +276,19 @@ export function ChartOfAccountsManagement() {
 
   return (
     <div className="space-y-6">
+      {/* Bulk Import Button */}
+      <div className="flex justify-end">
+        <Button
+          variant="outline"
+          onClick={() => setIsBulkImportOpen(true)}
+          className="rounded-full"
+          size="sm"
+        >
+          <Upload className="w-4 h-4 mr-2" />
+          Bulk Import
+        </Button>
+      </div>
+
       {/* Data Table */}
       <ProcurementDataTable
         data={chartOfAccounts}
@@ -333,6 +349,13 @@ export function ChartOfAccountsManagement() {
         confirmText="Delete"
         cancelText="Cancel"
         variant="danger"
+      />
+
+      {/* Bulk Import Modal */}
+      <BulkImportCoaModal
+        isOpen={isBulkImportOpen}
+        onClose={() => setIsBulkImportOpen(false)}
+        onSuccess={loadChartOfAccounts}
       />
     </div>
   )

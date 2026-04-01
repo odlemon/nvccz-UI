@@ -42,6 +42,8 @@ import { fetchCurrencies, fetchVendors } from "@/lib/store/slices/accountingSlic
 import { usePurchaseInvoices } from "@/lib/hooks/use-purchase-invoices"
 import { useAccountingPermissions } from "@/lib/hooks/useAccountingPermissions"
 import { CurrencyFilter } from "./CurrencyFilter"
+import { BatchPayModal } from "./batch-pay-modal"
+import { CreditCard } from "lucide-react"
 import type { RootState, AppDispatch } from "@/lib/store"
 import { PurchaseInvoice } from "@/lib/api/accounting-api"
 
@@ -122,6 +124,8 @@ export function PayablesManagement() {
   const [activeTab, setActiveTab] = useState("all")
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [isViewDrawerOpen, setIsViewDrawerOpen] = useState(false)
+  const [isBatchPayModalOpen, setIsBatchPayModalOpen] = useState(false)
+  const [selectedForBatchPay, setSelectedForBatchPay] = useState<any[]>([])
   const [isFiltersOpen, setIsFiltersOpen] = useState(false)
   const [selectedStartDate, setSelectedStartDate] = useState<Date | undefined>()
   const [selectedEndDate, setSelectedEndDate] = useState<Date | undefined>()
@@ -743,6 +747,15 @@ export function PayablesManagement() {
             title="Purchase Invoices"
             showActions={false}
             showFilters={false}
+            bulkActions={[
+              { label: "Batch Pay", value: "batch-pay", icon: <CreditCard className="w-4 h-4" /> },
+            ]}
+            onBulkAction={(selectedRows, action) => {
+              if (action === "batch-pay") {
+                setSelectedForBatchPay(selectedRows)
+                setIsBatchPayModalOpen(true)
+              }
+            }}
           />
         </CardContent>
       </div>
@@ -766,6 +779,18 @@ export function PayablesManagement() {
           setIsViewDrawerOpen(false)
           // Open edit modal or navigate to edit page
         } : undefined}
+      />
+
+      <BatchPayModal
+        isOpen={isBatchPayModalOpen}
+        onClose={() => {
+          setIsBatchPayModalOpen(false)
+          setSelectedForBatchPay([])
+        }}
+        onSuccess={() => {
+          loadPurchaseInvoices()
+        }}
+        selectedInvoices={selectedForBatchPay}
       />
     </div>
   )

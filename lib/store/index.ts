@@ -32,6 +32,7 @@ import adminReducer from './slices/adminSlice'
 import applicationPortalReducer from './slices/applicationPortalSlice'
 import portfolioCompaniesReducer from './slices/portfolioCompaniesSlice'
 import portfolioDashboardReducer from './slices/portfolioDashboardSlice'
+import reconciliationReducer from './slices/reconciliationSlice'
 
 export const store = configureStore({
   reducer: {
@@ -64,6 +65,7 @@ export const store = configureStore({
     applicationPortal: applicationPortalReducer,
     portfolioCompanies: portfolioCompaniesReducer,
     portfolioDashboard: portfolioDashboardReducer,
+    reconciliation: reconciliationReducer,
     zseStocks: zseStocksReducer,
     marketOverview: marketOverviewReducer,
   },

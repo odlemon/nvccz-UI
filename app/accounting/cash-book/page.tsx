@@ -4,7 +4,8 @@ import { useEffect, useState, useRef } from "react"
 import { useDispatch, useSelector } from "react-redux"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Plus, FileText, BarChart3, TrendingUp, BookOpen, Settings, Lock, FileSignature, Download } from "lucide-react"
+import { Plus, FileText, BarChart3, TrendingUp, BookOpen, Settings, Lock, FileSignature, Download, Search } from "lucide-react"
+import { Input } from "@/components/ui/input"
 import { format, startOfWeek, endOfWeek } from "date-fns"
 import { cn } from "@/lib/utils"
 import type { RootState, AppDispatch } from "@/lib/store/store"
@@ -107,9 +108,12 @@ function CashbookPage() {
     startDate: string;
     endDate: string;
     bankId: string;
+    search: string;
+    minAmount: string;
+    maxAmount: string;
   }>(() => {
     const { startDate, endDate } = getWeekRange()
-    return { type: "", status: "", startDate, endDate, bankId: "" }
+    return { type: "", status: "", startDate, endDate, bankId: "", search: "", minAmount: "", maxAmount: "" }
   })
 
   const isFetchingRef = useRef(false)
@@ -141,7 +145,10 @@ function CashbookPage() {
             status: filters.status,
             startDate: filters.startDate,
             endDate: filters.endDate,
-            currencyId: selectedCurrencyId || undefined
+            currencyId: selectedCurrencyId || undefined,
+            search: filters.search || undefined,
+            minAmount: filters.minAmount ? parseFloat(filters.minAmount) : undefined,
+            maxAmount: filters.maxAmount ? parseFloat(filters.maxAmount) : undefined,
           }))
       }, 300) // Debounce to prevent rapid re-fetches
 
@@ -363,7 +370,16 @@ function CashbookPage() {
             </div>
 
             {/* Filters */}
-            <div className="flex gap-4 items-center mt-2">
+            <div className="flex flex-wrap gap-3 items-center mt-2">
+              <div className="relative w-56">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Input
+                  placeholder="Search entries..."
+                  value={filters.search}
+                  onChange={(e) => setFilters(f => ({ ...f, search: e.target.value }))}
+                  className="pl-9 rounded-full"
+                />
+              </div>
               <Select
                 value={filters.type || "all"}
                 onValueChange={type => setFilters(f => ({ ...f, type: type === "all" ? "" : type }))}
@@ -391,6 +407,20 @@ function CashbookPage() {
                   <SelectItem value="PENDING">Pending</SelectItem>
                 </SelectContent>
               </Select>
+              <Input
+                type="number"
+                placeholder="Min Amount"
+                value={filters.minAmount}
+                onChange={(e) => setFilters(f => ({ ...f, minAmount: e.target.value }))}
+                className="w-32 rounded-full"
+              />
+              <Input
+                type="number"
+                placeholder="Max Amount"
+                value={filters.maxAmount}
+                onChange={(e) => setFilters(f => ({ ...f, maxAmount: e.target.value }))}
+                className="w-32 rounded-full"
+              />
               <div className="w-48">
                 <DatePicker
                   value={entriesStartDate}

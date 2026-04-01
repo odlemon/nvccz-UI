@@ -489,6 +489,19 @@ export function InvoiceViewDrawer({
                       {currentInvoice.currency.symbol}{currentInvoice.totalAmount}
                     </span>
                   </div>
+
+                  {currentInvoice.equivalentAtCreation && (
+                    <div className="flex justify-between items-center pt-1">
+                      <span className="text-sm text-gray-500">Equivalent Amount:</span>
+                      <span className="text-sm font-medium text-gray-700">
+                        {currentInvoice.equivalentAtCreation.currency.symbol}
+                        {parseFloat(currentInvoice.equivalentAtCreation.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        <span className="text-xs text-gray-500 ml-1">
+                          ({currentInvoice.equivalentAtCreation.currency.code})
+                        </span>
+                      </span>
+                    </div>
+                  )}
                   
                   <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t">
                     <div>

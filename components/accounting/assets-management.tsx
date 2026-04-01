@@ -56,6 +56,9 @@ export function AssetsManagement() {
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null)
   const [isViewDrawerOpen, setIsViewDrawerOpen] = useState(false)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+  const [assetsView, setAssetsView] = useState<"list" | "register">("list")
+  const [registerData, setRegisterData] = useState<any[]>([])
+  const [registerLoading, setRegisterLoading] = useState(false)
 
   // Pagination state
   const {
@@ -83,6 +86,26 @@ export function AssetsManagement() {
   useEffect(() => {
     dispatch(fetchChartOfAccounts({ isActive: true }))
   }, [dispatch])
+
+  useEffect(() => {
+    if (assetsView === "register") {
+      loadRegister()
+    }
+  }, [assetsView])
+
+  const loadRegister = async () => {
+    setRegisterLoading(true)
+    try {
+      const response = await accountingApi.getAssetRegister()
+      if (response.success && response.data) {
+        setRegisterData(Array.isArray(response.data) ? response.data : [])
+      }
+    } catch (error: any) {
+      toast.error("Failed to load asset register", { description: error.message })
+    } finally {
+      setRegisterLoading(false)
+    }
+  }
 
   const handlePageChange = (page: number) => {
     setPagination(prev => ({ ...prev, page }))
@@ -149,6 +172,71 @@ export function AssetsManagement() {
       .join('')
       .substring(0, 2)
   }
+
+  const formatRegisterAmount = (val: any) => {
+    const num = typeof val === "string" ? parseFloat(val) : (val ?? 0)
+    return num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  }
+
+  const registerColumns: Column<any>[] = [
+    {
+      key: 'name',
+      label: 'Asset Name',
+      sortable: true,
+      render: (value, row) => (
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+            <Package className="w-4 h-4 text-blue-600" />
+          </div>
+          <span className="font-medium">{row.name || row.assetName || "-"}</span>
+        </div>
+      ),
+    },
+    {
+      key: 'category',
+      label: 'Category',
+      sortable: true,
+      render: (value, row) => <span>{row.category || row.assetCategory || "-"}</span>,
+    },
+    {
+      key: 'purchaseDate',
+      label: 'Purchase Date',
+      sortable: true,
+      render: (value) => value ? format(new Date(value as string), "dd/MM/yyyy") : "-",
+    },
+    {
+      key: 'cost',
+      label: 'Cost',
+      sortable: true,
+      render: (value, row) => (
+        <span className="tabular-nums">{formatRegisterAmount(row.cost || row.purchaseCost)}</span>
+      ),
+    },
+    {
+      key: 'accumulatedDepreciation',
+      label: 'Accum. Depreciation',
+      sortable: true,
+      render: (value) => <span className="tabular-nums">{formatRegisterAmount(value)}</span>,
+    },
+    {
+      key: 'bookValue',
+      label: 'Book Value',
+      sortable: true,
+      render: (value, row) => (
+        <span className="tabular-nums font-medium">{formatRegisterAmount(row.bookValue || row.netBookValue)}</span>
+      ),
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      sortable: true,
+      render: (value) => (
+        <Badge className={value === "ACTIVE" ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}>
+          {(value as string) || "N/A"}
+        </Badge>
+      ),
+    },
+  ]
 
   const columns: Column<Asset>[] = [
     {
@@ -387,7 +475,37 @@ export function AssetsManagement() {
         )}
       </div>
 
-      {/* Assets Data Table */}
+      {/* View Toggle */}
+      <div className="flex gap-2">
+        <Button
+          variant={assetsView === "list" ? "default" : "outline"}
+          onClick={() => setAssetsView("list")}
+          className="rounded-full"
+          size="sm"
+        >
+          Asset List
+        </Button>
+        <Button
+          variant={assetsView === "register" ? "default" : "outline"}
+          onClick={() => setAssetsView("register")}
+          className="rounded-full"
+          size="sm"
+        >
+          Asset Register
+        </Button>
+      </div>
+
+      {assetsView === "register" ? (
+        <ProcurementDataTable
+          data={registerData}
+          columns={registerColumns}
+          title="Asset Register"
+          searchPlaceholder="Search asset register..."
+          loading={registerLoading}
+          emptyMessage="No asset register data available."
+        />
+      ) : (
+      /* Assets Data Table */
       <ProcurementDataTable
         data={assets}
         columns={columns}
@@ -412,6 +530,7 @@ export function AssetsManagement() {
         onPageChange={handlePageChange}
         onPageSizeChange={handlePageSizeChange}
       />
+      )}
 
       {/* Asset View Drawer */}
       <AssetViewDrawer

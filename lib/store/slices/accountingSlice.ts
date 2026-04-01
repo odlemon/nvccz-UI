@@ -504,8 +504,9 @@ export const deleteExchangeRate = createAsyncThunk(
 // Balance Sheet thunks
 export const generateBalanceSheet = createAsyncThunk(
   'accounting/generateBalanceSheet',
-  async (data: { asOfDate: string; currencyId: string }) => {
-    const response = await accountingApi.generateBalanceSheet(data)
+  async (data: { asOfDate: string; currencyId?: string; hideZeroBalances?: boolean }) => {
+    const { hideZeroBalances, ...body } = data
+    const response = await accountingApi.generateBalanceSheet(body, { hideZeroBalances })
     if (!response.success) throw new Error(response.error || 'Failed to generate balance sheet')
     return response.data
   }
@@ -654,13 +655,18 @@ export const fetchCashbookBanks = createAsyncThunk(
 
 export const fetchCashbookEntries = createAsyncThunk(
   'accounting/fetchCashbookEntries',
-  async (params: { 
-    bankId: string 
+  async (params: {
+    bankId?: string
     type?: 'RECEIPT' | 'PAYMENT'
     status?: string
     startDate?: string
     endDate?: string
     currencyId?: string
+    search?: string
+    minAmount?: number
+    maxAmount?: number
+    page?: number
+    limit?: number
   }) => {
     const response = await cashbookApi.getCashbookEntries(params)
     if (!response.success) throw new Error(response.error || 'Failed to fetch entries')

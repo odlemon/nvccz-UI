@@ -95,6 +95,15 @@ export interface Invoice {
     referenceNumber: string
     status: string
   }
+  equivalentAtCreation?: {
+    amount: string
+    currency: {
+      id: string
+      code: string
+      name: string
+      symbol: string
+    }
+  } | null
 }
 
 export interface InvoiceCustomer {
@@ -120,7 +129,6 @@ export interface CreateInvoiceRequest {
   invoiceDate?: string
   invoiceNumber?: string
   isTaxable: boolean
-  exchangeRateAtCreation?: number
   items: InvoiceItem[]
 }
 
@@ -1802,8 +1810,9 @@ class AccountingApiService {
   }
 
   // Balance Sheet
-  async generateBalanceSheet(data: { asOfDate: string; currencyId: string }): Promise<AccountingResponse<BalanceSheetResponse>> {
-    return apiClient.post<AccountingResponse<BalanceSheetResponse>>('/accounting/balance-sheet/generate', data)
+  async generateBalanceSheet(data: { asOfDate: string; currencyId?: string }, options?: { hideZeroBalances?: boolean }): Promise<AccountingResponse<BalanceSheetResponse>> {
+    const query = options?.hideZeroBalances ? '?hideZeroBalances=true' : ''
+    return apiClient.post<AccountingResponse<BalanceSheetResponse>>(`/accounting/balance-sheet/generate${query}`, data)
   }
   async getBalanceSheet(asOfDate: string, currencyId: string): Promise<AccountingResponse<BalanceSheetResponse>> {
     return apiClient.get<AccountingResponse<BalanceSheetResponse>>(`/accounting/balance-sheet?asOfDate=${asOfDate}&currencyId=${currencyId}`)
@@ -1909,6 +1918,42 @@ class AccountingApiService {
 
   async getPurchaseInvoiceExpenseAccounts(): Promise<AccountingResponse<ChartOfAccount[]>> {
     return apiClient.get<AccountingResponse<ChartOfAccount[]>>('/accounting/purchase-invoices/expense-accounts')
+  }
+
+  // Batch Pay Purchase Invoices
+  async batchPayPurchaseInvoices(data: {
+    invoiceIds: string[]
+    paymentMethod: string
+    bankId: string
+    paymentDate: string
+    paymentReference: string
+    notes?: string
+  }): Promise<AccountingResponse<any>> {
+    return apiClient.post<AccountingResponse<any>>('/accounting/purchase-invoices/batch-pay', data)
+  }
+
+  // Creditors Age Analysis
+  async getCreditorsAgeAnalysis(asOfDate?: string): Promise<AccountingResponse<any>> {
+    const query = asOfDate ? `?asOfDate=${asOfDate}` : ''
+    return apiClient.get<AccountingResponse<any>>(`/accounting/purchase-invoices/creditors-age-analysis${query}`)
+  }
+
+  // Asset Register
+  async getAssetRegister(): Promise<AccountingResponse<any>> {
+    return apiClient.get<AccountingResponse<any>>('/accounting/assets/register')
+  }
+
+  // Chart of Accounts Bulk Import
+  async validateChartOfAccountsBulkImport(file: File): Promise<AccountingResponse<any>> {
+    const formData = new FormData()
+    formData.append('file', file)
+    return apiClient.post<AccountingResponse<any>>('/accounting/chart-of-accounts/bulk-import/validate', formData)
+  }
+
+  // Unrealized FX Gains Report
+  async getUnrealizedFxGainsReport(asOfDate?: string): Promise<AccountingResponse<any>> {
+    const query = asOfDate ? `?asOfDate=${asOfDate}` : ''
+    return apiClient.get<AccountingResponse<any>>(`/accounting/multi-currency/reports/unrealized-fx${query}`)
   }
 
 }
