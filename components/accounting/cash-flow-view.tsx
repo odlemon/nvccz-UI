@@ -21,6 +21,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Badge } from "@/components/ui/badge"
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
+import { addLetterhead, addReportInfo } from "@/lib/utils/pdf-letterhead"
 import { TransactionsDataTable } from "./transactions-data-table"
 import { TransactionViewDrawer } from "./transaction-view-drawer"
 
@@ -241,15 +242,11 @@ export function CashFlowView() {
     setGeneratingPDF(true)
     try {
       const doc = new jsPDF()
-
-      doc.setFontSize(16)
-      doc.text("Cash Flow Statement", 14, 18)
-      doc.setFontSize(11)
-      doc.text(
+      let startY = await addLetterhead(doc, "Cash Flow Statement")
+      startY = addReportInfo(doc, startY, [
         `For the period ${format(new Date(cashFlow.period.startDate), "MMMM d, yyyy")} to ${format(new Date(cashFlow.period.endDate), "MMMM d, yyyy")}`,
-        14, 26
-      )
-      doc.text(`Currency: ${cashFlow.currency.name}`, 14, 32)
+        `Currency: ${cashFlow.currency.name}`,
+      ])
 
       const rows: any[] = []
       const pushSection = (label: string) => rows.push([{ content: label, colSpan: 2, styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } }])
@@ -285,9 +282,9 @@ export function CashFlowView() {
       autoTable(doc, {
         head: [["Description", "Amount"]],
         body: rows,
-        startY: 38,
+        startY,
         styles: { fontSize: 10, cellPadding: 2 },
-        headStyles: { fillColor: [220, 220, 220] },
+        headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255] },
         columnStyles: { 1: { halign: 'right' } }
       })
 

@@ -30,7 +30,8 @@ import {
   Download,
   FileText,
   Loader2,
-  Eye
+  Eye,
+  Check
 } from "lucide-react"
 import { ChevronDown, ChevronUp } from "lucide-react"
 import { CiSearch, CiFilter, CiReceipt } from "react-icons/ci"
@@ -42,7 +43,13 @@ import { format } from "date-fns"
 import { toast } from "sonner"
 import type { RootState, AppDispatch } from "@/lib/store/store"
 import { fetchTrialBalance, fetchTrialBalanceSummary } from "@/lib/store/slices/accountingSlice"
+import { accountingApi } from "@/lib/api/accounting-api"
 import { exportTrialBalanceToCSV, exportTrialBalanceToPDF } from "@/lib/utils/export"
+import { buildConsolidatedTrialBalance, ConsolidatedTrialBalance } from "@/lib/utils/consolidation/trial-balance"
+import { withUsdZwlFallbackRates } from "@/lib/utils/consolidation/fallback-rates"
+import jsPDF from "jspdf"
+import autoTable from "jspdf-autotable"
+import { addLetterhead, addReportInfo } from "@/lib/utils/pdf-letterhead"
 
 function TrialBalanceSkeleton() {
   return (
@@ -128,6 +135,10 @@ export function TrialBalanceView() {
 
   const [periodType, setPeriodType] = useState<'month' | 'quarter' | 'year'>('month')
   const [periodValue, setPeriodValue] = useState<string>(format(new Date(), 'yyyy-MM'))
+  const [reportMode, setReportMode] = useState<"single" | "consolidated">("single")
+  const [selectedCurrencyIds, setSelectedCurrencyIds] = useState<string[]>([])
+  const [consolidatedTrialBalance, setConsolidatedTrialBalance] = useState<ConsolidatedTrialBalance | null>(null)
+  const [isConsolidating, setIsConsolidating] = useState(false)
   const [generatingPDF, setGeneratingPDF] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
   const [filterAccountType, setFilterAccountType] = useState("all")
@@ -195,6 +206,14 @@ export function TrialBalanceView() {
   }, [periodType])
 
   useEffect(() => {
+    if (!currencies.length) return
+    if (selectedCurrencyIds.length === 0) {
+      const defaultCurrencyId = currencies.find(c => c.code === "USD")?.id || currencies[0]?.id
+      if (defaultCurrencyId) setSelectedCurrencyIds([defaultCurrencyId])
+    }
+  }, [currencies, selectedCurrencyIds.length])
+
+  useEffect(() => {
     // Only load data when we have a valid periodValue for the current periodType
     const isValidPeriodValue = 
       (periodType === 'month' && /^\d{4}-\d{2}$/.test(periodValue)) ||
@@ -202,9 +221,13 @@ export function TrialBalanceView() {
       (periodType === 'year' && /^\d{4}$/.test(periodValue))
     
     if (isValidPeriodValue) {
-      loadTrialBalanceData()
+      if (reportMode === "single") {
+        loadTrialBalanceData()
+      } else {
+        loadConsolidatedTrialBalance()
+      }
     }
-  }, [periodType, periodValue, selectedCurrencyId])
+  }, [periodType, periodValue, selectedCurrencyId, reportMode, selectedCurrencyIds])
 
   const loadTrialBalanceData = async () => {
     try {
@@ -220,10 +243,74 @@ export function TrialBalanceView() {
           currencyId: selectedCurrencyId || undefined
         }))
       ])
+      setConsolidatedTrialBalance(null)
     } catch (error: any) {
       toast.error("Failed to load trial balance data", {
         description: error.message
       })
+    }
+  }
+
+  const loadConsolidatedTrialBalance = async () => {
+    if (!selectedCurrencyIds.length) {
+      setConsolidatedTrialBalance(null)
+      return
+    }
+
+    try {
+      setIsConsolidating(true)
+      const reportingCurrency = currencies.find((c) => c.code === "USD") || currencies[0]
+
+      const responses = await Promise.all(
+        selectedCurrencyIds.map((id) =>
+          accountingApi.getTrialBalanceV2({
+            periodType,
+            periodValue,
+            currencyId: id,
+          })
+        )
+      )
+
+      const statements = responses
+        .map((res, idx) => ({
+          ok: res.success && res.data,
+          data: res.data as any,
+          currency: currencies.find((c) => c.id === selectedCurrencyIds[idx]),
+        }))
+        .filter((x) => x.ok && x.data && x.currency)
+        .map((x) => ({ currency: x.currency!, trialBalance: x.data }))
+
+      if (!statements.length) {
+        setConsolidatedTrialBalance(null)
+        return
+      }
+
+      const ratesResponse = await accountingApi.getExchangeRates()
+      const ratesRaw = (ratesResponse as any)?.data
+      const rates = Array.isArray(ratesRaw)
+        ? ratesRaw
+        : (ratesRaw?.exchangeRates || [])
+      const normalizedRates = withUsdZwlFallbackRates(rates, currencies)
+
+      const consolidated = buildConsolidatedTrialBalance(
+        statements,
+        normalizedRates,
+        { id: reportingCurrency?.id || selectedCurrencyId || "", code: reportingCurrency?.code || "USD" }
+      )
+      setConsolidatedTrialBalance(consolidated)
+
+      if (consolidated && consolidated.missingRates.length > 0) {
+        toast.warning("Some accounts were excluded due to missing exchange rates", {
+          description: `${consolidated.missingRates.length} row(s) have no effective rate for consolidation.`,
+        })
+      }
+    } catch (error: any) {
+      setConsolidatedTrialBalance(null)
+      toast.error("Failed to load consolidated trial balance", {
+        description: error?.message || "Unexpected error",
+      })
+    } finally {
+      setIsConsolidating(false)
     }
   }
 
@@ -253,8 +340,22 @@ export function TrialBalanceView() {
     setIsTransactionDrawerOpen(true)
   }
 
+  const toggleCurrencySelection = (id: string) => {
+    setSelectedCurrencyIds((prev) => {
+      if (prev.includes(id)) {
+        if (prev.length === 1) return prev
+        return prev.filter((x) => x !== id)
+      }
+      return [...prev, id]
+    })
+  }
+
   // Filter and search
-  const filteredAccounts = trialBalance?.accounts.filter((account: any) => {
+  const sourceAccounts = reportMode === "single"
+    ? (trialBalance?.accounts || [])
+    : (consolidatedTrialBalance?.rows || [])
+
+  const filteredAccounts = sourceAccounts.filter((account: any) => {
     const matchesSearch = account.accountName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           account.accountNo.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesFilter = filterAccountType === 'all' || account.accountType.toLowerCase() === filterAccountType.toLowerCase()
@@ -294,6 +395,38 @@ export function TrialBalanceView() {
   }
 
   const handleExportCSV = () => {
+    if (reportMode === "consolidated" && consolidatedTrialBalance) {
+      const headers = ['Account No.', 'Account Name', 'Account Type', 'Source Currency', 'Source Debit', 'Source Credit', 'Rate', `Consolidated Debit (${consolidatedTrialBalance.reportingCurrencyCode})`, `Consolidated Credit (${consolidatedTrialBalance.reportingCurrencyCode})`]
+      const rows = consolidatedTrialBalance.rows.map((row) => [
+        row.accountNo,
+        `"${row.accountName}"`,
+        row.accountType,
+        row.sourceCurrencyCode,
+        row.sourceDebit.toFixed(2),
+        row.sourceCredit.toFixed(2),
+        row.conversionRate.toFixed(6),
+        row.consolidatedDebit.toFixed(2),
+        row.consolidatedCredit.toFixed(2),
+      ])
+
+      rows.push([
+        '', '', 'TOTALS', '', '', '', '',
+        consolidatedTrialBalance.totals.totalDebits.toFixed(2),
+        consolidatedTrialBalance.totals.totalCredits.toFixed(2),
+      ])
+
+      const csv = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n')
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+      const link = document.createElement('a')
+      const url = URL.createObjectURL(blob)
+      link.href = url
+      link.download = `trial-balance-consolidated-${consolidatedTrialBalance.date}.csv`
+      link.click()
+      URL.revokeObjectURL(url)
+      toast.success("Consolidated trial balance exported to CSV successfully")
+      return
+    }
+
     if (!trialBalance) {
       toast.error("No trial balance data to export")
       return
@@ -308,6 +441,61 @@ export function TrialBalanceView() {
   }
 
   const handleExportPDF = async () => {
+    if (reportMode === "consolidated" && consolidatedTrialBalance) {
+      try {
+        setGeneratingPDF(true)
+        const doc = new jsPDF()
+        let startY = await addLetterhead(doc, 'Trial Balance')
+        startY = addReportInfo(doc, startY, [
+          `Consolidated (${consolidatedTrialBalance.reportingCurrencyCode})`,
+          `As of ${format(new Date(consolidatedTrialBalance.date), 'MMMM d, yyyy')}`,
+          `Status: ${consolidatedTrialBalance.totals.isBalanced ? 'Balanced' : 'Unbalanced'}`,
+        ])
+
+        const rows: any[] = consolidatedTrialBalance.rows.map((row) => [
+          row.accountNo,
+          row.accountName,
+          row.accountType,
+          `${row.sourceCurrencyCode} D:${row.sourceDebit.toFixed(2)} C:${row.sourceCredit.toFixed(2)}`,
+          row.conversionRate.toFixed(6),
+          row.consolidatedDebit.toFixed(2),
+          row.consolidatedCredit.toFixed(2),
+        ])
+
+        rows.push([
+          { content: 'TOTALS', colSpan: 5, styles: { fontStyle: 'bold' } },
+          { content: consolidatedTrialBalance.totals.totalDebits.toFixed(2), styles: { fontStyle: 'bold', textColor: [21, 128, 61] } },
+          { content: consolidatedTrialBalance.totals.totalCredits.toFixed(2), styles: { fontStyle: 'bold', textColor: [220, 38, 38] } },
+        ])
+
+        autoTable(doc, {
+          head: [[
+            'Account No.',
+            'Account Name',
+            'Account Type',
+            'Source',
+            'Rate',
+            `Debit (${consolidatedTrialBalance.reportingCurrencyCode})`,
+            `Credit (${consolidatedTrialBalance.reportingCurrencyCode})`,
+          ]],
+          body: rows,
+          startY,
+          styles: { fontSize: 8, cellPadding: 2 },
+          headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255] },
+          columnStyles: { 4: { halign: 'right' }, 5: { halign: 'right' }, 6: { halign: 'right' } },
+        })
+
+        doc.save(`TrialBalance_Consolidated_${consolidatedTrialBalance.date}.pdf`)
+        toast.success("Consolidated trial balance PDF generated successfully")
+      } catch (error) {
+        console.error('PDF generation error:', error)
+        toast.error("Failed to generate consolidated trial balance PDF")
+      } finally {
+        setGeneratingPDF(false)
+      }
+      return
+    }
+
     if (!trialBalance) {
       toast.error("No trial balance data to export")
       return
@@ -325,7 +513,7 @@ export function TrialBalanceView() {
     }
   }
 
-  if (trialBalanceError || trialBalanceSummaryError) {
+  if (reportMode === "single" && (trialBalanceError || trialBalanceSummaryError)) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="text-center">
@@ -344,14 +532,17 @@ export function TrialBalanceView() {
   return (
     <div className="space-y-6">
       {/* Header with Date Filter */}
-      <div className="flex items-center justify-between">
+      <div className="space-y-3">
         <div>
           <h2 className="text-2xl font-semibold text-gray-900">Trial Balance</h2>
-          <p className="text-gray-600">
-            Period: {getPeriodOptions().find(opt => opt.value === periodValue)?.label || periodValue} - Currency: {currencies.find(c => c.id === selectedCurrencyId)?.code || 'USD'}
+          <p className="text-gray-600 mt-1">
+            {reportMode === "single"
+              ? `Period: ${getPeriodOptions().find(opt => opt.value === periodValue)?.label || periodValue} - Currency: ${currencies.find(c => c.id === selectedCurrencyId)?.code || 'USD'}`
+              : `Consolidated View (${(currencies.find(c => c.code === 'USD') || currencies[0])?.code || 'USD'} reporting)`}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+
+        <div className="flex flex-wrap items-center gap-3">
           {/* Period Type Selector */}
           <Select value={periodType} onValueChange={(value: any) => setPeriodType(value)}>
             <SelectTrigger className="w-[140px] rounded-full">
@@ -378,13 +569,66 @@ export function TrialBalanceView() {
             </SelectContent>
           </Select>
           
-          <CurrencyFilter />
+          <div className="flex items-center gap-1 border rounded-full p-1">
+            <Button
+              size="sm"
+              variant={reportMode === "single" ? "default" : "ghost"}
+              className="rounded-full"
+              onClick={() => setReportMode("single")}
+            >
+              Single
+            </Button>
+            <Button
+              size="sm"
+              variant={reportMode === "consolidated" ? "default" : "ghost"}
+              className="rounded-full"
+              onClick={() => setReportMode("consolidated")}
+            >
+              Consolidated
+            </Button>
+          </div>
+
+          {reportMode === "single" ? (
+            <CurrencyFilter />
+          ) : (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="rounded-full min-w-[180px]">
+                  {selectedCurrencyIds.length
+                    ? selectedCurrencyIds
+                        .map((id) => currencies.find((c) => c.id === id)?.code)
+                        .filter(Boolean)
+                        .join(", ")
+                    : "Select currencies"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-64">
+                <div className="space-y-2">
+                  {currencies.map((c) => {
+                    const selected = selectedCurrencyIds.includes(c.id)
+                    return (
+                      <Button
+                        key={c.id}
+                        type="button"
+                        variant={selected ? "default" : "outline"}
+                        className="w-full justify-between"
+                        onClick={() => toggleCurrencySelection(c.id)}
+                      >
+                        <span>{c.code}</span>
+                        {selected ? <Check className="w-4 h-4" /> : null}
+                      </Button>
+                    )
+                  })}
+                </div>
+              </PopoverContent>
+            </Popover>
+          )}
           {/* Export Buttons */}
           <Button 
             onClick={handleExportCSV}
             variant="outline" 
             className="rounded-full"
-            disabled={!trialBalance}
+            disabled={reportMode === "single" ? !trialBalance : !consolidatedTrialBalance}
           >
             <Download className="w-4 h-4 mr-2" />
             Export CSV
@@ -394,7 +638,7 @@ export function TrialBalanceView() {
             onClick={handleExportPDF}
             variant="outline" 
             className="rounded-full"
-            disabled={!trialBalance || generatingPDF}
+            disabled={(reportMode === "single" ? !trialBalance : !consolidatedTrialBalance) || generatingPDF}
           >
             {generatingPDF ? (
               <>
@@ -410,13 +654,13 @@ export function TrialBalanceView() {
           </Button>
           
           <Button 
-            onClick={loadTrialBalanceData} 
-            disabled={trialBalanceLoading || trialBalanceSummaryLoading}
+            onClick={reportMode === "single" ? loadTrialBalanceData : loadConsolidatedTrialBalance} 
+            disabled={trialBalanceLoading || trialBalanceSummaryLoading || isConsolidating}
             className="rounded-full"
           >
             <RefreshCw className={cn(
               "w-4 h-4 mr-2",
-              (trialBalanceLoading || trialBalanceSummaryLoading) && "animate-spin"
+              (trialBalanceLoading || trialBalanceSummaryLoading || isConsolidating) && "animate-spin"
             )} />
             Refresh
           </Button>
@@ -424,7 +668,7 @@ export function TrialBalanceView() {
       </div>
 
       {/* Summary Cards */}
-      {trialBalanceSummary && (
+      {reportMode === "single" && trialBalanceSummary && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card className="border border-gray-200 hover:border-gray-300 transition-all duration-300 gradient-primary">
             <CardContent className="p-4 h-[80px] flex items-center">
@@ -533,7 +777,7 @@ export function TrialBalanceView() {
         </div>
 
         {/* Accounts Grid */}
-        {trialBalanceLoading ? (
+        {(reportMode === "single" && trialBalanceLoading) || (reportMode === "consolidated" && isConsolidating) ? (
           <TrialBalanceSkeleton />
         ) : paginatedAccounts.length > 0 ? (
           <>
@@ -547,8 +791,19 @@ export function TrialBalanceView() {
                         <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Account No.</th>
                         <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Account Name</th>
                         <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Account Type</th>
-                        <th className="text-right py-3 px-4 text-sm font-semibold text-gray-700">Debit Balance</th>
-                        <th className="text-right py-3 px-4 text-sm font-semibold text-gray-700">Credit Balance</th>
+                        {reportMode === "single" ? (
+                          <>
+                            <th className="text-right py-3 px-4 text-sm font-semibold text-gray-700">Debit Balance</th>
+                            <th className="text-right py-3 px-4 text-sm font-semibold text-gray-700">Credit Balance</th>
+                          </>
+                        ) : (
+                          <>
+                            <th className="text-right py-3 px-4 text-sm font-semibold text-gray-700">Source</th>
+                            <th className="text-right py-3 px-4 text-sm font-semibold text-gray-700">Rate</th>
+                            <th className="text-right py-3 px-4 text-sm font-semibold text-gray-700">Debit (USD)</th>
+                            <th className="text-right py-3 px-4 text-sm font-semibold text-gray-700">Credit (USD)</th>
+                          </>
+                        )}
                         <th className="w-10"></th>
                       </tr>
                     </thead>
@@ -586,24 +841,53 @@ export function TrialBalanceView() {
                                   {account.accountType}
                                 </Badge>
                               </td>
-                              <td className="py-3 px-4 text-right">
-                                <span className={cn(
-                                  "font-mono text-sm",
-                                  account.debitBalance > 0 ? "text-green-700 font-semibold" : "text-gray-400"
-                                )}>
-                                  {formatCurrency(account.debitBalance || 0)}
-                                </span>
-                              </td>
-                              <td className="py-3 px-4 text-right">
-                                <span className={cn(
-                                  "font-mono text-sm",
-                                  account.creditBalance > 0 ? "text-red-700 font-semibold" : "text-gray-400"
-                                )}>
-                                  {formatCurrency(account.creditBalance || 0)}
-                                </span>
-                              </td>
+                              {reportMode === "single" ? (
+                                <>
+                                  <td className="py-3 px-4 text-right">
+                                    <span className={cn(
+                                      "font-mono text-sm",
+                                      account.debitBalance > 0 ? "text-green-700 font-semibold" : "text-gray-400"
+                                    )}>
+                                      {formatCurrency(account.debitBalance || 0)}
+                                    </span>
+                                  </td>
+                                  <td className="py-3 px-4 text-right">
+                                    <span className={cn(
+                                      "font-mono text-sm",
+                                      account.creditBalance > 0 ? "text-red-700 font-semibold" : "text-gray-400"
+                                    )}>
+                                      {formatCurrency(account.creditBalance || 0)}
+                                    </span>
+                                  </td>
+                                </>
+                              ) : (
+                                <>
+                                  <td className="py-3 px-4 text-right font-mono text-sm text-gray-700">
+                                    {account.sourceCurrencyCode} D:{Number(account.sourceDebit || 0).toFixed(2)} C:{Number(account.sourceCredit || 0).toFixed(2)}
+                                  </td>
+                                  <td className="py-3 px-4 text-right font-mono text-sm text-gray-700">
+                                    {Number(account.conversionRate || 0).toFixed(6)}
+                                  </td>
+                                  <td className="py-3 px-4 text-right">
+                                    <span className={cn(
+                                      "font-mono text-sm",
+                                      account.consolidatedDebit > 0 ? "text-green-700 font-semibold" : "text-gray-400"
+                                    )}>
+                                      {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(account.consolidatedDebit || 0)}
+                                    </span>
+                                  </td>
+                                  <td className="py-3 px-4 text-right">
+                                    <span className={cn(
+                                      "font-mono text-sm",
+                                      account.consolidatedCredit > 0 ? "text-red-700 font-semibold" : "text-gray-400"
+                                    )}>
+                                      {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(account.consolidatedCredit || 0)}
+                                    </span>
+                                  </td>
+                                </>
+                              )}
                               <td className="py-3 px-4">
-                                {hasTransactions && (
+                                {reportMode === "single" && hasTransactions && (
                                   <div className="flex items-center justify-center">
                                     {isExpanded ? (
                                       <ChevronUp className="w-4 h-4 text-gray-600" />
@@ -615,9 +899,9 @@ export function TrialBalanceView() {
                               </td>
                             </tr>
                             {/* Expanded Transaction Row */}
-                            {isExpanded && hasTransactions && (
+                            {reportMode === "single" && isExpanded && hasTransactions && (
                               <tr>
-                                <td colSpan={6} className="p-0 bg-blue-50">
+                                <td colSpan={reportMode === "single" ? 6 : 8} className="p-0 bg-blue-50">
                                   <div className="px-4 py-4">
                                     <TransactionsDataTable
                                       transactions={account.transactions}
@@ -633,22 +917,41 @@ export function TrialBalanceView() {
                       })}
                     </tbody>
                     {/* Totals Row */}
-                    {trialBalance && (
+                    {(reportMode === "single" ? !!trialBalance : !!consolidatedTrialBalance) && (
                       <tfoot>
                         <tr className="border-t-2 border-gray-300 bg-gray-100 font-bold">
                           <td colSpan={3} className="py-3 px-4 text-sm text-gray-900">
                             TOTALS
                           </td>
-                          <td className="py-3 px-4 text-right">
-                            <span className="font-mono text-sm text-green-700">
-                              {formatCurrency(trialBalance.totals?.totalDebits || 0)}
-                            </span>
-                          </td>
-                          <td className="py-3 px-4 text-right">
-                            <span className="font-mono text-sm text-red-700">
-                              {formatCurrency(trialBalance.totals?.totalCredits || 0)}
-                            </span>
-                          </td>
+                          {reportMode === "single" ? (
+                            <>
+                              <td className="py-3 px-4 text-right">
+                                <span className="font-mono text-sm text-green-700">
+                                  {formatCurrency(trialBalance.totals?.totalDebits || 0)}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4 text-right">
+                                <span className="font-mono text-sm text-red-700">
+                                  {formatCurrency(trialBalance.totals?.totalCredits || 0)}
+                                </span>
+                              </td>
+                            </>
+                          ) : (
+                            <>
+                              <td className="py-3 px-4"></td>
+                              <td className="py-3 px-4"></td>
+                              <td className="py-3 px-4 text-right">
+                                <span className="font-mono text-sm text-green-700">
+                                  {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(consolidatedTrialBalance?.totals.totalDebits || 0)}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4 text-right">
+                                <span className="font-mono text-sm text-red-700">
+                                  {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(consolidatedTrialBalance?.totals.totalCredits || 0)}
+                                </span>
+                              </td>
+                            </>
+                          )}
                           <td></td>
                         </tr>
                       </tfoot>

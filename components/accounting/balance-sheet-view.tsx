@@ -16,14 +16,18 @@ import { format } from "date-fns"
 import { toast } from "sonner"
 import type { RootState, AppDispatch } from "@/lib/store/store"
 import { generateBalanceSheet } from "@/lib/store/slices/accountingSlice"
+import { accountingApi } from "@/lib/api/accounting-api"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
+import { addLetterhead, addReportInfo } from "@/lib/utils/pdf-letterhead"
 import { TransactionsDataTable } from "./transactions-data-table"
 import { TransactionViewDrawer } from "./transaction-view-drawer"
+import { ConsolidatedBalanceSheet, buildConsolidatedBalanceSheet } from "@/lib/utils/consolidation/balance-sheet"
+import { withUsdZwlFallbackRates } from "@/lib/utils/consolidation/fallback-rates"
 
 function formatMoney(v: number | string) {
   return (
@@ -77,6 +81,10 @@ export function BalanceSheetView() {
   const defaultCurrencyId = currencies.find(c => c.code === "USD")?.id || currencies[0]?.id || ""
   const [asOfDate, setAsOfDate] = useState<Date>(new Date())
   const [currencyId, setCurrencyId] = useState(defaultCurrencyId)
+  const [reportMode, setReportMode] = useState<"single" | "consolidated">("single")
+  const [selectedCurrencyIds, setSelectedCurrencyIds] = useState<string[]>([])
+  const [consolidatedBalance, setConsolidatedBalance] = useState<ConsolidatedBalanceSheet | null>(null)
+  const [isConsolidating, setIsConsolidating] = useState(false)
   const [periodType, setPeriodType] = useState<'month' | 'quarter' | 'year' | 'custom'>('custom')
   const [hideZeroBalances, setHideZeroBalances] = useState(true)
   const [generatingPDF, setGeneratingPDF] = useState(false)
@@ -90,23 +98,105 @@ export function BalanceSheetView() {
   }, [currencies])
 
   useEffect(() => {
-    if (currencyId) {
-      // Fetch for current year end (Dec 31)
-      const year = new Date().getFullYear()
-      const defaultDate = new Date(year, 11, 31) // Dec 31
-      setAsOfDate(defaultDate)
+    if (!currencies.length) return
+    if (selectedCurrencyIds.length === 0) {
+      setSelectedCurrencyIds([defaultCurrencyId])
+    }
+  }, [currencies, defaultCurrencyId])
+
+  useEffect(() => {
+    const year = new Date().getFullYear()
+    const defaultDate = new Date(year, 11, 31)
+    setAsOfDate(defaultDate)
+
+    if (reportMode === "single" && currencyId) {
       dispatch(generateBalanceSheet({ asOfDate: format(defaultDate, "yyyy-MM-dd"), currencyId, hideZeroBalances }) as any)
+      setConsolidatedBalance(null)
+    }
+
+    if (reportMode === "consolidated") {
+      loadConsolidatedBalanceSheet(defaultDate)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currencyId])
+  }, [currencyId, reportMode, selectedCurrencyIds])
+
+  const loadConsolidatedBalanceSheet = async (dateOverride?: Date) => {
+    const targetDate = dateOverride || asOfDate
+    if (!selectedCurrencyIds.length || !targetDate) {
+      setConsolidatedBalance(null)
+      return
+    }
+
+    try {
+      setIsConsolidating(true)
+      const asOfDateString = format(targetDate, "yyyy-MM-dd")
+      const reportingCurrency = currencies.find((c) => c.code === "USD") || currencies[0]
+
+      const responses = await Promise.all(
+        selectedCurrencyIds.map((id) =>
+          accountingApi.generateBalanceSheet(
+            { asOfDate: asOfDateString, currencyId: id },
+            { hideZeroBalances }
+          )
+        )
+      )
+
+      const statements = responses
+        .map((res, idx) => ({
+          ok: res.success && res.data,
+          data: res.data as any,
+          currency: currencies.find((c) => c.id === selectedCurrencyIds[idx]),
+        }))
+        .filter((x) => x.ok && x.data && x.currency)
+        .map((x) => ({ currency: x.currency!, sheet: x.data }))
+
+      if (!statements.length) {
+        setConsolidatedBalance(null)
+        return
+      }
+
+      const ratesResponse = await accountingApi.getExchangeRates()
+      const ratesRaw = (ratesResponse as any)?.data
+      const rates = Array.isArray(ratesRaw)
+        ? ratesRaw
+        : (ratesRaw?.exchangeRates || [])
+      const normalizedRates = withUsdZwlFallbackRates(rates, currencies)
+
+      const consolidated = buildConsolidatedBalanceSheet(
+        statements,
+        normalizedRates,
+        { id: reportingCurrency?.id || currencyId, code: reportingCurrency?.code || "USD" }
+      )
+
+      setConsolidatedBalance(consolidated)
+
+      if (consolidated && consolidated.missingRates.length > 0) {
+        toast.warning("Some balance sheet rows were excluded due to missing exchange rates", {
+          description: `${consolidated.missingRates.length} row(s) have no spot rate as of ${asOfDateString}.`,
+        })
+      }
+    } catch (error: any) {
+      setConsolidatedBalance(null)
+      toast.error("Failed to load consolidated balance sheet", {
+        description: error?.message || "Unexpected error",
+      })
+    } finally {
+      setIsConsolidating(false)
+    }
+  }
 
   const handleGenerate = async () => {
-    if (asOfDate && currencyId) {
+    if (asOfDate && reportMode === "single" && currencyId) {
       try {
         await dispatch(generateBalanceSheet({ asOfDate: format(asOfDate, "yyyy-MM-dd"), currencyId, hideZeroBalances }) as any)
+        setConsolidatedBalance(null)
       } catch (error: any) {
         toast.error("Failed to generate balance sheet", { description: error.message })
       }
+    }
+
+    if (asOfDate && reportMode === "consolidated") {
+      await loadConsolidatedBalanceSheet()
     }
   }
 
@@ -125,6 +215,16 @@ export function BalanceSheetView() {
   const handleTransactionClick = (transaction: any) => {
     setSelectedTransaction(transaction)
     setIsTransactionDrawerOpen(true)
+  }
+
+  const toggleCurrencySelection = (id: string) => {
+    setSelectedCurrencyIds((prev) => {
+      if (prev.includes(id)) {
+        if (prev.length === 1) return prev
+        return prev.filter((x) => x !== id)
+      }
+      return [...prev, id]
+    })
   }
 
   // Custom dropdown for currency selection
@@ -156,8 +256,199 @@ export function BalanceSheetView() {
     </DropdownMenu>
   )
 
+  const multiCurrencyDropdown = (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="outline"
+          className="rounded-full min-w-[180px] flex justify-between items-center"
+        >
+          {selectedCurrencyIds.length
+            ? selectedCurrencyIds
+                .map((id) => currencies.find((c) => c.id === id)?.code)
+                .filter(Boolean)
+                .join(", ")
+            : "Select currencies"}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="rounded-xl min-w-[220px]">
+        {currencies.map((c) => {
+          const selected = selectedCurrencyIds.includes(c.id)
+          return (
+            <DropdownMenuItem
+              key={c.id}
+              onClick={() => toggleCurrencySelection(c.id)}
+              className={cn(
+                "flex items-center justify-between rounded-full cursor-pointer",
+                selected && "bg-blue-100"
+              )}
+            >
+              <span>{c.code} <span className="text-xs text-gray-400 ml-1">{c.name}</span></span>
+              {selected && <Check className="w-4 h-4 text-blue-600 ml-2" />}
+            </DropdownMenuItem>
+          )
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+
+  const formatUSD = (value: number) =>
+    new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2,
+    }).format(Math.abs(value))
+
+  const renderConsolidatedBalanceView = () => {
+    if (!consolidatedBalance) return null
+
+    const groups = [
+      { key: "assets", label: "Assets" },
+      { key: "liabilities", label: "Liabilities" },
+      { key: "equity", label: "Equity" },
+    ] as const
+
+    return (
+      <div className="space-y-6">
+        <div className="text-center mb-8 border-b-2 border-gray-300 pb-4">
+          <h1 className="text-2xl font-bold text-gray-900 mb-1">National venture capital company of Zimbabwe</h1>
+          <h2 className="text-xl font-semibold text-gray-700 mb-2">Balance Sheet (Consolidated)</h2>
+          <p className="text-gray-600">As of {format(new Date(consolidatedBalance.asOfDate), "MMMM d, yyyy")}</p>
+          <p className="text-sm text-gray-500 mt-1">Reporting Currency: {consolidatedBalance.reportingCurrencyCode}</p>
+          {consolidatedBalance.missingRates.length > 0 && (
+            <p className="text-xs text-amber-700 mt-2">
+              Missing spot rates for {consolidatedBalance.missingRates.length} row(s). Those rows were excluded.
+            </p>
+          )}
+        </div>
+
+        {groups.map((group) => {
+          const rows = consolidatedBalance.rows.filter((r) => r.section === group.key)
+          if (!rows.length) return null
+
+          return (
+            <div key={group.key} className="space-y-2">
+              <h3 className="text-lg font-bold text-gray-900 uppercase tracking-wide border-b-2 border-gray-300 pb-2">{group.label}</h3>
+              <div className="overflow-x-auto border rounded-lg">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="text-left p-3">Account</th>
+                      <th className="text-right p-3">Source</th>
+                      <th className="text-right p-3">Spot Rate</th>
+                      <th className="text-right p-3">Consolidated (USD)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((row, idx) => (
+                      <tr key={`${group.key}-${row.accountNo}-${row.sourceCurrencyCode}-${idx}`} className="border-t">
+                        <td className="p-3">{row.accountNo} - {row.accountName}</td>
+                        <td className="p-3 text-right font-mono">
+                          {row.sourceCurrencyCode} {Math.abs(row.sourceAmount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                        <td className="p-3 text-right font-mono">{row.spotRate.toFixed(6)}</td>
+                        <td className="p-3 text-right font-mono">{formatUSD(row.consolidatedAmount)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )
+        })}
+
+        <div className="mt-8 pt-4 border-t-2 border-gray-400 space-y-2">
+          <div className="flex justify-between py-2 font-bold text-lg">
+            <span>TOTAL ASSETS</span>
+            <span className="font-mono text-blue-700">{formatUSD(consolidatedBalance.totals.assets)}</span>
+          </div>
+          <div className="flex justify-between py-2 font-bold text-lg">
+            <span>TOTAL LIABILITIES</span>
+            <span className="font-mono text-red-700">{formatUSD(consolidatedBalance.totals.liabilities)}</span>
+          </div>
+          <div className="flex justify-between py-2 font-bold text-lg">
+            <span>TOTAL EQUITY</span>
+            <span className="font-mono text-green-700">{formatUSD(consolidatedBalance.totals.equity)}</span>
+          </div>
+          <div className="flex justify-between py-2 font-bold text-lg border-t">
+            <span>TOTAL LIABILITIES & EQUITY</span>
+            <span className="font-mono">{formatUSD(consolidatedBalance.totals.liabilitiesAndEquity)}</span>
+          </div>
+          <div className="text-center mt-3">
+            {consolidatedBalance.isBalanced
+              ? <Badge className="bg-green-100 text-green-800">✓ Balanced</Badge>
+              : <Badge className="bg-red-100 text-red-800">⚠ Not Balanced (Diff: {formatUSD(consolidatedBalance.difference)})</Badge>}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   // Export to PDF implementation
   const handleExportPDF = async () => {
+    if (reportMode === "consolidated" && consolidatedBalance) {
+      setGeneratingPDF(true)
+      try {
+        const doc = new jsPDF()
+        let startY = await addLetterhead(doc, "Balance Sheet")
+        startY = addReportInfo(doc, startY, [
+          `Consolidated (${consolidatedBalance.reportingCurrencyCode})`,
+          `As of ${format(new Date(consolidatedBalance.asOfDate), "MMMM d, yyyy")}`,
+        ])
+
+        const rows: any[] = []
+        const sections: Array<"assets" | "liabilities" | "equity"> = ["assets", "liabilities", "equity"]
+        sections.forEach((section) => {
+          const sectionRows = consolidatedBalance.rows.filter((r) => r.section === section)
+          if (!sectionRows.length) return
+
+          rows.push([{ content: section.toUpperCase(), colSpan: 4, styles: { fontStyle: "bold", fillColor: [240, 240, 240] } }])
+          sectionRows.forEach((row) => {
+            rows.push([
+              `${row.accountNo} - ${row.accountName}`,
+              `${row.sourceCurrencyCode} ${Math.abs(row.sourceAmount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+              row.spotRate.toFixed(6),
+              Math.abs(row.consolidatedAmount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+            ])
+          })
+        })
+
+        rows.push([
+          { content: "TOTAL ASSETS", colSpan: 3, styles: { fontStyle: "bold" } },
+          { content: consolidatedBalance.totals.assets.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), styles: { fontStyle: "bold" } },
+        ])
+        rows.push([
+          { content: "TOTAL LIABILITIES", colSpan: 3, styles: { fontStyle: "bold" } },
+          { content: consolidatedBalance.totals.liabilities.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), styles: { fontStyle: "bold" } },
+        ])
+        rows.push([
+          { content: "TOTAL EQUITY", colSpan: 3, styles: { fontStyle: "bold" } },
+          { content: consolidatedBalance.totals.equity.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), styles: { fontStyle: "bold" } },
+        ])
+        rows.push([
+          { content: "TOTAL LIABILITIES & EQUITY", colSpan: 3, styles: { fontStyle: "bold" } },
+          { content: consolidatedBalance.totals.liabilitiesAndEquity.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), styles: { fontStyle: "bold" } },
+        ])
+
+        autoTable(doc, {
+          head: [["Account", "Source", "Spot Rate", `Consolidated (${consolidatedBalance.reportingCurrencyCode})`]],
+          body: rows,
+          startY,
+          styles: { fontSize: 9, cellPadding: 2 },
+          headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255] },
+          columnStyles: { 2: { halign: "right" }, 3: { halign: "right" } },
+        })
+
+        doc.save(`BalanceSheet_Consolidated_${consolidatedBalance.asOfDate}.pdf`)
+        toast.success("Consolidated balance sheet PDF generated successfully")
+      } catch {
+        toast.error("Failed to generate consolidated balance sheet PDF")
+      } finally {
+        setGeneratingPDF(false)
+      }
+      return
+    }
+
     if (!balanceSheet) {
       toast.error("No balance sheet data to export")
       return
@@ -165,13 +456,12 @@ export function BalanceSheetView() {
     setGeneratingPDF(true)
     try {
       const doc = new jsPDF()
-      doc.setFontSize(16)
-      doc.text("Balance Sheet", 14, 18)
-      doc.setFontSize(11)
-      doc.text(`As of ${format(new Date(balanceSheet.asOfDate), "MMMM d, yyyy")}`, 14, 26)
-      // Use currency name
       const currencyObj = currencies.find(c => c.code === balanceSheet.currency) || currencies.find(c => c.id === currencyId)
-      doc.text(`Currency: ${currencyObj?.name || balanceSheet.currency}`, 14, 32)
+      let startY = await addLetterhead(doc, "Balance Sheet")
+      startY = addReportInfo(doc, startY, [
+        `As of ${format(new Date(balanceSheet.asOfDate), "MMMM d, yyyy")}`,
+        `Currency: ${currencyObj?.name || balanceSheet.currency}`,
+      ])
 
       // Prepare rows for PDF
       const rows: any[] = []
@@ -228,9 +518,9 @@ export function BalanceSheetView() {
       autoTable(doc, {
         head: [["Description", "Amount"]],
         body: rows,
-        startY: 38,
+        startY,
         styles: { fontSize: 10, cellPadding: 2 },
-        headStyles: { fillColor: [220, 220, 220] },
+        headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255] },
         columnStyles: { 1: { halign: 'right' } }
       })
 
@@ -243,7 +533,7 @@ export function BalanceSheetView() {
     }
   }
 
-  if (balanceSheetError) {
+  if (reportMode === "single" && balanceSheetError) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="text-center">
@@ -315,7 +605,9 @@ export function BalanceSheetView() {
         <div>
           <h2 className="text-2xl font-semibold text-gray-900">Balance Sheet</h2>
           <p className="text-gray-600">
-            As of {format(asOfDate, "MMM d, yyyy")}
+            {reportMode === "single"
+              ? `As of ${format(asOfDate, "MMM d, yyyy")}`
+              : `Consolidated View (${(currencies.find((c) => c.code === "USD") || currencies[0])?.code || "USD"} reporting)`}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -339,8 +631,26 @@ export function BalanceSheetView() {
             </Popover>
           </div>
           {/* Custom currency dropdown */}
+          <div className="flex items-center gap-1 border rounded-full p-1">
+            <Button
+              size="sm"
+              variant={reportMode === "single" ? "default" : "ghost"}
+              className="rounded-full"
+              onClick={() => setReportMode("single")}
+            >
+              Single
+            </Button>
+            <Button
+              size="sm"
+              variant={reportMode === "consolidated" ? "default" : "ghost"}
+              className="rounded-full"
+              onClick={() => setReportMode("consolidated")}
+            >
+              Consolidated
+            </Button>
+          </div>
           <div>
-            {currencyDropdown}
+            {reportMode === "single" ? currencyDropdown : multiCurrencyDropdown}
           </div>
           <div className="flex items-center gap-2">
             <Switch
@@ -352,17 +662,17 @@ export function BalanceSheetView() {
           </div>
           <Button
             onClick={handleGenerate}
-            disabled={balanceSheetLoading}
+            disabled={balanceSheetLoading || isConsolidating}
             className="rounded-full"
           >
-            <RefreshCw className={cn("w-4 h-4 mr-2", balanceSheetLoading && "animate-spin")} />
+            <RefreshCw className={cn("w-4 h-4 mr-2", (balanceSheetLoading || isConsolidating) && "animate-spin")} />
             Generate
           </Button>
           <Button
             onClick={handleExportPDF}
             variant="outline"
             className="rounded-full"
-            disabled={generatingPDF}
+            disabled={generatingPDF || (reportMode === "single" ? !balanceSheet : !consolidatedBalance)}
           >
             {generatingPDF ? (
               <>
@@ -384,12 +694,22 @@ export function BalanceSheetView() {
         <CardHeader>
           <CardTitle className="text-xl flex items-center gap-2">
             <FileText className="w-6 h-6 text-blue-600" />
-            Balance Sheet
+            {reportMode === "single" ? "Balance Sheet" : "Balance Sheet (Consolidated)"}
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {balanceSheetLoading ? (
+          {(reportMode === "single" && balanceSheetLoading) || (reportMode === "consolidated" && isConsolidating) ? (
             <BalanceSheetSkeleton />
+          ) : reportMode === "consolidated" ? (
+            consolidatedBalance ? (
+              <div className="max-w-6xl mx-auto">{renderConsolidatedBalanceView()}</div>
+            ) : (
+              <div className="text-center py-12">
+                <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No Consolidated Balance Sheet Data</h3>
+                <p className="text-gray-600">No data available for selected currencies and date</p>
+              </div>
+            )
           ) : balanceSheet ? (
             <div className="max-w-6xl mx-auto">
               {/* Company Header */}

@@ -7,8 +7,6 @@ import {
   DollarSign,
   TrendingUp,
   Calculator,
-  Users,
-  Building,
   Tag,
   Landmark
 } from "lucide-react"
@@ -16,8 +14,6 @@ import { ExchangeRatesManagement } from "./exchange-rates-management"
 import { cn } from "@/lib/utils"
 import { CurrenciesManagement } from "./currencies-management"
 import { ChartOfAccountsManagement } from "./chart-of-accounts-management"
-import { CustomersManagement } from "./customers-management"
-import { VendorsManagement } from "./vendors-management"
 import { ExpenseCategoriesManagement } from "./expense-categories-management"
 import { BankAccountsManagement } from "./bank-accounts-management"
 import { AccountingSettingsSkeleton } from "./accounting-settings-skeleton"
@@ -43,20 +39,6 @@ const tabs = [
     icon: Calculator,
     description: "Manage account structure",
     gradient: "from-purple-400 to-purple-600"
-  },
-  {
-    id: "customers",
-    label: "Customers",
-    icon: Users,
-    description: "Manage customer accounts",
-    gradient: "from-orange-400 to-orange-600"
-  },
-  {
-    id: "vendors",
-    label: "Vendors",
-    icon: Building,
-    description: "Manage vendor accounts",
-    gradient: "from-red-400 to-red-600"
   },
   {
     id: "expense-categories",
@@ -90,10 +72,6 @@ export function AccountingSettings() {
         return <ExchangeRatesManagement />
       case "chart-of-accounts":
         return <ChartOfAccountsManagement />
-      case "customers":
-        return <CustomersManagement />
-      case "vendors":
-        return <VendorsManagement />
       case "expense-categories":
         return <ExpenseCategoriesManagement />
       case "bank-accounts":

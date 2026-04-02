@@ -132,6 +132,8 @@ const exportToCSV = (journalEntries: JournalEntry[]) => {
 interface JournalEntry {
   id: string
   transactionDate: string
+  createdAt?: string
+  created_at?: string
   referenceNumber: string
   description: string
   totalAmount: string
@@ -251,7 +253,13 @@ export function GeneralLedger() {
       })
       
       if (response.success) {
-        setJournalEntries((response.data as any) || [])
+        const sortedEntries = [...(((response.data as any) || []) as JournalEntry[])].sort((a, b) => {
+          const aDate = new Date(a.createdAt || a.created_at || a.transactionDate).getTime()
+          const bDate = new Date(b.createdAt || b.created_at || b.transactionDate).getTime()
+          return bDate - aDate
+        })
+
+        setJournalEntries(sortedEntries)
         // toast.success(`Loaded ${response.data?.length || 0} journal entries`)
       } else {
         toast.error("Failed to load journal entries", {

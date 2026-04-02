@@ -54,6 +54,25 @@ export function UnrealizedFxGainsView() {
     }
   }
 
+  const handleExport = (rows: any[]) => {
+    const csvContent = [
+      ['Invoice #', 'Customer', 'Status', 'Currency', 'Outstanding', 'Original Value', 'Current Value', 'Gain/Loss', 'Type'].join(','),
+      ...rows.map(r => [
+        r.invoiceNumber, r.customerName || '', r.status, r.invoiceCurrencyCode,
+        r.outstandingAmount, r.originalFunctionalValue, r.currentFunctionalValue,
+        r.unrealizedGainLoss, r.gainLossType
+      ].join(','))
+    ].join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv' })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `unrealized-fx-gains-${format(asOfDate, 'yyyy-MM-dd')}.csv`
+    a.click()
+    window.URL.revokeObjectURL(url)
+    toast.success(`Exported ${rows.length} records`)
+  }
+
   const lines: any[] = data?.lines || []
   const totals = data?.totals
   const functionalCurrency = data?.functionalCurrencyCode || ""
@@ -190,6 +209,7 @@ export function UnrealizedFxGainsView() {
         searchPlaceholder="Search by invoice, customer..."
         loading={loading}
         emptyMessage="Select a date and click Generate to view unrealized FX gains/losses."
+        onExport={handleExport}
       />
 
       {/* Excluded Items */}

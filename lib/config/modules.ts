@@ -216,8 +216,8 @@ export const MODULE_CONFIG: ModuleConfig[] = [
 
       },
 
-      { id: "invoices", name: "Accounts Receivable", path: "/accounting/invoices", icon: CiUser, description: "Customer invoices and payments" },
-      { id: "payables", name: "Accounts Payable", path: "/accounting/payables", icon: CiUser, description: "Supplier bills and payments" },
+      { id: "invoices", name: "Sales", path: "/accounting/invoices", icon: CiUser, description: "Customer invoices and payments" },
+      { id: "payables", name: "Purchases", path: "/accounting/payables", icon: CiUser, description: "Supplier bills and payments" },
 
       // { id: "accounts-receivable", name: "Accounts Receivable", path: "/accounting/debtors", icon: CiUser, description: "Customer invoices and payments" },
       // { id: "accounts-payable", name: "Accounts Payable", path: "/accounting/creditors", icon: CiWallet, description: "Supplier bills and payments" },
