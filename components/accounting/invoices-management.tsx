@@ -37,7 +37,8 @@ import {
   Phone,
   MapPin,
   Info,
-  User
+  User,
+  Users
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
@@ -52,6 +53,7 @@ import { fetchCurrencies, fetchCreditNotes } from "@/lib/store/slices/accounting
 import type { RootState, AppDispatch } from "@/lib/store"
 import { Invoice } from "@/lib/api/accounting-api"
 import { CreditNotesManagement } from "./credit-notes-management"
+import { CustomersManagement } from "./customers-management"
 import { useAccountingPermissions } from "@/lib/hooks/useAccountingPermissions"
 import { CurrencyFilter } from "./CurrencyFilter"
 
@@ -129,6 +131,13 @@ const mainTabs = [
     icon: CreditCard,
     description: "Manage credit notes",
     gradient: "from-red-400 to-red-600"
+  },
+  {
+    id: "customers",
+    label: "Customers",
+    icon: Users,
+    description: "Manage customer accounts",
+    gradient: "from-orange-400 to-orange-600"
   }
 ]
 
@@ -1111,10 +1120,14 @@ export function InvoicesManagement() {
         )}
 
         {activeMainTab === "credit-notes" && (
-          <CreditNotesManagement 
-            isCreateModalOpen={isCreateCreditNoteModalOpen} 
+          <CreditNotesManagement
+            isCreateModalOpen={isCreateCreditNoteModalOpen}
             onCreateModalClose={() => setIsCreateCreditNoteModalOpen(false)}
           />
+        )}
+
+        {activeMainTab === "customers" && (
+          <CustomersManagement />
         )}
       </div>
 

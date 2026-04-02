@@ -46,6 +46,24 @@ export function CreditorsAgeAnalysis() {
     return (num ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   }
 
+  const handleExport = (rows: any[]) => {
+    const csvContent = [
+      ['Invoice #', 'Vendor', 'Description', 'Due Date', 'Currency', 'Outstanding', 'Days Past Due', 'Bucket'].join(','),
+      ...rows.map(r => [
+        r.invoiceNumber, r.vendorName, `"${(r.description || '').replace(/"/g, '""')}"`,
+        r.dueDate || '', r.currencyCode, r.outstandingAmount, r.daysPastDue, r.reportColumnTitle || r.bucket
+      ].join(','))
+    ].join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv' })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `creditors-age-analysis-${format(asOfDate, 'yyyy-MM-dd')}.csv`
+    a.click()
+    window.URL.revokeObjectURL(url)
+    toast.success(`Exported ${rows.length} records`)
+  }
+
   const lines: any[] = data?.lines || []
   const totalsByCurrency: Record<string, any> = data?.totalsByCurrency || {}
   const bucketLabels = data?.bucketShortColumnTitles || {
@@ -162,6 +180,7 @@ export function CreditorsAgeAnalysis() {
         searchPlaceholder="Search by invoice, vendor..."
         loading={loading}
         emptyMessage="Select a date and click Generate to view the creditors age analysis."
+        onExport={handleExport}
       />
 
       {/* Totals by Currency */}

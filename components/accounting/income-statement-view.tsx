@@ -31,12 +31,16 @@ import { format, subDays } from "date-fns"
 import { toast } from "sonner"
 import type { RootState, AppDispatch } from "@/lib/store/store"
 import { fetchIncomeStatement } from "@/lib/store/slices/accountingSlice"
+import { accountingApi } from "@/lib/api/accounting-api"
 import { exportIncomeStatementToPDF } from "@/lib/utils/export"
+import { addLetterhead, addReportInfo } from "@/lib/utils/pdf-letterhead"
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
 import { TransactionsDataTable } from "./transactions-data-table"
 import { TransactionViewDrawer } from "./transaction-view-drawer"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { buildConsolidatedIncomeStatement, ConsolidatedIncomeStatement } from "@/lib/utils/consolidation/income-statement"
+import { withUsdZwlFallbackRates } from "@/lib/utils/consolidation/fallback-rates"
 
 export function IncomeStatementView() {
   const dispatch = useDispatch<AppDispatch>()
@@ -53,6 +57,10 @@ export function IncomeStatementView() {
   const [startDate, setStartDate] = useState<Date>(subDays(new Date(), 30))
   const [endDate, setEndDate] = useState<Date>(new Date())
   const [currencyId, setCurrencyId] = useState(defaultCurrencyId)
+  const [reportMode, setReportMode] = useState<"single" | "consolidated">("single")
+  const [selectedCurrencyIds, setSelectedCurrencyIds] = useState<string[]>([])
+  const [consolidatedIncome, setConsolidatedIncome] = useState<ConsolidatedIncomeStatement | null>(null)
+  const [isConsolidating, setIsConsolidating] = useState(false)
   const [generatingPDF, setGeneratingPDF] = useState(false)
   const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set())
   const [selectedTransaction, setSelectedTransaction] = useState<any | null>(null)
@@ -120,43 +128,123 @@ export function IncomeStatementView() {
   }, [currencies])
 
   useEffect(() => {
-    if (currencyId) {
-      // Only load data when we have a valid periodValue for the current periodType (or when in custom mode)
-      const isValidPeriodValue = periodType === 'custom' ||
-        (periodType === 'month' && /^\d{4}-\d{2}$/.test(periodValue)) ||
-        (periodType === 'quarter' && /^\d{4}-Q\d$/.test(periodValue)) ||
-        (periodType === 'year' && /^\d{4}$/.test(periodValue))
+    if (!currencies.length) return
+    if (selectedCurrencyIds.length === 0) {
+      setSelectedCurrencyIds([defaultCurrencyId])
+    }
+  }, [currencies, defaultCurrencyId])
 
-      if (isValidPeriodValue) {
-        loadIncomeStatement()
+  useEffect(() => {
+    if (!currencyId) return
+
+    const isValidPeriodValue = periodType === 'custom' ||
+      (periodType === 'month' && /^\d{4}-\d{2}$/.test(periodValue)) ||
+      (periodType === 'quarter' && /^\d{4}-Q\d$/.test(periodValue)) ||
+      (periodType === 'year' && /^\d{4}$/.test(periodValue))
+
+    if (!isValidPeriodValue) return
+
+    if (reportMode === "single") {
+      loadIncomeStatement()
+    } else {
+      loadConsolidatedIncomeStatement()
+    }
+  }, [periodType, periodValue, startDate, endDate, currencyId, reportMode, selectedCurrencyIds])
+
+  const buildParams = () => {
+    if (periodType === 'custom') {
+      return {
+        startDate: format(startDate, 'yyyy-MM-dd'),
+        endDate: format(endDate, 'yyyy-MM-dd'),
       }
     }
-  }, [periodType, periodValue, startDate, endDate, currencyId])
+
+    return {
+      periodType,
+      periodValue,
+    }
+  }
 
   const loadIncomeStatement = async () => {
     try {
-      if (periodType === 'custom') {
-        // Use date range for custom period
-        const startDateString = format(startDate, 'yyyy-MM-dd')
-        const endDateString = format(endDate, 'yyyy-MM-dd')
-
-        await dispatch(fetchIncomeStatement({
-          startDate: startDateString,
-          endDate: endDateString,
-          currencyId
-        }))
-      } else {
-        // Use period type and value
-        await dispatch(fetchIncomeStatement({
-          periodType,
-          periodValue,
-          currencyId
-        }))
-      }
+      await dispatch(fetchIncomeStatement({
+        ...buildParams(),
+        currencyId,
+      }))
+      setConsolidatedIncome(null)
     } catch (error: any) {
       toast.error("Failed to load income statement", {
         description: error.message
       })
+    }
+  }
+
+  const loadConsolidatedIncomeStatement = async () => {
+    if (!selectedCurrencyIds.length) {
+      setConsolidatedIncome(null)
+      return
+    }
+
+    try {
+      setIsConsolidating(true)
+      const params = buildParams()
+      const reportingCurrency = currencies.find((c) => c.code === "USD") || currencies[0]
+
+      const responses = await Promise.all(
+        selectedCurrencyIds.map((id) => accountingApi.getIncomeStatementV2({ ...params, currencyId: id }))
+      )
+
+      const statements = responses
+        .map((res, idx) => {
+          const selectedCurrency = currencies.find((c) => c.id === selectedCurrencyIds[idx])
+          if (!res.success || !res.data || !selectedCurrency) return null
+
+          return {
+            ...(res.data as any),
+            // Trust user-selected source currency for consolidation metadata.
+            currency: {
+              id: selectedCurrency.id,
+              code: selectedCurrency.code,
+              name: selectedCurrency.name,
+              symbol: selectedCurrency.symbol,
+            },
+          }
+        })
+        .filter(Boolean) as any[]
+
+      if (!statements.length) {
+        setConsolidatedIncome(null)
+        return
+      }
+
+      const ratesResponse = await accountingApi.getExchangeRates()
+      const ratesRaw = (ratesResponse as any)?.data
+      const rates = Array.isArray(ratesRaw)
+        ? ratesRaw
+        : (ratesRaw?.exchangeRates || [])
+      const normalizedRates = withUsdZwlFallbackRates(rates, currencies)
+
+      const consolidated = buildConsolidatedIncomeStatement(
+        statements,
+        normalizedRates,
+        reportingCurrency?.id || currencyId,
+        reportingCurrency?.code || "USD"
+      )
+
+      setConsolidatedIncome(consolidated)
+
+      if (consolidated && consolidated.missingRates.length > 0) {
+        toast.warning("Some rows were excluded due to missing exchange rates", {
+          description: `${consolidated.missingRates.length} row(s) have no effective rate for consolidation.`
+        })
+      }
+    } catch (error: any) {
+      setConsolidatedIncome(null)
+      toast.error("Failed to load consolidated income statement", {
+        description: error?.message || "Unexpected error"
+      })
+    } finally {
+      setIsConsolidating(false)
     }
   }
 
@@ -175,6 +263,16 @@ export function IncomeStatementView() {
   const handleTransactionClick = (transaction: any) => {
     setSelectedTransaction(transaction)
     setIsTransactionDrawerOpen(true)
+  }
+
+  const toggleCurrencySelection = (id: string) => {
+    setSelectedCurrencyIds((prev) => {
+      if (prev.includes(id)) {
+        if (prev.length === 1) return prev
+        return prev.filter((x) => x !== id)
+      }
+      return [...prev, id]
+    })
   }
 
   // Custom dropdown for currency selection
@@ -206,7 +304,112 @@ export function IncomeStatementView() {
     </DropdownMenu>
   )
 
+  const multiCurrencyDropdown = (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="outline"
+          className="rounded-full min-w-[180px] flex justify-between items-center"
+        >
+          {selectedCurrencyIds.length
+            ? selectedCurrencyIds
+                .map((id) => currencies.find((c) => c.id === id)?.code)
+                .filter(Boolean)
+                .join(", ")
+            : "Select currencies"}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="rounded-xl min-w-[220px]">
+        {currencies.map((c) => {
+          const selected = selectedCurrencyIds.includes(c.id)
+          return (
+            <DropdownMenuItem
+              key={c.id}
+              onClick={() => toggleCurrencySelection(c.id)}
+              className={cn(
+                "flex items-center justify-between rounded-full cursor-pointer",
+                selected && "bg-blue-100"
+              )}
+            >
+              <span>{c.code}</span>
+              {selected && <Check className="w-4 h-4 text-blue-600" />}
+            </DropdownMenuItem>
+          )
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+
   const handleExportPDF = async () => {
+    if (reportMode === "consolidated" && consolidatedIncome) {
+      setGeneratingPDF(true)
+      try {
+        const doc = new jsPDF()
+        let startY = await addLetterhead(doc, "Income Statement")
+        startY = addReportInfo(doc, startY, [
+          `Consolidated (${consolidatedIncome.reportingCurrencyCode})`,
+          `For the period ${format(new Date(consolidatedIncome.period.startDate), "MMMM d, yyyy")} to ${format(new Date(consolidatedIncome.period.endDate), "MMMM d, yyyy")}`,
+        ])
+
+        const sectionOrder: Array<"revenue" | "operatingExpenses" | "incomeTax" | "belowTheLine"> = [
+          "revenue",
+          "operatingExpenses",
+          "incomeTax",
+          "belowTheLine",
+        ]
+
+        const rows: any[] = []
+        sectionOrder.forEach((sectionKey) => {
+          const sectionRows = consolidatedIncome.rows.filter((r) => r.sectionKey === sectionKey)
+          if (!sectionRows.length) return
+
+          rows.push([{ content: sectionRows[0].sectionLabel, colSpan: 4, styles: { fontStyle: "bold", fillColor: [240, 240, 240] } }])
+          sectionRows.forEach((row) => {
+            const isBaseCurrency = row.sourceCurrencyCode === consolidatedIncome.reportingCurrencyCode
+            rows.push([
+              row.accountName,
+              `${row.sourceCurrencyCode} ${Math.abs(row.sourceAmount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+              isBaseCurrency ? "BASE" : row.conversionRate.toFixed(6),
+              Math.abs(row.consolidatedAmount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+            ])
+          })
+
+          rows.push([
+            { content: `Total ${sectionRows[0].sectionLabel}`, colSpan: 3, styles: { fontStyle: "bold" } },
+            {
+              content: Math.abs(consolidatedIncome.sectionTotals[sectionKey]).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+              styles: { fontStyle: "bold" },
+            },
+          ])
+        })
+
+        rows.push([
+          { content: `Net ${consolidatedIncome.totals.netIncome >= 0 ? "Income" : "Loss"}`, colSpan: 3, styles: { fontStyle: "bold" } },
+          {
+            content: Math.abs(consolidatedIncome.totals.netIncome).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+            styles: { fontStyle: "bold" },
+          },
+        ])
+
+        autoTable(doc, {
+          head: [["Account", "Source", "Rate", `Consolidated (${consolidatedIncome.reportingCurrencyCode})`]],
+          body: rows,
+          startY,
+          styles: { fontSize: 9, cellPadding: 2 },
+          headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255] },
+          columnStyles: { 2: { halign: "right" }, 3: { halign: "right" } },
+        })
+
+        doc.save(`IncomeStatement_Consolidated_${format(new Date(consolidatedIncome.period.startDate), "yyyyMMdd")}_${format(new Date(consolidatedIncome.period.endDate), "yyyyMMdd")}.pdf`)
+        toast.success("Consolidated income statement PDF generated successfully")
+      } catch {
+        toast.error("Failed to generate consolidated income statement PDF")
+      } finally {
+        setGeneratingPDF(false)
+      }
+      return
+    }
+
     if (!incomeStatement) {
       toast.error("No income statement data to export")
       return
@@ -214,17 +417,11 @@ export function IncomeStatementView() {
     setGeneratingPDF(true)
     try {
       const doc = new jsPDF()
-      doc.setFontSize(16)
-      doc.text("Income Statement", 14, 18)
-      doc.setFontSize(11)
-      doc.text(
+      let startY = await addLetterhead(doc, "Income Statement")
+      startY = addReportInfo(doc, startY, [
         `For the period ${format(new Date(incomeStatement.period.startDate), "MMMM d, yyyy")} to ${format(new Date(incomeStatement.period.endDate), "MMMM d, yyyy")}`,
-        14, 26
-      )
-      doc.text(
         `Currency: ${incomeStatement.currency.name || incomeStatement.currency.code}`,
-        14, 32
-      )
+      ])
 
       // Prepare rows for PDF
       const rows: any[] = []
@@ -277,9 +474,9 @@ export function IncomeStatementView() {
       autoTable(doc, {
         head: [["Description", "Amount"]],
         body: rows,
-        startY: 38,
+        startY,
         styles: { fontSize: 10, cellPadding: 2 },
-        headStyles: { fillColor: [220, 220, 220] },
+        headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255] },
         columnStyles: { 1: { halign: 'right' } }
       })
 
@@ -300,7 +497,102 @@ export function IncomeStatementView() {
     }).format(Math.abs(amount))
   }
 
-  if (incomeStatementError) {
+  const formatUSD = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2,
+    }).format(Math.abs(amount))
+  }
+
+  const renderConsolidatedIncomeView = () => {
+    if (!consolidatedIncome) return null
+
+    const sections: Array<"revenue" | "operatingExpenses" | "incomeTax" | "belowTheLine"> = [
+      "revenue",
+      "operatingExpenses",
+      "incomeTax",
+      "belowTheLine",
+    ]
+
+    return (
+      <div className="space-y-6">
+        <div className="text-center mb-4 border-b-2 border-gray-300 pb-4">
+          <h1 className="text-2xl font-bold text-gray-900 mb-1">National venture capital company of Zimbabwe</h1>
+          <h2 className="text-xl font-semibold text-gray-700 mb-2">Income Statement (Consolidated)</h2>
+          <p className="text-gray-600">
+            For the Period from {format(new Date(consolidatedIncome.period.startDate), 'MMMM d, yyyy')} to {format(new Date(consolidatedIncome.period.endDate), 'MMMM d, yyyy')}
+          </p>
+          <p className="text-sm text-gray-500 mt-1">Reporting Currency: {consolidatedIncome.reportingCurrencyCode}</p>
+          {consolidatedIncome.missingRates.length > 0 && (
+            <p className="text-xs text-amber-700 mt-2">
+              Missing rates for {consolidatedIncome.missingRates.length} row(s). Those rows were excluded from consolidated totals.
+            </p>
+          )}
+        </div>
+
+        {sections.map((sectionKey) => {
+          const sectionRows = consolidatedIncome.rows.filter((row) => row.sectionKey === sectionKey)
+          if (!sectionRows.length) return null
+
+          return (
+            <div key={sectionKey} className="space-y-2">
+              <h3 className="text-lg font-semibold text-gray-900 uppercase tracking-wide">{sectionRows[0].sectionLabel}</h3>
+              <div className="overflow-x-auto border rounded-lg">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="text-left p-3">Account</th>
+                      <th className="text-right p-3">Source</th>
+                      <th className="text-right p-3">Rate</th>
+                      <th className="text-right p-3">Consolidated (USD)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sectionRows.map((row, idx) => (
+                      <tr key={`${sectionKey}-${row.accountName}-${row.sourceCurrencyCode}-${idx}`} className="border-t">
+                        <td className="p-3">{row.accountName}</td>
+                        <td className="p-3 text-right font-mono">
+                          {row.sourceCurrencyCode} {Math.abs(row.sourceAmount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                        <td className="p-3 text-right font-mono">
+                          {row.sourceCurrencyCode === consolidatedIncome.reportingCurrencyCode ? "BASE" : row.conversionRate.toFixed(6)}
+                        </td>
+                        <td className="p-3 text-right font-mono">{formatUSD(row.consolidatedAmount)}</td>
+                      </tr>
+                    ))}
+                    <tr className="border-t-2 font-semibold bg-gray-50">
+                      <td className="p-3" colSpan={3}>Total {sectionRows[0].sectionLabel}</td>
+                      <td className="p-3 text-right font-mono">{formatUSD(consolidatedIncome.sectionTotals[sectionKey])}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )
+        })}
+
+        <div className="flex justify-between py-3 border-t-2 border-b-4 border-gray-900 font-bold text-lg">
+          <span className={cn(
+            "uppercase tracking-wide",
+            consolidatedIncome.totals.netIncome >= 0 ? "text-green-800" : "text-red-800"
+          )}>
+            Net {consolidatedIncome.totals.netIncome >= 0 ? "Income" : "Loss"}
+          </span>
+          <span className={cn(
+            "font-mono text-right text-xl",
+            consolidatedIncome.totals.netIncome >= 0 ? "text-green-700" : "text-red-700"
+          )}>
+            {consolidatedIncome.totals.netIncome < 0 ? '(' : ''}
+            {formatUSD(consolidatedIncome.totals.netIncome)}
+            {consolidatedIncome.totals.netIncome < 0 ? ')' : ''}
+          </span>
+        </div>
+      </div>
+    )
+  }
+
+  if (reportMode === "single" && incomeStatementError) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="text-center">
@@ -319,17 +611,20 @@ export function IncomeStatementView() {
   return (
     <div className="space-y-6">
       {/* Header with Date Filters */}
-      <div className="flex items-center justify-between">
+      <div className="space-y-3">
         <div>
           <h2 className="text-2xl font-semibold text-gray-900">Income Statement</h2>
-          <p className="text-gray-600">
-            {periodType === 'custom'
+          <p className="text-gray-600 mt-1">
+            {reportMode === "consolidated"
+              ? `Consolidated View (${(currencies.find((c) => c.code === "USD") || currencies[0])?.code || "USD"} reporting)`
+              : periodType === 'custom'
               ? `For the period ${format(startDate, 'MMM d, yyyy')} to ${format(endDate, 'MMM d, yyyy')}`
               : `Period: ${getPeriodOptions().find(opt => opt.value === periodValue)?.label || periodValue}`
             }
           </p>
         </div>
-        <div className="flex items-center gap-3">
+
+        <div className="flex flex-wrap items-center gap-3">
           {/* Period Type Selector */}
           <Select value={periodType} onValueChange={(value: any) => setPeriodType(value)}>
             <SelectTrigger className="w-[140px] rounded-full">
@@ -402,10 +697,31 @@ export function IncomeStatementView() {
             </>
           )}
 
+          <div className="flex items-center gap-1 border rounded-full p-1">
+            <Button
+              size="sm"
+              variant={reportMode === "single" ? "default" : "ghost"}
+              className="rounded-full"
+              onClick={() => setReportMode("single")}
+            >
+              Single
+            </Button>
+            <Button
+              size="sm"
+              variant={reportMode === "consolidated" ? "default" : "ghost"}
+              className="rounded-full"
+              onClick={() => setReportMode("consolidated")}
+            >
+              Consolidated
+            </Button>
+          </div>
+
           {/* Currency Selector */}
           <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600">Currency:</span>
-            {currencyDropdown}
+            <span className="text-sm text-gray-600">
+              {reportMode === "single" ? "Currency:" : "Source Currencies:"}
+            </span>
+            {reportMode === "single" ? currencyDropdown : multiCurrencyDropdown}
           </div>
 
           {/* Export PDF Button */}
@@ -413,7 +729,7 @@ export function IncomeStatementView() {
             onClick={handleExportPDF}
             variant="outline"
             className="rounded-full"
-            disabled={!incomeStatement || generatingPDF}
+            disabled={(reportMode === "single" && !incomeStatement) || (reportMode === "consolidated" && !consolidatedIncome) || generatingPDF}
           >
             {generatingPDF ? (
               <>
@@ -429,13 +745,13 @@ export function IncomeStatementView() {
           </Button>
 
           <Button
-            onClick={loadIncomeStatement}
-            disabled={incomeStatementLoading}
+            onClick={reportMode === "single" ? loadIncomeStatement : loadConsolidatedIncomeStatement}
+            disabled={incomeStatementLoading || isConsolidating}
             className="rounded-full"
           >
             <RefreshCw className={cn(
               "w-4 h-4 mr-2",
-              incomeStatementLoading && "animate-spin"
+              (incomeStatementLoading || isConsolidating) && "animate-spin"
             )} />
             Refresh
           </Button>
@@ -448,10 +764,10 @@ export function IncomeStatementView() {
           <div className="flex items-center justify-between">
             <CardTitle className="text-xl flex items-center gap-2">
               <FileText className="w-6 h-6 text-green-600" />
-              Profit & Loss Statement
+                {reportMode === "single" ? "Profit & Loss Statement" : "Profit & Loss Statement (Consolidated)"}
             </CardTitle>
             <div className="flex items-center gap-3">
-              {incomeStatement && (
+              {reportMode === "single" && incomeStatement && (
                 <Badge className={cn(
                   "text-sm",
                   incomeStatement.totals.netIncome >= 0
@@ -461,13 +777,23 @@ export function IncomeStatementView() {
                   {incomeStatement.totals.netIncome >= 0 ? "Profitable" : "Loss"}
                 </Badge>
               )}
+              {reportMode === "consolidated" && consolidatedIncome && (
+                <Badge className={cn(
+                  "text-sm",
+                  consolidatedIncome.totals.netIncome >= 0
+                    ? "bg-green-100 text-green-800"
+                    : "bg-red-100 text-red-800"
+                )}>
+                  {consolidatedIncome.totals.netIncome >= 0 ? "Profitable" : "Loss"}
+                </Badge>
+              )}
 
               {/* Quick Export Button in Table Header */}
               <Button
                 size="sm"
                 variant="ghost"
                 onClick={handleExportPDF}
-                disabled={!incomeStatement || generatingPDF}
+                disabled={(reportMode === "single" && !incomeStatement) || (reportMode === "consolidated" && !consolidatedIncome) || generatingPDF}
                 className="text-xs"
               >
                 {generatingPDF ? (
@@ -481,8 +807,18 @@ export function IncomeStatementView() {
           </div>
         </CardHeader>
         <CardContent>
-          {incomeStatementLoading ? (
+          {(reportMode === "single" && incomeStatementLoading) || (reportMode === "consolidated" && isConsolidating) ? (
             <IncomeStatementSkeleton />
+          ) : reportMode === "consolidated" ? (
+            consolidatedIncome ? (
+              <div className="max-w-6xl mx-auto">{renderConsolidatedIncomeView()}</div>
+            ) : (
+              <div className="text-center py-12">
+                <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No Consolidated Income Statement Data</h3>
+                <p className="text-gray-600">No data available for selected currencies and period</p>
+              </div>
+            )
           ) : incomeStatement ? (
             <div className="max-w-6xl mx-auto">
               {/* Company Header */}

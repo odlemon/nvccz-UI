@@ -450,12 +450,14 @@ export function CreateJournalEntryModal({
 
                       <div className="col-span-2">
                         <Input
-                          type="text"
+                          type="number"
+                          step="0.01"
+                          min="0"
                           placeholder="0.00"
-                          value={line.debitAmount?.toString() || ''}
+                          value={line.debitAmount ?? ''}
                           onChange={(e) => {
-                            const inputValue = e.target.value
-                            updateLine(line.id, 'debitAmount', inputValue ? parseFloat(inputValue) || null : null)
+                            const val = e.target.value
+                            updateLine(line.id, 'debitAmount', val === '' ? null : parseFloat(val))
                           }}
                           className="text-right font-mono border hover:border-green-300 focus:border-green-500 text-green-700 font-semibold h-10 text-sm rounded-full"
                         />
@@ -463,12 +465,14 @@ export function CreateJournalEntryModal({
 
                       <div className="col-span-2 flex items-center gap-2">
                         <Input
-                          type="text"
+                          type="number"
+                          step="0.01"
+                          min="0"
                           placeholder="0.00"
-                          value={line.creditAmount?.toString() || ''}
+                          value={line.creditAmount ?? ''}
                           onChange={(e) => {
-                            const inputValue = e.target.value
-                            updateLine(line.id, 'creditAmount', inputValue ? parseFloat(inputValue) || null : null)
+                            const val = e.target.value
+                            updateLine(line.id, 'creditAmount', val === '' ? null : parseFloat(val))
                           }}
                           className="text-right font-mono border hover:border-red-300 focus:border-red-500 text-red-700 font-semibold h-10 text-sm rounded-full"
                         />

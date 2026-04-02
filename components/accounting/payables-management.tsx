@@ -43,7 +43,8 @@ import { usePurchaseInvoices } from "@/lib/hooks/use-purchase-invoices"
 import { useAccountingPermissions } from "@/lib/hooks/useAccountingPermissions"
 import { CurrencyFilter } from "./CurrencyFilter"
 import { BatchPayModal } from "./batch-pay-modal"
-import { CreditCard } from "lucide-react"
+import { VendorsManagement } from "./vendors-management"
+import { CreditCard, Building } from "lucide-react"
 import type { RootState, AppDispatch } from "@/lib/store"
 import { PurchaseInvoice } from "@/lib/api/accounting-api"
 
@@ -121,6 +122,7 @@ export function PayablesManagement() {
   const vendors = useSelector((state: RootState) => state.accounting.vendors || [])
   const selectedCurrencyId = useSelector((state: RootState) => state.accounting.selectedCurrencyId)
 
+  const [activeMainTab, setActiveMainTab] = useState<"invoices" | "vendors">("invoices")
   const [activeTab, setActiveTab] = useState("all")
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [isViewDrawerOpen, setIsViewDrawerOpen] = useState(false)
@@ -580,10 +582,47 @@ export function PayablesManagement() {
 
   return (
     <div className="space-y-6">
+      {/* Main Tab Navigation */}
+      <div className="flex items-center overflow-x-auto border-b">
+        <div className="flex space-x-1 min-w-max">
+          {[
+            { id: "invoices" as const, label: "Purchase Invoices", icon: FileText, gradient: "from-orange-400 to-orange-600" },
+            { id: "vendors" as const, label: "Vendors", icon: Building, gradient: "from-red-400 to-red-600" },
+          ].map((tab) => {
+            const Icon = tab.icon
+            const isActive = activeMainTab === tab.id
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveMainTab(tab.id)}
+                className={cn(
+                  "flex items-center gap-3 px-6 py-4 text-lg font-medium rounded-t-lg border-b-2 transition-all duration-200",
+                  isActive
+                    ? "text-orange-600 border-orange-600"
+                    : "text-gray-600 border-transparent hover:text-gray-900 hover:border-gray-300"
+                )}
+              >
+                <div className={cn(
+                  "w-7 h-7 rounded-full flex items-center justify-center bg-gradient-to-br transition-all duration-200",
+                  isActive ? tab.gradient : "from-gray-300 to-gray-400"
+                )}>
+                  <Icon className="w-4 h-4 text-white" />
+                </div>
+                <span>{tab.label}</span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {activeMainTab === "vendors" ? (
+        <VendorsManagement />
+      ) : (
+      <>
       {/* Header with Create Button */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold">Accounts Payable</h2>
+          <h2 className="text-2xl font-bold">Purchases</h2>
           <p className="text-gray-500">Manage vendor purchase invoices</p>
         </div>
         <div className="flex items-center gap-3">
@@ -792,6 +831,8 @@ export function PayablesManagement() {
         }}
         selectedInvoices={selectedForBatchPay}
       />
+      </>
+      )}
     </div>
   )
 }

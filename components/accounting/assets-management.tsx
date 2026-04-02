@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
   Plus,
@@ -75,13 +76,27 @@ export function AssetsManagement() {
     page: 1,
     limit: 10
   })
+  const [assetStatusFilter, setAssetStatusFilter] = useState("")
+  const [assetSearch, setAssetSearch] = useState("")
+  const [debouncedSearch, setDebouncedSearch] = useState("")
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(assetSearch)
+      setPagination(p => ({ ...p, page: 1 }))
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [assetSearch])
 
   useEffect(() => {
     dispatch(fetchAssets({
       page: pagination.page,
-      limit: pagination.limit
+      limit: pagination.limit,
+      status: assetStatusFilter || undefined,
+      search: debouncedSearch || undefined,
     }))
-  }, [dispatch, pagination])
+  }, [dispatch, pagination, assetStatusFilter, debouncedSearch])
 
   useEffect(() => {
     dispatch(fetchChartOfAccounts({ isActive: true }))
@@ -511,7 +526,6 @@ export function AssetsManagement() {
         columns={columns}
         title="Assets"
         searchPlaceholder="Search assets..."
-        filterOptions={filterOptions}
         onView={handleViewAsset}
         onEdit={canEditAsset ? handleEditAsset : undefined}
         onDelete={canDeleteAsset ? handleDeleteAsset : undefined}
@@ -519,6 +533,8 @@ export function AssetsManagement() {
         bulkActions={bulkActions}
         loading={assetsLoading}
         onExport={handleExport}
+        showSearch={false}
+        showFilters={false}
         emptyMessage="No assets found. Create your first asset to get started."
         usePagination="backend"
         paginationData={{
@@ -529,6 +545,36 @@ export function AssetsManagement() {
         }}
         onPageChange={handlePageChange}
         onPageSizeChange={handlePageSizeChange}
+        extraControls={
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Input
+                placeholder="Search assets..."
+                value={assetSearch}
+                onChange={(e) => setAssetSearch(e.target.value)}
+                className="pl-9 w-56 rounded-full"
+              />
+            </div>
+            <Select
+              value={assetStatusFilter || "all"}
+              onValueChange={(val) => {
+                setAssetStatusFilter(val === "all" ? "" : val)
+                setPagination(p => ({ ...p, page: 1 }))
+              }}
+            >
+              <SelectTrigger className="w-44 rounded-full">
+                <SelectValue placeholder="All Statuses" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="IN_USE">In Use</SelectItem>
+                <SelectItem value="DISPOSED">Disposed</SelectItem>
+                <SelectItem value="UNDER_MAINTENANCE">Under Maintenance</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        }
       />
       )}
 

@@ -49,6 +49,24 @@ export function VatReportView() {
     return (num ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   }
 
+  const handleExport = (rows: any[]) => {
+    const csvContent = [
+      ['Date', 'Reference', 'Invoice #', 'Customer', 'Description', 'Type', 'Amount', 'VAT Amount'].join(','),
+      ...rows.map(r => [
+        r.date || '', r.reference || '', r.invoiceNumber || '', r.customerName || '',
+        `"${(r.description || '').replace(/"/g, '""')}"`, r.type || '', r.amount || 0, r.vatAmount || 0
+      ].join(','))
+    ].join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv' })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `vat-output-tax-audit-${format(startDate, 'yyyy-MM-dd')}-${format(endDate, 'yyyy-MM-dd')}.csv`
+    a.click()
+    window.URL.revokeObjectURL(url)
+    toast.success(`Exported ${rows.length} records`)
+  }
+
   const lines: any[] = data?.lines || []
   const totalOutputTax = data?.totalOutputTax ?? 0
   const period = data?.period
@@ -177,6 +195,7 @@ export function VatReportView() {
         searchPlaceholder="Search by invoice, customer, reference..."
         loading={loading}
         emptyMessage="Select a date range and click Generate to view the VAT output tax audit."
+        onExport={handleExport}
       />
     </div>
   )

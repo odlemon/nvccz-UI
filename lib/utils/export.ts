@@ -1,5 +1,8 @@
 import { format } from 'date-fns'
 import { TrialBalanceData, IncomeStatementData } from '@/lib/api/accounting-api'
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
+import { addLetterhead, addReportInfo } from '@/lib/utils/pdf-letterhead'
 
 export const exportTrialBalanceToCSV = (data: TrialBalanceData) => {
   const headers = [
@@ -49,211 +52,46 @@ export const exportTrialBalanceToCSV = (data: TrialBalanceData) => {
 }
 
 export const exportTrialBalanceToPDF = async (data: TrialBalanceData) => {
-  // Create a printable HTML page for PDF generation
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2
-    }).format(amount)
-  }
+  const formatAmount = (amount: number) =>
+    Number(amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
-  const htmlContent = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>Trial Balance - ${format(new Date(data.date), 'MMMM d, yyyy')}</title>
-      <style>
-        body {
-          font-family: Arial, sans-serif;
-          margin: 0;
-          padding: 20px;
-          font-size: 12px;
-          line-height: 1.4;
-        }
-        .header {
-          text-align: center;
-          margin-bottom: 30px;
-          border-bottom: 2px solid #333;
-          padding-bottom: 20px;
-        }
-        .header h1 {
-          margin: 0 0 10px 0;
-          font-size: 28px;
-          color: #333;
-        }
-        .header p {
-          margin: 5px 0;
-          color: #666;
-          font-size: 14px;
-        }
-        .status {
-          display: inline-block;
-          margin: 10px 0;
-          padding: 8px 16px;
-          border-radius: 20px;
-          font-weight: bold;
-          font-size: 14px;
-          ${data.totals.isBalanced
-      ? 'background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb;'
-      : 'background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb;'
-    }
-        }
-        .table-container {
-          margin-top: 20px;
-        }
-        table {
-          width: 100%;
-          border-collapse: collapse;
-          margin-top: 10px;
-        }
-        th, td {
-          border: 1px solid #ddd;
-          padding: 10px 8px;
-          text-align: left;
-        }
-        th {
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          color: white;
-          font-weight: bold;
-          font-size: 11px;
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
-        }
-        .account-no {
-          font-family: 'Courier New', monospace;
-          font-weight: bold;
-          color: #2563eb;
-        }
-        .account-name {
-          font-weight: 600;
-          color: #111827;
-        }
-        .account-type {
-          background-color: #f3f4f6;
-          padding: 4px 8px;
-          border-radius: 12px;
-          font-size: 10px;
-          display: inline-block;
-        }
-        .text-right {
-          text-align: right;
-        }
-        .debit {
-          color: #16a34a;
-          font-weight: bold;
-        }
-        .credit {
-          color: #dc2626;
-          font-weight: bold;
-        }
-        .zero-balance {
-          color: #6b7280;
-        }
-        .totals-row {
-          background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
-          font-weight: bold;
-          font-size: 14px;
-        }
-        .totals-label {
-          font-size: 16px;
-          letter-spacing: 1px;
-          color: #374151;
-        }
-        .footer {
-          margin-top: 40px;
-          text-align: center;
-          font-size: 10px;
-          color: #6b7280;
-          border-top: 1px solid #e5e7eb;
-          padding-top: 20px;
-        }
-        tr:nth-child(even) {
-          background-color: #f9fafb;
-        }
-        tr:hover {
-          background-color: #eff6ff;
-        }
-        @media print {
-          body { margin: 0; }
-          .no-print { display: none; }
-          @page { margin: 0.5in; }
-        }
-      </style>
-    </head>
-    <body>
-      <div class="header">
-        <h1>Trial Balance</h1>
-        <p>As of ${format(new Date(data.date), 'MMMM d, yyyy')}</p>
-        <div class="status">
-          ${data.totals.isBalanced ? '✓ BALANCED' : '⚠ UNBALANCED'}
-        </div>
-      </div>
+  const currencyCode = (data as any)?.currency?.code || 'USD'
+  const doc = new jsPDF()
 
-      <div class="table-container">
-        <table>
-          <thead>
-            <tr>
-              <th>Account No.</th>
-              <th>Account Name</th>
-              <th>Account Type</th>
-              <th class="text-right">Debit Balance</th>
-              <th class="text-right">Credit Balance</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${data.accounts.map((account: any) => `
-              <tr>
-                <td class="account-no">${account.accountNo}</td>
-                <td class="account-name">${account.accountName}</td>
-                <td><span class="account-type">${account.accountType}</span></td>
-                <td class="text-right ${account.debitBalance > 0 ? 'debit' : 'zero-balance'}">
-                  ${formatCurrency(account.debitBalance || 0)}
-                </td>
-                <td class="text-right ${account.creditBalance > 0 ? 'credit' : 'zero-balance'}">
-                  ${formatCurrency(account.creditBalance || 0)}
-                </td>
-              </tr>
-            `).join('')}
-            <tr class="totals-row">
-              <td colspan="3" class="totals-label">TOTALS</td>
-              <td class="text-right debit">${formatCurrency(data.totals.totalDebits)}</td>
-              <td class="text-right credit">${formatCurrency(data.totals.totalCredits)}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+  let startY = await addLetterhead(doc, 'Trial Balance')
+  startY = addReportInfo(doc, startY, [
+    `As of ${format(new Date(data.date), 'MMMM d, yyyy')}`,
+    `Currency: ${currencyCode}`,
+    `Status: ${data.totals.isBalanced ? 'Balanced' : 'Unbalanced'}`,
+  ])
 
-      <div class="footer">
-        <p>Generated on ${format(new Date(), 'PPP p')}</p>
-        <p>Total Accounts: ${data.accounts.length} | Balance Difference: ${data.totals.isBalanced ? '$0.00' : 'Unbalanced'}</p>
-      </div>
+  const rows: any[] = data.accounts.map((account: any) => [
+    account.accountNo,
+    account.accountName,
+    account.accountType,
+    formatAmount(account.debitBalance),
+    formatAmount(account.creditBalance),
+  ])
 
-      <script>
-        window.onload = function() {
-          // Auto-print to PDF
-          setTimeout(() => {
-            window.print();
-            // Auto-close after printing
-            setTimeout(() => {
-              window.close();
-            }, 1000);
-          }, 100);
-        }
-      </script>
-    </body>
-    </html>
-  `
+  rows.push([
+    { content: 'TOTALS', colSpan: 3, styles: { fontStyle: 'bold' } },
+    { content: formatAmount(data.totals.totalDebits), styles: { fontStyle: 'bold', textColor: [21, 128, 61] } },
+    { content: formatAmount(data.totals.totalCredits), styles: { fontStyle: 'bold', textColor: [220, 38, 38] } },
+  ])
 
-  // Open print-ready version for PDF download
-  const printWindow = window.open('', '_blank', 'width=800,height=600')
-  if (printWindow) {
-    printWindow.document.write(htmlContent)
-    printWindow.document.close()
-    printWindow.focus()
-  } else {
-    throw new Error('Popup blocked. Please allow popups to generate PDF.')
-  }
+  autoTable(doc, {
+    head: [['Account No.', 'Account Name', 'Account Type', 'Debit Balance', 'Credit Balance']],
+    body: rows,
+    startY,
+    styles: { fontSize: 9, cellPadding: 2 },
+    headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255] },
+    columnStyles: {
+      3: { halign: 'right' },
+      4: { halign: 'right' },
+    },
+  })
+
+  doc.save(`TrialBalance_${data.date}.pdf`)
 }
 
 export const exportIncomeStatementToPDF = async (data: IncomeStatementData) => {

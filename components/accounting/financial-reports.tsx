@@ -48,7 +48,7 @@ const tabs = [
     id: "creditors-age",
     label: "Creditors Age Analysis",
     icon: Users,
-    description: "Accounts Payable Aging",
+    description: "Purchase Invoices Aging",
     gradient: "from-orange-400 to-orange-600"
   },
   {

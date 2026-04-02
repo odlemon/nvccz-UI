@@ -17,7 +17,8 @@ import { ReconciliationHeaderForm } from "./reconciliation-header-form"
 import { ReconciliationEntriesTable } from "./reconciliation-entries-table"
 import { ReconciliationTotalsFooter } from "./reconciliation-totals-footer"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, Save, CheckCircle, XCircle, Loader2 } from "lucide-react"
+import { ArrowLeft, Save, CheckCircle, XCircle, Loader2, Download } from "lucide-react"
+import { format, parseISO } from "date-fns"
 import { toast } from "sonner"
 import {
   AlertDialog,
@@ -40,6 +41,7 @@ export function ReconciliationWorkspace({ selectedBank, onBack }: Reconciliation
   const dispatch = useDispatch<AppDispatch>()
   const {
     activeSession,
+    entries,
     statementDate,
     statementEndBalance,
     reference,
@@ -158,6 +160,30 @@ export function ReconciliationWorkspace({ selectedBank, onBack }: Reconciliation
     }
   }, [dispatch, activeSession, onBack])
 
+  const handleExport = useCallback(() => {
+    const selectedSet = new Set(selectedEntryIds)
+    const csvContent = [
+      ['Date', 'Reference', 'Name', 'Type', 'Received', 'Paid', 'Reconciled'].join(','),
+      ...entries.map(e => [
+        e.transactionDate ? format(parseISO(e.transactionDate), 'yyyy-MM-dd') : '',
+        e.reference || '',
+        `"${(e.counterparty || '').replace(/"/g, '""')}"`,
+        e.type,
+        e.received || 0,
+        e.paid || 0,
+        selectedSet.has(e.id) ? 'Yes' : 'No',
+      ].join(','))
+    ].join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv' })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `bank-reconciliation-${statementDate || 'export'}.csv`
+    a.click()
+    window.URL.revokeObjectURL(url)
+    toast.success('Reconciliation exported')
+  }, [entries, selectedEntryIds, statementDate])
+
   const handleBack = () => {
     dispatch(clearActiveSession())
     onBack()
@@ -183,10 +209,16 @@ export function ReconciliationWorkspace({ selectedBank, onBack }: Reconciliation
 
       {/* Action Buttons */}
       <div className="flex items-center justify-between bg-white border rounded-lg p-4">
-        <Button variant="outline" onClick={handleBack} disabled={isBusy} className="rounded-full">
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Sessions
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={handleBack} disabled={isBusy} className="rounded-full">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Sessions
+          </Button>
+          <Button variant="outline" onClick={handleExport} disabled={entries.length === 0} className="rounded-full">
+            <Download className="w-4 h-4 mr-2" />
+            Export
+          </Button>
+        </div>
 
         {activeSession?.status !== "FINALIZED" && (
           <div className="flex items-center gap-3">
