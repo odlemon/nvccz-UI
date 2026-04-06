@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useAppSelector } from "@/lib/store"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import type { IconType } from "react-icons"
 import { Button } from "@/components/ui/button"
@@ -26,6 +25,7 @@ import { ApplicationTimeline } from "./application-timeline"
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, LineChart, Line, AreaChart, Area } from 'recharts'
 import { DashboardSkeleton } from "@/components/ui/skeleton-loader"
 import { InitiateFundDisbursementDialog } from "./initiate-fund-disbursement-dialog"
+import { applicationsApi } from "@/lib/api/applications-api"
 
 export type Application = {
   id: string
@@ -59,8 +59,7 @@ export type Application = {
 }
 
 export function ApplicationsDashboard() {
-  const token = useAppSelector((s) => s.auth.token)
-  const [applications, setApplications] = useState<Application[]>([])
+const [applications, setApplications] = useState<Application[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -70,36 +69,22 @@ export function ApplicationsDashboard() {
   const [selectedApplicationForDisbursement, setSelectedApplicationForDisbursement] = useState<Application | null>(null)
 
   // Fetch applications data
-  useEffect(() => {
-    const fetchApplications = async () => {
-      try {
-        setLoading(true)
-        setError(null)
-        const res = await fetch("http://31.220.82.129:3010/api/applications", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        })
-        
-        if (!res.ok) {
-          throw new Error(`HTTP error! status: ${res.status}`)
-        }
-        
-        const data = await res.json()
-        setApplications(data.data?.applications || [])
-      } catch (error: any) {
-        console.error("Error fetching applications:", error)
-        setError(error.message)
-      } finally {
-        setLoading(false)
-      }
+  const loadApplications = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      const res = await applicationsApi.getAll()
+      setApplications(res.data?.applications || [])
+    } catch (err: any) {
+      setError(err.message || "Failed to load applications")
+    } finally {
+      setLoading(false)
     }
+  }
 
-    if (token) {
-      fetchApplications()
-    }
-  }, [token])
+  useEffect(() => {
+    loadApplications()
+  }, [refreshTrigger])
 
   // Calculate actual statistics
   const calculateStats = () => {
@@ -292,7 +277,7 @@ export function ApplicationsDashboard() {
   const handleFundDisbursementSuccess = () => {
     setShowInitiateFundDisbursementDialog(false)
     setSelectedApplicationForDisbursement(null)
-    fetchApplications()
+    loadApplications()
   }
 
   // Calculate real monthly data for the current year

@@ -54,13 +54,13 @@ const StepperProgress = ({ currentStep }: StepperProgressProps) => {
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.1 }}
-              className="flex items-start gap-3 p-2 rounded-xl hover:bg-gray-50 transition-all duration-300 cursor-pointer"
+              className="flex flex-col items-center text-center p-3 rounded-xl hover:bg-gray-50 transition-all duration-300 cursor-pointer"
             >
-              {/* Icon Column */}
+              {/* Icon */}
               <motion.div
-                className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-300 ${
-                  status === 'completed' 
-                    ? 'bg-gradient-to-br from-green-100 to-emerald-200 text-green-600 shadow-sm' 
+                className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 mb-2 transition-all duration-300 ${
+                  status === 'completed'
+                    ? 'bg-gradient-to-br from-green-100 to-emerald-200 text-green-600 shadow-sm'
                     : status === 'current'
                       ? 'bg-gradient-to-br from-blue-100 to-indigo-200 text-blue-600 shadow-sm'
                       : 'bg-gradient-to-br from-gray-100 to-slate-200 text-gray-400 shadow-sm'
@@ -71,9 +71,9 @@ const StepperProgress = ({ currentStep }: StepperProgressProps) => {
                 <Icon className="w-5 h-5" />
               </motion.div>
 
-              {/* Content Column */}
-              <div className="flex-1 ">
-                <h3 className={`text-sm font-normal mb-1 ${
+              {/* Content */}
+              <div>
+                <h3 className={`text-sm font-semibold mb-1 ${
                   status === 'current' ? 'text-blue-600' : 'text-gray-700'
                 }`}>
                   {step.title}

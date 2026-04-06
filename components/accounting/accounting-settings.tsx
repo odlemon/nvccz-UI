@@ -8,7 +8,8 @@ import {
   TrendingUp,
   Calculator,
   Tag,
-  Landmark
+  Landmark,
+  Percent
 } from "lucide-react"
 import { ExchangeRatesManagement } from "./exchange-rates-management"
 import { cn } from "@/lib/utils"
@@ -17,6 +18,7 @@ import { ChartOfAccountsManagement } from "./chart-of-accounts-management"
 import { ExpenseCategoriesManagement } from "./expense-categories-management"
 import { BankAccountsManagement } from "./bank-accounts-management"
 import { AccountingSettingsSkeleton } from "./accounting-settings-skeleton"
+import { VatRatesManagement } from "./vat-rates-management"
 
 const tabs = [
   {
@@ -28,7 +30,7 @@ const tabs = [
   },
   {
     id: "exchange-rates",
-    label: "Exchange Rates", 
+    label: "Exchange Rates",
     icon: TrendingUp,
     description: "Configure exchange rates",
     gradient: "from-green-400 to-green-600"
@@ -53,6 +55,13 @@ const tabs = [
     icon: Landmark,
     description: "Manage bank accounts",
     gradient: "from-teal-400 to-teal-600"
+  },
+  {
+    id: "vat-rates",
+    label: "VAT Rates",
+    icon: Percent,
+    description: "Manage VAT rates",
+    gradient: "from-orange-400 to-orange-600"
   }
 ]
 
@@ -76,6 +85,8 @@ export function AccountingSettings() {
         return <ExpenseCategoriesManagement />
       case "bank-accounts":
         return <BankAccountsManagement />
+      case "vat-rates":
+        return <VatRatesManagement />
       default:
         return <CurrenciesManagement />
     }
