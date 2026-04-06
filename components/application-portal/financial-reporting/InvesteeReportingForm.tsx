@@ -191,6 +191,17 @@ export function InvesteeReportingForm() {
   const startDateObj = formData.periodStart ? new Date(formData.periodStart + "T00:00:00") : undefined
   const endDateObj   = formData.periodEnd   ? new Date(formData.periodEnd   + "T00:00:00") : undefined
 
+  // Year labels derived from the reporting period end date
+  // Income Statement: 3 years (current, prior-1, prior-2)
+  // Balance Sheet / Cash Flow: 2 years (current, prior)
+  const currentYear = endDateObj ? endDateObj.getFullYear() : new Date().getFullYear()
+  const incomeYears: [string, string, string] = [
+    String(currentYear),
+    String(currentYear - 1),
+    String(currentYear - 2),
+  ]
+  const bsYears: [string, string] = [String(currentYear), String(currentYear - 1)]
+
   // Load draft on mount
   useEffect(() => {
     try {
@@ -425,18 +436,38 @@ export function InvesteeReportingForm() {
           </div>
         </CardHeader>
 
-        <CardContent className="pt-6">
+        <CardContent className="pt-4 px-0">
           {activeTab === "income" && (
-            <IncomeStatementTab data={formData.incomeStatement} onChange={updateIncome} readOnly={isLocked} />
+            <IncomeStatementTab
+              data={formData.incomeStatement}
+              onChange={updateIncome}
+              readOnly={isLocked}
+              years={incomeYears}
+            />
           )}
           {activeTab === "balance" && (
-            <BalanceSheetTab data={formData.balanceSheet} onChange={updateBalance} readOnly={isLocked} />
+            <BalanceSheetTab
+              data={formData.balanceSheet}
+              incomeStatement={formData.incomeStatement}
+              onChange={updateBalance}
+              readOnly={isLocked}
+              years={bsYears}
+            />
           )}
           {activeTab === "cashflow" && (
-            <CashFlowTab data={formData.cashFlow} onChange={updateCashFlow} readOnly={isLocked} />
+            <CashFlowTab
+              data={formData.cashFlow}
+              onChange={updateCashFlow}
+              readOnly={isLocked}
+              years={bsYears}
+            />
           )}
           {activeTab === "kpis" && (
-            <NonFinancialKPIsTab data={formData.nonFinancialKPIs} onChange={updateKPIs} readOnly={isLocked} />
+            <NonFinancialKPIsTab
+              data={formData.nonFinancialKPIs}
+              onChange={updateKPIs}
+              readOnly={isLocked}
+            />
           )}
         </CardContent>
       </Card>
