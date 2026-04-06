@@ -23,6 +23,7 @@ import * as yup from "yup"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
 import { FileText, Download, Upload, Check, ChevronRight, ChevronLeft, Loader2, Eye } from "lucide-react"
+import Image from "next/image"
 import Step1 from "@/app/portfolio/applications/components/Step1"
 import Step2 from "@/app/portfolio/applications/components/Step2"
 import Step3 from "@/app/portfolio/applications/components/Step3"
@@ -172,6 +173,9 @@ export default function ApplicationFormPage() {
         {/* Header */}
         <div className="mb-8">
           <div className="text-center">
+            <div className="flex justify-center mb-4">
+              <Image src="/logo.png" alt="Logo" width={160} height={56} className="object-contain" priority />
+            </div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Investment Application</h1>
             <p className="text-gray-600">Complete your application in 3 simple steps</p>
           </div>

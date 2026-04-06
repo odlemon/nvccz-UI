@@ -294,7 +294,7 @@ export function IncomeStatementView() {
             className={cn(
               "flex items-center justify-between rounded-full cursor-pointer",
               c.id === currencyId && "bg-blue-100"
-            )}
+            )}git
           >
             <span>{c.code}</span>
             {c.id === currencyId && <Check className="w-4 h-4 text-blue-600" />}

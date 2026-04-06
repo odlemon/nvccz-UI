@@ -423,6 +423,12 @@ export interface CalculateDepreciationRequest {
   period: string
 }
 
+export interface BackfillDepreciationRequest {
+  startDate: string
+  endDate: string
+  autoPost: boolean
+}
+
 export interface DisposeAssetRequest {
   disposalDate: string
   disposalAmount: number
@@ -1397,6 +1403,10 @@ class AccountingApiService {
     return apiClient.post<AccountingResponse<DepreciationRecord>>(`/accounting/assets/${id}/depreciation`, data)
   }
 
+  async backfillDepreciation(id: string, data: BackfillDepreciationRequest): Promise<AccountingResponse<any>> {
+    return apiClient.post<AccountingResponse<any>>(`/accounting/assets/${id}/depreciation/backfill`, data)
+  }
+
   // Post depreciation
   async postDepreciation(depreciationId: string): Promise<AccountingResponse<void>> {
     return apiClient.post<AccountingResponse<void>>(`/accounting/assets/depreciation/${depreciationId}/post`, {})
@@ -1956,9 +1966,51 @@ class AccountingApiService {
     return apiClient.get<AccountingResponse<any>>(`/accounting/multi-currency/reports/unrealized-fx${query}`)
   }
 
+  // VAT Rates
+  async getVatRates(): Promise<AccountingResponse<VatRate[]>> {
+    return apiClient.get<AccountingResponse<VatRate[]>>('/accounting/vat-rates')
+  }
+
+  async getActiveVatRate(): Promise<AccountingResponse<VatRate>> {
+    return apiClient.get<AccountingResponse<VatRate>>('/accounting/vat-rates/active')
+  }
+
+  async createVatRate(data: CreateVatRateRequest): Promise<AccountingResponse<VatRate>> {
+    return apiClient.post<AccountingResponse<VatRate>>('/accounting/vat-rates', data)
+  }
+
+  async updateVatRate(id: string, data: UpdateVatRateRequest): Promise<AccountingResponse<VatRate>> {
+    return apiClient.put<AccountingResponse<VatRate>>(`/accounting/vat-rates/${id}`, data)
+  }
+
+  async setActiveVatRate(id: string): Promise<AccountingResponse<VatRate>> {
+    return apiClient.post<AccountingResponse<VatRate>>(`/accounting/vat-rates/${id}/set-active`, {})
+  }
+
 }
 
 export const accountingApi = new AccountingApiService()
+
+export interface VatRate {
+  id: string
+  name: string
+  rateDecimal: string
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CreateVatRateRequest {
+  name: string
+  rateDecimal: number
+  isActive?: boolean
+}
+
+export interface UpdateVatRateRequest {
+  name: string
+  rateDecimal: number
+  isActive: boolean
+}
 
 
 

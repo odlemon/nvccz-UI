@@ -1,29 +1,20 @@
 "use client"
 
-import { useState } from "react"
+import { Fragment, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { CalendarIcon, RefreshCw, Loader2, Info } from "lucide-react"
+import { CalendarIcon, RefreshCw, Loader2, ChevronDown, ChevronRight } from "lucide-react"
 import { format } from "date-fns"
 import { toast } from "sonner"
 import { accountingApi } from "@/lib/api/accounting-api"
-import { ProcurementDataTable, Column } from "../procurement/procurement-data-table"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
 
 export function CreditorsAgeAnalysis() {
   const [asOfDate, setAsOfDate] = useState<Date>(new Date())
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<any>(null)
+  const [expandedVendors, setExpandedVendors] = useState<Set<string>>(new Set())
 
   const handleGenerate = async () => {
     setLoading(true)
@@ -31,6 +22,7 @@ export function CreditorsAgeAnalysis() {
       const response = await accountingApi.getCreditorsAgeAnalysis(format(asOfDate, "yyyy-MM-dd"))
       if (response.success && response.data) {
         setData(response.data)
+        setExpandedVendors(new Set())
       } else {
         throw new Error(response.error || "Failed to load report")
       }
@@ -41,30 +33,22 @@ export function CreditorsAgeAnalysis() {
     }
   }
 
-  const formatAmount = (val: number | string) => {
-    const num = typeof val === "string" ? parseFloat(val) : val
-    return (num ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const fmt = (val: number | string | null | undefined) => {
+    const num = typeof val === "string" ? parseFloat(val) : (val ?? 0)
+    return num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   }
 
-  const handleExport = (rows: any[]) => {
-    const csvContent = [
-      ['Invoice #', 'Vendor', 'Description', 'Due Date', 'Currency', 'Outstanding', 'Days Past Due', 'Bucket'].join(','),
-      ...rows.map(r => [
-        r.invoiceNumber, r.vendorName, `"${(r.description || '').replace(/"/g, '""')}"`,
-        r.dueDate || '', r.currencyCode, r.outstandingAmount, r.daysPastDue, r.reportColumnTitle || r.bucket
-      ].join(','))
-    ].join('\n')
-    const blob = new Blob([csvContent], { type: 'text/csv' })
-    const url = window.URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `creditors-age-analysis-${format(asOfDate, 'yyyy-MM-dd')}.csv`
-    a.click()
-    window.URL.revokeObjectURL(url)
-    toast.success(`Exported ${rows.length} records`)
+  const toggleVendor = (vendorId: string) => {
+    setExpandedVendors(prev => {
+      const next = new Set(prev)
+      if (next.has(vendorId)) next.delete(vendorId)
+      else next.add(vendorId)
+      return next
+    })
   }
 
-  const lines: any[] = data?.lines || []
+  const vendors: any[] = data?.vendors || []
+  const grandTotal = data?.grandTotal
   const totalsByCurrency: Record<string, any> = data?.totalsByCurrency || {}
   const bucketLabels = data?.bucketShortColumnTitles || {
     current: "Current",
@@ -74,74 +58,8 @@ export function CreditorsAgeAnalysis() {
     over90: "Over 90",
   }
 
-  const getBucketColor = (bucket: string) => {
-    switch (bucket) {
-      case "current": return "bg-green-100 text-green-800"
-      case "days1To30": return "bg-yellow-100 text-yellow-800"
-      case "days31To60": return "bg-orange-100 text-orange-800"
-      case "days61To90": return "bg-red-100 text-red-800"
-      case "over90": return "bg-red-200 text-red-900"
-      default: return "bg-gray-100 text-gray-800"
-    }
-  }
-
-  const columns: Column<any>[] = [
-    {
-      key: "invoiceNumber",
-      label: "Invoice #",
-      sortable: true,
-      render: (value) => <span className="font-mono text-sm">{value || "-"}</span>,
-    },
-    {
-      key: "vendorName",
-      label: "Vendor",
-      sortable: true,
-    },
-    {
-      key: "description",
-      label: "Description",
-      sortable: false,
-      render: (value) => <span className="text-sm max-w-[200px] truncate block">{value || "-"}</span>,
-    },
-    {
-      key: "dueDate",
-      label: "Due Date",
-      sortable: true,
-      render: (value) => <span className="text-sm">{value || "-"}</span>,
-    },
-    {
-      key: "currencyCode",
-      label: "Currency",
-      sortable: true,
-      render: (value) => <Badge variant="outline" className="text-xs">{value}</Badge>,
-    },
-    {
-      key: "outstandingAmount",
-      label: "Outstanding",
-      sortable: true,
-      render: (value) => <span className="tabular-nums font-medium">{formatAmount(value)}</span>,
-    },
-    {
-      key: "daysPastDue",
-      label: "Days Past Due",
-      sortable: true,
-      render: (value) => (
-        <span className={value > 0 ? "text-red-600 font-medium tabular-nums" : "text-green-600 tabular-nums"}>
-          {value}
-        </span>
-      ),
-    },
-    {
-      key: "bucket",
-      label: "Bucket",
-      sortable: true,
-      render: (value, row) => (
-        <Badge className={getBucketColor(value)}>
-          {row.reportColumnTitle || value}
-        </Badge>
-      ),
-    },
-  ]
+  const thCls = "text-xs font-semibold text-gray-600 px-3 py-3 whitespace-nowrap"
+  const tdAmt = "text-right tabular-nums px-3 py-3"
 
   return (
     <div className="space-y-4">
@@ -164,61 +82,180 @@ export function CreditorsAgeAnalysis() {
         </Button>
       </div>
 
-      {/* Info note */}
-      {data?.liabilityGlNote && (
-        <div className="flex items-start gap-2 text-sm text-gray-500 bg-blue-50 p-3 rounded-lg">
-          <Info className="w-4 h-4 mt-0.5 shrink-0 text-blue-500" />
-          <span>{data.liabilityGlNote}</span>
+      {/* Report card */}
+      <Card className="overflow-hidden">
+        {/* Report header */}
+        <div className="px-6 pt-5 pb-4 border-b">
+          <h2 className="text-2xl font-bold text-gray-900">Aged Creditors</h2>
+          {data?.asOfDate ? (
+            <p className="text-sm text-gray-500 mt-0.5">
+              As at {format(new Date(data.asOfDate + "T00:00:00"), "dd MMM yy")} ageing by bill date
+            </p>
+          ) : (
+            <p className="text-sm text-gray-400 mt-0.5">Select a date and click Generate</p>
+          )}
         </div>
-      )}
 
-      {/* Invoice Lines Data Table */}
-      <ProcurementDataTable
-        data={lines}
-        columns={columns}
-        title="Creditors Age Analysis"
-        searchPlaceholder="Search by invoice, vendor..."
-        loading={loading}
-        emptyMessage="Select a date and click Generate to view the creditors age analysis."
-        onExport={handleExport}
-      />
+        <CardContent className="p-0">
+          {/* Fixed-height scrollable area — totals stick to bottom */}
+          <div
+            className="overflow-auto"
+            style={{ height: "calc(100vh - 300px)", minHeight: "420px" }}
+          >
+            <table className="w-full text-sm border-collapse">
+              {/* Sticky column headers */}
+              <thead className="sticky top-0 z-10 bg-white border-b">
+                <tr>
+                  <th className={`text-left ${thCls} w-[240px]`}>Supplier/Bill</th>
+                  <th className={`text-left ${thCls}`}>Bill date</th>
+                  <th className={`text-left ${thCls}`}>Due date</th>
+                  <th className={`text-right ${thCls}`}>Total</th>
+                  <th className={`text-right ${thCls}`}>VAT</th>
+                  <th className={`text-right ${thCls}`}>{bucketLabels.current}</th>
+                  <th className={`text-right ${thCls}`}>{bucketLabels.days1To30}</th>
+                  <th className={`text-right ${thCls}`}>{bucketLabels.days31To60}</th>
+                  <th className={`text-right ${thCls}`}>{bucketLabels.days61To90}</th>
+                  <th className={`text-right ${thCls}`}>{bucketLabels.over90}</th>
+                </tr>
+              </thead>
 
-      {/* Totals by Currency */}
-      {Object.keys(totalsByCurrency).length > 0 && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Totals by Currency</CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-gray-50">
-                  <TableHead>Currency</TableHead>
-                  <TableHead className="text-right">{bucketLabels.current}</TableHead>
-                  <TableHead className="text-right">{bucketLabels.days1To30}</TableHead>
-                  <TableHead className="text-right">{bucketLabels.days31To60}</TableHead>
-                  <TableHead className="text-right">{bucketLabels.days61To90}</TableHead>
-                  <TableHead className="text-right">{bucketLabels.over90}</TableHead>
-                  <TableHead className="text-right font-semibold">Total</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {Object.entries(totalsByCurrency).map(([currency, totals]: [string, any]) => (
-                  <TableRow key={currency}>
-                    <TableCell className="font-medium">{currency}</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatAmount(totals.current)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatAmount(totals.days1To30)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatAmount(totals.days31To60)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatAmount(totals.days61To90)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatAmount(totals.over90)}</TableCell>
-                    <TableCell className="text-right tabular-nums font-bold">{formatAmount(totals.total)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
+              <tbody>
+                {loading && (
+                  <tr>
+                    <td colSpan={10} className="text-center py-20">
+                      <Loader2 className="w-6 h-6 animate-spin mx-auto text-gray-400" />
+                    </td>
+                  </tr>
+                )}
+
+                {!loading && vendors.length === 0 && (
+                  <tr>
+                    <td colSpan={10} className="text-center py-20 text-gray-400 text-sm">
+                      No data available. Select a date and click Generate.
+                    </td>
+                  </tr>
+                )}
+
+                {vendors.map((vendor) => {
+                  const isExpanded = expandedVendors.has(vendor.vendorId)
+                  return (
+                    <Fragment key={vendor.vendorId}>
+                      {/* Vendor summary row */}
+                      <tr
+                        className="border-b cursor-pointer hover:bg-gray-50 transition-colors"
+                        onClick={() => toggleVendor(vendor.vendorId)}
+                      >
+                        <td className="px-4 py-3 font-medium text-blue-600">
+                          <div className="flex items-center gap-1.5">
+                            {isExpanded
+                              ? <ChevronDown className="w-4 h-4 shrink-0 text-gray-400" />
+                              : <ChevronRight className="w-4 h-4 shrink-0 text-gray-400" />
+                            }
+                            {vendor.vendorName}
+                          </div>
+                        </td>
+                        <td className="px-3 py-3" />
+                        <td className="px-3 py-3" />
+                        <td className={`${tdAmt} font-medium`}>{fmt(vendor.total)}</td>
+                        <td className={tdAmt}>{fmt(vendor.vatTotal)}</td>
+                        <td className={tdAmt}>{fmt(vendor.current)}</td>
+                        <td className={tdAmt}>{fmt(vendor.days1To30)}</td>
+                        <td className={tdAmt}>{fmt(vendor.days31To60)}</td>
+                        <td className={tdAmt}>{fmt(vendor.days61To90)}</td>
+                        <td className={tdAmt}>{fmt(vendor.over90)}</td>
+                      </tr>
+
+                      {/* Expanded individual bill rows */}
+                      {isExpanded && vendor.bills?.map((bill: any) => (
+                        <tr
+                          key={bill.purchaseInvoiceId}
+                          className="border-b bg-gray-50/50 text-gray-600"
+                        >
+                          <td className="pl-11 pr-3 py-2 text-xs">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono">{bill.invoiceNumber}</span>
+                              {bill.currencyCode && (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-200 text-gray-700 shrink-0">
+                                  {bill.currencyCode}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-3 py-2 text-xs">{bill.invoiceDate || "–"}</td>
+                          <td className="px-3 py-2 text-xs">{bill.dueDate || "–"}</td>
+                          <td className="text-right tabular-nums px-3 py-2 text-xs">{fmt(bill.outstandingAmount)}</td>
+                          <td className="text-right tabular-nums px-3 py-2 text-xs">{fmt(bill.vatAmount)}</td>
+                          <td className="text-right tabular-nums px-3 py-2 text-xs">
+                            {bill.bucket === "current" ? fmt(bill.outstandingAmount) : "–"}
+                          </td>
+                          <td className="text-right tabular-nums px-3 py-2 text-xs">
+                            {bill.bucket === "days1To30" ? fmt(bill.outstandingAmount) : "–"}
+                          </td>
+                          <td className="text-right tabular-nums px-3 py-2 text-xs">
+                            {bill.bucket === "days31To60" ? fmt(bill.outstandingAmount) : "–"}
+                          </td>
+                          <td className="text-right tabular-nums px-3 py-2 text-xs">
+                            {bill.bucket === "days61To90" ? fmt(bill.outstandingAmount) : "–"}
+                          </td>
+                          <td className="text-right tabular-nums px-3 py-2 text-xs">
+                            {bill.bucket === "over90" ? fmt(bill.outstandingAmount) : "–"}
+                          </td>
+                        </tr>
+                      ))}
+                    </Fragment>
+                  )
+                })}
+              </tbody>
+
+              {/* Sticky footer: per-currency totals + Grand Total */}
+              {(grandTotal || Object.keys(totalsByCurrency).length > 0) && (
+                <tfoot className="sticky bottom-0 z-10 bg-white">
+                  {/* Per-currency rows */}
+                  {Object.entries(totalsByCurrency).map(([currency, totals]: [string, any], i) => (
+                    <tr
+                      key={currency}
+                      className={`text-gray-700 text-xs ${i === 0 ? "border-t-2 border-gray-300" : "border-t border-gray-100"}`}
+                    >
+                      <td className="px-4 py-2">
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-700">
+                            {currency}
+                          </span>
+                          <span className="text-gray-400 text-[11px]">subtotal</span>
+                        </div>
+                      </td>
+                      <td />
+                      <td />
+                      <td className="text-right tabular-nums px-3 py-2 font-medium">{fmt(totals.total)}</td>
+                      <td className="text-right tabular-nums px-3 py-2">–</td>
+                      <td className="text-right tabular-nums px-3 py-2">{fmt(totals.current)}</td>
+                      <td className="text-right tabular-nums px-3 py-2">{fmt(totals.days1To30)}</td>
+                      <td className="text-right tabular-nums px-3 py-2">{fmt(totals.days31To60)}</td>
+                      <td className="text-right tabular-nums px-3 py-2">{fmt(totals.days61To90)}</td>
+                      <td className="text-right tabular-nums px-3 py-2">{fmt(totals.over90)}</td>
+                    </tr>
+                  ))}
+                  {/* Grand Total */}
+                  {grandTotal && (
+                    <tr className="font-bold text-gray-900 border-t-2 border-gray-400">
+                      <td className="px-4 py-3 text-sm">Grand Total</td>
+                      <td />
+                      <td />
+                      <td className={tdAmt}>{fmt(grandTotal.total)}</td>
+                      <td className={tdAmt}>{fmt(grandTotal.vatTotal)}</td>
+                      <td className={tdAmt}>{fmt(grandTotal.current)}</td>
+                      <td className={tdAmt}>{fmt(grandTotal.days1To30)}</td>
+                      <td className={tdAmt}>{fmt(grandTotal.days31To60)}</td>
+                      <td className={tdAmt}>{fmt(grandTotal.days61To90)}</td>
+                      <td className={tdAmt}>{fmt(grandTotal.over90)}</td>
+                    </tr>
+                  )}
+                </tfoot>
+              )}
+            </table>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

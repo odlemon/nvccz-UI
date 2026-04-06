@@ -1,43 +1,53 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Card } from "@/components/ui/card"
-import { Wallet, Plus, Eye } from "lucide-react"
+import { Plus, Search, ChevronRight, RefreshCw, Wallet } from "lucide-react"
 import { fundsApi, type Fund } from "@/lib/api/funds-api"
 import { FundCreateModal } from "./fund-create-modal"
-import { FundDrawer } from "./fund-drawer"
+import { FundCard } from "./fund-card"
+import { HoldingDetails } from "./holding-details"
+import { FundDetailSections } from "./fund-detail-sections"
 import { toast } from "sonner"
-import { Progress } from "@/components/ui/progress"
 import { useRolePermissions } from "@/lib/hooks/useRolePermissions"
 import { PORTFOLIO_ACTIONS } from "@/lib/config/role-permissions"
 
+function SummaryCard({ title, rows }: { title: string; rows: [string, string][] }) {
+  return (
+    <div className="rounded-2xl border border-border bg-card overflow-hidden">
+      <div className="bg-primary px-5 py-3">
+        <h3 className="text-sm font-semibold text-primary-foreground">{title}</h3>
+      </div>
+      <div className="px-5 py-1 divide-y divide-border">
+        {rows.map(([label, value]) => (
+          <div key={label} className="flex items-center justify-between py-2.5 text-sm">
+            <span className="text-muted-foreground">{label}</span>
+            <span className="font-medium text-card-foreground">{value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export function FundsList() {
   const { hasSpecificAction } = useRolePermissions()
-  const canCreateFund = hasSpecificAction('portfolio-management', PORTFOLIO_ACTIONS.CREATE_FUND)
+  const canCreateFund = hasSpecificAction("portfolio-management", PORTFOLIO_ACTIONS.CREATE_FUND)
 
   const [funds, setFunds] = useState<Fund[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [query, setQuery] = useState("")
-  const [status, setStatus] = useState<string>("all")
-  const [industry, setIndustry] = useState<string>("all")
-  const [currentPage, setCurrentPage] = useState(1)
-  const [itemsPerPage] = useState(6)
+  const [status, setStatus] = useState("all")
+  const [selectedFund, setSelectedFund] = useState<Fund | null>(null)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
-  const [drawerOpen, setDrawerOpen] = useState(false)
-  const [selected, setSelected] = useState<Fund | null>(null)
 
   const loadFunds = async () => {
     try {
       setLoading(true)
-      setError(null)
       const res = await fundsApi.getAll()
       setFunds(res.data.funds || [])
     } catch (e: any) {
-      setError(e?.message || "Failed to load funds")
       toast.error("Failed to load funds", { description: e?.message })
     } finally {
       setLoading(false)
@@ -46,17 +56,17 @@ export function FundsList() {
 
   useEffect(() => { loadFunds() }, [])
 
-  const formatLongDate = (iso: string) => {
-    try {
-      return new Date(iso).toLocaleDateString(undefined, {
-        day: '2-digit',
-        month: 'long',
-        year: 'numeric'
-      })
-    } catch {
-      return iso
+  const stats = useMemo(() => {
+    const totalAUM = funds.reduce((s, f) => s + Number(f.totalAmount), 0)
+    const totalDeployed = funds.reduce((s, f) => s + (Number(f.totalAmount) - Number(f.remainingAmount)), 0)
+    return {
+      totalAUM,
+      totalDeployed,
+      openCount: funds.filter(f => f.status === "OPEN").length,
+      closedCount: funds.filter(f => f.status === "CLOSED").length,
+      pausedCount: funds.filter(f => f.status === "PAUSED").length,
     }
-  }
+  }, [funds])
 
   const allIndustries = useMemo(() => {
     const set = new Set<string>()
@@ -67,200 +77,154 @@ export function FundsList() {
   const filtered = useMemo(() => {
     const q = query.toLowerCase()
     return funds.filter(f => {
-      const matchesQuery = !q || f.name.toLowerCase().includes(q) || f.description.toLowerCase().includes(q)
-      const matchesStatus = status === 'all' || f.status === status
-      const matchesIndustry = industry === 'all' || (f.focusIndustries || []).includes(industry)
-      return matchesQuery && matchesStatus && matchesIndustry
+      const matchQ = !q || f.name.toLowerCase().includes(q) || f.description.toLowerCase().includes(q)
+      const matchS = status === "all" || f.status === status
+      return matchQ && matchS
     })
-  }, [funds, query, status, industry])
+  }, [funds, query, status])
 
-  const totalPages = Math.ceil(filtered.length / itemsPerPage) || 1
-  const startIndex = (currentPage - 1) * itemsPerPage
-  const endIndex = startIndex + itemsPerPage
-  const paginated = filtered.slice(startIndex, endIndex)
-
-  useEffect(() => { setCurrentPage(1) }, [query, status, industry])
+  const toggleFund = (f: Fund) => setSelectedFund(prev => prev?.id === f.id ? null : f)
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-4xl font-normal text-gray-900 flex items-center gap-3">
-            <Wallet className="w-8 h-8" />
-            Fund Management
-          </h1>
-          <p className="text-gray-600 mt-2 text-lg">Filter and review all funds</p>
-        </div>
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* ── Breadcrumb bar ── */}
+      <header className="flex items-center justify-between border-b border-border bg-card px-6 py-3 shrink-0">
+        <nav className="flex items-center gap-1 text-sm text-muted-foreground">
+          <span>Assets</span>
+          <ChevronRight className="h-3.5 w-3.5" />
+          <span>Venture Capital Funds</span>
+          {selectedFund && (
+            <>
+              <ChevronRight className="h-3.5 w-3.5" />
+              <span className="text-card-foreground font-medium">{selectedFund.name}</span>
+            </>
+          )}
+        </nav>
         <div className="flex items-center gap-2">
-          {loading && <span className="text-xs text-gray-500">Refreshing...</span>}
-          <Button
-            variant="outline"
-            className="rounded-full"
-            onClick={loadFunds}
-            disabled={loading}
-          >
+          <Button variant="outline" size="sm" className="rounded-full gap-1.5" onClick={loadFunds} disabled={loading}>
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
             Refresh
           </Button>
           {canCreateFund && (
-            <Button onClick={() => setIsCreateOpen(true)} className="rounded-full gradient-primary text-white font-normal">
-              <Plus className="w-4 h-4 mr-2" />
+            <Button onClick={() => setIsCreateOpen(true)} className="rounded-full gap-1.5 gradient-primary text-white" size="sm">
+              <Plus className="w-4 h-4" />
               Create Fund
             </Button>
           )}
         </div>
-      </div>
+      </header>
 
-      {/* Filters */}
-      <div className="flex flex-col md:flex-row gap-3">
-        <div className="relative flex-1 min-w-[220px]">
-          <Input
-            placeholder="Search funds..."
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className="rounded-full pl-4 h-11 text-base"
-          />
-        </div>
-        <div className="flex gap-3 items-end">
-          <div className="flex flex-col gap-1">
-            <label className="text-sm text-gray-600">Stage</label>
-            <select
-              className="border rounded-full px-4 py-2.5 text-base"
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-            >
-              <option value="all">All</option>
-              <option value="OPEN">OPEN</option>
-              <option value="CLOSED">CLOSED</option>
-              <option value="PAUSED">PAUSED</option>
-            </select>
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-sm text-gray-600">Industry</label>
-            <select
-              className="border rounded-full px-4 py-2.5 text-base"
-              value={industry}
-              onChange={(e) => setIndustry(e.target.value)}
-            >
-              <option value="all">All</option>
-              {allIndustries.map((ind) => (
-                <option key={ind} value={ind}>{ind}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-      </div>
-
-      {/* List */}
-      <div className="space-y-4">
-        {loading && (
-          <div className="space-y-3">
-            {Array.from({ length: itemsPerPage }).map((_, i) => (
-              <div key={i} className="h-20 bg-gray-100 rounded animate-pulse" />
-            ))}
-          </div>
-        )}
-        {!loading && paginated.length === 0 && (
-          <div className="text-center text-gray-600 py-12">No funds found</div>
-        )}
-        {!loading && paginated.map((f) => {
-          const totalDisbursed = (f.fundDisbursements || [])
-            .filter(d => d.status === 'DISBURSED')
-            .reduce((sum, d) => sum + Number(d.amount), 0)
-
-          return (
-            <div
-              key={f.id}
-              className="p-6 rounded-2xl border border-border hover:border-blue-300 hover:shadow-lg transition-all cursor-pointer bg-white relative"
-              onClick={() => { setSelected(f); setDrawerOpen(true) }}
-            >
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute top-4 right-4 rounded-full h-10 w-10 bg-blue-50 text-blue-600 hover:bg-blue-100"
-                onClick={(e) => { e.stopPropagation(); setSelected(f); setDrawerOpen(true) }}
-                aria-label="View"
-              >
-                <Eye className="w-5 h-5" />
-              </Button>
-              <div className="flex items-start justify-between mb-3">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <h4 className="font-medium text-xl">{f.name}</h4>
-                    <Badge variant={f.status === 'OPEN' ? 'default' : 'secondary'} className="text-xs">{f.status}</Badge>
-                  </div>
-                  <p className="text-base text-muted-foreground line-clamp-2">{f.description}</p>
-                  <div className="flex flex-wrap gap-1">
-                    {(f.focusIndustries || []).slice(0, 4).map((ind) => (
-                      <Badge key={ind} variant="secondary" className="text-xs">{ind}</Badge>
-                    ))}
-                  </div>
-                </div>
-                <div className="text-right space-y-2 mt-12">
-                  <div>
-                    <div className="text-xs text-gray-500">Total</div>
-                    <div className="text-base text-purple-700">${Number(f.totalAmount).toLocaleString()}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-gray-500">Remaining</div>
-                    <div className="text-base text-emerald-600">${Number(f.remainingAmount).toLocaleString()}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-gray-500">Disbursed</div>
-                    <div className="text-base text-blue-600">${totalDisbursed.toLocaleString()}</div>
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center justify-between text-sm text-muted-foreground mb-3">
-                <span className="font-medium">Min ${Number(f.minInvestment).toLocaleString()} • Max ${Number(f.maxInvestment).toLocaleString()}</span>
-                <span className="font-medium">
-                  {formatLongDate(f.applicationStart)} - {formatLongDate(f.applicationEnd)}
-                </span>
-              </div>
-              <div className="space-y-1">
-                {(() => {
-                  const total = Number(f.totalAmount) || 0
-                  const remaining = Number(f.remainingAmount) || 0
-                  const pct = total > 0 ? Math.max(0, Math.min(100, (remaining / total) * 100)) : 0
-                  return (
-                    <>
-                      <div className="flex items-center justify-between text-xs text-gray-600">
-                        <span>Funded</span>
-                        <span className="font-medium">{pct.toFixed(0)}% remaining</span>
-                      </div>
-                      <Progress value={pct} className="h-2" />
-                    </>
-                  )
-                })()}
-              </div>
+      {/* ── Body: main + right panel ── */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Scrollable main area */}
+        <main className="flex-1 overflow-y-auto p-6 space-y-6">
+          {/* ── Search / filter bar ── */}
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Input
+                placeholder="Search funds..."
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                className="rounded-full pl-9 h-9 text-sm"
+              />
             </div>
-          )
-        })}
-      </div>
+            <select
+              className="border rounded-full px-4 py-2 text-sm bg-card"
+              value={status}
+              onChange={e => setStatus(e.target.value)}
+            >
+              <option value="all">All Status</option>
+              <option value="OPEN">Open</option>
+              <option value="CLOSED">Closed</option>
+              <option value="PAUSED">Paused</option>
+            </select>
+          </div>
 
-      {/* Pagination */}
-      {!loading && totalPages > 1 && (
-        <div className="flex items-center justify-between mt-4">
-          <div className="text-base text-gray-600">
-            Showing {startIndex + 1} to {Math.min(endIndex, filtered.length)} of {filtered.length}
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="default" className="rounded-full" disabled={currentPage === 1} onClick={() => setCurrentPage(p => Math.max(1, p - 1))}>Prev</Button>
-            {Array.from({ length: totalPages }).slice(0, 5).map((_, i) => {
-              const page = i + 1
-              return (
-                <Button key={page} variant={currentPage === page ? 'default' : 'outline'} size="default" className="rounded-full w-9 h-9 p-0 text-base" onClick={() => setCurrentPage(page)}>
-                  {page}
-                </Button>
-              )
-            })}
-            <Button variant="outline" size="default" className="rounded-full" disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}>Next</Button>
-          </div>
-        </div>
-      )}
+          {/* ── Fund cards ── */}
+          {loading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="rounded-2xl border border-border bg-card p-6 flex flex-col items-center gap-3 animate-pulse">
+                  <div className="h-16 w-16 rounded-full bg-muted" />
+                  <div className="h-4 w-32 rounded bg-muted" />
+                  <div className="h-8 w-20 rounded bg-muted" />
+                  <div className="h-8 w-28 rounded bg-muted" />
+                </div>
+              ))}
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="text-center py-20 text-muted-foreground">
+              <Wallet className="w-12 h-12 mx-auto mb-3 opacity-30" />
+              <p>No funds found</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+              {filtered.map((f, i) => (
+                <FundCard
+                  key={f.id}
+                  fund={f}
+                  index={i}
+                  isSelected={selectedFund?.id === f.id}
+                  onClick={() => toggleFund(f)}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* ── Category banner ── */}
+          {!loading && (
+            <div className="rounded-full bg-primary px-6 py-3 text-center">
+              <span className="text-sm font-semibold text-primary-foreground">
+                Venture Capital Funds
+              </span>
+            </div>
+          )}
+
+          {/* ── Bottom sections ── */}
+          {!loading && (
+            selectedFund ? (
+              <FundDetailSections fund={selectedFund} />
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                <SummaryCard
+                  title="Total AUM"
+                  rows={[
+                    ["Total Funds", String(funds.length)],
+                    ["AUM", `$${stats.totalAUM.toLocaleString()}`],
+                    ["Deployed", `$${stats.totalDeployed.toLocaleString()}`],
+                  ]}
+                />
+                <SummaryCard
+                  title="Status Overview"
+                  rows={[
+                    ["Open Funds", String(stats.openCount)],
+                    ["Closed Funds", String(stats.closedCount)],
+                    ["Paused Funds", String(stats.pausedCount)],
+                  ]}
+                />
+                <SummaryCard
+                  title="Industries"
+                  rows={allIndustries.slice(0, 4).map(ind => [ind, "Active"] as [string, string])}
+                />
+              </div>
+            )
+          )}
+        </main>
+
+        {/* ── Right panel: Holding Details ── */}
+        {selectedFund && (
+          <aside className="hidden lg:flex w-[360px] shrink-0 overflow-hidden">
+            <HoldingDetails
+              fund={selectedFund}
+              onClose={() => setSelectedFund(null)}
+              onCreateFund={canCreateFund ? () => setIsCreateOpen(true) : undefined}
+            />
+          </aside>
+        )}
+      </div>
 
       <FundCreateModal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} onCreated={loadFunds} />
-      <FundDrawer isOpen={drawerOpen} onClose={() => setDrawerOpen(false)} fund={selected} />
     </div>
   )
 }
