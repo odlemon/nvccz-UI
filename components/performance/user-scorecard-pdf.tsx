@@ -1,133 +1,25 @@
 import React from "react"
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer"
 
-// Create styles
 const styles = StyleSheet.create({
-  page: {
-    flexDirection: "column",
-    backgroundColor: "#ffffff",
-    padding: 30,
-  },
-  header: {
-    marginBottom: 20,
-    borderBottomWidth: 2,
-    borderBottomColor: "#3b82f6",
-    paddingBottom: 10,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#1f2937",
-    marginBottom: 5,
-  },
-  subtitle: {
-    fontSize: 12,
-    color: "#6b7280",
-  },
-  userInfo: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 20,
-    padding: 15,
-    backgroundColor: "#f3f4f6",
-    borderRadius: 8,
-  },
-  userDetails: {
-    flexDirection: "column",
-  },
-  userName: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 5,
-  },
-  userRole: {
-    fontSize: 12,
-    color: "#6b7280",
-  },
-  badge: {
-    padding: "8 12",
-    backgroundColor: "#3b82f6",
-    borderRadius: 4,
-    color: "#ffffff",
-    fontSize: 12,
-    fontWeight: "bold",
-  },
-  section: {
-    marginBottom: 15,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "bold",
-    marginBottom: 10,
-    color: "#1f2937",
-  },
-  statsGrid: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 15,
-  },
-  statCard: {
-    width: "23%",
-    padding: 10,
-    backgroundColor: "#f9fafb",
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-  },
-  statLabel: {
-    fontSize: 10,
-    color: "#6b7280",
-    marginBottom: 5,
-  },
-  statValue: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#3b82f6",
-  },
-  performanceItem: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    padding: 10,
-    marginBottom: 8,
-    backgroundColor: "#f9fafb",
-    borderRadius: 6,
-  },
-  performanceLabel: {
-    fontSize: 12,
-    fontWeight: "bold",
-  },
-  performanceValue: {
-    fontSize: 12,
-    color: "#3b82f6",
-  },
-  goalItem: {
-    padding: 12,
-    marginBottom: 10,
-    backgroundColor: "#f9fafb",
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-  },
-  goalTitle: {
-    fontSize: 11,
-    fontWeight: "bold",
-    marginBottom: 5,
-  },
-  goalProgress: {
-    fontSize: 10,
-    color: "#6b7280",
-  },
+  page: { flexDirection: "column", backgroundColor: "#ffffff", padding: 30 },
+  header: { marginBottom: 20, borderBottomWidth: 2, borderBottomColor: "#3b82f6", paddingBottom: 10 },
+  title: { fontSize: 20, fontWeight: "bold", color: "#1f2937", marginBottom: 4 },
+  subtitle: { fontSize: 11, color: "#6b7280" },
+  section: { marginBottom: 14 },
+  sectionTitle: { fontSize: 14, fontWeight: "bold", marginBottom: 8, color: "#1f2937" },
+  row: { flexDirection: "row", justifyContent: "space-between", marginBottom: 6 },
+  label: { fontSize: 10, color: "#6b7280" },
+  value: { fontSize: 10, color: "#111827", fontWeight: "bold" },
+  card: { padding: 10, borderWidth: 1, borderColor: "#e5e7eb", borderRadius: 6, marginBottom: 8 },
   footer: {
     marginTop: 20,
-    paddingTop: 15,
+    paddingTop: 10,
     borderTopWidth: 1,
     borderTopColor: "#e5e7eb",
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  footerText: {
-    fontSize: 10,
+    fontSize: 9,
     color: "#6b7280",
+    textAlign: "center",
   },
 })
 
@@ -135,116 +27,93 @@ interface UserScorecardPDFProps {
   data: any
 }
 
+const toNumber = (value: unknown) => {
+  const n = typeof value === "string" ? Number.parseFloat(value) : Number(value)
+  return Number.isFinite(n) ? n : 0
+}
+
 export default function UserScorecardPDF({ data }: UserScorecardPDFProps) {
-  const getPerformanceBandColor = (band: string) => {
-    switch (band) {
-      case "Excellent":
-        return "#10b981"
-      case "Good":
-        return "#3b82f6"
-      case "Fair":
-        return "#f59e0b"
-      default:
-        return "#ef4444"
-    }
-  }
+  const employee = data?.employee || {}
+  const goals = data?.goals || []
+  const warnings = data?.warnings || []
+  const matrix = data?.document?.performanceMatrix || []
+  const taskSummary = data?.document?.taskSummary || []
+  const flatTasks = taskSummary.flatMap((section: any) => section?.tasks || [])
+
+  const totalGoals = goals.length
+  const completedGoals = goals.filter((goal: any) => toNumber(goal.progressPct ?? goal.progressPercentage) >= 100).length
+  const completedTasks = flatTasks.filter((task: any) => String(task.status || "").toLowerCase().includes("complete")).length
 
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.title}>Performance Scorecard</Text>
-          <Text style={styles.subtitle}>Individual Performance Report</Text>
+          <Text style={styles.title}>Individual Performance Scorecard</Text>
+          <Text style={styles.subtitle}>Employee: {employee?.name || "N/A"}</Text>
         </View>
 
-        {/* User Info */}
-        <View style={styles.userInfo}>
-          <View style={styles.userDetails}>
-            <Text style={styles.userName}>{data.user.name}</Text>
-            <Text style={styles.userRole}>
-              {data.user.department || "No Department"}
-              {data.user.role && ` • ${data.user.role}`}
-            </Text>
-          </View>
-          <View
-            style={[
-              styles.badge,
-              { backgroundColor: getPerformanceBandColor(data.scorecard.finalScore.performanceBand) },
-            ]}
-          >
-            <Text>{data.scorecard.finalScore.performanceBand}</Text>
-          </View>
-        </View>
-
-        {/* Stats Overview */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Performance Overview</Text>
-          <View style={styles.statsGrid}>
-            <View style={styles.statCard}>
-              <Text style={styles.statLabel}>Total Goals</Text>
-              <Text style={styles.statValue}>{data.scorecard.summary.totalGoals}</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statLabel}>Completed</Text>
-              <Text style={styles.statValue}>{data.scorecard.summary.completedGoals}</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statLabel}>Total Tasks</Text>
-              <Text style={styles.statValue}>{data.scorecard.summary.totalTasks}</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statLabel}>Final Score</Text>
-              <Text style={styles.statValue}>{data.scorecard.finalScore.total}</Text>
-            </View>
+          <Text style={styles.sectionTitle}>Overview</Text>
+          <View style={styles.row}>
+            <Text style={styles.label}>Department</Text>
+            <Text style={styles.value}>{employee?.department || "N/A"}</Text>
+          </View>
+          <View style={styles.row}>
+            <Text style={styles.label}>Role</Text>
+            <Text style={styles.value}>{employee?.role || "N/A"}</Text>
+          </View>
+          <View style={styles.row}>
+            <Text style={styles.label}>Final Score</Text>
+            <Text style={styles.value}>{data?.scores?.finalScore ?? "N/A"}</Text>
+          </View>
+          <View style={styles.row}>
+            <Text style={styles.label}>Performance Label</Text>
+            <Text style={styles.value}>{data?.scores?.performanceLabel ?? "N/A"}</Text>
+          </View>
+          <View style={styles.row}>
+            <Text style={styles.label}>Goals</Text>
+            <Text style={styles.value}>{completedGoals}/{totalGoals} completed</Text>
+          </View>
+          <View style={styles.row}>
+            <Text style={styles.label}>Tasks</Text>
+            <Text style={styles.value}>{completedTasks}/{flatTasks.length} completed</Text>
           </View>
         </View>
 
-        {/* Performance Breakdown */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Performance Breakdown</Text>
-          {data.scorecard.sections.resultsDelivery && (
-            <View style={styles.performanceItem}>
-              <Text style={styles.performanceLabel}>Results Delivery</Text>
-              <Text style={styles.performanceValue}>
-                {data.scorecard.sections.resultsDelivery.totalScore} /{" "}
-                {data.scorecard.sections.resultsDelivery.maxScore}
-              </Text>
+          <Text style={styles.sectionTitle}>Goals</Text>
+          {goals.slice(0, 10).map((goal: any, idx: number) => (
+            <View key={goal.id || idx} style={styles.card}>
+              <Text style={styles.value}>{goal.goalName || goal.title || `Goal ${idx + 1}`}</Text>
+              <Text style={styles.label}>Progress: {toNumber(goal.progressPct ?? goal.progressPercentage).toFixed(1)}%</Text>
+              <Text style={styles.label}>Weight: {goal.weight ?? "N/A"} | Rating: {goal.rawRating ?? "N/A"}</Text>
             </View>
-          )}
-          {data.scorecard.sections.budgetPerformance && (
-            <View style={styles.performanceItem}>
-              <Text style={styles.performanceLabel}>Budget Performance</Text>
-              <Text style={styles.performanceValue}>
-                {data.scorecard.sections.budgetPerformance.totalScore} /{" "}
-                {data.scorecard.sections.budgetPerformance.maxScore}
-              </Text>
-            </View>
-          )}
+          ))}
         </View>
 
-        {/* Active Goals */}
-        {data.goals.length > 0 && (
+        {matrix.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Active Goals ({data.goals.length})</Text>
-            {data.goals.slice(0, 5).map((goal: any, index: number) => (
-              <View key={index} style={styles.goalItem}>
-                <Text style={styles.goalTitle}>{goal.title}</Text>
-                <Text style={styles.goalProgress}>
-                  Progress: {goal.progressPercentage}% • Status: {goal.stage.replace("_", " ")}
-                </Text>
+            <Text style={styles.sectionTitle}>Performance Matrix</Text>
+            {matrix.slice(0, 8).map((row: any, idx: number) => (
+              <View key={idx} style={styles.card}>
+                <Text style={styles.value}>{row.goal || row.kpiOrMeasure || `Row ${idx + 1}`}</Text>
+                <Text style={styles.label}>Target: {row.target ?? "N/A"} | Actual: {row.actual ?? "N/A"}</Text>
+                <Text style={styles.label}>Rating: {row.rawRating ?? "N/A"} | Weighted: {row.weightedScore ?? "N/A"}</Text>
               </View>
             ))}
           </View>
         )}
 
-        {/* Footer */}
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>
-            Generated on {new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}
-          </Text>
-          <Text style={styles.footerText}>Arcus Performance Management System</Text>
-        </View>
+        {warnings.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Warnings</Text>
+            {warnings.map((warning: string, idx: number) => (
+              <Text key={idx} style={styles.label}>- {warning}</Text>
+            ))}
+          </View>
+        )}
+
+        <Text style={styles.footer}>Generated on {new Date().toLocaleString()}</Text>
       </Page>
     </Document>
   )

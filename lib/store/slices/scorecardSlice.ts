@@ -3,7 +3,7 @@ import {
   scorecardApiService,
   type DepartmentScorecard,
   type UserScorecard,
-} from "@/lib/api/scorecard-api"
+} from "@/lib/api/scorecard-service"
 
 export interface ScorecardState {
   departmentScorecard: DepartmentScorecard | null

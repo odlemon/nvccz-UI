@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useAppDispatch, useAppSelector } from "@/lib/store"
 import { fetchUserScorecard } from "@/lib/store/slices/scorecardSlice"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -50,7 +50,6 @@ export function UserScorecardsPage() {
   const dispatch = useAppDispatch()
   const { userScorecard, loading, error } = useAppSelector((state) => state.scorecard)
   const scorecardRef = useRef<HTMLDivElement>(null)
-  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false)
   const [isClient, setIsClient] = useState(false)
   const [PDFComponents, setPDFComponents] = useState<any>(null)
   const hasFetched = useRef(false)
@@ -110,8 +109,12 @@ export function UserScorecardsPage() {
         return "bg-emerald-500/10 text-emerald-700 border-emerald-500/20"
       case "in_progress":
         return "bg-blue-500/10 text-blue-700 border-blue-500/20"
+      case "green":
+        return "bg-emerald-500/10 text-emerald-700 border-emerald-500/20"
+      case "amber":
       case "pending":
         return "bg-amber-500/10 text-amber-700 border-amber-500/20"
+      case "red":
       case "cancelled":
         return "bg-red-500/10 text-red-700 border-red-500/20"
       default:
@@ -125,6 +128,33 @@ export function UserScorecardsPage() {
     if (percentage >= 40) return "bg-amber-500"
     return "bg-red-500"
   }
+
+  const toNumber = (value: unknown) => {
+    const n = typeof value === "string" ? Number.parseFloat(value) : Number(value)
+    return Number.isFinite(n) ? n : 0
+  }
+
+  const goals = userScorecard?.goals ?? []
+  const performanceMatrix = userScorecard?.document?.performanceMatrix ?? []
+  const taskRows = useMemo(() => {
+    const sections = userScorecard?.document?.taskSummary ?? []
+    return sections.flatMap((section: any) => section?.tasks ?? [])
+  }, [userScorecard])
+
+  const completedGoals = goals.filter((goal: any) => toNumber(goal.progressPct ?? goal.progressPercentage) >= 100).length
+  const totalGoals = goals.length
+  const completedTasks = taskRows.filter((task: any) => String(task.status || "").toLowerCase().includes("complete")).length
+  const overdueTasks = taskRows.filter((task: any) => {
+    if (!task?.dueDate) return false
+    const dueDate = new Date(task.dueDate).getTime()
+    return dueDate < Date.now() && !String(task.status || "").toLowerCase().includes("complete")
+  }).length
+
+  const finalScore = toNumber(userScorecard?.scores?.finalScore)
+  const resultsDeliveryScore = userScorecard?.scores?.resultsDeliveryScore
+  const budgetScore = userScorecard?.scores?.budgetScore
+  const performanceLabel = userScorecard?.scores?.performanceLabel ?? "N/A"
+  const employee = userScorecard?.employee
 
   if (loading && !userScorecard) return <UserScorecardSkeleton />
 
@@ -145,7 +175,7 @@ export function UserScorecardsPage() {
           {isClient && userScorecard && PDFComponents && (
             <PDFComponents.PDFDownloadLink
               document={<PDFComponents.UserScorecardPDF data={userScorecard} />}
-              fileName={`${userScorecard.user.name.replace(/\s+/g, "-")}-Scorecard-${new Date()
+              fileName={`${(employee?.name || "employee").replace(/\s+/g, "-")}-Scorecard-${new Date()
                 .toISOString()
                 .split("T")[0]}.pdf`}
             >
@@ -179,16 +209,14 @@ export function UserScorecardsPage() {
                     <CiUser className="w-8 h-8 text-white" />
                   </div>
                   <div className="flex-1">
-                    <h2 className="text-2xl font-bold">{userScorecard.user.name}</h2>
+                    <h2 className="text-2xl font-bold">{employee?.name || "Unknown Employee"}</h2>
                     <p className="text-muted-foreground">
-                      {userScorecard.user.department || "No Department"}
-                      {userScorecard.user.role && ` • ${userScorecard.user.role}`}
+                      {employee?.department || "No Department"}
+                      {employee?.role && ` • ${employee.role}`}
                     </p>
                   </div>
-                  <Badge
-                    className={`${getPerformanceColor(userScorecard.scorecard.finalScore.performanceBand)} text-sm px-4 py-2`}
-                  >
-                    {userScorecard.scorecard.finalScore.performanceBand}
+                  <Badge className={`${getPerformanceColor(performanceLabel)} text-sm px-4 py-2`}>
+                    {performanceLabel}
                   </Badge>
                 </div>
               </CardContent>
@@ -201,7 +229,7 @@ export function UserScorecardsPage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-white/80">Total Goals</p>
-                      <p className="text-4xl font-bold mt-1">{userScorecard.scorecard.summary.totalGoals}</p>
+                      <p className="text-4xl font-bold mt-1">{totalGoals}</p>
                       <p className="text-sm text-white/80 mt-2">Assigned goals</p>
                     </div>
                     <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
@@ -218,6 +246,7 @@ export function UserScorecardsPage() {
                       <p className="text-sm font-medium text-muted-foreground">Completed Goals</p>
                       <p className="text-4xl font-bold mt-1 text-emerald-600">
                         {userScorecard.scorecard.summary.completedGoals}
+                        {completedGoals}
                       </p>
                       <p className="text-sm text-muted-foreground mt-2">Successfully achieved</p>
                     </div>
@@ -233,9 +262,9 @@ export function UserScorecardsPage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-white/80">Total Tasks</p>
-                      <p className="text-4xl font-bold mt-1">{userScorecard.scorecard.summary.totalTasks}</p>
+                      <p className="text-4xl font-bold mt-1">{taskRows.length}</p>
                       <p className="text-sm text-white/80 mt-2">
-                        {userScorecard.scorecard.summary.completedTasks} completed
+                        {completedTasks} completed
                       </p>
                     </div>
                     <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
@@ -250,8 +279,8 @@ export function UserScorecardsPage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Final Score</p>
-                      <p className="text-4xl font-bold mt-1 text-primary">{userScorecard.scorecard.finalScore.total}</p>
-                      <p className="text-sm text-muted-foreground mt-2">{userScorecard.scorecard.finalScore.rating}</p>
+                      <p className="text-4xl font-bold mt-1 text-primary">{finalScore.toFixed(2)}</p>
+                      <p className="text-sm text-muted-foreground mt-2">{performanceLabel}</p>
                     </div>
                     <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
                       <CiTrophy className="w-6 h-6 text-primary" />
@@ -274,71 +303,36 @@ export function UserScorecardsPage() {
                 </CardHeader>
                 <CardContent className="space-y-6">
                   {/* Results Delivery */}
-                  {userScorecard.scorecard.sections.resultsDelivery && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-semibold">Results Delivery</p>
-                          <p className="text-xs text-muted-foreground">
-                            {userScorecard.scorecard.sections.resultsDelivery.completionRate}% completion rate
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-2xl font-bold text-primary">
-                            {userScorecard.scorecard.sections.resultsDelivery.totalScore}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            of {userScorecard.scorecard.sections.resultsDelivery.maxScore}
-                          </p>
-                        </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-semibold">Results Delivery Score</p>
+                        <p className="text-xs text-muted-foreground">Calculated from weighted goal results</p>
                       </div>
-                      <Progress
-                        value={
-                          (Number.parseFloat(userScorecard.scorecard.sections.resultsDelivery.totalScore) /
-                            userScorecard.scorecard.sections.resultsDelivery.maxScore) *
-                          100
-                        }
-                        className="h-2"
-                      />
+                      <div className="text-right">
+                        <p className="text-2xl font-bold text-primary">{resultsDeliveryScore ?? "N/A"}</p>
+                      </div>
                     </div>
-                  )}
+                  </div>
 
-                  {/* Budget Performance */}
-                  {userScorecard.scorecard.sections.budgetPerformance && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-semibold">Budget Performance</p>
-                          <p className="text-xs text-muted-foreground">
-                            {userScorecard.scorecard.sections.budgetPerformance.budgetUtilization}% utilization
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-2xl font-bold text-primary">
-                            {userScorecard.scorecard.sections.budgetPerformance.totalScore}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            of {userScorecard.scorecard.sections.budgetPerformance.maxScore}
-                          </p>
-                        </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-semibold">Budget Score</p>
+                        <p className="text-xs text-muted-foreground">Optional budget component for final score</p>
                       </div>
-                      <Progress
-                        value={
-                          (Number.parseFloat(userScorecard.scorecard.sections.budgetPerformance.totalScore) /
-                            userScorecard.scorecard.sections.budgetPerformance.maxScore) *
-                          100
-                        }
-                        className="h-2"
-                      />
+                      <div className="text-right">
+                        <p className="text-2xl font-bold text-primary">{budgetScore ?? "N/A"}</p>
+                      </div>
                     </div>
-                  )}
+                  </div>
                 </CardContent>
               </Card>
 
               {/* Charts */}
               <div className="space-y-6">
                 {/* Goal Status Distribution */}
-                {userScorecard.scorecard.summary.totalGoals > 0 && (
+                {totalGoals > 0 && (
                   <Card className="bg-white rounded-2xl">
                     <CardHeader>
                       <CardTitle>Goal Status Distribution</CardTitle>
@@ -350,14 +344,12 @@ export function UserScorecardsPage() {
                             data={[
                               {
                                 name: "Completed",
-                                value: userScorecard.scorecard.summary.completedGoals,
+                                value: completedGoals,
                                 color: "#10b981",
                               },
                               {
                                 name: "In Progress",
-                                value:
-                                  userScorecard.scorecard.summary.totalGoals -
-                                  userScorecard.scorecard.summary.completedGoals,
+                                value: totalGoals - completedGoals,
                                 color: "#3b82f6",
                               },
                             ]}
@@ -382,7 +374,7 @@ export function UserScorecardsPage() {
                 )}
 
                 {/* Task Status */}
-                {userScorecard.scorecard.summary.totalTasks > 0 && (
+                {taskRows.length > 0 && (
                   <Card className="bg-white rounded-2xl">
                     <CardHeader>
                       <CardTitle>Task Status</CardTitle>
@@ -393,12 +385,9 @@ export function UserScorecardsPage() {
                           data={[
                             {
                               name: "Tasks",
-                              Completed: userScorecard.scorecard.summary.completedTasks,
-                              Overdue: userScorecard.scorecard.summary.overdueTasks,
-                              Pending:
-                                userScorecard.scorecard.summary.totalTasks -
-                                userScorecard.scorecard.summary.completedTasks -
-                                userScorecard.scorecard.summary.overdueTasks,
+                              Completed: completedTasks,
+                              Overdue: overdueTasks,
+                              Pending: taskRows.length - completedTasks - overdueTasks,
                             },
                           ]}
                         >
@@ -419,75 +408,79 @@ export function UserScorecardsPage() {
             </div>
 
             {/* Goals and Tasks */}
-            {(userScorecard.goals.length > 0 || userScorecard.tasks.length > 0) && (
+            {(goals.length > 0 || taskRows.length > 0) && (
               <div className="grid gap-6 lg:grid-cols-2 mb-6">
                 {/* Active Goals */}
-                {userScorecard.goals.length > 0 && (
+                {goals.length > 0 && (
                   <Card className="bg-white rounded-2xl">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center">
                           <TbTarget className="w-5 h-5 text-white" />
                         </div>
-                        Active Goals ({userScorecard.goals.length})
+                        Active Goals ({goals.length})
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-3">
-                        {userScorecard.goals.map((goal) => (
+                        {goals.map((goal: any) => {
+                          const progress = toNumber(goal.progressPct ?? goal.progressPercentage)
+                          const rowStatus = goal.status || (progress >= 100 ? "completed" : "in_progress")
+                          return (
                           <div key={goal.id} className="p-4 rounded-lg bg-muted/50 border space-y-3">
                             <div className="flex items-start justify-between gap-2">
-                              <h4 className="font-medium text-sm leading-tight flex-1">{goal.title}</h4>
+                              <h4 className="font-medium text-sm leading-tight flex-1">{goal.goalName ?? goal.title ?? "Untitled Goal"}</h4>
                               <Badge variant="outline" className={`${getStatusColor(goal.stage)} text-xs shrink-0`}>
-                                {goal.stage.replace("_", " ")}
+                                {String(rowStatus).replace("_", " ")}
                               </Badge>
                             </div>
                             <div className="space-y-1">
                               <div className="flex items-center justify-between text-xs">
                                 <span className="text-muted-foreground">Progress</span>
-                                <span className="font-medium">{goal.progressPercentage}%</span>
+                                <span className="font-medium">{progress.toFixed(1)}%</span>
                               </div>
                               <div className="h-2 bg-muted rounded-full overflow-hidden">
                                 <div
-                                  className={`h-full transition-all ${getProgressColor(Number.parseFloat(goal.progressPercentage))}`}
-                                  style={{ width: `${Math.min(Number.parseFloat(goal.progressPercentage), 100)}%` }}
+                                  className={`h-full transition-all ${getProgressColor(progress)}`}
+                                  style={{ width: `${Math.min(progress, 100)}%` }}
                                 />
                               </div>
                             </div>
                           </div>
-                        ))}
+                          )
+                        })}
                       </div>
                     </CardContent>
                   </Card>
                 )}
 
                 {/* Tasks */}
-                {userScorecard.tasks.length > 0 && (
+                {taskRows.length > 0 && (
                   <Card className="bg-white rounded-2xl">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center">
                           <CiCircleCheck className="w-5 h-5 text-white" />
                         </div>
-                        Tasks ({userScorecard.tasks.length})
+                        Tasks ({taskRows.length})
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-3">
-                        {userScorecard.tasks.map((task: any) => (
+                        {taskRows.map((task: any) => (
                           <div key={task.id} className="p-4 rounded-lg bg-muted/50 border space-y-3">
                             <div className="flex items-start justify-between gap-2">
                               <h4 className="font-medium text-sm leading-tight flex-1">{task.title}</h4>
                               <Badge variant="outline" className={`${getStatusColor(task.stage)} text-xs shrink-0`}>
-                                {task.stage.replace("_", " ")}
+                                {String(task.status || task.stage || "pending").replace("_", " ")}
                               </Badge>
                             </div>
                             <div className="flex items-center justify-between pt-2 border-t">
                               <Badge variant="outline" className="text-xs">
-                                {task.priority} priority
+                                {(task.priority || "normal")} priority
                               </Badge>
                               <span className="text-xs text-muted-foreground">
-                                Due: {new Date(task.date).toLocaleDateString()}
+                                Due: {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : "N/A"}
                               </span>
                             </div>
                           </div>
@@ -508,16 +501,52 @@ export function UserScorecardsPage() {
                   </div>
                   <div className="flex-1">
                     <p className="font-semibold">Performance Summary</p>
-                    <p className="text-sm text-muted-foreground mt-1">{userScorecard.scorecard.finalScore.rating}</p>
+                    <p className="text-sm text-muted-foreground mt-1">{performanceLabel}</p>
                   </div>
-                  <Badge
-                    className={`${getPerformanceColor(userScorecard.scorecard.finalScore.performanceBand)} text-sm px-4 py-2`}
-                  >
-                    {userScorecard.scorecard.finalScore.performanceBand}
+                  <Badge className={`${getPerformanceColor(performanceLabel)} text-sm px-4 py-2`}>
+                    {performanceLabel}
                   </Badge>
                 </div>
               </CardContent>
             </Card>
+
+              {userScorecard.warnings?.length > 0 && (
+                <Card className="rounded-2xl border-amber-300 bg-amber-50">
+                  <CardHeader>
+                    <CardTitle className="text-amber-900">Warnings</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {userScorecard.warnings.map((warning: string, idx: number) => (
+                      <p key={idx} className="text-sm text-amber-800">{warning}</p>
+                    ))}
+                  </CardContent>
+                </Card>
+              )}
+
+              {performanceMatrix.length > 0 && (
+                <Card className="bg-white rounded-2xl">
+                  <CardHeader>
+                    <CardTitle>Performance Matrix</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {performanceMatrix.slice(0, 8).map((row: any, idx: number) => (
+                        <div key={idx} className="border rounded-lg p-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <div>
+                              <p className="font-medium text-sm">{row.goal || row.kpiOrMeasure || `Item ${idx + 1}`}</p>
+                              <p className="text-xs text-muted-foreground">
+                                Target: {row.target ?? "N/A"} • Actual: {row.actual ?? "N/A"}
+                              </p>
+                            </div>
+                            <Badge variant="outline">Rating {row.rawRating ?? "-"}</Badge>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
           </>
         )}
       </div>

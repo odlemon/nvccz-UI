@@ -51,11 +51,16 @@ const routePermissions: Record<string, { module: string; subModule?: string }> =
   '/procurement/approval-configs': { module: 'procurement', subModule: 'approval-configurations' },
 
   // Performance Management routes
-  '/performance': { module: 'performance-management', subModule: 'dashboard' },
-  '/performance/kpi-management': { module: 'performance-management', subModule: 'kpiManagement' },
-  '/performance/goals': { module: 'performance-management', subModule: 'goalsManagement' },
+  '/performance': { module: 'performance-management', subModule: 'performance-dashboard' },
+  '/performance/departments': { module: 'performance-management', subModule: 'departments-management' },
+  '/performance/kpis': { module: 'performance-management', subModule: 'kpi-management' },
+  '/performance/goals': { module: 'performance-management', subModule: 'goals-management' },
   '/performance/tasks': { module: 'performance-management', subModule: 'taskManagement' },
-  '/performance/scorecards': { module: 'performance-management', subModule: 'userScorecard' },
+  '/performance/user-scorecards': { module: 'performance-management', subModule: 'userScorecard' },
+  '/performance/department-scorecards': { module: 'performance-management', subModule: 'departmentScorecard' },
+  '/performance/ceo-scorecards': { module: 'performance-management', subModule: 'performance-dashboard' },
+  '/performance/board-scorecards': { module: 'performance-management', subModule: 'performance-dashboard' },
+  '/performance/org-bsc': { module: 'performance-management', subModule: 'performance-dashboard' },
 
   // Payroll routes
   '/payroll': { module: 'payroll', subModule: 'payroll-dashboard' },

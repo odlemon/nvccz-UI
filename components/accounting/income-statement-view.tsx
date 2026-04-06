@@ -33,7 +33,8 @@ import type { RootState, AppDispatch } from "@/lib/store/store"
 import { fetchIncomeStatement } from "@/lib/store/slices/accountingSlice"
 import { accountingApi } from "@/lib/api/accounting-api"
 import { exportIncomeStatementToPDF } from "@/lib/utils/export"
-import { addLetterhead, addReportInfo } from "@/lib/utils/pdf-letterhead"
+import { addLetterhead, addReportInfo, type LetterheadAddress } from "@/lib/utils/pdf-letterhead"
+import { companyProfileApi } from "@/lib/api/company-profile-api"
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
 import { TransactionsDataTable } from "./transactions-data-table"
@@ -62,6 +63,11 @@ export function IncomeStatementView() {
   const [consolidatedIncome, setConsolidatedIncome] = useState<ConsolidatedIncomeStatement | null>(null)
   const [isConsolidating, setIsConsolidating] = useState(false)
   const [generatingPDF, setGeneratingPDF] = useState(false)
+  const [activeAddress, setActiveAddress] = useState<LetterheadAddress | null>(null)
+
+  useEffect(() => {
+    companyProfileApi.getActiveAddress().then(a => { if (a) setActiveAddress(a) }).catch(() => {})
+  }, [])
   const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set())
   const [selectedTransaction, setSelectedTransaction] = useState<any | null>(null)
   const [isTransactionDrawerOpen, setIsTransactionDrawerOpen] = useState(false)
@@ -345,7 +351,7 @@ export function IncomeStatementView() {
       setGeneratingPDF(true)
       try {
         const doc = new jsPDF()
-        let startY = await addLetterhead(doc, "Income Statement")
+        let startY = await addLetterhead(doc, "Income Statement", undefined, activeAddress)
         startY = addReportInfo(doc, startY, [
           `Consolidated (${consolidatedIncome.reportingCurrencyCode})`,
           `For the period ${format(new Date(consolidatedIncome.period.startDate), "MMMM d, yyyy")} to ${format(new Date(consolidatedIncome.period.endDate), "MMMM d, yyyy")}`,
@@ -417,7 +423,7 @@ export function IncomeStatementView() {
     setGeneratingPDF(true)
     try {
       const doc = new jsPDF()
-      let startY = await addLetterhead(doc, "Income Statement")
+      let startY = await addLetterhead(doc, "Income Statement", undefined, activeAddress)
       startY = addReportInfo(doc, startY, [
         `For the period ${format(new Date(incomeStatement.period.startDate), "MMMM d, yyyy")} to ${format(new Date(incomeStatement.period.endDate), "MMMM d, yyyy")}`,
         `Currency: ${incomeStatement.currency.name || incomeStatement.currency.code}`,

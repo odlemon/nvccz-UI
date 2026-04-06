@@ -49,7 +49,8 @@ import { buildConsolidatedTrialBalance, ConsolidatedTrialBalance } from "@/lib/u
 import { withUsdZwlFallbackRates } from "@/lib/utils/consolidation/fallback-rates"
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
-import { addLetterhead, addReportInfo } from "@/lib/utils/pdf-letterhead"
+import { addLetterhead, addReportInfo, type LetterheadAddress } from "@/lib/utils/pdf-letterhead"
+import { companyProfileApi } from "@/lib/api/company-profile-api"
 
 function TrialBalanceSkeleton() {
   return (
@@ -140,6 +141,11 @@ export function TrialBalanceView() {
   const [consolidatedTrialBalance, setConsolidatedTrialBalance] = useState<ConsolidatedTrialBalance | null>(null)
   const [isConsolidating, setIsConsolidating] = useState(false)
   const [generatingPDF, setGeneratingPDF] = useState(false)
+  const [activeAddress, setActiveAddress] = useState<LetterheadAddress | null>(null)
+
+  useEffect(() => {
+    companyProfileApi.getActiveAddress().then(a => { if (a) setActiveAddress(a) }).catch(() => {})
+  }, [])
   const [searchTerm, setSearchTerm] = useState("")
   const [filterAccountType, setFilterAccountType] = useState("all")
   const [currentPage, setCurrentPage] = useState(1)
@@ -445,7 +451,7 @@ export function TrialBalanceView() {
       try {
         setGeneratingPDF(true)
         const doc = new jsPDF()
-        let startY = await addLetterhead(doc, 'Trial Balance')
+        let startY = await addLetterhead(doc, 'Trial Balance', undefined, activeAddress)
         startY = addReportInfo(doc, startY, [
           `Consolidated (${consolidatedTrialBalance.reportingCurrencyCode})`,
           `As of ${format(new Date(consolidatedTrialBalance.date), 'MMMM d, yyyy')}`,

@@ -21,7 +21,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Badge } from "@/components/ui/badge"
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
-import { addLetterhead, addReportInfo } from "@/lib/utils/pdf-letterhead"
+import { addLetterhead, addReportInfo, type LetterheadAddress } from "@/lib/utils/pdf-letterhead"
+import { companyProfileApi } from "@/lib/api/company-profile-api"
 import { TransactionsDataTable } from "./transactions-data-table"
 import { TransactionViewDrawer } from "./transaction-view-drawer"
 
@@ -82,7 +83,12 @@ export function CashFlowView() {
   const [endDate, setEndDate] = useState<Date>(endOfYear)
   const [currencyId, setCurrencyId] = useState(defaultCurrencyId)
   const [generatingPDF, setGeneratingPDF] = useState(false)
+  const [activeAddress, setActiveAddress] = useState<LetterheadAddress | null>(null)
   const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    companyProfileApi.getActiveAddress().then(a => { if (a) setActiveAddress(a) }).catch(() => {})
+  }, [])
   const [selectedTransaction, setSelectedTransaction] = useState<any | null>(null)
   const [isTransactionDrawerOpen, setIsTransactionDrawerOpen] = useState(false)
 
@@ -242,7 +248,7 @@ export function CashFlowView() {
     setGeneratingPDF(true)
     try {
       const doc = new jsPDF()
-      let startY = await addLetterhead(doc, "Cash Flow Statement")
+      let startY = await addLetterhead(doc, "Cash Flow Statement", undefined, activeAddress)
       startY = addReportInfo(doc, startY, [
         `For the period ${format(new Date(cashFlow.period.startDate), "MMMM d, yyyy")} to ${format(new Date(cashFlow.period.endDate), "MMMM d, yyyy")}`,
         `Currency: ${cashFlow.currency.name}`,

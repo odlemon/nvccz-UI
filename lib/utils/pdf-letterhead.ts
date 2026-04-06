@@ -11,20 +11,48 @@ const HEADER_BG_COLOR: [number, number, number] = [15, 23, 42] // slate-900
 const HEADER_HEIGHT = 40
 const LOGO_PATH = '/logo.png'
 
+export interface LetterheadAddress {
+  label?: string
+  line1: string
+  line2?: string | null
+  city: string
+  state?: string | null
+  postalCode?: string | null
+  country: string
+  logoUrl?: string | null
+}
+
 /**
  * Adds a company letterhead to a jsPDF document.
+ * Pass `address` to use a dynamic address from the company profile API.
  * Returns the Y position where content should start after the header.
  */
-export async function addLetterhead(doc: jsPDF, title: string, subtitle?: string): Promise<number> {
+export async function addLetterhead(
+  doc: jsPDF,
+  title: string,
+  subtitle?: string,
+  address?: LetterheadAddress | null
+): Promise<number> {
   const pageWidth = doc.internal.pageSize.getWidth()
+
+  // Build address lines from dynamic address or fallback to hardcoded
+  const addressLines: string[] = address
+    ? [
+        address.line1,
+        ...(address.line2 ? [address.line2] : []),
+        [address.city, address.state, address.postalCode].filter(Boolean).join(', '),
+        address.country,
+      ]
+    : COMPANY_ADDRESS
 
   // Header background
   doc.setFillColor(...HEADER_BG_COLOR)
   doc.rect(0, 0, pageWidth, HEADER_HEIGHT, 'F')
 
-  // Try to load and add logo
+  // Try to load logo — prefer address logoUrl, then fallback to local /logo.png
+  const logoSrc = address?.logoUrl || LOGO_PATH
   try {
-    const logoImg = await loadImage(LOGO_PATH)
+    const logoImg = await loadImage(logoSrc)
     doc.addImage(logoImg, 'PNG', 10, 6, 28, 28)
   } catch {
     // If logo fails to load, just show company name in place of logo
@@ -42,7 +70,7 @@ export async function addLetterhead(doc: jsPDF, title: string, subtitle?: string
   doc.setFont('helvetica', 'bold')
   doc.text(COMPANY_NAME, addressX, 12, { align: 'right' })
   doc.setFont('helvetica', 'normal')
-  COMPANY_ADDRESS.forEach((line, i) => {
+  addressLines.forEach((line, i) => {
     doc.text(line, addressX, 16 + i * 4, { align: 'right' })
   })
 

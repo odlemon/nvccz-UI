@@ -25,7 +25,6 @@ import {
   CiMedal,
   CiText,
   CiTrophy,
-  CiChart,
   CiLock
 } from "react-icons/ci"
 import {
@@ -156,7 +155,10 @@ export const MODULE_CONFIG: ModuleConfig[] = [
       },
       { id: "tasks-management", name: "Tasks Management", path: "/performance/tasks", icon: CiViewList, description: "Tasks" },
       { id: "department-scorecards", name: "Department Scorecards", path: "/performance/department-scorecards", icon: CiViewBoard, description: "Department performance scorecards" },
-      { id: "user-scorecards", name: "User Scorecards", path: "/performance/user-scorecards", icon: CiViewTable, description: "User performance scorecards" }
+      { id: "user-scorecards", name: "User Scorecards", path: "/performance/user-scorecards", icon: CiViewTable, description: "User performance scorecards" },
+      { id: "ceo-scorecards", name: "CEO Scorecards", path: "/performance/ceo-scorecards", icon: CiTrophy, description: "CEO contract scorecards" },
+      { id: "board-scorecards", name: "Board Scorecards", path: "/performance/board-scorecards", icon: IoStatsChartOutline, description: "Board contract scorecards" },
+      { id: "org-bsc", name: "Org BSC", path: "/performance/org-bsc", icon: CiGrid41, description: "Organisational BSC dashboard" }
     ]
   },
   {
@@ -316,10 +318,15 @@ export const MODULE_CONFIG: ModuleConfig[] = [
         name: "Board Review Voting",
         path: "/admin/configs/voting-members",
         icon: CiUser,
-        description: "Manage board review votting members",
+        description: "Manage board review voting members",
       },
-      // voting memebrs
-
+      {
+        id: "company-addresses",
+        name: "Company Addresses",
+        path: "/admin/addresses",
+        icon: CiMapPin,
+        description: "Manage company addresses used on report letterheads",
+      },
     ],
   },
 

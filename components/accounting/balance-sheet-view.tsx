@@ -23,7 +23,8 @@ import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
-import { addLetterhead, addReportInfo } from "@/lib/utils/pdf-letterhead"
+import { addLetterhead, addReportInfo, type LetterheadAddress } from "@/lib/utils/pdf-letterhead"
+import { companyProfileApi } from "@/lib/api/company-profile-api"
 import { TransactionsDataTable } from "./transactions-data-table"
 import { TransactionViewDrawer } from "./transaction-view-drawer"
 import { ConsolidatedBalanceSheet, buildConsolidatedBalanceSheet } from "@/lib/utils/consolidation/balance-sheet"
@@ -88,7 +89,12 @@ export function BalanceSheetView() {
   const [periodType, setPeriodType] = useState<'month' | 'quarter' | 'year' | 'custom'>('custom')
   const [hideZeroBalances, setHideZeroBalances] = useState(true)
   const [generatingPDF, setGeneratingPDF] = useState(false)
+  const [activeAddress, setActiveAddress] = useState<LetterheadAddress | null>(null)
   const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    companyProfileApi.getActiveAddress().then(a => { if (a) setActiveAddress(a) }).catch(() => {})
+  }, [])
   const [selectedTransaction, setSelectedTransaction] = useState<any | null>(null)
   const [isTransactionDrawerOpen, setIsTransactionDrawerOpen] = useState(false)
 
@@ -390,7 +396,7 @@ export function BalanceSheetView() {
       setGeneratingPDF(true)
       try {
         const doc = new jsPDF()
-        let startY = await addLetterhead(doc, "Balance Sheet")
+        let startY = await addLetterhead(doc, "Balance Sheet", undefined, activeAddress)
         startY = addReportInfo(doc, startY, [
           `Consolidated (${consolidatedBalance.reportingCurrencyCode})`,
           `As of ${format(new Date(consolidatedBalance.asOfDate), "MMMM d, yyyy")}`,
@@ -457,7 +463,7 @@ export function BalanceSheetView() {
     try {
       const doc = new jsPDF()
       const currencyObj = currencies.find(c => c.code === balanceSheet.currency) || currencies.find(c => c.id === currencyId)
-      let startY = await addLetterhead(doc, "Balance Sheet")
+      let startY = await addLetterhead(doc, "Balance Sheet", undefined, activeAddress)
       startY = addReportInfo(doc, startY, [
         `As of ${format(new Date(balanceSheet.asOfDate), "MMMM d, yyyy")}`,
         `Currency: ${currencyObj?.name || balanceSheet.currency}`,

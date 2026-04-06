@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-import { Users, Shield, Building2, Activity } from "lucide-react"
+import { Users, Shield, Building2, Activity, MapPin } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
 
@@ -231,6 +231,12 @@ export function AdminDashboard() {
                 <Button variant="outline" className="w-full rounded-full bg-white hover:bg-gray-50 justify-start">
                   <Building2 className="w-4 h-4 mr-2" />
                   Department Overview
+                </Button>
+              </Link>
+              <Link href="/admin/addresses">
+                <Button variant="outline" className="w-full rounded-full bg-white hover:bg-gray-50 justify-start">
+                  <MapPin className="w-4 h-4 mr-2" />
+                  Company Addresses
                 </Button>
               </Link>
             </div>
