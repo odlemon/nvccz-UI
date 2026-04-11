@@ -886,6 +886,80 @@ export interface BalanceSheetResponse {
   difference: number
 }
 
+// Consolidated Balance Sheet API types
+export interface ConsolidatedBSCurrencyBreakdown {
+  sourceCurrency: string
+  sourceCurrencyId: string
+  sourceAmount: number
+  conversionRate: number
+  consolidatedAmount: number
+}
+
+export interface ConsolidatedBSAccount {
+  accountId: string
+  accountNo: string
+  accountName: string
+  accountType: string
+  balance: number
+  currencyBreakdown: ConsolidatedBSCurrencyBreakdown[]
+}
+
+export interface ConsolidatedBalanceSheetApiResponse {
+  asOfDate: string
+  consolidationCurrency: { id: string; code: string; name: string }
+  exchangeRates: Array<{ currencyId: string; currencyCode: string; rate: number }>
+  assets: {
+    cashAndCashEquivalents: { total: number; breakdown: ConsolidatedBSAccount[] }
+    currentAssets: { accounts: ConsolidatedBSAccount[]; total: number }
+    fixedAssets: { accounts: ConsolidatedBSAccount[]; total: number }
+    otherAssets: { accounts: ConsolidatedBSAccount[]; total: number }
+    totalAssets: number
+  }
+  liabilities: {
+    currentLiabilities: { accounts: ConsolidatedBSAccount[]; total: number }
+    longTermLiabilities: { accounts: ConsolidatedBSAccount[]; total: number }
+    totalLiabilities: number
+  }
+  equity: {
+    accounts: ConsolidatedBSAccount[]
+    total: number
+  }
+  totalLiabilitiesAndEquity: number
+  isBalanced: boolean
+  difference: number
+  generatedAt: string
+}
+
+// Consolidated Income Statement API types
+export interface ConsolidatedISAccount {
+  accountId: string
+  accountNo: string
+  accountName: string
+  accountType: string
+  balance: number
+  currencyBreakdown: ConsolidatedBSCurrencyBreakdown[]
+}
+
+export interface ConsolidatedIncomeStatementApiResponse {
+  period: { startDate: string; endDate: string }
+  consolidationCurrency: { id: string; code: string; name: string }
+  exchangeRates: Array<{ currencyId: string; currencyCode: string; rate: number }>
+  sections: {
+    revenue: { accounts: ConsolidatedISAccount[]; total: number }
+    operatingExpenses: { accounts: ConsolidatedISAccount[]; total: number }
+    incomeTax: { accounts: ConsolidatedISAccount[]; total: number }
+    belowTheLine: { accounts: ConsolidatedISAccount[]; total: number }
+  }
+  totals: {
+    netIncomeBeforeTaxes: number
+    incomeTaxExpense: number
+    incomeFromContinuingOperations: number
+    belowTheLine: number
+    netIncome: number
+  }
+  generatedAt: string
+}
+
 // Cash Flow types
 export interface CashFlowAccount {
   accountId: string
@@ -1826,6 +1900,26 @@ class AccountingApiService {
   }
   async getBalanceSheet(asOfDate: string, currencyId: string): Promise<AccountingResponse<BalanceSheetResponse>> {
     return apiClient.get<AccountingResponse<BalanceSheetResponse>>(`/accounting/balance-sheet?asOfDate=${asOfDate}&currencyId=${currencyId}`)
+  }
+
+  // Consolidated Balance Sheet
+  async getConsolidatedBalanceSheet(data: {
+    asOfDate: string
+    consolidationCurrencyId: string
+    startDate: string
+    endDate: string
+  }): Promise<AccountingResponse<ConsolidatedBalanceSheetApiResponse>> {
+    return apiClient.post<AccountingResponse<ConsolidatedBalanceSheetApiResponse>>('/accounting/balance-sheet/consolidated', data)
+  }
+
+  // Consolidated Income Statement
+  async getConsolidatedIncomeStatement(data: {
+    consolidationCurrencyId: string
+    startDate: string
+    endDate: string
+  }, periodType?: string): Promise<AccountingResponse<ConsolidatedIncomeStatementApiResponse>> {
+    const query = periodType ? `?periodType=${periodType}` : ''
+    return apiClient.post<AccountingResponse<ConsolidatedIncomeStatementApiResponse>>(`/accounting/income-statement/consolidated${query}`, data)
   }
 
   // Cash Flow

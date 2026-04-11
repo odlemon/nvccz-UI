@@ -1,6 +1,105 @@
 import { apiClient } from './api-client'
 import { AccountingResponse } from './chart-of-accounts-api'
 
+// --- FISCAL CALENDAR TYPES ---
+export interface FiscalModuleLock {
+    moduleCode: string
+    lockStatus: 'LOCKED' | 'OPEN'
+    reason?: string
+}
+
+export interface FiscalPeriod {
+    id: string
+    fiscalYearId: string
+    periodNumber: number
+    name: string
+    startDate: string
+    endDate: string
+    status: 'OPEN' | 'CLOSED'
+    createdAt: string
+    updatedAt: string
+    moduleLocks: FiscalModuleLock[]
+}
+
+export interface FiscalYear {
+    id: string
+    name: string
+    startDate: string
+    endDate: string
+    status: 'OPEN' | 'CLOSED'
+    createdAt: string
+    updatedAt: string
+}
+
+export interface FiscalYearWithPeriods {
+    fiscalYear: FiscalYear
+    periods: FiscalPeriod[]
+}
+
+export interface FiscalPolicy {
+    lockedPeriodPolicy: 'ERROR' | 'WARN'
+    allowOverridePosting: boolean
+    glErrorBatchEnabled: boolean
+}
+
+export interface FiscalCalendarResponse {
+    lockConfigVersion: number
+    policy: FiscalPolicy
+    fiscalYears: FiscalYearWithPeriods[]
+}
+
+export interface FiscalLockDraftItem {
+    fiscalPeriodId: string
+    moduleCode: string
+    lockStatus: 'LOCKED' | 'OPEN'
+    reason?: string
+}
+
+export interface FiscalAuditEntry {
+    id: string
+    actionType: string
+    moduleCode: string
+    fiscalPeriodId: string | null
+    oldValue: any
+    newValue: any
+    reason: string | null
+    performedById: string
+    source: string
+    createdAt: string
+    performedBy: {
+        id: string
+        email: string
+        firstName: string
+        lastName: string
+    }
+    fiscalPeriod: {
+        id: string
+        name: string
+        startDate: string
+        endDate: string
+    } | null
+    display: {
+        scope: string
+        moduleLabel: string
+        periodLabel: string
+        summary: string
+    }
+}
+
+export interface PeriodStatusResponse {
+    period: string
+    isLocked: boolean
+    lockedAt: string | null
+    lockedBy: {
+        id: string
+        email: string
+        firstName: string
+        lastName: string
+    } | null
+    reason: string | null
+    effectiveModuleLock: boolean
+}
+
 // --- CASHBOOK TYPES ---
 export interface CashbookBank {
     id: string
@@ -477,6 +576,43 @@ class CashbookApiService {
 
     async validateTransactionDate(transactionDate: string): Promise<AccountingResponse<any>> {
         return apiClient.post<AccountingResponse<any>>('/cashbook/periods/validate-date', { transactionDate })
+    }
+
+    async getPeriodHistory(period: string): Promise<AccountingResponse<any[]>> {
+        return apiClient.get<AccountingResponse<any[]>>(`/cashbook/periods/${period}/history`)
+    }
+
+    // Fiscal Calendar Management
+    async getFiscalCalendar(): Promise<AccountingResponse<FiscalCalendarResponse>> {
+        return apiClient.get<AccountingResponse<FiscalCalendarResponse>>('/accounting/fiscal-calendar')
+    }
+
+    async saveLocksDraft(draft: FiscalLockDraftItem[]): Promise<AccountingResponse<any>> {
+        return apiClient.put<AccountingResponse<any>>('/accounting/fiscal-calendar/locks/draft', {
+            draft: { moduleLocks: draft }
+        })
+    }
+
+    async commitLocks(reason?: string): Promise<AccountingResponse<any>> {
+        return apiClient.post<AccountingResponse<any>>('/accounting/fiscal-calendar/locks/commit', {
+            reason: reason || 'Committed via UI'
+        })
+    }
+
+    async updateFiscalPolicy(policy: Partial<FiscalPolicy>): Promise<AccountingResponse<any>> {
+        return apiClient.patch<AccountingResponse<any>>('/accounting/fiscal-calendar/policy', policy)
+    }
+
+    async getFiscalAuditLog(params?: { take?: number; skip?: number }): Promise<AccountingResponse<FiscalAuditEntry[]>> {
+        const queryParams = new URLSearchParams()
+        if (params?.take) queryParams.append('take', params.take.toString())
+        if (params?.skip !== undefined) queryParams.append('skip', params.skip.toString())
+        const query = queryParams.toString() ? `?${queryParams.toString()}` : ''
+        return apiClient.get<AccountingResponse<FiscalAuditEntry[]>>(`/accounting/fiscal-calendar/period-lock/audit${query}`)
+    }
+
+    async getPostingExceptions(): Promise<AccountingResponse<any[]>> {
+        return apiClient.get<AccountingResponse<any[]>>('/accounting/fiscal-calendar/posting-exceptions')
     }
 
     // Contra Entry Management

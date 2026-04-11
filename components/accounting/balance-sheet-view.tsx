@@ -27,8 +27,8 @@ import { addLetterhead, addReportInfo, type LetterheadAddress } from "@/lib/util
 import { companyProfileApi } from "@/lib/api/company-profile-api"
 import { TransactionsDataTable } from "./transactions-data-table"
 import { TransactionViewDrawer } from "./transaction-view-drawer"
-import { ConsolidatedBalanceSheet, buildConsolidatedBalanceSheet } from "@/lib/utils/consolidation/balance-sheet"
-import { withUsdZwlFallbackRates } from "@/lib/utils/consolidation/fallback-rates"
+import { ConsolidatedBalanceSheet, ConsolidatedBalanceRow } from "@/lib/utils/consolidation/balance-sheet"
+import type { ConsolidatedBalanceSheetApiResponse } from "@/lib/api/accounting-api"
 
 function formatMoney(v: number | string) {
   return (
@@ -83,7 +83,7 @@ export function BalanceSheetView() {
   const [asOfDate, setAsOfDate] = useState<Date>(new Date())
   const [currencyId, setCurrencyId] = useState(defaultCurrencyId)
   const [reportMode, setReportMode] = useState<"single" | "consolidated">("single")
-  const [selectedCurrencyIds, setSelectedCurrencyIds] = useState<string[]>([])
+  const [consolidationCurrencyId, setConsolidationCurrencyId] = useState(defaultCurrencyId)
   const [consolidatedBalance, setConsolidatedBalance] = useState<ConsolidatedBalanceSheet | null>(null)
   const [isConsolidating, setIsConsolidating] = useState(false)
   const [periodType, setPeriodType] = useState<'month' | 'quarter' | 'year' | 'custom'>('custom')
@@ -101,14 +101,8 @@ export function BalanceSheetView() {
   // Fetch on mount and when currency changes
   useEffect(() => {
     if (currencies.length && !currencyId) setCurrencyId(defaultCurrencyId)
+    if (currencies.length && !consolidationCurrencyId) setConsolidationCurrencyId(defaultCurrencyId)
   }, [currencies])
-
-  useEffect(() => {
-    if (!currencies.length) return
-    if (selectedCurrencyIds.length === 0) {
-      setSelectedCurrencyIds([defaultCurrencyId])
-    }
-  }, [currencies, defaultCurrencyId])
 
   useEffect(() => {
     const year = new Date().getFullYear()
@@ -124,63 +118,107 @@ export function BalanceSheetView() {
       loadConsolidatedBalanceSheet(defaultDate)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currencyId, reportMode, selectedCurrencyIds])
+  }, [currencyId, reportMode, consolidationCurrencyId])
+
+  const transformApiToConsolidatedBalanceSheet = (
+    apiData: ConsolidatedBalanceSheetApiResponse
+  ): ConsolidatedBalanceSheet => {
+    const rows: ConsolidatedBalanceRow[] = []
+
+    const flattenAccounts = (
+      accounts: typeof apiData.assets.currentAssets.accounts,
+      section: "assets" | "liabilities" | "equity",
+      group: string
+    ) => {
+      accounts.forEach((account) => {
+        if (account.currencyBreakdown.length > 0) {
+          account.currencyBreakdown.forEach((bd) => {
+            rows.push({
+              section,
+              group,
+              accountNo: account.accountNo,
+              accountName: account.accountName,
+              sourceCurrencyCode: bd.sourceCurrency,
+              sourceAmount: bd.sourceAmount,
+              spotRate: bd.conversionRate,
+              consolidatedAmount: bd.consolidatedAmount,
+            })
+          })
+        } else if (account.balance !== 0) {
+          rows.push({
+            section,
+            group,
+            accountNo: account.accountNo,
+            accountName: account.accountName,
+            sourceCurrencyCode: apiData.consolidationCurrency.code,
+            sourceAmount: account.balance,
+            spotRate: 1,
+            consolidatedAmount: account.balance,
+          })
+        }
+      })
+    }
+
+    // Assets
+    flattenAccounts(apiData.assets.cashAndCashEquivalents.breakdown || [], "assets", "Cash & Cash Equivalents")
+    flattenAccounts(apiData.assets.currentAssets.accounts, "assets", "Current Assets")
+    flattenAccounts(apiData.assets.fixedAssets.accounts, "assets", "Fixed Assets")
+    flattenAccounts(apiData.assets.otherAssets.accounts, "assets", "Other Assets")
+
+    // Liabilities
+    flattenAccounts(apiData.liabilities.currentLiabilities.accounts, "liabilities", "Current Liabilities")
+    flattenAccounts(apiData.liabilities.longTermLiabilities.accounts, "liabilities", "Long-Term Liabilities")
+
+    // Equity
+    flattenAccounts(apiData.equity.accounts, "equity", "Equity")
+
+    return {
+      asOfDate: apiData.asOfDate,
+      reportingCurrencyCode: apiData.consolidationCurrency.code,
+      rows,
+      totals: {
+        assets: apiData.assets.totalAssets,
+        liabilities: apiData.liabilities.totalLiabilities,
+        equity: apiData.equity.total,
+        liabilitiesAndEquity: apiData.totalLiabilitiesAndEquity,
+      },
+      isBalanced: apiData.isBalanced,
+      difference: apiData.difference,
+      missingRates: [],
+    }
+  }
 
   const loadConsolidatedBalanceSheet = async (dateOverride?: Date) => {
     const targetDate = dateOverride || asOfDate
-    if (!selectedCurrencyIds.length || !targetDate) {
+    if (!consolidationCurrencyId || !targetDate) {
       setConsolidatedBalance(null)
       return
     }
 
     try {
       setIsConsolidating(true)
-      const asOfDateString = format(targetDate, "yyyy-MM-dd")
-      const reportingCurrency = currencies.find((c) => c.code === "USD") || currencies[0]
+      const asOfDateISO = targetDate.toISOString()
+      // Use start of the year as startDate for the consolidation period
+      const startOfYear = new Date(targetDate.getFullYear(), 0, 1)
+      const startDateISO = startOfYear.toISOString()
 
-      const responses = await Promise.all(
-        selectedCurrencyIds.map((id) =>
-          accountingApi.generateBalanceSheet(
-            { asOfDate: asOfDateString, currencyId: id },
-            { hideZeroBalances }
-          )
-        )
-      )
+      const response = await accountingApi.getConsolidatedBalanceSheet({
+        asOfDate: asOfDateISO,
+        consolidationCurrencyId,
+        startDate: startDateISO,
+        endDate: asOfDateISO,
+      })
 
-      const statements = responses
-        .map((res, idx) => ({
-          ok: res.success && res.data,
-          data: res.data as any,
-          currency: currencies.find((c) => c.id === selectedCurrencyIds[idx]),
-        }))
-        .filter((x) => x.ok && x.data && x.currency)
-        .map((x) => ({ currency: x.currency!, sheet: x.data }))
-
-      if (!statements.length) {
+      if (!response.success || !response.data) {
         setConsolidatedBalance(null)
+        toast.error("Failed to load consolidated balance sheet", {
+          description: (response as any)?.error || "No data returned",
+        })
         return
       }
 
-      const ratesResponse = await accountingApi.getExchangeRates()
-      const ratesRaw = (ratesResponse as any)?.data
-      const rates = Array.isArray(ratesRaw)
-        ? ratesRaw
-        : (ratesRaw?.exchangeRates || [])
-      const normalizedRates = withUsdZwlFallbackRates(rates, currencies)
-
-      const consolidated = buildConsolidatedBalanceSheet(
-        statements,
-        normalizedRates,
-        { id: reportingCurrency?.id || currencyId, code: reportingCurrency?.code || "USD" }
-      )
-
+      const consolidated = transformApiToConsolidatedBalanceSheet(response.data)
       setConsolidatedBalance(consolidated)
-
-      if (consolidated && consolidated.missingRates.length > 0) {
-        toast.warning("Some balance sheet rows were excluded due to missing exchange rates", {
-          description: `${consolidated.missingRates.length} row(s) have no spot rate as of ${asOfDateString}.`,
-        })
-      }
     } catch (error: any) {
       setConsolidatedBalance(null)
       toast.error("Failed to load consolidated balance sheet", {
@@ -223,16 +261,6 @@ export function BalanceSheetView() {
     setIsTransactionDrawerOpen(true)
   }
 
-  const toggleCurrencySelection = (id: string) => {
-    setSelectedCurrencyIds((prev) => {
-      if (prev.includes(id)) {
-        if (prev.length === 1) return prev
-        return prev.filter((x) => x !== id)
-      }
-      return [...prev, id]
-    })
-  }
-
   // Custom dropdown for currency selection
   const currencyDropdown = (
     <DropdownMenu>
@@ -262,38 +290,30 @@ export function BalanceSheetView() {
     </DropdownMenu>
   )
 
-  const multiCurrencyDropdown = (
+  const consolidationCurrencyDropdown = (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
           variant="outline"
-          className="rounded-full min-w-[180px] flex justify-between items-center"
+          className="rounded-full min-w-[120px] flex justify-between items-center"
         >
-          {selectedCurrencyIds.length
-            ? selectedCurrencyIds
-                .map((id) => currencies.find((c) => c.id === id)?.code)
-                .filter(Boolean)
-                .join(", ")
-            : "Select currencies"}
+          {currencies.find(c => c.id === consolidationCurrencyId)?.code || "Select"} <span className="text-xs text-gray-400 ml-1">(Target)</span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="rounded-xl min-w-[220px]">
-        {currencies.map((c) => {
-          const selected = selectedCurrencyIds.includes(c.id)
-          return (
-            <DropdownMenuItem
-              key={c.id}
-              onClick={() => toggleCurrencySelection(c.id)}
-              className={cn(
-                "flex items-center justify-between rounded-full cursor-pointer",
-                selected && "bg-blue-100"
-              )}
-            >
-              <span>{c.code} <span className="text-xs text-gray-400 ml-1">{c.name}</span></span>
-              {selected && <Check className="w-4 h-4 text-blue-600 ml-2" />}
-            </DropdownMenuItem>
-          )
-        })}
+      <DropdownMenuContent align="start" className="rounded-xl min-w-[180px]">
+        {currencies.map(c => (
+          <DropdownMenuItem
+            key={c.id}
+            onClick={() => setConsolidationCurrencyId(c.id)}
+            className={cn(
+              "flex items-center justify-between rounded-full cursor-pointer",
+              c.id === consolidationCurrencyId && "bg-blue-100"
+            )}
+          >
+            <span>{c.code} <span className="text-xs text-gray-400 ml-1">{c.name}</span></span>
+            {c.id === consolidationCurrencyId && <Check className="w-4 h-4 text-blue-600 ml-2" />}
+          </DropdownMenuItem>
+        ))}
       </DropdownMenuContent>
     </DropdownMenu>
   )
@@ -317,7 +337,7 @@ export function BalanceSheetView() {
     return (
       <div className="space-y-6">
         <div className="text-center mb-8 border-b-2 border-gray-300 pb-4">
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">National venture capital company of Zimbabwe</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-1">{activeAddress?.label || "National venture capital company of Zimbabwe"}</h1>
           <h2 className="text-xl font-semibold text-gray-700 mb-2">Balance Sheet (Consolidated)</h2>
           <p className="text-gray-600">As of {format(new Date(consolidatedBalance.asOfDate), "MMMM d, yyyy")}</p>
           <p className="text-sm text-gray-500 mt-1">Reporting Currency: {consolidatedBalance.reportingCurrencyCode}</p>
@@ -607,7 +627,7 @@ export function BalanceSheetView() {
   return (
     <div className="space-y-6">
       {/* Header with Date Filters */}
-      <div className="flex items-center justify-between">
+      <div className="space-y-3">
         <div>
           <h2 className="text-2xl font-semibold text-gray-900">Balance Sheet</h2>
           <p className="text-gray-600">
@@ -616,7 +636,8 @@ export function BalanceSheetView() {
               : `Consolidated View (${(currencies.find((c) => c.code === "USD") || currencies[0])?.code || "USD"} reporting)`}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+
+        <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-600">As of:</span>
             <Popover>
@@ -636,7 +657,7 @@ export function BalanceSheetView() {
               </PopoverContent>
             </Popover>
           </div>
-          {/* Custom currency dropdown */}
+
           <div className="flex items-center gap-1 border rounded-full p-1">
             <Button
               size="sm"
@@ -655,9 +676,14 @@ export function BalanceSheetView() {
               Consolidated
             </Button>
           </div>
-          <div>
-            {reportMode === "single" ? currencyDropdown : multiCurrencyDropdown}
+
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600">
+              {reportMode === "single" ? "Currency:" : "Consolidation Currency:"}
+            </span>
+            {reportMode === "single" ? currencyDropdown : consolidationCurrencyDropdown}
           </div>
+
           <div className="flex items-center gap-2">
             <Switch
               id="hideZeroBalances"
@@ -666,6 +692,7 @@ export function BalanceSheetView() {
             />
             <Label htmlFor="hideZeroBalances" className="text-sm whitespace-nowrap">Hide zero balances</Label>
           </div>
+
           <Button
             onClick={handleGenerate}
             disabled={balanceSheetLoading || isConsolidating}
@@ -720,7 +747,7 @@ export function BalanceSheetView() {
             <div className="max-w-6xl mx-auto">
               {/* Company Header */}
               <div className="text-center mb-8 border-b-2 border-gray-300 pb-4">
-                <h1 className="text-2xl font-bold text-gray-900 mb-1">National venture capital company of Zimbabwe</h1>
+                <h1 className="text-2xl font-bold text-gray-900 mb-1">{activeAddress?.label || "National venture capital company of Zimbabwe"}</h1>
                 <h2 className="text-xl font-semibold text-gray-700 mb-2">Balance Sheet</h2>
                 <p className="text-gray-600">
                   As of {format(new Date(balanceSheet.asOfDate), "MMMM d, yyyy")}

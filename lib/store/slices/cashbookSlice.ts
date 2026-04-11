@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit'
-import { cashbookApi } from '@/lib/api/cashbook-api'
+import { cashbookApi, type FiscalCalendarResponse, type FiscalLockDraftItem, type FiscalPolicy, type FiscalAuditEntry } from '@/lib/api/cashbook-api'
 
 interface CashbookState {
   // Entry Types
@@ -12,6 +12,13 @@ interface CashbookState {
   periodsLoading: boolean
   periodsError: string | null
   periodStatus: any | null
+
+  // Fiscal Calendar
+  fiscalCalendar: FiscalCalendarResponse | null
+  fiscalCalendarLoading: boolean
+  fiscalCalendarError: string | null
+  fiscalAuditLog: FiscalAuditEntry[]
+  fiscalAuditLoading: boolean
 
   // Contra Entries
   contraConfigs: any[]
@@ -28,6 +35,12 @@ const initialState: CashbookState = {
   periodsLoading: false,
   periodsError: null,
   periodStatus: null,
+
+  fiscalCalendar: null,
+  fiscalCalendarLoading: false,
+  fiscalCalendarError: null,
+  fiscalAuditLog: [],
+  fiscalAuditLoading: false,
 
   contraConfigs: [],
   contraConfigsLoading: false,
@@ -99,6 +112,47 @@ export const fetchPeriodStatus = createAsyncThunk(
   async (period: string) => {
     const response = await cashbookApi.getPeriodStatus(period)
     return response.data || response.message
+  }
+)
+
+// Fiscal Calendar Thunks
+export const fetchFiscalCalendar = createAsyncThunk(
+  'cashbook/fetchFiscalCalendar',
+  async () => {
+    const response = await cashbookApi.getFiscalCalendar()
+    return response.data
+  }
+)
+
+export const saveLocksDraft = createAsyncThunk(
+  'cashbook/saveLocksDraft',
+  async (draft: FiscalLockDraftItem[]) => {
+    const response = await cashbookApi.saveLocksDraft(draft)
+    return response.data
+  }
+)
+
+export const commitLocks = createAsyncThunk(
+  'cashbook/commitLocks',
+  async (reason?: string) => {
+    const response = await cashbookApi.commitLocks(reason)
+    return response.data
+  }
+)
+
+export const updateFiscalPolicy = createAsyncThunk(
+  'cashbook/updateFiscalPolicy',
+  async (policy: Partial<FiscalPolicy>) => {
+    const response = await cashbookApi.updateFiscalPolicy(policy)
+    return response.data
+  }
+)
+
+export const fetchFiscalAuditLog = createAsyncThunk(
+  'cashbook/fetchFiscalAuditLog',
+  async (params?: { take?: number; skip?: number }) => {
+    const response = await cashbookApi.getFiscalAuditLog(params)
+    return Array.isArray(response.data) ? response.data : []
   }
 )
 
@@ -204,6 +258,34 @@ const cashbookSlice = createSlice({
       })
       .addCase(fetchPeriodStatus.fulfilled, (state, action) => {
         state.periodStatus = action.payload
+      })
+
+    // Fiscal Calendar
+    builder
+      .addCase(fetchFiscalCalendar.pending, (state) => {
+        state.fiscalCalendarLoading = true
+        state.fiscalCalendarError = null
+      })
+      .addCase(fetchFiscalCalendar.fulfilled, (state, action) => {
+        state.fiscalCalendarLoading = false
+        state.fiscalCalendar = action.payload || null
+      })
+      .addCase(fetchFiscalCalendar.rejected, (state, action) => {
+        state.fiscalCalendarLoading = false
+        state.fiscalCalendarError = action.error.message || 'Failed to fetch fiscal calendar'
+      })
+
+    // Fiscal Audit Log
+    builder
+      .addCase(fetchFiscalAuditLog.pending, (state) => {
+        state.fiscalAuditLoading = true
+      })
+      .addCase(fetchFiscalAuditLog.fulfilled, (state, action) => {
+        state.fiscalAuditLoading = false
+        state.fiscalAuditLog = Array.isArray(action.payload) ? action.payload : []
+      })
+      .addCase(fetchFiscalAuditLog.rejected, (state) => {
+        state.fiscalAuditLoading = false
       })
 
     // Contra Entries

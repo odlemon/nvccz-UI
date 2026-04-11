@@ -35,6 +35,9 @@ export async function addLetterhead(
 ): Promise<number> {
   const pageWidth = doc.internal.pageSize.getWidth()
 
+  // Use address label if available, otherwise fallback to hardcoded company name
+  const companyLabel = address?.label || COMPANY_NAME
+
   // Build address lines from dynamic address or fallback to hardcoded
   const addressLines: string[] = address
     ? [
@@ -59,7 +62,7 @@ export async function addLetterhead(
     doc.setTextColor(255, 255, 255)
     doc.setFontSize(18)
     doc.setFont('helvetica', 'bold')
-    doc.text(COMPANY_NAME, 14, 22)
+    doc.text(companyLabel, 14, 22)
   }
 
   // Company details block on the right
@@ -68,7 +71,7 @@ export async function addLetterhead(
   doc.setTextColor(200, 200, 200)
   const addressX = pageWidth - 14
   doc.setFont('helvetica', 'bold')
-  doc.text(COMPANY_NAME, addressX, 12, { align: 'right' })
+  doc.text(companyLabel, addressX, 12, { align: 'right' })
   doc.setFont('helvetica', 'normal')
   addressLines.forEach((line, i) => {
     doc.text(line, addressX, 16 + i * 4, { align: 'right' })

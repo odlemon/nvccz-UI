@@ -40,8 +40,8 @@ import autoTable from "jspdf-autotable"
 import { TransactionsDataTable } from "./transactions-data-table"
 import { TransactionViewDrawer } from "./transaction-view-drawer"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { buildConsolidatedIncomeStatement, ConsolidatedIncomeStatement } from "@/lib/utils/consolidation/income-statement"
-import { withUsdZwlFallbackRates } from "@/lib/utils/consolidation/fallback-rates"
+import { ConsolidatedIncomeStatement, ConsolidatedIncomeRow } from "@/lib/utils/consolidation/income-statement"
+import type { ConsolidatedIncomeStatementApiResponse } from "@/lib/api/accounting-api"
 
 export function IncomeStatementView() {
   const dispatch = useDispatch<AppDispatch>()
@@ -59,7 +59,7 @@ export function IncomeStatementView() {
   const [endDate, setEndDate] = useState<Date>(new Date())
   const [currencyId, setCurrencyId] = useState(defaultCurrencyId)
   const [reportMode, setReportMode] = useState<"single" | "consolidated">("single")
-  const [selectedCurrencyIds, setSelectedCurrencyIds] = useState<string[]>([])
+  const [consolidationCurrencyId, setConsolidationCurrencyId] = useState(defaultCurrencyId)
   const [consolidatedIncome, setConsolidatedIncome] = useState<ConsolidatedIncomeStatement | null>(null)
   const [isConsolidating, setIsConsolidating] = useState(false)
   const [generatingPDF, setGeneratingPDF] = useState(false)
@@ -131,14 +131,8 @@ export function IncomeStatementView() {
 
   useEffect(() => {
     if (currencies.length && !currencyId) setCurrencyId(defaultCurrencyId)
+    if (currencies.length && !consolidationCurrencyId) setConsolidationCurrencyId(defaultCurrencyId)
   }, [currencies])
-
-  useEffect(() => {
-    if (!currencies.length) return
-    if (selectedCurrencyIds.length === 0) {
-      setSelectedCurrencyIds([defaultCurrencyId])
-    }
-  }, [currencies, defaultCurrencyId])
 
   useEffect(() => {
     if (!currencyId) return
@@ -155,7 +149,7 @@ export function IncomeStatementView() {
     } else {
       loadConsolidatedIncomeStatement()
     }
-  }, [periodType, periodValue, startDate, endDate, currencyId, reportMode, selectedCurrencyIds])
+  }, [periodType, periodValue, startDate, endDate, currencyId, reportMode, consolidationCurrencyId])
 
   const buildParams = () => {
     if (periodType === 'custom') {
@@ -185,65 +179,125 @@ export function IncomeStatementView() {
     }
   }
 
+  const transformApiToConsolidatedIncomeStatement = (
+    apiData: ConsolidatedIncomeStatementApiResponse
+  ): ConsolidatedIncomeStatement => {
+    const rows: ConsolidatedIncomeRow[] = []
+    const sectionMap: Record<string, string> = {
+      revenue: "Revenue",
+      operatingExpenses: "Operating Expenses",
+      incomeTax: "Income Tax",
+      belowTheLine: "Below-the-Line Items",
+    }
+
+    const flattenSection = (accounts: typeof apiData.sections.revenue.accounts, sectionKey: string) => {
+      accounts.forEach((account) => {
+        if (account.currencyBreakdown.length > 0) {
+          account.currencyBreakdown.forEach((bd) => {
+            rows.push({
+              sectionKey: sectionKey as ConsolidatedIncomeRow["sectionKey"],
+              sectionLabel: sectionMap[sectionKey],
+              accountName: account.accountName,
+              sourceCurrencyCode: bd.sourceCurrency,
+              sourceAmount: bd.sourceAmount,
+              conversionRate: bd.conversionRate,
+              consolidatedAmount: bd.consolidatedAmount,
+            })
+          })
+        } else if (account.balance !== 0) {
+          rows.push({
+            sectionKey: sectionKey as ConsolidatedIncomeRow["sectionKey"],
+            sectionLabel: sectionMap[sectionKey],
+            accountName: account.accountName,
+            sourceCurrencyCode: apiData.consolidationCurrency.code,
+            sourceAmount: account.balance,
+            conversionRate: 1,
+            consolidatedAmount: account.balance,
+          })
+        }
+      })
+    }
+
+    flattenSection(apiData.sections.revenue.accounts, "revenue")
+    flattenSection(apiData.sections.operatingExpenses.accounts, "operatingExpenses")
+    flattenSection(apiData.sections.incomeTax.accounts, "incomeTax")
+    flattenSection(apiData.sections.belowTheLine.accounts, "belowTheLine")
+
+    return {
+      period: apiData.period,
+      reportingCurrencyCode: apiData.consolidationCurrency.code,
+      rows,
+      sectionTotals: {
+        revenue: apiData.sections.revenue.total,
+        operatingExpenses: apiData.sections.operatingExpenses.total,
+        incomeTax: apiData.sections.incomeTax.total,
+        belowTheLine: apiData.sections.belowTheLine.total,
+      },
+      totals: {
+        netIncomeBeforeTaxes: apiData.totals.netIncomeBeforeTaxes,
+        netIncome: apiData.totals.netIncome,
+      },
+      missingRates: [],
+    }
+  }
+
   const loadConsolidatedIncomeStatement = async () => {
-    if (!selectedCurrencyIds.length) {
+    if (!consolidationCurrencyId) {
       setConsolidatedIncome(null)
       return
     }
 
     try {
       setIsConsolidating(true)
-      const params = buildParams()
-      const reportingCurrency = currencies.find((c) => c.code === "USD") || currencies[0]
 
-      const responses = await Promise.all(
-        selectedCurrencyIds.map((id) => accountingApi.getIncomeStatementV2({ ...params, currencyId: id }))
+      let apiStartDate: string
+      let apiEndDate: string
+
+      if (periodType === 'custom') {
+        apiStartDate = startDate.toISOString()
+        apiEndDate = endDate.toISOString()
+      } else {
+        // Compute start/end dates from period selection
+        const now = new Date()
+        if (periodType === 'month' && /^\d{4}-\d{2}$/.test(periodValue)) {
+          const [year, month] = periodValue.split('-').map(Number)
+          apiStartDate = new Date(year, month - 1, 1).toISOString()
+          apiEndDate = new Date(year, month, 0, 23, 59, 59, 999).toISOString()
+        } else if (periodType === 'quarter' && /^\d{4}-Q\d$/.test(periodValue)) {
+          const year = parseInt(periodValue.split('-')[0])
+          const quarter = parseInt(periodValue.split('Q')[1])
+          const startMonth = (quarter - 1) * 3
+          apiStartDate = new Date(year, startMonth, 1).toISOString()
+          apiEndDate = new Date(year, startMonth + 3, 0, 23, 59, 59, 999).toISOString()
+        } else if (periodType === 'year' && /^\d{4}$/.test(periodValue)) {
+          const year = parseInt(periodValue)
+          apiStartDate = new Date(year, 0, 1).toISOString()
+          apiEndDate = new Date(year, 11, 31, 23, 59, 59, 999).toISOString()
+        } else {
+          apiStartDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+          apiEndDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999).toISOString()
+        }
+      }
+
+      const response = await accountingApi.getConsolidatedIncomeStatement(
+        {
+          consolidationCurrencyId,
+          startDate: apiStartDate,
+          endDate: apiEndDate,
+        },
+        periodType !== 'custom' ? periodType : undefined
       )
 
-      const statements = responses
-        .map((res, idx) => {
-          const selectedCurrency = currencies.find((c) => c.id === selectedCurrencyIds[idx])
-          if (!res.success || !res.data || !selectedCurrency) return null
-
-          return {
-            ...(res.data as any),
-            // Trust user-selected source currency for consolidation metadata.
-            currency: {
-              id: selectedCurrency.id,
-              code: selectedCurrency.code,
-              name: selectedCurrency.name,
-              symbol: selectedCurrency.symbol,
-            },
-          }
-        })
-        .filter(Boolean) as any[]
-
-      if (!statements.length) {
+      if (!response.success || !response.data) {
         setConsolidatedIncome(null)
+        toast.error("Failed to load consolidated income statement", {
+          description: (response as any)?.error || "No data returned"
+        })
         return
       }
 
-      const ratesResponse = await accountingApi.getExchangeRates()
-      const ratesRaw = (ratesResponse as any)?.data
-      const rates = Array.isArray(ratesRaw)
-        ? ratesRaw
-        : (ratesRaw?.exchangeRates || [])
-      const normalizedRates = withUsdZwlFallbackRates(rates, currencies)
-
-      const consolidated = buildConsolidatedIncomeStatement(
-        statements,
-        normalizedRates,
-        reportingCurrency?.id || currencyId,
-        reportingCurrency?.code || "USD"
-      )
-
+      const consolidated = transformApiToConsolidatedIncomeStatement(response.data)
       setConsolidatedIncome(consolidated)
-
-      if (consolidated && consolidated.missingRates.length > 0) {
-        toast.warning("Some rows were excluded due to missing exchange rates", {
-          description: `${consolidated.missingRates.length} row(s) have no effective rate for consolidation.`
-        })
-      }
     } catch (error: any) {
       setConsolidatedIncome(null)
       toast.error("Failed to load consolidated income statement", {
@@ -271,16 +325,6 @@ export function IncomeStatementView() {
     setIsTransactionDrawerOpen(true)
   }
 
-  const toggleCurrencySelection = (id: string) => {
-    setSelectedCurrencyIds((prev) => {
-      if (prev.includes(id)) {
-        if (prev.length === 1) return prev
-        return prev.filter((x) => x !== id)
-      }
-      return [...prev, id]
-    })
-  }
-
   // Custom dropdown for currency selection
   const currencyDropdown = (
     <DropdownMenu>
@@ -300,48 +344,40 @@ export function IncomeStatementView() {
             className={cn(
               "flex items-center justify-between rounded-full cursor-pointer",
               c.id === currencyId && "bg-blue-100"
-            )}git
+            )}
           >
-            <span>{c.code}</span>
-            {c.id === currencyId && <Check className="w-4 h-4 text-blue-600" />}
+            <span>{c.code} <span className="text-xs text-gray-400 ml-1">{c.name}</span></span>
+            {c.id === currencyId && <Check className="w-4 h-4 text-blue-600 ml-2" />}
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>
     </DropdownMenu>
   )
 
-  const multiCurrencyDropdown = (
+  const consolidationCurrencyDropdown = (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
           variant="outline"
-          className="rounded-full min-w-[180px] flex justify-between items-center"
+          className="rounded-full min-w-[120px] flex justify-between items-center"
         >
-          {selectedCurrencyIds.length
-            ? selectedCurrencyIds
-                .map((id) => currencies.find((c) => c.id === id)?.code)
-                .filter(Boolean)
-                .join(", ")
-            : "Select currencies"}
+          {currencies.find(c => c.id === consolidationCurrencyId)?.code || "Select"} <span className="text-xs text-gray-400 ml-1">(Target)</span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="rounded-xl min-w-[220px]">
-        {currencies.map((c) => {
-          const selected = selectedCurrencyIds.includes(c.id)
-          return (
-            <DropdownMenuItem
-              key={c.id}
-              onClick={() => toggleCurrencySelection(c.id)}
-              className={cn(
-                "flex items-center justify-between rounded-full cursor-pointer",
-                selected && "bg-blue-100"
-              )}
-            >
-              <span>{c.code}</span>
-              {selected && <Check className="w-4 h-4 text-blue-600" />}
-            </DropdownMenuItem>
-          )
-        })}
+      <DropdownMenuContent align="start" className="rounded-xl min-w-[180px]">
+        {currencies.map(c => (
+          <DropdownMenuItem
+            key={c.id}
+            onClick={() => setConsolidationCurrencyId(c.id)}
+            className={cn(
+              "flex items-center justify-between rounded-full cursor-pointer",
+              c.id === consolidationCurrencyId && "bg-blue-100"
+            )}
+          >
+            <span>{c.code} <span className="text-xs text-gray-400 ml-1">{c.name}</span></span>
+            {c.id === consolidationCurrencyId && <Check className="w-4 h-4 text-blue-600 ml-2" />}
+          </DropdownMenuItem>
+        ))}
       </DropdownMenuContent>
     </DropdownMenu>
   )
@@ -524,7 +560,7 @@ export function IncomeStatementView() {
     return (
       <div className="space-y-6">
         <div className="text-center mb-4 border-b-2 border-gray-300 pb-4">
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">National venture capital company of Zimbabwe</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-1">{activeAddress?.label || "National venture capital company of Zimbabwe"}</h1>
           <h2 className="text-xl font-semibold text-gray-700 mb-2">Income Statement (Consolidated)</h2>
           <p className="text-gray-600">
             For the Period from {format(new Date(consolidatedIncome.period.startDate), 'MMMM d, yyyy')} to {format(new Date(consolidatedIncome.period.endDate), 'MMMM d, yyyy')}
@@ -725,9 +761,9 @@ export function IncomeStatementView() {
           {/* Currency Selector */}
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-600">
-              {reportMode === "single" ? "Currency:" : "Source Currencies:"}
+              {reportMode === "single" ? "Currency:" : "Consolidation Currency:"}
             </span>
-            {reportMode === "single" ? currencyDropdown : multiCurrencyDropdown}
+            {reportMode === "single" ? currencyDropdown : consolidationCurrencyDropdown}
           </div>
 
           {/* Export PDF Button */}
@@ -829,7 +865,7 @@ export function IncomeStatementView() {
             <div className="max-w-6xl mx-auto">
               {/* Company Header */}
               <div className="text-center mb-8 border-b-2 border-gray-300 pb-4">
-                <h1 className="text-2xl font-bold text-gray-900 mb-1">National venture capital company of Zimbabwe</h1>
+                <h1 className="text-2xl font-bold text-gray-900 mb-1">{activeAddress?.label || "National venture capital company of Zimbabwe"}</h1>
                 <h2 className="text-xl font-semibold text-gray-700 mb-2">Income Statement</h2>
                 <p className="text-gray-600">
                   For the Period from {format(new Date(incomeStatement.period.startDate), 'MMMM d, yyyy')} to {format(new Date(incomeStatement.period.endDate), 'MMMM d, yyyy')}
