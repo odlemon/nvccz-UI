@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { CalendarIcon } from "lucide-react"
+import { CalendarIcon, Download, Upload } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { format, parseISO } from "date-fns"
 import { CashbookBank } from "@/lib/api/cashbook-api"
@@ -16,10 +16,25 @@ import { CashbookBank } from "@/lib/api/cashbook-api"
 interface ReconciliationHeaderFormProps {
   selectedBank: CashbookBank | null
   onApply: () => void
+  onImportStatement: () => void
+  onDownloadTemplate: () => void
+  importSummary?: {
+    fileName: string
+    transactionsCount: number
+    matchedCount: number
+    unmatchedCount: number
+  } | null
   disabled?: boolean
 }
 
-export function ReconciliationHeaderForm({ selectedBank, onApply, disabled }: ReconciliationHeaderFormProps) {
+export function ReconciliationHeaderForm({
+  selectedBank,
+  onApply,
+  onImportStatement,
+  onDownloadTemplate,
+  importSummary,
+  disabled,
+}: ReconciliationHeaderFormProps) {
   const dispatch = useDispatch<AppDispatch>()
   const { statementDate, statementEndBalance, reference, openingBalance } = useSelector(
     (state: RootState) => state.reconciliation
@@ -29,6 +44,42 @@ export function ReconciliationHeaderForm({ selectedBank, onApply, disabled }: Re
 
   return (
     <div className="bg-white border rounded-lg p-4 space-y-4">
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          className="rounded-full"
+          onClick={onDownloadTemplate}
+          disabled={disabled}
+        >
+          <Download className="w-4 h-4 mr-2" />
+          Download CSV Template
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          className="rounded-full"
+          onClick={onImportStatement}
+          disabled={disabled || !selectedBank}
+        >
+          <Upload className="w-4 h-4 mr-2" />
+          Import Statement CSV
+        </Button>
+      </div>
+
+      {importSummary && (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm">
+          <span className="font-medium text-blue-900">Imported:</span>{" "}
+          <span className="text-blue-800">{importSummary.fileName}</span>
+          <span className="mx-2 text-blue-500">|</span>
+          <span className="text-blue-800">Transactions: {importSummary.transactionsCount}</span>
+          <span className="mx-2 text-blue-500">|</span>
+          <span className="text-green-700">Auto-matched: {importSummary.matchedCount}</span>
+          <span className="mx-2 text-blue-500">|</span>
+          <span className="text-amber-700">Unmatched: {importSummary.unmatchedCount}</span>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Statement Date */}
         <div className="space-y-1.5">

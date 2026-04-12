@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback } from "react"
+import { useCallback, useRef, ChangeEvent } from "react"
 import { useDispatch, useSelector } from "react-redux"
 import { AppDispatch, RootState } from "@/lib/store/store"
 import {
@@ -11,6 +11,8 @@ import {
   discardReconciliationSession,
   clearActiveSession,
   selectIsBalanced,
+  setAutoMatchedEntryIds,
+  setImportedStatement,
 } from "@/lib/store/slices/reconciliationSlice"
 import { CashbookBank } from "@/lib/api/cashbook-api"
 import { ReconciliationHeaderForm } from "./reconciliation-header-form"
@@ -20,6 +22,11 @@ import { Button } from "@/components/ui/button"
 import { ArrowLeft, Save, CheckCircle, XCircle, Loader2, Download } from "lucide-react"
 import { format, parseISO } from "date-fns"
 import { toast } from "sonner"
+import {
+  getBankStatementTemplateCSV,
+  matchStatementTransactionsToEntries,
+  parseBankStatementCSV,
+} from "@/lib/utils/bank-statement-import"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -39,6 +46,7 @@ interface ReconciliationWorkspaceProps {
 
 export function ReconciliationWorkspace({ selectedBank, onBack }: ReconciliationWorkspaceProps) {
   const dispatch = useDispatch<AppDispatch>()
+  const importInputRef = useRef<HTMLInputElement | null>(null)
   const {
     activeSession,
     entries,
@@ -51,15 +59,97 @@ export function ReconciliationWorkspace({ selectedBank, onBack }: Reconciliation
     savingDraft,
     finishing,
     discarding,
+    importedStatement,
+    importedStatementFileName,
+    autoMatchedEntryIds,
   } = useSelector((state: RootState) => state.reconciliation)
   const isBalanced = useSelector(selectIsBalanced)
 
   const isBusy = savingDraft || finishing || discarding
 
-  const handleApply = useCallback(() => {
+  const applyAutoMatch = useCallback((nextEntries: typeof entries) => {
+    if (!importedStatement || importedStatement.transactions.length === 0) {
+      return
+    }
+
+    const matchResult = matchStatementTransactionsToEntries(importedStatement.transactions, nextEntries)
+    dispatch(setAutoMatchedEntryIds(matchResult.matchedEntryIds))
+    toast.success("Statement imported and compared", {
+      description: `Matched ${matchResult.matchedTransactionCount} of ${importedStatement.transactions.length} statement transactions.`,
+    })
+  }, [dispatch, importedStatement])
+
+  const handleApply = useCallback(async () => {
     if (!selectedBank || !statementDate) return
-    dispatch(fetchReconciliationEntries({ bankId: selectedBank.id, asOf: statementDate }))
-  }, [dispatch, selectedBank, statementDate])
+    try {
+      const nextEntries = await dispatch(fetchReconciliationEntries({ bankId: selectedBank.id, asOf: statementDate })).unwrap()
+      applyAutoMatch(nextEntries || [])
+    } catch (error: any) {
+      toast.error("Failed to load reconciliation entries", { description: error?.message || String(error) })
+    }
+  }, [dispatch, selectedBank, statementDate, applyAutoMatch])
+
+  const handleDownloadTemplate = useCallback(() => {
+    const template = getBankStatementTemplateCSV()
+    const blob = new Blob([template], { type: "text/csv;charset=utf-8;" })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = "bank-statement-import-template.csv"
+    a.click()
+    window.URL.revokeObjectURL(url)
+  }, [])
+
+  const handleImportStatement = useCallback(() => {
+    importInputRef.current?.click()
+  }, [])
+
+  const handleStatementFileChange = useCallback(async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    if (!selectedBank) {
+      toast.error("Please select a bank account before importing a statement")
+      event.target.value = ""
+      return
+    }
+
+    try {
+      const text = await file.text()
+      const parsedStatement = parseBankStatementCSV(text)
+
+      if (parsedStatement.transactions.length === 0) {
+        toast.error("No valid statement transactions were found in the CSV")
+        event.target.value = ""
+        return
+      }
+
+      dispatch(setImportedStatement({ statement: parsedStatement, fileName: file.name }))
+
+      if (!parsedStatement.statementDate) {
+        toast.error("Could not determine statement date from the file")
+        event.target.value = ""
+        return
+      }
+
+      const nextEntries = await dispatch(fetchReconciliationEntries({
+        bankId: selectedBank.id,
+        asOf: parsedStatement.statementDate,
+      })).unwrap()
+      applyAutoMatch(nextEntries || [])
+
+      if (parsedStatement.warnings.length > 0) {
+        toast.warning("Statement imported with warnings", {
+          description: parsedStatement.warnings[0],
+        })
+      }
+    } catch (error: any) {
+      toast.error("Failed to import bank statement", {
+        description: error?.message || String(error),
+      })
+    } finally {
+      event.target.value = ""
+    }
+  }, [dispatch, selectedBank, applyAutoMatch])
 
   const handleSaveDraft = useCallback(async () => {
     if (!selectedBank) return
@@ -195,7 +285,23 @@ export function ReconciliationWorkspace({ selectedBank, onBack }: Reconciliation
       <ReconciliationHeaderForm
         selectedBank={selectedBank}
         onApply={handleApply}
+        onImportStatement={handleImportStatement}
+        onDownloadTemplate={handleDownloadTemplate}
+        importSummary={importedStatement && importedStatementFileName ? {
+          fileName: importedStatementFileName,
+          transactionsCount: importedStatement.transactions.length,
+          matchedCount: autoMatchedEntryIds.length,
+          unmatchedCount: Math.max(0, importedStatement.transactions.length - autoMatchedEntryIds.length),
+        } : null}
         disabled={isBusy || (activeSession?.status === "FINALIZED")}
+      />
+
+      <input
+        ref={importInputRef}
+        type="file"
+        accept=".csv,text/csv"
+        className="hidden"
+        onChange={handleStatementFileChange}
       />
 
       {/* Entries Table */}

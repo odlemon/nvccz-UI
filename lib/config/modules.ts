@@ -229,6 +229,7 @@ export const MODULE_CONFIG: ModuleConfig[] = [
       { id: "inventory-accounting", name: "Inventory", path: "/accounting/inventory", icon: CiShop, description: "Stock management and COGS" },
 
       { id: "asset-management", name: "Asset Management", path: "/accounting/assets", icon: CiViewBoard, description: "Fixed assets and depreciation" },
+      { id: "short-term-investments", name: "Short-Term Investments", path: "/accounting/short-term-investments", icon: CiCoins1, description: "Track and manage short-term liquid investments" },
       { id: "financial-reports", name: "Financial Reports", path: "/accounting/reports", icon: CiViewTable, description: "Financial statements and analytics" },
 
       { id: "accounting-settings", name: "Settings", path: "/accounting/settings", icon: CiSettings, description: "Chart of accounts and configuration" },

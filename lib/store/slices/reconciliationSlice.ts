@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk, createSelector, PayloadAction } from '@reduxjs/toolkit'
 import { reconciliationApi, ReconciliationEntry, ReconciliationSession, CreateSessionRequest, UpdateSessionRequest } from '@/lib/api/reconciliation-api'
+import { ImportedBankStatement } from '@/lib/utils/bank-statement-import'
 import { RootState } from '../store'
 
 interface ReconciliationState {
@@ -27,6 +28,11 @@ interface ReconciliationState {
     reference: string
     openingBalance: number | null
 
+    // Imported statement context
+    importedStatement: ImportedBankStatement | null
+    importedStatementFileName: string | null
+    autoMatchedEntryIds: string[]
+
     // Action loading states
     savingDraft: boolean
     finishing: boolean
@@ -52,6 +58,10 @@ const initialState: ReconciliationState = {
     statementEndBalance: null,
     reference: '',
     openingBalance: null,
+
+    importedStatement: null,
+    importedStatementFileName: null,
+    autoMatchedEntryIds: [],
 
     savingDraft: false,
     finishing: false,
@@ -151,6 +161,35 @@ const reconciliationSlice = createSlice({
         setOpeningBalance(state, action: PayloadAction<number | null>) {
             state.openingBalance = action.payload
         },
+        setImportedStatement(
+            state,
+            action: PayloadAction<{ statement: ImportedBankStatement; fileName: string } | null>
+        ) {
+            if (!action.payload) {
+                state.importedStatement = null
+                state.importedStatementFileName = null
+                state.autoMatchedEntryIds = []
+                return
+            }
+
+            const { statement, fileName } = action.payload
+            state.importedStatement = statement
+            state.importedStatementFileName = fileName
+
+            if (statement.statementDate) {
+                state.statementDate = statement.statementDate
+            }
+            if (typeof statement.openingBalance === 'number') {
+                state.openingBalance = statement.openingBalance
+            }
+            if (typeof statement.closingBalance === 'number') {
+                state.statementEndBalance = statement.closingBalance
+            }
+        },
+        setAutoMatchedEntryIds(state, action: PayloadAction<string[]>) {
+            state.autoMatchedEntryIds = action.payload
+            state.selectedEntryIds = action.payload
+        },
         clearActiveSession(state) {
             state.activeSession = null
             state.activeSessionError = null
@@ -161,6 +200,9 @@ const reconciliationSlice = createSlice({
             state.statementEndBalance = null
             state.reference = ''
             state.openingBalance = null
+            state.importedStatement = null
+            state.importedStatementFileName = null
+            state.autoMatchedEntryIds = []
         },
         setSelectedEntryIds(state, action: PayloadAction<string[]>) {
             state.selectedEntryIds = action.payload
@@ -216,6 +258,9 @@ const reconciliationSlice = createSlice({
             state.activeSessionLoading = false
             const session = action.payload
             state.activeSession = session || null
+            state.importedStatement = null
+            state.importedStatementFileName = null
+            state.autoMatchedEntryIds = []
             if (session) {
                 state.statementDate = session.statementDate
                 state.statementEndBalance = session.statementEndBalance
@@ -281,6 +326,8 @@ export const {
     setStatementEndBalance,
     setReference,
     setOpeningBalance,
+    setImportedStatement,
+    setAutoMatchedEntryIds,
     clearActiveSession,
     setSelectedEntryIds,
 } = reconciliationSlice.actions

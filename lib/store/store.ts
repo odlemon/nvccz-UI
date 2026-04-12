@@ -12,6 +12,7 @@ import authReducer from './slices/authSlice'
 import uiReducer from './slices/uiSlice'
 import fundsReducer from './slices/fundsSlice'
 import reconciliationReducer from './slices/reconciliationSlice'
+import shortTermInvestmentsReducer from './slices/shortTermInvestmentsSlice'
 
 export const store = configureStore({
   reducer: {
@@ -28,6 +29,7 @@ export const store = configureStore({
     auth: authReducer,
     ui: uiReducer,
     funds: fundsReducer,
+    shortTermInvestments: shortTermInvestmentsReducer,
   },
   // ...existing middleware...
 })

@@ -33,6 +33,7 @@ import applicationPortalReducer from './slices/applicationPortalSlice'
 import portfolioCompaniesReducer from './slices/portfolioCompaniesSlice'
 import portfolioDashboardReducer from './slices/portfolioDashboardSlice'
 import reconciliationReducer from './slices/reconciliationSlice'
+import shortTermInvestmentsReducer from './slices/shortTermInvestmentsSlice'
 
 export const store = configureStore({
   reducer: {
@@ -68,6 +69,7 @@ export const store = configureStore({
     reconciliation: reconciliationReducer,
     zseStocks: zseStocksReducer,
     marketOverview: marketOverviewReducer,
+    shortTermInvestments: shortTermInvestmentsReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
