@@ -187,6 +187,65 @@ class ApplicationsApiService {
     return apiClient.get<ApplicationsResponse>('/applications')
   }
 
+  // ── New Flow APIs ──────────────────────────────────────────────────
+
+  /** Step 2: Assign lead analyst (SCREENING_PENDING or SCREENING) */
+  async assignAnalyst(applicationId: string, analystUserId: string): Promise<any> {
+    return apiClient.patch(`/applications/${applicationId}/assigned-analyst`, { analystUserId })
+  }
+
+  /** Step 3: Analyst screening score (stage SCREENING, caller = assigned analyst) */
+  async analystScreening(applicationId: string, score: number): Promise<any> {
+    return apiClient.post(`/applications/${applicationId}/analyst-screening`, { score })
+  }
+
+  /** Step 4: Trigger AI shortlisting (stage SCREENING_PENDING) */
+  async triggerShortlisting(applicationId: string): Promise<any> {
+    return apiClient.post(`/applications/${applicationId}/trigger-shortlisting`, {})
+  }
+
+  /** Step 5a: Upload RBZ Exchange Control document */
+  async uploadRbzDocument(applicationId: string, file: File): Promise<any> {
+    const formData = new FormData()
+    formData.append('file', file)
+    return apiClient.postFormData(`/applications/${applicationId}/rbz-exchange-control-document`, formData)
+  }
+
+  /** Step 5b: Set KYC verified (statutory compliance) */
+  async setStatutoryCompliance(applicationId: string, kycVerified: boolean): Promise<any> {
+    return apiClient.patch(`/applications/${applicationId}/statutory-compliance`, { kycVerified })
+  }
+
+  /** Step 6a: Get collaboration messages */
+  async getCollaborationMessages(applicationId: string): Promise<any> {
+    return apiClient.get(`/applications/${applicationId}/collaboration/messages`)
+  }
+
+  /** Step 6b: Post collaboration message */
+  async postCollaborationMessage(applicationId: string, content: string, mentionUserIds?: string[]): Promise<any> {
+    return apiClient.post(`/applications/${applicationId}/collaboration/messages`, { content, mentionUserIds })
+  }
+
+  /** Step 6c: Post collaboration comment with optional attachments */
+  async postCollaborationComment(applicationId: string, content: string, attachments?: File[]): Promise<any> {
+    const formData = new FormData()
+    formData.append('content', content)
+    if (attachments) {
+      attachments.forEach(file => formData.append('attachments', file))
+    }
+    return apiClient.postFormData(`/applications/${applicationId}/collaboration/comments`, formData)
+  }
+
+  /** Step 7: Initiate due diligence (stage SCREENING → ACTIVE_DD) */
+  async initiateDueDiligence(applicationId: string): Promise<any> {
+    return apiClient.post(`/applications/${applicationId}/due-diligence/initiate`, {})
+  }
+
+  /** Get application status */
+  async getStatus(applicationId: string): Promise<any> {
+    return apiClient.get(`/applications/status/${applicationId}`)
+  }
+
   // Create a new application with FormData
   async create(applicationData: ApplicationCreateRequest): Promise<ApplicationCreateResponse> {
     const formData = new FormData()

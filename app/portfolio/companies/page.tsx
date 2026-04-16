@@ -99,69 +99,61 @@ export default function CompaniesPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            {/* Total Companies */}
-            <div className="bg-gradient-to-br from-blue-500 via-blue-600 to-purple-700 rounded-2xl p-6 text-white">
-              <div className="flex items-center justify-between mb-4">
-                <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
-                  <CiBank className="w-6 h-6 text-white" />
+            <Card className="rounded-2xl border border-border bg-card shadow-sm">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="w-12 h-12 rounded-full border border-border bg-muted/40 flex items-center justify-center">
+                    <CiBank className="w-6 h-6 text-gray-700" />
+                  </div>
+                  <div className="text-right">
+                    <p className="text-muted-foreground text-sm font-medium">Total Companies</p>
+                    <p className="text-3xl font-normal text-gray-900">{totalCompanies}</p>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-white/80 text-sm font-medium">Total Companies</p>
-                  <p className="text-3xl font-normal text-white">{totalCompanies}</p>
-                </div>
-              </div>
-              {/* <div className="w-full h-2 bg-white/20 rounded-full">
-                <div className="w-3/4 h-2 bg-white rounded-full"></div>
-              </div> */}
-            </div>
+              </CardContent>
+            </Card>
 
-            {/* Active Investments */}
-            <div className="bg-gradient-to-br from-green-500 via-emerald-600 to-teal-700 rounded-2xl p-6 text-white">
-              <div className="flex items-center justify-between mb-4">
-                <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
-                  <TrendingUp className="w-6 h-6 text-white" />
+            <Card className="rounded-2xl border border-border bg-card shadow-sm">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="w-12 h-12 rounded-full border border-border bg-muted/40 flex items-center justify-center">
+                    <TrendingUp className="w-6 h-6 text-gray-700" />
+                  </div>
+                  <div className="text-right">
+                    <p className="text-muted-foreground text-sm font-medium">Active Companies</p>
+                    <p className="text-3xl font-normal text-gray-900">{activeCompanies}</p>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-white/80 text-sm font-medium">Active Companies</p>
-                  <p className="text-3xl font-normal text-white">{activeCompanies}</p>
-                </div>
-              </div>
-              {/* <div className="w-full h-2 bg-white/20 rounded-full">
-                <div className="w-4/5 h-2 bg-white rounded-full"></div>
-              </div> */}
-            </div>
+              </CardContent>
+            </Card>
 
-            {/* Total Investment */}
-            <div className="bg-gradient-to-br from-amber-400 via-orange-500 to-red-500 rounded-2xl p-6 text-white">
-              <div className="flex items-center justify-between mb-4">
-                <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
-                  <CiDollar className="w-6 h-6 text-white" />
+            <Card className="rounded-2xl border border-border bg-card shadow-sm">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="w-12 h-12 rounded-full border border-border bg-muted/40 flex items-center justify-center">
+                    <CiDollar className="w-6 h-6 text-gray-700" />
+                  </div>
+                  <div className="text-right">
+                    <p className="text-muted-foreground text-sm font-medium">Total Investment</p>
+                    <p className="text-3xl font-normal text-gray-900">${(totalInvestment / 1000).toFixed(1)}K</p>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-white/80 text-sm font-medium">Total Investment</p>
-                  <p className="text-3xl font-normal text-white">${(totalInvestment / 1000).toFixed(1)}K</p>
-                </div>
-              </div>
-              {/* <div className="w-full h-2 bg-white/20 rounded-full">
-                <div className="w-2/3 h-2 bg-white rounded-full"></div>
-              </div> */}
-            </div>
+              </CardContent>
+            </Card>
 
-            {/* Avg Investment */}
-            <div className="bg-gradient-to-br from-purple-500 via-violet-600 to-indigo-700 rounded-2xl p-6 text-white">
-              <div className="flex items-center justify-between mb-4">
-                <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
-                  <BarChart3 className="w-6 h-6 text-white" />
+            <Card className="rounded-2xl border border-border bg-card shadow-sm">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="w-12 h-12 rounded-full border border-border bg-muted/40 flex items-center justify-center">
+                    <BarChart3 className="w-6 h-6 text-gray-700" />
+                  </div>
+                  <div className="text-right">
+                    <p className="text-muted-foreground text-sm font-medium">Avg. Investment</p>
+                    <p className="text-3xl font-normal text-gray-900">${avgPerformance.toFixed(0)}</p>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-white/80 text-sm font-medium">Avg. Investment</p>
-                  <p className="text-3xl font-normal text-white">${avgPerformance.toFixed(0)}</p>
-                </div>
-              </div>
-              {/* <div className="w-full h-2 bg-white/20 rounded-full">
-                <div className="w-5/6 h-2 bg-white rounded-full"></div>
-              </div> */}
-            </div>
+              </CardContent>
+            </Card>
           </div>
         )}
 
@@ -217,23 +209,24 @@ export default function CompaniesPage() {
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
             {filteredCompanies.map((company) => (
-              <div 
-                key={company.id} 
+              <Card
+                key={company.id}
                 onClick={() => handleViewCompany(company)}
-                className="bg-gradient-to-br from-blue-500 via-blue-600 to-purple-700 rounded-2xl p-6 text-white hover:scale-105 transition-all duration-300 cursor-pointer"
+                className="rounded-2xl border border-border bg-card shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer"
               >
+                <CardContent className="p-6">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center space-x-3">
-                    <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center text-2xl">
+                    <div className="w-12 h-12 border border-border bg-muted/40 rounded-full flex items-center justify-center text-xl font-medium text-gray-700">
                       {company.name.charAt(0)}
                     </div>
                     <div>
-                      <h3 className="text-lg font-medium text-white">{company.name}</h3>
-                      <p className="text-sm text-white/80">{company.industry}</p>
+                      <h3 className="text-lg font-medium text-gray-900">{company.name}</h3>
+                      <p className="text-sm text-muted-foreground">{company.industry}</p>
                     </div>
                   </div>
-                  <Badge className={`text-xs ${getStatusColor(company.status)}`}>
+                  <Badge className={`text-xs ${getStatusColorLight(company.status)}`}>
                     {company.status}
                   </Badge>
                 </div>
@@ -242,32 +235,33 @@ export default function CompaniesPage() {
                 <div className="space-y-3 mb-4">
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
-                      <p className="text-white/70">Total Invested</p>
-                      <p className="text-lg font-normal text-white">${(Number(company.totalInvested) || 0).toLocaleString()}</p>
+                      <p className="text-muted-foreground">Total Invested</p>
+                      <p className="text-lg font-normal text-gray-900">${(Number(company.totalInvested) || 0).toLocaleString()}</p>
                     </div>
                     <div>
-                      <p className="text-white/70">Disbursements</p>
-                      <p className="text-lg font-normal text-white">{company.disbursements?.length || 0}</p>
+                      <p className="text-muted-foreground">Disbursements</p>
+                      <p className="text-lg font-normal text-gray-900">{company.disbursements?.length || 0}</p>
                     </div>
                     <div>
-                      <p className="text-white/70">Fund</p>
-                      <p className="text-sm font-normal text-white truncate">{company.fund?.name || 'N/A'}</p>
+                      <p className="text-muted-foreground">Fund</p>
+                      <p className="text-sm font-normal text-gray-900 truncate">{company.fund?.name || 'N/A'}</p>
                     </div>
                     <div>
-                      <p className="text-white/70">Owner</p>
-                      <p className="text-sm font-normal text-white truncate">{company.user?.firstName || 'N/A'}</p>
+                      <p className="text-muted-foreground">Owner</p>
+                      <p className="text-sm font-normal text-gray-900 truncate">{company.user?.firstName || 'N/A'}</p>
                     </div>
                   </div>
                 </div>
 
                 {/* Last Update */}
-                <div className="pt-3 border-t border-white/20">
+                <div className="pt-3 border-t border-border">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-white/70">Registration</span>
-                    <span className="text-white/90 text-xs font-mono">{(company.registrationNumber || '').slice(0, 15)}...</span>
+                    <span className="text-muted-foreground">Registration</span>
+                    <span className="text-gray-900 text-xs font-mono">{(company.registrationNumber || '').slice(0, 15)}...</span>
                   </div>
                 </div>
-              </div>
+                </CardContent>
+              </Card>
             ))}
           </div>
         )}

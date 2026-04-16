@@ -27,7 +27,10 @@ import {
   Edit,
   Play,
   X,
-  UserPlus
+  UserPlus,
+  Search,
+  Shield,
+  MessageSquare,
 } from "lucide-react"
 import { CiFileOn } from "react-icons/ci"
 import { useAppDispatch, useAppSelector } from '@/lib/store'
@@ -52,7 +55,7 @@ import { BoardReviewSection } from "./timeline/board-review-section"
 import { TermSheetSection } from "./timeline/term-sheet-section"
 import { FundDisbursementSection } from "./timeline/fund-disbursement-section"
 import { TimelineStageActions } from "./timeline/timeline-stage-actions"
-import type { ExtendedApplication } from '@/lib/api/applications-api'
+import { applicationsApi, type ExtendedApplication } from '@/lib/api/applications-api'
 import { toast } from "sonner"
 
 import {
@@ -72,6 +75,8 @@ import { ActivityApprovalModal } from "./activity-approval-modal"
 import { BoardVoteModal } from "./board-voting-modal"
 import { MilestoneModal } from "./milestone-modal"
 import { ChecklistModal } from "./checklist-modal"
+import { AssignAnalystModal } from "./assign-analyst-modal"
+import { AnalystScreeningModal } from "./analyst-screening-modal"
 import { TimelineSkeleton } from "@/components/ui/skeleton-loader"
 // import { BoardVoteModal } from "./board-vote-modal"
 
@@ -97,7 +102,7 @@ interface ApplicationTimelineProps {
 const stages = [
   {
     id: "APPLICATION_SUBMISSION",
-    statusCodes: ["SHORTLISTED"],
+    statusCodes: ["SHORTLISTED", "SCREENING_PENDING"],
     title: "Application Submission",
     description: "Applicant submits form; documents linked; status visible to applicant.",
     icon: FileText,
@@ -105,12 +110,39 @@ const stages = [
     completedColor: "bg-green-500"
   },
   {
+    id: "SCREENING_GROUP",
+    statusCodes: ["SCREENING_PENDING", "SCREENING"],
+    title: "Screening & Analyst Review",
+    description: "Assign lead analyst; analyst screening score determines if application advances to due diligence.",
+    icon: Search,
+    color: "bg-cyan-500",
+    completedColor: "bg-green-500"
+  },
+  {
+    id: "COMPLIANCE_GROUP",
+    statusCodes: ["SCREENING", "ACTIVE_DD"],
+    title: "Compliance & KYC",
+    description: "Upload RBZ Exchange Control document and verify KYC before disbursement can proceed.",
+    icon: Shield,
+    color: "bg-rose-500",
+    completedColor: "bg-green-500"
+  },
+  {
     id: "DUE_DILIGENCE_GROUP",
-    statusCodes: ["UNDER_DUE_DILIGENCE", "DUE_DILIGENCE_COMPLETED"],
+    statusCodes: ["ACTIVE_DD", "UNDER_DUE_DILIGENCE", "DUE_DILIGENCE_COMPLETED"],
     title: "Due Diligence",
     description: "Due diligence review in progress by Investments team; completed when finished.",
     icon: Eye,
     color: "bg-amber-500",
+    completedColor: "bg-green-500"
+  },
+  {
+    id: "BOARD_GROUP",
+    statusCodes: ["UNDER_BOARD_REVIEW", "BOARD_APPROVED", "BOARD_CONDITIONAL", "BOARD_REJECTED"],
+    title: "Board Review & IC Decision",
+    description: "Investment Memorandum submitted; IC members cast votes; quorum determines outcome.",
+    icon: Users,
+    color: "bg-purple-500",
     completedColor: "bg-green-500"
   },
   {
@@ -123,26 +155,17 @@ const stages = [
     completedColor: "bg-green-500"
   },
   {
-    id: "BOARD_GROUP",
-    statusCodes: ["UNDER_BOARD_REVIEW", "BOARD_APPROVED", "BOARD_CONDITIONAL", "BOARD_REJECTED"],
-    title: "Board Review & Decision",
-    description: "Application queued for board review; board outcomes determine next steps.",
-    icon: Users,
-    color: "bg-purple-500",
-    completedColor: "bg-green-500"
-  },
-  {
     id: "INVESTMENT_GROUP",
     statusCodes: ["INVESTMENT_IMPLEMENTATION", "DISBURSED", "FUNDED"],
     title: "Investment Implementation & Disbursement",
-    description: "Implementation plan started; all disbursements approved/disbursed and investment marked as funded.",
+    description: "Implementation plan started; CFO approves tranches with bank selection; all disbursements completed.",
     icon: DollarSign,
     color: "bg-emerald-500",
     completedColor: "bg-green-500"
   },
   {
     id: "REJECTION_PATH",
-    statusCodes: ["REJECTED", "BELOW_THRESHOLD"],
+    statusCodes: ["REJECTED", "BELOW_THRESHOLD", "REJECTED_SCREENING", "AUTO_REJECTED"],
     title: "Rejection Path",
     description: "Application may move here from any stage if criteria are not met.",
     icon: X,
@@ -182,21 +205,44 @@ export function ApplicationTimeline({
 
   // Helper to check if a stage is completed
   const isStageCompleted = (stageId: string) => {
+    const cs = latestApplication?.currentStage
+    if (!cs) return false
+
+    // Define stage order for progression checks
+    const stageOrder = [
+      'SHORTLISTED', 'SCREENING_PENDING', 'SCREENING',
+      'ACTIVE_DD', 'UNDER_DUE_DILIGENCE', 'DUE_DILIGENCE_COMPLETED',
+      'UNDER_BOARD_REVIEW', 'BOARD_APPROVED', 'BOARD_CONDITIONAL', 'BOARD_REJECTED',
+      'TERM_SHEET_NEGOTIATION', 'TERM_SHEET', 'TERM_SHEET_SIGNED',
+      'INVESTMENT_IMPLEMENTATION', 'DISBURSED', 'FUNDED'
+    ]
+    const currentIdx = stageOrder.indexOf(cs)
+
     switch (stageId) {
       case "APPLICATION_SUBMISSION":
-        return latestApplication?.currentStage !== 'SHORTLISTED';
+        return cs !== 'SHORTLISTED' && cs !== 'SCREENING_PENDING'
+      case "SCREENING_GROUP":
+        return currentIdx > stageOrder.indexOf('SCREENING') ||
+          ['REJECTED_SCREENING', 'AUTO_REJECTED'].includes(cs)
+      case "COMPLIANCE_GROUP":
+        // Compliance can happen alongside screening/DD; check if past ACTIVE_DD
+        return currentIdx > stageOrder.indexOf('ACTIVE_DD')
       case "DUE_DILIGENCE_GROUP":
-        return (latestApplication as any)?.dueDiligenceReview?.status === 'COMPLETED';
-      case "TERM_SHEET_GROUP":
-        return (latestApplication as any)?.termSheet?.status === 'SIGNED';
+        return (latestApplication as any)?.dueDiligenceReview?.status === 'COMPLETED' ||
+          currentIdx > stageOrder.indexOf('DUE_DILIGENCE_COMPLETED')
       case "BOARD_GROUP":
-        return (latestApplication as any)?.boardReview?.status === 'COMPLETED' || latestApplication?.currentStage && ['BOARD_APPROVED', 'BOARD_CONDITIONAL', 'BOARD_REJECTED'].includes(latestApplication.currentStage);
+        return (latestApplication as any)?.boardReview?.status === 'COMPLETED' ||
+          ['BOARD_APPROVED', 'BOARD_CONDITIONAL', 'BOARD_REJECTED', 'TERM_SHEET_NEGOTIATION', 'TERM_SHEET', 'TERM_SHEET_SIGNED', 'INVESTMENT_IMPLEMENTATION', 'DISBURSED', 'FUNDED'].includes(cs)
+      case "TERM_SHEET_GROUP":
+        return (latestApplication as any)?.termSheet?.status === 'SIGNED' ||
+          ['INVESTMENT_IMPLEMENTATION', 'DISBURSED', 'FUNDED'].includes(cs)
       case "INVESTMENT_GROUP":
-        return latestApplication?.currentStage !== 'INVESTMENT_IMPLEMENTATION' && (!!(latestApplication as any)?.investmentImplementation || latestApplication?.currentStage && ['DISBURSED', 'FUNDED'].includes(latestApplication.currentStage));
+        return cs !== 'INVESTMENT_IMPLEMENTATION' &&
+          (!!(latestApplication as any)?.investmentImplementation || ['DISBURSED', 'FUNDED'].includes(cs))
       case "REJECTION_PATH":
-        return latestApplication?.currentStage && ['REJECTED', 'BELOW_THRESHOLD'].includes(latestApplication.currentStage);
+        return ['REJECTED', 'BELOW_THRESHOLD', 'REJECTED_SCREENING', 'AUTO_REJECTED'].includes(cs)
       default:
-        return false;
+        return false
     }
   };
 
@@ -259,6 +305,70 @@ export function ApplicationTimeline({
   const handleUpdateTermSheet = async () => { setTermSheetModalOpen(true); };
   const handleFinalizeTermSheet = async () => { setFinalizeTermSheetConfirmationOpen(true); };
   const handleInvestorSignTermSheet = async () => { setInvestorSignModalOpen(true); };
+
+  // ── New flow action handlers ──
+  const handleAssignAnalyst = async () => {
+    setShowAssignAnalystModal(true)
+  }
+
+  const handleAnalystScreening = async () => {
+    setShowScreeningScoreModal(true)
+  }
+
+  const handleTriggerShortlisting = async () => {
+    try {
+      await applicationsApi.triggerShortlisting(application.id)
+      toast.success('Shortlisting triggered')
+      await refreshSelectedApplication()
+    } catch (e: any) {
+      toast.error('Failed to trigger shortlisting', { description: e?.message })
+    }
+  }
+
+  const handleUploadRbz = async () => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.pdf'
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0]
+      if (!file) return
+
+      setRbzFileToUpload(file)
+      setRbzConfirmOpen(true)
+    }
+    input.click()
+  }
+
+  const handleConfirmRbzUpload = async () => {
+    if (!rbzFileToUpload) {
+      toast.error('No RBZ document selected')
+      return
+    }
+
+    setRbzUploading(true)
+    try {
+      await applicationsApi.uploadRbzDocument(application.id, rbzFileToUpload)
+      toast.success('RBZ Exchange Control document uploaded')
+      setRbzConfirmOpen(false)
+      setRbzFileToUpload(null)
+      await refreshSelectedApplication()
+    } catch (err: any) {
+      toast.error('Failed to upload RBZ document', { description: err?.message })
+    } finally {
+      setRbzUploading(false)
+    }
+  }
+
+  const handleSetKycVerified = async () => {
+    try {
+      await applicationsApi.setStatutoryCompliance(application.id, true)
+      toast.success('KYC verified successfully')
+      await refreshSelectedApplication()
+    } catch (e: any) {
+      toast.error('Failed to verify KYC', { description: e?.message })
+    }
+  }
+
   // Fetch required data once when drawer opens
   useEffect(() => {
     dispatch(fetchLatestApplicationById(application.id))
@@ -369,6 +479,11 @@ export function ApplicationTimeline({
   const [pendingDisbursement, setPendingDisbursement] = useState<any>(null);
   const [showMilestoneModal, setShowMilestoneModal] = useState(false);
   const [showChecklistModal, setShowChecklistModal] = useState(false);
+  const [showAssignAnalystModal, setShowAssignAnalystModal] = useState(false);
+  const [showScreeningScoreModal, setShowScreeningScoreModal] = useState(false);
+  const [rbzFileToUpload, setRbzFileToUpload] = useState<File | null>(null);
+  const [rbzConfirmOpen, setRbzConfirmOpen] = useState(false);
+  const [rbzUploading, setRbzUploading] = useState(false);
 
   const handleCreateTask = () => {
     setShowTaskModal(true)
@@ -652,6 +767,59 @@ export function ApplicationTimeline({
           onSuccess={handleChecklistSuccess}
         />
 
+        <AssignAnalystModal
+          isOpen={showAssignAnalystModal}
+          onClose={() => setShowAssignAnalystModal(false)}
+          applicationId={application.id}
+          businessName={application.businessName}
+          onSuccess={refreshSelectedApplication}
+        />
+
+        <AnalystScreeningModal
+          isOpen={showScreeningScoreModal}
+          onClose={() => setShowScreeningScoreModal(false)}
+          applicationId={application.id}
+          businessName={application.businessName}
+          hasAssignedAnalyst={Boolean((latestApplication as any)?.assignedAnalystId || (latestApplication as any)?.assignedAnalyst)}
+          onAssignAnalyst={() => {
+            setShowScreeningScoreModal(false)
+            setShowAssignAnalystModal(true)
+          }}
+          onSuccess={refreshSelectedApplication}
+        />
+
+        <AlertDialog
+          open={rbzConfirmOpen}
+          onOpenChange={(open) => {
+            setRbzConfirmOpen(open)
+            if (!open) {
+              setRbzFileToUpload(null)
+            }
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirm RBZ Document Upload</AlertDialogTitle>
+              <AlertDialogDescription>
+                You are about to upload this RBZ Exchange Control document:
+                <span className="block mt-2 font-medium text-foreground">{rbzFileToUpload?.name || 'No file selected'}</span>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={rbzUploading}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={(e) => {
+                  e.preventDefault()
+                  void handleConfirmRbzUpload()
+                }}
+                disabled={rbzUploading || !rbzFileToUpload}
+              >
+                {rbzUploading ? 'Uploading...' : 'Upload Document'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
         {stages.map((stage, index) => {
           const status = getStageStatus(index);
           const isCompleted = status === "completed"
@@ -667,6 +835,10 @@ export function ApplicationTimeline({
           if (stage.id === "APPLICATION_SUBMISSION") {
             showAccordion = true;
           } else if (isCurrent || isCompleted) {
+            showAccordion = true;
+          } else if (stage.id === "SCREENING_GROUP" && ['SCREENING_PENDING', 'SCREENING'].includes(latestApplication?.currentStage || '')) {
+            showAccordion = true;
+          } else if (stage.id === "COMPLIANCE_GROUP" && (isCurrent || isCompleted)) {
             showAccordion = true;
           } else if (stage.id === "DUE_DILIGENCE_GROUP" && dueDiligenceData) {
             showAccordion = true;
@@ -754,6 +926,98 @@ export function ApplicationTimeline({
                             </AccordionTrigger>
                             <AccordionContent>
                               <ApplicationDataSection application={application} />
+                            </AccordionContent>
+                          </AccordionItem>
+                        </Accordion>
+                      )}
+
+                      {stage.id === "SCREENING_GROUP" && showAccordion && (
+                        <Accordion type="single" collapsible className="w-full">
+                          <AccordionItem value="screening-data">
+                            <AccordionTrigger className="text-left hover:bg-cyan-50 transition-colors duration-200 cursor-pointer">
+                              <div className="flex items-center gap-3">
+                                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-cyan-100 to-sky-200 flex items-center justify-center">
+                                  <Search className="w-4 h-4 text-cyan-500" />
+                                </div>
+                                <span>Screening & Analyst Details</span>
+                              </div>
+                            </AccordionTrigger>
+                            <AccordionContent>
+                              <div className="space-y-3 text-sm p-3 bg-cyan-50/30 rounded-lg">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-muted-foreground">Current Stage</span>
+                                  <Badge variant="secondary">{latestApplication?.currentStage || 'N/A'}</Badge>
+                                </div>
+                                {(latestApplication as any)?.assignedAnalyst && (
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-muted-foreground">Assigned Analyst</span>
+                                    <span className="font-medium">{(latestApplication as any).assignedAnalyst.firstName} {(latestApplication as any).assignedAnalyst.lastName}</span>
+                                  </div>
+                                )}
+                                {(latestApplication as any)?.screeningScore !== undefined && (latestApplication as any)?.screeningScore !== null && (
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-muted-foreground">Screening Score</span>
+                                    <span className={`font-semibold ${Number((latestApplication as any).screeningScore) >= 50 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                      {(latestApplication as any).screeningScore}/100
+                                    </span>
+                                  </div>
+                                )}
+                                <p className="text-xs text-muted-foreground mt-2">
+                                  Assign an analyst to begin screening. Score &ge; 50 advances to Active DD; below 50 rejects at screening.
+                                </p>
+                              </div>
+                            </AccordionContent>
+                          </AccordionItem>
+                        </Accordion>
+                      )}
+
+                      {stage.id === "COMPLIANCE_GROUP" && showAccordion && (
+                        <Accordion type="single" collapsible className="w-full">
+                          <AccordionItem value="compliance-data">
+                            <AccordionTrigger className="text-left hover:bg-rose-50 transition-colors duration-200 cursor-pointer">
+                              <div className="flex items-center gap-3">
+                                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-rose-100 to-pink-200 flex items-center justify-center">
+                                  <Shield className="w-4 h-4 text-rose-500" />
+                                </div>
+                                <span>Compliance & KYC Status</span>
+                              </div>
+                            </AccordionTrigger>
+                            <AccordionContent>
+                              <div className="space-y-3 text-sm p-3 bg-rose-50/30 rounded-lg">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-muted-foreground">KYC Verified</span>
+                                  <Badge className={
+                                    (latestApplication as any)?.kycVerified
+                                      ? 'bg-emerald-100 text-emerald-700'
+                                      : 'bg-amber-100 text-amber-700'
+                                  }>
+                                    {(latestApplication as any)?.kycVerified ? 'Verified' : 'Pending'}
+                                  </Badge>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-muted-foreground">Compliance Cleared</span>
+                                  <Badge className={
+                                    (latestApplication as any)?.complianceCleared
+                                      ? 'bg-emerald-100 text-emerald-700'
+                                      : 'bg-amber-100 text-amber-700'
+                                  }>
+                                    {(latestApplication as any)?.complianceCleared ? 'Cleared' : 'Pending'}
+                                  </Badge>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-muted-foreground">RBZ Document</span>
+                                  <Badge className={
+                                    (latestApplication as any)?.rbzDocumentUrl
+                                      ? 'bg-emerald-100 text-emerald-700'
+                                      : 'bg-gray-100 text-gray-700'
+                                  }>
+                                    {(latestApplication as any)?.rbzDocumentUrl ? 'Uploaded' : 'Not uploaded'}
+                                  </Badge>
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-2">
+                                  RBZ Exchange Control document and KYC verification are required before fund disbursement.
+                                </p>
+                              </div>
                             </AccordionContent>
                           </AccordionItem>
                         </Accordion>
@@ -909,6 +1173,11 @@ export function ApplicationTimeline({
                           onInitiateFundDisbursement={handleInitiateFundDisbursement}
                           onCreateFundDisbursement={handleCreateFundDisbursement}
                           onUpdateChecklist={() => setShowChecklistModal(true)}
+                          onAssignAnalyst={handleAssignAnalyst}
+                          onAnalystScreening={handleAnalystScreening}
+                          onTriggerShortlisting={handleTriggerShortlisting}
+                          onUploadRbz={handleUploadRbz}
+                          onSetKycVerified={handleSetKycVerified}
                           onRefresh={async () => { await refreshSelectedApplication(); }}
                         />
                       </div>

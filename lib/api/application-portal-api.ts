@@ -433,7 +433,15 @@ export interface MyTermSheetsResponse {
 }
 
 // Financial Reports Interfaces
-export type FinancialReportType = 'BALANCE_SHEET' | 'INCOME_STATEMENT' | 'CASHFLOW_STATEMENT'
+export type FinancialReportType =
+  | 'BALANCE_SHEET'
+  | 'INCOME_STATEMENT'
+  | 'CASHFLOW_STATEMENT'
+  | 'INCOME_STATEMENTS'
+  | 'CASHFLOW_STATEMENTS'
+  | 'STATEMENT_OF_FINANCIAL_POSITION'
+  | 'BUSINESS_PLAN'
+  | 'OPERATIONAL_KPIS'
 export type PeriodType = 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'ANNUALLY'
 
 export interface FinancialReport {
@@ -444,17 +452,27 @@ export interface FinancialReport {
   periodType: PeriodType
   periodStart: string
   periodEnd: string
+  reportingPeriod?: string | null
   title: string
-  description: string
-  reportUrl: string
-  storagePath: string
+  description: string | null
+  reportUrl: string | null
+  fileUrl?: string | null
+  storagePath?: string | null
   templateVersion: string
-  status: 'DRAFT' | 'SUBMITTED' | 'REVIEWED'
+  status: 'DRAFT' | 'PENDING' | 'SUBMITTED' | 'REVIEWED' | 'ACCEPTED' | 'REJECTED'
+  totalRevenue?: number | null
+  netProfit?: number | null
+  cashFlowNet?: number | null
   createdAt: string
   updatedAt: string
+  reviewerId?: string | null
+  reviewedAt?: string | null
+  reviewerComment?: string | null
   isDraft: boolean
   canSubmit: boolean
+  canUploadFile?: boolean
   canDownload: boolean
+  data?: Record<string, any>
 }
 
 export interface UploadFinancialReportRequest {
@@ -480,8 +498,95 @@ export interface SubmitPeriodKPIsRequest {
   cashFlowNet: number
 }
 
+export interface ReportingRequestItem {
+  id: string
+  portfolioCompanyId?: string
+  companyName?: string
+  reportingPeriod: string
+  dueDate: string
+  status?: string
+  lastRequestedAt?: string
+  portalStatus?: string
+  mandatoryAttachments?: Array<{ name: string; formats: string[] }>
+}
+
+export interface ReportingRequestsResponse extends ApiResponse {
+  data: ReportingRequestItem[]
+}
+
+export interface FinancialReportDraftRequest {
+  reportingPeriod: string
+  periodType: PeriodType
+  periodStart: string
+  periodEnd: string
+  title: string
+  description?: string
+  templateVersion?: string
+  data: Record<string, any>
+}
+
+export interface FinancialReportDraftResponse extends ApiResponse {
+  data: {
+    id: string
+    status: string
+    reportType: string
+    reportingPeriod: string
+  }
+}
+
+export interface FinancialReportDetailResponse extends ApiResponse {
+  data: FinancialReport & {
+    data?: Record<string, any>
+    reviewerComment?: string | null
+    canUploadFile?: boolean
+  }
+}
+
 export interface FinancialReportsResponse extends ApiResponse {
   data: FinancialReport[]
+}
+
+interface PaginatedFinancialReportsData {
+  page: number
+  limit: number
+  total: number
+  items: FinancialReport[]
+}
+
+const normalizeFinancialReportsResponse = (response: any): FinancialReportsResponse => {
+  const rawData = response?.data
+  const items = Array.isArray(rawData)
+    ? rawData
+    : Array.isArray(rawData?.items)
+    ? rawData.items
+    : []
+
+  return {
+    ...response,
+    data: items,
+  } as FinancialReportsResponse
+}
+
+const normalizeReportingRequestsResponse = (response: any): ReportingRequestsResponse => {
+  const rawData = Array.isArray(response?.data) ? response.data : []
+  const normalized: ReportingRequestItem[] = rawData.map((item: any, idx: number) => {
+    const reportingPeriod = item?.reportingPeriod || ''
+    const dueDate = item?.dueDate || ''
+    const syntheticId = item?.id || `${item?.portfolioCompanyId || 'request'}-${reportingPeriod || idx}`
+
+    return {
+      ...item,
+      id: syntheticId,
+      reportingPeriod,
+      dueDate,
+      mandatoryAttachments: Array.isArray(item?.mandatoryAttachments) ? item.mandatoryAttachments : [],
+    }
+  })
+
+  return {
+    ...response,
+    data: normalized,
+  } as ReportingRequestsResponse
 }
 
 export interface UploadFinancialReportResponse extends ApiResponse {
@@ -565,7 +670,8 @@ export const applicationPortalApiService = {
 
   // Financial Reports endpoints
   async getFinancialReports(): Promise<FinancialReportsResponse> {
-    return apiClient.get<FinancialReportsResponse>('/applicant/financial-reports')
+    const response = await apiClient.get<ApiResponse<FinancialReport[] | PaginatedFinancialReportsData>>('/applicant/financial-reports')
+    return normalizeFinancialReportsResponse(response)
   },
 
   async downloadFinancialReportTemplate(reportType: FinancialReportType): Promise<string> {
@@ -597,6 +703,41 @@ export const applicationPortalApiService = {
 
   async submitPeriodKPIs(data: SubmitPeriodKPIsRequest): Promise<ApiResponse> {
     return apiClient.post<ApiResponse>('/applicant/financial-reports/period-kpis', data)
+  },
+
+  async getReportingRequests(): Promise<ReportingRequestsResponse> {
+    const response = await apiClient.get<ReportingRequestsResponse>('/applicant/reporting/requests')
+    return normalizeReportingRequestsResponse(response)
+  },
+
+  async createIncomeStatementDraft(data: FinancialReportDraftRequest): Promise<FinancialReportDraftResponse> {
+    return apiClient.post<FinancialReportDraftResponse>('/applicant/financial-reports/income-statement/draft', data)
+  },
+
+  async createBalanceSheetDraft(data: FinancialReportDraftRequest): Promise<FinancialReportDraftResponse> {
+    return apiClient.post<FinancialReportDraftResponse>('/applicant/financial-reports/balance-sheet/draft', data)
+  },
+
+  async createCashFlowDraft(data: FinancialReportDraftRequest): Promise<FinancialReportDraftResponse> {
+    return apiClient.post<FinancialReportDraftResponse>('/applicant/financial-reports/cash-flow/draft', data)
+  },
+
+  async getFinancialReportById(reportId: string): Promise<FinancialReportDetailResponse> {
+    return apiClient.get<FinancialReportDetailResponse>(`/applicant/financial-reports/${reportId}`)
+  },
+
+  async updateFinancialReportData(reportId: string, data: Record<string, any>): Promise<ApiResponse> {
+    return apiClient.patch<ApiResponse>(`/applicant/financial-reports/${reportId}/data`, { data })
+  },
+
+  async uploadFinancialReportFile(reportId: string, file: File): Promise<ApiResponse> {
+    const formData = new FormData()
+    formData.append('file', file)
+    return apiClient.post<ApiResponse>(`/applicant/financial-reports/${reportId}/file`, formData)
+  },
+
+  async submitFinancialReportBundle(reportId: string): Promise<ApiResponse> {
+    return apiClient.post<ApiResponse>(`/applicant/financial-reports/submit/${reportId}`)
   },
 }
 

@@ -74,9 +74,12 @@ class FundDisbursementApiService {
     return apiClient.post<FundDisbursementResponse>('/investment-implementations/disbursements', data)
   }
 
-  // Approve disbursement
-  async approveDisbursement(disbursementId: string): Promise<{ success: boolean; message?: string }> {
-    return apiClient.post<{ success: boolean; message?: string }>(`/investment-implementations/disbursements/${disbursementId}/approve`)
+  // Approve disbursement (legacy — requires bankId)
+  async approveDisbursement(disbursementId: string, bankId?: string): Promise<{ success: boolean; message?: string }> {
+    return apiClient.post<{ success: boolean; message?: string }>(
+      `/investment-implementations/disbursements/${disbursementId}/approve`,
+      bankId ? { bankId } : undefined
+    )
   }
 
   // Mark disbursement as disbursed
@@ -85,6 +88,19 @@ class FundDisbursementApiService {
       `/investment-implementations/disbursements/${disbursementId}/disburse`,
       { transactionReference }
     )
+  }
+
+  // CFO: Approve or reject via decision endpoint
+  async disbursementDecision(
+    disbursementId: string,
+    decision: 'APPROVE' | 'REJECT',
+    bankId?: string,
+    reason?: string
+  ): Promise<{ success: boolean; message?: string }> {
+    const body: Record<string, string> = { decision }
+    if (decision === 'APPROVE' && bankId) body.bankId = bankId
+    if (decision === 'REJECT' && reason) body.reason = reason
+    return apiClient.post(`/investment-implementations/disbursements/${disbursementId}/decision`, body)
   }
 }
 

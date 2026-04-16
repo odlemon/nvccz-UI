@@ -1,7 +1,7 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { FileText, Users, Edit, Play, CheckCircle, DollarSign, UserPlus, Loader2, ThumbsUp, Vote, PenLine, CheckSquare } from "lucide-react"
+import { FileText, Users, Edit, Play, CheckCircle, DollarSign, UserPlus, Loader2, ThumbsUp, Vote, PenLine, CheckSquare, Search, Shield, Upload, MessageSquare } from "lucide-react"
 import type { ExtendedApplication } from '@/lib/api/applications-api'
 import { BoardReviewData, VoteSummaryData } from "@/lib/api/board-review-api"
 import { useRolePermissions } from "@/lib/hooks/useRolePermissions"
@@ -37,6 +37,11 @@ interface TimelineStageActionsProps {
   onInitiateFundDisbursement?: () => Promise<void>
   onCreateFundDisbursement?: () => void
   onUpdateChecklist?: () => void
+  onAssignAnalyst?: () => void
+  onAnalystScreening?: () => void
+  onTriggerShortlisting?: () => void
+  onUploadRbz?: () => void
+  onSetKycVerified?: () => void
   onRefresh: () => Promise<void>
 }
 
@@ -69,6 +74,11 @@ export function TimelineStageActions({
   onInitiateFundDisbursement,
   onCreateFundDisbursement,
   onUpdateChecklist,
+  onAssignAnalyst,
+  onAnalystScreening,
+  onTriggerShortlisting,
+  onUploadRbz,
+  onSetKycVerified,
   onRefresh
 }: TimelineStageActionsProps) {
   // Permission checks for application-portal specific actions
@@ -137,9 +147,13 @@ export function TimelineStageActions({
     // Handle grouped stage IDs
     switch (stageId) {
       case "APPLICATION_SUBMISSION":
-        return application.currentStage === "SHORTLISTED"
+        return ["SHORTLISTED", "SCREENING_PENDING"].includes(application.currentStage)
+      case "SCREENING_GROUP":
+        return ["SCREENING_PENDING", "SCREENING"].includes(application.currentStage)
+      case "COMPLIANCE_GROUP":
+        return ["SCREENING", "ACTIVE_DD"].includes(application.currentStage)
       case "DUE_DILIGENCE_GROUP":
-        return ["UNDER_DUE_DILIGENCE", "DUE_DILIGENCE_COMPLETED"].includes(application.currentStage)
+        return ["ACTIVE_DD", "UNDER_DUE_DILIGENCE", "DUE_DILIGENCE_COMPLETED"].includes(application.currentStage)
       case "TERM_SHEET_GROUP":
         return ["TERM_SHEET_NEGOTIATION", "TERM_SHEET", "TERM_SHEET_SIGNED"].includes(application.currentStage)
       case "BOARD_GROUP":
@@ -147,7 +161,7 @@ export function TimelineStageActions({
       case "INVESTMENT_GROUP":
         return ["INVESTMENT_IMPLEMENTATION", "DISBURSED", "FUNDED"].includes(application.currentStage)
       case "REJECTION_PATH":
-        return ["REJECTED", "BELOW_THRESHOLD"].includes(application.currentStage)
+        return ["REJECTED", "BELOW_THRESHOLD", "REJECTED_SCREENING", "AUTO_REJECTED"].includes(application.currentStage)
       default:
         return application.currentStage === stageId
     }
@@ -162,8 +176,17 @@ export function TimelineStageActions({
   switch (stageId) {
     case "APPLICATION_SUBMISSION":
       return (
-        <div className="flex gap-2">
-          {canInitiateDueDiligence && (
+        <div className="flex gap-2 flex-wrap">
+          {application.currentStage === 'SCREENING_PENDING' && onTriggerShortlisting && (
+            <Button
+              onClick={onTriggerShortlisting}
+              className="bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-600 hover:to-cyan-700 text-white rounded-full"
+            >
+              <Search className="w-4 h-4 mr-2" />
+              Trigger Shortlisting
+            </Button>
+          )}
+          {application.currentStage === 'SHORTLISTED' && canInitiateDueDiligence && (
             <Button
               onClick={onInitiateDueDiligence}
               className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white rounded-full"
@@ -172,13 +195,86 @@ export function TimelineStageActions({
               Initiate Due Diligence
             </Button>
           )}
-          {!canInitiateDueDiligence && (
-            <p className="text-sm text-gray-500 italic py-2">You don't have permission to initiate due diligence</p>
+          {application.currentStage === 'SHORTLISTED' && !canInitiateDueDiligence && (
+            <p className="text-sm text-gray-500 italic py-2">You don&apos;t have permission to initiate due diligence</p>
+          )}
+        </div>
+      )
+
+    case "SCREENING_GROUP":
+      return (
+        <div className="flex gap-2 flex-wrap">
+          {application.currentStage === 'SCREENING_PENDING' && onAssignAnalyst && (
+            <Button
+              onClick={onAssignAnalyst}
+              className="bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-600 hover:to-cyan-700 text-white rounded-full"
+            >
+              <UserPlus className="w-4 h-4 mr-2" />
+              Assign Lead Analyst
+            </Button>
+          )}
+          {application.currentStage === 'SCREENING' && onAnalystScreening && (
+            <Button
+              onClick={onAnalystScreening}
+              className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-full"
+            >
+              <Search className="w-4 h-4 mr-2" />
+              Submit Screening Score
+            </Button>
+          )}
+          {application.currentStage === 'SCREENING' && canInitiateDueDiligence && onInitiateDueDiligence && (
+            <Button
+              onClick={onInitiateDueDiligence}
+              className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white rounded-full"
+            >
+              <Play className="w-4 h-4 mr-2" />
+              Initiate Due Diligence
+            </Button>
+          )}
+        </div>
+      )
+
+    case "COMPLIANCE_GROUP":
+      return (
+        <div className="flex gap-2 flex-wrap">
+          {onUploadRbz && (
+            <Button
+              onClick={onUploadRbz}
+              variant="outline"
+              className="border-rose-500 text-rose-600 hover:bg-rose-50 rounded-full"
+            >
+              <Upload className="w-4 h-4 mr-2" />
+              Upload RBZ Document
+            </Button>
+          )}
+          {onSetKycVerified && (
+            <Button
+              onClick={onSetKycVerified}
+              className="bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700 text-white rounded-full"
+            >
+              <Shield className="w-4 h-4 mr-2" />
+              Verify KYC
+            </Button>
           )}
         </div>
       )
 
     case "DUE_DILIGENCE_GROUP":
+      // If stage is ACTIVE_DD and no DD review yet, show initiate
+      if (application.currentStage === 'ACTIVE_DD' && !dueDiligenceData && canInitiateDueDiligence) {
+        return (
+          <div className="flex gap-2">
+            <Button
+              onClick={onInitiateDueDiligence}
+              className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white rounded-full"
+            >
+              <Play className="w-4 h-4 mr-2" />
+              Initiate Due Diligence
+            </Button>
+          </div>
+        )
+      }
+
       // Show loading state while fetching due diligence data
       if (dueDiligenceLoading || activityApprovalLoading) {
         return (
@@ -398,8 +494,9 @@ export function TimelineStageActions({
 
       // If term sheet data exists, show Update and Finalize buttons
       if (termSheetData) {
-        const bothPartiesSigned = termSheetData.applicantSignedAt && termSheetData.investorSignedAt;
-        const canInvestorSign = termSheetData.applicantSignedAt && !termSheetData.investorSignedAt;
+        const bothPartiesSigned = Boolean(termSheetData.applicantSignedAt && termSheetData.investorSignedAt)
+        const isFinalized = Boolean(termSheetData.isFinal || termSheetData.status === 'FINAL' || termSheetData.status === 'SIGNED')
+        const canInvestorSign = isFinalized && Boolean(termSheetData.applicantSignedAt) && !termSheetData.investorSignedAt
 
         return (
           <div className="flex gap-2">
@@ -413,6 +510,15 @@ export function TimelineStageActions({
                 Update Term Sheet
               </Button>
             )}
+            {canFinalizeTermSheet && !isFinalized && (
+              <Button
+                onClick={onFinalizeTermSheet}
+                className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-full"
+              >
+                <CheckCircle className="w-4 h-4 mr-2" />
+                Finalize Term Sheet
+              </Button>
+            )}
             {canInvestorSign && onSignAsInvestor && (
               <Button
                 onClick={onSignAsInvestor}
@@ -422,19 +528,16 @@ export function TimelineStageActions({
                 Sign as Investor
               </Button>
             )}
-            {canFinalizeTermSheet && termSheetData.status !== 'FINAL'  && (
-              <Button
-                onClick={onFinalizeTermSheet}
-                className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-full"
-              >
-                <CheckCircle className="w-4 h-4 mr-2" />
-                Finalize Term Sheet
-              </Button>
-            )}
-            {!bothPartiesSigned && termSheetData.status === 'FINAL' && !canInvestorSign && (
+            {!isFinalized && !bothPartiesSigned && (
               <p className="text-sm text-amber-600 italic py-2 flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                Waiting for both parties to sign before finalization
+                Finalize the term sheet before sign-off
+              </p>
+            )}
+            {isFinalized && !bothPartiesSigned && !canInvestorSign && (
+              <p className="text-sm text-amber-600 italic py-2 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                Waiting for applicant sign-off before investor signing
               </p>
             )}
             {!canUpdateTermSheet && !canFinalizeTermSheet && !canInvestorSign && (

@@ -51,7 +51,14 @@ export const fetchCompanyFinancialReports = createAsyncThunk(
   async (companyId: string, { rejectWithValue }) => {
     try {
       const response = await portfolioApi.getCompanyFinancialReports(companyId)
-      return response.data
+      const payload = response?.data
+      if (Array.isArray(payload)) {
+        return payload
+      }
+      if (payload && typeof payload === 'object' && Array.isArray((payload as any).items)) {
+        return (payload as any).items
+      }
+      return []
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to fetch financial reports')
     }

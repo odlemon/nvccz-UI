@@ -46,9 +46,52 @@ export interface DisbursementSummaryData {
   totalCommittedAmount: number
   totalDisbursedAmount: number
   remainingCommittedAmount: number
+  undrawnCommittedAmount?: number
   disbursementCount: number
   disbursementMode: string
-  disbursements: any[]
+  complianceCleared?: boolean
+  kycVerified?: boolean
+  disbursementBlockedReason?: string
+  disbursements: Array<{
+    id: string
+    trancheIndex?: number
+    cfoApprovalStatusLabel?: string
+    milestoneId?: string
+    amount: string
+    status: string
+    disbursementType: string
+    disbursementDate: string
+    approvedAt?: string
+    transactionReference?: string
+    disbursedById?: string
+    disbursedAt?: string
+  }>
+}
+
+export interface DisbursementBank {
+  id: string
+  name: string
+  accountNumber: string
+  currencyId: string
+  currencyCode: string
+  currencyName: string
+  glAccount: {
+    id: string
+    accountNo: string
+    accountName: string
+    accountType: string
+  }
+}
+
+export interface PendingDisbursement {
+  id: string
+  trancheIndex: number
+  amount: string
+  status: string
+  cfoApprovalStatusLabel: string
+  disbursementType: string
+  disbursementDate: string
+  investmentImplementation?: any
 }
 
 export interface InvestmentImplementationCreateRequest {
@@ -123,6 +166,49 @@ class InvestmentImplementationApiService {
   // Get disbursement summary
   async getDisbursementSummary(implementationId: string): Promise<DisbursementSummaryResponse> {
     return apiClient.get<DisbursementSummaryResponse>(`/investment-implementations/${implementationId}/disbursement-summary`)
+  }
+
+  // ── CFO Disbursement Flow ──────────────────────────────────────────
+
+  /** Get signed term sheets ready for implementation */
+  async getSignedTermSheets(page = 1, limit = 10): Promise<any> {
+    return apiClient.get(`/investment-implementations/signed-term-sheets?page=${page}&limit=${limit}`)
+  }
+
+  /** List banks + GL accounts for CFO disbursement picker */
+  async getDisbursementBanks(paymentCurrencyId?: string): Promise<{ success: boolean; data: DisbursementBank[] }> {
+    const qs = paymentCurrencyId ? `?paymentCurrencyId=${paymentCurrencyId}` : ''
+    return apiClient.get(`/investment-implementations/disbursement-banks${qs}`)
+  }
+
+  /** List pending disbursement requests */
+  async getPendingDisbursements(): Promise<{ success: boolean; data: PendingDisbursement[] }> {
+    return apiClient.get('/investment-implementations/disbursements/pending')
+  }
+
+  /** CFO: Approve or reject disbursement */
+  async disbursementDecision(
+    disbursementId: string,
+    decision: 'APPROVE' | 'REJECT',
+    bankId?: string,
+    reason?: string
+  ): Promise<any> {
+    const body: any = { decision }
+    if (decision === 'APPROVE' && bankId) body.bankId = bankId
+    if (decision === 'REJECT' && reason) body.reason = reason
+    return apiClient.post(`/investment-implementations/disbursements/${disbursementId}/decision`, body)
+  }
+
+  /** Create disbursement tranche with paymentCurrencyId */
+  async createDisbursement(data: {
+    investmentImplementationId: string
+    amount: number
+    disbursementDate: string
+    disbursementType: string
+    notes?: string
+    paymentCurrencyId?: string
+  }): Promise<any> {
+    return apiClient.post('/investment-implementations/disbursements', data)
   }
 }
 

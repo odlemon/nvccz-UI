@@ -94,6 +94,7 @@ export const MODULE_CONFIG: ModuleConfig[] = [
     subModules: [
       { id: "Dashboard", name: "Dashboard", path: "/portfolio", icon: CiGrid41, description: "Manage your portfolio" },
       { id: "funds", name: "Funds", path: "/portfolio/funds", icon: CiDollar, description: "Manage funds and investments" },
+      { id: "capital-calls", name: "Capital Calls", path: "/portfolio/funds/capital-calls", icon: CiCoins1, description: "Fund investment capital calls" },
       { id: "companies", name: "Companies", path: "/portfolio/companies", icon: CiShop, description: "Manage companies" }
 
     ],
