@@ -3,12 +3,15 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useAppDispatch, useAppSelector } from "@/lib/store"
 import { fetchUserScorecard } from "@/lib/store/slices/scorecardSlice"
+import { companyProfileApi, type CompanyAddress } from "@/lib/api/company-profile-api"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
-import { CiUser, CiViewBoard, CiCircleCheck, CiRedo, CiTrophy, CiFileOn } from "react-icons/ci"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { CiUser, CiViewBoard, CiCircleCheck, CiTrophy, CiFileOn } from "react-icons/ci"
 import { TbTarget } from "react-icons/tb"
+import { Calendar, RefreshCw } from "lucide-react"
 import { toast } from "sonner"
 import {
   PieChart,
@@ -52,14 +55,11 @@ export function UserScorecardsPage() {
   const scorecardRef = useRef<HTMLDivElement>(null)
   const [isClient, setIsClient] = useState(false)
   const [PDFComponents, setPDFComponents] = useState<any>(null)
-  const hasFetched = useRef(false)
-
+  const [periodLabel, setPeriodLabel] = useState(String(new Date().getFullYear()))
+  const [activeAddress, setActiveAddress] = useState<CompanyAddress | null>(null)
   useEffect(() => {
-    if (!hasFetched.current) {
-      hasFetched.current = true
-      dispatch(fetchUserScorecard())
-    }
-  }, [dispatch])
+    dispatch(fetchUserScorecard({ periodLabel }))
+  }, [dispatch, periodLabel])
 
   useEffect(() => {
     if (error) {
@@ -78,13 +78,11 @@ export function UserScorecardsPage() {
         })
       })
     })
+    companyProfileApi.getActiveAddress().then((a) => setActiveAddress(a)).catch(() => {})
   }, [])
 
   const handleRefresh = () => {
-    hasFetched.current = false
-    dispatch(fetchUserScorecard()).finally(() => {
-      hasFetched.current = true
-    })
+    dispatch(fetchUserScorecard({ periodLabel }))
   }
 
   const getPerformanceColor = (rating: string) => {
@@ -167,21 +165,45 @@ export function UserScorecardsPage() {
             Track your performance metrics and goal achievement
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button onClick={handleRefresh} variant="outline" disabled={loading}>
-            <CiRedo className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`} />
+        <div className="flex items-center gap-2 flex-wrap">
+          <Select value={periodLabel} onValueChange={setPeriodLabel}>
+            <SelectTrigger className="w-[120px] rounded-full" size="sm">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                <SelectValue />
+              </div>
+            </SelectTrigger>
+            <SelectContent>
+              {Array.from({ length: 6 }, (_, i) => new Date().getFullYear() + 1 - i).map((y) => (
+                <SelectItem key={y} value={String(y)}>
+                  {y}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            onClick={handleRefresh}
+            size="sm"
+            className="rounded-full gap-1.5 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white"
+            disabled={loading}
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
             Refresh
           </Button>
           {isClient && userScorecard && PDFComponents && (
             <PDFComponents.PDFDownloadLink
-              document={<PDFComponents.UserScorecardPDF data={userScorecard} />}
+              document={<PDFComponents.UserScorecardPDF data={userScorecard} activeAddress={activeAddress} />}
               fileName={`${(employee?.name || "employee").replace(/\s+/g, "-")}-Scorecard-${new Date()
                 .toISOString()
                 .split("T")[0]}.pdf`}
             >
               {({ loading: pdfLoading }: any) => (
-                <Button variant="outline" disabled={pdfLoading}>
-                  <CiFileOn className={`w-4 h-4 mr-2 ${pdfLoading ? "animate-spin" : ""}`} />
+                <Button
+                  size="sm"
+                  className="rounded-full gap-1.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white"
+                  disabled={pdfLoading}
+                >
+                  <CiFileOn className={`w-3.5 h-3.5 ${pdfLoading ? "animate-spin" : ""}`} />
                   {pdfLoading ? "Generating..." : "Export PDF"}
                 </Button>
               )}

@@ -1,4 +1,5 @@
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer"
+import { PerformancePdfLetterhead } from "./pdf-letterhead"
 
 const styles = StyleSheet.create({
   page: { padding: 30, fontFamily: "Helvetica" },
@@ -24,6 +25,7 @@ const styles = StyleSheet.create({
 
 interface DepartmentScorecardPDFProps {
   data: any
+  activeAddress?: any
 }
 
 const toNumber = (value: unknown) => {
@@ -31,7 +33,7 @@ const toNumber = (value: unknown) => {
   return Number.isFinite(n) ? n : 0
 }
 
-export default function DepartmentScorecardPDF({ data }: DepartmentScorecardPDFProps) {
+export default function DepartmentScorecardPDF({ data, activeAddress }: DepartmentScorecardPDFProps) {
   const department = data?.department?.name || data?.department || "Department"
   const goals = data?.goals || []
   const matrix = data?.document?.performanceMatrix || []
@@ -41,10 +43,12 @@ export default function DepartmentScorecardPDF({ data }: DepartmentScorecardPDFP
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Department Performance Scorecard</Text>
-          <Text style={styles.subtitle}>{department}</Text>
-        </View>
+        <PerformancePdfLetterhead
+          title="Department Performance Scorecard"
+          subtitle={department}
+          periodLabel={data?.contract?.periodLabel || data?.reviewPeriod}
+          activeAddress={activeAddress}
+        />
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Summary</Text>

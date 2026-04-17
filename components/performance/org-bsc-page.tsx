@@ -2,11 +2,14 @@
 
 import { useEffect, useState } from "react"
 import { scorecardApiService, type OrgBscScorecard } from "@/lib/api/scorecard-service"
+import { companyProfileApi, type CompanyAddress } from "@/lib/api/company-profile-api"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
 import { CiFileOn } from "react-icons/ci"
+import { Calendar, RefreshCw } from "lucide-react"
 import OrgBscPDF from "./org-bsc-pdf-document"
 
 export function OrgBscPage() {
@@ -14,18 +17,21 @@ export function OrgBscPage() {
   const [loading, setLoading] = useState(true)
   const [isClient, setIsClient] = useState(false)
   const [PDFDownloadLink, setPDFDownloadLink] = useState<any>(null)
+  const [periodLabel, setPeriodLabel] = useState(String(new Date().getFullYear()))
+  const [activeAddress, setActiveAddress] = useState<CompanyAddress | null>(null)
 
   useEffect(() => {
     setIsClient(true)
     import("@react-pdf/renderer").then((pdfModule) => {
       setPDFDownloadLink(() => pdfModule.PDFDownloadLink)
     })
+    companyProfileApi.getActiveAddress().then((a) => setActiveAddress(a)).catch(() => {})
   }, [])
 
   const loadData = async () => {
     setLoading(true)
     try {
-      const response = await scorecardApiService.getOrgBscScorecard()
+      const response = await scorecardApiService.getOrgBscScorecard({ periodLabel })
       setData(response.data)
     } catch (error: any) {
       toast.error("Failed to load organisational BSC", { description: error.message })
@@ -37,7 +43,7 @@ export function OrgBscPage() {
 
   useEffect(() => {
     void loadData()
-  }, [])
+  }, [periodLabel])
 
   const pillars = data?.pillars ?? []
   const overallScore = data?.orgBscScore ?? data?.overallScore ?? 0
@@ -51,16 +57,43 @@ export function OrgBscPage() {
           <h1 className="text-3xl text-gray-900">Organisational BSC Dashboard</h1>
           <p className="text-gray-600">Live executive Balanced Scorecard view</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => void loadData()} disabled={loading}>Refresh</Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Select value={periodLabel} onValueChange={setPeriodLabel}>
+            <SelectTrigger className="w-[120px] rounded-full" size="sm">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                <SelectValue />
+              </div>
+            </SelectTrigger>
+            <SelectContent>
+              {Array.from({ length: 6 }, (_, i) => new Date().getFullYear() + 1 - i).map((y) => (
+                <SelectItem key={y} value={String(y)}>
+                  {y}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            size="sm"
+            className="rounded-full gap-1.5 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white"
+            onClick={() => void loadData()}
+            disabled={loading}
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
           {isClient && data && PDFDownloadLink && (
             <PDFDownloadLink
-              document={<OrgBscPDF data={data} />}
+              document={<OrgBscPDF data={data} activeAddress={activeAddress} />}
               fileName={`org-bsc-${new Date().toISOString().split("T")[0]}.pdf`}
             >
               {({ loading: pdfLoading }: any) => (
-                <Button variant="outline" disabled={pdfLoading}>
-                  <CiFileOn className={`w-4 h-4 mr-2 ${pdfLoading ? "animate-spin" : ""}`} />
+                <Button
+                  size="sm"
+                  className="rounded-full gap-1.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white"
+                  disabled={pdfLoading}
+                >
+                  <CiFileOn className={`w-3.5 h-3.5 ${pdfLoading ? "animate-spin" : ""}`} />
                   {pdfLoading ? "Generating..." : "Export PDF"}
                 </Button>
               )}

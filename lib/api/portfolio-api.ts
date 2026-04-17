@@ -3,22 +3,37 @@ import { apiClient, ApiResponse } from './api-client'
 export interface PortfolioFinancialReport {
   id: string
   portfolioCompanyId: string
-  submittedById: string
-  reportType: 'BALANCE_SHEET' | 'INCOME_STATEMENT' | 'CASHFLOW_STATEMENT'
+  submittedById?: string | null
+  reportType:
+    | 'BALANCE_SHEET'
+    | 'INCOME_STATEMENT'
+    | 'CASHFLOW_STATEMENT'
+    | 'INCOME_STATEMENTS'
+    | 'CASHFLOW_STATEMENTS'
+    | 'STATEMENT_OF_FINANCIAL_POSITION'
+    | 'BUSINESS_PLAN'
+    | 'OPERATIONAL_KPIS'
   periodType: 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'ANNUALLY'
   periodStart: string
   periodEnd: string
+  reportingPeriod?: string | null
   title: string
-  description: string
-  reportUrl: string
+  description?: string | null
+  reportUrl?: string | null
+  fileUrl?: string | null
+  templateVersion?: string | null
   status: 'PENDING' | 'ACCEPTED' | 'REJECTED'
   reviewerId: string | null
   reviewedAt: string | null
   reviewerComment: string | null
   createdAt: string
   updatedAt: string
-  submittedByFirstName: string
-  submittedByLastName: string
+  submittedByFirstName?: string | null
+  submittedByLastName?: string | null
+  totalRevenue?: number | null
+  netProfit?: number | null
+  cashFlowNet?: number | null
+  data?: Record<string, any> | null
 }
 
 export interface ReviewFinancialReportRequest {

@@ -3,6 +3,7 @@ import { departmentApiService } from "@/lib/api/department-api"
 import { kpiApiService } from '@/lib/api/kpi-api'
 import { goalApiService, type GoalActivity, type GoalRollupData } from "@/lib/api/goal-api"
 import { performanceApi, type PerformanceDashboardData, type PerformanceDashboardParams } from "@/lib/api/performance-api"
+import { performanceBscApiService, type ContractCreatePayload } from "@/lib/api/performance-bsc-api"
 
 // KPI Types
 export interface KPI {
@@ -129,6 +130,9 @@ interface PerformanceState {
   goals: any[]
   tasks: Task[]
   metrics: PerformanceMetrics | null
+  selectedGoal: any | null
+  selectedKPI: KPI | null
+  selectedTask: Task | null
   
   // UI State
   loading: boolean
@@ -161,10 +165,13 @@ interface PerformanceState {
 
   // Available Departments
   availableDepartments: { name: string; description: string }[]
+  availableDepartmentsLoading: boolean
 
   // KPI Statistics
   availableKPIs: any[]
   kpiStatistics: any | null
+  selectedViewMode: 'all' | 'department' | 'accountType'
+  selectedAccountType: string
   selectedDepartmentFilter: string
   selectedAccountTypeFilter: string
 
@@ -207,13 +214,22 @@ interface PerformanceState {
   performanceDashboardData: PerformanceDashboardData | null
   performanceDashboardLoading: boolean
   performanceDashboardError: string | null
+
+  // BSC Operations
+  bscOperationLoading: boolean
+  bscOperationError: string | null
+  budgetVarianceReports: any[]
+  statutorySubmissions: any[]
 }
 
 const initialState: PerformanceState = {
+  departments: [],
   goals: [],
   kpis: [],
   tasks: [],
+  metrics: null,
   loading: false,
+  crudLoading: false,
   error: null,
   selectedGoal: null,
   selectedKPI: null,
@@ -249,6 +265,8 @@ const initialState: PerformanceState = {
   availableKPIs: [],
   kpiStatistics: null,
   selectedDepartmentFilter: 'all',
+  selectedViewMode: 'all',
+  selectedAccountType: 'all',
   selectedAccountTypeFilter: 'all',
 
   // Financial KPIs
@@ -290,6 +308,12 @@ const initialState: PerformanceState = {
   performanceDashboardData: null,
   performanceDashboardLoading: false,
   performanceDashboardError: null,
+
+  // BSC Operations
+  bscOperationLoading: false,
+  bscOperationError: null,
+  budgetVarianceReports: [],
+  statutorySubmissions: [],
 }
 
 // Async thunks
@@ -386,7 +410,7 @@ export const createGoal = createAsyncThunk(
   async (goalData: any, { dispatch, rejectWithValue }) => {
     try {
       const response = await goalApiService.createGoal(goalData)
-      dispatch(fetchGoals()) // Refetch goals after creation
+      dispatch(fetchGoals({})) // Refetch goals after creation
       return response.goal
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to create goal')
@@ -399,7 +423,7 @@ export const deleteGoal = createAsyncThunk(
   async (goalId: string, { dispatch, rejectWithValue }) => {
     try {
       await goalApiService.deleteGoal(goalId)
-      dispatch(fetchGoals()) // Refetch goals after deletion
+      dispatch(fetchGoals({})) // Refetch goals after deletion
       return goalId
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to delete goal')
@@ -412,7 +436,7 @@ export const updateGoal = createAsyncThunk(
   async ({ goalId, data }: { goalId: string; data: any }, { dispatch, rejectWithValue }) => {
     try {
       const response = await goalApiService.updateGoal(goalId, data)
-      dispatch(fetchGoals()) // Refetch goals after update
+      dispatch(fetchGoals({})) // Refetch goals after update
       return response.goal
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to update goal')
@@ -428,7 +452,7 @@ export const breakdownGoalToDepartments = createAsyncThunk(
       const response = await goalApiService.breakdownToDepartments(data)
       
       // Refetch goals to show new sub-goals
-      await dispatch(fetchGoals())
+      await dispatch(fetchGoals({}))
       
       // Return the response for success handling
       return response
@@ -458,7 +482,7 @@ export const breakdownGoalToIndividuals = createAsyncThunk(
   async (data: any, { dispatch, rejectWithValue }) => {
     try {
       const response = await goalApiService.breakdownToIndividuals(data)
-      dispatch(fetchGoals()) // Refetch goals to show new sub-goals
+      dispatch(fetchGoals({})) // Refetch goals to show new sub-goals
       return response
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to breakdown goal')
@@ -558,6 +582,94 @@ export const fetchPerformanceDashboard = createAsyncThunk(
     } catch (error: any) {
       console.error('Thunk: Error caught:', error)
       return rejectWithValue(error.message || 'Failed to fetch performance dashboard')
+    }
+  }
+)
+
+export const createPerformanceContract = createAsyncThunk(
+  'performance/createPerformanceContract',
+  async (
+    { type, payload }: { type: 'BOARD' | 'CEO' | 'DEPARTMENT' | 'EMPLOYEE'; payload: ContractCreatePayload },
+    { rejectWithValue }
+  ) => {
+    try {
+      if (type === 'BOARD') return await performanceBscApiService.createBoardContract(payload)
+      if (type === 'CEO') return await performanceBscApiService.createCeoContract(payload)
+      if (type === 'DEPARTMENT') {
+        return await performanceBscApiService.createDepartmentContract(payload as ContractCreatePayload & { departmentName: string })
+      }
+      return await performanceBscApiService.createEmployeeContract(payload as ContractCreatePayload & { subjectUserId: string })
+    } catch (error: any) {
+      return rejectWithValue(error?.message || 'Failed to create performance contract')
+    }
+  }
+)
+
+export const submitBscFinancialOutcomeRoi = createAsyncThunk(
+  'performance/submitBscFinancialOutcomeRoi',
+  async (
+    payload: {
+      goalId: string
+      netProfit: number
+      totalCapitalInvested: number
+      currencyCode?: string
+      periodLabel?: string
+      periodStart?: string
+      periodEnd?: string
+      skipCeoBoardMirror?: boolean
+    },
+    { rejectWithValue }
+  ) => {
+    try {
+      return await performanceBscApiService.recordFinancialOutcomeRoi(payload)
+    } catch (error: any) {
+      return rejectWithValue(error?.message || 'Failed to submit ROI entry')
+    }
+  }
+)
+
+export const createBscBudgetVarianceReport = createAsyncThunk(
+  'performance/createBscBudgetVarianceReport',
+  async (
+    payload: {
+      performanceGoalId?: string
+      goalId?: string
+      narrative?: string
+      varianceAnalysis?: string
+      periodLabel?: string
+      periodStart?: string
+      periodEnd?: string
+      actualSpend?: number
+      strategicAllocation?: number
+    },
+    { rejectWithValue }
+  ) => {
+    try {
+      return await performanceBscApiService.createBudgetVarianceReport(payload)
+    } catch (error: any) {
+      return rejectWithValue(error?.message || 'Failed to create budget variance report')
+    }
+  }
+)
+
+export const fetchBscBudgetVarianceReportsByGoal = createAsyncThunk(
+  'performance/fetchBscBudgetVarianceReportsByGoal',
+  async (goalId: string, { rejectWithValue }) => {
+    try {
+      return await performanceBscApiService.getBudgetVarianceReportsByGoal(goalId)
+    } catch (error: any) {
+      return rejectWithValue(error?.message || 'Failed to load budget variance reports')
+    }
+  }
+)
+
+export const fetchBscStatutorySubmissionsByGoal = createAsyncThunk(
+  'performance/fetchBscStatutorySubmissionsByGoal',
+  async (goalId: string, { rejectWithValue }) => {
+    try {
+      return await performanceBscApiService.getStatutorySubmissionsByGoal(goalId)
+    } catch (error: any) {
+      return rejectWithValue(error?.message || 'Failed to load statutory submissions')
     }
   }
 )
@@ -967,12 +1079,74 @@ const performanceSlice = createSlice({
       .addCase(fetchPerformanceDashboard.fulfilled, (state, action) => {
         console.log('Reducer: fetchPerformanceDashboard.fulfilled with payload:', action.payload)
         state.performanceDashboardLoading = false
-        state.performanceDashboardData = action.payload
+        state.performanceDashboardData = action.payload || null
       })
       .addCase(fetchPerformanceDashboard.rejected, (state, action) => {
         console.log('Reducer: fetchPerformanceDashboard.rejected with error:', action.payload)
         state.performanceDashboardLoading = false
         state.performanceDashboardError = action.payload as string
+      })
+      // Create performance contract
+      .addCase(createPerformanceContract.pending, (state) => {
+        state.bscOperationLoading = true
+        state.bscOperationError = null
+      })
+      .addCase(createPerformanceContract.fulfilled, (state) => {
+        state.bscOperationLoading = false
+      })
+      .addCase(createPerformanceContract.rejected, (state, action) => {
+        state.bscOperationLoading = false
+        state.bscOperationError = action.payload as string
+      })
+      // Submit ROI BSC entry
+      .addCase(submitBscFinancialOutcomeRoi.pending, (state) => {
+        state.bscOperationLoading = true
+        state.bscOperationError = null
+      })
+      .addCase(submitBscFinancialOutcomeRoi.fulfilled, (state) => {
+        state.bscOperationLoading = false
+      })
+      .addCase(submitBscFinancialOutcomeRoi.rejected, (state, action) => {
+        state.bscOperationLoading = false
+        state.bscOperationError = action.payload as string
+      })
+      // Create budget variance report
+      .addCase(createBscBudgetVarianceReport.pending, (state) => {
+        state.bscOperationLoading = true
+        state.bscOperationError = null
+      })
+      .addCase(createBscBudgetVarianceReport.fulfilled, (state) => {
+        state.bscOperationLoading = false
+      })
+      .addCase(createBscBudgetVarianceReport.rejected, (state, action) => {
+        state.bscOperationLoading = false
+        state.bscOperationError = action.payload as string
+      })
+      // Fetch budget variance reports by goal
+      .addCase(fetchBscBudgetVarianceReportsByGoal.pending, (state) => {
+        state.bscOperationLoading = true
+        state.bscOperationError = null
+      })
+      .addCase(fetchBscBudgetVarianceReportsByGoal.fulfilled, (state, action) => {
+        state.bscOperationLoading = false
+        state.budgetVarianceReports = (action.payload as any)?.data || []
+      })
+      .addCase(fetchBscBudgetVarianceReportsByGoal.rejected, (state, action) => {
+        state.bscOperationLoading = false
+        state.bscOperationError = action.payload as string
+      })
+      // Fetch statutory submissions by goal
+      .addCase(fetchBscStatutorySubmissionsByGoal.pending, (state) => {
+        state.bscOperationLoading = true
+        state.bscOperationError = null
+      })
+      .addCase(fetchBscStatutorySubmissionsByGoal.fulfilled, (state, action) => {
+        state.bscOperationLoading = false
+        state.statutorySubmissions = (action.payload as any)?.data || []
+      })
+      .addCase(fetchBscStatutorySubmissionsByGoal.rejected, (state, action) => {
+        state.bscOperationLoading = false
+        state.bscOperationError = action.payload as string
       })
   },
 })

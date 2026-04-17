@@ -2,12 +2,21 @@
 
 import { useEffect, useState } from "react"
 import { scorecardApiService, type ContractScorecard, type ScorecardGeneratePayload } from "@/lib/api/scorecard-service"
+import { performanceBscApiService } from "@/lib/api/performance-bsc-api"
+import { companyProfileApi, type CompanyAddress } from "@/lib/api/company-profile-api"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { toast } from "sonner"
 import { CiFileOn } from "react-icons/ci"
+import { RefreshCw, Plus, Sparkles } from "lucide-react"
 import ContractScorecardPDF from "./contract-scorecard-pdf-document"
 
 interface ContractScorecardPageProps {
@@ -18,15 +27,18 @@ export function ContractScorecardPage({ type }: ContractScorecardPageProps) {
   const [data, setData] = useState<ContractScorecard | null>(null)
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
+  const [creatingContract, setCreatingContract] = useState(false)
   const [periodLabel, setPeriodLabel] = useState("2026")
   const [isClient, setIsClient] = useState(false)
   const [PDFDownloadLink, setPDFDownloadLink] = useState<any>(null)
+  const [activeAddress, setActiveAddress] = useState<CompanyAddress | null>(null)
 
   useEffect(() => {
     setIsClient(true)
     import("@react-pdf/renderer").then((pdfModule) => {
       setPDFDownloadLink(() => pdfModule.PDFDownloadLink)
     })
+    companyProfileApi.getActiveAddress().then((a) => setActiveAddress(a)).catch(() => {})
   }, [])
 
   const loadData = async () => {
@@ -46,7 +58,44 @@ export function ContractScorecardPage({ type }: ContractScorecardPageProps) {
 
   useEffect(() => {
     void loadData()
-  }, [])
+  }, [type, periodLabel])
+
+  const resolvePeriodYear = () => {
+    const parsed = Number.parseInt(periodLabel, 10)
+    if (Number.isFinite(parsed) && parsed >= 2000 && parsed <= 2100) return parsed
+    return new Date().getFullYear()
+  }
+
+  const handleCreateContract = async () => {
+    setCreatingContract(true)
+    try {
+      const payload = {
+        periodYear: resolvePeriodYear(),
+        periodLabel: periodLabel || String(resolvePeriodYear()),
+      }
+
+      if (type === "CEO") {
+        await performanceBscApiService.createCeoContract(payload)
+      } else {
+        await performanceBscApiService.createBoardContract(payload)
+      }
+
+      toast.success(`${type} contract created successfully`)
+      await loadData()
+    } catch (error: any) {
+      const isDuplicate = error?.status === 409 || error?.response?.code === "PERFORMANCE_CONTRACT_DUPLICATE"
+      if (isDuplicate) {
+        toast.info(`${type} contract already exists for ${resolvePeriodYear()}. Loading existing scorecard...`)
+        await loadData()
+      } else {
+        toast.error(`Failed to create ${type} contract`, {
+          description: error?.message || "Please review inputs and try again",
+        })
+      }
+    } finally {
+      setCreatingContract(false)
+    }
+  }
 
   const handleGenerate = async () => {
     setGenerating(true)
@@ -77,27 +126,61 @@ export function ContractScorecardPage({ type }: ContractScorecardPageProps) {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl text-gray-900">{type} Contract Scorecard</h1>
-          <p className="text-gray-600">Contract-based executive performance scorecard</p>
+          <p className="text-gray-600">Contract setup + contract-based executive performance scorecard</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Input
-            value={periodLabel}
-            onChange={(e) => setPeriodLabel(e.target.value)}
-            className="w-32"
-            placeholder="Period"
-          />
-          <Button variant="outline" onClick={() => void loadData()} disabled={loading}>Refresh</Button>
-          <Button onClick={() => void handleGenerate()} disabled={generating}>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Select value={periodLabel} onValueChange={setPeriodLabel}>
+            <SelectTrigger className="w-[110px]" size="sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {Array.from({ length: 6 }, (_, i) => new Date().getFullYear() + 1 - i).map((y) => (
+                <SelectItem key={y} value={String(y)}>
+                  {y}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            size="sm"
+            className="rounded-full gap-1.5 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white"
+            onClick={() => void handleCreateContract()}
+            disabled={creatingContract || loading}
+          >
+            <Plus className="w-3.5 h-3.5" />
+            {creatingContract ? "Creating..." : `Create ${type}`}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="rounded-full gap-1.5"
+            onClick={() => void loadData()}
+            disabled={loading}
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+          <Button
+            size="sm"
+            className="rounded-full gap-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white"
+            onClick={() => void handleGenerate()}
+            disabled={generating}
+          >
+            <Sparkles className={`w-3.5 h-3.5 ${generating ? "animate-spin" : ""}`} />
             {generating ? "Generating..." : "Generate"}
           </Button>
           {isClient && data && PDFDownloadLink && (
             <PDFDownloadLink
-              document={<ContractScorecardPDF data={data} type={type} />}
+              document={<ContractScorecardPDF data={data} type={type} activeAddress={activeAddress} />}
               fileName={`${type.toLowerCase()}-scorecard-${data.contract?.periodLabel || periodLabel}-${new Date().toISOString().split("T")[0]}.pdf`}
             >
               {({ loading: pdfLoading }: any) => (
-                <Button variant="outline" disabled={pdfLoading}>
-                  <CiFileOn className={`w-4 h-4 mr-2 ${pdfLoading ? "animate-spin" : ""}`} />
+                <Button
+                  size="sm"
+                  className="rounded-full gap-1.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white"
+                  disabled={pdfLoading}
+                >
+                  <CiFileOn className={`w-3.5 h-3.5 ${pdfLoading ? "animate-spin" : ""}`} />
                   {pdfLoading ? "Generating..." : "Export PDF"}
                 </Button>
               )}

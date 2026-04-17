@@ -1,5 +1,6 @@
 import React from "react"
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer"
+import { PerformancePdfLetterhead } from "./pdf-letterhead"
 
 const styles = StyleSheet.create({
   page: { flexDirection: "column", backgroundColor: "#ffffff", padding: 30 },
@@ -25,6 +26,7 @@ const styles = StyleSheet.create({
 
 interface UserScorecardPDFProps {
   data: any
+  activeAddress?: any
 }
 
 const toNumber = (value: unknown) => {
@@ -32,7 +34,7 @@ const toNumber = (value: unknown) => {
   return Number.isFinite(n) ? n : 0
 }
 
-export default function UserScorecardPDF({ data }: UserScorecardPDFProps) {
+export default function UserScorecardPDF({ data, activeAddress }: UserScorecardPDFProps) {
   const employee = data?.employee || {}
   const goals = data?.goals || []
   const warnings = data?.warnings || []
@@ -47,10 +49,12 @@ export default function UserScorecardPDF({ data }: UserScorecardPDFProps) {
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Individual Performance Scorecard</Text>
-          <Text style={styles.subtitle}>Employee: {employee?.name || "N/A"}</Text>
-        </View>
+        <PerformancePdfLetterhead
+          title="Individual Performance Scorecard"
+          subtitle={`Employee: ${employee?.name || "N/A"}`}
+          periodLabel={data?.contract?.periodLabel || data?.reviewPeriod}
+          activeAddress={activeAddress}
+        />
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Overview</Text>

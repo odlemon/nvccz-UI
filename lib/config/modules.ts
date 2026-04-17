@@ -155,6 +155,8 @@ export const MODULE_CONFIG: ModuleConfig[] = [
         id: "goals-management", name: "Goals Management", path: "/performance/goals", icon: CiCircleCheck, description: "Goals"
       },
       { id: "tasks-management", name: "Tasks Management", path: "/performance/tasks", icon: CiViewList, description: "Tasks" },
+      { id: "performance-contracts", name: "Performance Contracts", path: "/performance/contracts", icon: CiMedal, description: "CEO, Board, Department and Employee BSC contracts" },
+      { id: "bsc-operations", name: "BSC Operations", path: "/performance/bsc-operations", icon: CiCoins1, description: "BSC data entry, workflow submissions and contract creation hub" },
       { id: "department-scorecards", name: "Department Scorecards", path: "/performance/department-scorecards", icon: CiViewBoard, description: "Department performance scorecards" },
       { id: "user-scorecards", name: "User Scorecards", path: "/performance/user-scorecards", icon: CiViewTable, description: "User performance scorecards" },
       { id: "ceo-scorecards", name: "CEO Scorecards", path: "/performance/ceo-scorecards", icon: CiTrophy, description: "CEO contract scorecards" },

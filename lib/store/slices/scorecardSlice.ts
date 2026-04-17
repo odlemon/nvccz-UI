@@ -22,9 +22,17 @@ const initialState: ScorecardState = {
 // Async Thunks
 export const fetchDepartmentScorecard = createAsyncThunk(
   "scorecard/fetchDepartmentScorecard",
-  async (departmentName: string, { rejectWithValue }) => {
+  async (
+    payload: string | { departmentName: string; periodLabel?: string },
+    { rejectWithValue },
+  ) => {
     try {
-      const response = await scorecardApiService.getDepartmentScorecard(departmentName)
+      const departmentName = typeof payload === "string" ? payload : payload.departmentName
+      const periodLabel = typeof payload === "string" ? undefined : payload.periodLabel
+      const response = await scorecardApiService.getDepartmentScorecard(
+        departmentName,
+        periodLabel ? { periodLabel } : undefined,
+      )
       return response.data
     } catch (error: any) {
       return rejectWithValue(error.message)
@@ -34,9 +42,11 @@ export const fetchDepartmentScorecard = createAsyncThunk(
 
 export const fetchUserScorecard = createAsyncThunk(
   "scorecard/fetchUserScorecard",
-  async (_, { rejectWithValue }) => {
+  async (payload: { periodLabel?: string } | undefined, { rejectWithValue }) => {
     try {
-      const response = await scorecardApiService.getUserScorecard()
+      const response = await scorecardApiService.getUserScorecard(
+        payload?.periodLabel ? { periodLabel: payload.periodLabel } : undefined,
+      )
       return response.data
     } catch (error: any) {
       return rejectWithValue(error.message)

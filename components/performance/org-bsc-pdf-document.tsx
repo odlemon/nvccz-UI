@@ -1,4 +1,5 @@
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer"
+import { PerformancePdfLetterhead } from "./pdf-letterhead"
 
 const styles = StyleSheet.create({
   page: { padding: 30, fontFamily: "Helvetica" },
@@ -16,9 +17,10 @@ const styles = StyleSheet.create({
 
 interface OrgBscPDFProps {
   data: any
+  activeAddress?: any
 }
 
-export default function OrgBscPDF({ data }: OrgBscPDFProps) {
+export default function OrgBscPDF({ data, activeAddress }: OrgBscPDFProps) {
   const pillars = data?.pillars || []
   const warnings = data?.warnings || []
   const alerts = data?.alerts || []
@@ -26,10 +28,12 @@ export default function OrgBscPDF({ data }: OrgBscPDFProps) {
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Organisational Balanced Scorecard</Text>
-          <Text style={styles.subtitle}>{data?.organisationName || "Organisation"}</Text>
-        </View>
+        <PerformancePdfLetterhead
+          title="Organisational Balanced Scorecard"
+          subtitle={data?.organisationName || "Organisation"}
+          periodLabel={data?.reviewPeriod}
+          activeAddress={activeAddress}
+        />
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Overview</Text>

@@ -4,11 +4,13 @@ import { useState, useEffect, useMemo } from "react"
 import { useAppDispatch, useAppSelector } from "@/lib/store"
 import { fetchDepartmentScorecard } from "@/lib/store/slices/scorecardSlice"
 import { fetchAvailableDepartments } from "@/lib/store/slices/performanceSlice"
+import { companyProfileApi, type CompanyAddress } from "@/lib/api/company-profile-api"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { CiViewBoard, CiUser, CiRedo, CiTrophy, CiFileOn } from "react-icons/ci"
+import { CiViewBoard, CiUser, CiTrophy, CiFileOn } from "react-icons/ci"
+import { Calendar, RefreshCw } from "lucide-react"
 import { TbTarget } from "react-icons/tb"
 import { toast } from "sonner"
 import DepartmentScorecardPDF from "./department-scorecard-pdf-document"
@@ -51,14 +53,17 @@ export function DepartmentScorecardsPage() {
   const { departmentScorecard, loading, error } = useAppSelector((state) => state.scorecard)
   const { availableDepartments } = useAppSelector((state) => state.performance)
   const [selectedDepartment, setSelectedDepartment] = useState<string>("")
+  const [periodLabel, setPeriodLabel] = useState(String(new Date().getFullYear()))
   const [isClient, setIsClient] = useState(false)
   const [PDFDownloadLink, setPDFDownloadLink] = useState<any>(null)
+  const [activeAddress, setActiveAddress] = useState<CompanyAddress | null>(null)
 
   useEffect(() => {
     setIsClient(true)
     import("@react-pdf/renderer").then((pdfModule) => {
       setPDFDownloadLink(() => pdfModule.PDFDownloadLink)
     })
+    companyProfileApi.getActiveAddress().then((a) => setActiveAddress(a)).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -73,9 +78,9 @@ export function DepartmentScorecardsPage() {
 
   useEffect(() => {
     if (selectedDepartment) {
-      dispatch(fetchDepartmentScorecard(selectedDepartment))
+      dispatch(fetchDepartmentScorecard({ departmentName: selectedDepartment, periodLabel }))
     }
-  }, [selectedDepartment, dispatch])
+  }, [selectedDepartment, periodLabel, dispatch])
 
   useEffect(() => {
     if (error) {
@@ -85,7 +90,7 @@ export function DepartmentScorecardsPage() {
 
   const handleRefresh = () => {
     if (selectedDepartment) {
-      dispatch(fetchDepartmentScorecard(selectedDepartment))
+      dispatch(fetchDepartmentScorecard({ departmentName: selectedDepartment, periodLabel }))
     }
   }
 
@@ -126,9 +131,24 @@ export function DepartmentScorecardsPage() {
             Aggregated department performance and goal matrix
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Select value={periodLabel} onValueChange={setPeriodLabel}>
+            <SelectTrigger className="w-[120px] rounded-full" size="sm">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                <SelectValue />
+              </div>
+            </SelectTrigger>
+            <SelectContent>
+              {Array.from({ length: 6 }, (_, i) => new Date().getFullYear() + 1 - i).map((y) => (
+                <SelectItem key={y} value={String(y)}>
+                  {y}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-            <SelectTrigger className="w-48">
+            <SelectTrigger className="w-48 rounded-full">
               <SelectValue placeholder="Select Department" />
             </SelectTrigger>
             <SelectContent>
@@ -139,18 +159,27 @@ export function DepartmentScorecardsPage() {
               ))}
             </SelectContent>
           </Select>
-          <Button onClick={handleRefresh} variant="outline" disabled={loading}>
-            <CiRedo className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`} />
+          <Button
+            onClick={handleRefresh}
+            size="sm"
+            className="rounded-full gap-1.5 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white"
+            disabled={loading}
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
             Refresh
           </Button>
           {isClient && departmentScorecard && PDFDownloadLink && (
             <PDFDownloadLink
-              document={<DepartmentScorecardPDF data={departmentScorecard} />}
+              document={<DepartmentScorecardPDF data={departmentScorecard} activeAddress={activeAddress} />}
               fileName={`${(departmentInfo?.name || selectedDepartment || "department").replace(/\s+/g, "-")}-Scorecard-${new Date().toISOString().split("T")[0]}.pdf`}
             >
               {({ loading: pdfLoading }: any) => (
-                <Button variant="outline" disabled={pdfLoading}>
-                  <CiFileOn className={`w-4 h-4 mr-2 ${pdfLoading ? "animate-spin" : ""}`} />
+                <Button
+                  size="sm"
+                  className="rounded-full gap-1.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white"
+                  disabled={pdfLoading}
+                >
+                  <CiFileOn className={`w-3.5 h-3.5 ${pdfLoading ? "animate-spin" : ""}`} />
                   {pdfLoading ? "Generating..." : "Export PDF"}
                 </Button>
               )}
