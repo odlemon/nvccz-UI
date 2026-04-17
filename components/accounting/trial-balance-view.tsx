@@ -138,6 +138,7 @@ export function TrialBalanceView() {
   const [periodValue, setPeriodValue] = useState<string>(format(new Date(), 'yyyy-MM'))
   const [reportMode, setReportMode] = useState<"single" | "consolidated">("single")
   const [selectedCurrencyIds, setSelectedCurrencyIds] = useState<string[]>([])
+  const [consolidationCurrencyId, setConsolidationCurrencyId] = useState<string>("")
   const [consolidatedTrialBalance, setConsolidatedTrialBalance] = useState<ConsolidatedTrialBalance | null>(null)
   const [isConsolidating, setIsConsolidating] = useState(false)
   const [generatingPDF, setGeneratingPDF] = useState(false)
@@ -217,7 +218,11 @@ export function TrialBalanceView() {
       const defaultCurrencyId = currencies.find(c => c.code === "USD")?.id || currencies[0]?.id
       if (defaultCurrencyId) setSelectedCurrencyIds([defaultCurrencyId])
     }
-  }, [currencies, selectedCurrencyIds.length])
+    if (!consolidationCurrencyId) {
+      const defaultCurrencyId = currencies.find(c => c.code === "USD")?.id || currencies[0]?.id
+      if (defaultCurrencyId) setConsolidationCurrencyId(defaultCurrencyId)
+    }
+  }, [currencies, selectedCurrencyIds.length, consolidationCurrencyId])
 
   useEffect(() => {
     // Only load data when we have a valid periodValue for the current periodType
@@ -233,7 +238,7 @@ export function TrialBalanceView() {
         loadConsolidatedTrialBalance()
       }
     }
-  }, [periodType, periodValue, selectedCurrencyId, reportMode, selectedCurrencyIds])
+  }, [periodType, periodValue, selectedCurrencyId, reportMode, selectedCurrencyIds, consolidationCurrencyId])
 
   const loadTrialBalanceData = async () => {
     try {
@@ -265,7 +270,11 @@ export function TrialBalanceView() {
 
     try {
       setIsConsolidating(true)
-      const reportingCurrency = currencies.find((c) => c.code === "USD") || currencies[0]
+      // Use the user-selected target reporting currency. Fall back to USD only if nothing is chosen.
+      const reportingCurrency =
+        currencies.find((c) => c.id === consolidationCurrencyId) ||
+        currencies.find((c) => c.code === "USD") ||
+        currencies[0]
 
       const responses = await Promise.all(
         selectedCurrencyIds.map((id) =>
@@ -327,6 +336,24 @@ export function TrialBalanceView() {
       currency: currencyCode,
       minimumFractionDigits: 2
     }).format(amount)
+  }
+
+  // Format in the target/reporting currency (consolidated mode).
+  const formatConsolidated = (amount: number) => {
+    const code =
+      consolidatedTrialBalance?.reportingCurrencyCode ||
+      currencies.find((c) => c.id === consolidationCurrencyId)?.code ||
+      'USD'
+    try {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: code,
+        minimumFractionDigits: 2,
+      }).format(amount)
+    } catch {
+      const symbol = currencies.find((c) => c.code === code)?.symbol || code + " "
+      return `${symbol}${Math.abs(amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    }
   }
 
   const toggleAccountExpand = (accountId: string) => {
@@ -544,7 +571,7 @@ export function TrialBalanceView() {
           <p className="text-gray-600 mt-1">
             {reportMode === "single"
               ? `Period: ${getPeriodOptions().find(opt => opt.value === periodValue)?.label || periodValue} - Currency: ${currencies.find(c => c.id === selectedCurrencyId)?.code || 'USD'}`
-              : `Consolidated View (${(currencies.find(c => c.code === 'USD') || currencies[0])?.code || 'USD'} reporting)`}
+              : `Consolidated View (${consolidatedTrialBalance?.reportingCurrencyCode || currencies.find(c => c.id === consolidationCurrencyId)?.code || 'target'} reporting)`}
           </p>
         </div>
 
@@ -597,37 +624,69 @@ export function TrialBalanceView() {
           {reportMode === "single" ? (
             <CurrencyFilter />
           ) : (
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="rounded-full min-w-[180px]">
-                  {selectedCurrencyIds.length
-                    ? selectedCurrencyIds
-                        .map((id) => currencies.find((c) => c.id === id)?.code)
-                        .filter(Boolean)
-                        .join(", ")
-                    : "Select currencies"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-64">
-                <div className="space-y-2">
-                  {currencies.map((c) => {
-                    const selected = selectedCurrencyIds.includes(c.id)
-                    return (
-                      <Button
-                        key={c.id}
-                        type="button"
-                        variant={selected ? "default" : "outline"}
-                        className="w-full justify-between"
-                        onClick={() => toggleCurrencySelection(c.id)}
-                      >
-                        <span>{c.code}</span>
-                        {selected ? <Check className="w-4 h-4" /> : null}
-                      </Button>
-                    )
-                  })}
-                </div>
-              </PopoverContent>
-            </Popover>
+            <>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="rounded-full min-w-[180px]">
+                    {selectedCurrencyIds.length
+                      ? `Sources: ${selectedCurrencyIds
+                          .map((id) => currencies.find((c) => c.id === id)?.code)
+                          .filter(Boolean)
+                          .join(", ")}`
+                      : "Select source currencies"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-64">
+                  <div className="space-y-2">
+                    {currencies.map((c) => {
+                      const selected = selectedCurrencyIds.includes(c.id)
+                      return (
+                        <Button
+                          key={c.id}
+                          type="button"
+                          variant={selected ? "default" : "outline"}
+                          className="w-full justify-between"
+                          onClick={() => toggleCurrencySelection(c.id)}
+                        >
+                          <span>{c.code}</span>
+                          {selected ? <Check className="w-4 h-4" /> : null}
+                        </Button>
+                      )
+                    })}
+                  </div>
+                </PopoverContent>
+              </Popover>
+
+              {/* Target reporting currency picker */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="rounded-full min-w-[180px]">
+                    Target:{" "}
+                    {currencies.find((c) => c.id === consolidationCurrencyId)?.code || "Select"}
+                    <span className="text-xs text-gray-400 ml-1">(reporting)</span>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-56">
+                  <div className="space-y-2">
+                    {currencies.map((c) => {
+                      const selected = c.id === consolidationCurrencyId
+                      return (
+                        <Button
+                          key={c.id}
+                          type="button"
+                          variant={selected ? "default" : "outline"}
+                          className="w-full justify-between"
+                          onClick={() => setConsolidationCurrencyId(c.id)}
+                        >
+                          <span>{c.code}</span>
+                          {selected ? <Check className="w-4 h-4 text-blue-600" /> : null}
+                        </Button>
+                      )
+                    })}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </>
           )}
           {/* Export Buttons */}
           <Button 
@@ -879,7 +938,7 @@ export function TrialBalanceView() {
                                       "font-mono text-sm",
                                       account.consolidatedDebit > 0 ? "text-green-700 font-semibold" : "text-gray-400"
                                     )}>
-                                      {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(account.consolidatedDebit || 0)}
+                                      {formatConsolidated(account.consolidatedDebit || 0)}
                                     </span>
                                   </td>
                                   <td className="py-3 px-4 text-right">
@@ -887,7 +946,7 @@ export function TrialBalanceView() {
                                       "font-mono text-sm",
                                       account.consolidatedCredit > 0 ? "text-red-700 font-semibold" : "text-gray-400"
                                     )}>
-                                      {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(account.consolidatedCredit || 0)}
+                                      {formatConsolidated(account.consolidatedCredit || 0)}
                                     </span>
                                   </td>
                                 </>
@@ -948,12 +1007,12 @@ export function TrialBalanceView() {
                               <td className="py-3 px-4"></td>
                               <td className="py-3 px-4 text-right">
                                 <span className="font-mono text-sm text-green-700">
-                                  {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(consolidatedTrialBalance?.totals.totalDebits || 0)}
+                                  {formatConsolidated(consolidatedTrialBalance?.totals.totalDebits || 0)}
                                 </span>
                               </td>
                               <td className="py-3 px-4 text-right">
                                 <span className="font-mono text-sm text-red-700">
-                                  {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(consolidatedTrialBalance?.totals.totalCredits || 0)}
+                                  {formatConsolidated(consolidatedTrialBalance?.totals.totalCredits || 0)}
                                 </span>
                               </td>
                             </>

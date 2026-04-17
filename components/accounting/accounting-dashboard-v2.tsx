@@ -63,14 +63,57 @@ export function AccountingDashboardV2() {
         dispatch(fetchCurrencies())
     }, [dispatch])
 
+    // Resolve selected currency symbol (falls back to $)
+    const currencySymbol = useMemo(() => {
+        if (!selectedCurrency) return "$"
+        const match = currencies.find((c: any) => c.id === selectedCurrency)
+        return match?.symbol || "$"
+    }, [selectedCurrency, currencies])
+
+    // Compute date window from year + quarter filters
+    const dateWindow = useMemo(() => {
+        const yearSet = financialYear && financialYear !== "all"
+        const quarterSet = selectedMonths && selectedMonths !== "all"
+        if (!yearSet && !quarterSet) return null
+
+        const year = Number.parseInt(financialYear, 10) || new Date().getFullYear()
+        const quarterRanges: Record<string, [number, number, number, number]> = {
+            q1: [0, 1, 2, 31],   // Jan 1 - Mar 31
+            q2: [3, 4, 5, 30],   // Apr 1 - Jun 30
+            q3: [6, 7, 8, 30],   // Jul 1 - Sep 30
+            q4: [9, 10, 11, 31], // Oct 1 - Dec 31
+        }
+
+        let startMonth = 0, endMonth = 11, endDay = 31
+        if (quarterSet && quarterRanges[selectedMonths]) {
+            const r = quarterRanges[selectedMonths]
+            startMonth = r[0]
+            endMonth = r[2]
+            endDay = r[3]
+        }
+
+        const pad = (n: number) => String(n).padStart(2, "0")
+        return {
+            startDate: `${year}-${pad(startMonth + 1)}-01`,
+            endDate: `${year}-${pad(endMonth + 1)}-${pad(endDay)}`,
+        }
+    }, [financialYear, selectedMonths])
+
     // Fetch dashboard data on mount and when filters change
     useEffect(() => {
-        dispatch(fetchAccountingDashboard({
-            period,
+        const params: Parameters<typeof fetchAccountingDashboard>[0] = {
             benchmark,
-            currencyId: selectedCurrency
-        }))
-    }, [dispatch, period, benchmark, selectedCurrency])
+            currencyId: selectedCurrency,
+        }
+        if (dateWindow) {
+            params.period = "CUSTOM"
+            params.startDate = dateWindow.startDate
+            params.endDate = dateWindow.endDate
+        } else {
+            params.period = period
+        }
+        dispatch(fetchAccountingDashboard(params))
+    }, [dispatch, period, benchmark, selectedCurrency, dateWindow])
 
     // Use only API data - these hooks must be called before any conditional returns
     const stats = {
@@ -92,13 +135,13 @@ export function AccountingDashboardV2() {
 
     const formatCurrency = (value: number) => {
         if (value >= 1000000) {
-            return `$${(value / 1000000).toFixed(1)}M`
+            return `${currencySymbol}${(value / 1000000).toFixed(1)}M`
         }
-        return `$${value.toLocaleString()}`
+        return `${currencySymbol}${value.toLocaleString()}`
     }
 
     const formatLargeCurrency = (value: number) => {
-        return `$${value.toLocaleString()}`
+        return `${currencySymbol}${value.toLocaleString()}`
     }
 
     // Calculate total assets for display
@@ -360,7 +403,7 @@ export function AccountingDashboardV2() {
                                         tick={{ fontSize: 11, fill: '#94a3b8' }}
                                         axisLine={false}
                                         tickLine={false}
-                                        tickFormatter={(v) => `${(v / 1000000).toFixed(0)}M`}
+                                        tickFormatter={(v) => `${currencySymbol}${(v / 1000000).toFixed(0)}M`}
                                     />
                                     <YAxis
                                         yAxisId="right"
@@ -374,7 +417,7 @@ export function AccountingDashboardV2() {
                                         contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                                         formatter={(value: number | undefined, name: string | undefined) => {
                                             if (name === 'percent') return [`${value}%`, 'Margin']
-                                            return [`$${((value || 0) / 1000000).toFixed(1)}M`, name === 'value' ? 'Profit' : 'COGS']
+                                            return [`${currencySymbol}${((value || 0) / 1000000).toFixed(1)}M`, name === 'value' ? 'Profit' : 'COGS']
                                         }}
                                     />
                                     <Bar yAxisId="left" dataKey="value" fill="#fbbf24" radius={[6, 6, 0, 0]} barSize={12} />
@@ -426,7 +469,7 @@ export function AccountingDashboardV2() {
                                         tick={{ fontSize: 11, fill: '#94a3b8' }}
                                         axisLine={false}
                                         tickLine={false}
-                                        tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
+                                        tickFormatter={(v) => `${currencySymbol}${(v / 1000).toFixed(0)}k`}
                                     />
                                     <YAxis
                                         yAxisId="right"
@@ -480,7 +523,7 @@ export function AccountingDashboardV2() {
                                             <div className="w-1.5 h-10 rounded-full" style={{ backgroundColor: ASSET_GRID_COLORS[index % ASSET_GRID_COLORS.length] }}></div>
                                             <div className="flex-1">
                                                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{asset.category}</p>
-                                                <p className="text-xl font-normal text-foreground mt-1 tracking-tight">${asset.amount.toLocaleString()}</p>
+                                                <p className="text-xl font-normal text-foreground mt-1 tracking-tight">{currencySymbol}{asset.amount.toLocaleString()}</p>
                                             </div>
                                         </div>
                                     ))
@@ -536,7 +579,7 @@ export function AccountingDashboardV2() {
                                                                 {item.category}
                                                             </span>
                                                             <span className="text-xl font-light text-white tracking-tight">
-                                                                ${item.amount.toLocaleString()}
+                                                                {currencySymbol}{item.amount.toLocaleString()}
                                                             </span>
                                                         </div>
                                                     );
@@ -572,7 +615,7 @@ export function AccountingDashboardV2() {
                                         <div key={index} className="space-y-1.5">
                                             <div className="flex items-center justify-between text-xs font-medium px-1">
                                                 <span className="text-muted-foreground uppercase tracking-wider">{expense.category}</span>
-                                                <span className="text-foreground">{(expense.amount || 0).toLocaleString()}</span>
+                                                <span className="text-foreground">{currencySymbol}{(expense.amount || 0).toLocaleString()}</span>
                                             </div>
                                             <div className="h-4 w-full bg-gray-50 rounded-full overflow-hidden">
                                                 <div

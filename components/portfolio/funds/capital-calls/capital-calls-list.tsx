@@ -36,6 +36,7 @@ import {
   Receipt,
   Users,
   AlertCircle,
+  UserPlus,
 } from "lucide-react"
 import { fundsApi, type Fund } from "@/lib/api/funds-api"
 import {
@@ -47,6 +48,7 @@ import { toast } from "sonner"
 import { CapitalCallDetailDrawer } from "./capital-call-detail-drawer"
 import { InitiateCapitalCallModal } from "./initiate-capital-call-modal"
 import { LpSummaryPanel } from "./lp-summary-panel"
+import { AddLpModal } from "./add-lp-modal"
 
 function fmtCurrency(val: string | number, symbol = "$") {
   const n = Number(val)
@@ -131,6 +133,7 @@ export function CapitalCallsList() {
   const [createOpen, setCreateOpen] = useState(false)
   const [sendingNotices, setSendingNotices] = useState<string | null>(null)
   const [confirmSendCallId, setConfirmSendCallId] = useState<string | null>(null)
+  const [addLpOpen, setAddLpOpen] = useState(false)
 
   // ── Load funds ──
   const loadFunds = async () => {
@@ -273,6 +276,16 @@ export function CapitalCallsList() {
               className={`w-3.5 h-3.5 ${callsLoading || fundsLoading ? "animate-spin" : ""}`}
             />
             Refresh
+          </Button>
+          <Button
+            onClick={() => setAddLpOpen(true)}
+            variant="outline"
+            size="sm"
+            className="rounded-full gap-1.5 border-blue-300 text-blue-700 hover:bg-blue-50"
+            disabled={!selectedFund}
+          >
+            <UserPlus className="w-4 h-4" />
+            Add LP
           </Button>
           <Button
             onClick={() => setCreateOpen(true)}
@@ -431,9 +444,25 @@ export function CapitalCallsList() {
             <div className="text-center py-20 text-muted-foreground">
               <CalendarClock className="w-12 h-12 mx-auto mb-3 opacity-30" />
               <p>No capital calls found</p>
-              <p className="text-xs mt-1">
-                Initiate a capital call to get started
-              </p>
+              {lpSummary.length === 0 ? (
+                <>
+                  <p className="text-xs mt-1">
+                    Add at least one LP with an active or pending commitment before you can initiate a call.
+                  </p>
+                  <Button
+                    onClick={() => setAddLpOpen(true)}
+                    size="sm"
+                    className="rounded-full gap-1.5 gradient-primary text-white mt-4"
+                  >
+                    <UserPlus className="w-4 h-4" />
+                    Add First LP
+                  </Button>
+                </>
+              ) : (
+                <p className="text-xs mt-1">
+                  Initiate a capital call to get started
+                </p>
+              )}
             </div>
           ) : (
             <div className="space-y-3">
@@ -619,6 +648,13 @@ export function CapitalCallsList() {
           <InitiateCapitalCallModal
             isOpen={createOpen}
             onClose={() => setCreateOpen(false)}
+            fundId={selectedFund.id}
+            fundName={selectedFund.name}
+            onCreated={loadCallsAndSummary}
+          />
+          <AddLpModal
+            isOpen={addLpOpen}
+            onClose={() => setAddLpOpen(false)}
             fundId={selectedFund.id}
             fundName={selectedFund.name}
             onCreated={loadCallsAndSummary}

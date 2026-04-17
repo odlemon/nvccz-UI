@@ -1,10 +1,9 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useDispatch, useSelector } from "react-redux"
-import type { AppDispatch, RootState } from "@/lib/store/store"
-import { fetchRateHistory, fetchAccruals, fetchAuditTrail, fetchSTIInstruments } from "@/lib/store/slices/shortTermInvestmentsSlice"
-import { fetchSTIDashboard } from "@/lib/store/slices/shortTermInvestmentsSlice"
+import { useState, useEffect, useCallback } from "react"
+import { useDispatch } from "react-redux"
+import type { AppDispatch } from "@/lib/store/store"
+import { fetchSTIInstruments, fetchSTIDashboard } from "@/lib/store/slices/shortTermInvestmentsSlice"
 import {
   Sheet,
   SheetContent,
@@ -24,23 +23,32 @@ import {
   DollarSign,
   Calendar,
   TrendingUp,
-  Clock,
   FileText,
   Shield,
   Plus,
   Ban,
   CheckCircle,
   Trash2,
-  Edit2,
+  Loader2,
+  RefreshCw,
+  AlertTriangle,
+  Clock,
 } from "lucide-react"
 import { format } from "date-fns"
 import { toast } from "sonner"
-import type { STIInstrument } from "@/lib/api/short-term-investments-api"
+import type {
+  STIInstrument,
+  STIInstrumentDetail,
+  AccrualEntry,
+  AuditTrailEntry,
+} from "@/lib/api/short-term-investments-api"
 import {
   addRate,
   voidInstrument,
-  approveAccruals,
+  approveAllAccruals,
+  approveAccrual,
   deleteInstrument,
+  getInstrument,
   extractErrorMessage,
 } from "@/lib/api/short-term-investments-api"
 import { LiquidateInstrumentModal } from "./liquidate-instrument-modal"
@@ -55,37 +63,58 @@ type DetailTab = "details" | "rates" | "accruals" | "audit"
 
 export function InstrumentViewDrawer({ instrument, open, onOpenChange }: InstrumentViewDrawerProps) {
   const dispatch = useDispatch<AppDispatch>()
-  const stiState = useSelector((state: RootState) => state.shortTermInvestments)
-  const rateHistory = stiState?.rateHistory ?? []
-  const rateHistoryLoading = stiState?.rateHistoryLoading ?? false
-  const accruals = stiState?.accruals ?? []
-  const accrualsLoading = stiState?.accrualsLoading ?? false
-  const auditTrail = stiState?.auditTrail ?? []
-  const auditTrailLoading = stiState?.auditTrailLoading ?? false
 
   const [tab, setTab] = useState<DetailTab>("details")
+  const [detail, setDetail] = useState<STIInstrumentDetail | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
   const [showAddRate, setShowAddRate] = useState(false)
   const [newApy, setNewApy] = useState("")
   const [newEffectiveDate, setNewEffectiveDate] = useState<Date | undefined>(undefined)
   const [addingRate, setAddingRate] = useState(false)
   const [isLiquidateOpen, setIsLiquidateOpen] = useState(false)
+  const [approvingAccrualId, setApprovingAccrualId] = useState<string | null>(null)
+  const [approvingAll, setApprovingAll] = useState(false)
+
+  const loadDetail = useCallback(async () => {
+    if (!instrument?.id) return
+    setDetailLoading(true)
+    try {
+      const res = await getInstrument(instrument.id)
+      setDetail(res.data)
+    } catch (e: any) {
+      toast.error("Failed to load instrument detail", { description: extractErrorMessage(e) })
+    } finally {
+      setDetailLoading(false)
+    }
+  }, [instrument?.id])
 
   useEffect(() => {
-    if (open && instrument) {
-      dispatch(fetchRateHistory(instrument.id))
-      dispatch(fetchAccruals(instrument.id))
-      dispatch(fetchAuditTrail(instrument.id))
+    if (open && instrument?.id) {
+      setTab("details")
+      loadDetail()
     }
-  }, [open, instrument, dispatch])
-
-  const formatCurrency = (amount: string | number) => {
-    const num = typeof amount === "string" ? parseFloat(amount) : amount
-    return num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-  }
+  }, [open, instrument?.id, loadDetail])
 
   const refreshAll = () => {
     dispatch(fetchSTIInstruments())
     dispatch(fetchSTIDashboard({}))
+  }
+
+  // Use detail where available, fall back to the light instrument row from the list
+  const src: STIInstrument | STIInstrumentDetail = detail || instrument
+  const accruals: AccrualEntry[] = detail?.accruals ?? []
+  const apyRates = detail?.apyRates ?? []
+  const auditLogs: AuditTrailEntry[] = detail?.auditLogs ?? []
+  const currencyCode = detail?.currency?.code || instrument.currency?.code || ""
+  const currencySymbol = (detail?.currency as any)?.symbol || ""
+
+  const pendingAccruals = accruals.filter((a) => a.status === "PENDING_POST")
+
+  const fmtAmount = (amount: string | number | null | undefined) => {
+    if (amount === null || amount === undefined) return "—"
+    const num = typeof amount === "string" ? parseFloat(amount) : amount
+    if (!Number.isFinite(num)) return "—"
+    return num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })
   }
 
   const handleAddRate = async () => {
@@ -95,9 +124,11 @@ export function InstrumentViewDrawer({ instrument, open, onOpenChange }: Instrum
     }
     setAddingRate(true)
     try {
-      await addRate(instrument.id, { apy: parseFloat(newApy), effectiveFromIso: format(newEffectiveDate, "yyyy-MM-dd") })
+      const apy = parseFloat(newApy)
+      const normalized = Math.abs(apy) > 1 ? apy / 100 : apy
+      await addRate(instrument.id, { apy: normalized, effectiveFromIso: format(newEffectiveDate, "yyyy-MM-dd") })
       toast.success("Rate added successfully")
-      dispatch(fetchRateHistory(instrument.id))
+      await loadDetail()
       setShowAddRate(false)
       setNewApy("")
       setNewEffectiveDate(undefined)
@@ -119,14 +150,40 @@ export function InstrumentViewDrawer({ instrument, open, onOpenChange }: Instrum
     }
   }
 
-  const handleApproveAccruals = async () => {
+  const handleApproveAll = async () => {
+    if (!pendingAccruals.length) {
+      toast.info("No pending accruals to approve")
+      return
+    }
+    setApprovingAll(true)
     try {
-      await approveAccruals(instrument.id)
-      toast.success("Accruals approved successfully")
-      dispatch(fetchAccruals(instrument.id))
+      const res = await approveAllAccruals(instrument.id)
+      const data: any = res?.data || {}
+      toast.success("Accruals approved", {
+        description: `Approved ${data.approved ?? pendingAccruals.length} of ${data.pendingFound ?? pendingAccruals.length}` +
+          (data.skipped ? ` · skipped ${data.skipped}` : "") +
+          (data.failures?.length ? ` · ${data.failures.length} error(s)` : ""),
+      })
+      await loadDetail()
       refreshAll()
     } catch (e: any) {
-      toast.error("Failed to approve accruals", { description: extractErrorMessage(e) })
+      toast.error("Failed to approve all accruals", { description: extractErrorMessage(e) })
+    } finally {
+      setApprovingAll(false)
+    }
+  }
+
+  const handleApproveOne = async (accrualId: string) => {
+    setApprovingAccrualId(accrualId)
+    try {
+      await approveAccrual(accrualId)
+      toast.success("Accrual approved")
+      await loadDetail()
+      refreshAll()
+    } catch (e: any) {
+      toast.error("Failed to approve accrual", { description: extractErrorMessage(e) })
+    } finally {
+      setApprovingAccrualId(null)
     }
   }
 
@@ -156,43 +213,99 @@ export function InstrumentViewDrawer({ instrument, open, onOpenChange }: Instrum
     }
   }
 
-  const tabs: { id: DetailTab; label: string; icon: React.ElementType }[] = [
+  const accrualStatusBadge = (status?: string) => {
+    switch (status) {
+      case "POSTED":
+        return <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 rounded-full text-[10px] px-2" variant="outline">Posted</Badge>
+      case "PENDING_POST":
+        return <Badge className="bg-amber-50 text-amber-700 border-amber-200 rounded-full text-[10px] px-2" variant="outline">Pending</Badge>
+      case "SKIPPED":
+        return <Badge className="bg-gray-100 text-gray-600 border-gray-200 rounded-full text-[10px] px-2" variant="outline">Skipped</Badge>
+      case "VOIDED":
+        return <Badge className="bg-red-50 text-red-700 border-red-200 rounded-full text-[10px] px-2" variant="outline">Voided</Badge>
+      default:
+        return <Badge variant="outline" className="rounded-full text-[10px] px-2">{status || "—"}</Badge>
+    }
+  }
+
+  const auditActionLabel = (entry: AuditTrailEntry) => {
+    // Prefer detail shape (action + entityType); fall back to legacy field.
+    if (entry.action) {
+      const action = entry.action.replace(/_/g, " ")
+      return entry.entityType
+        ? `${action} · ${entry.entityType.replace(/([A-Z])/g, " $1").trim()}`
+        : action
+    }
+    return entry.field || "Change"
+  }
+
+  const latestApy = apyRates[0]?.apy ?? (accruals[0]?.apyRate?.apy ?? null)
+
+  const tabs: { id: DetailTab; label: string; icon: React.ElementType; count?: number }[] = [
     { id: "details", label: "Details", icon: FileText },
-    { id: "rates", label: "Rates", icon: TrendingUp },
-    { id: "accruals", label: "Accruals", icon: DollarSign },
-    { id: "audit", label: "Audit", icon: Shield },
+    { id: "rates", label: "Rates", icon: TrendingUp, count: apyRates.length },
+    { id: "accruals", label: "Accruals", icon: DollarSign, count: accruals.length },
+    { id: "audit", label: "Audit", icon: Shield, count: auditLogs.length },
   ]
 
   return (
     <>
       <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
+        <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
           <SheetHeader className="pb-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <SheetTitle className="text-lg font-semibold">{instrument.name}</SheetTitle>
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <SheetTitle className="text-lg font-semibold truncate">{src.name}</SheetTitle>
                 <SheetDescription className="text-xs mt-1">
-                  {instrument.category} &middot; {instrument.broker}
+                  {src.category} &middot; {src.broker}
                 </SheetDescription>
               </div>
-              {getStatusBadge(instrument.status)}
+              <div className="flex items-center gap-2 shrink-0">
+                {detailLoading && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />}
+                {getStatusBadge(src.status)}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 w-7 p-0 rounded-full"
+                  onClick={() => loadDetail()}
+                  disabled={detailLoading}
+                  title="Refresh"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${detailLoading ? "animate-spin" : ""}`} />
+                </Button>
+              </div>
             </div>
 
-            {instrument.capitalErosion && (
-              <Badge className="bg-red-50 text-red-600 border-red-200 rounded-full text-xs px-3 w-fit mt-2" variant="outline">
-                Capital Erosion Instrument
-              </Badge>
-            )}
+            <div className="flex flex-wrap gap-2 mt-2">
+              {src.capitalErosion && (
+                <Badge className="bg-red-50 text-red-600 border-red-200 rounded-full text-xs px-3" variant="outline">
+                  <AlertTriangle className="w-3 h-3 mr-1" /> Capital Erosion
+                </Badge>
+              )}
+              {pendingAccruals.length > 0 && (
+                <Badge className="bg-amber-50 text-amber-700 border-amber-200 rounded-full text-xs px-3" variant="outline">
+                  <Clock className="w-3 h-3 mr-1" /> {pendingAccruals.length} pending accrual{pendingAccruals.length > 1 ? "s" : ""}
+                </Badge>
+              )}
+              {latestApy !== null && (
+                <Badge className="bg-indigo-50 text-indigo-700 border-indigo-200 rounded-full text-xs px-3" variant="outline">
+                  APY: {(Number(latestApy) * 100).toFixed(3)}%
+                </Badge>
+              )}
+            </div>
 
             {/* Action Buttons */}
-            {instrument.status === "ACTIVE" && (
+            {src.status === "ACTIVE" && (
               <div className="flex flex-wrap gap-2 mt-3">
-                <Button size="sm" className="rounded-full h-8 text-xs gap-1.5 bg-[#4f77ff] hover:bg-[#4f77ff]/90" onClick={() => setIsLiquidateOpen(true)}>
+                <Button size="sm" className="rounded-full h-8 text-xs gap-1.5 bg-gradient-to-r from-blue-500 to-indigo-600 text-white" onClick={() => setIsLiquidateOpen(true)}>
                   <DollarSign className="w-3.5 h-3.5" /> Liquidate
                 </Button>
-                <Button size="sm" variant="outline" className="rounded-full h-8 text-xs gap-1.5" onClick={handleApproveAccruals}>
-                  <CheckCircle className="w-3.5 h-3.5" /> Approve Accruals
-                </Button>
+                {pendingAccruals.length > 0 && (
+                  <Button size="sm" className="rounded-full h-8 text-xs gap-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white" onClick={handleApproveAll} disabled={approvingAll}>
+                    {approvingAll ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
+                    Approve all ({pendingAccruals.length})
+                  </Button>
+                )}
                 <Button size="sm" variant="outline" className="rounded-full h-8 text-xs gap-1.5 text-red-600 border-red-200 hover:bg-red-50" onClick={handleVoid}>
                   <Ban className="w-3.5 h-3.5" /> Void
                 </Button>
@@ -217,6 +330,9 @@ export function InstrumentViewDrawer({ instrument, open, onOpenChange }: Instrum
                 >
                   <Icon className="w-3.5 h-3.5" />
                   {t.label}
+                  {typeof t.count === "number" && t.count > 0 && (
+                    <span className="text-[9px] px-1.5 py-0 rounded-full bg-gray-200 text-gray-700">{t.count}</span>
+                  )}
                 </button>
               )
             })}
@@ -228,68 +344,78 @@ export function InstrumentViewDrawer({ instrument, open, onOpenChange }: Instrum
               <div className="grid grid-cols-2 gap-3">
                 <div className="p-3 bg-blue-50 rounded-xl">
                   <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Principal</p>
-                  <p className="text-lg font-semibold mt-0.5">{instrument.currency.code} {formatCurrency(instrument.principal)}</p>
+                  <p className="text-lg font-semibold mt-0.5">
+                    {currencySymbol || currencyCode} {fmtAmount(src.principal)}
+                  </p>
                 </div>
                 <div className="p-3 bg-emerald-50 rounded-xl">
                   <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Settlement Bank</p>
-                  <p className="text-sm font-semibold mt-0.5">{instrument.settlementBank.name}</p>
-                  <p className="text-[10px] text-muted-foreground">{instrument.settlementBank.accountNumber}</p>
+                  <p className="text-sm font-semibold mt-0.5 truncate">{src.settlementBank?.name}</p>
+                  <p className="text-[10px] text-muted-foreground truncate">{src.settlementBank?.accountNumber}</p>
                 </div>
               </div>
 
               <div className="space-y-3">
-                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Investment Parameters</h4>
+                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Investment parameters</h4>
                 <div className="grid grid-cols-2 gap-y-3 text-xs">
-                  <DetailRow label="Compounding Method" value={instrument.compoundingMethod.replace(/_/g, " ")} />
-                  <DetailRow label="Day Count Convention" value={instrument.dayCountConvention.replace(/_/g, "/")} />
-                  <DetailRow label="Start Date" value={format(new Date(instrument.startDate), "MMM dd, yyyy")} />
-                  <DetailRow label="Maturity Date" value={format(new Date(instrument.maturityDate), "MMM dd, yyyy")} />
-                  <DetailRow label="Currency" value={instrument.currency.code} />
-                  <DetailRow label="Day Count Locked" value={instrument.dayCountLocked ? "Yes" : "No"} />
+                  <DetailRow label="Compounding" value={src.compoundingMethod.replace(/_/g, " ").toLowerCase()} />
+                  <DetailRow label="Day-count rule" value={src.dayCountConvention.replace(/_/g, "/")} />
+                  <DetailRow label="Start date" value={format(new Date(src.startDate), "MMM dd, yyyy")} />
+                  <DetailRow label="Maturity date" value={format(new Date(src.maturityDate), "MMM dd, yyyy")} />
+                  <DetailRow label="Investment currency" value={currencyCode} />
+                  <DetailRow
+                    label="Reporting currency"
+                    value={detail?.functionalCurrency?.code || "Same as investment"}
+                  />
+                  <DetailRow label="Day-count locked" value={src.dayCountLocked ? "Yes" : "No"} />
+                  {latestApy !== null && (
+                    <DetailRow label="Current APY" value={`${(Number(latestApy) * 100).toFixed(3)}%`} />
+                  )}
                 </div>
               </div>
 
-              <Separator />
-
-              {instrument.status === "SETTLED" && instrument.liquidationDate && (
-                <div className="space-y-3">
-                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Settlement Details</h4>
-                  <div className="grid grid-cols-2 gap-y-3 text-xs">
-                    <DetailRow label="Liquidation Date" value={format(new Date(instrument.liquidationDate), "MMM dd, yyyy")} />
-                    <DetailRow label="Cash Received" value={instrument.liquidationCashReceived ? formatCurrency(instrument.liquidationCashReceived) : "—"} />
-                    {instrument.carryingFunctionalAtSettlement && (
-                      <DetailRow label="Carrying Value (Functional)" value={formatCurrency(instrument.carryingFunctionalAtSettlement)} />
-                    )}
+              {src.status === "SETTLED" && src.liquidationDate && (
+                <>
+                  <Separator />
+                  <div className="space-y-3">
+                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Settlement details</h4>
+                    <div className="grid grid-cols-2 gap-y-3 text-xs">
+                      <DetailRow label="Liquidation date" value={format(new Date(src.liquidationDate), "MMM dd, yyyy")} />
+                      <DetailRow label="Cash received" value={src.liquidationCashReceived ? fmtAmount(src.liquidationCashReceived) : "—"} />
+                      {src.carryingFunctionalAtSettlement && (
+                        <DetailRow label="Carrying value (reporting)" value={fmtAmount(src.carryingFunctionalAtSettlement)} />
+                      )}
+                    </div>
                   </div>
-                </div>
+                </>
               )}
 
-              {instrument.status === "VOIDED" && instrument.voidedAt && (
+              {src.status === "VOIDED" && src.voidedAt && (
                 <div className="p-3 bg-gray-50 rounded-xl">
-                  <p className="text-xs font-medium text-gray-600">Voided on {format(new Date(instrument.voidedAt), "MMM dd, yyyy HH:mm")}</p>
+                  <p className="text-xs font-medium text-gray-600">Voided on {format(new Date(src.voidedAt), "MMM dd, yyyy HH:mm")}</p>
                 </div>
               )}
 
               <Separator />
 
               <div className="space-y-2">
-                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Record Info</h4>
+                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Record info</h4>
                 <div className="grid grid-cols-2 gap-y-2 text-xs">
-                  <DetailRow label="Created" value={format(new Date(instrument.createdAt), "MMM dd, yyyy HH:mm")} />
-                  <DetailRow label="Updated" value={format(new Date(instrument.updatedAt), "MMM dd, yyyy HH:mm")} />
+                  <DetailRow label="Created" value={format(new Date(src.createdAt), "MMM dd, yyyy HH:mm")} />
+                  <DetailRow label="Updated" value={format(new Date(src.updatedAt), "MMM dd, yyyy HH:mm")} />
                 </div>
               </div>
             </div>
           )}
 
-          {/* Rate History Tab */}
+          {/* Rates Tab */}
           {tab === "rates" && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Effective-Dated Rate Table</h4>
-                {instrument.status === "ACTIVE" && (
+                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Effective-dated APY history</h4>
+                {src.status === "ACTIVE" && (
                   <Button variant="outline" size="sm" className="rounded-full h-7 text-[10px] gap-1" onClick={() => setShowAddRate(!showAddRate)}>
-                    <Plus className="w-3 h-3" /> Add Rate
+                    <Plus className="w-3 h-3" /> Add rate
                   </Button>
                 )}
               </div>
@@ -300,36 +426,42 @@ export function InstrumentViewDrawer({ instrument, open, onOpenChange }: Instrum
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1">
                         <Label className="text-[10px] font-medium">New APY</Label>
-                        <Input type="number" step="0.001" value={newApy} onChange={(e) => setNewApy(e.target.value)} placeholder="e.g. 0.06" className="rounded-full h-8 text-xs" />
+                        <Input type="number" step="0.001" value={newApy} onChange={(e) => setNewApy(e.target.value)} placeholder="5 or 0.05" className="rounded-full h-8 text-xs" />
+                        <p className="text-[9px] text-muted-foreground">Enter 5 for 5%, or 0.05 for 5%.</p>
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-[10px] font-medium">Effective From</Label>
+                        <Label className="text-[10px] font-medium">Effective from</Label>
                         <DatePicker value={newEffectiveDate} onChange={setNewEffectiveDate} placeholder="Pick date" allowFutureDates className="h-8 text-xs" />
                       </div>
                     </div>
                     <div className="flex justify-end gap-2">
                       <Button variant="ghost" size="sm" className="h-7 text-[10px] rounded-full" onClick={() => setShowAddRate(false)}>Cancel</Button>
-                      <Button size="sm" className="h-7 text-[10px] rounded-full bg-[#4f77ff]" onClick={handleAddRate} disabled={addingRate}>
-                        {addingRate ? "Saving..." : "Save Rate"}
+                      <Button size="sm" className="h-7 text-[10px] rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white" onClick={handleAddRate} disabled={addingRate}>
+                        {addingRate ? "Saving..." : "Save rate"}
                       </Button>
                     </div>
                   </CardContent>
                 </Card>
               )}
 
-              {rateHistoryLoading ? (
+              {detailLoading && apyRates.length === 0 ? (
                 <div className="space-y-2">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-12 w-full rounded-lg" />)}</div>
-              ) : rateHistory.length === 0 ? (
-                <p className="text-xs text-muted-foreground text-center py-8">No rate history found</p>
+              ) : apyRates.length === 0 ? (
+                <p className="text-xs text-muted-foreground text-center py-8">No APY history.</p>
               ) : (
                 <div className="space-y-2">
-                  {rateHistory.map((rate) => (
+                  {apyRates.map((rate) => (
                     <div key={rate.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg text-xs">
                       <div>
-                        <p className="font-medium">APY: {(Number(rate.apy) * 100).toFixed(3)}%</p>
-                        <p className="text-muted-foreground mt-0.5">Effective from {format(new Date(rate.effectiveFrom), "MMM dd, yyyy")}</p>
+                        <p className="font-semibold">APY: {(Number(rate.apy) * 100).toFixed(3)}%</p>
+                        <p className="text-muted-foreground mt-0.5">
+                          Effective from {format(new Date(rate.effectiveFrom), "MMM dd, yyyy")}
+                          {rate.effectiveTo ? ` to ${format(new Date(rate.effectiveTo), "MMM dd, yyyy")}` : " (current)"}
+                        </p>
                       </div>
-                      <p className="text-muted-foreground">{format(new Date(rate.createdAt), "MMM dd, yy HH:mm")}</p>
+                      {rate.createdAt && (
+                        <p className="text-muted-foreground">{format(new Date(rate.createdAt), "MMM dd, yy HH:mm")}</p>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -341,18 +473,26 @@ export function InstrumentViewDrawer({ instrument, open, onOpenChange }: Instrum
           {tab === "accruals" && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Daily Accruals</h4>
-                {instrument.status === "ACTIVE" && (
-                  <Button variant="outline" size="sm" className="rounded-full h-7 text-[10px] gap-1" onClick={handleApproveAccruals}>
-                    <CheckCircle className="w-3 h-3" /> Approve All
+                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Daily accruals{accruals.length ? ` · ${accruals.length}` : ""}
+                </h4>
+                {src.status === "ACTIVE" && pendingAccruals.length > 0 && (
+                  <Button
+                    size="sm"
+                    className="rounded-full h-7 text-[10px] gap-1 bg-gradient-to-r from-emerald-500 to-teal-600 text-white"
+                    onClick={handleApproveAll}
+                    disabled={approvingAll}
+                  >
+                    {approvingAll ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle className="w-3 h-3" />}
+                    Approve all ({pendingAccruals.length})
                   </Button>
                 )}
               </div>
 
-              {accrualsLoading ? (
+              {detailLoading && accruals.length === 0 ? (
                 <div className="space-y-2">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-10 w-full rounded-lg" />)}</div>
               ) : accruals.length === 0 ? (
-                <p className="text-xs text-muted-foreground text-center py-8">No accruals found</p>
+                <p className="text-xs text-muted-foreground text-center py-8">No accruals yet.</p>
               ) : (
                 <div className="border rounded-md overflow-hidden">
                   <table className="w-full text-xs">
@@ -360,32 +500,54 @@ export function InstrumentViewDrawer({ instrument, open, onOpenChange }: Instrum
                       <tr className="border-b bg-muted/30">
                         <th className="text-left font-medium text-muted-foreground py-2 px-3">Date</th>
                         <th className="text-right font-medium text-muted-foreground py-2 px-3">Amount</th>
-                        <th className="text-center font-medium text-muted-foreground py-2 px-3">Journal Status</th>
+                        <th className="text-right font-medium text-muted-foreground py-2 px-3">Running balance</th>
+                        <th className="text-center font-medium text-muted-foreground py-2 px-3">Status</th>
+                        <th className="text-right font-medium text-muted-foreground py-2 px-3">Action</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {accruals.map((acc, index) => (
-                        <tr key={acc.id} className={`border-b ${index % 2 !== 0 ? "bg-muted/20" : ""}`}>
-                          <td className="py-2 px-3">{format(new Date(acc.accrualDate), "MMM dd, yyyy")}</td>
-                          <td className="py-2 px-3 text-right font-mono">
-                            <span className={parseFloat(acc.amount) < 0 ? "text-red-600" : "text-emerald-600"}>
-                              {formatCurrency(acc.amount)}
-                            </span>
-                          </td>
-                          <td className="py-2 px-3 text-center">
-                            <Badge
-                              variant="outline"
-                              className={`rounded-full text-[9px] px-2 ${
-                                acc.journalStatus === "APPROVED" ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                                  : acc.journalStatus === "DRAFT" ? "bg-amber-50 text-amber-700 border-amber-200"
-                                  : "bg-gray-100 text-gray-600 border-gray-200"
-                              }`}
-                            >
-                              {acc.journalStatus || "Pending"}
-                            </Badge>
-                          </td>
-                        </tr>
-                      ))}
+                      {accruals.map((acc, index) => {
+                        const amount = acc.amountInstrumentCcy ?? acc.amount ?? "0"
+                        const running = acc.runningAccruedBalance
+                        const isNegative = parseFloat(amount) < 0
+                        const isPending = acc.status === "PENDING_POST"
+                        return (
+                          <tr key={acc.id} className={`border-b ${index % 2 !== 0 ? "bg-muted/20" : ""}`}>
+                            <td className="py-2 px-3">{format(new Date(acc.accrualDate), "MMM dd, yyyy")}</td>
+                            <td className="py-2 px-3 text-right font-mono">
+                              <span className={isNegative ? "text-red-600" : "text-emerald-600"}>
+                                {fmtAmount(amount)}
+                              </span>
+                            </td>
+                            <td className="py-2 px-3 text-right font-mono text-muted-foreground">
+                              {running !== undefined ? fmtAmount(running) : "—"}
+                            </td>
+                            <td className="py-2 px-3 text-center">
+                              {accrualStatusBadge(acc.status || acc.journalStatus || undefined)}
+                            </td>
+                            <td className="py-2 px-3 text-right">
+                              {isPending && src.status === "ACTIVE" ? (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-6 rounded-full text-[10px] px-2 gap-1"
+                                  onClick={() => handleApproveOne(acc.id)}
+                                  disabled={approvingAccrualId === acc.id || approvingAll}
+                                >
+                                  {approvingAccrualId === acc.id ? (
+                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                  ) : (
+                                    <CheckCircle className="w-3 h-3" />
+                                  )}
+                                  Approve
+                                </Button>
+                              ) : (
+                                <span className="text-muted-foreground text-[10px]">—</span>
+                              )}
+                            </td>
+                          </tr>
+                        )
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -393,29 +555,46 @@ export function InstrumentViewDrawer({ instrument, open, onOpenChange }: Instrum
             </div>
           )}
 
-          {/* Audit Trail Tab */}
+          {/* Audit Tab */}
           {tab === "audit" && (
             <div className="space-y-3">
-              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Immutable Audit Trail</h4>
-              {auditTrailLoading ? (
+              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Audit trail</h4>
+              {detailLoading && auditLogs.length === 0 ? (
                 <div className="space-y-2">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-14 w-full rounded-lg" />)}</div>
-              ) : auditTrail.length === 0 ? (
-                <p className="text-xs text-muted-foreground text-center py-8">No audit trail entries</p>
+              ) : auditLogs.length === 0 ? (
+                <p className="text-xs text-muted-foreground text-center py-8">No audit entries.</p>
               ) : (
                 <div className="space-y-2">
-                  {auditTrail.map((entry) => (
-                    <div key={entry.id} className="p-3 bg-gray-50 rounded-lg text-xs">
-                      <div className="flex items-center justify-between mb-1">
-                        <Badge variant="outline" className="rounded-full text-[9px] px-2">{entry.field}</Badge>
-                        <span className="text-muted-foreground">{format(new Date(entry.changedAt), "MMM dd, yyyy HH:mm")}</span>
+                  {auditLogs.map((entry) => {
+                    const when = entry.createdAt || entry.changedAt
+                    const who = entry.user
+                      ? `${entry.user.firstName || ""} ${entry.user.lastName || ""}`.trim() || entry.user.email
+                      : ""
+                    return (
+                      <div key={entry.id} className="p-3 bg-gray-50 rounded-lg text-xs">
+                        <div className="flex items-center justify-between mb-1">
+                          <Badge variant="outline" className="rounded-full text-[9px] px-2">
+                            {auditActionLabel(entry)}
+                          </Badge>
+                          {when && (
+                            <span className="text-muted-foreground">{format(new Date(when), "MMM dd, yyyy HH:mm")}</span>
+                          )}
+                        </div>
+                        {who && <p className="text-[11px] text-gray-700 mb-1">{who}</p>}
+                        {entry.newValues && typeof entry.newValues === "object" ? (
+                          <pre className="text-[10px] bg-white border rounded p-2 overflow-x-auto max-h-28">
+                            {JSON.stringify(entry.newValues, null, 2)}
+                          </pre>
+                        ) : entry.field ? (
+                          <div className="flex items-center gap-2 mt-1.5">
+                            <span className="text-red-600 line-through">{entry.oldValue || "—"}</span>
+                            <span className="text-muted-foreground">&rarr;</span>
+                            <span className="text-emerald-600 font-medium">{String(entry.newValue ?? "")}</span>
+                          </div>
+                        ) : null}
                       </div>
-                      <div className="flex items-center gap-2 mt-1.5">
-                        <span className="text-red-600 line-through">{entry.oldValue || "—"}</span>
-                        <span className="text-muted-foreground">&rarr;</span>
-                        <span className="text-emerald-600 font-medium">{entry.newValue}</span>
-                      </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </div>

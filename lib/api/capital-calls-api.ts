@@ -218,3 +218,68 @@ export const capitalCallsApi = {
     )
   },
 }
+
+// ── LPs (Clients) ──────────────────────────────────────────────────────
+
+export interface ClientCreateRequest {
+  investor_id?: string
+  type?: 'individual' | 'entity' | 'trust' | string
+  legal_name: string
+  email: string
+  country?: string
+  phone?: string
+  address?: string
+  tax_id?: string
+  status?: 'ACTIVE' | 'PENDING' | 'INACTIVE'
+  notes?: string
+  // Optional initial commitment
+  fund_id?: string
+  amount?: number
+  currency?: string
+  effective_date?: string
+}
+
+export interface ClientRecord {
+  id: string
+  investorId: string
+  type: string
+  legalName: string
+  email: string
+  country: string
+  phone: string | null
+  address: string | null
+  taxId: string | null
+  status: string
+  createdAt: string
+  updatedAt: string
+  investmentCommitments?: Array<{
+    id: string
+    clientId: string
+    fundId: string
+    amount: string
+    currency: string
+    effectiveDate: string
+    status: string
+    notes: string | null
+    createdAt: string
+    updatedAt: string
+    fund?: { id: string; name: string; description: string; status: string }
+  }>
+}
+
+export const clientsApi = {
+  /** 0a. Create LP (client) + optional fund commitment */
+  create: async (
+    body: ClientCreateRequest
+  ): Promise<{ success: boolean; message: string; data: ClientRecord }> => {
+    return apiClient.post('/clients', body)
+  },
+
+  /** 0b. Add/update commitment on existing LP */
+  update: async (
+    id: string,
+    body: Partial<ClientCreateRequest>
+  ): Promise<{ success: boolean; message: string; data: ClientRecord }> => {
+    return apiClient.put(`/clients/${id}`, body)
+  },
+}

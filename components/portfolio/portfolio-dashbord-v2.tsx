@@ -115,9 +115,13 @@ export function PortfolioDashboardV2() {
     // Filter portfolio summary based on search
     const filteredPortfolio = useMemo(() => {
         return portfolioSummaryData.filter((item: any) => {
-            const matchesSearch = (item.company || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-                (item.sector || '').toLowerCase().includes(searchQuery.toLowerCase())
-            return matchesSearch
+            const normalizedQuery = searchQuery.toLowerCase().trim()
+            if (!normalizedQuery) return true
+
+            const companyName = (item.name || item.company || '').toLowerCase()
+            const sectorName = (item.mainIndustry || item.sector || '').toLowerCase()
+
+            return companyName.includes(normalizedQuery) || sectorName.includes(normalizedQuery)
         })
     }, [portfolioSummaryData, searchQuery])
 
@@ -148,16 +152,6 @@ export function PortfolioDashboardV2() {
                     </div>
 
                     <div className="flex items-center gap-3">
-                        <div className="relative">
-                            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                            <Input
-                                placeholder="Search portfolio..."
-                                className="pl-10 h-11 w-64 rounded-full border-gray-200 bg-white shadow-none text-xs font-semibold ring-0 focus:ring-0"
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                            />
-                        </div>
-
                         <Select value={selectedFund} onValueChange={setSelectedFund}>
                             <SelectTrigger className="w-[160px] h-11 bg-white border-gray-200 rounded-full shadow-none font-bold text-xs ring-0 focus:ring-0">
                                 <SelectValue placeholder="Select Fund" />
@@ -406,15 +400,26 @@ export function PortfolioDashboardV2() {
                 {/* --- Portfolio Summary Table --- */}
                 <Card className="bg-white border-none rounded-2xl shadow-none overflow-hidden">
                     <CardHeader className="p-6">
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
                             <div>
                                 <CardTitle className="text-lg font-semibold text-foreground">Portfolio summary</CardTitle>
                                 <p className="text-xs text-muted-foreground mt-1">Realization and Portfolio Summary in USD Million unless otherwise stated</p>
                             </div>
-                            <Button variant="outline" className="h-10 rounded-full gap-2 border-gray-200 font-bold text-xs">
-                                <Download className="w-4 h-4" />
-                                Export summary
-                            </Button>
+                            <div className="flex flex-wrap items-center gap-2">
+                                <div className="relative">
+                                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                                    <Input
+                                        placeholder="Filter table..."
+                                        className="pl-10 h-10 w-64 rounded-full border-gray-200 bg-white shadow-none text-xs font-semibold ring-0 focus:ring-0"
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                    />
+                                </div>
+                                <Button variant="outline" className="h-10 rounded-full gap-2 border-gray-200 font-bold text-xs">
+                                    <Download className="w-4 h-4" />
+                                    Export summary
+                                </Button>
+                            </div>
                         </div>
                     </CardHeader>
                     <CardContent className="p-0">
@@ -476,7 +481,6 @@ export function PortfolioDashboardV2() {
                         </div>
                     </CardContent>
                 </Card>
-
             </div>
         </div>
     )

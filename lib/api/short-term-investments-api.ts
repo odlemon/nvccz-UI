@@ -26,12 +26,21 @@ export interface UpdateSTISettingsRequest {
 export interface STICurrency {
   id: string
   code: string
+  name?: string
+  symbol?: string
+  isActive?: boolean
+  isDefault?: boolean
 }
 
 export interface STIBank {
   id: string
   name: string
   accountNumber: string
+  currencyId?: string
+  branchCode?: string | null
+  swiftCode?: string | null
+  glAccountId?: string | null
+  isActive?: boolean
 }
 
 export interface STIInstrument {
@@ -116,24 +125,61 @@ export interface RateEntry {
   createdAt: string
 }
 
+export type AccrualStatus = 'PENDING_POST' | 'POSTED' | 'SKIPPED' | 'VOIDED' | string
+
 export interface AccrualEntry {
   id: string
-  instrumentId: string
+  instrumentId?: string
   accrualDate: string
-  amount: string
+  // Detail endpoint returns richer fields; legacy list endpoint returns just `amount`
+  amount?: string
+  amountInstrumentCcy?: string
+  runningAccruedBalance?: string
+  reportingAmountFunctional?: string | null
+  functionalCurrencyId?: string | null
+  fxRateUsed?: string | null
+  status?: AccrualStatus
   journalEntryId: string | null
-  journalStatus: string | null
-  createdAt: string
+  journalStatus?: string | null
+  apyRateId?: string
+  apyRate?: { apy: string | number; effectiveFrom: string }
+  createdAt?: string
 }
 
 export interface AuditTrailEntry {
   id: string
-  instrumentId: string
-  field: string
-  oldValue: string
-  newValue: string
-  changedById: string
-  changedAt: string
+  instrumentId?: string
+  // Legacy simple fields (kept for back-compat)
+  field?: string
+  oldValue?: string | null
+  newValue?: any
+  changedById?: string
+  changedAt?: string
+  // Detail endpoint shape
+  userId?: string
+  action?: string
+  entityType?: string
+  entityId?: string
+  oldValues?: any
+  newValues?: any
+  ipAddress?: string | null
+  userAgent?: string | null
+  createdAt?: string
+  user?: {
+    id: string
+    email: string
+    firstName?: string
+    lastName?: string
+  }
+}
+
+// Full instrument detail (response of GET /instruments/{id}) — includes nested apyRates, accruals, auditLogs
+export interface STIInstrumentDetail extends STIInstrument {
+  apyRates: RateEntry[]
+  accruals: AccrualEntry[]
+  auditLogs: AuditTrailEntry[]
+  functionalCurrency: STICurrency | null
+  _count?: { accruals: number }
 }
 
 // Dashboard types
@@ -265,8 +311,8 @@ export async function getInstruments(params?: {
   return apiClient.get<ApiRes<STIInstrument[]>>(`${BASE}/instruments${query ? `?${query}` : ''}`)
 }
 
-export async function getInstrument(id: string): Promise<ApiRes<STIInstrument>> {
-  return apiClient.get<ApiRes<STIInstrument>>(`${BASE}/instruments/${id}`)
+export async function getInstrument(id: string): Promise<ApiRes<STIInstrumentDetail>> {
+  return apiClient.get<ApiRes<STIInstrumentDetail>>(`${BASE}/instruments/${id}`)
 }
 
 export async function createInstrument(body: CreateInstrumentRequest): Promise<ApiRes<STIInstrument>> {
@@ -303,8 +349,24 @@ export async function getAccruals(instrumentId: string): Promise<ApiRes<AccrualE
   return apiClient.get<ApiRes<AccrualEntry[]>>(`${BASE}/instruments/${instrumentId}/accruals`)
 }
 
+/** Approve a single accrual row — accrualId is the accrual row id, NOT the instrument id. */
+export async function approveAccrual(accrualId: string): Promise<ApiRes<any>> {
+  return apiClient.post<ApiRes<any>>(`${BASE}/accruals/${accrualId}/approve`, {})
+}
+
+/** Approve all PENDING_POST accruals for an instrument. Bulk endpoint — pass the instrument id. */
+export async function approveAllAccruals(instrumentId: string): Promise<ApiRes<{
+  pendingFound: number
+  approved: number
+  skipped: number
+  failures: Array<{ accrualId: string; error: string }>
+}>> {
+  return apiClient.post(`${BASE}/accruals/${instrumentId}/approve-all`, {})
+}
+
+/** @deprecated Use approveAllAccruals(instrumentId) or approveAccrual(accrualId). */
 export async function approveAccruals(instrumentId: string): Promise<ApiRes<any>> {
-  return apiClient.post<ApiRes<any>>(`${BASE}/accruals/${instrumentId}/approve`, {})
+  return approveAllAccruals(instrumentId)
 }
 
 // Audit trail

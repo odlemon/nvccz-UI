@@ -539,13 +539,21 @@ export function IncomeStatementView() {
     }).format(Math.abs(amount))
   }
 
-  const formatUSD = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2,
-    }).format(Math.abs(amount))
+  // Format in the active consolidated reporting currency (from the API response).
+  const formatConsolidated = (amount: number) => {
+    const code = consolidatedIncome?.reportingCurrencyCode || 'USD'
+    try {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: code,
+        minimumFractionDigits: 2,
+      }).format(Math.abs(amount))
+    } catch {
+      const symbol = currencies.find((c) => c.code === code)?.symbol || code + " "
+      return `${symbol}${Math.abs(amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    }
   }
+  const formatUSD = formatConsolidated
 
   const renderConsolidatedIncomeView = () => {
     if (!consolidatedIncome) return null
@@ -587,7 +595,7 @@ export function IncomeStatementView() {
                       <th className="text-left p-3">Account</th>
                       <th className="text-right p-3">Source</th>
                       <th className="text-right p-3">Rate</th>
-                      <th className="text-right p-3">Consolidated (USD)</th>
+                      <th className="text-right p-3">Consolidated ({consolidatedIncome.reportingCurrencyCode})</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -658,7 +666,7 @@ export function IncomeStatementView() {
           <h2 className="text-2xl font-semibold text-gray-900">Income Statement</h2>
           <p className="text-gray-600 mt-1">
             {reportMode === "consolidated"
-              ? `Consolidated View (${(currencies.find((c) => c.code === "USD") || currencies[0])?.code || "USD"} reporting)`
+              ? `Consolidated View (${consolidatedIncome?.reportingCurrencyCode || currencies.find((c) => c.id === consolidationCurrencyId)?.code || "target"} reporting)`
               : periodType === 'custom'
               ? `For the period ${format(startDate, 'MMM d, yyyy')} to ${format(endDate, 'MMM d, yyyy')}`
               : `Period: ${getPeriodOptions().find(opt => opt.value === periodValue)?.label || periodValue}`

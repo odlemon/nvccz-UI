@@ -318,12 +318,23 @@ export function BalanceSheetView() {
     </DropdownMenu>
   )
 
-  const formatUSD = (value: number) =>
-    new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2,
-    }).format(Math.abs(value))
+  // Format in the active reporting (consolidation) currency. Falls back to USD if unknown.
+  const formatConsolidated = (value: number) => {
+    const code = consolidatedBalance?.reportingCurrencyCode || "USD"
+    try {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: code,
+        minimumFractionDigits: 2,
+      }).format(Math.abs(value))
+    } catch {
+      // Fallback when the currency code is not recognised by Intl (e.g. ZWG, ZiG)
+      const symbol = currencies.find((c) => c.code === code)?.symbol || code + " "
+      return `${symbol}${Math.abs(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    }
+  }
+  // Back-compat alias so existing call sites don't break.
+  const formatUSD = formatConsolidated
 
   const renderConsolidatedBalanceView = () => {
     if (!consolidatedBalance) return null
@@ -362,7 +373,7 @@ export function BalanceSheetView() {
                       <th className="text-left p-3">Account</th>
                       <th className="text-right p-3">Source</th>
                       <th className="text-right p-3">Spot Rate</th>
-                      <th className="text-right p-3">Consolidated (USD)</th>
+                      <th className="text-right p-3">Consolidated ({consolidatedBalance.reportingCurrencyCode})</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -633,7 +644,7 @@ export function BalanceSheetView() {
           <p className="text-gray-600">
             {reportMode === "single"
               ? `As of ${format(asOfDate, "MMM d, yyyy")}`
-              : `Consolidated View (${(currencies.find((c) => c.code === "USD") || currencies[0])?.code || "USD"} reporting)`}
+              : `Consolidated View (${consolidatedBalance?.reportingCurrencyCode || currencies.find((c) => c.id === consolidationCurrencyId)?.code || "target"} reporting)`}
           </p>
         </div>
 
