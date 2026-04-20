@@ -51,6 +51,7 @@ export function STIDashboard() {
   const stiState = useSelector((state: RootState) => state.shortTermInvestments)
   const dashboard = stiState?.dashboard ?? null
   const dashboardLoading = stiState?.dashboardLoading ?? false
+  const instruments = stiState?.instruments ?? []
 
   const [asOfDate, setAsOfDate] = useState<Date>(new Date())
   const asOf = format(asOfDate, "yyyy-MM-dd")
@@ -64,9 +65,9 @@ export function STIDashboard() {
   }, [dispatch, asOf, broker])
 
   const brokers = useMemo(() => {
-    if (!dashboard?.instruments) return []
-    return [...new Set(dashboard.instruments.map((i) => i.broker))]
-  }, [dashboard])
+    const source = instruments.length > 0 ? instruments : (dashboard?.instruments ?? [])
+    return [...new Set(source.map((i) => i.broker).filter(Boolean))].sort((a, b) => a.localeCompare(b))
+  }, [instruments, dashboard])
 
   const formatCurrency = (value: number) => {
     if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(2)}M`
@@ -94,7 +95,8 @@ export function STIDashboard() {
   const dailyYieldData = useMemo(() => {
     if (!dashboard?.dailyYieldInMonth) return []
     return dashboard.dailyYieldInMonth.map((d) => ({
-      date: format(new Date(d.accrualDate), "dd"),
+      day: format(new Date(d.accrualDate), "d"),
+      fullDate: format(new Date(d.accrualDate), "MMMM d, yyyy"),
       amount: d.amountSum,
     }))
   }, [dashboard])
@@ -123,7 +125,10 @@ export function STIDashboard() {
         </div>
         <div className="flex flex-col gap-1">
           <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Broker</span>
-          <Select value={broker} onValueChange={setBroker}>
+          <Select
+            value={broker || "all"}
+            onValueChange={(value) => setBroker(value === "all" ? "" : value)}
+          >
             <SelectTrigger className="w-[180px] bg-white border border-gray-200 rounded-full h-10 text-xs font-semibold shadow-none ring-0 focus:ring-0">
               <SelectValue placeholder="All Brokers" />
             </SelectTrigger>
@@ -219,7 +224,7 @@ export function STIDashboard() {
                 <BarChart data={dailyYieldData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                   <XAxis
-                    dataKey="date"
+                    dataKey="day"
                     tick={{ fontSize: 10, fill: "#94a3b8" }}
                     axisLine={false}
                     tickLine={false}
@@ -232,7 +237,10 @@ export function STIDashboard() {
                   />
                   <Tooltip
                     formatter={(value: number) => [`$${formatNumber(value)}`, "Interest"]}
-                    labelFormatter={(label) => `Day ${label}`}
+                    labelFormatter={(label) => {
+                      const found = dailyYieldData.find((item) => item.day === String(label))
+                      return found ? `Day ${label} (${found.fullDate})` : `Day ${label}`
+                    }}
                     contentStyle={{ borderRadius: 12, border: "1px solid #e2e8f0", fontSize: 12 }}
                   />
                   <Bar dataKey="amount" radius={[4, 4, 0, 0]}>

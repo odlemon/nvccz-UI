@@ -144,6 +144,14 @@ export function AccountingDashboardV2() {
         return `${currencySymbol}${value.toLocaleString()}`
     }
 
+    const getMetricAmountClass = (formattedAmount: string) => {
+        const length = formattedAmount.length
+        if (length >= 17) return "text-lg sm:text-xl"
+        if (length >= 15) return "text-xl sm:text-2xl"
+        if (length >= 13) return "text-2xl sm:text-3xl"
+        return "text-3xl sm:text-4xl"
+    }
+
     // Calculate total assets for display
     const totalAssets = dashboardData?.assets?.total || assetsGridData.reduce((sum: number, asset: any) => sum + (asset.amount || 0), 0)
     const totalAssetsLabel = formatCurrency(totalAssets)
@@ -274,7 +282,9 @@ export function AccountingDashboardV2() {
                                     </div>
                                     <div>
                                         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Revenue</p>
-                                        <p className="text-4xl font-normal text-foreground mt-1 tracking-tight">{formatLargeCurrency(stats.revenue)}</p>
+                                        <p className={`${getMetricAmountClass(formatLargeCurrency(stats.revenue))} font-normal text-foreground mt-1 tracking-tight leading-tight whitespace-nowrap`}>
+                                            {formatLargeCurrency(stats.revenue)}
+                                        </p>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2 text-xs">
@@ -300,7 +310,9 @@ export function AccountingDashboardV2() {
                                     </div>
                                     <div>
                                         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">COGS</p>
-                                        <p className="text-4xl font-normal text-foreground mt-1 tracking-tight">{formatLargeCurrency(stats.cogs)}</p>
+                                        <p className={`${getMetricAmountClass(formatLargeCurrency(stats.cogs))} font-normal text-foreground mt-1 tracking-tight leading-tight whitespace-nowrap`}>
+                                            {formatLargeCurrency(stats.cogs)}
+                                        </p>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2 text-xs">
@@ -326,7 +338,9 @@ export function AccountingDashboardV2() {
                                     </div>
                                     <div>
                                         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Gross Profit</p>
-                                        <p className="text-4xl font-normal text-foreground mt-1 tracking-tight">{formatLargeCurrency(stats.gross)}</p>
+                                        <p className={`${getMetricAmountClass(formatLargeCurrency(stats.gross))} font-normal text-foreground mt-1 tracking-tight leading-tight whitespace-nowrap`}>
+                                            {formatLargeCurrency(stats.gross)}
+                                        </p>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2 text-xs">
@@ -352,7 +366,9 @@ export function AccountingDashboardV2() {
                                     </div>
                                     <div>
                                         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Net Profit</p>
-                                        <p className="text-4xl font-normal text-foreground mt-1 tracking-tight">{formatLargeCurrency(stats.net)}</p>
+                                        <p className={`${getMetricAmountClass(formatLargeCurrency(stats.net))} font-normal text-foreground mt-1 tracking-tight leading-tight whitespace-nowrap`}>
+                                            {formatLargeCurrency(stats.net)}
+                                        </p>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2 text-xs">

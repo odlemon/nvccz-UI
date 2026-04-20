@@ -17,6 +17,11 @@ const goalSchema = yup.object({
   title: yup.string().required("Title is required").min(3),
   description: yup.string().required("Description is required"),
   type: yup.string().oneOf(["company", "department", "individual"]).required("Type is required"),
+  scorecardPillar: yup.string().when("type", {
+    is: "company",
+    then: (schema) => schema.oneOf(["FINANCIAL", "CUSTOMER", "INTERNAL_OPS", "LEARNING_GROWTH"]).required("Scorecard pillar is required for company goals"),
+    otherwise: (schema) => schema.nullable(),
+  }),
   category: yup.string().required("Category is required"),
   targetValue: yup.number().typeError("Target must be a number").required("Target value is required"),
   targetUnit: yup.string().required("Target unit is required"),
@@ -43,6 +48,11 @@ interface GoalFormModalProps {
 export function GoalFormModal({ isOpen, onClose, goal, onSubmit }: GoalFormModalProps) {
   const { availableDepartments, goals, availableKPIs } = useAppSelector((state) => state.performance)
 
+  const getErrorMessage = (error: any) => {
+    if (!error) return ""
+    return typeof error.message === "string" ? error.message : "Invalid value"
+  }
+
   const {
     handleSubmit,
     control,
@@ -54,6 +64,7 @@ export function GoalFormModal({ isOpen, onClose, goal, onSubmit }: GoalFormModal
       title: goal?.title || "",
       description: goal?.description || "",
       type: goal?.type || "company",
+      scorecardPillar: goal?.scorecardPillar || "FINANCIAL",
       category: goal?.category || "financial",
       targetValue: goal?.targetValue || 0,
       targetUnit: goal?.targetUnit || "USD",
@@ -101,7 +112,7 @@ export function GoalFormModal({ isOpen, onClose, goal, onSubmit }: GoalFormModal
                   placeholder="e.g., Achieve $5M Fund I AUM by Q4"
                   className={errors.title ? "border-red-500" : ""}
                 />
-                {errors.title && <p className="text-sm text-red-600">{errors.title.message}</p>}
+                {errors.title && <p className="text-sm text-red-600">{getErrorMessage(errors.title)}</p>}
               </div>
             )}
           />
@@ -120,7 +131,7 @@ export function GoalFormModal({ isOpen, onClose, goal, onSubmit }: GoalFormModal
                   className={errors.description ? "border-red-500" : ""}
                   rows={4}
                 />
-                {errors.description && <p className="text-sm text-red-600">{errors.description.message}</p>}
+                {errors.description && <p className="text-sm text-red-600">{getErrorMessage(errors.description)}</p>}
               </div>
             )}
           />
@@ -143,7 +154,7 @@ export function GoalFormModal({ isOpen, onClose, goal, onSubmit }: GoalFormModal
                       <SelectItem value="individual">Individual</SelectItem>
                     </SelectContent>
                   </Select>
-                  {errors.type && <p className="text-sm text-red-600">{errors.type.message}</p>}
+                  {errors.type && <p className="text-sm text-red-600">{getErrorMessage(errors.type)}</p>}
                 </div>
               )}
             />
@@ -164,11 +175,35 @@ export function GoalFormModal({ isOpen, onClose, goal, onSubmit }: GoalFormModal
                       <SelectItem value="growth">Growth</SelectItem>
                     </SelectContent>
                   </Select>
-                  {errors.category && <p className="text-sm text-red-600">{errors.category.message}</p>}
+                  {errors.category && <p className="text-sm text-red-600">{getErrorMessage(errors.category)}</p>}
                 </div>
               )}
             />
           </div>
+
+          {goalType === "company" && (
+            <Controller
+              name="scorecardPillar"
+              control={control}
+              render={({ field }) => (
+                <div className="space-y-2">
+                  <Label>Scorecard Pillar *</Label>
+                  <Select onValueChange={field.onChange} value={field.value || "FINANCIAL"}>
+                    <SelectTrigger className={errors.scorecardPillar ? "border-red-500" : ""}>
+                      <SelectValue placeholder="Select scorecard pillar" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="FINANCIAL">Financial</SelectItem>
+                      <SelectItem value="CUSTOMER">Customer & Market</SelectItem>
+                      <SelectItem value="INTERNAL_OPS">Internal Operations</SelectItem>
+                      <SelectItem value="LEARNING_GROWTH">Learning, Growth & HR</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {errors.scorecardPillar && <p className="text-sm text-red-600">{getErrorMessage(errors.scorecardPillar)}</p>}
+                </div>
+              )}
+            />
+          )}
 
           {/* Department and Parent Goal */}
           {(goalType === "department" || goalType === "individual") && (
@@ -196,7 +231,7 @@ export function GoalFormModal({ isOpen, onClose, goal, onSubmit }: GoalFormModal
                         ))}
                       </SelectContent>
                     </Select>
-                    {errors.departmentName && <p className="text-sm text-red-600">{errors.departmentName.message}</p>}
+                    {errors.departmentName && <p className="text-sm text-red-600">{getErrorMessage(errors.departmentName)}</p>}
                     {validDepartments.length === 0 && (
                       <p className="text-xs text-amber-500">No departments available</p>
                     )}
@@ -254,7 +289,7 @@ export function GoalFormModal({ isOpen, onClose, goal, onSubmit }: GoalFormModal
                       ))}
                     </SelectContent>
                   </Select>
-                  {errors.kpiName && <p className="text-sm text-red-600">{errors.kpiName.message}</p>}
+                  {errors.kpiName && <p className="text-sm text-red-600">{getErrorMessage(errors.kpiName)}</p>}
                   {validKPIs.length === 0 && (
                     <p className="text-xs text-amber-500">No KPIs available</p>
                   )}
@@ -275,7 +310,7 @@ export function GoalFormModal({ isOpen, onClose, goal, onSubmit }: GoalFormModal
                     placeholder="e.g., 5000000"
                     className={errors.targetValue ? "border-red-500" : ""}
                   />
-                  {errors.targetValue && <p className="text-sm text-red-600">{errors.targetValue.message}</p>}
+                  {errors.targetValue && <p className="text-sm text-red-600">{getErrorMessage(errors.targetValue)}</p>}
                 </div>
               )}
             />
@@ -291,7 +326,7 @@ export function GoalFormModal({ isOpen, onClose, goal, onSubmit }: GoalFormModal
                     placeholder="e.g., USD, %, items"
                     className={errors.targetUnit ? "border-red-500" : ""}
                   />
-                  {errors.targetUnit && <p className="text-sm text-red-600">{errors.targetUnit.message}</p>}
+                  {errors.targetUnit && <p className="text-sm text-red-600">{getErrorMessage(errors.targetUnit)}</p>}
                 </div>
               )}
             />
@@ -311,7 +346,7 @@ export function GoalFormModal({ isOpen, onClose, goal, onSubmit }: GoalFormModal
                     allowFutureDates={true}
                     className={errors.startDate ? "border-red-500" : ""}
                   />
-                  {errors.startDate && <p className="text-sm text-red-600">{errors.startDate.message}</p>}
+                  {errors.startDate && <p className="text-sm text-red-600">{getErrorMessage(errors.startDate)}</p>}
                 </div>
               )}
             />
@@ -327,7 +362,7 @@ export function GoalFormModal({ isOpen, onClose, goal, onSubmit }: GoalFormModal
                     onChange={field.onChange}
                     className={errors.endDate ? "border-red-500" : ""}
                   />
-                  {errors.endDate && <p className="text-sm text-red-600">{errors.endDate.message}</p>}
+                  {errors.endDate && <p className="text-sm text-red-600">{getErrorMessage(errors.endDate)}</p>}
                 </div>
               )}
             />

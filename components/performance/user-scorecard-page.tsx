@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { useAppDispatch, useAppSelector } from "@/lib/store"
 import { fetchUserScorecard } from "@/lib/store/slices/scorecardSlice"
 import { companyProfileApi, type CompanyAddress } from "@/lib/api/company-profile-api"
+import { employeesApi } from "@/lib/api/payroll-api"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -13,6 +14,7 @@ import { CiUser, CiViewBoard, CiCircleCheck, CiTrophy, CiFileOn } from "react-ic
 import { TbTarget } from "react-icons/tb"
 import { Calendar, RefreshCw } from "lucide-react"
 import { toast } from "sonner"
+import { usePerformancePermissions } from "@/lib/hooks/usePerformancePermissions"
 import {
   PieChart,
   Pie,
@@ -51,15 +53,58 @@ const UserScorecardSkeleton = () => (
 
 export function UserScorecardsPage() {
   const dispatch = useAppDispatch()
+  const { permissions } = usePerformancePermissions()
   const { userScorecard, loading, error } = useAppSelector((state) => state.scorecard)
   const scorecardRef = useRef<HTMLDivElement>(null)
   const [isClient, setIsClient] = useState(false)
   const [PDFComponents, setPDFComponents] = useState<any>(null)
   const [periodLabel, setPeriodLabel] = useState(String(new Date().getFullYear()))
+  const [employees, setEmployees] = useState<Array<{ id: string; userId: string; name: string; isActive: boolean }>>([])
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState("self")
   const [activeAddress, setActiveAddress] = useState<CompanyAddress | null>(null)
+
+  const canSelectEmployee =
+    permissions.canViewUserScorecards ||
+    permissions.canViewAllScorecards ||
+    permissions.canConductPerformanceReview
+
   useEffect(() => {
-    dispatch(fetchUserScorecard({ periodLabel }))
-  }, [dispatch, periodLabel])
+    dispatch(
+      fetchUserScorecard({
+        periodLabel,
+        employeeId: canSelectEmployee && selectedEmployeeId !== "self" ? selectedEmployeeId : undefined,
+      }),
+    )
+  }, [dispatch, periodLabel, canSelectEmployee, selectedEmployeeId])
+
+  useEffect(() => {
+    if (!canSelectEmployee) {
+      setEmployees([])
+      setSelectedEmployeeId("self")
+      return
+    }
+
+    const loadEmployees = async () => {
+      try {
+        const response = await employeesApi.getAll()
+        if (response.success && response.data) {
+          const mapped = response.data
+            .filter((emp) => emp.isActive)
+            .map((emp) => ({
+              id: emp.id,
+              userId: emp.userId,
+              name: `${emp.user.firstName} ${emp.user.lastName}`.trim(),
+              isActive: emp.isActive,
+            }))
+          setEmployees(mapped)
+        }
+      } catch {
+        toast.error("Failed to load employees for scorecard selection")
+      }
+    }
+
+    loadEmployees()
+  }, [canSelectEmployee])
 
   useEffect(() => {
     if (error) {
@@ -82,7 +127,12 @@ export function UserScorecardsPage() {
   }, [])
 
   const handleRefresh = () => {
-    dispatch(fetchUserScorecard({ periodLabel }))
+    dispatch(
+      fetchUserScorecard({
+        periodLabel,
+        employeeId: canSelectEmployee && selectedEmployeeId !== "self" ? selectedEmployeeId : undefined,
+      }),
+    )
   }
 
   const getPerformanceColor = (rating: string) => {
@@ -166,6 +216,21 @@ export function UserScorecardsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          {canSelectEmployee && (
+            <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
+              <SelectTrigger className="w-[260px] rounded-full" size="sm">
+                <SelectValue placeholder="Select employee" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="self">My Scorecard</SelectItem>
+                {employees.map((employee) => (
+                  <SelectItem key={employee.userId || employee.id} value={employee.userId || employee.id}>
+                    {employee.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           <Select value={periodLabel} onValueChange={setPeriodLabel}>
             <SelectTrigger className="w-[120px] rounded-full" size="sm">
               <div className="flex items-center gap-2">
@@ -267,7 +332,6 @@ export function UserScorecardsPage() {
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Completed Goals</p>
                       <p className="text-4xl font-bold mt-1 text-emerald-600">
-                        {userScorecard.scorecard.summary.completedGoals}
                         {completedGoals}
                       </p>
                       <p className="text-sm text-muted-foreground mt-2">Successfully achieved</p>
@@ -378,7 +442,7 @@ export function UserScorecardsPage() {
                             cx="50%"
                             cy="50%"
                             labelLine={false}
-                            label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                            label={({ name, percent }) => `${name}: ${((percent ?? 0) * 100).toFixed(0)}%`}
                             outerRadius={80}
                             fill="#8884d8"
                             dataKey="value"

@@ -4,12 +4,23 @@ export interface KPICreateRequest {
   name: string
   description?: string
   type: 'Percentage' | 'Metric' | 'Count'
+  isReverseKpi?: boolean
   unit?: string
+  hasUnit?: boolean
+  unitCategory?: string
+  unitSymbol?: string
+  unitPosition?: 'prefix' | 'suffix'
   targetValue?: number
   currentValue?: number
   category: 'sales' | 'marketing' | 'operations' | 'finance' | 'hr'
   frequency: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly'
   departmentId?: string
+  catalogDepartmentName?: string | null
+  code?: string
+  accountType?: 'Asset' | 'Liability' | 'Equity' | 'Revenue' | 'Expense' | null
+  accountNumber?: string | null
+  journalEntryType?: 'Debit' | 'Credit' | null
+  isFinancial?: boolean
   weightValue: number
   isActive: boolean
 }
@@ -18,12 +29,23 @@ export interface KPIUpdateRequest {
   name?: string
   description?: string
   type?: 'Percentage' | 'Metric' | 'Count'
+  isReverseKpi?: boolean
   unit?: string
+  hasUnit?: boolean
+  unitCategory?: string
+  unitSymbol?: string
+  unitPosition?: 'prefix' | 'suffix'
   targetValue?: number
   currentValue?: number
   category?: 'sales' | 'marketing' | 'operations' | 'finance' | 'hr'
   frequency?: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly'
   departmentId?: string
+  catalogDepartmentName?: string | null
+  code?: string
+  accountType?: 'Asset' | 'Liability' | 'Equity' | 'Revenue' | 'Expense' | null
+  accountNumber?: string | null
+  journalEntryType?: 'Debit' | 'Credit' | null
+  isFinancial?: boolean
   weightValue?: number
   isActive?: boolean
 }
@@ -33,18 +55,27 @@ export interface KPI {
   name: string
   description?: string
   type: 'Percentage' | 'Metric' | 'Count'
+  isReverseKpi?: boolean
   unit?: string
+  hasUnit?: boolean
+  unitCategory?: string
+  unitSymbol?: string
+  unitPosition?: 'prefix' | 'suffix'
   targetValue?: number
   currentValue?: number
   category: 'sales' | 'marketing' | 'operations' | 'finance' | 'hr'
   frequency: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly'
   departmentId?: string
+  departmentName?: string
+  catalogDepartmentName?: string | null
+  code?: string
+  accountType?: 'Asset' | 'Liability' | 'Equity' | 'Revenue' | 'Expense' | null
+  accountNumber?: string | null
+  journalEntryType?: 'Debit' | 'Credit' | null
+  isFinancial?: boolean
+  hardcodedDetails?: any
   weightValue: number
   isActive: boolean
-  hasUnit: boolean
-  unitCategory?: string
-  unitSymbol?: string
-  unitPosition?: 'prefix' | 'suffix'
   createdAt: string
   updatedAt: string
   performanceGoals?: any[]

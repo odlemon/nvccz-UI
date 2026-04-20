@@ -77,12 +77,12 @@ export function PortfolioSidebar() {
     return bestId
   }, [module, pathname])
 
-  // Initialize default: first group open, others collapsed
+  // Initialize groups as collapsed by default
   useEffect(() => {
     if (module && module.groups && module.groups.length > 0 && Object.keys(collapsedGroups).length === 0) {
       const initial: Record<string, boolean> = {}
-      module.groups.forEach((g, idx) => {
-        initial[g.id] = idx === 0 ? false : true
+      module.groups.forEach((g) => {
+        initial[g.id] = true
       })
       setCollapsedGroups(initial)
     }
@@ -133,6 +133,16 @@ export function PortfolioSidebar() {
     )
   }, [module, canAccessSubModule])
 
+  const dashboardSubModule = useMemo(
+    () => filteredSubModules.find((subModule) => subModule.id === "Dashboard"),
+    [filteredSubModules],
+  )
+
+  const remainingSubModules = useMemo(
+    () => filteredSubModules.filter((subModule) => subModule.id !== "Dashboard"),
+    [filteredSubModules],
+  )
+
   if (!module) {
     return null
   }
@@ -160,12 +170,30 @@ export function PortfolioSidebar() {
 
         {/* Navigation Items */}
         <div className="space-y-4">
+          {/* Dashboard standalone top item */}
+          {dashboardSubModule && (
+            <Button
+              variant="ghost"
+              className={cn(
+                "w-full justify-start gap-3 h-10 cursor-pointer rounded-full transition-all duration-200 text-gray-800",
+                "hover:bg-gradient-to-r hover:from-orange-50 hover:to-amber-100",
+                activeItemId === dashboardSubModule.id &&
+                  "bg-gradient-to-r from-orange-500 to-amber-600 text-white shadow-lg",
+              )}
+              onClick={() => handleItemClick(dashboardSubModule.path)}
+            >
+              <dashboardSubModule.icon className="w-5 h-5" />
+              <span className="text-sm">{dashboardSubModule.name}</span>
+            </Button>
+          )}
+
           {/* Groups with collapsible items */}
           {filteredGroups.length > 0 && (
             <>
               {filteredGroups.map(group => {
                 const GroupIcon = getGroupIcon(group.id)
                 const collapsed = collapsedGroups[group.id]
+                const displayTitle = group.id === "applications" ? "Deal Flow" : group.title
                 return (
                   <div key={group.id} className="space-y-2">
                     <button
@@ -175,7 +203,7 @@ export function PortfolioSidebar() {
                     >
                       <span className="flex items-center gap-2 text-[15px] text-gray-800">
                         <GroupIcon className="w-5 h-5" />
-                        {group.title}
+                        {displayTitle}
                       </span>
                       {collapsed ? (
                         <CiCirclePlus className="w-5 h-5 text-gray-500" />
@@ -229,9 +257,9 @@ export function PortfolioSidebar() {
           )}
 
           {/* SubModules - displayed below groups */}
-          {filteredSubModules.length > 0 && (
+          {remainingSubModules.length > 0 && (
             <div className="space-y-1 pt-4 border-t border-gray-200">
-              {filteredSubModules.map((subModule) => {
+              {remainingSubModules.map((subModule) => {
                 const Icon = subModule.icon
                 const active = activeItemId === subModule.id
                 return (

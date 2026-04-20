@@ -1,29 +1,34 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useDispatch } from "react-redux"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Switch } from "@/components/ui/switch"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { FileText, Loader2, CalendarIcon, Plus, Trash2 } from "lucide-react"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
-import { AccountingCurrency, InvoiceCustomer, CreateInvoiceRequest, Invoice, InvoiceItem, accountingApi } from "@/lib/api/accounting-api"
-import type { AppDispatch } from "@/lib/store"
+import { AccountingCurrency, CreateInvoiceRequest, Invoice, InvoiceItem, accountingApi } from "@/lib/api/accounting-api"
+import { CreateCustomerModal } from "./create-customer-modal"
+
+type InvoiceCustomerOption = {
+  id: string
+  name: string
+  isActive: boolean
+}
 
 interface CreateInvoiceModalProps {
   isOpen: boolean
   onClose: () => void
   onSuccess: () => void
+  onCustomerCreated?: () => void | Promise<void>
   currencies: AccountingCurrency[]
-  customers: InvoiceCustomer[]
+  customers: InvoiceCustomerOption[]
   invoice?: Invoice | null // For editing
 }
 
@@ -31,11 +36,11 @@ export function CreateInvoiceModal({
   isOpen, 
   onClose, 
   onSuccess, 
+  onCustomerCreated,
   currencies,
   customers,
   invoice 
 }: CreateInvoiceModalProps) {
-  const dispatch = useDispatch<AppDispatch>()
   const isEditing = !!invoice
   
   const [formData, setFormData] = useState<CreateInvoiceRequest>({
@@ -55,6 +60,7 @@ export function CreateInvoiceModal({
     ]
   })
   const [isLoading, setIsLoading] = useState(false)
+  const [isCreateCustomerModalOpen, setIsCreateCustomerModalOpen] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   // Get default currency
@@ -198,6 +204,14 @@ export function CreateInvoiceModal({
     }
   }
 
+  const handleCreateCustomerSuccess = async () => {
+    setIsCreateCustomerModalOpen(false)
+    if (onCustomerCreated) {
+      await onCustomerCreated()
+    }
+    toast.success("Customer created. You can now select them from the list.")
+  }
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -219,7 +233,20 @@ export function CreateInvoiceModal({
           {/* Customer & Currency Row */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="customerId">Customer *</Label>
+              <div className="flex items-center justify-between gap-2">
+                <Label htmlFor="customerId">Customer *</Label>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 px-2 text-xs"
+                  onClick={() => setIsCreateCustomerModalOpen(true)}
+                  disabled={isLoading}
+                >
+                  <Plus className="w-3 h-3 mr-1" />
+                  Create Customer
+                </Button>
+              </div>
               <Select
                 value={formData.customerId}
                 onValueChange={(value) => handleInputChange("customerId", value)}
@@ -248,6 +275,11 @@ export function CreateInvoiceModal({
               </Select>
               {errors.customerId && (
                 <p className="text-sm text-red-500">{errors.customerId}</p>
+              )}
+              {(!customers || customers.length === 0) && (
+                <p className="text-xs text-muted-foreground">
+                  No customers yet. Click "Create Customer" to add one without leaving this form.
+                </p>
               )}
             </div>
 
@@ -443,7 +475,7 @@ export function CreateInvoiceModal({
           </div>
 
           {/* Taxable Status */}
-          <div className="flex items-center justify-between">
+          {/* <div className="flex items-center justify-between">
             <div>
               <Label htmlFor="isTaxable">Taxable Invoice</Label>
               <p className="text-sm text-gray-500">Include VAT/Tax calculations</p>
@@ -454,7 +486,7 @@ export function CreateInvoiceModal({
               onCheckedChange={(checked) => handleInputChange("isTaxable", checked)}
               disabled={isLoading}
             />
-          </div>
+          </div> */}
 
           {/* Total Display */}
           <div className="bg-gray-50 p-4 rounded-lg">
@@ -494,6 +526,12 @@ export function CreateInvoiceModal({
           </div>
         </form>
       </DialogContent>
+
+      <CreateCustomerModal
+        isOpen={isCreateCustomerModalOpen}
+        onClose={() => setIsCreateCustomerModalOpen(false)}
+        onSuccess={handleCreateCustomerSuccess}
+      />
     </Dialog>
   )
 }

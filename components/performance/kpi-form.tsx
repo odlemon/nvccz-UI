@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useEffect } from "react"
 import { useForm, Controller } from "react-hook-form"
 import { yupResolver } from "@hookform/resolvers/yup"
 import * as yup from "yup"
@@ -23,123 +23,157 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { 
-  CiFloppyDisk, 
-  CiSquareRemove
-} from "react-icons/ci"
-import { KPI } from "@/lib/store/slices/performanceSlice"
+import { CiFloppyDisk, CiSquareRemove } from "react-icons/ci"
 import { useAppSelector } from "@/lib/store"
 
 const schema = yup.object({
   name: yup.string().required("KPI name is required"),
-  description: yup.string(),
   type: yup.string().oneOf(["Percentage", "Metric", "Count"]).required("Type is required"),
-  unit: yup.string(),
-  targetValue: yup.number().positive("Target value must be positive"),
-  currentValue: yup.number().min(0, "Current value cannot be negative"),
-  category: yup.string().oneOf(["sales", "marketing", "operations", "finance", "hr"]).required("Category is required"),
-  frequency: yup.string().oneOf(["daily", "weekly", "monthly", "quarterly", "yearly"]).required("Frequency is required"),
-  departmentId: yup.string(),
-  weightValue: yup.number().min(0, "Weight value cannot be negative").max(1, "Weight value cannot exceed 1").required("Weight value is required"),
-  isActive: yup.boolean().required("Status is required")
+  isReverseKpi: yup.boolean().required(),
+  weightValue: yup
+    .number()
+    .typeError("Weight value must be a number")
+    .min(0, "Weight value cannot be negative")
+    .required("Weight value is required"),
+  hasUnit: yup.boolean().required(),
+  unitCategory: yup.string().nullable(),
+  unit: yup.string().nullable(),
+  unitSymbol: yup.string().nullable(),
+  unitPosition: yup.string().oneOf(["prefix", "suffix"]).nullable(),
+  code: yup.string().required("Code is required"),
+  description: yup.string().required("Description is required"),
+  catalogDepartmentName: yup.string().nullable(),
+  accountType: yup
+    .string()
+    .oneOf(["Asset", "Liability", "Equity", "Revenue", "Expense"])
+    .required("Account type is required"),
+  accountNumber: yup.string().when("isFinancial", {
+    is: true,
+    then: (s) => s.required("Account number is required for financial KPIs"),
+    otherwise: (s) => s.nullable(),
+  }),
+  journalEntryType: yup.string().when("isFinancial", {
+    is: true,
+    then: (s) => s.oneOf(["Debit", "Credit"]).required("Journal entry type is required for financial KPIs"),
+    otherwise: (s) => s.nullable(),
+  }),
+  isFinancial: yup.boolean().required(),
+  isActive: yup.boolean().required(),
 })
 
 interface KPIFormProps {
   isOpen: boolean
   onClose: () => void
   onSubmit: (data: any) => void
-  kpi?: KPI | null
+  kpi?: any
   isLoading?: boolean
 }
 
+const getErrorMessage = (error: any) => {
+  if (!error) return ""
+  return typeof error.message === "string" ? error.message : "Invalid value"
+}
+
 export function KPIForm({ isOpen, onClose, onSubmit, kpi, isLoading = false }: KPIFormProps) {
-  const { departments } = useAppSelector((state) => state.performance)
-  const [selectedDepartment, setSelectedDepartment] = useState<string>("")
+  const { availableDepartments } = useAppSelector((state) => state.performance)
+  const validDepartments = Array.isArray(availableDepartments) ? availableDepartments : []
 
   const {
     control,
     handleSubmit,
     reset,
     formState: { errors },
-    watch
+    watch,
   } = useForm({
     resolver: yupResolver(schema),
     defaultValues: {
       name: "",
-      description: "",
       type: "Metric",
-      unit: "",
-      targetValue: 0,
-      currentValue: 0,
-      category: "sales",
-      frequency: "monthly",
-      departmentId: "",
-      weightValue: 0.1,
-      isActive: true
-    }
+      isReverseKpi: false,
+      weightValue: 1,
+      hasUnit: true,
+      unitCategory: "Currency",
+      unit: "USD",
+      unitSymbol: "$",
+      unitPosition: "prefix",
+      code: "",
+      description: "",
+      catalogDepartmentName: "none",
+      accountType: "Expense",
+      accountNumber: null,
+      journalEntryType: null,
+      isFinancial: false,
+      isActive: true,
+    },
   })
 
-  const watchedType = watch("type")
+  const hasUnit = watch("hasUnit")
+  const isFinancial = watch("isFinancial")
 
   useEffect(() => {
     if (kpi) {
       reset({
-        name: kpi.name,
-        description: kpi.description || "",
-        type: kpi.type,
-        unit: kpi.unit || "",
-        targetValue: kpi.targetValue || 0,
-        currentValue: kpi.currentValue || 0,
-        category: kpi.category,
-        frequency: kpi.frequency,
-        departmentId: kpi.departmentId || "none",
-        weightValue: kpi.weightValue,
-        isActive: kpi.isActive
+        name: kpi.name || "",
+        type: kpi.type || "Metric",
+        isReverseKpi: Boolean(kpi.isReverseKpi ?? false),
+        weightValue: Number.parseFloat(String(kpi.weightValue ?? 1)) || 1,
+        hasUnit: Boolean(kpi.hasUnit ?? true),
+        unitCategory: kpi.unitCategory || "Currency",
+        unit: kpi.unit || "USD",
+        unitSymbol: kpi.unitSymbol || "$",
+        unitPosition: kpi.unitPosition || "prefix",
+        code: kpi.code || kpi.hardcodedDetails?.code || "",
+        description: kpi.description || kpi.hardcodedDetails?.description || "",
+        catalogDepartmentName: kpi.catalogDepartmentName || kpi.departmentName || "none",
+        accountType: kpi.accountType || kpi.hardcodedDetails?.accountType || "Expense",
+        accountNumber: kpi.accountNumber || kpi.hardcodedDetails?.accountNumber || null,
+        journalEntryType: kpi.journalEntryType || kpi.hardcodedDetails?.journalEntryType || null,
+        isFinancial: Boolean(kpi.isFinancial ?? kpi.hardcodedDetails?.isFinancial ?? false),
+        isActive: Boolean(kpi.isActive ?? true),
       })
-      setSelectedDepartment(kpi.departmentId || "none")
     } else {
       reset({
         name: "",
-        description: "",
         type: "Metric",
-        unit: "",
-        targetValue: 0,
-        currentValue: 0,
-        category: "sales",
-        frequency: "monthly",
-        departmentId: "none",
-        weightValue: 0.1,
-        isActive: true
+        isReverseKpi: false,
+        weightValue: 1,
+        hasUnit: true,
+        unitCategory: "Currency",
+        unit: "USD",
+        unitSymbol: "$",
+        unitPosition: "prefix",
+        code: "",
+        description: "",
+        catalogDepartmentName: "none",
+        accountType: "Expense",
+        accountNumber: null,
+        journalEntryType: null,
+        isFinancial: false,
+        isActive: true,
       })
-      setSelectedDepartment("none")
     }
   }, [kpi, reset])
 
   const handleFormSubmit = (data: any) => {
-    // Convert "none" to null for departmentId
-    const formData = {
+    const payload = {
       ...data,
-      departmentId: data.departmentId === "none" ? null : data.departmentId
+      catalogDepartmentName:
+        !data.catalogDepartmentName || data.catalogDepartmentName === "none" ? null : data.catalogDepartmentName,
+      unitCategory: data.hasUnit ? data.unitCategory : null,
+      unit: data.hasUnit ? data.unit : null,
+      unitSymbol: data.hasUnit ? data.unitSymbol : null,
+      unitPosition: data.hasUnit ? data.unitPosition : null,
+      accountType: data.accountType,
+      accountNumber: data.isFinancial ? data.accountNumber : null,
+      journalEntryType: data.isFinancial ? data.journalEntryType : null,
     }
-    onSubmit(formData)
-  }
 
-  const getUnitOptions = (type: string) => {
-    switch (type) {
-      case "Percentage":
-        return ["%", "ratio", "rate"]
-      case "Metric":
-        return ["USD", "EUR", "GBP", "ZAR", "count", "units", "items"]
-      case "Count":
-        return ["count", "units", "items", "people", "deals"]
-      default:
-        return ["USD", "count", "units", "%"]
-    }
+    onSubmit(payload)
   }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-w-3xl md:max-w-4xl">
+      <DialogContent className="max-w-3xl md:max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-2xl font-normal flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg">
@@ -148,35 +182,26 @@ export function KPIForm({ isOpen, onClose, onSubmit, kpi, isLoading = false }: K
             {kpi ? "Edit KPI" : "Create New KPI"}
           </DialogTitle>
           <DialogDescription>
-            {kpi ? "Update the KPI information below." : "Fill in the details to create a new KPI."}
+            {kpi ? "Update KPI catalog details." : "Create a KPI in the database catalog."}
           </DialogDescription>
         </DialogHeader>
 
-          <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {/* Name */}
+        <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="name">KPI Name *</Label>
+              <Label>KPI Name *</Label>
               <Controller
                 name="name"
                 control={control}
                 render={({ field }) => (
-                  <Input
-                    {...field}
-                    id="name"
-                    placeholder="Enter KPI name"
-                    className={errors.name ? "border-red-500" : ""}
-                  />
+                  <Input {...field} placeholder="Training Expense" className={errors.name ? "border-red-500" : ""} />
                 )}
               />
-              {errors.name && (
-                <p className="text-sm text-red-500">{errors.name.message}</p>
-              )}
+              {errors.name && <p className="text-sm text-red-500">{getErrorMessage(errors.name)}</p>}
             </div>
 
-            {/* Type */}
             <div className="space-y-2">
-              <Label htmlFor="type">Type *</Label>
+              <Label>Type *</Label>
               <Controller
                 name="type"
                 control={control}
@@ -186,91 +211,61 @@ export function KPIForm({ isOpen, onClose, onSubmit, kpi, isLoading = false }: K
                       <SelectValue placeholder="Select type" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Percentage">Percentage</SelectItem>
                       <SelectItem value="Metric">Metric</SelectItem>
+                      <SelectItem value="Percentage">Percentage</SelectItem>
                       <SelectItem value="Count">Count</SelectItem>
                     </SelectContent>
                   </Select>
                 )}
               />
-              {errors.type && (
-                <p className="text-sm text-red-500">{errors.type.message}</p>
-              )}
+              {errors.type && <p className="text-sm text-red-500">{getErrorMessage(errors.type)}</p>}
             </div>
 
-            {/* Category */}
             <div className="space-y-2">
-              <Label htmlFor="category">Category *</Label>
+              <Label>Code *</Label>
               <Controller
-                name="category"
+                name="code"
                 control={control}
                 render={({ field }) => (
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <SelectTrigger className={errors.category ? "border-red-500" : ""}>
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="sales">Sales</SelectItem>
-                      <SelectItem value="marketing">Marketing</SelectItem>
-                      <SelectItem value="operations">Operations</SelectItem>
-                      <SelectItem value="finance">Finance</SelectItem>
-                      <SelectItem value="hr">Human Resources</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Input {...field} placeholder="TRAINING_EXPENSE" className={errors.code ? "border-red-500" : ""} />
                 )}
               />
-              {errors.category && (
-                <p className="text-sm text-red-500">{errors.category.message}</p>
-              )}
+              {errors.code && <p className="text-sm text-red-500">{getErrorMessage(errors.code)}</p>}
             </div>
 
-            {/* Frequency */}
             <div className="space-y-2">
-              <Label htmlFor="frequency">Frequency *</Label>
+              <Label>Weight Value *</Label>
               <Controller
-                name="frequency"
+                name="weightValue"
                 control={control}
                 render={({ field }) => (
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <SelectTrigger className={errors.frequency ? "border-red-500" : ""}>
-                      <SelectValue placeholder="Select frequency" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="daily">Daily</SelectItem>
-                      <SelectItem value="weekly">Weekly</SelectItem>
-                      <SelectItem value="monthly">Monthly</SelectItem>
-                      <SelectItem value="quarterly">Quarterly</SelectItem>
-                      <SelectItem value="yearly">Yearly</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    {...field}
+                    onChange={(e) => field.onChange(Number.parseFloat(e.target.value) || 0)}
+                    className={errors.weightValue ? "border-red-500" : ""}
+                  />
                 )}
               />
-              {errors.frequency && (
-                <p className="text-sm text-red-500">{errors.frequency.message}</p>
-              )}
+              {errors.weightValue && <p className="text-sm text-red-500">{getErrorMessage(errors.weightValue)}</p>}
             </div>
 
-            {/* Department */}
             <div className="space-y-2">
-              <Label htmlFor="departmentId">Department</Label>
+              <Label>Department</Label>
               <Controller
-                name="departmentId"
+                name="catalogDepartmentName"
                 control={control}
                 render={({ field }) => (
-                  <Select 
-                    value={field.value} 
-                    onValueChange={(value) => {
-                      field.onChange(value)
-                      setSelectedDepartment(value)
-                    }}
-                  >
+                  <Select value={field.value || "none"} onValueChange={field.onChange}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select department (optional)" />
+                      <SelectValue placeholder="Select department" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">No Department</SelectItem>
-                      {departments.map((dept) => (
-                        <SelectItem key={dept.id} value={dept.id}>
+                      <SelectItem value="none">None</SelectItem>
+                      {validDepartments.map((dept: any) => (
+                        <SelectItem key={dept.name} value={dept.name}>
                           {dept.name}
                         </SelectItem>
                       ))}
@@ -278,112 +273,20 @@ export function KPIForm({ isOpen, onClose, onSubmit, kpi, isLoading = false }: K
                   </Select>
                 )}
               />
-            </div>
-
-            {/* Unit */}
-            <div className="space-y-2">
-              <Label htmlFor="unit">Unit</Label>
-              <Controller
-                name="unit"
-                control={control}
-                render={({ field }) => (
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select unit" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {getUnitOptions(watchedType).map((unit) => (
-                        <SelectItem key={unit} value={unit}>
-                          {unit}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-            </div>
-
-            {/* Target Value */}
-            <div className="space-y-2">
-              <Label htmlFor="targetValue">Target Value</Label>
-              <Controller
-                name="targetValue"
-                control={control}
-                render={({ field }) => (
-                  <Input
-                    {...field}
-                    type="number"
-                    step="0.01"
-                    placeholder="Enter target value"
-                    className={errors.targetValue ? "border-red-500" : ""}
-                    onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                  />
-                )}
-              />
-              {errors.targetValue && (
-                <p className="text-sm text-red-500">{errors.targetValue.message}</p>
+              {errors.catalogDepartmentName && (
+                <p className="text-sm text-red-500">{getErrorMessage(errors.catalogDepartmentName)}</p>
               )}
             </div>
 
-            {/* Current Value */}
             <div className="space-y-2">
-              <Label htmlFor="currentValue">Current Value</Label>
-              <Controller
-                name="currentValue"
-                control={control}
-                render={({ field }) => (
-                  <Input
-                    {...field}
-                    type="number"
-                    step="0.01"
-                    placeholder="Enter current value"
-                    className={errors.currentValue ? "border-red-500" : ""}
-                    onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                  />
-                )}
-              />
-              {errors.currentValue && (
-                <p className="text-sm text-red-500">{errors.currentValue.message}</p>
-              )}
-            </div>
-
-            {/* Weight Value */}
-            <div className="space-y-2">
-              <Label htmlFor="weightValue">Weight Value * (0.0 - 1.0)</Label>
-              <Controller
-                name="weightValue"
-                control={control}
-                render={({ field }) => (
-                  <Input
-                    {...field}
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    max="1"
-                    placeholder="Enter weight value"
-                    className={errors.weightValue ? "border-red-500" : ""}
-                    onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                  />
-                )}
-              />
-              {errors.weightValue && (
-                <p className="text-sm text-red-500">{errors.weightValue.message}</p>
-              )}
-            </div>
-
-            {/* Status */}
-            <div className="space-y-2">
-              <Label htmlFor="isActive">Status *</Label>
+              <Label>Status *</Label>
               <Controller
                 name="isActive"
                 control={control}
                 render={({ field }) => (
-                  <Select 
-                    value={field.value ? "active" : "inactive"} 
-                    onValueChange={(value) => field.onChange(value === "active")}
-                  >
-                    <SelectTrigger className={errors.isActive ? "border-red-500" : ""}>
-                      <SelectValue placeholder="Select status" />
+                  <Select value={field.value ? "active" : "inactive"} onValueChange={(v) => field.onChange(v === "active")}>
+                    <SelectTrigger>
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="active">Active</SelectItem>
@@ -392,31 +295,210 @@ export function KPIForm({ isOpen, onClose, onSubmit, kpi, isLoading = false }: K
                   </Select>
                 )}
               />
-              {errors.isActive && (
-                <p className="text-sm text-red-500">{errors.isActive.message}</p>
-              )}
             </div>
+
+            <div className="space-y-2">
+              <Label>Financial KPI *</Label>
+              <Controller
+                name="isFinancial"
+                control={control}
+                render={({ field }) => (
+                  <Select value={field.value ? "yes" : "no"} onValueChange={(v) => field.onChange(v === "yes")}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="no">No</SelectItem>
+                      <SelectItem value="yes">Yes</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Reverse KPI *</Label>
+              <Controller
+                name="isReverseKpi"
+                control={control}
+                render={({ field }) => (
+                  <Select value={field.value ? "yes" : "no"} onValueChange={(v) => field.onChange(v === "yes")}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="no">No</SelectItem>
+                      <SelectItem value="yes">Yes</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Has Unit *</Label>
+              <Controller
+                name="hasUnit"
+                control={control}
+                render={({ field }) => (
+                  <Select value={field.value ? "yes" : "no"} onValueChange={(v) => field.onChange(v === "yes")}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="yes">Yes</SelectItem>
+                      <SelectItem value="no">No</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            </div>
+
+            {hasUnit && (
+              <>
+                <div className="space-y-2">
+                  <Label>Unit Category</Label>
+                  <Controller
+                    name="unitCategory"
+                    control={control}
+                    render={({ field }) => (
+                      <Select value={field.value || "Currency"} onValueChange={field.onChange}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Currency">Currency</SelectItem>
+                          <SelectItem value="Percentage">Percentage</SelectItem>
+                          <SelectItem value="Count">Count</SelectItem>
+                          <SelectItem value="Ratio">Ratio</SelectItem>
+                          <SelectItem value="Metric">Metric</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Unit</Label>
+                  <Controller
+                    name="unit"
+                    control={control}
+                    render={({ field }) => <Input {...field} value={field.value || ""} placeholder="USD" />}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Unit Symbol</Label>
+                  <Controller
+                    name="unitSymbol"
+                    control={control}
+                    render={({ field }) => <Input {...field} value={field.value || ""} placeholder="$" />}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Unit Position</Label>
+                  <Controller
+                    name="unitPosition"
+                    control={control}
+                    render={({ field }) => (
+                      <Select value={field.value || "prefix"} onValueChange={field.onChange}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="prefix">Prefix</SelectItem>
+                          <SelectItem value="suffix">Suffix</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                </div>
+              </>
+            )}
+
+            <div className="space-y-2">
+              <Label>Account Type *</Label>
+              <Controller
+                name="accountType"
+                control={control}
+                render={({ field }) => (
+                  <Select value={field.value || "Expense"} onValueChange={field.onChange}>
+                    <SelectTrigger className={errors.accountType ? "border-red-500" : ""}>
+                      <SelectValue placeholder="Select account type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Asset">Asset</SelectItem>
+                      <SelectItem value="Liability">Liability</SelectItem>
+                      <SelectItem value="Equity">Equity</SelectItem>
+                      <SelectItem value="Revenue">Revenue</SelectItem>
+                      <SelectItem value="Expense">Expense</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              {errors.accountType && <p className="text-sm text-red-500">{getErrorMessage(errors.accountType)}</p>}
+            </div>
+
+            {isFinancial && (
+              <>
+                <div className="space-y-2">
+                  <Label>Account Number *</Label>
+                  <Controller
+                    name="accountNumber"
+                    control={control}
+                    render={({ field }) => (
+                      <Input
+                        {...field}
+                        value={field.value || ""}
+                        placeholder="5090"
+                        className={errors.accountNumber ? "border-red-500" : ""}
+                      />
+                    )}
+                  />
+                  {errors.accountNumber && <p className="text-sm text-red-500">{getErrorMessage(errors.accountNumber)}</p>}
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Journal Entry Type *</Label>
+                  <Controller
+                    name="journalEntryType"
+                    control={control}
+                    render={({ field }) => (
+                      <Select value={field.value || ""} onValueChange={field.onChange}>
+                        <SelectTrigger className={errors.journalEntryType ? "border-red-500" : ""}>
+                          <SelectValue placeholder="Select journal type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Debit">Debit</SelectItem>
+                          <SelectItem value="Credit">Credit</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                  {errors.journalEntryType && (
+                    <p className="text-sm text-red-500">{getErrorMessage(errors.journalEntryType)}</p>
+                  )}
+                </div>
+              </>
+            )}
           </div>
 
-          {/* Description */}
           <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
+            <Label>Description *</Label>
             <Controller
               name="description"
               control={control}
               render={({ field }) => (
                 <Textarea
                   {...field}
-                  id="description"
-                  placeholder="Enter KPI description"
+                  placeholder="Employee training and development costs"
                   rows={3}
                   className={errors.description ? "border-red-500" : ""}
                 />
               )}
             />
-            {errors.description && (
-              <p className="text-sm text-red-500">{errors.description.message}</p>
-            )}
+            {errors.description && <p className="text-sm text-red-500">{getErrorMessage(errors.description)}</p>}
           </div>
 
           <DialogFooter className="gap-3">

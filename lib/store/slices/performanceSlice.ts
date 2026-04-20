@@ -413,7 +413,8 @@ export const createGoal = createAsyncThunk(
       dispatch(fetchGoals({})) // Refetch goals after creation
       return response.goal
     } catch (error: any) {
-      return rejectWithValue(error.message || 'Failed to create goal')
+      const apiMessage = error?.response?.message || error?.response?.error || error?.message
+      return rejectWithValue(apiMessage || 'Failed to create goal')
     }
   },
 )
@@ -439,7 +440,8 @@ export const updateGoal = createAsyncThunk(
       dispatch(fetchGoals({})) // Refetch goals after update
       return response.goal
     } catch (error: any) {
-      return rejectWithValue(error.message || 'Failed to update goal')
+      const apiMessage = error?.response?.message || error?.response?.error || error?.message
+      return rejectWithValue(apiMessage || 'Failed to update goal')
     }
   },
 )

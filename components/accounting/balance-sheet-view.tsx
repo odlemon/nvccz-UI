@@ -395,21 +395,21 @@ export function BalanceSheetView() {
         })}
 
         <div className="mt-8 pt-4 border-t-2 border-gray-400 space-y-2">
-          <div className="flex justify-between py-2 font-bold text-lg">
-            <span>TOTAL ASSETS</span>
-            <span className="font-mono text-blue-700">{formatUSD(consolidatedBalance.totals.assets)}</span>
+          <div className="flex justify-between py-2 font-bold text-lg gap-3">
+            <span className="min-w-0">TOTAL ASSETS</span>
+            <span className="font-mono text-sm sm:text-base md:text-lg text-blue-700 text-right leading-tight break-all max-w-[60%]">{formatUSD(consolidatedBalance.totals.assets)}</span>
           </div>
-          <div className="flex justify-between py-2 font-bold text-lg">
-            <span>TOTAL LIABILITIES</span>
-            <span className="font-mono text-red-700">{formatUSD(consolidatedBalance.totals.liabilities)}</span>
+          <div className="flex justify-between py-2 font-bold text-lg gap-3">
+            <span className="min-w-0">TOTAL LIABILITIES</span>
+            <span className="font-mono text-sm sm:text-base md:text-lg text-red-700 text-right leading-tight break-all max-w-[60%]">{formatUSD(consolidatedBalance.totals.liabilities)}</span>
           </div>
-          <div className="flex justify-between py-2 font-bold text-lg">
-            <span>TOTAL EQUITY</span>
-            <span className="font-mono text-green-700">{formatUSD(consolidatedBalance.totals.equity)}</span>
+          <div className="flex justify-between py-2 font-bold text-lg gap-3">
+            <span className="min-w-0">TOTAL EQUITY</span>
+            <span className="font-mono text-sm sm:text-base md:text-lg text-green-700 text-right leading-tight break-all max-w-[60%]">{formatUSD(consolidatedBalance.totals.equity)}</span>
           </div>
-          <div className="flex justify-between py-2 font-bold text-lg border-t">
-            <span>TOTAL LIABILITIES & EQUITY</span>
-            <span className="font-mono">{formatUSD(consolidatedBalance.totals.liabilitiesAndEquity)}</span>
+          <div className="flex justify-between py-2 font-bold text-lg border-t gap-3">
+            <span className="min-w-0">TOTAL LIABILITIES & EQUITY</span>
+            <span className="font-mono text-sm sm:text-base md:text-lg text-right leading-tight break-all max-w-[60%]">{formatUSD(consolidatedBalance.totals.liabilitiesAndEquity)}</span>
           </div>
           <div className="text-center mt-3">
             {consolidatedBalance.isBalanced
@@ -926,9 +926,9 @@ export function BalanceSheetView() {
                   )}
 
                   {/* Total Assets */}
-                  <div className="flex justify-between py-3 border-t-2 border-gray-800 font-bold text-lg">
-                    <span>TOTAL ASSETS</span>
-                    <span className="font-mono text-blue-700">{formatMoney(balanceSheet.assets.totalAssets)}</span>
+                  <div className="flex justify-between py-3 border-t-2 border-gray-800 font-bold text-lg gap-3">
+                    <span className="min-w-0">TOTAL ASSETS</span>
+                    <span className="font-mono text-sm sm:text-base md:text-lg text-blue-700 text-right leading-tight break-all max-w-[60%]">{formatMoney(balanceSheet.assets.totalAssets)}</span>
                   </div>
                 </div>
 
@@ -989,9 +989,9 @@ export function BalanceSheetView() {
                   )}
 
                   {/* Total Liabilities */}
-                  <div className="flex justify-between py-3 border-t-2 border-gray-800 font-bold text-lg">
-                    <span>TOTAL LIABILITIES</span>
-                    <span className="font-mono text-red-700">{formatMoney(balanceSheet.liabilities.totalLiabilities)}</span>
+                  <div className="flex justify-between py-3 border-t-2 border-gray-800 font-bold text-lg gap-3">
+                    <span className="min-w-0">TOTAL LIABILITIES</span>
+                    <span className="font-mono text-sm sm:text-base md:text-lg text-red-700 text-right leading-tight break-all max-w-[60%]">{formatMoney(balanceSheet.liabilities.totalLiabilities)}</span>
                   </div>
                 </div>
 
@@ -1003,18 +1003,18 @@ export function BalanceSheetView() {
                       <span className="text-sm text-gray-700">Retained Earnings</span>
                       <span className="font-mono text-sm text-gray-900">{formatMoney(balanceSheet.equity.retainedEarnings)}</span>
                     </div>
-                    <div className="flex justify-between py-3 border-t-2 border-gray-800 font-bold text-lg">
-                      <span>TOTAL EQUITY</span>
-                      <span className="font-mono text-green-700">{formatMoney(balanceSheet.equity.total)}</span>
+                    <div className="flex justify-between py-3 border-t-2 border-gray-800 font-bold text-lg gap-3">
+                      <span className="min-w-0">TOTAL EQUITY</span>
+                      <span className="font-mono text-sm sm:text-base md:text-lg text-green-700 text-right leading-tight break-all max-w-[60%]">{formatMoney(balanceSheet.equity.total)}</span>
                     </div>
                   </div>
                 </div>
 
                 {/* Balance Check */}
                 <div className="mt-8 pt-4 border-t-2 border-gray-400">
-                  <div className="flex justify-between py-3 font-bold text-lg">
-                    <span>TOTAL LIABILITIES & EQUITY</span>
-                    <span className="font-mono">{formatMoney(balanceSheet.totalLiabilitiesAndEquity)}</span>
+                  <div className="flex justify-between py-3 font-bold text-lg gap-3">
+                    <span className="min-w-0">TOTAL LIABILITIES & EQUITY</span>
+                    <span className="font-mono text-sm sm:text-base md:text-lg text-right leading-tight break-all max-w-[60%]">{formatMoney(balanceSheet.totalLiabilitiesAndEquity)}</span>
                   </div>
                   <div className="text-center mt-4">
                     {balanceSheet.isBalanced

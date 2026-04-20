@@ -104,6 +104,14 @@ export function GoalsManagement() {
   const [selectedGoalForIndividualBreakdown, setSelectedGoalForIndividualBreakdown] = useState<any>(null)
   const hasLoadedInitialData = useRef(false)
 
+  const getErrorText = (err: unknown) => {
+    if (typeof err === "string") return err
+    if (err && typeof err === "object" && "message" in err && typeof (err as any).message === "string") {
+      return (err as any).message
+    }
+    return "Unknown error"
+  }
+
   useEffect(() => {
     // Only load initial data once when component mounts
     if (!hasLoadedInitialData.current) {
@@ -147,11 +155,17 @@ export function GoalsManagement() {
   }
 
   const handleFormSubmit = async (data: any) => {
-    const action = editingGoal ? updateGoal({ goalId: editingGoal.id, data }) : createGoal(data)
+    const normalizedData = {
+      ...data,
+      departmentName: data.departmentName === "none" ? null : data.departmentName,
+      parentGoalId: data.parentGoalId === "none" ? null : data.parentGoalId,
+      scorecardPillar: data.type === "company" ? data.scorecardPillar : null,
+    }
+    const action = editingGoal ? updateGoal({ goalId: editingGoal.id, data: normalizedData }) : createGoal(normalizedData)
     toast.promise(dispatch(action).unwrap(), {
       loading: editingGoal ? "Updating goal..." : "Creating goal...",
       success: `Goal ${editingGoal ? "updated" : "created"} successfully.`,
-      error: (err) => `Failed to ${editingGoal ? "update" : "create"} goal: ${err.message}`,
+      error: (err) => `Failed to ${editingGoal ? "update" : "create"} goal: ${getErrorText(err)}`,
     })
     setShowCreateModal(false)
     setEditingGoal(null)
@@ -180,7 +194,7 @@ export function GoalsManagement() {
     toast.promise(dispatch(breakdownGoalToIndividuals(data)).unwrap(), {
       loading: "Breaking down goal...",
       success: "Goal broken down successfully.",
-      error: (err) => `Failed to breakdown goal: ${err.message}`,
+      error: (err) => `Failed to breakdown goal: ${getErrorText(err)}`,
     })
     setBreakdownGoal(null)
   }

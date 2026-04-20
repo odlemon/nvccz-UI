@@ -134,6 +134,7 @@ export function CapitalCallsList() {
   const [sendingNotices, setSendingNotices] = useState<string | null>(null)
   const [confirmSendCallId, setConfirmSendCallId] = useState<string | null>(null)
   const [addLpOpen, setAddLpOpen] = useState(false)
+  const [isLpPanelOpen, setIsLpPanelOpen] = useState(true)
 
   // ── Load funds ──
   const loadFunds = async () => {
@@ -177,6 +178,7 @@ export function CapitalCallsList() {
   useEffect(() => {
     if (selectedFund) {
       loadCallsAndSummary()
+      setIsLpPanelOpen(true)
     }
   }, [selectedFund?.id])
 
@@ -262,6 +264,17 @@ export function CapitalCallsList() {
           </span>
         </nav>
         <div className="flex items-center gap-2">
+          {selectedFund && lpSummary.length > 0 && !isLpPanelOpen && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-full gap-1.5"
+              onClick={() => setIsLpPanelOpen(true)}
+            >
+              <Users className="w-3.5 h-3.5" />
+              Show LP Dashboard
+            </Button>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -621,12 +634,12 @@ export function CapitalCallsList() {
         </main>
 
         {/* ── Right panel: LP Summary ── */}
-        {selectedFund && lpSummary.length > 0 && (
+        {selectedFund && lpSummary.length > 0 && isLpPanelOpen && (
           <aside className="hidden lg:flex w-[360px] shrink-0 overflow-hidden">
             <LpSummaryPanel
               fund={selectedFund}
               lpSummary={lpSummary}
-              onClose={() => {}}
+              onClose={() => setIsLpPanelOpen(false)}
             />
           </aside>
         )}

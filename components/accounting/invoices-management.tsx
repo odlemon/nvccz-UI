@@ -1152,8 +1152,9 @@ export function InvoicesManagement() {
         isOpen={isCreateModalOpen}
         onClose={closeCreateModal}
         onSuccess={handleCreateModalSuccess}
+        onCustomerCreated={loadCustomers}
         currencies={currencies}
-        customers={customers}
+        customers={customers as any}
         invoice={invoiceToEdit}
       />
     </div>

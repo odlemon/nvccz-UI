@@ -42,11 +42,12 @@ export const fetchDepartmentScorecard = createAsyncThunk(
 
 export const fetchUserScorecard = createAsyncThunk(
   "scorecard/fetchUserScorecard",
-  async (payload: { periodLabel?: string } | undefined, { rejectWithValue }) => {
+  async (payload: { periodLabel?: string; employeeId?: string } | undefined, { rejectWithValue }) => {
     try {
-      const response = await scorecardApiService.getUserScorecard(
-        payload?.periodLabel ? { periodLabel: payload.periodLabel } : undefined,
-      )
+      const query = payload?.periodLabel ? { periodLabel: payload.periodLabel } : undefined
+      const response = payload?.employeeId
+        ? await scorecardApiService.getEmployeeScorecard(payload.employeeId, query)
+        : await scorecardApiService.getUserScorecard(query)
       return response.data
     } catch (error: any) {
       return rejectWithValue(error.message)

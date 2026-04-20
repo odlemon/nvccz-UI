@@ -326,7 +326,14 @@ export function CashFlowView() {
       <div className="max-w-6xl mx-auto space-y-6">
         {/* Company Header */}
         <div className="text-center mb-8 border-b-2 border-gray-300 pb-4">
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">National venture capital company of Zimbabwe</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-1">{activeAddress?.label || "National venture capital company of Zimbabwe"}</h1>
+          {activeAddress && (
+            <p className="text-sm text-gray-500 mb-1">
+              {[activeAddress.line1, activeAddress.line2, [activeAddress.city, activeAddress.state, activeAddress.postalCode].filter(Boolean).join(", "), activeAddress.country]
+                .filter(Boolean)
+                .join(" • ")}
+            </p>
+          )}
           <h2 className="text-xl font-semibold text-gray-700 mb-2">Cash Flow Statement</h2>
           <p className="text-gray-600">
             For the period {format(new Date(cashFlow.period.startDate), "MMMM d, yyyy")} to {format(new Date(cashFlow.period.endDate), "MMMM d, yyyy")}
@@ -558,22 +565,22 @@ export function CashFlowView() {
 
         {/* Cash Flow Summary */}
         <div className="space-y-3 border-t-2 border-gray-500 pt-4">
-          <div className="flex justify-between items-center">
-            <span className="text-base font-bold">Net Change in Cash</span>
+          <div className="flex justify-between items-center gap-3">
+            <span className="text-base font-bold min-w-0">Net Change in Cash</span>
             <span className={cn(
-              "font-mono text-base font-bold",
+              "font-mono text-sm sm:text-base md:text-lg font-bold text-right leading-tight break-all max-w-[60%]",
               cashFlow.netCashFlow < 0 ? "text-red-600" : "text-blue-700"
             )}>
               {formatMoney(cashFlow.netCashFlow)}
             </span>
           </div>
-          <div className="flex justify-between items-center text-sm">
-            <span className="pl-4">Beginning Cash Balance</span>
-            <span className="font-mono">{formatMoney(cashFlow.beginningCashBalance)}</span>
+          <div className="flex justify-between items-center text-sm gap-3">
+            <span className="pl-4 min-w-0">Beginning Cash Balance</span>
+            <span className="font-mono text-right leading-tight break-all max-w-[60%]">{formatMoney(cashFlow.beginningCashBalance)}</span>
           </div>
-          <div className="flex justify-between items-center border-t-2 border-gray-500 pt-2">
-            <span className="text-base font-bold">Ending Cash Balance</span>
-            <span className="font-mono text-base font-bold text-blue-700">
+          <div className="flex justify-between items-center border-t-2 border-gray-500 pt-2 gap-3">
+            <span className="text-base font-bold min-w-0">Ending Cash Balance</span>
+            <span className="font-mono text-sm sm:text-base md:text-lg font-bold text-blue-700 text-right leading-tight break-all max-w-[60%]">
               {formatMoney(cashFlow.endingCashBalance)}
             </span>
           </div>

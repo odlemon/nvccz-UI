@@ -263,7 +263,7 @@ export function ProcurementInvoices() {
       render: (value, row) => (
         <div className="flex items-center gap-1">
           <CiDollar className="w-4 h-4 text-green-600" />
-          <span className="font-medium">{row.currency.symbol}{parseFloat(value || '0').toLocaleString()}</span>
+          <span className="font-medium">{row.currency?.symbol}{parseFloat(value || '0').toLocaleString()}</span>
         </div>
       )
     },

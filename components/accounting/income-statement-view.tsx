@@ -539,6 +539,14 @@ export function IncomeStatementView() {
     }).format(Math.abs(amount))
   }
 
+  const getSingleLineAmountClass = (formattedAmount: string) => {
+    const length = formattedAmount.length
+    if (length >= 17) return "text-base sm:text-lg"
+    if (length >= 15) return "text-lg sm:text-xl"
+    if (length >= 13) return "text-xl sm:text-2xl"
+    return "text-2xl"
+  }
+
   // Format in the active consolidated reporting currency (from the API response).
   const formatConsolidated = (amount: number) => {
     const code = consolidatedIncome?.reportingCurrencyCode || 'USD'
@@ -624,13 +632,13 @@ export function IncomeStatementView() {
 
         <div className="flex justify-between py-3 border-t-2 border-b-4 border-gray-900 font-bold text-lg">
           <span className={cn(
-            "uppercase tracking-wide",
+            "uppercase tracking-wide pr-3",
             consolidatedIncome.totals.netIncome >= 0 ? "text-green-800" : "text-red-800"
           )}>
             Net {consolidatedIncome.totals.netIncome >= 0 ? "Income" : "Loss"}
           </span>
           <span className={cn(
-            "font-mono text-right text-xl",
+            "font-mono text-right text-base sm:text-lg md:text-xl lg:text-2xl leading-tight break-all",
             consolidatedIncome.totals.netIncome >= 0 ? "text-green-700" : "text-red-700"
           )}>
             {consolidatedIncome.totals.netIncome < 0 ? '(' : ''}
@@ -1188,7 +1196,8 @@ export function IncomeStatementView() {
                       Net {incomeStatement.totals.netIncome >= 0 ? "Income" : "Loss"}
                     </span>
                     <span className={cn(
-                      "font-mono text-right w-32 text-xl",
+                      "font-mono text-right whitespace-nowrap leading-tight max-w-[65%]",
+                      getSingleLineAmountClass(formatCurrency(Math.abs(incomeStatement.totals.netIncome))),
                       incomeStatement.totals.netIncome >= 0 ? "text-green-700" : "text-red-700"
                     )}>
                       {incomeStatement.totals.netIncome < 0 ? '(' : ''}

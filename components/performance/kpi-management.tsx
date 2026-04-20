@@ -13,6 +13,7 @@ import {
   clearAvailableKPIs,
   fetchFinancialKPIs
 } from "@/lib/store/slices/performanceSlice"
+import { kpiApiService } from "@/lib/api/kpi-api"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -28,14 +29,18 @@ import { toast } from "sonner"
 import { 
   BarChart3,
   TrendingUp,
-  Building2,
   FileText,
   Search,
-  X
+  X,
+  Plus,
+  Pencil,
+  Trash2,
 } from "lucide-react"
 import { CiRedo, CiViewList, CiViewTimeline, CiViewBoard, CiCircleCheck, CiUser } from "react-icons/ci"
 import { KPIViewDrawer } from "./kpi-view-drawer"
 import { KPIManagementSkeleton } from "./kpi-skeleton"
+import { KPIForm } from "./kpi-form"
+import { KPIConfirmDeleteModal } from "./kpi-confirm-delete-modal"
 import {
   Pagination,
   PaginationContent,
@@ -47,9 +52,11 @@ import {
 import { cn } from "@/lib/utils"
 import { ProcurementDataTable } from "@/components/procurement/procurement-data-table"
 import { KPIPerformanceAnalysisTab } from "./kpi-performance-analysis-tab"
+import { usePerformancePermissions } from "@/lib/hooks/usePerformancePermissions"
 
 export function KPIManagement() {
   const dispatch = useAppDispatch()
+  const { permissions } = usePerformancePermissions()
   const {
     availableKPIs,
     availableDepartments,
@@ -70,6 +77,11 @@ export function KPIManagement() {
   const [financialCurrentPage, setFinancialCurrentPage] = useState(1)
   const [financialItemsPerPage] = useState(10)
   const [activeTab, setActiveTab] = useState<"overview" | "financials" | "analysis">("overview")
+  const [isKpiFormOpen, setIsKpiFormOpen] = useState(false)
+  const [editingKPI, setEditingKPI] = useState<any | null>(null)
+  const [isSubmittingKPI, setIsSubmittingKPI] = useState(false)
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
+  const [kpiToDelete, setKpiToDelete] = useState<any | null>(null)
   const hasLoadedRef = useRef(false)
 
   // Account types for filtering
@@ -105,6 +117,32 @@ export function KPIManagement() {
     }
   }
 
+  const getErrorText = (error: unknown) => {
+    if (typeof error === "string") return error
+    if (error && typeof error === "object") {
+      const maybeError = error as any
+      if (typeof maybeError?.response?.message === "string") return maybeError.response.message
+      if (typeof maybeError?.response?.error === "string") return maybeError.response.error
+      if (typeof maybeError?.message === "string") return maybeError.message
+    }
+    return "Unknown error"
+  }
+
+  const reloadKPIData = async () => {
+    dispatch(clearAvailableKPIs())
+    if (selectedDepartmentFilter !== "all") {
+      await dispatch(fetchKPIsByDepartment(selectedDepartmentFilter)).unwrap()
+    } else if (selectedAccountTypeFilter !== "all") {
+      await dispatch(fetchKPIsByAccountType(selectedAccountTypeFilter)).unwrap()
+    } else {
+      await dispatch(fetchAvailableKPIs()).unwrap()
+    }
+    await dispatch(fetchKPIStatistics()).unwrap()
+    if (activeTab === "financials") {
+      await dispatch(fetchFinancialKPIs()).unwrap()
+    }
+  }
+
   // Handle filter changes
   useEffect(() => {
     if (!hasLoadedRef.current) return
@@ -137,17 +175,65 @@ export function KPIManagement() {
 
   const handleRefresh = async () => {
     try {
-      if (selectedDepartmentFilter !== 'all') {
-        await dispatch(fetchKPIsByDepartment(selectedDepartmentFilter)).unwrap()
-      } else if (selectedAccountTypeFilter !== 'all') {
-        await dispatch(fetchKPIsByAccountType(selectedAccountTypeFilter)).unwrap()
-      } else {
-        await dispatch(fetchAvailableKPIs()).unwrap()
-      }
-      await dispatch(fetchKPIStatistics()).unwrap()
+      await reloadKPIData()
       toast.success("KPIs refreshed successfully")
     } catch (error) {
       toast.error("Failed to refresh KPIs")
+    }
+  }
+
+  const handleOpenCreateKPI = () => {
+    setEditingKPI(null)
+    setIsKpiFormOpen(true)
+  }
+
+  const handleOpenEditKPI = (kpi: any) => {
+    setEditingKPI(kpi)
+    setIsKpiFormOpen(true)
+  }
+
+  const handleRequestDeleteKPI = (kpi: any) => {
+    setKpiToDelete(kpi)
+    setIsDeleteModalOpen(true)
+  }
+
+  const handleSubmitKPI = async (formData: any) => {
+    setIsSubmittingKPI(true)
+    try {
+      if (editingKPI?.id) {
+        await kpiApiService.updateKPI(editingKPI.id, formData)
+      } else {
+        await kpiApiService.createKPI(formData)
+      }
+
+      await reloadKPIData()
+      toast.success(`KPI ${editingKPI ? "updated" : "created"} successfully`)
+      setIsKpiFormOpen(false)
+      setEditingKPI(null)
+    } catch (error) {
+      toast.error(`Failed to ${editingKPI ? "update" : "create"} KPI: ${getErrorText(error)}`)
+    } finally {
+      setIsSubmittingKPI(false)
+    }
+  }
+
+  const handleConfirmDeleteKPI = async () => {
+    if (!kpiToDelete?.id) return
+
+    try {
+      await kpiApiService.deleteKPI(kpiToDelete.id)
+      await reloadKPIData()
+      toast.success("KPI deleted successfully")
+
+      if (viewingKPI?.id === kpiToDelete.id) {
+        setIsViewDrawerOpen(false)
+        setViewingKPI(null)
+      }
+      setIsDeleteModalOpen(false)
+      setKpiToDelete(null)
+    } catch (error) {
+      toast.error(`Failed to delete KPI: ${getErrorText(error)}`)
+      throw error
     }
   }
 
@@ -364,15 +450,26 @@ export function KPIManagement() {
           <h1 className="text-3xl text-gray-900">KPI Management</h1>
           <p className="text-gray-600 font-normal">View and analyze key performance indicators</p>
         </div>
-        <Button 
-          onClick={handleRefresh}
-          disabled={loading}
-          variant="outline"
-          className="rounded-full bg-gradient-to-br from-gray-50 to-gray-100 hover:from-gray-100 hover:to-gray-200 border-gray-300"
-        >
-          <CiRedo className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-          {loading ? "Refreshing..." : "Refresh"}
-        </Button>
+        <div className="flex items-center gap-2">
+          {permissions.canCreateKPI && (
+            <Button
+              onClick={handleOpenCreateKPI}
+              className="rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Create KPI
+            </Button>
+          )}
+          <Button 
+            onClick={handleRefresh}
+            disabled={loading}
+            variant="outline"
+            className="rounded-full bg-gradient-to-br from-gray-50 to-gray-100 hover:from-gray-100 hover:to-gray-200 border-gray-300"
+          >
+            <CiRedo className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            {loading ? "Refreshing..." : "Refresh"}
+          </Button>
+        </div>
       </div>
 
       {/* Statistics Cards */}
@@ -633,6 +730,32 @@ export function KPIManagement() {
                       >
                         <CiViewList className="w-4 h-4" />
                       </Button>
+                      {permissions.canUpdateKPI && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="rounded-full w-8 h-8 p-0 bg-amber-500 hover:bg-amber-600 text-white"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleOpenEditKPI(kpi)
+                          }}
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                      )}
+                      {permissions.canDeleteKPI && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="rounded-full w-8 h-8 p-0 bg-red-500 hover:bg-red-600 text-white"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleRequestDeleteKPI(kpi)
+                          }}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
                     </div>
                     <CardTitle className="text-base font-semibold line-clamp-2">{kpi.name}</CardTitle>
                     <div className="flex items-center gap-2 flex-wrap mt-2">
@@ -776,6 +899,32 @@ export function KPIManagement() {
                         >
                           <CiViewList className="w-4 h-4" />
                         </Button>
+                        {permissions.canUpdateKPI && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="rounded-full w-8 h-8 p-0 bg-amber-500 hover:bg-amber-600 text-white"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleOpenEditKPI(kpi)
+                            }}
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                        )}
+                        {permissions.canDeleteKPI && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="rounded-full w-8 h-8 p-0 bg-red-500 hover:bg-red-600 text-white"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleRequestDeleteKPI(kpi)
+                            }}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
                       </div>
                       <CardTitle className="text-base font-semibold line-clamp-2">{kpi.name}</CardTitle>
                       <div className="flex items-center gap-2 flex-wrap mt-2">
@@ -881,6 +1030,31 @@ export function KPIManagement() {
           setViewingKPI(null)
         }}
         kpi={viewingKPI}
+        onEdit={(kpi) => handleOpenEditKPI(kpi)}
+        onDelete={(kpi) => handleRequestDeleteKPI(kpi)}
+      />
+
+      <KPIForm
+        isOpen={isKpiFormOpen}
+        onClose={() => {
+          setIsKpiFormOpen(false)
+          setEditingKPI(null)
+        }}
+        onSubmit={handleSubmitKPI}
+        kpi={editingKPI}
+        isLoading={isSubmittingKPI}
+      />
+
+      <KPIConfirmDeleteModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => {
+          setIsDeleteModalOpen(false)
+          setKpiToDelete(null)
+        }}
+        onConfirm={handleConfirmDeleteKPI}
+        title="Delete KPI"
+        description="Are you sure you want to delete this KPI from the catalog?"
+        itemName={kpiToDelete?.name || "Selected KPI"}
       />
     </div>
   )

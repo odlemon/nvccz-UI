@@ -125,7 +125,7 @@ export function CreateAssetModal({ isOpen, onClose, onSuccess }: CreateAssetModa
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-hidden overflow-y-auto rounded-2xl">
-        <DialogHeader>
+        <DialogHeader>/
           <DialogTitle className="flex items-center gap-2">
             <Package className="w-5 h-5" />
             Create New Asset
