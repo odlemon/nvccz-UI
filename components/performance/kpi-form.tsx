@@ -52,11 +52,10 @@ const schema = yup.object({
     then: (s) => s.required("Account number is required for financial KPIs"),
     otherwise: (s) => s.nullable(),
   }),
-  journalEntryType: yup.string().when("isFinancial", {
-    is: true,
-    then: (s) => s.oneOf(["Debit", "Credit"]).required("Journal entry type is required for financial KPIs"),
-    otherwise: (s) => s.nullable(),
-  }),
+  journalEntryType: yup
+    .string()
+    .oneOf(["Debit", "Credit"])
+    .required("Journal entry type is required"),
   isFinancial: yup.boolean().required(),
   isActive: yup.boolean().required(),
 })
@@ -101,7 +100,7 @@ export function KPIForm({ isOpen, onClose, onSubmit, kpi, isLoading = false }: K
       catalogDepartmentName: "none",
       accountType: "Expense",
       accountNumber: null,
-      journalEntryType: null,
+      journalEntryType: "Debit",
       isFinancial: false,
       isActive: true,
     },
@@ -127,7 +126,7 @@ export function KPIForm({ isOpen, onClose, onSubmit, kpi, isLoading = false }: K
         catalogDepartmentName: kpi.catalogDepartmentName || kpi.departmentName || "none",
         accountType: kpi.accountType || kpi.hardcodedDetails?.accountType || "Expense",
         accountNumber: kpi.accountNumber || kpi.hardcodedDetails?.accountNumber || null,
-        journalEntryType: kpi.journalEntryType || kpi.hardcodedDetails?.journalEntryType || null,
+        journalEntryType: kpi.journalEntryType || kpi.hardcodedDetails?.journalEntryType || "Debit",
         isFinancial: Boolean(kpi.isFinancial ?? kpi.hardcodedDetails?.isFinancial ?? false),
         isActive: Boolean(kpi.isActive ?? true),
       })
@@ -147,7 +146,7 @@ export function KPIForm({ isOpen, onClose, onSubmit, kpi, isLoading = false }: K
         catalogDepartmentName: "none",
         accountType: "Expense",
         accountNumber: null,
-        journalEntryType: null,
+        journalEntryType: "Debit",
         isFinancial: false,
         isActive: true,
       })
@@ -165,7 +164,7 @@ export function KPIForm({ isOpen, onClose, onSubmit, kpi, isLoading = false }: K
       unitPosition: data.hasUnit ? data.unitPosition : null,
       accountType: data.accountType,
       accountNumber: data.isFinancial ? data.accountNumber : null,
-      journalEntryType: data.isFinancial ? data.journalEntryType : null,
+      journalEntryType: data.journalEntryType,
     }
 
     onSubmit(payload)
@@ -440,6 +439,28 @@ export function KPIForm({ isOpen, onClose, onSubmit, kpi, isLoading = false }: K
               {errors.accountType && <p className="text-sm text-red-500">{getErrorMessage(errors.accountType)}</p>}
             </div>
 
+            <div className="space-y-2">
+              <Label>Journal Entry Type *</Label>
+              <Controller
+                name="journalEntryType"
+                control={control}
+                render={({ field }) => (
+                  <Select value={field.value || "Debit"} onValueChange={field.onChange}>
+                    <SelectTrigger className={errors.journalEntryType ? "border-red-500" : ""}>
+                      <SelectValue placeholder="Select journal type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Debit">Debit</SelectItem>
+                      <SelectItem value="Credit">Credit</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              {errors.journalEntryType && (
+                <p className="text-sm text-red-500">{getErrorMessage(errors.journalEntryType)}</p>
+              )}
+            </div>
+
             {isFinancial && (
               <>
                 <div className="space-y-2">
@@ -457,28 +478,6 @@ export function KPIForm({ isOpen, onClose, onSubmit, kpi, isLoading = false }: K
                     )}
                   />
                   {errors.accountNumber && <p className="text-sm text-red-500">{getErrorMessage(errors.accountNumber)}</p>}
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Journal Entry Type *</Label>
-                  <Controller
-                    name="journalEntryType"
-                    control={control}
-                    render={({ field }) => (
-                      <Select value={field.value || ""} onValueChange={field.onChange}>
-                        <SelectTrigger className={errors.journalEntryType ? "border-red-500" : ""}>
-                          <SelectValue placeholder="Select journal type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Debit">Debit</SelectItem>
-                          <SelectItem value="Credit">Credit</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                  {errors.journalEntryType && (
-                    <p className="text-sm text-red-500">{getErrorMessage(errors.journalEntryType)}</p>
-                  )}
                 </div>
               </>
             )}
