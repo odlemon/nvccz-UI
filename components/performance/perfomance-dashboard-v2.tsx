@@ -480,16 +480,16 @@ export function PerformanceDashboardV2() {
                                         </PieChart>
                                     </ResponsiveContainer>
                                 </div>
-                                <div className="flex flex-row justify-center gap-8 w-full">
+                                <div className="flex flex-row flex-wrap justify-center gap-x-4 gap-y-2 w-full">
                                     {performanceDistribution.map((item: any) => (
-                                        <div key={item.name} className="flex items-center gap-3">
+                                        <div key={item.name} className="flex items-center gap-2 min-w-0">
                                             <div
-                                                className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                                                className="w-2 h-2 rounded-full flex-shrink-0"
                                                 style={{ backgroundColor: item.color }}
                                             />
-                                            <div className="flex flex-col">
-                                                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider leading-tight">{item.name}</p>
-                                                <p className="text-xl font-normal text-foreground mt-1 tracking-tight">{item.value}%</p>
+                                            <div className="flex flex-col min-w-0">
+                                                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide leading-tight truncate">{item.name}</p>
+                                                <p className="text-sm font-semibold text-foreground mt-0.5 tracking-tight">{item.value}%</p>
                                             </div>
                                         </div>
                                     ))}

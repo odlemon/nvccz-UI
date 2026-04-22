@@ -17,6 +17,8 @@ import applicationPortalApiService, {
   SubmitFinancialReportsRequest,
   SubmitPeriodKPIsRequest,
   FinancialReportType,
+  Letterhead,
+  UpdateLetterheadRequest,
 } from "@/lib/api/application-portal-api"
 
 interface ApplicationPortalState {
@@ -75,6 +77,13 @@ interface ApplicationPortalState {
   financialReportsLoading: boolean
   financialReportsError: string | null
 
+  // Letterhead
+  letterhead: Letterhead | null
+  letterheadLoading: boolean
+  letterheadError: string | null
+  letterheadSaving: boolean
+  letterheadLogoUploading: boolean
+
   // General
   loading: boolean
   error: string | null
@@ -125,6 +134,12 @@ const initialState: ApplicationPortalState = {
   financialReports: [],
   financialReportsLoading: false,
   financialReportsError: null,
+
+  letterhead: null,
+  letterheadLoading: false,
+  letterheadError: null,
+  letterheadSaving: false,
+  letterheadLogoUploading: false,
 
   loading: false,
   error: null,
@@ -201,6 +216,60 @@ export const updateCompany = createAsyncThunk(
       return response
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to update company')
+    }
+  }
+)
+
+export const fetchLetterhead = createAsyncThunk(
+  'applicationPortal/fetchLetterhead',
+  async (portfolioCompanyId: string, { rejectWithValue }) => {
+    try {
+      const response = await applicationPortalApiService.getLetterhead(portfolioCompanyId)
+      return response.data
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to fetch letterhead')
+    }
+  }
+)
+
+export const updateLetterhead = createAsyncThunk(
+  'applicationPortal/updateLetterhead',
+  async (
+    { portfolioCompanyId, data }: { portfolioCompanyId: string; data: UpdateLetterheadRequest },
+    { rejectWithValue }
+  ) => {
+    try {
+      const response = await applicationPortalApiService.updateLetterhead(portfolioCompanyId, data)
+      return response.data
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to update letterhead')
+    }
+  }
+)
+
+export const deleteLetterhead = createAsyncThunk(
+  'applicationPortal/deleteLetterhead',
+  async (portfolioCompanyId: string, { rejectWithValue }) => {
+    try {
+      await applicationPortalApiService.deleteLetterhead(portfolioCompanyId)
+      return true
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to delete letterhead')
+    }
+  }
+)
+
+export const uploadLetterheadLogo = createAsyncThunk(
+  'applicationPortal/uploadLetterheadLogo',
+  async (
+    { portfolioCompanyId, file }: { portfolioCompanyId: string; file: File },
+    { rejectWithValue }
+  ) => {
+    try {
+      const response = await applicationPortalApiService.uploadLetterheadLogo(portfolioCompanyId, file)
+      return response.data
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to upload letterhead logo')
     }
   }
 )
@@ -620,6 +689,54 @@ const applicationPortalSlice = createSlice({
       .addCase(submitPeriodKPIs.rejected, (state, action) => {
         state.loading = false
         state.error = action.payload as string
+      })
+
+      // Letterhead
+      .addCase(fetchLetterhead.pending, (state) => {
+        state.letterheadLoading = true
+        state.letterheadError = null
+      })
+      .addCase(fetchLetterhead.fulfilled, (state, action: PayloadAction<Letterhead>) => {
+        state.letterheadLoading = false
+        state.letterhead = action.payload
+      })
+      .addCase(fetchLetterhead.rejected, (state, action) => {
+        state.letterheadLoading = false
+        state.letterheadError = action.payload as string
+        state.letterhead = null
+      })
+      .addCase(updateLetterhead.pending, (state) => {
+        state.letterheadSaving = true
+      })
+      .addCase(updateLetterhead.fulfilled, (state, action: PayloadAction<Letterhead>) => {
+        state.letterheadSaving = false
+        state.letterhead = action.payload
+      })
+      .addCase(updateLetterhead.rejected, (state, action) => {
+        state.letterheadSaving = false
+        state.letterheadError = action.payload as string
+      })
+      .addCase(deleteLetterhead.pending, (state) => {
+        state.letterheadSaving = true
+      })
+      .addCase(deleteLetterhead.fulfilled, (state) => {
+        state.letterheadSaving = false
+        state.letterhead = null
+      })
+      .addCase(deleteLetterhead.rejected, (state, action) => {
+        state.letterheadSaving = false
+        state.letterheadError = action.payload as string
+      })
+      .addCase(uploadLetterheadLogo.pending, (state) => {
+        state.letterheadLogoUploading = true
+      })
+      .addCase(uploadLetterheadLogo.fulfilled, (state, action: PayloadAction<Letterhead>) => {
+        state.letterheadLogoUploading = false
+        state.letterhead = action.payload
+      })
+      .addCase(uploadLetterheadLogo.rejected, (state, action) => {
+        state.letterheadLogoUploading = false
+        state.letterheadError = action.payload as string
       })
   },
 })

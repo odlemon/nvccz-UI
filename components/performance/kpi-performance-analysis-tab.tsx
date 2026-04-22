@@ -103,10 +103,25 @@ export function KPIPerformanceAnalysisTab() {
   }
 
   const formatValue = (value: number, kpi: any) => {
-    if (kpi.unitPosition === "prefix") {
-      return `${kpi.unitSymbol}${value.toLocaleString()}`
+    const safeValue = Number.isFinite(Number(value)) ? Number(value) : 0
+    const unitPosition = kpi?.unitPosition || "suffix"
+    const unitSymbol = kpi?.unitSymbol || ""
+
+    if (unitPosition === "prefix") {
+      return `${unitSymbol}${safeValue.toLocaleString()}`
     }
-    return `${value.toLocaleString()}${kpi.unitSymbol || ""}`
+    return `${safeValue.toLocaleString()}${unitSymbol}`
+  }
+
+  const getKpiLabel = (item: any) => item?.kpi?.name || "Unmapped KPI"
+  const getKpiType = (item: any) => item?.kpi?.type || "Unknown"
+  const getSafePercentage = (value: any) => {
+    const numeric = Number.parseFloat(String(value))
+    return Number.isFinite(numeric) ? numeric : 0
+  }
+  const getGoalShare = (part: number, total: number) => {
+    if (!total || total <= 0) return 0
+    return (part / total) * 100
   }
 
   const getProgressColor = (percentage: number) => {
@@ -128,8 +143,8 @@ export function KPIPerformanceAnalysisTab() {
       label: "KPI",
       render: (_: unknown, row: any) => (
         <div>
-          <p className="font-medium">{row.kpi.name}</p>
-          <p className="text-xs text-muted-foreground">{row.kpi.type}</p>
+          <p className="font-medium">{getKpiLabel(row)}</p>
+          <p className="text-xs text-muted-foreground">{getKpiType(row)}</p>
         </div>
       ),
       sortable: true,
@@ -222,8 +237,8 @@ export function KPIPerformanceAnalysisTab() {
     ]
 
     const rows = kpiAnalytics.map((item: any) => [
-      item.kpi.name,
-      item.kpi.type,
+      getKpiLabel(item),
+      getKpiType(item),
       item.totalGoals,
       item.completedGoals,
       item.inProgressGoals,
@@ -449,8 +464,8 @@ export function KPIPerformanceAnalysisTab() {
         </div>
       ) : !kpiAnalyticsLoading && kpiAnalytics && kpiAnalytics.length > 0 && (
         <div className="grid grid-cols-1 gap-6">
-          {kpiAnalytics.map((item: any) => (
-            <Card key={item.kpi.id} className="rounded-2xl bg-white border hover:shadow-lg transition-all duration-300 hover:border-blue-300">
+          {kpiAnalytics.map((item: any, index: number) => (
+            <Card key={item?.kpi?.id || `unmapped-${index}`} className="rounded-2xl bg-white border hover:shadow-lg transition-all duration-300 hover:border-blue-300">
               <CardContent className="p-6">
                 {/* Header Section */}
                 <div className="flex items-center justify-between mb-6">
@@ -459,12 +474,12 @@ export function KPIPerformanceAnalysisTab() {
                       <CiViewTimeline className="w-6 h-6 text-white" />
                     </div>
                     <div>
-                      <h3 className="text-lg font-semibold text-gray-900">{item.kpi.name}</h3>
+                      <h3 className="text-lg font-semibold text-gray-900">{getKpiLabel(item)}</h3>
                       <div className="flex items-center gap-2 mt-0.5">
                         <Badge className="text-xs px-2 py-0.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white">
-                          {item.kpi.type}
+                          {getKpiType(item)}
                         </Badge>
-                        {getTrendIcon(parseFloat(item.progressPercentage))}
+                        {getTrendIcon(getSafePercentage(item.progressPercentage))}
                       </div>
                     </div>
                   </div>
@@ -483,7 +498,7 @@ export function KPIPerformanceAnalysisTab() {
                       <div className="w-full bg-gray-200 rounded-full h-1">
                         <div 
                           className="bg-emerald-500 h-1 rounded-full transition-all duration-1000 ease-out"
-                          style={{ width: `${(item.completedGoals / item.totalGoals) * 100}%` }}
+                          style={{ width: `${getGoalShare(item.completedGoals, item.totalGoals)}%` }}
                         />
                       </div>
                     </div>
@@ -496,7 +511,7 @@ export function KPIPerformanceAnalysisTab() {
                       <div className="w-full bg-gray-200 rounded-full h-1">
                         <div 
                           className="bg-blue-500 h-1 rounded-full transition-all duration-1000 ease-out"
-                          style={{ width: `${(item.inProgressGoals / item.totalGoals) * 100}%` }}
+                          style={{ width: `${getGoalShare(item.inProgressGoals, item.totalGoals)}%` }}
                         />
                       </div>
                     </div>
@@ -509,7 +524,7 @@ export function KPIPerformanceAnalysisTab() {
                       <div className="w-full bg-gray-200 rounded-full h-1">
                         <div 
                           className="bg-gray-400 h-1 rounded-full transition-all duration-1000 ease-out"
-                          style={{ width: `${(item.notStartedGoals / item.totalGoals) * 100}%` }}
+                          style={{ width: `${getGoalShare(item.notStartedGoals, item.totalGoals)}%` }}
                         />
                       </div>
                     </div>
@@ -538,7 +553,7 @@ export function KPIPerformanceAnalysisTab() {
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-gray-700">Overall Progress</span>
                     <span className="text-xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-                      {parseFloat(item.progressPercentage).toFixed(2)}%
+                      {getSafePercentage(item.progressPercentage).toFixed(2)}%
                     </span>
                   </div>
                   
@@ -547,10 +562,10 @@ export function KPIPerformanceAnalysisTab() {
                       <div
                         className={`h-full transition-all duration-1000 ease-out`}
                         style={{ 
-                          width: `${Math.min(parseFloat(item.progressPercentage), 100)}%`,
-                          background: parseFloat(item.progressPercentage) >= 80 ? 'linear-gradient(90deg, #10b981, #059669)' : 
-                            parseFloat(item.progressPercentage) >= 60 ? 'linear-gradient(90deg, #3b82f6, #2563eb)' : 
-                            parseFloat(item.progressPercentage) >= 40 ? 'linear-gradient(90deg, #f59e0b, #d97706)' : 
+                          width: `${Math.min(getSafePercentage(item.progressPercentage), 100)}%`,
+                          background: getSafePercentage(item.progressPercentage) >= 80 ? 'linear-gradient(90deg, #10b981, #059669)' : 
+                            getSafePercentage(item.progressPercentage) >= 60 ? 'linear-gradient(90deg, #3b82f6, #2563eb)' : 
+                            getSafePercentage(item.progressPercentage) >= 40 ? 'linear-gradient(90deg, #f59e0b, #d97706)' : 
                             'linear-gradient(90deg, #ef4444, #dc2626)'
                         }}
                       >
@@ -564,18 +579,18 @@ export function KPIPerformanceAnalysisTab() {
                 <div className="pt-4 border-t border-gray-200 flex items-center justify-between">
                   <div>
                     <p className="text-xs text-muted-foreground mb-0.5">Completion Rate</p>
-                    <p className="text-lg font-semibold text-gray-900">{parseFloat(item.completionRate).toFixed(1)}%</p>
+                    <p className="text-lg font-semibold text-gray-900">{getSafePercentage(item.completionRate).toFixed(1)}%</p>
                   </div>
                   <Badge 
                     variant="outline" 
                     className={`text-sm px-3 py-1 ${
-                      parseFloat(item.completionRate) >= 80 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                      parseFloat(item.completionRate) >= 60 ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                      parseFloat(item.completionRate) >= 40 ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                      getSafePercentage(item.completionRate) >= 80 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                      getSafePercentage(item.completionRate) >= 60 ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                      getSafePercentage(item.completionRate) >= 40 ? 'bg-amber-50 text-amber-700 border-amber-200' :
                       'bg-red-50 text-red-700 border-red-200'
                     }`}
                   >
-                    {parseFloat(item.completionRate).toFixed(1)}% Complete
+                    {getSafePercentage(item.completionRate).toFixed(1)}% Complete
                   </Badge>
                 </div>
               </CardContent>

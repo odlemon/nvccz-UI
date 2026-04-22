@@ -51,8 +51,8 @@ import { BalanceSheetTab } from "./tabs/BalanceSheetTab"
 import { CashFlowTab } from "./tabs/CashFlowTab"
 import { NonFinancialKPIsTab } from "./tabs/NonFinancialKPIsTab"
 import { toast } from "sonner"
-import applicationPortalApiService, { type FinancialReport, type ReportingRequestItem } from "@/lib/api/application-portal-api"
-import { addLetterhead, addReportInfo } from "@/lib/utils/pdf-letterhead"
+import applicationPortalApiService, { type FinancialReport, type Letterhead, type ReportingRequestItem } from "@/lib/api/application-portal-api"
+import { addLetterhead, addReportInfo, type LetterheadAddress } from "@/lib/utils/pdf-letterhead"
 
 type MandatoryFileMap = Record<string, File | null>
 
@@ -321,10 +321,12 @@ function ReportDetailDrawer({
   open,
   onClose,
   report,
+  letterheadAddress,
 }: {
   open: boolean
   onClose: () => void
   report: FinancialReport | null
+  letterheadAddress: LetterheadAddress | null
 }) {
   const handleOpenFile = () => {
     const link = report?.fileUrl || report?.reportUrl
@@ -340,7 +342,7 @@ function ReportDetailDrawer({
     try {
       const doc = new jsPDF()
       const prettyType = report.reportType.replaceAll("_", " ")
-      let startY = await addLetterhead(doc, prettyType)
+      let startY = await addLetterhead(doc, prettyType, undefined, letterheadAddress)
       startY = addReportInfo(doc, startY, [
         `Title: ${report.title || "-"}`,
         `Period: ${(report.periodStart || "-").slice(0, 10)} to ${(report.periodEnd || "-").slice(0, 10)}`,
@@ -725,6 +727,7 @@ export function InvesteeReportingForm() {
   const [submitOpen, setSubmitOpen] = useState(false)
   const [selectedReport, setSelectedReport] = useState<FinancialReport | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [letterhead, setLetterhead] = useState<Letterhead | null>(null)
 
   const isLocked = false
   const selectedRequest = reportingRequests.find((req) => req.id === selectedRequestId) || null
@@ -799,6 +802,40 @@ export function InvesteeReportingForm() {
 
     void loadReportingRequests()
   }, [])
+
+  useEffect(() => {
+    let cancelled = false
+
+    const loadLetterhead = async () => {
+      try {
+        const companyResp = await applicationPortalApiService.getCompany()
+        const companyId = companyResp?.data?.id
+        if (!companyId) return
+        const letterheadResp = await applicationPortalApiService.getLetterhead(companyId)
+        if (!cancelled && letterheadResp?.data) {
+          setLetterhead(letterheadResp.data)
+        }
+      } catch {
+        // letterhead is optional — PDFs fall back to default header if this fails
+      }
+    }
+
+    void loadLetterhead()
+    return () => { cancelled = true }
+  }, [])
+
+  const letterheadAddress: LetterheadAddress | null = letterhead
+    ? {
+        label: letterhead.addressLabel || letterhead.legalName,
+        line1: letterhead.line1,
+        line2: letterhead.line2,
+        city: letterhead.city,
+        state: letterhead.state,
+        postalCode: letterhead.postalCode,
+        country: letterhead.country,
+        logoUrl: letterhead.logoUrl,
+      }
+    : null
 
   const saveDraft = useCallback(() => {
     setSaving(true)
@@ -1347,6 +1384,7 @@ export function InvesteeReportingForm() {
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         report={selectedReport}
+        letterheadAddress={letterheadAddress}
       />
     </div>
   )

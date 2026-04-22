@@ -14,30 +14,33 @@ import { FileText, Loader2, CalendarIcon, Plus, Trash2 } from "lucide-react"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
-import { AccountingCurrency, Vendor, CreatePurchaseInvoiceRequest, PurchaseInvoice, PurchaseInvoiceItem, accountingApi } from "@/lib/api/accounting-api"
+import { AccountingCurrency, Vendor, CreatePurchaseInvoiceRequest, PurchaseInvoice, PurchaseInvoiceItem, VatRate, accountingApi } from "@/lib/api/accounting-api"
 import { useAppDispatch } from "@/lib/store"
 import { createPurchaseInvoice, updatePurchaseInvoice } from "@/lib/store/slices/purchase-invoices-slice"
+import { CreateVendorModal } from "./create-vendor-modal"
 
 interface CreatePurchaseInvoiceModalProps {
   isOpen: boolean
   onClose: () => void
   onSuccess: () => void
+  onVendorCreated?: () => void | Promise<void>
   currencies: AccountingCurrency[]
   vendors: Vendor[]
   invoice?: PurchaseInvoice | null
 }
 
-export function CreatePurchaseInvoiceModal({ 
-  isOpen, 
-  onClose, 
-  onSuccess, 
+export function CreatePurchaseInvoiceModal({
+  isOpen,
+  onClose,
+  onSuccess,
+  onVendorCreated,
   currencies,
   vendors,
-  invoice 
+  invoice
 }: CreatePurchaseInvoiceModalProps) {
   const isEditing = !!invoice
   const dispatch = useAppDispatch()
-  
+
   const [formData, setFormData] = useState<CreatePurchaseInvoiceRequest>({
     vendorId: "",
     invoiceDate: new Date().toISOString().split('T')[0],
@@ -51,15 +54,18 @@ export function CreatePurchaseInvoiceModal({
         quantity: "" as any,
         unitPrice: "" as any,
         unit: "",
-        vatRate: "" as any
+        vatRate: 0
       }
     ],
-    isTaxable: true,
+    isTaxable: false,
     invoiceNumber: "",
     notes: ""
   })
   const [isLoading, setIsLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [activeVatRate, setActiveVatRate] = useState<VatRate | null>(null)
+  const [isVatLoading, setIsVatLoading] = useState(false)
+  const [isCreateVendorModalOpen, setIsCreateVendorModalOpen] = useState(false)
 
   useEffect(() => {
     const defaultCurrency = currencies.find(c => c.isDefault) || currencies[0]
@@ -77,7 +83,7 @@ export function CreatePurchaseInvoiceModal({
           dueDate: invoice.dueDate.split('T')[0],
           currencyId: invoice.currencyId,
           description: invoice.description,
-          items: invoice.items.length > 0 ? invoice.items : [{ itemName: "", description: "", quantity: 1, unitPrice: 0, unit: "pcs", vatRate: 15 }],
+          items: invoice.items.length > 0 ? invoice.items : [{ itemName: "", description: "", quantity: 1, unitPrice: 0, unit: "pcs", vatRate: 0 }],
           isTaxable: invoice.isTaxable,
           invoiceNumber: invoice.invoiceNumber,
           notes: invoice.notes
@@ -89,8 +95,8 @@ export function CreatePurchaseInvoiceModal({
           dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
           currencyId: currencies.find(c => c.isDefault)?.id || currencies[0]?.id || "",
           description: "",
-          items: [{ itemName: "", description: "", quantity: "" as any, unitPrice: "" as any, unit: "", vatRate: "" as any }],
-          isTaxable: true,
+          items: [{ itemName: "", description: "", quantity: "" as any, unitPrice: "" as any, unit: "", vatRate: 0 }],
+          isTaxable: false,
           invoiceNumber: "",
           notes: ""
         })
@@ -98,6 +104,37 @@ export function CreatePurchaseInvoiceModal({
       setErrors({})
     }
   }, [isOpen, currencies, isEditing, invoice])
+
+  useEffect(() => {
+    if (!isOpen) return
+    if (!formData.isTaxable) return
+    if (activeVatRate) return
+
+    let cancelled = false
+    setIsVatLoading(true)
+    accountingApi.getActiveVatRate()
+      .then(res => {
+        if (cancelled) return
+        if (res.success && res.data) {
+          setActiveVatRate(res.data)
+        } else {
+          toast.error("No active VAT rate configured", {
+            description: "Set one in Accounting Settings → VAT Rates."
+          })
+        }
+      })
+      .catch(err => {
+        if (cancelled) return
+        toast.error("Failed to load active VAT rate", {
+          description: err?.message || 'Unknown error'
+        })
+      })
+      .finally(() => {
+        if (!cancelled) setIsVatLoading(false)
+      })
+
+    return () => { cancelled = true }
+  }, [isOpen, formData.isTaxable, activeVatRate])
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
@@ -111,32 +148,33 @@ export function CreatePurchaseInvoiceModal({
     if (formData.items.length === 0) {
       newErrors.items = "Please add at least one item"
     } else {
-      const hasInvalidItems = formData.items.some(item => 
-        !item.itemName.trim() || !item.description.trim() || !item.unit || 
-        (item.quantity as any) === "" || Number(item.quantity) <= 0 || 
-        (item.unitPrice as any) === "" || Number(item.unitPrice) <= 0 || 
-        (item.vatRate as any) === ""
+      const hasInvalidItems = formData.items.some(item =>
+        !item.itemName.trim() || !item.description.trim() || !item.unit ||
+        (item.quantity as any) === "" || Number(item.quantity) <= 0 ||
+        (item.unitPrice as any) === "" || Number(item.unitPrice) <= 0
       )
       if (hasInvalidItems) {
-        newErrors.items = "All items must have name, description, unit, valid quantity, price, and VAT rate"
+        newErrors.items = "All items must have name, description, unit, valid quantity, and price"
       }
+    }
+
+    if (formData.isTaxable && !activeVatRate) {
+      newErrors.vatRate = "No active VAT rate available"
     }
 
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
 
+  const activeRateDecimal = activeVatRate ? Number(activeVatRate.rateDecimal) : 0
+
   const calculateSubtotal = () => {
     return formData.items.reduce((total, item) => total + (Number(item.quantity) * Number(item.unitPrice)), 0)
   }
 
   const calculateVAT = () => {
-    if (!formData.isTaxable) return 0
-    return formData.items.reduce((total, item) => {
-      const itemTotal = Number(item.quantity) * Number(item.unitPrice)
-      const vatRate = Number(item.vatRate)
-      return total + (itemTotal * vatRate)
-    }, 0)
+    if (!formData.isTaxable || !activeVatRate) return 0
+    return calculateSubtotal() * activeRateDecimal
   }
 
   const calculateTotal = () => {
@@ -148,13 +186,25 @@ export function CreatePurchaseInvoiceModal({
     
     if (!validateForm()) return
 
+    const payload: CreatePurchaseInvoiceRequest = {
+      ...formData,
+      items: formData.items.map(item => ({
+        itemName: item.itemName,
+        description: item.description,
+        quantity: Number(item.quantity),
+        unitPrice: Number(item.unitPrice),
+        unit: item.unit,
+        vatRate: 0
+      }))
+    }
+
     setIsLoading(true)
     try {
       if (isEditing && invoice) {
-        await dispatch(updatePurchaseInvoice({ id: invoice.id, data: formData })).unwrap()
+        await dispatch(updatePurchaseInvoice({ id: invoice.id, data: payload })).unwrap()
         toast.success("Purchase invoice updated successfully")
       } else {
-        await dispatch(createPurchaseInvoice(formData)).unwrap()
+        await dispatch(createPurchaseInvoice(payload)).unwrap()
         toast.success("Purchase invoice created successfully")
       }
       onSuccess()
@@ -186,8 +236,16 @@ export function CreatePurchaseInvoiceModal({
   const addItem = () => {
     setFormData(prev => ({
       ...prev,
-      items: [...prev.items, { itemName: "", description: "", quantity: "" as any, unitPrice: "" as any, unit: "", vatRate: "" as any }]
+      items: [...prev.items, { itemName: "", description: "", quantity: "" as any, unitPrice: "" as any, unit: "", vatRate: 0 }]
     }))
+  }
+
+  const handleCreateVendorSuccess = async () => {
+    setIsCreateVendorModalOpen(false)
+    if (onVendorCreated) {
+      await onVendorCreated()
+    }
+    toast.success("Vendor created. You can now select them from the list.")
   }
 
   const removeItem = (index: number) => {
@@ -218,7 +276,20 @@ export function CreatePurchaseInvoiceModal({
           {/* Vendor & Currency Row */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="vendorId">Vendor *</Label>
+              <div className="flex items-center justify-between gap-2">
+                <Label htmlFor="vendorId">Vendor *</Label>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 px-2 text-xs"
+                  onClick={() => setIsCreateVendorModalOpen(true)}
+                  disabled={isLoading}
+                >
+                  <Plus className="w-3 h-3 mr-1" />
+                  Add Vendor
+                </Button>
+              </div>
               <Select
                 value={formData.vendorId}
                 onValueChange={(value) => handleInputChange("vendorId", value)}
@@ -277,7 +348,7 @@ export function CreatePurchaseInvoiceModal({
           </div>
 
           {/* Invoice Date & Due Date */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="invoiceDate">Invoice Date *</Label>
               <Popover>
@@ -285,7 +356,7 @@ export function CreatePurchaseInvoiceModal({
                   <Button
                     variant="outline"
                     className={cn(
-                      "w-full justify-start text-left font-normal",
+                      "w-full h-10 rounded-full border-gray-300 bg-white px-4 justify-start text-left font-normal",
                       !formData.invoiceDate && "text-muted-foreground",
                       errors.invoiceDate && "border-red-500"
                     )}
@@ -323,7 +394,7 @@ export function CreatePurchaseInvoiceModal({
                   <Button
                     variant="outline"
                     className={cn(
-                      "w-full justify-start text-left font-normal",
+                      "w-full h-10 rounded-full border-gray-300 bg-white px-4 justify-start text-left font-normal",
                       !formData.dueDate && "text-muted-foreground",
                       errors.dueDate && "border-red-500"
                     )}
@@ -352,17 +423,6 @@ export function CreatePurchaseInvoiceModal({
               {errors.dueDate && (
                 <p className="text-sm text-red-500">{errors.dueDate}</p>
               )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="invoiceNumber">Invoice Number</Label>
-              <Input
-                id="invoiceNumber"
-                value={formData.invoiceNumber}
-                onChange={(e) => handleInputChange("invoiceNumber", e.target.value)}
-                placeholder="Auto-generated if empty"
-                disabled={isLoading}
-              />
             </div>
           </div>
 
@@ -403,14 +463,13 @@ export function CreatePurchaseInvoiceModal({
             {/* Table Headings */}
             <div className="grid grid-cols-12 gap-2 px-4 py-2 bg-gray-50 rounded-lg text-sm font-medium text-gray-700">
               <div className="col-span-3">Item Name</div>
-              <div className="col-span-2">Description</div>
+              <div className="col-span-3">Description</div>
               <div className="col-span-2">Quantity</div>
               <div className="col-span-2">Unit Price</div>
               <div className="col-span-1">Unit</div>
-              <div className="col-span-1">VAT Rate</div>
               <div className="col-span-1">Action</div>
             </div>
-            
+
             <div className="space-y-3">
               {formData.items.map((item, index) => (
                 <div key={index} className="grid grid-cols-12 gap-2 p-4 border rounded-lg">
@@ -422,7 +481,7 @@ export function CreatePurchaseInvoiceModal({
                       disabled={isLoading}
                     />
                   </div>
-                  <div className="col-span-2">
+                  <div className="col-span-3">
                     <Input
                       placeholder="Description"
                       value={item.description}
@@ -472,31 +531,18 @@ export function CreatePurchaseInvoiceModal({
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="col-span-1">
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      max="1"
-                      placeholder="0.15"
-                      value={item.vatRate}
-                      onChange={(e) => handleItemChange(index, "vatRate", e.target.value === "" ? "" : parseFloat(e.target.value))}
-                      disabled={isLoading}
-                    />
-                  </div>
-                  <div className="col-span-1 flex items-center">
-                    {formData.items.length > 1 && (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => removeItem(index)}
-                        disabled={isLoading}
-                        className="w-8 h-8 p-0"
-                      >
-                        <Trash2 className="w-4 h-4 text-red-500" />
-                      </Button>
-                    )}
+                  <div className="col-span-1 flex items-center justify-center">
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="outline"
+                      onClick={() => removeItem(index)}
+                      disabled={isLoading || formData.items.length === 1}
+                      className="h-9 w-9 rounded-full border-red-200 bg-red-50 hover:bg-red-100 hover:border-red-300 disabled:opacity-40"
+                      title={formData.items.length === 1 ? "At least one item required" : "Remove item"}
+                    >
+                      <Trash2 className="w-4 h-4 text-red-600" />
+                    </Button>
                   </div>
                 </div>
               ))}
@@ -509,10 +555,18 @@ export function CreatePurchaseInvoiceModal({
 
           {/* Taxable Status & Notes */}
           <div className="grid grid-cols-2 gap-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between rounded-lg border p-4">
               <div>
                 <Label htmlFor="isTaxable">Taxable Invoice</Label>
-                <p className="text-sm text-gray-500">Include VAT/Tax calculations</p>
+                <p className="text-sm text-gray-500">
+                  {formData.isTaxable
+                    ? (isVatLoading
+                        ? "Loading active VAT rate…"
+                        : activeVatRate
+                          ? `VAT will be applied at ${(activeRateDecimal * 100).toFixed(2)}% (${activeVatRate.name})`
+                          : "No active VAT rate set — check Accounting Settings")
+                    : "VAT/Tax will not be calculated"}
+                </p>
               </div>
               <Switch
                 id="isTaxable"
@@ -521,7 +575,7 @@ export function CreatePurchaseInvoiceModal({
                 disabled={isLoading}
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="notes">Notes</Label>
               <Textarea
@@ -544,19 +598,29 @@ export function CreatePurchaseInvoiceModal({
               </span>
             </div>
             {formData.isTaxable && (
-              <div className="flex justify-between items-center">
-                <span className="text-sm">VAT:</span>
-                <span className="font-medium">
-                  {currencies.find(c => c.id === formData.currencyId)?.symbol || '$'}{calculateVAT().toFixed(2)}
-                </span>
-              </div>
+              <>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">
+                    VAT {activeVatRate ? `(${(activeRateDecimal * 100).toFixed(2)}%)` : ""}:
+                  </span>
+                  <span className="font-medium">
+                    {currencies.find(c => c.id === formData.currencyId)?.symbol || '$'}{calculateVAT().toFixed(2)}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500">
+                  The subtotal is submitted; VAT is calculated on the backend using the active rate.
+                </p>
+              </>
             )}
             <div className="flex justify-between items-center text-lg font-semibold pt-2 border-t">
-              <span>Total Amount:</span>
+              <span>Total Amount{formData.isTaxable ? " (incl. VAT)" : ""}:</span>
               <span className="text-green-600">
                 {currencies.find(c => c.id === formData.currencyId)?.symbol || '$'}{calculateTotal().toFixed(2)}
               </span>
             </div>
+            {errors.vatRate && (
+              <p className="text-sm text-red-500">{errors.vatRate}</p>
+            )}
           </div>
 
           {/* Form Actions */}
@@ -587,6 +651,12 @@ export function CreatePurchaseInvoiceModal({
           </div>
         </form>
       </DialogContent>
+
+      <CreateVendorModal
+        isOpen={isCreateVendorModalOpen}
+        onClose={() => setIsCreateVendorModalOpen(false)}
+        onSuccess={handleCreateVendorSuccess}
+      />
     </Dialog>
   )
 }

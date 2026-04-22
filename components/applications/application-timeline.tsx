@@ -468,6 +468,12 @@ export function ApplicationTimeline({
   // Use latestApplication for all subcomponent payloads
   const dueDiligenceData = dueDiligenceByApp[application.id] || (latestApplication as any)?.dueDiligenceReview || null;
   const voteSummary = useAppSelector((s) => s.application.voteSummaryByApp[application.id] || null);
+  const hasRbzDocument = Boolean(
+    (latestApplication as any)?.rbzDocumentUrl ||
+      (latestApplication as any)?.documents?.some(
+        (doc: any) => doc?.documentType === 'RBZ_EXCHANGE_CONTROL' && doc?.isSubmitted,
+      ),
+  )
 
   // UI state hooks
   const [showVoteModal, setShowVoteModal] = useState(false);
@@ -1007,11 +1013,11 @@ export function ApplicationTimeline({
                                 <div className="flex items-center justify-between">
                                   <span className="text-muted-foreground">RBZ Document</span>
                                   <Badge className={
-                                    (latestApplication as any)?.rbzDocumentUrl
+                                    hasRbzDocument
                                       ? 'bg-emerald-100 text-emerald-700'
                                       : 'bg-gray-100 text-gray-700'
                                   }>
-                                    {(latestApplication as any)?.rbzDocumentUrl ? 'Uploaded' : 'Not uploaded'}
+                                    {hasRbzDocument ? 'Uploaded' : 'Not uploaded'}
                                   </Badge>
                                 </div>
                                 <p className="text-xs text-muted-foreground mt-2">
@@ -1146,7 +1152,7 @@ export function ApplicationTimeline({
                       <div className="pt-4 border-t border-gray-200">
                         <TimelineStageActions
                           stageId={stage.id}
-                          application={application}
+                          application={(latestApplication as any) || application}
                           termSheetData={termSheetData}
                           termSheetDataLoding={termSheetLoading}
                           dueDiligenceData={dueDiligenceData}

@@ -13,8 +13,9 @@ import { FileText, Loader2, CalendarIcon, Plus, Trash2 } from "lucide-react"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
-import { AccountingCurrency, CreateInvoiceRequest, Invoice, InvoiceItem, accountingApi } from "@/lib/api/accounting-api"
+import { AccountingCurrency, CreateInvoiceRequest, Invoice, InvoiceItem, VatRate, accountingApi } from "@/lib/api/accounting-api"
 import { CreateCustomerModal } from "./create-customer-modal"
+import { Switch } from "@/components/ui/switch"
 
 type InvoiceCustomerOption = {
   id: string
@@ -50,7 +51,7 @@ export function CreateInvoiceModal({
     transactionDate: new Date().toISOString().split('T')[0],
     description: "",
     invoiceDate: new Date().toISOString().split('T')[0],
-    isTaxable: true,
+    isTaxable: false,
     items: [
       {
         description: "",
@@ -62,6 +63,8 @@ export function CreateInvoiceModal({
   const [isLoading, setIsLoading] = useState(false)
   const [isCreateCustomerModalOpen, setIsCreateCustomerModalOpen] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [activeVatRate, setActiveVatRate] = useState<VatRate | null>(null)
+  const [isVatLoading, setIsVatLoading] = useState(false)
 
   // Get default currency
   useEffect(() => {
@@ -82,7 +85,7 @@ export function CreateInvoiceModal({
           transactionDate: invoice.transactionDate.split('T')[0],
           description: invoice.description,
           invoiceDate: invoice.transactionDate.split('T')[0],
-          isTaxable: invoice.isTaxable,
+          isTaxable: invoice.isTaxable ?? false,
           items: invoice.items.length > 0 ? invoice.items.map(i => ({
             description: i.description || "",
             amount: i.amount || 0,
@@ -100,13 +103,44 @@ export function CreateInvoiceModal({
           transactionDate: new Date().toISOString().split('T')[0],
           description: "",
           invoiceDate: new Date().toISOString().split('T')[0],
-          isTaxable: true,
+          isTaxable: false,
           items: [{ description: "", amount: 0, category: "", quantity: 1, unitPrice: 0 }]
         })
       }
       setErrors({})
     }
   }, [isOpen, currencies, isEditing, invoice])
+
+  useEffect(() => {
+    if (!isOpen) return
+    if (!formData.isTaxable) return
+    if (activeVatRate) return
+
+    let cancelled = false
+    setIsVatLoading(true)
+    accountingApi.getActiveVatRate()
+      .then(res => {
+        if (cancelled) return
+        if (res.success && res.data) {
+          setActiveVatRate(res.data)
+        } else {
+          toast.error("No active VAT rate configured", {
+            description: "Set one in Accounting Settings → VAT Rates."
+          })
+        }
+      })
+      .catch(err => {
+        if (cancelled) return
+        toast.error("Failed to load active VAT rate", {
+          description: err?.message || 'Unknown error'
+        })
+      })
+      .finally(() => {
+        if (!cancelled) setIsVatLoading(false)
+      })
+
+    return () => { cancelled = true }
+  }, [isOpen, formData.isTaxable, activeVatRate])
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
@@ -136,12 +170,31 @@ export function CreateInvoiceModal({
       }
     }
 
+    if (formData.isTaxable && !activeVatRate) {
+      newErrors.vatRate = "No active VAT rate available"
+    }
+
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
 
-  const calculateTotalAmount = () => {
+  const activeRateDecimal = activeVatRate ? Number(activeVatRate.rateDecimal) : 0
+
+  const calculateSubtotal = () => {
     return formData.items.reduce((total, item) => total + (item.amount || 0), 0)
+  }
+
+  const calculateVAT = () => {
+    if (!formData.isTaxable || !activeVatRate) return 0
+    return calculateSubtotal() * activeRateDecimal
+  }
+
+  const calculateTotalAmount = () => {
+    return calculateSubtotal()
+  }
+
+  const calculateTotalWithVat = () => {
+    return calculateSubtotal() + calculateVAT()
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -475,10 +528,18 @@ export function CreateInvoiceModal({
           </div>
 
           {/* Taxable Status */}
-          {/* <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between rounded-lg border p-4">
             <div>
               <Label htmlFor="isTaxable">Taxable Invoice</Label>
-              <p className="text-sm text-gray-500">Include VAT/Tax calculations</p>
+              <p className="text-sm text-gray-500">
+                {formData.isTaxable
+                  ? (isVatLoading
+                      ? "Loading active VAT rate…"
+                      : activeVatRate
+                        ? `VAT will be applied at ${(activeRateDecimal * 100).toFixed(2)}% (${activeVatRate.name})`
+                        : "No active VAT rate set — check Accounting Settings")
+                  : "VAT/Tax will not be calculated"}
+              </p>
             </div>
             <Switch
               id="isTaxable"
@@ -486,16 +547,40 @@ export function CreateInvoiceModal({
               onCheckedChange={(checked) => handleInputChange("isTaxable", checked)}
               disabled={isLoading}
             />
-          </div> */}
+          </div>
 
           {/* Total Display */}
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <div className="flex justify-between items-center text-lg font-semibold">
-              <span>Total Amount:</span>
-              <span className="text-green-600">
-                {currencies.find(c => c.id === formData.currencyId)?.symbol || '$'}{calculateTotalAmount().toFixed(2)}
+          <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+            <div className="flex justify-between items-center">
+              <span className="text-sm">Subtotal:</span>
+              <span className="font-medium">
+                {currencies.find(c => c.id === formData.currencyId)?.symbol || '$'}{calculateSubtotal().toFixed(2)}
               </span>
             </div>
+            {formData.isTaxable && (
+              <>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">
+                    VAT {activeVatRate ? `(${(activeRateDecimal * 100).toFixed(2)}%)` : ""}:
+                  </span>
+                  <span className="font-medium">
+                    {currencies.find(c => c.id === formData.currencyId)?.symbol || '$'}{calculateVAT().toFixed(2)}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500">
+                  The subtotal is submitted; VAT is calculated on the backend using the active rate.
+                </p>
+              </>
+            )}
+            <div className="flex justify-between items-center text-lg font-semibold pt-2 border-t">
+              <span>Total Amount{formData.isTaxable ? " (incl. VAT)" : ""}:</span>
+              <span className="text-green-600">
+                {currencies.find(c => c.id === formData.currencyId)?.symbol || '$'}{calculateTotalWithVat().toFixed(2)}
+              </span>
+            </div>
+            {errors.vatRate && (
+              <p className="text-sm text-red-500">{errors.vatRate}</p>
+            )}
           </div>
 
           {/* Form Actions */}

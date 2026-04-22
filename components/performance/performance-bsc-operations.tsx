@@ -55,6 +55,7 @@ import {
   ClipboardList,
   Calendar as CalendarIcon,
   AlertTriangle,
+  Info,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -142,6 +143,15 @@ function FormField({
         {label} {required && <span className="text-red-500">*</span>}
       </Label>
       {children}
+    </div>
+  )
+}
+
+function KpiHint({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex items-start gap-1.5 rounded-lg bg-blue-50 border border-blue-100 px-2.5 py-1.5 text-[11px] leading-snug text-blue-800">
+      <Info className="w-3 h-3 mt-0.5 shrink-0" />
+      <span>{children}</span>
     </div>
   )
 }
@@ -613,8 +623,21 @@ export function PerformanceBscOperations() {
               accent="emerald"
             >
               <FormField label="ROI Goal" required>
-                <GoalSelect value={roiGoalId} onChange={setRoiGoalId} placeholder="Select ROI goal" />
+                <GoalSelect
+                  value={roiGoalId}
+                  onChange={setRoiGoalId}
+                  placeholder="Select ROI goal"
+                  bscEntryKind="FINANCIAL_OUTCOME_ROI"
+                  formulaType={["ROI", "FINANCIAL_OUTCOME_ROI"]}
+                  titleMatch={/roi|return on investment/i}
+                  emptyMessage="No ROI goals found. Use 'Show all' to override."
+                />
               </FormField>
+              <KpiHint>
+                This form saves <strong>ROI only</strong>. Goals tied to other financial KPIs
+                (e.g. EBIT, Net Profit) are hidden — use their dedicated forms so the numbers
+                don't end up on the wrong KPI.
+              </KpiHint>
               <div className="grid grid-cols-3 gap-3">
                 <FormField label="Net Profit">
                   <Input
@@ -657,8 +680,19 @@ export function PerformanceBscOperations() {
               accent="blue"
             >
               <FormField label="Funding Goal" required>
-                <GoalSelect value={fundingGoalId} onChange={setFundingGoalId} placeholder="Select funding goal" />
+                <GoalSelect
+                  value={fundingGoalId}
+                  onChange={setFundingGoalId}
+                  placeholder="Select funding goal"
+                  bscEntryKind="INTERNAL_PROCESS_FUNDING_RATE"
+                  formulaType={["FUNDING_RATE", "INTERNAL_PROCESS_FUNDING_RATE"]}
+                  titleMatch={/funding|projects funded|funding rate/i}
+                  emptyMessage="No funding-rate goals found. Use 'Show all' to override."
+                />
               </FormField>
+              <KpiHint>
+                Records <strong>projects funded vs approved</strong>. Only goals tied to a funding-rate KPI appear.
+              </KpiHint>
               <div className="grid grid-cols-2 gap-3">
                 <FormField label="Projects Funded">
                   <Input className="rounded-full" value={projectsFunded} onChange={(e) => setProjectsFunded(e.target.value)} type="number" placeholder="0" />
@@ -705,8 +739,19 @@ export function PerformanceBscOperations() {
               accent="purple"
             >
               <FormField label="Survey Goal" required>
-                <GoalSelect value={surveyGoalId} onChange={setSurveyGoalId} placeholder="Select survey goal" />
+                <GoalSelect
+                  value={surveyGoalId}
+                  onChange={setSurveyGoalId}
+                  placeholder="Select survey goal"
+                  bscEntryKind="STAKEHOLDER_SURVEY"
+                  formulaType={["STAKEHOLDER_SURVEY", "SURVEY_SCORE"]}
+                  titleMatch={/survey|stakeholder|satisfaction/i}
+                  emptyMessage="No stakeholder-survey goals found. Use 'Show all' to override."
+                />
               </FormField>
+              <KpiHint>
+                Saves an <strong>average survey score</strong>. Non-survey goals are hidden.
+              </KpiHint>
               <div className="grid grid-cols-3 gap-3">
                 <FormField label="Average Score">
                   <Input className="rounded-full" value={avgScore} onChange={(e) => setAvgScore(e.target.value)} type="number" placeholder="e.g. 4.2" />
@@ -747,8 +792,19 @@ export function PerformanceBscOperations() {
               accent="indigo"
             >
               <FormField label="Partnership Goal" required>
-                <GoalSelect value={partnershipGoalId} onChange={setPartnershipGoalId} placeholder="Select partnership goal" />
+                <GoalSelect
+                  value={partnershipGoalId}
+                  onChange={setPartnershipGoalId}
+                  placeholder="Select partnership goal"
+                  bscEntryKind="PARTNERSHIPS_SIGNED"
+                  formulaType={["PARTNERSHIPS_SIGNED", "PARTNERSHIPS_COUNT"]}
+                  titleMatch={/partnership|mou|mo u/i}
+                  emptyMessage="No partnership/MoU goals found. Use 'Show all' to override."
+                />
               </FormField>
+              <KpiHint>
+                Increments the <strong>signed partnerships counter</strong>. Only MoU/partnership goals appear.
+              </KpiHint>
               <div className="grid grid-cols-2 gap-3">
                 <FormField label="Increment By">
                   <Input className="rounded-full" value={partnershipIncrement} onChange={(e) => setPartnershipIncrement(e.target.value)} type="number" placeholder="1" />
@@ -789,8 +845,19 @@ export function PerformanceBscOperations() {
               accent="emerald"
             >
               <FormField label="Charter Goal" required>
-                <GoalSelect value={charterGoalId} onChange={setCharterGoalId} placeholder="Select charter goal" />
+                <GoalSelect
+                  value={charterGoalId}
+                  onChange={setCharterGoalId}
+                  placeholder="Select charter goal"
+                  bscEntryKind="SERVICE_DELIVERY_CUSTOMER_CHARTER"
+                  formulaType={["CUSTOMER_CHARTER", "SERVICE_DELIVERY_CUSTOMER_CHARTER"]}
+                  titleMatch={/charter|service delivery/i}
+                  emptyMessage="No customer-charter goals found. Use 'Show all' to override."
+                />
               </FormField>
+              <KpiHint>
+                Tracks <strong>customer charter progress</strong> and language availability.
+              </KpiHint>
               <div className="grid grid-cols-2 gap-3">
                 <FormField label="Add % Progress">
                   <Input className="rounded-full" value={charterAddPercent} onChange={(e) => setCharterAddPercent(e.target.value)} type="number" placeholder="e.g. 20" />
@@ -843,8 +910,19 @@ export function PerformanceBscOperations() {
               accent="blue"
             >
               <FormField label="Jobs Goal" required>
-                <GoalSelect value={jobsGoalId} onChange={setJobsGoalId} placeholder="Select jobs goal" />
+                <GoalSelect
+                  value={jobsGoalId}
+                  onChange={setJobsGoalId}
+                  placeholder="Select jobs goal"
+                  bscEntryKind="JOBS_CREATED_AGGREGATE"
+                  formulaType={["JOBS_CREATED", "JOBS_CREATED_AGGREGATE"]}
+                  titleMatch={/jobs|employment|full[- ]?time/i}
+                  emptyMessage="No jobs-created goals found. Use 'Show all' to override."
+                />
               </FormField>
+              <KpiHint>
+                Writes a <strong>portfolio-wide jobs-created count</strong>. Only employment/jobs goals appear.
+              </KpiHint>
               <div className="grid grid-cols-2 gap-3">
                 <FormField label="Total Full-time Jobs">
                   <Input className="rounded-full" value={jobsCount} onChange={(e) => setJobsCount(e.target.value)} type="number" placeholder="0" />
@@ -885,8 +963,19 @@ export function PerformanceBscOperations() {
               accent="amber"
             >
               <FormField label="Budget Goal" required>
-                <GoalSelect value={budgetGoalId} onChange={setBudgetGoalId} placeholder="Select budget goal" />
+                <GoalSelect
+                  value={budgetGoalId}
+                  onChange={setBudgetGoalId}
+                  placeholder="Select budget goal"
+                  bscEntryKind="RESOURCE_BUDGET_ALIGNMENT"
+                  formulaType={["STRATEGIC_ALLOCATION_COMPLIANCE", "RESOURCE_BUDGET_ALIGNMENT", "ALLOCATION_COMPLIANCE"]}
+                  titleMatch={/budget|spend|alignment|allocation/i}
+                  emptyMessage="No budget-alignment goals found. Use 'Show all' to override."
+                />
               </FormField>
+              <KpiHint>
+                Compares <strong>actual spend vs strategic allocation</strong>. Only budget-alignment goals appear.
+              </KpiHint>
               <div className="grid grid-cols-3 gap-3">
                 <FormField label="Actual Spend">
                   <Input className="rounded-full" value={actualSpend} onChange={(e) => setActualSpend(e.target.value)} type="number" placeholder="0" />
@@ -931,8 +1020,19 @@ export function PerformanceBscOperations() {
               accent="rose"
             >
               <FormField label="Diversity Goal" required>
-                <GoalSelect value={inclusionGoalId} onChange={setInclusionGoalId} placeholder="Select diversity goal" />
+                <GoalSelect
+                  value={inclusionGoalId}
+                  onChange={setInclusionGoalId}
+                  placeholder="Select diversity goal"
+                  bscEntryKind="INCLUSION_DIVERSITY_REPORTING"
+                  formulaType={["INCLUSION_DIVERSITY", "INCLUSION_DIVERSITY_REPORTING", "INCLUSIVE_PROGRAMMING"]}
+                  titleMatch={/inclusion|diversity|women|youth|gender|inclusive/i}
+                  emptyMessage="No inclusion/diversity goals found. Use 'Show all' to override."
+                />
               </FormField>
+              <KpiHint>
+                Records <strong>group counts</strong> (women, youth, disability, etc.) on an inclusion goal.
+              </KpiHint>
               <FormField label="Group Counts (JSON object)">
                 <Textarea
                   value={groupCountsJson}
@@ -970,12 +1070,29 @@ export function PerformanceBscOperations() {
             >
               <div className="grid grid-cols-2 gap-3">
                 <FormField label="Revenue Goal">
-                  <GoalSelect value={glRevenueGoalId} onChange={setGlRevenueGoalId} placeholder="Revenue goal" />
+                  <GoalSelect
+                    value={glRevenueGoalId}
+                    onChange={setGlRevenueGoalId}
+                    placeholder="Revenue goal"
+                    bscEntryKind={["ACCOUNTING_PERIOD_REVENUE", "REVENUE_FROM_GL"]}
+                    titleMatch={/revenue|sales|turnover|gross income|total income/i}
+                    emptyMessage="No revenue goals found. Use 'Show all' to override."
+                  />
                 </FormField>
                 <FormField label="Net Profit Goal">
-                  <GoalSelect value={glNetProfitGoalId} onChange={setGlNetProfitGoalId} placeholder="Net profit goal" />
+                  <GoalSelect
+                    value={glNetProfitGoalId}
+                    onChange={setGlNetProfitGoalId}
+                    placeholder="Net profit goal"
+                    bscEntryKind={["ACCOUNTING_PERIOD_NET_PROFIT", "NET_PROFIT_FROM_GL"]}
+                    titleMatch={/net profit|profit|ebit|earnings/i}
+                    emptyMessage="No net-profit goals found. Use 'Show all' to override."
+                  />
                 </FormField>
               </div>
+              <KpiHint>
+                Pulls the GL totals for the selected period and writes them to the matching revenue / net-profit goals.
+              </KpiHint>
               <FormField label="Currency">
                 <CurrencySelect value={currencyCode} onChange={setCurrencyCode} />
               </FormField>
@@ -1013,8 +1130,19 @@ export function PerformanceBscOperations() {
               accent="amber"
             >
               <FormField label="Statutory Goal" required>
-                <GoalSelect value={statOutputGoalId} onChange={setStatOutputGoalId} placeholder="Select statutory goal" />
+                <GoalSelect
+                  value={statOutputGoalId}
+                  onChange={setStatOutputGoalId}
+                  placeholder="Select statutory goal"
+                  bscEntryKind="STATUTORY_REPORTS_OUTPUT"
+                  formulaType={["STATUTORY_REPORTS", "STATUTORY_REPORTS_OUTPUT"]}
+                  titleMatch={/statutory|filing|compliance filing|submission/i}
+                  emptyMessage="No statutory-report goals found. Use 'Show all' to override."
+                />
               </FormField>
+              <KpiHint>
+                Increments <strong>statutory filings submitted</strong>. Attach the filing as evidence.
+              </KpiHint>
               <div className="grid grid-cols-2 gap-3">
                 <FormField label="Increment By">
                   <Input className="rounded-full" value={statOutputIncrement} onChange={(e) => setStatOutputIncrement(e.target.value)} type="number" placeholder="1" />
@@ -1055,8 +1183,20 @@ export function PerformanceBscOperations() {
               accent="purple"
             >
               <FormField label="Governance Goal" required>
-                <GoalSelect value={govGoalId} onChange={setGovGoalId} placeholder="Select governance goal" />
+                <GoalSelect
+                  value={govGoalId}
+                  onChange={setGovGoalId}
+                  placeholder="Select governance goal"
+                  bscEntryKind="GOVERNANCE_CHECKLIST_SCORE"
+                  categoryMatch="governance"
+                  formulaType={["GOVERNANCE_CHECKLIST", "COUNT_VS_TARGET", "STRATEGIC_PLANNING_REVIEWS", "ALLOCATION_COMPLIANCE", "NDS2_PROGRAMME_ACHIEVEMENT"]}
+                  titleMatch={/governance|board|planning review|allocation|levels evaluated|programme achievement/i}
+                  emptyMessage="No governance-checklist goals found. Use 'Show all' to override."
+                />
               </FormField>
+              <KpiHint>
+                Writes a <strong>governance-compliance score</strong> from items met / total requirements.
+              </KpiHint>
               <div className="grid grid-cols-2 gap-3">
                 <FormField label="Items Met">
                   <Input className="rounded-full" value={govItemsMet} onChange={(e) => setGovItemsMet(e.target.value)} type="number" placeholder="0" />
@@ -1093,8 +1233,19 @@ export function PerformanceBscOperations() {
               accent="emerald"
             >
               <FormField label="Procurement Goal" required>
-                <GoalSelect value={procGoalId} onChange={setProcGoalId} placeholder="Select procurement goal" />
+                <GoalSelect
+                  value={procGoalId}
+                  onChange={setProcGoalId}
+                  placeholder="Select procurement goal"
+                  bscEntryKind="PROCUREMENT_PLAN_COMPLIANCE"
+                  formulaType={["PROCUREMENT_PLAN_COMPLIANCE"]}
+                  titleMatch={/procurement|purchase plan/i}
+                  emptyMessage="No procurement-plan goals found. Use 'Show all' to override."
+                />
               </FormField>
+              <KpiHint>
+                Compares <strong>actual procurement vs annual planned value</strong>.
+              </KpiHint>
               <div className="grid grid-cols-3 gap-3">
                 <FormField label="Actual Procured">
                   <Input className="rounded-full" value={actualProcured} onChange={(e) => setActualProcured(e.target.value)} type="number" placeholder="0" />
@@ -1135,8 +1286,19 @@ export function PerformanceBscOperations() {
               accent="indigo"
             >
               <FormField label="EoDB Goal" required>
-                <GoalSelect value={easeGoalId} onChange={setEaseGoalId} placeholder="Select EoDB goal" />
+                <GoalSelect
+                  value={easeGoalId}
+                  onChange={setEaseGoalId}
+                  placeholder="Select EoDB goal"
+                  bscEntryKind="EASE_OF_DOING_BUSINESS_PROGRESS"
+                  formulaType={["EASE_OF_DOING_BUSINESS", "E_GOVERNMENT_FLAGSHIPS"]}
+                  titleMatch={/ease of doing|innovation|eodb|doing business|flagship|e[- ]?government/i}
+                  emptyMessage="No ease-of-doing-business goals found. Use 'Show all' to override."
+                />
               </FormField>
+              <KpiHint>
+                Tracks <strong>innovations completed vs annual target</strong>.
+              </KpiHint>
               <div className="grid grid-cols-2 gap-3">
                 <FormField label="Innovations Completed">
                   <Input className="rounded-full" value={innovationsCompleted} onChange={(e) => setInnovationsCompleted(e.target.value)} type="number" placeholder="0" />
@@ -1173,8 +1335,19 @@ export function PerformanceBscOperations() {
               accent="blue"
             >
               <FormField label="Skills Goal" required>
-                <GoalSelect value={skillsGoalId} onChange={setSkillsGoalId} placeholder="Select skills goal" />
+                <GoalSelect
+                  value={skillsGoalId}
+                  onChange={setSkillsGoalId}
+                  placeholder="Select skills goal"
+                  bscEntryKind="SKILLS_DEVELOPMENT_PROGRESS"
+                  formulaType={["SKILLS_DEVELOPMENT", "TRAINING_CERTIFICATES"]}
+                  titleMatch={/skill|training|certificate|learning/i}
+                  emptyMessage="No skills-development goals found. Use 'Show all' to override."
+                />
               </FormField>
+              <KpiHint>
+                Writes <strong>certificates completed vs plan target</strong>.
+              </KpiHint>
               <div className="grid grid-cols-2 gap-3">
                 <FormField label="Completed">
                   <Input className="rounded-full" value={skillsCompleted} onChange={(e) => setSkillsCompleted(e.target.value)} type="number" placeholder="0" />
@@ -1211,8 +1384,19 @@ export function PerformanceBscOperations() {
               accent="rose"
             >
               <FormField label="CSR Goal" required>
-                <GoalSelect value={csrGoalId} onChange={setCsrGoalId} placeholder="Select CSR goal" />
+                <GoalSelect
+                  value={csrGoalId}
+                  onChange={setCsrGoalId}
+                  placeholder="Select CSR goal"
+                  bscEntryKind="CSR_PARTICIPATION_RATE"
+                  formulaType={["CSR_PARTICIPATION_RATE"]}
+                  titleMatch={/csr|corporate social|community|clean environment|wellness|inclusive programming|integrity/i}
+                  emptyMessage="No CSR-participation goals found. Use 'Show all' to override."
+                />
               </FormField>
+              <KpiHint>
+                Records <strong>participants completed vs eligible</strong> for a CSR programme.
+              </KpiHint>
               <div className="grid grid-cols-2 gap-3">
                 <FormField label="Participants Completed">
                   <Input className="rounded-full" value={csrCompleted} onChange={(e) => setCsrCompleted(e.target.value)} type="number" placeholder="0" />
@@ -1246,16 +1430,49 @@ export function PerformanceBscOperations() {
         {/* Workflow tab */}
         {activeTab === "workflow" && (
           <div className="space-y-5">
+            <div className="rounded-xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-purple-50 p-4 text-sm text-indigo-900">
+              <p className="font-semibold mb-2">Workflows on this tab</p>
+              <ul className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs leading-relaxed">
+                <li className="rounded-lg bg-white/70 border border-indigo-100 px-3 py-2">
+                  <strong>Budget Variance</strong> <span className="text-indigo-600">· 1 step</span>
+                  <p className="text-indigo-800/80">File a narrative against a budget goal.</p>
+                </li>
+                <li className="rounded-lg bg-white/70 border border-indigo-100 px-3 py-2">
+                  <strong>Statutory Compliance</strong> <span className="text-indigo-600">· 2 steps</span>
+                  <p className="text-indigo-800/80">
+                    File a submission, then a manager signs off.
+                  </p>
+                </li>
+                <li className="rounded-lg bg-white/70 border border-indigo-100 px-3 py-2">
+                  <strong>Training Certificate</strong> <span className="text-indigo-600">· 1 step</span>
+                  <p className="text-indigo-800/80">Increment skills progress when HR logs a cert.</p>
+                </li>
+              </ul>
+              <p className="text-xs text-indigo-800/80 mt-3">
+                Each goal picker only shows goals whose KPI matches the form — so numbers never land on the wrong KPI.
+              </p>
+            </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <SectionCard
                 title="Budget Variance Report"
-                description="Submit narrative on why actual spend differs from plan."
+                description="One-step: file a narrative explaining why actual spend differs from the plan."
                 icon={AlertTriangle}
                 accent="amber"
               >
                 <FormField label="Variance Goal" required>
-                  <GoalSelect value={varianceGoalId} onChange={setVarianceGoalId} placeholder="Select variance goal" />
+                  <GoalSelect
+                    value={varianceGoalId}
+                    onChange={setVarianceGoalId}
+                    placeholder="Select variance goal"
+                    bscEntryKind={["RESOURCE_BUDGET_ALIGNMENT", "BUDGET_VARIANCE_REPORT"]}
+                    formulaType={["STRATEGIC_ALLOCATION_COMPLIANCE", "ALLOCATION_COMPLIANCE", "BUDGET_VARIANCE"]}
+                    titleMatch={/budget|variance|spend|alignment|allocation/i}
+                    emptyMessage="No budget-variance goals found. Use 'Show all' to override."
+                  />
                 </FormField>
+                <KpiHint>
+                  The narrative attaches to a <strong>budget/spend</strong> goal. Financial KPIs like ROI or EBIT won't appear here.
+                </KpiHint>
                 <FormField label="Narrative" required>
                   <Textarea
                     value={varianceNarrative}
@@ -1297,14 +1514,25 @@ export function PerformanceBscOperations() {
               </SectionCard>
 
               <SectionCard
-                title="Statutory Submission"
-                description="Evidence bundle for statutory compliance filings."
+                title="Statutory Submission — Step 1"
+                description="File filing evidence (URL or file) against a statutory goal. Manager approves in Step 2 below."
                 icon={ShieldCheck}
                 accent="purple"
               >
                 <FormField label="Statutory Goal" required>
-                  <GoalSelect value={statGoalId} onChange={setStatGoalId} placeholder="Select statutory goal" />
+                  <GoalSelect
+                    value={statGoalId}
+                    onChange={setStatGoalId}
+                    placeholder="Select statutory goal"
+                    bscEntryKind={["STATUTORY_REPORTS_OUTPUT", "STATUTORY_SUBMISSION"]}
+                    formulaType={["STATUTORY_REPORTS", "STATUTORY_REPORTS_OUTPUT"]}
+                    titleMatch={/statutory|filing|compliance filing|submission/i}
+                    emptyMessage="No statutory-filing goals found. Use 'Show all' to override."
+                  />
                 </FormField>
+                <KpiHint>
+                  Creates a submission record. After it's created, a manager approves it in the <strong>Sign-off</strong> card below.
+                </KpiHint>
                 <FormField label="Evidence URL (optional)">
                   <Input className="rounded-full" value={statEvidenceUrl} onChange={(e) => setStatEvidenceUrl(e.target.value)} placeholder="https://..." />
                 </FormField>
@@ -1345,19 +1573,49 @@ export function PerformanceBscOperations() {
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <SectionCard
-                title="Manager Sign-off"
-                description="Approve a statutory submission by ID."
+                title="Statutory Submission — Step 2: Sign-off"
+                description="Manager approves the submission filed in Step 1."
                 icon={ClipboardCheck}
                 accent="emerald"
               >
-                <FormField label="Submission ID" required>
-                  <Input
-                    className="rounded-full"
-                    value={signoffSubmissionId}
-                    onChange={(e) => setSignoffSubmissionId(e.target.value)}
-                    placeholder="Enter submission ID to sign off"
-                  />
-                </FormField>
+                {statutorySubmissions.length > 0 ? (
+                  <FormField label="Pending Submission" required>
+                    <Select
+                      value={signoffSubmissionId}
+                      onValueChange={setSignoffSubmissionId}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Pick a submission to approve" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {statutorySubmissions.map((s: any) => (
+                          <SelectItem key={s.id} value={s.id}>
+                            <div className="flex flex-col">
+                              <span className="truncate">
+                                {s.periodLabel || s.id}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                {s.status || "PENDING"}{s.createdAt ? ` · ${format(new Date(s.createdAt), "MMM d, yyyy")}` : ""}
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FormField>
+                ) : (
+                  <FormField label="Submission ID" required>
+                    <Input
+                      className="rounded-full"
+                      value={signoffSubmissionId}
+                      onChange={(e) => setSignoffSubmissionId(e.target.value)}
+                      placeholder="Load statutory history to populate this list, or paste an ID"
+                    />
+                  </FormField>
+                )}
+                <KpiHint>
+                  Load the statutory history above to pick from a list — otherwise paste the submission ID directly.
+                </KpiHint>
                 <FormField label="Sign-off Note (optional)">
                   <Textarea
                     value={signoffNote}
@@ -1387,13 +1645,24 @@ export function PerformanceBscOperations() {
 
               <SectionCard
                 title="Training Certificate Recorded"
-                description="HR hook — increments skills counter."
+                description="HR hook — one-step: increment the skills/training counter when a certificate is logged."
                 icon={GraduationCap}
                 accent="blue"
               >
                 <FormField label="Training Goal" required>
-                  <GoalSelect value={trainingGoalId} onChange={setTrainingGoalId} placeholder="Select training goal" />
+                  <GoalSelect
+                    value={trainingGoalId}
+                    onChange={setTrainingGoalId}
+                    placeholder="Select training goal"
+                    bscEntryKind={["SKILLS_DEVELOPMENT_PROGRESS", "TRAINING_CERTIFICATE"]}
+                    formulaType={["SKILLS_DEVELOPMENT", "TRAINING_CERTIFICATES"]}
+                    titleMatch={/skill|training|certificate|learning/i}
+                    emptyMessage="No skills/training goals found. Use 'Show all' to override."
+                  />
                 </FormField>
+                <KpiHint>
+                  Bumps <strong>completed certificates</strong> on a skills-development goal by the increment you set.
+                </KpiHint>
                 <FormField label="Increment (default 1)">
                   <Input className="rounded-full" value={trainingIncrement} onChange={(e) => setTrainingIncrement(e.target.value)} type="number" placeholder="1" />
                 </FormField>
@@ -1417,7 +1686,10 @@ export function PerformanceBscOperations() {
               </SectionCard>
             </div>
 
-            <div className="flex justify-end">
+            <div className="flex items-center justify-between gap-3 flex-wrap rounded-xl border border-border bg-gray-50 px-3 py-2">
+              <p className="text-xs text-muted-foreground">
+                Pick a goal above and click here to load its history — populates the sign-off list and the counters below each card.
+              </p>
               <Button
                 variant="outline"
                 size="sm"
@@ -1426,7 +1698,7 @@ export function PerformanceBscOperations() {
                 disabled={Boolean(actionLoadingKey)}
               >
                 {isActionLoading("load-workflow-history") ? <Loader2 className="w-4 h-4 animate-spin" /> : <Activity className="w-4 h-4" />}
-                {isActionLoading("load-workflow-history") ? "Loading..." : "Load All Workflow History"}
+                {isActionLoading("load-workflow-history") ? "Loading..." : "Load history for selected goals"}
               </Button>
             </div>
           </div>

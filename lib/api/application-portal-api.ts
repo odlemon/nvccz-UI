@@ -217,6 +217,58 @@ export interface UpdateCompanyResponse {
   }
 }
 
+// Letterhead Interfaces
+export interface Letterhead {
+  id: string
+  portfolioCompanyId: string
+  legalName: string
+  registrationNumber: string | null
+  taxNumber: string | null
+  email: string | null
+  phone: string | null
+  website: string | null
+  logoUrl: string | null
+  line1: string
+  line2: string | null
+  city: string
+  state: string | null
+  postalCode: string | null
+  country: string
+  addressLabel: string | null
+  twitter: string | null
+  facebook: string | null
+  linkedin: string | null
+  instagram: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface LetterheadResponse {
+  success: boolean
+  message?: string
+  data: Letterhead
+}
+
+export interface UpdateLetterheadRequest {
+  legalName?: string
+  registrationNumber?: string | null
+  taxNumber?: string | null
+  email?: string | null
+  phone?: string | null
+  website?: string | null
+  line1?: string
+  line2?: string | null
+  city?: string
+  state?: string | null
+  postalCode?: string | null
+  country?: string
+  addressLabel?: string | null
+  twitter?: string | null
+  facebook?: string | null
+  linkedin?: string | null
+  instagram?: string | null
+}
+
 // Dashboard Interfaces
 export interface DashboardApplication {
   id: string
@@ -623,6 +675,28 @@ export const applicationPortalApiService = {
 
   async updateCompany(data: UpdateCompanyRequest): Promise<UpdateCompanyResponse> {
     return apiClient.put<UpdateCompanyResponse>('/applicant/company', data)
+  },
+
+  // Letterhead endpoints (scoped to a portfolio-company id)
+  async getLetterhead(portfolioCompanyId: string): Promise<LetterheadResponse> {
+    return apiClient.get<LetterheadResponse>(`/portfolio-companies/${portfolioCompanyId}/letterhead`)
+  },
+
+  async updateLetterhead(portfolioCompanyId: string, data: UpdateLetterheadRequest): Promise<LetterheadResponse> {
+    return apiClient.put<LetterheadResponse>(`/portfolio-companies/${portfolioCompanyId}/letterhead`, data)
+  },
+
+  async deleteLetterhead(portfolioCompanyId: string): Promise<ApiResponse> {
+    return apiClient.delete<ApiResponse>(`/portfolio-companies/${portfolioCompanyId}/letterhead`)
+  },
+
+  async uploadLetterheadLogo(portfolioCompanyId: string, file: File): Promise<LetterheadResponse> {
+    const formData = new FormData()
+    formData.append('logo', file)
+    return apiClient.post<LetterheadResponse>(
+      `/portfolio-companies/${portfolioCompanyId}/letterhead/logo`,
+      formData
+    )
   },
 
   // Dashboard endpoint

@@ -804,6 +804,7 @@ export function PayablesManagement() {
         isOpen={isCreateModalOpen}
         onClose={closeCreateModal}
         onSuccess={handleCreateModalSuccess}
+        onVendorCreated={async () => { await dispatch(fetchVendors()) }}
         currencies={currencies}
         vendors={vendors}
       />

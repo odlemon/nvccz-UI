@@ -81,6 +81,13 @@ export function TimelineStageActions({
   onSetKycVerified,
   onRefresh
 }: TimelineStageActionsProps) {
+  const appAny = application as any
+  const hasRbzDocument = Boolean(
+    appAny?.rbzDocumentUrl ||
+      appAny?.documents?.some((doc: any) => doc?.documentType === "RBZ_EXCHANGE_CONTROL" && doc?.isSubmitted),
+  )
+  const isKycVerified = Boolean(appAny?.kycVerified)
+
   // Permission checks for application-portal specific actions
   const { hasSpecificAction } = useRolePermissions()
 
@@ -237,7 +244,7 @@ export function TimelineStageActions({
     case "COMPLIANCE_GROUP":
       return (
         <div className="flex gap-2 flex-wrap">
-          {onUploadRbz && (
+          {!isKycVerified && onUploadRbz && (
             <Button
               onClick={onUploadRbz}
               variant="outline"
@@ -247,7 +254,7 @@ export function TimelineStageActions({
               Upload RBZ Document
             </Button>
           )}
-          {onSetKycVerified && (
+          {!isKycVerified && hasRbzDocument && onSetKycVerified && (
             <Button
               onClick={onSetKycVerified}
               className="bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700 text-white rounded-full"

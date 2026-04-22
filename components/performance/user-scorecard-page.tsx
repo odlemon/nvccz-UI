@@ -4,11 +4,10 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { useAppDispatch, useAppSelector } from "@/lib/store"
 import { fetchUserScorecard } from "@/lib/store/slices/scorecardSlice"
 import { companyProfileApi, type CompanyAddress } from "@/lib/api/company-profile-api"
-import { employeesApi } from "@/lib/api/payroll-api"
+import { scorecardApiService } from "@/lib/api/scorecard-service"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Progress } from "@/components/ui/progress"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { CiUser, CiViewBoard, CiCircleCheck, CiTrophy, CiFileOn } from "react-icons/ci"
 import { TbTarget } from "react-icons/tb"
@@ -59,7 +58,7 @@ export function UserScorecardsPage() {
   const [isClient, setIsClient] = useState(false)
   const [PDFComponents, setPDFComponents] = useState<any>(null)
   const [periodLabel, setPeriodLabel] = useState(String(new Date().getFullYear()))
-  const [employees, setEmployees] = useState<Array<{ id: string; userId: string; name: string; isActive: boolean }>>([])
+  const [employees, setEmployees] = useState<Array<{ id: string; name: string }>>([])
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("self")
   const [activeAddress, setActiveAddress] = useState<CompanyAddress | null>(null)
 
@@ -86,17 +85,16 @@ export function UserScorecardsPage() {
 
     const loadEmployees = async () => {
       try {
-        const response = await employeesApi.getAll()
+        const response = await scorecardApiService.getEmployeesForGeneration(periodLabel)
         if (response.success && response.data) {
-          const mapped = response.data
-            .filter((emp) => emp.isActive)
-            .map((emp) => ({
-              id: emp.id,
-              userId: emp.userId,
-              name: `${emp.user.firstName} ${emp.user.lastName}`.trim(),
-              isActive: emp.isActive,
-            }))
+          const mapped = response.data.employees.map((emp) => ({
+            id: emp.id,
+            name: `${emp.firstName || ""} ${emp.lastName || ""}`.trim() || emp.email,
+          }))
           setEmployees(mapped)
+          setSelectedEmployeeId((current) =>
+            current !== "self" && !mapped.some((employee) => employee.id === current) ? "self" : current,
+          )
         }
       } catch {
         toast.error("Failed to load employees for scorecard selection")
@@ -104,7 +102,7 @@ export function UserScorecardsPage() {
     }
 
     loadEmployees()
-  }, [canSelectEmployee])
+  }, [canSelectEmployee, periodLabel])
 
   useEffect(() => {
     if (error) {
@@ -224,7 +222,7 @@ export function UserScorecardsPage() {
               <SelectContent>
                 <SelectItem value="self">My Scorecard</SelectItem>
                 {employees.map((employee) => (
-                  <SelectItem key={employee.userId || employee.id} value={employee.userId || employee.id}>
+                  <SelectItem key={employee.id} value={employee.id}>
                     {employee.name}
                   </SelectItem>
                 ))}

@@ -7,6 +7,7 @@ import {
   fetchAvailableDepartments,
 } from "@/lib/store/slices/performanceSlice"
 import { applicationsApi, type InvestmentUser } from "@/lib/api/applications-api"
+import { scorecardApiService } from "@/lib/api/scorecard-service"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -104,6 +105,14 @@ interface ContractFormState {
   lastName: string
 }
 
+interface ContractEmployeeOption {
+  id: string
+  firstName: string
+  lastName: string
+  email: string
+  userDepartment: string | null
+}
+
 function defaultForm(year: number): ContractFormState {
   return {
     periodYear: String(year),
@@ -127,6 +136,8 @@ export function PerformanceContractsManagement() {
   const [selectedYear, setSelectedYear] = useState(currentYear)
   const [users, setUsers] = useState<InvestmentUser[]>([])
   const [usersLoading, setUsersLoading] = useState(false)
+  const [contractEmployees, setContractEmployees] = useState<ContractEmployeeOption[]>([])
+  const [contractEmployeesLoading, setContractEmployeesLoading] = useState(false)
 
   const [dialogType, setDialogType] = useState<ContractType | null>(null)
   const [form, setForm] = useState<ContractFormState>(defaultForm(currentYear))
@@ -137,7 +148,18 @@ export function PerformanceContractsManagement() {
   useEffect(() => {
     dispatch(fetchAvailableDepartments())
     void loadUsers()
+    void loadContractEmployees(String(currentYear))
   }, [dispatch])
+
+  useEffect(() => {
+    void loadContractEmployees(String(selectedYear))
+  }, [selectedYear])
+
+  useEffect(() => {
+    if (dialogType !== "EMPLOYEE") return
+    const period = form.periodYear || String(selectedYear)
+    void loadContractEmployees(period)
+  }, [dialogType, form.periodYear, selectedYear])
 
   const loadUsers = async () => {
     setUsersLoading(true)
@@ -148,6 +170,40 @@ export function PerformanceContractsManagement() {
       toast.error("Failed to load users", { description: e?.message })
     } finally {
       setUsersLoading(false)
+    }
+  }
+
+  const loadContractEmployees = async (periodLabel: string) => {
+    setContractEmployeesLoading(true)
+    try {
+      const res = await scorecardApiService.getEmployeesForGeneration(periodLabel)
+      const mapped = (res.data?.employees || []).map((emp) => ({
+        id: emp.id,
+        firstName: emp.firstName || "",
+        lastName: emp.lastName || "",
+        email: emp.email || "",
+        userDepartment: emp.userDepartment,
+      }))
+      setContractEmployees(mapped)
+
+      setForm((prev) =>
+        prev.subjectUserId && !mapped.some((emp) => emp.id === prev.subjectUserId)
+          ? {
+              ...prev,
+              subjectUserId: "",
+              firstName: "",
+              lastName: "",
+              departmentName: "",
+            }
+          : prev,
+      )
+    } catch (e: any) {
+      setContractEmployees([])
+      toast.error("Failed to load employees with contracts", {
+        description: e?.message,
+      })
+    } finally {
+      setContractEmployeesLoading(false)
     }
   }
 
@@ -268,12 +324,13 @@ export function PerformanceContractsManagement() {
             onClick={() => {
               dispatch(fetchAvailableDepartments())
               void loadUsers()
+              void loadContractEmployees(String(selectedYear))
             }}
-            disabled={usersLoading || availableDepartmentsLoading}
+            disabled={usersLoading || availableDepartmentsLoading || contractEmployeesLoading}
           >
             <RefreshCw
               className={`w-3.5 h-3.5 ${
-                usersLoading || availableDepartmentsLoading ? "animate-spin" : ""
+                usersLoading || availableDepartmentsLoading || contractEmployeesLoading ? "animate-spin" : ""
               }`}
             />
             Refresh
@@ -304,7 +361,7 @@ export function PerformanceContractsManagement() {
                   {availableDepartments.length} departments
                 </Badge>
                 <Badge className="bg-white/70 text-card-foreground">
-                  {users.length} users available
+                  {contractEmployees.length} employees with contracts
                 </Badge>
               </div>
             </div>
@@ -550,7 +607,8 @@ export function PerformanceContractsManagement() {
                 <Select
                   value={form.subjectUserId}
                   onValueChange={(v) => {
-                    const user = users.find((u) => u.id === v)
+                    const pool = dialogType === "EMPLOYEE" ? contractEmployees : users
+                    const user = pool.find((u: any) => u.id === v)
                     setForm({
                       ...form,
                       subjectUserId: v,
@@ -559,12 +617,12 @@ export function PerformanceContractsManagement() {
                       departmentName: user?.userDepartment || "",
                     })
                   }}
-                  disabled={usersLoading}
+                  disabled={dialogType === "EMPLOYEE" ? contractEmployeesLoading : usersLoading}
                 >
                   <SelectTrigger>
                     <SelectValue
                       placeholder={
-                        usersLoading
+                        (dialogType === "EMPLOYEE" ? contractEmployeesLoading : usersLoading)
                           ? "Loading..."
                           : dialogType === "CEO"
                             ? "Leave empty to auto-resolve"
@@ -573,7 +631,7 @@ export function PerformanceContractsManagement() {
                     />
                   </SelectTrigger>
                   <SelectContent>
-                    {users.map((u) => (
+                    {(dialogType === "EMPLOYEE" ? contractEmployees : users).map((u: any) => (
                       <SelectItem key={u.id} value={u.id}>
                         <div className="flex flex-col">
                           <span>

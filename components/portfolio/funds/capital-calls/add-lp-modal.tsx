@@ -264,7 +264,7 @@ export function AddLpModal({
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1.5">
+              {/* <div className="space-y-1.5">
                 <Label className="text-xs">Investor ID (optional)</Label>
                 <div className="relative">
                   <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
@@ -275,7 +275,7 @@ export function AddLpModal({
                     placeholder="EXT-LP-2026-0042"
                   />
                 </div>
-              </div>
+              </div> */}
               <div className="space-y-1.5">
                 <Label className="text-xs">Status</Label>
                 <Select

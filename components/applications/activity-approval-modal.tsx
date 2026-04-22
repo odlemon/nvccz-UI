@@ -89,7 +89,7 @@ export function ActivityApprovalModal({ isOpen, onClose, activityId, onSuccess }
   if (loading) {
     return (
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-2xl">
+        <DialogContent className="w-[96vw] max-w-5xl max-h-[92vh] overflow-y-auto overflow-x-hidden">
           <div className="flex items-center justify-center py-8">
             <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
           </div>
@@ -106,7 +106,7 @@ export function ActivityApprovalModal({ isOpen, onClose, activityId, onSuccess }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[96vw] max-w-5xl max-h-[92vh] overflow-y-auto overflow-x-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl font-normal">
             <CheckCircle className="w-5 h-5 text-blue-500" />
@@ -131,7 +131,7 @@ export function ActivityApprovalModal({ isOpen, onClose, activityId, onSuccess }
                 <p className="text-sm mt-1 whitespace-pre-wrap bg-gray-50 p-3 rounded-lg">{displayDescription}</p>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label className="text-sm font-normal text-gray-600">Submitted By</Label>
                   <p className="text-sm font-medium mt-1">
@@ -189,12 +189,12 @@ export function ActivityApprovalModal({ isOpen, onClose, activityId, onSuccess }
                   {documents.map((doc: any, index: number) => (
                     <div
                       key={index}
-                      className="flex items-center justify-between p-3 bg-purple-50 rounded-lg border border-purple-200"
+                      className="flex flex-wrap items-center justify-between gap-3 p-3 bg-purple-50 rounded-lg border border-purple-200"
                     >
                       <div className="flex items-center gap-3 flex-1 min-w-0">
                         <FileText className="w-4 h-4 text-purple-600 flex-shrink-0" />
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">{doc.fileName}</p>
+                          <p className="text-sm font-medium text-gray-900 break-all">{doc.fileName}</p>
                           <p className="text-xs text-gray-600">{(doc.fileSize / 1024).toFixed(2)} KB</p>
                         </div>
                       </div>

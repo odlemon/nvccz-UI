@@ -393,6 +393,13 @@ export const MODULE_CONFIG: ModuleConfig[] = [
         icon: CiText,
         description: "Detailed view of a specific report",
       },
+      {
+        id: "application-portal-settings",
+        name: "Settings",
+        path: "/application-portal/settings",
+        icon: CiSettings,
+        description: "Company letterhead and portal settings",
+      },
     ],
   },
 

@@ -101,7 +101,12 @@ export interface InvestmentImplementationCreateRequest {
   implementationPlan: string
   notes?: string
   disbursementMode: 'MILESTONE_BASED' | 'ONE_TIME'
-  totalCommittedAmount: number
+  totalCommittedAmount?: number
+  disbursementPeriods?: Array<{
+    label: string
+    dueDate: string
+    amount?: number
+  }>
 }
 
 export interface MilestoneCreateRequest {

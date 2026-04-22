@@ -340,6 +340,24 @@ interface ScorecardQueryParams {
   sectionBlendMode?: "redistribute" | "penalise"
 }
 
+interface EmployeesForGenerationResponse {
+  period: {
+    periodStart: string
+    periodEnd: string
+    periodLabel: string
+  }
+  employees: Array<{
+    id: string
+    firstName: string
+    lastName: string
+    email: string
+    userDepartment: string | null
+    departmentRole: string | null
+    roleCode: string | null
+    roleName: string | null
+  }>
+}
+
 const buildQuery = (params?: ScorecardQueryParams) => {
   if (!params) return ""
 
@@ -410,5 +428,11 @@ export const scorecardApiService = {
 
   async getAllDepartmentScorecards(): Promise<ApiResponse<DepartmentScorecard[]>> {
     return apiClient.get(`/performance/scorecards/departments`)
+  },
+
+  async getEmployeesForGeneration(periodLabel: string): Promise<ApiResponse<EmployeesForGenerationResponse>> {
+    const queryParams = new URLSearchParams()
+    queryParams.append("periodLabel", periodLabel)
+    return apiClient.get(`/performance/scorecards/employees-for-generation?${queryParams.toString()}`)
   },
 }
