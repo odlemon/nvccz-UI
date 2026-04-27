@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Image from 'next/image'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,6 +13,7 @@ import { Building2, Mail, Phone, MapPin, User, FileText, DollarSign, Calendar, P
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { DatePicker } from '@/components/ui/date-picker'
+import { procurementApiV2 } from '@/lib/api/procurement-api-v2'
 
 interface QuotationItem {
   itemName: string
@@ -35,6 +37,15 @@ export default function VendorQuotationSubmissionPage() {
   const [submitted, setSubmitted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submittedData, setSubmittedData] = useState<any>(null)
+  const [logoError, setLogoError] = useState(false)
+
+  const getOrgLogo = () => {
+    return process.env.NEXT_PUBLIC_ORGANIZATION_LOGO || '/logo.png'
+  }
+
+  const getOrgName = () => {
+    return process.env.NEXT_PUBLIC_ORGANIZATION_NAME || 'Arcus'
+  }
 
   // Form state
   const [vendorName, setVendorName] = useState('')
@@ -159,21 +170,11 @@ export default function VendorQuotationSubmissionPage() {
         }))
       }
 
-      const response = await fetch('http://31.220.82.129:3010/api/vendor-quotations/submit', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'accept': '*/*'
-        },
-        body: JSON.stringify(payload)
-      })
+      const result = await procurementApiV2.submitQuotation(payload)
 
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.message || 'Failed to submit quotation')
+      if (!result.success) {
+        throw new Error(result.message || 'Failed to submit quotation')
       }
-
-      const result = await response.json()
       setSubmittedData({
         ...payload,
         quotationNumber: result.data?.quotationNumber || 'PENDING',
@@ -195,13 +196,30 @@ export default function VendorQuotationSubmissionPage() {
           <Card className="border-2 border-green-200 shadow-2xl">
             <CardHeader className="text-center space-y-4 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-t-lg pb-8">
               <div className="flex justify-center">
-                <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center">
-                  <CheckCircle2 className="w-12 h-12 text-green-600" />
+                <div className="w-20 h-20 bg-white rounded-full shadow-lg overflow-hidden relative">
+                  {!logoError ? (
+                    <Image
+                      src={getOrgLogo()}
+                      alt={getOrgName()}
+                      width={80}
+                      height={80}
+                      className="rounded-full"
+                      onError={() => setLogoError(true)}
+                      priority
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-100 to-blue-200">
+                      <span className="text-sm font-bold text-blue-700">{getOrgName().substring(0, 2).toUpperCase()}</span>
+                    </div>
+                  )}
+                  <div className="absolute bottom-0 right-0 bg-green-500 rounded-full p-1.5">
+                    <CheckCircle2 className="w-5 h-5 text-white" />
+                  </div>
                 </div>
               </div>
               <CardTitle className="text-3xl font-bold">Quotation Submitted Successfully!</CardTitle>
               <CardDescription className="text-green-50 text-lg">
-                Thank you for submitting your quotation to Arcus
+                Thank you for submitting your quotation to {getOrgName()}
               </CardDescription>
             </CardHeader>
             <CardContent className="p-8 space-y-6">
@@ -374,10 +392,26 @@ export default function VendorQuotationSubmissionPage() {
       <div className="max-w-5xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-600 to-purple-600 rounded-full mb-4">
-            <FileText className="w-8 h-8 text-white" />
+          <div className="flex justify-center mb-6">
+            <div className="w-20 h-20 bg-white rounded-full shadow-lg border-4 border-blue-100 flex items-center justify-center overflow-hidden">
+              {!logoError ? (
+                <Image
+                  src={getOrgLogo()}
+                  alt={getOrgName()}
+                  width={80}
+                  height={80}
+                  className="rounded-full"
+                  onError={() => setLogoError(true)}
+                  priority
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-100 to-blue-200">
+                  <span className="text-sm font-bold text-blue-700">{getOrgName().substring(0, 2).toUpperCase()}</span>
+                </div>
+              )}
+            </div>
           </div>
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Submit Quotation to Arcus</h1>
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">Submit Quotation to {getOrgName()}</h1>
           <p className="text-lg text-gray-600">Request for Quotation: <Badge variant="outline" className="text-base font-mono">{rfqNumber}</Badge></p>
         </div>
 

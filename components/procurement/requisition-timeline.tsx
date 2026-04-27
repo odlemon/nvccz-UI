@@ -38,7 +38,8 @@ import {
   RefreshCw,
   Send,
   X,
-  ShoppingCart
+  ShoppingCart,
+  ShieldCheck
 } from "lucide-react"
 import { CiUser, CiDollar, CiFileOn, CiCalendar } from "react-icons/ci"
 import { PurchaseRequisition, procurementApi } from "@/lib/api/procurement-api"
@@ -70,11 +71,27 @@ const stages = [
     completedColor: "bg-green-500"
   },
   {
+    id: "PENDING_VC_EXECUTIVE_REVIEW",
+    title: "VC Executive Review",
+    description: "Awaiting CFO/VC approval for investee drawdown",
+    icon: ShieldCheck,
+    color: "bg-violet-500",
+    completedColor: "bg-green-500"
+  },
+  {
     id: "APPROVED",
     title: "Approved",
     description: "Requisition has been approved",
     icon: CheckCircle,
     color: "bg-green-500",
+    completedColor: "bg-green-500"
+  },
+  {
+    id: "RFQ_SENT",
+    title: "RFQ Sent to Vendors",
+    description: "Request for quotation has been sent to vendors",
+    icon: Send,
+    color: "bg-purple-500",
     completedColor: "bg-green-500"
   },
   {
@@ -150,6 +167,13 @@ export function RequisitionTimeline({
     if (index < currentStageIndex) return "completed"
     if (index === currentStageIndex) return "current"
     return "upcoming"
+  }
+
+  const getStageActionContent = (stageId: string, status: string) => {
+    if (status === "upcoming") {
+      return <p className="text-sm text-gray-500 italic">This stage is not yet available</p>
+    }
+    return getStageActions(stageId)
   }
 
   const handleSubmitForApproval = async () => {
@@ -316,6 +340,13 @@ export function RequisitionTimeline({
             </Button>
           </div>
         ) : null
+      case "RFQ_SENT":
+        return (
+          <div className="text-center py-4">
+            <p className="text-sm text-green-600 font-medium">✓ RFQ has been sent to vendors</p>
+            <p className="text-xs text-gray-500 mt-1">Waiting for vendor quotations</p>
+          </div>
+        )
       case "CONVERTED_TO_PO":
         return (
           <div className="space-y-4">
@@ -535,7 +566,7 @@ export function RequisitionTimeline({
 
         {/* Timeline Steps Skeleton */}
         <div className="relative">
-          {[1, 2, 3, 4, 5].map((index) => (
+          {[1, 2, 3, 4, 5, 6].map((index) => (
             <motion.div
               key={index}
               className="relative flex items-start"
@@ -544,7 +575,7 @@ export function RequisitionTimeline({
               transition={{ delay: index * 0.1, duration: 0.3 }}
             >
               {/* Timeline Line */}
-              {index < 5 && (
+              {index < 6 && (
                 <div className="absolute left-6 top-12 w-0.5 h-full bg-gray-200" />
               )}
 

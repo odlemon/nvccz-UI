@@ -12,6 +12,7 @@ import { Building2, Mail, Phone, MapPin, User, FileText, DollarSign, Calendar, P
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { DatePicker } from '@/components/ui/date-picker'
+import { procurementApiV2 } from '@/lib/api/procurement-api-v2'
 
 interface QuotationItem {
   itemName: string
@@ -143,21 +144,11 @@ export default function VendorQuotationSubmissionPage() {
         }))
       }
 
-      const response = await fetch('http://31.220.82.129:3010/api/vendor-quotations/submit', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'accept': '*/*'
-        },
-        body: JSON.stringify(payload)
-      })
+      const result = await procurementApiV2.submitQuotation(payload)
 
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.message || 'Failed to submit quotation')
+      if (!result.success) {
+        throw new Error(result.message || 'Failed to submit quotation')
       }
-
-      const result = await response.json()
       setSubmittedData({
         ...payload,
         quotationNumber: result.data?.quotationNumber || 'PENDING',

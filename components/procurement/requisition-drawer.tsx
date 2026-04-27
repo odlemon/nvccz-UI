@@ -69,6 +69,7 @@ export function RequisitionDrawer({ requisition, open, onOpenChange }: Requisiti
   const canApprove = requisition.status === 'PENDING_APPROVAL'
   const isApproved = requisition.status === 'APPROVED'
   const isRejected = requisition.status === 'REJECTED'
+  const isRFQSent = requisition.status === 'RFQ_SENT'
 
   const handleSubmit = async () => {
     if (!permissions.canCreatePurchaseRequisition && !permissions.canUpdatePurchaseRequisition) {
@@ -339,14 +340,17 @@ export function RequisitionDrawer({ requisition, open, onOpenChange }: Requisiti
                 )}
 
                 {/* Approved */}
-                {isApproved && requisition.approvedAt && (
+                {(isApproved || isRFQSent) && requisition.approvedAt && (
                   <div className="flex gap-3">
                     <div className="flex flex-col items-center">
                       <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center">
                         <CheckCircle2 className="h-4 w-4 text-green-600" />
                       </div>
+                      {isRFQSent && (
+                        <div className="h-full w-0.5 bg-border mt-2" />
+                      )}
                     </div>
-                    <div className="flex-1">
+                    <div className="flex-1 pb-4">
                       <p className="text-sm font-medium">Approved</p>
                       <p className="text-xs text-muted-foreground">
                         {format(new Date(requisition.approvedAt), 'MMM dd, yyyy HH:mm')}
@@ -356,6 +360,23 @@ export function RequisitionDrawer({ requisition, open, onOpenChange }: Requisiti
                           by {requisition.approvedBy.firstName} {requisition.approvedBy.lastName}
                         </p>
                       )}
+                    </div>
+                  </div>
+                )}
+
+                {/* RFQ Sent */}
+                {isRFQSent && (
+                  <div className="flex gap-3">
+                    <div className="flex flex-col items-center">
+                      <div className="h-8 w-8 rounded-full bg-purple-100 flex items-center justify-center">
+                        <Send className="h-4 w-4 text-purple-600" />
+                      </div>
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">RFQ Sent to Vendors</p>
+                      <p className="text-xs text-muted-foreground">
+                        {format(new Date(requisition.updatedAt), 'MMM dd, yyyy HH:mm')}
+                      </p>
                     </div>
                   </div>
                 )}
@@ -495,8 +516,10 @@ function StatusBadge({ status }: { status: string }) {
   const config: Record<string, { className: string; label: string }> = {
     DRAFT: { className: 'bg-gray-100 text-gray-800', label: 'Draft' },
     PENDING_APPROVAL: { className: 'bg-yellow-100 text-yellow-800', label: 'Pending Approval' },
+    PENDING_VC_EXECUTIVE_REVIEW: { className: 'bg-violet-100 text-violet-800', label: 'VC Review' },
     APPROVED: { className: 'bg-green-100 text-green-800', label: 'Approved' },
     REJECTED: { className: 'bg-red-100 text-red-800', label: 'Rejected' },
+    RFQ_SENT: { className: 'bg-purple-100 text-purple-800', label: 'RFQ Sent' },
     CONVERTED_TO_PO: { className: 'bg-blue-100 text-blue-800', label: 'Converted to PO' },
   }
 

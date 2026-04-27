@@ -4,8 +4,10 @@ import { useEffect, useMemo, useState } from "react"
 import { useAppDispatch, useAppSelector } from "@/lib/store"
 import { ProcurementDataTable, Column } from "./procurement-data-table"
 import { ProcurementDrawer } from "./procurement-drawer"
+import { PODrawerContent } from "./po-drawer-content"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useProcurementPermissions } from "@/lib/hooks/useProcurementPermissions"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -18,8 +20,9 @@ import {
   setSelectedPurchaseOrder
 } from "@/lib/store/slices/procurementSlice"
 import { procurementApi, PurchaseOrder } from "@/lib/api/procurement-api"
+import { procurementApiV2 } from "@/lib/api/procurement-api-v2"
 import { CiShop, CiCalendar, CiDollar, CiUser } from "react-icons/ci"
-import { Building, CheckCircle, Clock, AlertCircle, Truck } from "lucide-react"
+import { Building, CheckCircle, Clock, AlertCircle, Truck, Download, Send, FileText, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { CreatePurchaseOrderModal } from "./create-purchase-order-modal"
 import { ApprovalDialog } from "./approval-dialog"
@@ -28,12 +31,14 @@ export function PurchaseOrders() {
   const dispatch = useAppDispatch()
   const { permissions } = useProcurementPermissions()
   const { purchaseOrders, purchaseOrdersLoading } = useAppSelector(state => state.procurement)
+  const [selectedTab, setSelectedTab] = useState('all')
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   const [viewingOrder, setViewingOrder] = useState<PurchaseOrder | null>(null)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [isApprovalDialogOpen, setIsApprovalDialogOpen] = useState(false)
   const [approvalLoading, setApprovalLoading] = useState(false)
   const [selectedOrderForApproval, setSelectedOrderForApproval] = useState<PurchaseOrder | null>(null)
+  const [poActionsLoading, setPoActionsLoading] = useState(false)
 
   useEffect(() => {
     loadPurchaseOrders()
@@ -86,6 +91,63 @@ export function PurchaseOrders() {
     }
   }
 
+  const handleSendPO = async (orderId: string, orderNumber: string) => {
+    setPoActionsLoading(true)
+    try {
+      const response = await procurementApiV2.sendPurchaseOrder(orderId)
+      if (response.success) {
+        toast.success(`Purchase order ${orderNumber} sent to vendor`)
+        loadPurchaseOrders()
+      } else {
+        toast.error('Failed to send PO', { description: response.message })
+      }
+    } catch (error: any) {
+      const description = typeof error === 'string' ? error : error?.message || 'Failed to send purchase order'
+      toast.error('Send failed', { description })
+    } finally {
+      setPoActionsLoading(false)
+    }
+  }
+
+  const handleDownloadPOPDF = async (orderId: string, orderNumber: string) => {
+    setPoActionsLoading(true)
+    try {
+      const blob = await procurementApiV2.downloadPOPDF(orderId)
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${orderNumber}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+      toast.success('PDF downloaded successfully')
+    } catch (error: any) {
+      const description = typeof error === 'string' ? error : error?.message || 'Failed to download PDF'
+      toast.error('Download failed', { description })
+    } finally {
+      setPoActionsLoading(false)
+    }
+  }
+
+  const handleConvertToBill = async (orderId: string) => {
+    setPoActionsLoading(true)
+    try {
+      const response = await procurementApiV2.convertToBill(orderId)
+      if (response.success) {
+        toast.success('Purchase order converted to bill successfully')
+        loadPurchaseOrders()
+      } else {
+        toast.error('Failed to convert to bill', { description: response.message })
+      }
+    } catch (error: any) {
+      const description = typeof error === 'string' ? error : error?.message || 'Failed to convert to bill'
+      toast.error('Conversion failed', { description })
+    } finally {
+      setPoActionsLoading(false)
+    }
+  }
+
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'DRAFT': return <Clock className="w-4 h-4" />
@@ -118,6 +180,19 @@ export function PurchaseOrders() {
       case 'URGENT': return 'bg-red-100 text-red-800'
       default: return 'bg-gray-100 text-gray-800'
     }
+  }
+
+  const getCurrentData = () => {
+    if (selectedTab === 'all') return purchaseOrders
+    if (selectedTab === 'sent') return purchaseOrders.filter(po => po.status === 'SENT')
+    if (selectedTab === 'received') return purchaseOrders.filter(po => po.status === 'RECEIVED')
+    if (selectedTab === 'paid') return purchaseOrders.filter(po => po.status === 'PAID')
+    return purchaseOrders
+  }
+
+  const getTabCount = (status: string) => {
+    if (status === 'all') return purchaseOrders.length
+    return purchaseOrders.filter(po => po.status === status.toUpperCase()).length
   }
 
   const columns: Column<PurchaseOrder>[] = [
@@ -256,23 +331,47 @@ export function PurchaseOrders() {
         </div>
       </div>
 
-      {/* Data Table */}
-      <ProcurementDataTable
-        data={purchaseOrders}
-        columns={columns}
-        title="Purchase Orders"
-        searchPlaceholder="Search purchase orders..."
-        filterOptions={filterOptions}
-        onView={handleView}
-        onEdit={permissions.canUpdatePurchaseOrder ? handleEdit : undefined}
-        onDelete={permissions.canDeletePurchaseOrder ? handleDelete : undefined}
-        onCreate={permissions.canCreatePurchaseOrder ? handleCreate : undefined}
-        onBulkAction={handleBulkAction}
-        bulkActions={filteredBulkActions}
-        loading={purchaseOrdersLoading}
-        onExport={handleExport}
-        emptyMessage="No purchase orders found. Create your first purchase order to get started."
-      />
+      {/* Status Tabs */}
+      <Tabs value={selectedTab} onValueChange={setSelectedTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="all" className="flex gap-2">
+            All
+            <Badge variant="secondary">{getTabCount('all')}</Badge>
+          </TabsTrigger>
+          <TabsTrigger value="sent" className="flex gap-2">
+            Sent
+            <Badge variant="secondary">{getTabCount('sent')}</Badge>
+          </TabsTrigger>
+          <TabsTrigger value="received" className="flex gap-2">
+            Received
+            <Badge variant="secondary">{getTabCount('received')}</Badge>
+          </TabsTrigger>
+          <TabsTrigger value="paid" className="flex gap-2">
+            Paid
+            <Badge variant="secondary">{getTabCount('paid')}</Badge>
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value={selectedTab} className="space-y-6">
+          {/* Data Table */}
+          <ProcurementDataTable
+            data={getCurrentData()}
+            columns={columns}
+            title="Purchase Orders"
+            searchPlaceholder="Search purchase orders..."
+            filterOptions={filterOptions}
+            onView={handleView}
+            onEdit={permissions.canUpdatePurchaseOrder ? handleEdit : undefined}
+            onDelete={permissions.canDeletePurchaseOrder ? handleDelete : undefined}
+            onCreate={permissions.canCreatePurchaseOrder ? handleCreate : undefined}
+            onBulkAction={handleBulkAction}
+            bulkActions={filteredBulkActions}
+            loading={purchaseOrdersLoading}
+            onExport={handleExport}
+            emptyMessage="No purchase orders found. Create your first purchase order to get started."
+          />
+        </TabsContent>
+      </Tabs>
 
       {/* View Drawer */}
       <ProcurementDrawer
@@ -283,110 +382,13 @@ export function PurchaseOrders() {
         size="xl"
       >
         {viewingOrder && (
-          <div className="space-y-6">
-            {/* Order Info */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <CiShop className="w-5 h-5" />
-                  Order Information
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">PO Number</label>
-                    <p className="text-lg font-semibold">{viewingOrder.purchaseOrderNumber}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Status</label>
-                    <div className="mt-1">
-                      <Badge className={getStatusColor(viewingOrder.status)}>
-                        {getStatusIcon(viewingOrder.status)}
-                        {viewingOrder.status.replace('_', ' ')}
-                      </Badge>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Vendor</label>
-                    <p className="font-medium">{viewingOrder.vendor?.name || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Priority</label>
-                    <div className="mt-1">
-                      <Badge className={getPriorityColor(viewingOrder.priority)}>
-                        {viewingOrder.priority}
-                      </Badge>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Total Amount</label>
-                    <p className="text-lg font-semibold text-green-600">
-                      ${parseFloat(viewingOrder.totalAmount).toLocaleString()}
-                    </p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Expected Delivery</label>
-                    <p className="font-medium">
-                      {new Date(viewingOrder.expectedDeliveryDate).toLocaleDateString()}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Items */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Order Items</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {viewingOrder.items?.map((item, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div>
-                        <h4 className="font-medium">{item.itemName}</h4>
-                        <p className="text-sm text-gray-600">{item.description}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-medium">
-                          {item.quantity} {item.unit} × ${parseFloat(item.unitPrice.toString()).toFixed(2)}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          Total: ${(parseFloat(item.quantity.toString()) * parseFloat(item.unitPrice.toString())).toFixed(2)}
-                        </p>
-                      </div>
-                    </div>
-                  )) || (
-                      <p className="text-gray-500 text-center py-4">No items found</p>
-                    )}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Actions */}
-            <div className="flex items-center gap-3 pt-4 border-t">
-              <Button variant="outline" onClick={() => setIsDrawerOpen(false)}>
-                Close
-              </Button>
-              {permissions.canUpdatePurchaseOrder && (
-                <Button className="gradient-primary text-white">
-                  Edit Order
-                </Button>
-              )}
-              {viewingOrder?.status === 'DRAFT' && permissions.canApprovePurchaseOrder && (
-                <Button
-                  className="bg-green-600 hover:bg-green-700 text-white"
-                  onClick={() => {
-                    setSelectedOrderForApproval(viewingOrder)
-                    setIsApprovalDialogOpen(true)
-                  }}
-                >
-                  Send for Approval
-                </Button>
-              )}
-            </div>
-          </div>
+          <PODrawerContent
+            po={viewingOrder}
+            onSuccess={() => {
+              setIsDrawerOpen(false)
+              loadPurchaseOrders()
+            }}
+          />
         )}
       </ProcurementDrawer>
 

@@ -1,19 +1,65 @@
 "use client"
 
-import { useAppSelector } from "@/lib/store"
+import { useState } from "react"
+import { useAppDispatch, useAppSelector } from "@/lib/store"
+import { generateReport } from "@/lib/store/slices/eventsSlice"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Label } from "@/components/ui/label"
+import { Loader2, FileText, Sparkles } from "lucide-react"
+import { toast } from "sonner"
+import { format } from "date-fns"
 import { CiUser, CiDollar, CiStar, CiCircleCheck } from "react-icons/ci"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts"
+import { type ReportType } from "@/lib/api/events-api"
 
 interface EventAnalyticsTabProps {
   eventId: string
 }
 
+const REPORT_TYPES: { value: ReportType; label: string; description: string }[] = [
+  { value: "COMPREHENSIVE", label: "Comprehensive", description: "All metrics, analytics, and recommendations" },
+  { value: "FINANCIAL", label: "Financial", description: "Budget, expenses, and variance analysis" },
+  { value: "ATTENDANCE", label: "Attendance", description: "RSVP, check-in, and attendance metrics" },
+  { value: "FEEDBACK", label: "Feedback", description: "Ratings and qualitative feedback summary" },
+]
+
 export function EventAnalyticsTab({ eventId }: EventAnalyticsTabProps) {
-  const { currentEventAnalytics, currentEventGuests, currentEventFeedback, currentEvent } = useAppSelector(
-    (state) => state.events
-  )
+  const dispatch = useAppDispatch()
+  const {
+    currentEventAnalytics,
+    currentEventGuests,
+    currentEventFeedback,
+    currentEvent,
+    currentEventReport,
+    generatingReport,
+  } = useAppSelector((state) => state.events)
+
+  const [isReportDialogOpen, setIsReportDialogOpen] = useState(false)
+  const [reportType, setReportType] = useState<ReportType>("COMPREHENSIVE")
+
+  const handleGenerateReport = async () => {
+    try {
+      await dispatch(generateReport({ eventId, reportType })).unwrap()
+      toast.success("Report generated successfully")
+      setIsReportDialogOpen(false)
+    } catch (error: any) {
+      toast.error("Failed to generate report", {
+        description: error.message || error || "Please try again",
+      })
+    }
+  }
 
   const analytics = currentEventAnalytics || {
     rsvpRate: 0,
@@ -47,6 +93,21 @@ export function EventAnalyticsTab({ eventId }: EventAnalyticsTabProps) {
 
   return (
     <div className="space-y-6">
+      {/* Header + Generate Report action */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-lg font-semibold">Event Analytics</h3>
+          <p className="text-sm text-muted-foreground">Metrics, insights, and generated reports</p>
+        </div>
+        <Button
+          onClick={() => setIsReportDialogOpen(true)}
+          className="gap-2 bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 rounded-full"
+        >
+          <FileText size={18} />
+          Generate Report
+        </Button>
+      </div>
+
       {/* Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
@@ -272,6 +333,139 @@ export function EventAnalyticsTab({ eventId }: EventAnalyticsTabProps) {
           </CardContent>
         </Card>
       )}
+
+      {/* Generated Report */}
+      {currentEventReport && (
+        <Card className="border-l-4 border-l-indigo-500">
+          <CardHeader>
+            <div className="flex items-start justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-indigo-600" />
+                  Generated Report
+                </CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {currentEventReport.reportType} · generated {format(new Date(currentEventReport.generatedAt), "PPP 'at' p")}
+                </p>
+              </div>
+              <Badge variant="outline" className="uppercase">
+                {currentEventReport.reportType}
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div>
+                <div className="text-xs text-muted-foreground">Total Attendees</div>
+                <div className="text-xl font-semibold mt-1">{currentEventReport.totalAttendees}</div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground">RSVP Rate</div>
+                <div className="text-xl font-semibold mt-1">{Number(currentEventReport.rsvpRate).toFixed(1)}%</div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground">Check-in Rate</div>
+                <div className="text-xl font-semibold mt-1">{Number(currentEventReport.checkInRate).toFixed(1)}%</div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground">Average Rating</div>
+                <div className="text-xl font-semibold mt-1">{Number(currentEventReport.averageRating).toFixed(1)}</div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground">Total Budget</div>
+                <div className="text-xl font-semibold mt-1">${Number(currentEventReport.totalBudget).toLocaleString()}</div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground">Total Expenses</div>
+                <div className="text-xl font-semibold mt-1">${Number(currentEventReport.totalExpenses).toLocaleString()}</div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground">Budget Variance</div>
+                <div className="text-xl font-semibold mt-1">${Number(currentEventReport.budgetVariance).toLocaleString()}</div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground">Cost / Attendee</div>
+                <div className="text-xl font-semibold mt-1">${Number(currentEventReport.costPerAttendee).toFixed(2)}</div>
+              </div>
+            </div>
+
+            {currentEventReport.summary && (
+              <div>
+                <div className="text-sm font-semibold text-gray-900 mb-1">Summary</div>
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap">{currentEventReport.summary}</p>
+              </div>
+            )}
+
+            {currentEventReport.recommendations && (
+              <div className="pt-4 border-t">
+                <div className="text-sm font-semibold text-gray-900 mb-1">Recommendations</div>
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap">{currentEventReport.recommendations}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Generate Report Dialog */}
+      <Dialog open={isReportDialogOpen} onOpenChange={setIsReportDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Generate Event Report</DialogTitle>
+            <DialogDescription>
+              Select the type of report to generate. The report persists against this event and can be viewed any time.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Report Type</Label>
+              <Select value={reportType} onValueChange={(v) => setReportType(v as ReportType)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {REPORT_TYPES.map((t) => (
+                    <SelectItem key={t.value} value={t.value}>
+                      {t.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {REPORT_TYPES.find((t) => t.value === reportType)?.description}
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsReportDialogOpen(false)}
+              disabled={generatingReport}
+              className="rounded-full"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleGenerateReport}
+              disabled={generatingReport}
+              className="bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 rounded-full"
+            >
+              {generatingReport ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <FileText className="mr-2 h-4 w-4" />
+                  Generate
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

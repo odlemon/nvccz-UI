@@ -1,5 +1,7 @@
 import { apiClient, type ApiResponse } from '@/lib/api/api-client'
 
+const PUBLIC_API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://31.220.82.129:3009/api'
+
 export interface EventAuthor {
   id: string
   firstName: string
@@ -245,6 +247,27 @@ export const eventsApi = {
     return apiClient.post<ApiResponse<EventGuest>>(`/events/${eventId}/guests/${guestId}/check-in`, { notes })
   },
 
+  // Bulk guest upload (CSV/XLSX file or multi-line text)
+  bulkUploadGuests: async (
+    eventId: string,
+    payload: { file?: File; text?: string }
+  ): Promise<ApiResponse<EventGuest[]>> => {
+    const formData = new FormData()
+    if (payload.file) formData.append('file', payload.file)
+    if (payload.text) formData.append('text', payload.text)
+    return apiClient.postFormData<ApiResponse<EventGuest[]>>(
+      `/events/${eventId}/guests/bulk-upload`,
+      formData
+    )
+  },
+
+  // Download bulk-upload template (CSV or XLSX)
+  downloadBulkUploadTemplate: async (format: 'csv' | 'xlsx' = 'xlsx'): Promise<Blob> => {
+    return apiClient.get<Blob>(`/events/guests/bulk-upload/template?format=${format}`, {
+      responseType: 'blob',
+    })
+  },
+
   // Budget Management
   getBudgetItems: async (eventId: string): Promise<ApiResponse<BudgetItem[]>> => {
     return apiClient.get<ApiResponse<BudgetItem[]>>(`/events/${eventId}/budget-items`)
@@ -322,7 +345,29 @@ export const eventsApi = {
     return apiClient.post<ApiResponse<EventReport>>(`/events/${eventId}/reports`, { reportType })
   },
 
-  // RSVP Management - Public endpoint, no auth required
+  // Public endpoints - no JWT required
+  getAllPublic: async (): Promise<ApiResponse<AppEvent[]>> => {
+    const res = await fetch(`${PUBLIC_API_BASE}/events/public`, {
+      headers: { 'accept': 'application/json' }
+    })
+    return res.json()
+  },
+
+  getUpcomingPublic: async (): Promise<ApiResponse<AppEvent[]>> => {
+    const res = await fetch(`${PUBLIC_API_BASE}/events/public/upcoming`, {
+      headers: { 'accept': 'application/json' }
+    })
+    return res.json()
+  },
+
+  getByIdPublic: async (id: string): Promise<ApiResponse<AppEvent>> => {
+    const res = await fetch(`${PUBLIC_API_BASE}/events/public/${id}`, {
+      headers: { 'accept': 'application/json' }
+    })
+    return res.json()
+  },
+
+  // Public RSVP by invitation token — no JWT required
   respondToRSVP: async (token: string, data: {
     rsvpStatus: 'ACCEPTED' | 'DECLINED' | 'MAYBE'
     notes?: string
@@ -331,8 +376,7 @@ export const eventsApi = {
     rsvpStatus: string
     rsvpRespondedAt: string
   }>> => {
-    // Direct fetch without auth for public RSVP
-    const response = await fetch(`http://31.220.82.129:3009/api/events/rsvp/${token}`, {
+    const res = await fetch(`${PUBLIC_API_BASE}/events/rsvp/${token}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -340,7 +384,34 @@ export const eventsApi = {
       },
       body: JSON.stringify(data)
     })
-    return response.json()
+    return res.json()
+  },
+
+  // Public feedback submission — no JWT required
+  submitFeedbackPublic: async (eventId: string, data: {
+    rating: number
+    overallSatisfaction: number
+    contentQuality?: number
+    venueQuality?: number
+    foodQuality?: number
+    organization?: number
+    positiveAspects?: string
+    areasForImprovement?: string
+    suggestions?: string
+    wouldAttendAgain: boolean
+    wouldRecommend: boolean
+    additionalComments?: string
+    anonymous?: boolean
+  }): Promise<ApiResponse<EventFeedback>> => {
+    const res = await fetch(`${PUBLIC_API_BASE}/events/${eventId}/feedback`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'accept': 'application/json'
+      },
+      body: JSON.stringify(data)
+    })
+    return res.json()
   }
 }
 

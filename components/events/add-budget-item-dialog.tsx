@@ -13,7 +13,7 @@ import { Loader2 } from "lucide-react"
 import { CiDollar } from "react-icons/ci"
 import { toast } from "sonner"
 import { useAppDispatch } from "@/lib/store"
-import { addBudgetItems, fetchBudgetItems } from "@/lib/store/slices/eventsSlice"
+import { addBudgetItems, fetchBudgetItems, fetchEventById } from "@/lib/store/slices/eventsSlice"
 import { type BudgetCategory } from "@/lib/api/events-api"
 
 interface AddBudgetItemDialogProps {
@@ -92,14 +92,17 @@ export function AddBudgetItemDialog({ isOpen, onClose, eventId }: AddBudgetItemD
         })
       ).unwrap()
 
-      await dispatch(fetchBudgetItems(eventId))
+      await Promise.all([
+        dispatch(fetchBudgetItems(eventId)),
+        dispatch(fetchEventById(eventId)),
+      ])
       toast.success("Budget item added successfully")
       handleClose()
     } catch (error: any) {
+      const description =
+        typeof error === "string" ? error : error?.message || "Please try again"
       console.error("Failed to add budget item:", error)
-      toast.error("Failed to add budget item", {
-        description: error.message || "Please try again"
-      })
+      toast.error("Failed to add budget item", { description })
     } finally {
       setLoading(false)
     }

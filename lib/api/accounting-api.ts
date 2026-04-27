@@ -11,6 +11,9 @@ export interface Vendor {
   address?: string
   paymentTerms?: string
   isActive: boolean
+  isBlacklisted?: boolean
+  blacklistReason?: string | null
+  blacklistedAt?: string | null
   createdAt: string
   updatedAt: string
 }

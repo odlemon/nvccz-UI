@@ -24,6 +24,7 @@ interface CreateRequisitionModalProps {
   onSuccess?: () => void
   editMode?: boolean
   requisitionId?: string
+  isInvesteeMode?: boolean
 }
 
 interface RequisitionItem {
@@ -35,7 +36,7 @@ interface RequisitionItem {
 }
 
 
-export function CreateRequisitionModal({ isOpen, onClose, onSuccess, editMode = false, requisitionId }: CreateRequisitionModalProps) {
+export function CreateRequisitionModal({ isOpen, onClose, onSuccess, editMode = false, requisitionId, isInvesteeMode = false }: CreateRequisitionModalProps) {
   const dispatch = useAppDispatch()
   const [loading, setLoading] = useState(false)
   const [loadingData, setLoadingData] = useState(false)
@@ -44,12 +45,19 @@ export function CreateRequisitionModal({ isOpen, onClose, onSuccess, editMode = 
   const { availableDepartments, loading: departmentsLoading } = useAppSelector((state) => state.performance)
   const { permissions } = useProcurementPermissions()
 
-  const [formData, setFormData] = useState<CreateRequisitionRequest>({
+  const [formData, setFormData] = useState<CreateRequisitionRequest & {
+    drawdownRequestAmount?: number
+    sourcingCategory?: string
+    useOfFundsDocumentUrl?: string
+  }>({
     title: '',
     description: '',
     department: '',
     priority: 'MEDIUM',
     justification: '',
+    drawdownRequestAmount: undefined,
+    sourcingCategory: '',
+    useOfFundsDocumentUrl: '',
     items: [{
       itemName: '',
       description: '',
@@ -152,6 +160,21 @@ export function CreateRequisitionModal({ isOpen, onClose, onSuccess, editMode = 
       return
     }
 
+    if (isInvesteeMode) {
+      if (!formData.drawdownRequestAmount || formData.drawdownRequestAmount <= 0) {
+        toast.error('Please enter a valid drawdown request amount')
+        return
+      }
+      if (!formData.sourcingCategory) {
+        toast.error('Please select a sourcing category')
+        return
+      }
+      if (!formData.useOfFundsDocumentUrl?.trim()) {
+        toast.error('Please provide a use of funds document URL')
+        return
+      }
+    }
+
     // Validate items
     for (let i = 0; i < formData.items.length; i++) {
       const item = formData.items[i]
@@ -194,6 +217,9 @@ export function CreateRequisitionModal({ isOpen, onClose, onSuccess, editMode = 
         department: '',
         priority: 'MEDIUM',
         justification: '',
+        drawdownRequestAmount: undefined,
+        sourcingCategory: '',
+        useOfFundsDocumentUrl: '',
         items: [{
           itemName: '',
           description: '',
@@ -214,10 +240,10 @@ export function CreateRequisitionModal({ isOpen, onClose, onSuccess, editMode = 
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl font-normal">
             <FileText className="w-5 h-5" />
-            {editMode ? 'Edit Purchase Requisition' : 'Create Purchase Requisition'}
+            {editMode ? 'Edit Purchase Requisition' : isInvesteeMode ? 'Create Investee Drawdown Request' : 'Create Purchase Requisition'}
           </DialogTitle>
           <DialogDescription>
-            {editMode ? 'Update the purchase requisition details' : 'Create a new purchase requisition for approval'}
+            {editMode ? 'Update the purchase requisition details' : isInvesteeMode ? 'Create a new investee drawdown request for VC approval' : 'Create a new purchase requisition for approval'}
           </DialogDescription>
         </DialogHeader>
 
@@ -317,6 +343,70 @@ export function CreateRequisitionModal({ isOpen, onClose, onSuccess, editMode = 
               </CardContent>
             </Card>
           </div>
+
+          {/* Investee Drawdown Details */}
+          {isInvesteeMode && (
+            <div className="space-y-4">
+              <h3 className="text-base font-normal text-gray-900">Investee Drawdown Details</h3>
+              <Card className="border-l-4 border-l-violet-500">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base font-normal flex items-center gap-2">
+                    <DollarSign className="w-5 h-5 text-violet-500" />
+                    Drawdown Request Information
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="drawdownRequestAmount">Drawdown Request Amount *</Label>
+                      <Input
+                        id="drawdownRequestAmount"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={formData.drawdownRequestAmount || ''}
+                        onChange={(e) => setFormData(prev => ({ ...prev, drawdownRequestAmount: parseFloat(e.target.value) || undefined }))}
+                        placeholder="Enter amount..."
+                        className="rounded-lg"
+                        required={isInvesteeMode}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="sourcingCategory">Sourcing Category *</Label>
+                      <Select
+                        value={formData.sourcingCategory || ''}
+                        onValueChange={(value) => setFormData(prev => ({ ...prev, sourcingCategory: value }))}
+                      >
+                        <SelectTrigger className="rounded-lg">
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="IT_SERVICES">IT Services</SelectItem>
+                          <SelectItem value="EQUIPMENT">Equipment</SelectItem>
+                          <SelectItem value="SERVICES">Services</SelectItem>
+                          <SelectItem value="GOODS">Goods</SelectItem>
+                          <SelectItem value="CONSTRUCTION">Construction</SelectItem>
+                          <SelectItem value="CONSULTING">Consulting</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="useOfFundsDocumentUrl">Use of Funds Document URL *</Label>
+                    <Input
+                      id="useOfFundsDocumentUrl"
+                      type="url"
+                      value={formData.useOfFundsDocumentUrl || ''}
+                      onChange={(e) => setFormData(prev => ({ ...prev, useOfFundsDocumentUrl: e.target.value }))}
+                      placeholder="https://example.com/use-of-funds.pdf"
+                      className="rounded-lg"
+                      required={isInvesteeMode}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
 
           {/* Justification */}
           <div className="space-y-4">

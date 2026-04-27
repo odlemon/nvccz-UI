@@ -6,7 +6,9 @@
 'use client'
 
 import React, { useState } from 'react'
+import Image from 'next/image'
 import { useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -19,6 +21,7 @@ import {
   ArrowRight,
   Info,
   CheckCircle2,
+  Plus,
 } from 'lucide-react'
 
 export default function VendorPortalPage() {
@@ -26,6 +29,15 @@ export default function VendorPortalPage() {
   const [email, setEmail] = useState(searchParams?.get('email') || '')
   const [rfqNumber, setRfqNumber] = useState(searchParams?.get('rfq') || '')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [logoError, setLogoError] = useState(false)
+
+  const getOrgLogo = () => {
+    return process.env.NEXT_PUBLIC_ORGANIZATION_LOGO || '/logo.png'
+  }
+
+  const getOrgName = () => {
+    return process.env.NEXT_PUBLIC_ORGANIZATION_NAME || 'Arcus'
+  }
 
   const handleAccess = async () => {
     if (!email || !rfqNumber) return
@@ -45,12 +57,26 @@ export default function VendorPortalPage() {
       <div className="bg-white border-b">
         <div className="container mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Building2 className="h-8 w-8 text-primary" />
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-blue-100 to-blue-50 rounded-lg shadow-sm border border-blue-200 flex items-center justify-center overflow-hidden">
+                {!logoError ? (
+                  <Image
+                    src={getOrgLogo()}
+                    alt={getOrgName()}
+                    width={48}
+                    height={48}
+                    className="w-full h-full object-cover"
+                    onError={() => setLogoError(true)}
+                    priority
+                  />
+                ) : (
+                  <span className="text-sm font-bold text-blue-700">{getOrgName().substring(0, 2).toUpperCase()}</span>
+                )}
+              </div>
               <div>
                 <h1 className="text-2xl font-bold">Vendor Portal</h1>
                 <p className="text-sm text-muted-foreground">
-                  Arcus
+                  {getOrgName()}
                 </p>
               </div>
             </div>
@@ -69,7 +95,7 @@ export default function VendorPortalPage() {
             <CardHeader>
               <CardTitle className="text-2xl">Welcome to the Vendor Portal</CardTitle>
               <p className="text-muted-foreground">
-                Submit quotations for Request for Quotations (RFQs) sent by Arcus
+                Submit quotations for Request for Quotations (RFQs) sent by {getOrgName()}
               </p>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -187,20 +213,23 @@ export default function VendorPortalPage() {
               </div>
 
               <div>
-                <h4 className="font-medium mb-1">Want to become a vendor?</h4>
-                <p className="text-muted-foreground">
-                  To register as a vendor and receive RFQ invitations, please contact{' '}
-                  <a href="mailto:vendors@nvccz.co.zw" className="text-primary hover:underline">
-                    vendors@nvccz.co.zw
-                  </a>
+                <h4 className="font-medium mb-2">Want to become a vendor?</h4>
+                <p className="text-muted-foreground mb-3">
+                  Register now to start receiving RFQ invitations from {getOrgName()}
                 </p>
+                <Link href="/vendor-portal/register">
+                  <Button className="gap-2">
+                    <Plus size={18} />
+                    Register as Vendor
+                  </Button>
+                </Link>
               </div>
             </CardContent>
           </Card>
 
           {/* Footer */}
           <div className="text-center text-sm text-muted-foreground">
-            <p>© 2024 Arcus. All rights reserved.</p>
+            <p>© 2024 {getOrgName()}. All rights reserved.</p>
             <p className="mt-1">
               This is a secure vendor portal. For security reasons, please do not share your access
               link.

@@ -16,11 +16,13 @@ import {
   fetchRequisitions,
   fetchMyRequisitions,
   fetchPendingApprovalRequisitions,
+  fetchInvesteeRequisitions,
+  fetchSlaBreachedRequisitions,
   setRequisitionFilters
 } from "@/lib/store/slices/procurementV2Slice"
 import { PurchaseRequisition } from "@/lib/api/procurement-api-v2"
 import { CiFileOn, CiUser, CiDollar, CiCalendar, CiSearch, CiFilter } from "react-icons/ci"
-import { FileText, CheckCircle, Clock, AlertCircle, Send, XCircle, Eye, Edit, X, ShoppingCart, Plus } from "lucide-react"
+import { FileText, CheckCircle, Clock, AlertCircle, Send, XCircle, Eye, Edit, X, ShoppingCart, Plus, Building2 } from "lucide-react"
 import { CreateRequisitionModal } from "./create-requisition-modal"
 import { CreateRFQModal } from "./create-rfq-modal"
 import { RequisitionTimeline } from "./requisition-timeline"
@@ -28,7 +30,7 @@ import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 
 type TabConfig = {
-  id: 'all' | 'my' | 'pending'
+  id: 'all' | 'my' | 'pending' | 'investee'
   label: string
   icon: any
   gradient: string
@@ -53,6 +55,12 @@ const mainTabs: TabConfig[] = [
     icon: Clock,
     gradient: 'from-orange-500 to-orange-600'
   },
+  {
+    id: 'investee',
+    label: 'Investee PRs',
+    icon: Building2,
+    gradient: 'from-violet-500 to-violet-600'
+  },
 ]
 
 export function PurchaseRequisitions() {
@@ -62,7 +70,11 @@ export function PurchaseRequisitions() {
     requisitions,
     myRequisitions,
     pendingApprovalRequisitions,
+    investeeRequisitions,
+    investeeRequisitionsCount,
+    slaBreachedRequisitions,
     requisitionsLoading,
+    investeeRequisitionsLoading,
     requisitionsCount,
     myRequisitionsCount,
     pendingApprovalCount,
@@ -75,7 +87,8 @@ export function PurchaseRequisitions() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [isCreateRFQModalOpen, setIsCreateRFQModalOpen] = useState(false)
   const [selectedRequisitionForRFQ, setSelectedRequisitionForRFQ] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<'all' | 'my' | 'pending'>('all')
+  const [isInvesteeMode, setIsInvesteeMode] = useState(false)
+  const [activeTab, setActiveTab] = useState<'all' | 'my' | 'pending' | 'investee'>('all')
 
   // Filter states
   const [searchTerm, setSearchTerm] = useState('')
@@ -101,16 +114,16 @@ export function PurchaseRequisitions() {
       if (priorityFilter !== 'all') filters.priority = priorityFilter
 
       await dispatch(fetchRequisitions(filters)).unwrap()
-
       await dispatch(fetchMyRequisitions()).unwrap()
       await dispatch(fetchPendingApprovalRequisitions()).unwrap()
 
-      // if (activeTab === 'all') {
-      // } else if (activeTab === 'my') {
-      //   // My requisitions - could add filters here if backend supports
-      // } else if (activeTab === 'pending') {
-      //   // Pending approval requisitions
-      // }
+      if (activeTab === 'investee') {
+        await dispatch(fetchInvesteeRequisitions()).unwrap()
+      }
+
+      if (permissions.canApprovePurchaseRequisition) {
+        await dispatch(fetchSlaBreachedRequisitions()).unwrap()
+      }
     } catch (error: any) {
       toast.error("Error loading requisitions", { description: error.message })
     }
@@ -119,12 +132,14 @@ export function PurchaseRequisitions() {
   const getCurrentData = () => {
     if (activeTab === 'my') return myRequisitions
     if (activeTab === 'pending') return pendingApprovalRequisitions
+    if (activeTab === 'investee') return investeeRequisitions
     return requisitions
   }
 
   const getCurrentCount = () => {
     if (activeTab === 'my') return myRequisitionsCount
     if (activeTab === 'pending') return pendingApprovalCount
+    if (activeTab === 'investee') return investeeRequisitionsCount
     return requisitionsCount
   }
 
@@ -144,6 +159,7 @@ export function PurchaseRequisitions() {
   }
 
   const handleCreate = () => {
+    setIsInvesteeMode(activeTab === 'investee')
     setIsCreateModalOpen(true)
   }
 
@@ -319,13 +335,36 @@ export function PurchaseRequisitions() {
 
   return (
     <div className="space-y-6">
+      {/* SLA Breach Alert Banner */}
+      {permissions.canApprovePurchaseRequisition && slaBreachedRequisitions.length > 0 && (
+        <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5" />
+            <div className="flex-1">
+              <h3 className="font-semibold text-amber-900">SLA Breach Alert</h3>
+              <p className="text-sm text-amber-800 mt-1">
+                {slaBreachedRequisitions.length} investee PR(s) have exceeded their VC review SLA (48 hours). Immediate action required.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between p-4">
         <div>
           <h1 className="text-3xl font-normal">Purchase Requisitions</h1>
           <p className="text-muted-foreground">Create and manage purchase requisitions with approval workflow</p>
         </div>
-        {permissions.canCreatePurchaseRequisition && (
+        {activeTab === 'investee' && permissions.canCreatePurchaseRequisition ? (
+          <Button
+            onClick={handleCreate}
+            className="rounded-full bg-gradient-to-r from-violet-500 to-violet-600 hover:from-violet-600 hover:to-violet-700 text-white"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Create Investee PR
+          </Button>
+        ) : permissions.canCreatePurchaseRequisition ? (
           <Button
             onClick={handleCreate}
             className="rounded-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white"
@@ -333,7 +372,7 @@ export function PurchaseRequisitions() {
             <Plus className="w-4 h-4 mr-2" />
             Create New Requisition
           </Button>
-        )}
+        ) : null}
       </div>
 
       {/* Tabs with new styling */}
@@ -343,13 +382,19 @@ export function PurchaseRequisitions() {
             {mainTabs.map((tab) => {
               const Icon = tab.icon
               const isActive = activeTab === tab.id
-              const count = tab.id === 'all' ? requisitionsCount : tab.id === 'my' ? myRequisitionsCount : pendingApprovalCount
+              let count = requisitionsCount
+              if (tab.id === 'my') count = myRequisitionsCount
+              else if (tab.id === 'pending') count = pendingApprovalCount
+              else if (tab.id === 'investee') count = investeeRequisitionsCount
+              const showTab = tab.id !== 'investee' || permissions.canApprovePurchaseRequisition
+
+              if (!showTab) return null
 
               return (
                 <button
                   key={tab.id}
                   onClick={() => {
-                    setActiveTab(tab.id)
+                    setActiveTab(tab.id as 'all' | 'my' | 'pending' | 'investee')
                     setCurrentPage(1)
                   }}
                   className={cn(
@@ -538,11 +583,16 @@ export function PurchaseRequisitions() {
       {/* Create Modal */}
       <CreateRequisitionModal
         isOpen={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
+        onClose={() => {
+          setIsCreateModalOpen(false)
+          setIsInvesteeMode(false)
+        }}
         onSuccess={() => {
           setIsCreateModalOpen(false)
+          setIsInvesteeMode(false)
           loadRequisitions()
         }}
+        isInvesteeMode={isInvesteeMode}
       />
 
       {/* Edit Modal */}

@@ -4,34 +4,39 @@ import { useEffect, useState } from "react"
 import { ProcurementDataTable, Column } from "../procurement/procurement-data-table"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { 
-  Building, 
-  CheckCircle, 
-  Clock, 
+import { Button } from "@/components/ui/button"
+import {
+  Building,
+  CheckCircle,
+  Clock,
   Mail,
   Phone,
-  FileText
+  FileText,
+  RefreshCcw,
+  ShieldCheck
 } from "lucide-react"
 import { toast } from "sonner"
 import { CreateVendorModal } from "./create-vendor-modal"
 import { ViewVendorModal } from "./view-vendor-modal"
 import { ConfirmationDialog } from "../ui/confirmation-drawer"
-import { accountingApi, Vendor, CreateVendorRequest } from "@/lib/api/accounting-api"
+import { accountingApi, Vendor } from "@/lib/api/accounting-api"
 import { useAccountingPermissions } from "@/lib/hooks/useAccountingPermissions"
+import { cn } from "@/lib/utils"
 
 // Export the type for use in other components
 export type { Vendor }
 
 export function VendorsManagement() {
   const { permissions } = useAccountingPermissions()
-  
+
   // Permission checks
   const canCreateVendor = permissions.canCreateVendor
   const canEditVendor = permissions.canUpdateVendor
   const canDeleteVendor = permissions.canDeleteVendor
-  
+
   const [vendors, setVendors] = useState<Vendor[]>([])
   const [vendorsLoading, setVendorsLoading] = useState(false)
+
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [isViewModalOpen, setIsViewModalOpen] = useState(false)
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false)
@@ -95,6 +100,7 @@ export function VendorsManagement() {
     }
   }
 
+
   const getStatusIcon = (isActive: boolean) => {
     return isActive ? <CheckCircle className="w-4 h-4" /> : <Clock className="w-4 h-4" />
   }
@@ -102,6 +108,7 @@ export function VendorsManagement() {
   const getStatusColor = (isActive: boolean) => {
     return isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
   }
+
 
   const getInitials = (name: string) => {
     return name
@@ -198,24 +205,25 @@ export function VendorsManagement() {
     }
   ]
 
+
   const filterOptions = [
     { label: 'Active', value: 'true' },
     { label: 'Inactive', value: 'false' }
   ]
 
   const bulkActions = [
-    { 
-      label: 'Activate', 
-      value: 'activate', 
+    {
+      label: 'Activate',
+      value: 'activate',
       icon: (
         <div className="w-6 h-6 mr-2 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center">
           <CheckCircle className="w-3 h-3 text-white" />
         </div>
       )
     },
-    { 
-      label: 'Deactivate', 
-      value: 'deactivate', 
+    {
+      label: 'Deactivate',
+      value: 'deactivate',
       icon: (
         <div className="w-6 h-6 mr-2 bg-gradient-to-br from-gray-400 to-gray-600 rounded-full flex items-center justify-center">
           <Clock className="w-3 h-3 text-white" />
@@ -270,13 +278,12 @@ export function VendorsManagement() {
     a.download = 'vendors.csv'
     a.click()
     window.URL.revokeObjectURL(url)
-    
+
     toast.success(`Exported ${data.length} vendors`)
   }
 
   return (
     <div className="space-y-6">
-      {/* Data Table */}
       <ProcurementDataTable
         data={vendors}
         columns={columns}
@@ -294,7 +301,6 @@ export function VendorsManagement() {
         emptyMessage="No vendors found. Create your first vendor to get started."
       />
 
-      {/* View Modal */}
       <ViewVendorModal
         isOpen={isViewModalOpen}
         onClose={() => {
@@ -302,9 +308,9 @@ export function VendorsManagement() {
           setSelectedVendorForView(null)
         }}
         vendor={selectedVendorForView}
+        onVendorUpdated={loadVendors}
       />
 
-      {/* Create/Edit Modal */}
       <CreateVendorModal
         isOpen={isCreateModalOpen}
         onClose={() => {
@@ -319,7 +325,6 @@ export function VendorsManagement() {
         vendor={selectedVendorForEdit}
       />
 
-      {/* Delete Confirmation Dialog */}
       <ConfirmationDialog
         isOpen={isConfirmDialogOpen}
         onClose={() => {
@@ -337,6 +342,7 @@ export function VendorsManagement() {
         cancelText="Cancel"
         variant="danger"
       />
+
     </div>
   )
 }

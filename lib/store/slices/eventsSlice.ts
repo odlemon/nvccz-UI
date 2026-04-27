@@ -24,6 +24,8 @@ export interface EventsState {
   currentEventExpenses: EventExpense[]
   currentEventFeedback: EventFeedback[]
   currentEventAnalytics: EventAnalytics | null
+  currentEventReport: EventReport | null
+  generatingReport: boolean
   viewMode: 'list' | 'calendar' | 'grid'
   filters: {
     search: string
@@ -49,6 +51,8 @@ const initialState: EventsState = {
   currentEventExpenses: [],
   currentEventFeedback: [],
   currentEventAnalytics: null,
+  currentEventReport: null,
+  generatingReport: false,
   viewMode: 'list',
   filters: {
     search: '',
@@ -284,9 +288,10 @@ export const addExpense = createAsyncThunk(
       if (response.success) {
         return response.data
       }
-      throw new Error('Failed to add expense')
+      // API returned 2xx but success=false — surface the server's message
+      return rejectWithValue(response.message || 'Failed to add expense')
     } catch (error: any) {
-      return rejectWithValue(error.message || 'Failed to add expense')
+      return rejectWithValue(error?.message || 'Failed to add expense')
     }
   }
 )
@@ -425,6 +430,9 @@ const eventsSlice = createSlice({
       })
       .addCase(fetchEventById.fulfilled, (state, action) => {
         state.loading = false
+        if (state.currentEvent?.id !== action.payload.id) {
+          state.currentEventReport = null
+        }
         state.currentEvent = action.payload
         const index = state.events.findIndex(e => e.id === action.payload.id)
         if (index !== -1) {
@@ -565,6 +573,21 @@ const eventsSlice = createSlice({
     builder
       .addCase(fetchAnalytics.fulfilled, (state, action) => {
         state.currentEventAnalytics = action.payload
+      })
+
+    // Report generation
+    builder
+      .addCase(generateReport.pending, (state) => {
+        state.generatingReport = true
+        state.error = null
+      })
+      .addCase(generateReport.fulfilled, (state, action) => {
+        state.generatingReport = false
+        state.currentEventReport = action.payload
+      })
+      .addCase(generateReport.rejected, (state, action) => {
+        state.generatingReport = false
+        state.error = action.payload as string
       })
   }
 })

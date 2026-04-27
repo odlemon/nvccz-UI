@@ -23,7 +23,6 @@ import invoicesReducer from "./slices/invoices-slice"
 import purchaseInvoicesReducer from "./slices/purchase-invoices-slice"
 import accountingReducer2 from "./slices/accountingSlice"
 import eventsReducer from './slices/eventsSlice';
-import eventWizardReducer from './slices/eventWizardSlice'
 import analyticsReducer from './slices/analyticsSlice'
 import testPerfomanceReducer from './slices/testPerfomanceSlice'
 import cashbookReducer from './slices/cashbookSlice'
@@ -57,7 +56,6 @@ export const store = configureStore({
     invoices: invoicesReducer,
     purchaseInvoices: purchaseInvoicesReducer,
     events: eventsReducer,
-    eventWizard: eventWizardReducer,
     analytics: analyticsReducer,
     testPerfomance:testPerfomanceReducer,
     cashbook: cashbookReducer,

@@ -269,6 +269,24 @@ function LoginForm() {
                 </Button>
               </motion.div>
 
+              {/* Vendor Registration Link */}
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.55 }}
+                className="text-center"
+              >
+                <span className="text-gray-600 text-sm">
+                  Are you a supplier?{' '}
+                </span>
+                <Link
+                  href="/vendor-portal/register"
+                  className="text-blue-600 hover:text-blue-700 font-medium text-sm transition-colors"
+                >
+                  Register as Vendor
+                </Link>
+              </motion.div>
+
               {/* Sign Up Link */}
               {/* <motion.div
                 initial={{ opacity: 0, y: 10 }}

@@ -196,8 +196,11 @@ export const MODULE_CONFIG: ModuleConfig[] = [
       { id: "quotations", name: "Quotations", path: "/procurement/quotations", icon: CiShop, description: "Quotations management" },
       { id: "purchase-orders", name: "Purchase Orders", path: "/procurement/purchase-orders", icon: CiShop, description: "Purchase orders management" },
       { id: "procurement-invoices", name: "Invoices", path: "/procurement/invoices", icon: CiWallet, description: "Procurement invoices management" },
-      { id: "goods-received-notes", name: "Goods Received Notes", path: "/procurement/grn", icon: CiViewTimeline, description: "Goods received notes management" },
+      { id: "goods-received-notes", name: "Goods Received Notes", path: "/procurement/goods-received", icon: CiViewTimeline, description: "Goods received notes management" },
       { id: "payments", name: "Payments", path: "/procurement/payments", icon: CiViewTimeline, description: "Payments management" },
+      { id: "ai-intake", name: "AI Invoice Intake", path: "/procurement/ai-intake", icon: FileText, description: "AI-powered vendor invoice extraction and verification" },
+      { id: "three-way-match", name: "3-Way Match", path: "/procurement/three-way-match", icon: BarChart3, description: "PO vs GRN vs Invoice matching" },
+      { id: "cfo-dashboard", name: "CFO Dashboard", path: "/procurement/cfo-dashboard", icon: TrendingUp, description: "Executive procurement overview and analytics" },
       { id: "approval-configurations", name: "Approval Configurations", path: "/procurement/approval-configs", icon: CiSettings, description: "Approval workflow configurations" },
       // { id: "approval-requests", name: "My Approvals", path: "/procurement/approvals", icon: CiCircleCheck, description: "Pending approval requests" }
     ]
@@ -378,7 +381,20 @@ export const MODULE_CONFIG: ModuleConfig[] = [
         icon: CiCoins1,
         description: "Detailed view of a specific investment",
       },
-
+      {
+        id: "drawdown",
+        name: "Drawdown Requests",
+        path: "/application-portal/drawdown",
+        icon: CiFileOn,
+        description: "Create and manage drawdown requests",
+      },
+      {
+        id: "grn",
+        name: "Goods Received Notes",
+        path: "/application-portal/grn",
+        icon: Package,
+        description: "Track goods received from purchase orders",
+      },
       {
         id: "valuations",
         name: "Valuations",

@@ -6,6 +6,9 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import {
   Collapsible,
   CollapsibleContent,
@@ -14,19 +17,29 @@ import {
 import { ProcurementDataTable, Column } from "./procurement-data-table"
 import { RFQ, Quotation } from "@/lib/api/procurement-api-v2"
 import { procurementApiV2 } from "@/lib/api/procurement-api-v2"
+import { RFQClarifications } from "./rfq-clarifications"
+import { RFQComparisonMatrix } from "./rfq-comparison-matrix"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { ChevronDown, ChevronUp, Building2, Mail, Phone, MapPin, Package, DollarSign, Calendar } from "lucide-react"
+import { ChevronDown, ChevronUp, Building2, Mail, Phone, MapPin, Package, DollarSign, Calendar, Clock, Globe, Copy, Check, BarChart2 } from "lucide-react"
 import { format } from "date-fns"
 import { toast } from "sonner"
+import { useAppDispatch } from "@/lib/store"
+import { extendRFQDeadline } from "@/lib/store/slices/procurementV2Slice"
 
 interface RFQDrawerContentProps {
   rfq: RFQ
 }
 
 export function RFQDrawerContent({ rfq }: RFQDrawerContentProps) {
+  const dispatch = useAppDispatch()
   const [quotations, setQuotations] = useState<Quotation[]>([])
   const [loadingQuotations, setLoadingQuotations] = useState(false)
   const [expandedVendors, setExpandedVendors] = useState<Record<string, boolean>>({})
+  const [extendDeadlineOpen, setExtendDeadlineOpen] = useState(false)
+  const [newDeadline, setNewDeadline] = useState('')
+  const [extendingDeadline, setExtendingDeadline] = useState(false)
+  const [matrixOpen, setMatrixOpen] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     loadQuotations()
@@ -52,6 +65,38 @@ export function RFQDrawerContent({ rfq }: RFQDrawerContentProps) {
       ...prev,
       [vendorId]: !prev[vendorId]
     }))
+  }
+
+  const handleExtendDeadline = async () => {
+    if (!newDeadline.trim()) {
+      toast.error('Please select a new deadline')
+      return
+    }
+
+    setExtendingDeadline(true)
+    try {
+      await dispatch(extendRFQDeadline({ rfqId: rfq.id, newDeadline })).unwrap()
+      toast.success('RFQ deadline extended successfully')
+      setExtendDeadlineOpen(false)
+      setNewDeadline('')
+    } catch (error: any) {
+      const description = typeof error === 'string' ? error : error?.message || 'Failed to extend deadline'
+      toast.error('Failed to extend deadline', { description })
+    } finally {
+      setExtendingDeadline(false)
+    }
+  }
+
+  const handleCopyPublicLink = async () => {
+    const publicLink = `${typeof window !== 'undefined' ? window.location.origin : ''}/public-tenders/${rfq.rfqNumber}`
+    try {
+      await navigator.clipboard.writeText(publicLink)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+      toast.success('Public tender link copied to clipboard')
+    } catch (error) {
+      toast.error('Failed to copy link')
+    }
   }
 
   const getInitials = (name: string) => {
@@ -141,13 +186,14 @@ export function RFQDrawerContent({ rfq }: RFQDrawerContentProps) {
 
   return (
     <Tabs defaultValue="details" className="w-full">
-      <TabsList className="grid w-full grid-cols-3">
+      <TabsList className="grid w-full grid-cols-4">
         <TabsTrigger value="details">Details</TabsTrigger>
         <TabsTrigger value="items">Items</TabsTrigger>
         <TabsTrigger value="quotations">
           Quotations
           <Badge variant="secondary" className="ml-2">{quotations.length}</Badge>
         </TabsTrigger>
+        <TabsTrigger value="clarifications">Clarifications</TabsTrigger>
       </TabsList>
 
       {/* Details Tab */}
@@ -164,10 +210,20 @@ export function RFQDrawerContent({ rfq }: RFQDrawerContentProps) {
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-500">Status</label>
-                <div className="mt-1">
+                <div className="mt-1 flex items-center gap-2">
                   <Badge className={getStatusColor(rfq.status)}>
                     {rfq.status}
                   </Badge>
+                  {rfq.status === 'SENT' && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setExtendDeadlineOpen(true)}
+                      className="gap-2"
+                    >
+                      <Clock className="w-4 h-4" /> Extend
+                    </Button>
+                  )}
                 </div>
               </div>
               <div className="col-span-2">
@@ -201,6 +257,37 @@ export function RFQDrawerContent({ rfq }: RFQDrawerContentProps) {
                 <div className="col-span-2">
                   <label className="text-sm font-medium text-gray-500">Special Requirements</label>
                   <p className="mt-1 text-gray-700">{rfq.specialRequirements}</p>
+                </div>
+              )}
+              {rfq.status !== 'DRAFT' && (
+                <div className="col-span-2">
+                  <label className="text-sm font-medium text-gray-500 flex items-center gap-2">
+                    <Globe className="w-4 h-4" />
+                    Public Tender URL
+                  </label>
+                  <div className="mt-2 flex items-center gap-2 p-2 bg-gray-50 rounded">
+                    <code className="text-xs flex-1 truncate text-blue-600">
+                      {typeof window !== 'undefined' ? window.location.origin : ''}/public-tenders/{rfq.rfqNumber}
+                    </code>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={handleCopyPublicLink}
+                      className="gap-1"
+                    >
+                      {copied ? (
+                        <>
+                          <Check className="w-4 h-4 text-green-600" />
+                          <span className="text-xs text-green-600">Copied</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-4 h-4" />
+                          <span className="text-xs">Copy</span>
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>
@@ -297,6 +384,11 @@ export function RFQDrawerContent({ rfq }: RFQDrawerContentProps) {
 
       {/* Quotations Tab */}
       <TabsContent value="quotations" className="space-y-4">
+        {quotations.length > 0 && (rfq.status === 'SENT' || rfq.status === 'CLOSED') && (
+          <Button onClick={() => setMatrixOpen(true)} className="gap-2">
+            <BarChart2 className="w-4 h-4" /> View Comparison Matrix
+          </Button>
+        )}
         <Card>
           <CardContent className="pt-6">
             {loadingQuotations ? (
@@ -320,7 +412,48 @@ export function RFQDrawerContent({ rfq }: RFQDrawerContentProps) {
             )}
           </CardContent>
         </Card>
+        <RFQComparisonMatrix rfqId={rfq.id} isOpen={matrixOpen} onClose={() => setMatrixOpen(false)} />
       </TabsContent>
+
+      {/* Clarifications Tab */}
+      <TabsContent value="clarifications" className="space-y-4">
+        <RFQClarifications rfqId={rfq.id} />
+      </TabsContent>
+
+      {/* Extend Deadline Dialog */}
+      <Dialog open={extendDeadlineOpen} onOpenChange={setExtendDeadlineOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Extend RFQ Deadline</DialogTitle>
+            <DialogDescription>
+              Select a new closing date for this RFQ
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="deadline">New Deadline</Label>
+              <Input
+                id="deadline"
+                type="date"
+                value={newDeadline}
+                onChange={(e) => setNewDeadline(e.target.value)}
+                min={format(new Date(), 'yyyy-MM-dd')}
+              />
+            </div>
+            <div className="flex gap-3 justify-end">
+              <Button variant="outline" onClick={() => setExtendDeadlineOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handleExtendDeadline}
+                disabled={extendingDeadline || !newDeadline}
+              >
+                {extendingDeadline ? 'Extending...' : 'Extend Deadline'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Tabs>
   )
 }

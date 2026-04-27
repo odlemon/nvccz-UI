@@ -288,11 +288,11 @@ export default function ProcurementInvoicePDF({ invoice }: ProcurementInvoicePDF
                   {item.quantity} {item.unit}
                 </Text>
                 <Text style={[styles.tableCell, styles.col5]}>
-                  {invoice.currency.symbol}
+                  {invoice.currency?.symbol || '$'}
                   {formatCurrency(item.unitPrice)}
                 </Text>
                 <Text style={[styles.tableCell, styles.col6]}>
-                  {invoice.currency.symbol}
+                  {invoice.currency?.symbol || '$'}
                   {formatCurrency(item.totalPrice || 0)}
                 </Text>
               </View>
@@ -305,21 +305,21 @@ export default function ProcurementInvoicePDF({ invoice }: ProcurementInvoicePDF
           <View style={styles.totalsRow}>
             <Text style={styles.totalsLabel}>Subtotal</Text>
             <Text style={styles.totalsValue}>
-              {invoice.currency.symbol}
+              {invoice.currency?.symbol || '$'}
               {formatCurrency(invoice.subtotal)}
             </Text>
           </View>
           <View style={styles.totalsRow}>
             <Text style={styles.totalsLabel}>Tax Amount</Text>
             <Text style={styles.totalsValue}>
-              {invoice.currency.symbol}
+              {invoice.currency?.symbol || '$'}
               {formatCurrency(invoice.taxAmount)}
             </Text>
           </View>
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>Total Amount</Text>
             <Text style={styles.totalValue}>
-              {invoice.currency.symbol}
+              {invoice.currency?.symbol || '$'}
               {formatCurrency(invoice.totalAmount)}
             </Text>
           </View>
@@ -351,7 +351,7 @@ export default function ProcurementInvoicePDF({ invoice }: ProcurementInvoicePDF
         <View style={styles.footer}>
           <Text style={styles.footerText}>Generated on {formatDate(new Date().toISOString())}</Text>
           <Text style={styles.footerText}>
-            Currency: {invoice.currency.code} ({invoice.currency.name})
+            Currency: {invoice.currency?.code || 'USD'} ({invoice.currency?.name || 'US Dollar'})
           </Text>
         </View>
       </Page>

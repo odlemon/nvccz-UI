@@ -112,6 +112,7 @@ export function middleware(request: NextRequest) {
     '/verify-email',
     '/applications/form',
     '/vendor/quotation/submit',
+    '/vendor-portal',
     '/events/rsvp',
     '/permissions-matrix'
   ]

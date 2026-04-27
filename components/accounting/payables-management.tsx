@@ -44,6 +44,7 @@ import { useAccountingPermissions } from "@/lib/hooks/useAccountingPermissions"
 import { CurrencyFilter } from "./CurrencyFilter"
 import { BatchPayModal } from "./batch-pay-modal"
 import { VendorsManagement } from "./vendors-management"
+import { PendingVendorsList } from "./vendor-approval/pending-vendors-list"
 import { CreditCard, Building } from "lucide-react"
 import type { RootState, AppDispatch } from "@/lib/store"
 import { PurchaseInvoice } from "@/lib/api/accounting-api"
@@ -123,6 +124,7 @@ export function PayablesManagement() {
   const selectedCurrencyId = useSelector((state: RootState) => state.accounting.selectedCurrencyId)
 
   const [activeMainTab, setActiveMainTab] = useState<"invoices" | "vendors">("invoices")
+  const [activeVendorTab, setActiveVendorTab] = useState<"all" | "pending">("all")
   const [activeTab, setActiveTab] = useState("all")
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [isViewDrawerOpen, setIsViewDrawerOpen] = useState(false)
@@ -229,7 +231,7 @@ export function PayablesManagement() {
 
   const handleCreateInvoiceClick = () => {
     setIsCreateModalOpen(true)
-  }
+  } 
 
   const closeCreateModal = () => {
     setIsCreateModalOpen(false)
@@ -616,7 +618,42 @@ export function PayablesManagement() {
       </div>
 
       {activeMainTab === "vendors" ? (
-        <VendorsManagement />
+        <div className="space-y-6">
+          {/* Vendor Sub-tabs */}
+          <div className="flex items-center border-b">
+            <div className="flex space-x-1">
+              {[
+                { id: "all" as const, label: "All Vendors", icon: Building },
+                { id: "pending" as const, label: "Pending Approvals", icon: CheckCircle },
+              ].map((tab) => {
+                const Icon = tab.icon
+                const isActive = activeVendorTab === tab.id
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveVendorTab(tab.id)}
+                    className={cn(
+                      "flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-all duration-200",
+                      isActive
+                        ? "text-blue-600 border-blue-600"
+                        : "text-gray-600 border-transparent hover:text-gray-900"
+                    )}
+                  >
+                    <Icon className="w-4 h-4" />
+                    {tab.label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Vendor Content */}
+          {activeVendorTab === "all" ? (
+            <VendorsManagement />
+          ) : (
+            <PendingVendorsList />
+          )}
+        </div>
       ) : (
       <>
       {/* Header with Create Button */}

@@ -14,9 +14,10 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
-import { ChevronDown } from "lucide-react"
+import { ChevronDown, Upload } from "lucide-react"
 import { format } from "date-fns"
 import { AddGuestDialog } from "../add-guest-dialog"
+import { BulkUploadGuestsDialog } from "../bulk-upload-guests-dialog"
 
 interface EventGuestsTabProps {
   eventId: string
@@ -27,6 +28,7 @@ export function EventGuestsTab({ eventId }: EventGuestsTabProps) {
   const { currentEventGuests, guestsPagination, loading } = useAppSelector((state) => state.events)
   const [searchTerm, setSearchTerm] = useState("")
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
+  const [isBulkDialogOpen, setIsBulkDialogOpen] = useState(false)
 
   const filteredGuests = currentEventGuests.filter(
     (guest) =>
@@ -157,6 +159,14 @@ export function EventGuestsTab({ eventId }: EventGuestsTabProps) {
             className="pl-10"
           />
         </div>
+        <Button
+          variant="outline"
+          onClick={() => setIsBulkDialogOpen(true)}
+          className="gap-2 rounded-full"
+        >
+          <Upload size={18} />
+          Bulk Upload
+        </Button>
         <Button onClick={() => setIsAddDialogOpen(true)} className="gap-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-full">
           <CiCirclePlus size={20} />
           Add Guest
@@ -302,6 +312,13 @@ export function EventGuestsTab({ eventId }: EventGuestsTabProps) {
       <AddGuestDialog
         isOpen={isAddDialogOpen}
         onClose={() => setIsAddDialogOpen(false)}
+        eventId={eventId}
+      />
+
+      {/* Bulk Upload Dialog */}
+      <BulkUploadGuestsDialog
+        isOpen={isBulkDialogOpen}
+        onClose={() => setIsBulkDialogOpen(false)}
         eventId={eventId}
       />
     </div>

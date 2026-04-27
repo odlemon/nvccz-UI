@@ -9,29 +9,29 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Save, X, Package, CheckCircle, XCircle, FileText } from "lucide-react"
+import { Plus, Save, X, Package, CheckCircle, XCircle, FileText, MapPin, Upload, AlertCircle } from "lucide-react"
 import { toast } from "sonner"
 import { useProcurementPermissions } from "@/lib/hooks/useProcurementPermissions"
-import { procurementApi, PurchaseOrder } from "@/lib/api/procurement-api"
+import { procurementApiV2, PurchaseOrder } from "@/lib/api/procurement-api-v2"
 
 interface CreateGRNModalProps {
   isOpen: boolean
   onClose: () => void
   onSuccess: () => void
+  isInvestee?: boolean
 }
 
 interface GRNItem {
-  purchaseOrderItemId: string
+  poItemId: string
   itemName: string
-  quantityOrdered: number
-  quantityReceived: number
-  quantityAccepted: number
-  quantityRejected: number
-  qualityStatus: 'PASSED' | 'FAILED' | 'PENDING'
-  qualityNotes: string
+  poQuantity: number
+  receivedQuantity: number
+  unit: string
+  status: 'PENDING' | 'RECEIVED' | 'REJECTED'
+  rejectionReason?: string
 }
 
-export function CreateGRNModal({ isOpen, onClose, onSuccess }: CreateGRNModalProps) {
+export function CreateGRNModal({ isOpen, onClose, onSuccess, isInvestee }: CreateGRNModalProps) {
   const [loading, setLoading] = useState(false)
   const [loadingData, setLoadingData] = useState(false)
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([])
@@ -39,21 +39,22 @@ export function CreateGRNModal({ isOpen, onClose, onSuccess }: CreateGRNModalPro
 
   const [formData, setFormData] = useState({
     purchaseOrderId: "",
-    receivedBy: "",
     receivedDate: new Date().toISOString().split('T')[0],
-    notes: ""
+    notes: "",
+    tolerancePercentage: "5",
+    attachmentUrl: "",
+    geoLocation: "",
   })
 
   const [items, setItems] = useState<GRNItem[]>([
     {
-      purchaseOrderItemId: "",
+      poItemId: "",
       itemName: "",
-      quantityOrdered: 0,
-      quantityReceived: 0,
-      quantityAccepted: 0,
-      quantityRejected: 0,
-      qualityStatus: 'PENDING',
-      qualityNotes: ""
+      poQuantity: 0,
+      receivedQuantity: 0,
+      unit: "",
+      status: 'PENDING',
+      rejectionReason: ""
     }
   ])
 
@@ -67,12 +68,11 @@ export function CreateGRNModal({ isOpen, onClose, onSuccess }: CreateGRNModalPro
     try {
       setLoadingData(true)
 
-      // Load purchase orders (sent/acknowledged ones that can receive goods)
-      const poResponse = await procurementApi.getPurchaseOrders()
-      if (poResponse.success && poResponse.data) {
-        setPurchaseOrders(poResponse.data.filter(po =>
-          po.status === 'SENT' || po.status === 'ACKNOWLEDGED' || po.status === 'PARTIALLY_RECEIVED'
-        ))
+      const response = await procurementApiV2.getPurchaseOrders({
+        status: 'SENT'
+      })
+      if (response.success && response.data) {
+        setPurchaseOrders(response.data)
       }
     } catch (error) {
       console.error('Error loading initial data:', error)
@@ -89,75 +89,69 @@ export function CreateGRNModal({ isOpen, onClose, onSuccess }: CreateGRNModalPro
   const handleItemChange = (index: number, field: keyof GRNItem, value: string | number) => {
     const updatedItems = [...items]
     updatedItems[index] = { ...updatedItems[index], [field]: value }
-
-    // Auto-calculate accepted/rejected quantities
-    if (field === 'quantityReceived' || field === 'quantityRejected') {
-      const received = field === 'quantityReceived' ? value as number : updatedItems[index].quantityReceived
-      const rejected = field === 'quantityRejected' ? value as number : updatedItems[index].quantityRejected
-      updatedItems[index].quantityAccepted = Math.max(0, received - rejected)
-    }
-
     setItems(updatedItems)
   }
 
   const loadPurchaseOrderItems = (poId: string) => {
-    // Mock loading PO items
-    if (poId) {
-      const mockItems: GRNItem[] = [
-        {
-          purchaseOrderItemId: "poi-1",
-          itemName: "Office Chairs",
-          quantityOrdered: 10,
-          quantityReceived: 10,
-          quantityAccepted: 9,
-          quantityRejected: 1,
-          qualityStatus: 'PENDING',
-          qualityNotes: ""
-        },
-        {
-          purchaseOrderItemId: "poi-2",
-          itemName: "Desk Lamps",
-          quantityOrdered: 5,
-          quantityReceived: 5,
-          quantityAccepted: 5,
-          quantityRejected: 0,
-          qualityStatus: 'PENDING',
-          qualityNotes: ""
-        }
-      ]
-      setItems(mockItems)
+    const selectedPO = purchaseOrders.find(po => po.id === poId)
+    if (selectedPO && selectedPO.items) {
+      const poItems: GRNItem[] = selectedPO.items.map((item: any, idx: number) => ({
+        poItemId: item.id || `item-${idx}`,
+        itemName: item.itemName,
+        poQuantity: parseInt(item.quantity) || 0,
+        receivedQuantity: 0,
+        unit: item.unit || '',
+        status: 'PENDING',
+        rejectionReason: ""
+      }))
+      setItems(poItems)
       toast.success("Purchase order items loaded successfully")
     }
   }
 
   const getQualityStatusColor = (status: string) => {
     switch (status) {
-      case 'PASSED': return 'bg-green-100 text-green-800'
-      case 'FAILED': return 'bg-red-100 text-red-800'
+      case 'RECEIVED': return 'bg-green-100 text-green-800'
+      case 'REJECTED': return 'bg-red-100 text-red-800'
       case 'PENDING': return 'bg-yellow-100 text-yellow-800'
       default: return 'bg-gray-100 text-gray-800'
     }
   }
 
-  const getQualityStatusIcon = (status: string) => {
-    switch (status) {
-      case 'PASSED': return <CheckCircle className="w-4 h-4" />
-      case 'FAILED': return <XCircle className="w-4 h-4" />
-      default: return <Package className="w-4 h-4" />
+  const calculateOverDelivery = () => {
+    const selectedPO = purchaseOrders.find(po => po.id === formData.purchaseOrderId)
+    if (!selectedPO) return { hasOverDelivery: false, percentage: 0 }
+
+    const tolerance = parseFloat(formData.tolerancePercentage) || 0
+    const totalOrdered = items.reduce((sum, item) => sum + item.poQuantity, 0)
+    const totalReceived = items.reduce((sum, item) => sum + item.receivedQuantity, 0)
+    const overDeliveryPercentage = totalOrdered > 0 ? ((totalReceived - totalOrdered) / totalOrdered) * 100 : 0
+
+    return {
+      hasOverDelivery: overDeliveryPercentage > tolerance,
+      percentage: Math.round(overDeliveryPercentage * 100) / 100
     }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!formData.purchaseOrderId || !formData.receivedBy) {
-      toast.error("Please fill in all required fields")
+    if (!formData.purchaseOrderId) {
+      toast.error("Please select a purchase order")
       return
     }
 
-    if (items.some(item => item.quantityReceived <= 0)) {
-      toast.error("All items must have a received quantity greater than 0")
+    if (items.some(item => item.receivedQuantity < 0)) {
+      toast.error("Received quantity cannot be negative")
       return
+    }
+
+    // Check over-delivery tolerance
+    const overDelivery = calculateOverDelivery()
+    if (overDelivery.hasOverDelivery) {
+      if (!confirm(`Over-delivery detected (${overDelivery.percentage}% above tolerance). Continue?`)) {
+        return
+      }
     }
 
     // Check permissions
@@ -169,19 +163,28 @@ export function CreateGRNModal({ isOpen, onClose, onSuccess }: CreateGRNModalPro
     setLoading(true)
     try {
       const grnData = {
-        ...formData,
-        items: items.filter(item => item.itemName.trim() !== ""),
-        status: "PENDING_APPROVAL"
+        purchaseOrderId: formData.purchaseOrderId,
+        receivedDate: formData.receivedDate,
+        items: items.map(item => ({
+          poItemId: item.poItemId,
+          receivedQuantity: item.receivedQuantity,
+          status: item.status,
+          rejectionReason: item.rejectionReason
+        })),
+        notes: formData.notes,
+        tolerancePercentage: parseFloat(formData.tolerancePercentage),
+        attachmentUrl: formData.attachmentUrl || undefined,
+        geoLocation: formData.geoLocation || undefined,
       }
 
-      const response = await procurementApi.createGRN(grnData)
+      const response = await procurementApiV2.createGRN(grnData)
 
       if (response.success) {
         toast.success("Goods Received Note created successfully!")
         onSuccess()
         handleClose()
       } else {
-        toast.error("Failed to create GRN")
+        toast.error(response.message || "Failed to create GRN")
       }
     } catch (error: any) {
       toast.error("Error creating GRN", { description: error.message })
@@ -193,30 +196,33 @@ export function CreateGRNModal({ isOpen, onClose, onSuccess }: CreateGRNModalPro
   const handleClose = () => {
     setFormData({
       purchaseOrderId: "",
-      receivedBy: "",
       receivedDate: new Date().toISOString().split('T')[0],
-      notes: ""
+      notes: "",
+      tolerancePercentage: "5",
+      attachmentUrl: "",
+      geoLocation: "",
     })
     setItems([{
-      purchaseOrderItemId: "",
+      poItemId: "",
       itemName: "",
-      quantityOrdered: 0,
-      quantityReceived: 0,
-      quantityAccepted: 0,
-      quantityRejected: 0,
-      qualityStatus: 'PENDING',
-      qualityNotes: ""
+      poQuantity: 0,
+      receivedQuantity: 0,
+      unit: "",
+      status: 'PENDING',
+      rejectionReason: ""
     }])
     onClose()
   }
 
+  const overDeliveryWarning = calculateOverDelivery()
+
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-3xl md:max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-2xl font-semibold flex items-center gap-2">
             <Package className="w-6 h-6" />
-            Create Goods Received Note
+            Create Goods Received Note {isInvestee && '(Investee)'}
           </DialogTitle>
         </DialogHeader>
 
@@ -245,23 +251,12 @@ export function CreateGRNModal({ isOpen, onClose, onSuccess }: CreateGRNModalPro
                       <SelectItem key={po.id} value={po.id}>
                         <div className="flex items-center gap-2">
                           <FileText className="w-4 h-4" />
-                          {po.purchaseOrderNumber} - {po.vendor?.name}
+                          {po.poNumber} - {po.vendorName}
                         </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="receivedBy">Received By *</Label>
-                <Input
-                  id="receivedBy"
-                  value={formData.receivedBy}
-                  onChange={(e) => handleInputChange("receivedBy", e.target.value)}
-                  placeholder="Enter receiver name"
-                  required
-                />
               </div>
 
               <div>
@@ -274,8 +269,49 @@ export function CreateGRNModal({ isOpen, onClose, onSuccess }: CreateGRNModalPro
                   required
                 />
               </div>
+
+              <div>
+                <Label htmlFor="tolerancePercentage">Over-Delivery Tolerance (%)</Label>
+                <Input
+                  id="tolerancePercentage"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  value={formData.tolerancePercentage}
+                  onChange={(e) => handleInputChange("tolerancePercentage", e.target.value)}
+                  placeholder="5"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="geoLocation">Geo Location (optional)</Label>
+                <Input
+                  id="geoLocation"
+                  value={formData.geoLocation}
+                  onChange={(e) => handleInputChange("geoLocation", e.target.value)}
+                  placeholder="e.g., lat,lng or warehouse location"
+                />
+              </div>
             </CardContent>
           </Card>
+
+          {/* Over-Delivery Warning */}
+          {overDeliveryWarning.percentage !== 0 && (
+            <Card className={overDeliveryWarning.hasOverDelivery ? "border-l-4 border-l-red-500" : "border-l-4 border-l-amber-500"}>
+              <CardContent className="pt-6 flex items-start gap-3">
+                <AlertCircle className={overDeliveryWarning.hasOverDelivery ? "text-red-600 mt-0.5" : "text-amber-600 mt-0.5"} />
+                <div>
+                  <p className={overDeliveryWarning.hasOverDelivery ? "text-red-900 font-medium" : "text-amber-900 font-medium"}>
+                    {overDeliveryWarning.hasOverDelivery ? "Over-Delivery Exceeds Tolerance" : "Warning: Over-Delivery Detected"}
+                  </p>
+                  <p className={overDeliveryWarning.hasOverDelivery ? "text-red-800 text-sm" : "text-amber-800 text-sm"}>
+                    Received quantity is {overDeliveryWarning.percentage}% above ordered quantity (tolerance: {formData.tolerancePercentage}%)
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Items Quality Control */}
           <Card>
@@ -283,121 +319,101 @@ export function CreateGRNModal({ isOpen, onClose, onSuccess }: CreateGRNModalPro
               <CardTitle className="text-lg">Items & Quality Control</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {items.map((item, index) => (
-                <div key={index} className="border rounded-lg p-4 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-medium flex items-center gap-2">
-                      <Package className="w-4 h-4" />
-                      {item.itemName || `Item ${index + 1}`}
-                    </h4>
-                    <Badge className={getQualityStatusColor(item.qualityStatus)}>
-                      {getQualityStatusIcon(item.qualityStatus)}
-                      {item.qualityStatus}
-                    </Badge>
-                  </div>
+              {items.length === 0 ? (
+                <p className="text-gray-500 text-center py-4">Select a purchase order to load items</p>
+              ) : (
+                items.map((item, index) => (
+                  <div key={index} className="border rounded-lg p-4 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-medium flex items-center gap-2">
+                        <Package className="w-4 h-4" />
+                        {item.itemName}
+                      </h4>
+                      <Badge className={getQualityStatusColor(item.status)}>
+                        {item.status}
+                      </Badge>
+                    </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div>
-                      <Label>Quantity Ordered</Label>
-                      <div className="flex items-center h-10 px-3 border rounded-md bg-gray-50">
-                        <span className="font-medium">{item.quantityOrdered}</span>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <Label>Quantity Ordered</Label>
+                        <div className="flex items-center h-10 px-3 border rounded-md bg-gray-50">
+                          <span className="font-medium">{item.poQuantity}</span>
+                        </div>
+                      </div>
+
+                      <div>
+                        <Label>Quantity Received *</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={item.receivedQuantity}
+                          onChange={(e) => handleItemChange(index, "receivedQuantity", parseInt(e.target.value) || 0)}
+                        />
+                      </div>
+
+                      <div>
+                        <Label>Unit</Label>
+                        <div className="flex items-center h-10 px-3 border rounded-md bg-gray-50">
+                          <span className="font-medium">{item.unit}</span>
+                        </div>
                       </div>
                     </div>
 
-                    <div>
-                      <Label>Quantity Received *</Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        max={item.quantityOrdered}
-                        value={item.quantityReceived}
-                        onChange={(e) => handleItemChange(index, "quantityReceived", parseInt(e.target.value) || 0)}
-                      />
-                    </div>
-
-                    <div>
-                      <Label>Quantity Rejected</Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        max={item.quantityReceived}
-                        value={item.quantityRejected}
-                        onChange={(e) => handleItemChange(index, "quantityRejected", parseInt(e.target.value) || 0)}
-                      />
-                    </div>
-
-                    <div>
-                      <Label>Quantity Accepted</Label>
-                      <div className="flex items-center h-10 px-3 border rounded-md bg-green-50">
-                        <span className="font-medium text-green-700">{item.quantityAccepted}</span>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label>Status</Label>
+                        <Select
+                          value={item.status}
+                          onValueChange={(value: 'PENDING' | 'RECEIVED' | 'REJECTED') => handleItemChange(index, "status", value)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="PENDING">Pending Inspection</SelectItem>
+                            <SelectItem value="RECEIVED">Received & Accepted</SelectItem>
+                            <SelectItem value="REJECTED">Rejected</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
+
+                      {item.status === 'REJECTED' && (
+                        <div>
+                          <Label>Rejection Reason</Label>
+                          <Textarea
+                            value={item.rejectionReason || ''}
+                            onChange={(e) => handleItemChange(index, "rejectionReason", e.target.value)}
+                            placeholder="Reason for rejection..."
+                            rows={2}
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label>Quality Status</Label>
-                      <Select
-                        value={item.qualityStatus}
-                        onValueChange={(value: 'PASSED' | 'FAILED' | 'PENDING') => handleItemChange(index, "qualityStatus", value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="PENDING">Pending Inspection</SelectItem>
-                          <SelectItem value="PASSED">Quality Passed</SelectItem>
-                          <SelectItem value="FAILED">Quality Failed</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div>
-                      <Label>Quality Notes</Label>
-                      <Textarea
-                        value={item.qualityNotes}
-                        onChange={(e) => handleItemChange(index, "qualityNotes", e.target.value)}
-                        placeholder="Quality inspection notes..."
-                        rows={2}
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))}
-
-              {/* Summary */}
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h4 className="font-medium mb-3">Receipt Summary</h4>
-                <div className="grid grid-cols-3 gap-4 text-center">
-                  <div>
-                    <p className="text-2xl font-bold text-blue-600">
-                      {items.reduce((sum, item) => sum + item.quantityReceived, 0)}
-                    </p>
-                    <p className="text-sm text-gray-600">Total Received</p>
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-green-600">
-                      {items.reduce((sum, item) => sum + item.quantityAccepted, 0)}
-                    </p>
-                    <p className="text-sm text-gray-600">Total Accepted</p>
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-red-600">
-                      {items.reduce((sum, item) => sum + item.quantityRejected, 0)}
-                    </p>
-                    <p className="text-sm text-gray-600">Total Rejected</p>
-                  </div>
-                </div>
-              </div>
+                ))
+              )}
             </CardContent>
           </Card>
 
-          {/* Additional Notes */}
+          {/* Additional Information */}
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Additional Information</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="attachmentUrl">Attachment URL (optional)</Label>
+                <Input
+                  id="attachmentUrl"
+                  type="url"
+                  value={formData.attachmentUrl}
+                  onChange={(e) => handleInputChange("attachmentUrl", e.target.value)}
+                  placeholder="https://..."
+                />
+                <p className="text-xs text-gray-500 mt-1">Link to GRN document, photo, or quality report</p>
+              </div>
+
               <div>
                 <Label htmlFor="notes">General Notes</Label>
                 <Textarea
@@ -405,7 +421,7 @@ export function CreateGRNModal({ isOpen, onClose, onSuccess }: CreateGRNModalPro
                   value={formData.notes}
                   onChange={(e) => handleInputChange("notes", e.target.value)}
                   placeholder="Any additional notes about the goods receipt..."
-                  rows={4}
+                  rows={3}
                 />
               </div>
             </CardContent>

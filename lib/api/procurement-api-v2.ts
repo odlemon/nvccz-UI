@@ -382,6 +382,214 @@ export interface DashboardData {
   lastUpdated: string
 }
 
+// Purchase Order Types
+export interface PurchaseOrder {
+  id: string
+  poNumber: string
+  quotationId: string
+  vendorId: string
+  vendorName: string
+  status: 'DRAFT' | 'SENT' | 'ACKNOWLEDGED' | 'DELIVERED' | 'BILLED' | 'PAID' | 'CANCELLED'
+  totalAmount: string
+  currencyCode: string
+  poDate: string
+  expectedDeliveryDate: string
+  deliveryAddress?: string
+  notes?: string
+  items: PurchaseOrderItem[]
+  createdAt: string
+  updatedAt: string
+  sentAt?: string
+  acknowledgedAt?: string
+  acknowledgedBy?: string
+}
+
+export interface PurchaseOrderItem {
+  id: string
+  poId: string
+  itemName: string
+  description: string
+  quantity: number
+  unit: string
+  unitPrice: string
+  totalPrice: string
+  status?: string
+}
+
+// GRN Types
+export interface GoodsReceivedNote {
+  id: string
+  grnNumber: string
+  poId: string
+  poNumber: string
+  vendorId: string
+  vendorName: string
+  receivedDate: string
+  status: 'DRAFT' | 'RECEIVED' | 'PARTIALLY_RECEIVED' | 'APPROVED' | 'REJECTED'
+  totalItems: number
+  receivedItems: number
+  notes?: string
+  items: GRNItem[]
+  createdAt: string
+  updatedAt: string
+}
+
+export interface GRNItem {
+  id: string
+  grnId: string
+  poItemId: string
+  itemName: string
+  poQuantity: number
+  receivedQuantity: number
+  unit: string
+  status: 'PENDING' | 'RECEIVED' | 'REJECTED'
+  rejectionReason?: string
+}
+
+// Invoice Types
+export interface ProcurementInvoice {
+  id: string
+  invoiceNumber: string
+  vendorId: string
+  vendorName: string
+  poId?: string
+  grnId?: string
+  status: 'DRAFT' | 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'PAID' | 'PARTIALLY_PAID' | 'REJECTED'
+  invoiceDate: string
+  dueDate: string
+  subtotal: string
+  taxAmount: string
+  totalAmount: string
+  paidAmount: string
+  paymentStatus: 'PENDING' | 'PARTIALLY_PAID' | 'FULLY_PAID'
+  currencyCode: string
+  items?: any[]
+  payments?: InvoicePayment[]
+  createdAt: string
+  updatedAt: string
+}
+
+export interface InvoicePayment {
+  id: string
+  invoiceId: string
+  amount: string
+  paymentDate: string
+  paymentMethod: string
+  status: 'PENDING' | 'COMPLETED' | 'FAILED'
+}
+
+// RFQ Comparison & Clarifications
+export interface ComparisonMatrix {
+  rfqId: string
+  rfqNumber: string
+  items: Array<{
+    id: string
+    itemName: string
+    quantity: number
+    unit: string
+  }>
+  vendors: Array<{
+    id: string
+    quotationId: string
+    vendorName: string
+    vendorEmail: string
+    validUntil: string
+    currencyCode: string
+    itemPrices: Record<string, string>
+    totalPrice: string
+  }>
+}
+
+export interface RFQClarification {
+  id: string
+  rfqId: string
+  vendorId: string
+  vendorName: string
+  question: string
+  askedAt: string
+  answer?: string
+  answeredAt?: string
+  answeredBy?: string
+}
+
+// Vendor Registration & KYC
+export interface VendorRegistration {
+  id: string
+  kycUploadToken: string
+  kycDocumentsUrl?: string
+  companyName: string
+  name?: string
+  email: string
+  contactPerson: string
+  phoneNumber: string
+  industry: string
+  status: 'PENDING' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED'
+  registrationStatus?: 'DRAFT' | 'KYC_PENDING' | 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED' | 'ACTIVE'
+  banks?: Array<{
+    id?: string
+    name: string
+    bankAccount: string
+    branchCode?: string
+    currency?: string
+    swiftBicCode?: string
+  }>
+  createdAt: string
+  updatedAt: string
+}
+
+export interface VendorSelfRegistrationRequest {
+  companyName: string
+  name?: string
+  email: string
+  contactPerson: string
+  phoneNumber: string
+  industry: string
+  banks?: Array<{
+    bankName: string
+    accountName: string
+    accountNumber: string
+    branchCode?: string
+    currencyCode?: 'USD' | 'ZWL' | 'ZIG'
+    swiftCode?: string
+  }>
+}
+
+export interface KYCDocument {
+  id: string
+  registrationId: string
+  documentType: 'CR14' | 'BANK_LETTER' | 'CERTIFICATE_OF_INCORPORATION' | 'ITF263' | 'OTHER'
+  fileUrl: string
+  fileName: string
+  uploadedAt: string
+  verificationStatus: 'PENDING' | 'VERIFIED' | 'REJECTED'
+}
+
+export interface VendorBank {
+  id: string
+  vendorId: string
+  bankName: string
+  accountNumber: string
+  accountHolder: string
+  branchCode?: string
+  swiftCode?: string
+  iban?: string
+  isPrimary: boolean
+}
+
+// Suite 06 AI Invoice Intake
+export interface InvoiceIntake {
+  id: string
+  status: 'PENDING' | 'EXTRACTED' | 'VERIFIED' | 'DRAFT_BILL' | 'MATCHED' | 'ERROR'
+  invoiceFile: string
+  invoiceNumber?: string
+  vendorName?: string
+  totalAmount?: string
+  extractedData?: any
+  verificationErrors?: string[]
+  createdAt: string
+  updatedAt: string
+}
+
 // Generic Response Type
 export interface ProcurementResponse<T> {
   success: boolean
@@ -622,7 +830,628 @@ class ProcurementApiServiceV2 {
   async deleteQuotation(id: string): Promise<ProcurementResponse<void>> {
     return apiClient.delete<ProcurementResponse<void>>(`/vendor-quotations/${id}`)
   }
+
+  // ============================================================================
+  // RFQ ENHANCEMENTS (Suite 03)
+  // ============================================================================
+
+  /**
+   * Get RFQ comparison matrix with all vendor quotations normalized
+   * Required Role: PROC_MGR, PROC_OFF, or BUYER
+   */
+  async getComparisonMatrix(rfqId: string): Promise<ProcurementResponse<ComparisonMatrix>> {
+    return apiClient.get<ProcurementResponse<ComparisonMatrix>>(`/procurement/rfqs/${rfqId}/comparison-matrix`)
+  }
+
+  /**
+   * Award RFQ to a selected vendor quotation
+   * Required Role: PROC_MGR or PROC_OFF
+   */
+  async awardRFQ(rfqId: string, data: { quotationId: string }): Promise<ProcurementResponse<RFQ>> {
+    return apiClient.post<ProcurementResponse<RFQ>>(`/procurement/rfqs/${rfqId}/award`, data)
+  }
+
+  /**
+   * Extend RFQ closing deadline
+   * Required Role: PROC_MGR or PROC_OFF
+   */
+  async extendRFQDeadline(rfqId: string, data: { newDeadline: string }): Promise<ProcurementResponse<RFQ>> {
+    return apiClient.patch<ProcurementResponse<RFQ>>(`/procurement/rfqs/${rfqId}/closing`, data)
+  }
+
+  /**
+   * Get RFQ clarifications
+   * Required Role: PROC_MGR, PROC_OFF, or BUYER
+   */
+  async getRFQClarifications(rfqId: string): Promise<ProcurementResponse<RFQClarification[]>> {
+    return apiClient.get<ProcurementResponse<RFQClarification[]>>(`/procurement/rfqs/${rfqId}/clarifications`)
+  }
+
+  /**
+   * Post a clarification to an RFQ (staff reply to vendor question or new clarification to all)
+   * If clarificationId is provided, replies to that specific question. Otherwise posts to all vendors.
+   * Required Role: PROC_MGR, PROC_OFF, or BUYER
+   */
+  async postRFQClarification(rfqId: string, data: { clarificationId?: string; answer: string }): Promise<ProcurementResponse<RFQClarification>> {
+    const endpoint = data.clarificationId
+      ? `/procurement/rfqs/${rfqId}/clarifications/${data.clarificationId}/reply`
+      : `/procurement/rfqs/${rfqId}/clarifications`
+    return apiClient.post<ProcurementResponse<RFQClarification>>(endpoint, { answer: data.answer })
+  }
+
+  /**
+   * Get publicly available RFQs (no authentication required)
+   */
+  async getPublicRFQs(): Promise<ProcurementResponse<RFQ[]>> {
+    return apiClient.get<ProcurementResponse<RFQ[]>>('/public/procurement/rfqs')
+  }
+
+  // ============================================================================
+  // PURCHASE ORDERS (Suite 04)
+  // ============================================================================
+
+  /**
+   * Get all purchase orders
+   * Required Role: PROC_MGR, PROC_OFF, or BUYER
+   */
+  async getPurchaseOrders(filters?: { status?: string; vendorId?: string; limit?: number; offset?: number }): Promise<ProcurementResponse<PurchaseOrder[]>> {
+    const params = new URLSearchParams()
+    if (filters?.status) params.append('status', filters.status)
+    if (filters?.vendorId) params.append('vendorId', filters.vendorId)
+    if (filters?.limit) params.append('limit', filters.limit.toString())
+    if (filters?.offset) params.append('offset', filters.offset.toString())
+
+    const queryString = params.toString()
+    const url = `/procurement/purchase-orders${queryString ? `?${queryString}` : ''}`
+    return apiClient.get<ProcurementResponse<PurchaseOrder[]>>(url)
+  }
+
+  /**
+   * Get a single purchase order by ID
+   * Required Role: PROC_MGR, PROC_OFF, or BUYER
+   */
+  async getPurchaseOrderById(id: string): Promise<ProcurementResponse<PurchaseOrder>> {
+    return apiClient.get<ProcurementResponse<PurchaseOrder>>(`/procurement/purchase-orders/${id}`)
+  }
+
+  /**
+   * Create a new purchase order
+   * Required Role: PROC_MGR or PROC_OFF
+   */
+  async createPurchaseOrder(data: any): Promise<ProcurementResponse<PurchaseOrder>> {
+    return apiClient.post<ProcurementResponse<PurchaseOrder>>('/procurement/purchase-orders', data)
+  }
+
+  /**
+   * Send purchase order to vendor
+   * Required Role: PROC_MGR or PROC_OFF
+   */
+  async sendPurchaseOrder(id: string): Promise<ProcurementResponse<PurchaseOrder>> {
+    return apiClient.post<ProcurementResponse<PurchaseOrder>>(`/procurement/purchase-orders/${id}/send`, {})
+  }
+
+  /**
+   * Convert purchase order to bill (creates invoice)
+   * Required Role: PROC_MGR or PROC_OFF
+   */
+  async convertToBill(id: string): Promise<ProcurementResponse<ProcurementInvoice>> {
+    return apiClient.post<ProcurementResponse<ProcurementInvoice>>(`/procurement/purchase-orders/${id}/convert-to-bill`, {})
+  }
+
+  /**
+   * Download PO as PDF
+   * Required Role: PROC_MGR, PROC_OFF, or BUYER
+   * Returns: Blob (PDF file)
+   */
+  async downloadPOPDF(id: string): Promise<Blob> {
+    const response = await fetch(`/api/procurement/purchase-orders/${id}/pdf`, {
+      headers: { 'Authorization': `Bearer ${document.cookie}` }
+    })
+    return response.blob()
+  }
+
+  /**
+   * Cancel a PO line item
+   * Required Role: PROC_MGR or PROC_OFF
+   */
+  async cancelPOLine(poId: string, lineId: string): Promise<ProcurementResponse<PurchaseOrder>> {
+    return apiClient.patch<ProcurementResponse<PurchaseOrder>>(`/procurement/purchase-orders/${poId}/lines/${lineId}/cancel`, {})
+  }
+
+  /**
+   * Acknowledge PO via token (vendor endpoint - public)
+   */
+  async acknowledgeViaToken(token: string): Promise<ProcurementResponse<PurchaseOrder>> {
+    return apiClient.post<ProcurementResponse<PurchaseOrder>>(`/public/purchase-orders/${token}/acknowledge`, {})
+  }
+
+  // ============================================================================
+  // GOODS RECEIVED NOTES (Suite 05)
+  // ============================================================================
+
+  /**
+   * Get all GRNs
+   * Required Role: PROC_MGR, PROC_OFF, or WAREHOUSE
+   */
+  async getGRNs(filters?: { poId?: string; status?: string; limit?: number; offset?: number }): Promise<ProcurementResponse<GoodsReceivedNote[]>> {
+    const params = new URLSearchParams()
+    if (filters?.poId) params.append('poId', filters.poId)
+    if (filters?.status) params.append('status', filters.status)
+    if (filters?.limit) params.append('limit', filters.limit.toString())
+    if (filters?.offset) params.append('offset', filters.offset.toString())
+
+    const queryString = params.toString()
+    const url = `/procurement/goods-received-notes${queryString ? `?${queryString}` : ''}`
+    return apiClient.get<ProcurementResponse<GoodsReceivedNote[]>>(url)
+  }
+
+  /**
+   * Create a new GRN
+   * Required Role: WAREHOUSE or PROC_MGR
+   */
+  async createGRN(data: any): Promise<ProcurementResponse<GoodsReceivedNote>> {
+    return apiClient.post<ProcurementResponse<GoodsReceivedNote>>('/procurement/goods-received-notes', data)
+  }
+
+  // ============================================================================
+  // INVOICES & PAYMENTS
+  // ============================================================================
+
+  /**
+   * Get all invoices
+   * Required Role: PROC_MGR, PROC_OFF, or FINANCE
+   */
+  async getInvoices(params?: { status?: string; vendorId?: string; limit?: number; offset?: number }): Promise<ProcurementResponse<ProcurementInvoice[]>> {
+    const queryParams = new URLSearchParams()
+    if (params?.status) queryParams.append('status', params.status)
+    if (params?.vendorId) queryParams.append('vendorId', params.vendorId)
+    if (params?.limit) queryParams.append('limit', params.limit.toString())
+    if (params?.offset) queryParams.append('offset', params.offset.toString())
+
+    const queryString = queryParams.toString()
+    const url = `/procurement/invoices${queryString ? `?${queryString}` : ''}`
+    return apiClient.get<ProcurementResponse<ProcurementInvoice[]>>(url)
+  }
+
+  /**
+   * Create an invoice (vendor endpoint - public)
+   */
+  async createInvoice(data: any): Promise<ProcurementResponse<ProcurementInvoice>> {
+    return apiClient.post<ProcurementResponse<ProcurementInvoice>>('/procurement/invoices', data)
+  }
+
+  /**
+   * Approve an invoice
+   * Required Role: PROC_MGR or FINANCE
+   */
+  async approveInvoice(id: string, data: { approvalNotes?: string }): Promise<ProcurementResponse<ProcurementInvoice>> {
+    return apiClient.put<ProcurementResponse<ProcurementInvoice>>(`/procurement/invoices/${id}/approve`, data)
+  }
+
+  /**
+   * Process invoice payment (supports file upload for proof)
+   * Required Role: FINANCE
+   */
+  async processInvoicePayment(id: string, formData: FormData): Promise<ProcurementResponse<InvoicePayment>> {
+    return apiClient.post<ProcurementResponse<InvoicePayment>>(`/procurement/invoices/${id}/payment`, formData)
+  }
+
+  /**
+   * Get all payments
+   * Required Role: FINANCE or PROC_MGR
+   */
+  async getPayments(params?: { status?: string; invoiceId?: string; limit?: number; offset?: number }): Promise<ProcurementResponse<InvoicePayment[]>> {
+    const queryParams = new URLSearchParams()
+    if (params?.status) queryParams.append('status', params.status)
+    if (params?.invoiceId) queryParams.append('invoiceId', params.invoiceId)
+    if (params?.limit) queryParams.append('limit', params.limit.toString())
+    if (params?.offset) queryParams.append('offset', params.offset.toString())
+
+    const queryString = queryParams.toString()
+    const url = `/procurement/payments${queryString ? `?${queryString}` : ''}`
+    return apiClient.get<ProcurementResponse<InvoicePayment[]>>(url)
+  }
+
+  // ============================================================================
+  // SUITE 06: AI INVOICE INTAKE & 3-WAY MATCH
+  // ============================================================================
+
+  /**
+   * Create a new invoice intake
+   * Required Role: FINANCE or PROC_MGR
+   */
+  async createIntake(data: any): Promise<ProcurementResponse<InvoiceIntake>> {
+    return apiClient.post<ProcurementResponse<InvoiceIntake>>('/procurement/suite06/intakes', data)
+  }
+
+  /**
+   * Extract invoice data using AI
+   * Required Role: FINANCE or PROC_MGR
+   */
+  async extractIntake(id: string): Promise<ProcurementResponse<InvoiceIntake>> {
+    return apiClient.post<ProcurementResponse<InvoiceIntake>>(`/procurement/suite06/intakes/${id}/extract`, {})
+  }
+
+  /**
+   * Verify extracted invoice data
+   * Required Role: FINANCE or PROC_MGR
+   */
+  async verifyIntake(id: string, data: { verifiedData: any }): Promise<ProcurementResponse<InvoiceIntake>> {
+    return apiClient.patch<ProcurementResponse<InvoiceIntake>>(`/procurement/suite06/intakes/${id}/verify`, data)
+  }
+
+  /**
+   * Create draft bill from verified intake
+   * Required Role: FINANCE or PROC_MGR
+   */
+  async createDraftBill(id: string): Promise<ProcurementResponse<ProcurementInvoice>> {
+    return apiClient.post<ProcurementResponse<ProcurementInvoice>>(`/procurement/suite06/intakes/${id}/create-draft-bill`, {})
+  }
+
+  /**
+   * Run 3-way match (PO vs GRN vs Vendor Bill)
+   * Required Role: FINANCE or PROC_MGR
+   */
+  async runMatch(purchaseInvoiceId: string): Promise<ProcurementResponse<any>> {
+    return apiClient.post<ProcurementResponse<any>>(`/procurement/suite06/purchase-invoices/${purchaseInvoiceId}/run-match`, {})
+  }
+
+  /**
+   * Get CFO dashboard summary for Suite 06
+   * Required Role: CFO or FINANCE
+   */
+  async getCFODashboard(): Promise<ProcurementResponse<any>> {
+    return apiClient.get<ProcurementResponse<any>>('/procurement/suite06/cfo-dashboard')
+  }
+
+  /**
+   * Get verification queue (invoices pending manual review)
+   * Required Role: FINANCE or PROC_MGR
+   */
+  async getVerificationQueue(take?: number): Promise<ProcurementResponse<InvoiceIntake[]>> {
+    const url = take ? `/procurement/suite06/verification-queue?take=${take}` : '/procurement/suite06/verification-queue'
+    return apiClient.get<ProcurementResponse<InvoiceIntake[]>>(url)
+  }
+
+  // ============================================================================
+  // VENDOR SELF-REGISTRATION & KYC (Suite 01 - PUBLIC)
+  // ============================================================================
+
+  /**
+   * Vendor self-registration (public endpoint - no auth)
+   */
+  async vendorSelfRegister(data: VendorSelfRegistrationRequest): Promise<ProcurementResponse<VendorRegistration>> {
+    return apiClient.post<ProcurementResponse<VendorRegistration>>('/public/vendor-registration', data)
+  }
+
+  /**
+   * Get registration by token (public endpoint - no auth)
+   */
+  async getRegistrationByToken(token: string): Promise<ProcurementResponse<VendorRegistration>> {
+    return apiClient.get<ProcurementResponse<VendorRegistration>>(`/public/vendor-registration/${token}`)
+  }
+
+  /**
+   * Get KYC requirements for token (public endpoint - no auth)
+   */
+  async getKYCRequirements(token: string): Promise<ProcurementResponse<any>> {
+    return apiClient.get<ProcurementResponse<any>>(`/public/vendor-registration/${token}/kyc-requirements`)
+  }
+
+  /**
+   * Upload KYC documents (public endpoint - no auth, multipart form data)
+   */
+  async uploadKYCDocuments(token: string, formData: FormData): Promise<ProcurementResponse<KYCDocument[]>> {
+    return apiClient.post<ProcurementResponse<KYCDocument[]>>(`/public/vendor-registration/${token}/kyc-documents`, formData)
+  }
+
+  /**
+   * Get uploaded KYC documents (public endpoint - no auth)
+   */
+  async getKYCDocuments(token: string): Promise<ProcurementResponse<KYCDocument[]>> {
+    return apiClient.get<ProcurementResponse<KYCDocument[]>>(`/public/vendor-registration/${token}/kyc-documents`)
+  }
+
+  /**
+   * Download a KYC document (public endpoint - no auth)
+   * Returns: Blob (file)
+   */
+  async downloadKYCDoc(token: string, docId: string): Promise<Blob> {
+    const response = await fetch(`/api/public/vendor-registration/${token}/kyc-documents/${docId}/download`)
+    return response.blob()
+  }
+
+  // ============================================================================
+  // VENDOR MANAGEMENT (Suite 01 - STAFF)
+  // ============================================================================
+
+  /**
+   * Get pending vendor registrations (awaiting KYC review)
+   * Required Role: PROC_MGR or ADMIN
+   */
+  async getPendingVendors(): Promise<ProcurementResponse<VendorRegistration[]>> {
+    return apiClient.get<ProcurementResponse<VendorRegistration[]>>('/accounting/vendors/pending-review')
+  }
+
+  /**
+   * Approve a vendor registration
+   * Required Role: PROC_MGR or ADMIN
+   */
+  async approveVendorRegistration(id: string): Promise<ProcurementResponse<VendorRegistration>> {
+    return apiClient.put<ProcurementResponse<VendorRegistration>>(`/accounting/vendors/${id}/approve-registration`, {})
+  }
+
+  /**
+   * Blacklist a vendor
+   * Required Role: PROC_MGR or ADMIN
+   */
+  async blacklistVendor(id: string, data: { reason: string }): Promise<ProcurementResponse<any>> {
+    return apiClient.post<ProcurementResponse<any>>(`/accounting/vendors/${id}/blacklist`, data)
+  }
+
+  /**
+   * Unblacklist a vendor
+   * Required Role: PROC_MGR or ADMIN
+   */
+  async unblacklistVendor(id: string, data: { reason: string }): Promise<ProcurementResponse<any>> {
+    return apiClient.post<ProcurementResponse<any>>(`/accounting/vendors/${id}/unblacklist`, data)
+  }
+
+  /**
+   * Get vendor bank accounts
+   * Required Role: PROC_MGR, ADMIN, or FINANCE
+   */
+  async getVendorBanks(id: string): Promise<ProcurementResponse<VendorBank[]>> {
+    return apiClient.get<ProcurementResponse<VendorBank[]>>(`/accounting/vendors/${id}/banks`)
+  }
+
+  /**
+   * Add a bank account to vendor
+   * Required Role: PROC_MGR or ADMIN
+   */
+  async addVendorBank(id: string, data: any): Promise<ProcurementResponse<VendorBank>> {
+    return apiClient.post<ProcurementResponse<VendorBank>>(`/accounting/vendors/${id}/banks`, data)
+  }
+
+  /**
+   * Update vendor bank account
+   * Required Role: PROC_MGR or ADMIN
+   */
+  async updateVendorBank(id: string, bankId: string, data: any): Promise<ProcurementResponse<VendorBank>> {
+    return apiClient.put<ProcurementResponse<VendorBank>>(`/accounting/vendors/${id}/banks/${bankId}`, data)
+  }
+
+  /**
+   * Get vendor KYC documents
+   * Required Role: PROC_MGR, ADMIN, or FINANCE
+   */
+  async getVendorKYCDocs(id: string): Promise<ProcurementResponse<KYCDocument[]>> {
+    return apiClient.get<ProcurementResponse<KYCDocument[]>>(`/accounting/vendors/${id}/kyc-documents`)
+  }
+
+  /**
+   * Download KYC document (staff side)
+   * Returns: Blob (file)
+   */
+  async downloadStaffKYCDoc(docId: string): Promise<Blob> {
+    const response = await fetch(`/api/accounting/vendors/kyc-documents/${docId}/download`)
+    return response.blob()
+  }
+
+  // ─── SUITE 02: INVESTEE / APPLICANT ───
+
+  /**
+   * Get investee (portfolio-linked) purchase requisitions
+   * Scope: CFO, SYSADMIN, PROC_MGR see all; FundManagers see PRs for their fund(s)
+   */
+  async getInvesteeRequisitions(): Promise<ProcurementResponse<PurchaseRequisition[]>> {
+    return apiClient.get<ProcurementResponse<PurchaseRequisition[]>>('/procurement/requisitions/investee')
+  }
+
+  /**
+   * Get investee PRs pending VC executive review longer than 48 hours (SLA breach)
+   * Same fund scope as getInvesteeRequisitions
+   */
+  async getInvesteeRequisitionsSlaBreached(): Promise<ProcurementResponse<PurchaseRequisition[]>> {
+    return apiClient.get<ProcurementResponse<PurchaseRequisition[]>>('/procurement/requisitions/investee/sla-breached')
+  }
+
+  /**
+   * Get applicant drawdown summary and PR ledger
+   * Auth: applicant with portfolio company
+   */
+  async getApplicantDrawdown(): Promise<ProcurementResponse<ApplicantDrawdown>> {
+    return apiClient.get<ProcurementResponse<ApplicantDrawdown>>('/applicant/procurement/drawdown')
+  }
+
+  /**
+   * Create investee purchase requisition (draft)
+   * Auth: applicant with portfolio company
+   */
+  async createApplicantRequisition(data: CreateApplicantRequisitionRequest): Promise<ProcurementResponse<PurchaseRequisition>> {
+    return apiClient.post<ProcurementResponse<PurchaseRequisition>>('/applicant/procurement/requisitions', data)
+  }
+
+  /**
+   * Submit investee PR for VC executive review
+   * Auth: applicant for the portfolio company only
+   */
+  async submitApplicantRequisition(id: string): Promise<ProcurementResponse<PurchaseRequisition>> {
+    return apiClient.put<ProcurementResponse<PurchaseRequisition>>(`/applicant/procurement/requisitions/${id}/submit`, {})
+  }
+
+  /**
+   * Cancel investee PR before RFQ award (returns to DRAFT)
+   * Allowed for DRAFT or PENDING_VC_EXECUTIVE_REVIEW only
+   */
+  async cancelApplicantRequisition(id: string): Promise<ProcurementResponse<PurchaseRequisition>> {
+    return apiClient.post<ProcurementResponse<PurchaseRequisition>>(`/applicant/procurement/requisitions/${id}/cancel`, {})
+  }
+
+  /**
+   * Create GRN return-to-vendor record (stub / workflow)
+   * Auth: procurement staff with PO approval rights
+   */
+  async createGRNReturn(data: { purchaseOrderId: string }): Promise<any> {
+    return apiClient.post('/procurement/grn-return-to-vendor', data)
+  }
+
+  // ============================================================================
+  // SUITE 06: AI INVOICE INTAKE, 3-WAY MATCH & VERIFICATION
+  // ============================================================================
+
+  async createInvoiceIntake(data: { documentUrl: string; vendorId?: string }): Promise<ProcurementResponse<InvoiceIntake>> {
+    return apiClient.post<ProcurementResponse<InvoiceIntake>>('/procurement/suite06/intakes', data)
+  }
+
+  async getInvoiceIntake(id: string): Promise<ProcurementResponse<InvoiceIntake>> {
+    return apiClient.get<ProcurementResponse<InvoiceIntake>>(`/procurement/suite06/intakes/${id}`)
+  }
+
+  async extractInvoiceData(id: string): Promise<ProcurementResponse<ExtractedInvoiceData>> {
+    return apiClient.post<ProcurementResponse<ExtractedInvoiceData>>(`/procurement/suite06/intakes/${id}/extract`)
+  }
+
+  async verifyInvoiceIntake(id: string): Promise<ProcurementResponse<InvoiceIntake>> {
+    return apiClient.patch<ProcurementResponse<InvoiceIntake>>(`/procurement/suite06/intakes/${id}/verify`)
+  }
+
+  async createDraftBillFromIntake(id: string): Promise<ProcurementResponse<ProcurementInvoice>> {
+    return apiClient.post<ProcurementResponse<ProcurementInvoice>>(`/procurement/suite06/intakes/${id}/create-draft-bill`)
+  }
+
+  async getVerificationQueue(take: number = 50): Promise<ProcurementResponse<InvoiceIntake[]>> {
+    return apiClient.get<ProcurementResponse<InvoiceIntake[]>>(`/procurement/suite06/verification-queue?take=${take}`)
+  }
+
+  async upsertFieldCorrections(data: VendorFieldCorrections): Promise<ProcurementResponse<any>> {
+    return apiClient.post<ProcurementResponse<any>>('/procurement/suite06/field-corrections', data)
+  }
+
+  async runThreeWayMatch(purchaseInvoiceId: string): Promise<ProcurementResponse<ThreeWayMatchResult>> {
+    return apiClient.post<ProcurementResponse<ThreeWayMatchResult>>(`/procurement/suite06/purchase-invoices/${purchaseInvoiceId}/run-match`)
+  }
+
+  async getCFODashboard(): Promise<ProcurementResponse<CFODashboardData>> {
+    return apiClient.get<ProcurementResponse<CFODashboardData>>('/procurement/suite06/cfo-dashboard')
+  }
+}
+
+// ============================================================================
+// SUITE 06: AI INVOICE INTAKE & 3-WAY MATCH TYPES
+// ============================================================================
+
+export interface InvoiceIntake {
+  id: string
+  documentUrl: string
+  vendorId?: string
+  vendorName?: string
+  status: 'PENDING' | 'EXTRACTED' | 'VERIFIED' | 'PROCESSED'
+  extractedData?: ExtractedInvoiceData
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ExtractedInvoiceData {
+  invoiceNumber: string
+  invoiceDate: string
+  dueDate: string
+  vendorName: string
+  vendorId?: string
+  totalAmount: string
+  currency: string
+  items: ExtractedLineItem[]
+  confidence: number
+}
+
+export interface ExtractedLineItem {
+  itemName: string
+  description?: string
+  quantity: string
+  unitPrice: string
+  totalPrice: string
+  unit: string
+}
+
+export interface VendorFieldCorrections {
+  vendorId: string
+  fieldMappings: Record<string, string>
+  createdAt?: string
+}
+
+export interface ThreeWayMatchResult {
+  purchaseInvoiceId: string
+  status: 'MATCHED' | 'DISPUTED'
+  matchDetails: {
+    poMatch: MatchLineResult[]
+    grnMatch: MatchLineResult[]
+    priceVariance: PriceVariance[]
+    quantityVariance: QuantityVariance[]
+  }
+  disputes: string[]
+}
+
+export interface MatchLineResult {
+  lineId: string
+  itemName: string
+  status: 'MATCHED' | 'UNMATCHED' | 'PARTIAL'
+  matchPercentage: number
+}
+
+export interface PriceVariance {
+  lineId: string
+  poPrice: string
+  invoicePrice: string
+  variance: string
+  variancePercentage: number
+}
+
+export interface QuantityVariance {
+  lineId: string
+  poQuantity: string
+  grnQuantity: string
+  invoiceQuantity: string
+  variance: string
+}
+
+export interface CFODashboardData {
+  totalBills: number
+  matchedBills: number
+  disputedBills: number
+  pendingVerification: number
+  totalInvoiceAmount: string
+  matchRate: number
 }
 
 // Export singleton instance
 export const procurementApiV2 = new ProcurementApiServiceV2()
+
+// ─── TYPES: SUITE 02 ───
+
+export interface ApplicantDrawdown {
+  totalInvestmentAward: string
+  committed: string
+  reserved: string
+  available: string
+  totalApprovedDrawdownAmount: string
+  ledgerApprovedPrs: any[]
+  requisitions: PurchaseRequisition[]
+}
+
+export interface CreateApplicantRequisitionRequest {
+  title: string
+  description: string
+  priority: string
+  justification: string
+  sourcingCategory: string
+  drawdownRequestAmount: number
+  useOfFundsDocumentUrl: string
+  department: string
+  items: {
+    itemName: string
+    description: string
+    quantity: number
+    unit: string
+    specifications?: Record<string, any>
+  }[]
+}

@@ -22,6 +22,15 @@ export function RSVPPage({ token, initialStatus }: RSVPPageProps) {
   const [notes, setNotes] = useState('')
   const [success, setSuccess] = useState(false)
   const [responseData, setResponseData] = useState<any>(null)
+  const [logoError, setLogoError] = useState(false)
+
+  const getOrgLogo = () => {
+    return process.env.NEXT_PUBLIC_ORGANIZATION_LOGO || '/logo.png'
+  }
+
+  const getOrgName = () => {
+    return process.env.NEXT_PUBLIC_ORGANIZATION_NAME || 'Arcus'
+  }
 
   useEffect(() => {
     if (initialStatus) {
@@ -122,15 +131,28 @@ export function RSVPPage({ token, initialStatus }: RSVPPageProps) {
           <Card className="shadow-2xl border-0">
             <CardHeader className="text-center pb-6 pt-8">
               {/* Logo */}
-              <div className="flex justify-center mb-6">
-                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg">
-                  <Calendar className="w-12 h-12 text-white" />
+              <div className="flex justify-center mb-6 relative">
+                <div className="w-24 h-24 rounded-full bg-white flex items-center justify-center shadow-md border-4 border-slate-100 relative overflow-hidden">
+                  {!logoError ? (
+                    <Image
+                      src={getOrgLogo()}
+                      alt={getOrgName()}
+                      width={96}
+                      height={96}
+                      className="rounded-full"
+                      onError={() => setLogoError(true)}
+                      priority
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-50 to-blue-100">
+                      <span className="text-xs font-bold text-blue-600">{getOrgName().substring(0, 2).toUpperCase()}</span>
+                    </div>
+                  )}
                 </div>
-              </div>
-
-              {/* Status Icon */}
-              <div className="flex justify-center mb-4">
-                {getStatusIcon(responseData.rsvpStatus)}
+                {/* Status Icon Overlay */}
+                <div className="absolute bottom-0 right-0">
+                  {getStatusIcon(responseData.rsvpStatus)}
+                </div>
               </div>
 
               <CardTitle className="text-3xl font-bold text-gray-900 mb-2">
@@ -181,10 +203,10 @@ export function RSVPPage({ token, initialStatus }: RSVPPageProps) {
               )}
 
               <Button
-                onClick={() => window.location.href = 'http://kyntaro.com'}
+                onClick={() => window.location.href = process.env.NEXT_PUBLIC_ORGANIZATION_URL || '/'}
                 className="w-full h-12 text-base font-semibold bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 rounded-full"
               >
-                Go to Home
+                Back to {getOrgName()}
               </Button>
             </CardContent>
           </Card>
@@ -205,8 +227,22 @@ export function RSVPPage({ token, initialStatus }: RSVPPageProps) {
           <CardHeader className="text-center pb-6 pt-8">
             {/* Logo */}
             <div className="flex justify-center mb-6">
-              <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg">
-                <Calendar className="w-12 h-12 text-white" />
+              <div className="w-24 h-24 rounded-full bg-white flex items-center justify-center shadow-md border-4 border-slate-100 overflow-hidden">
+                {!logoError ? (
+                  <Image
+                    src={getOrgLogo()}
+                    alt={getOrgName()}
+                    width={96}
+                    height={96}
+                    className="rounded-full"
+                    onError={() => setLogoError(true)}
+                    priority
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-50 to-blue-100">
+                    <span className="text-xs font-bold text-blue-600">{getOrgName().substring(0, 2).toUpperCase()}</span>
+                  </div>
+                )}
               </div>
             </div>
 

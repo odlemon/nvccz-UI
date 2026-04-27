@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useForm, Controller } from "react-hook-form"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -15,6 +15,7 @@ import { toast } from "sonner"
 import { useAppDispatch, useAppSelector } from "@/lib/store"
 import { addExpense, fetchExpenses } from "@/lib/store/slices/eventsSlice"
 import { type BudgetCategory, type PaymentMethod } from "@/lib/api/events-api"
+import { accountingApi, type Vendor } from "@/lib/api/accounting-api"
 
 interface AddExpenseDialogProps {
   isOpen: boolean
@@ -26,7 +27,7 @@ interface ExpenseFormData {
   description: string
   amount: string
   category: BudgetCategory
-  vendor: string
+  vendorId: string
   budgetItemId: string
   paymentMethod: PaymentMethod
   paymentDate: string
@@ -53,6 +54,8 @@ const PAYMENT_METHODS: PaymentMethod[] = ["BANK", "CASH", "CARD", "OTHER"]
 export function AddExpenseDialog({ isOpen, onClose, eventId }: AddExpenseDialogProps) {
   const dispatch = useAppDispatch()
   const [loading, setLoading] = useState(false)
+  const [vendors, setVendors] = useState<Vendor[]>([])
+  const [vendorsLoading, setVendorsLoading] = useState(false)
   const { currentEventBudgetItems } = useAppSelector((state) => state.events)
 
   const {
@@ -66,7 +69,7 @@ export function AddExpenseDialog({ isOpen, onClose, eventId }: AddExpenseDialogP
       description: "",
       amount: "",
       category: "CATERING",
-      vendor: "",
+      vendorId: "",
       budgetItemId: "NONE",
       paymentMethod: "BANK",
       paymentDate: new Date().toISOString().split("T")[0],
@@ -76,11 +79,45 @@ export function AddExpenseDialog({ isOpen, onClose, eventId }: AddExpenseDialogP
     }
   })
 
+  useEffect(() => {
+    if (!isOpen) return
+    let cancelled = false
+    const loadVendors = async () => {
+      setVendorsLoading(true)
+      try {
+        const res = await accountingApi.getVendors({ isActive: true, limit: 200 })
+        if (!cancelled && res.success && res.data) {
+          setVendors(res.data)
+        }
+      } catch (err: any) {
+        if (!cancelled) {
+          toast.error("Failed to load vendors", {
+            description: err?.message || "Try reopening the dialog",
+          })
+        }
+      } finally {
+        if (!cancelled) setVendorsLoading(false)
+      }
+    }
+    loadVendors()
+    return () => {
+      cancelled = true
+    }
+  }, [isOpen])
+
   const onSubmit = async (data: ExpenseFormData) => {
     if (!data.description.trim() || !data.amount) {
       toast.error("Description and amount are required")
       return
     }
+    if (!data.vendorId) {
+      toast.error("Vendor is required", {
+        description: "A vendor must be selected so the journal entry can be posted",
+      })
+      return
+    }
+
+    const selectedVendor = vendors.find((v) => v.id === data.vendorId)
 
     setLoading(true)
     try {
@@ -88,11 +125,18 @@ export function AddExpenseDialog({ isOpen, onClose, eventId }: AddExpenseDialogP
         addExpense({
           eventId,
           data: {
-            ...data,
+            description: data.description,
             amount: Number(data.amount),
+            category: data.category,
+            vendorId: data.vendorId,
+            vendor: selectedVendor?.name,
+            paymentMethod: data.paymentMethod,
             paymentDate: new Date(data.paymentDate).toISOString(),
-            budgetItemId: data.budgetItemId === "NONE" ? undefined : data.budgetItemId
-          }
+            isTaxable: data.isTaxable,
+            isReimbursable: data.isReimbursable,
+            receiptNumber: data.receiptNumber || undefined,
+            budgetItemId: data.budgetItemId === "NONE" ? undefined : data.budgetItemId,
+          },
         })
       ).unwrap()
 
@@ -100,10 +144,13 @@ export function AddExpenseDialog({ isOpen, onClose, eventId }: AddExpenseDialogP
       toast.success("Expense recorded successfully")
       handleClose()
     } catch (error: any) {
+      // rejectWithValue passes a string; thrown Errors come through as objects
+      const description =
+        typeof error === "string"
+          ? error
+          : error?.message || "Please try again"
       console.error("Failed to record expense:", error)
-      toast.error("Failed to record expense", {
-        description: error.message || "Please try again"
-      })
+      toast.error("Failed to record expense", { description })
     } finally {
       setLoading(false)
     }
@@ -208,16 +255,41 @@ export function AddExpenseDialog({ isOpen, onClose, eventId }: AddExpenseDialogP
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="vendor">Vendor</Label>
+                  <Label htmlFor="vendorId">Vendor *</Label>
                   <Controller
-                    name="vendor"
+                    name="vendorId"
                     control={control}
+                    rules={{ required: "Vendor is required" }}
                     render={({ field }) => (
-                      <Input
-                        {...field}
-                        id="vendor"
-                        placeholder="Vendor name"
-                      />
+                      <div>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value}
+                          disabled={vendorsLoading}
+                        >
+                          <SelectTrigger className={errors.vendorId ? "border-red-500" : ""}>
+                            <SelectValue
+                              placeholder={vendorsLoading ? "Loading vendors..." : "Select vendor"}
+                            />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {vendors.length === 0 && !vendorsLoading ? (
+                              <div className="px-3 py-2 text-sm text-muted-foreground">
+                                No vendors found. Add one in Accounting → Vendors.
+                              </div>
+                            ) : (
+                              vendors.map((v) => (
+                                <SelectItem key={v.id} value={v.id}>
+                                  {v.name}
+                                </SelectItem>
+                              ))
+                            )}
+                          </SelectContent>
+                        </Select>
+                        {errors.vendorId && (
+                          <p className="text-sm text-red-500 mt-1">{errors.vendorId.message}</p>
+                        )}
+                      </div>
                     )}
                   />
                 </div>

@@ -30,6 +30,8 @@ export function InvoiceDrawerContent({ invoice, onUpdate, onProcessPayment, onCl
   const [approving, setApproving] = useState(false)
   const [PDFComponents, setPDFComponents] = useState<any>(null)
 
+  const currencySymbol = invoice.currency?.symbol || '$'
+
   useEffect(() => {
     // Dynamically import PDF components only on client
     import("@react-pdf/renderer").then((pdfModule) => {
@@ -234,10 +236,10 @@ export function InvoiceDrawerContent({ invoice, onUpdate, onProcessPayment, onCl
                   <TableCell className="text-sm text-gray-600">{item.description}</TableCell>
                   <TableCell className="text-right">{item.quantity} {item.unit}</TableCell>
                   <TableCell className="text-right">
-                    {invoice.currency.symbol}{parseFloat(item.unitPrice.toString()).toFixed(2)}
+                    {currencySymbol}{parseFloat(item.unitPrice.toString()).toFixed(2)}
                   </TableCell>
                   <TableCell className="text-right font-medium">
-                    {invoice.currency.symbol}{parseFloat(item.totalPrice?.toString() || '0').toFixed(2)}
+                    {currencySymbol}{parseFloat(item.totalPrice?.toString() || '0').toFixed(2)}
                   </TableCell>
                 </TableRow>
               ))}
@@ -249,13 +251,13 @@ export function InvoiceDrawerContent({ invoice, onUpdate, onProcessPayment, onCl
             <div className="flex justify-between items-center text-lg">
               <span className="text-gray-600">Subtotal:</span>
               <span className="font-semibold">
-                {invoice.currency.symbol}{parseFloat(invoice.subtotal).toLocaleString()}
+                {currencySymbol}{parseFloat(invoice.subtotal).toLocaleString()}
               </span>
             </div>
             <div className="flex justify-between items-center text-lg">
               <span className="text-gray-600">Tax Amount:</span>
               <span className="font-semibold">
-                {invoice.currency.symbol}{parseFloat(invoice.taxAmount).toLocaleString()}
+                {currencySymbol}{parseFloat(invoice.taxAmount).toLocaleString()}
               </span>
             </div>
             <div className="flex justify-between items-center text-2xl font-bold bg-gradient-to-r from-green-500 to-green-600 text-white p-4 rounded-lg">
@@ -263,7 +265,7 @@ export function InvoiceDrawerContent({ invoice, onUpdate, onProcessPayment, onCl
                 <DollarSign className="w-6 h-6" />
                 Total Amount:
               </span>
-              <span>{invoice.currency.symbol}{parseFloat(invoice.totalAmount).toLocaleString()}</span>
+              <span>{currencySymbol}{parseFloat(invoice.totalAmount).toLocaleString()}</span>
             </div>
           </div>
         </CardContent>
@@ -334,7 +336,7 @@ export function InvoiceDrawerContent({ invoice, onUpdate, onProcessPayment, onCl
               <div>
                 <p className="font-medium text-blue-900">Total Amount</p>
                 <p className="text-2xl font-bold text-blue-600">
-                  {invoice.currency.symbol}{parseFloat(invoice.totalAmount).toLocaleString()}
+                  {currencySymbol}{parseFloat(invoice.totalAmount).toLocaleString()}
                 </p>
               </div>
             </div>

@@ -1,23 +1,14 @@
 "use client"
 
 import { useEffect, useState, useMemo } from "react"
-import { useAppDispatch, useAppSelector } from "@/lib/store"
 import { ProcurementDataTable, Column } from "./procurement-data-table"
 import { ProcurementDrawer } from "./procurement-drawer"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useProcurementPermissions } from "@/lib/hooks/useProcurementPermissions"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import {
-  setGoodsReceivedNotes,
-  addGoodsReceivedNote,
-  updateGoodsReceivedNote,
-  removeGoodsReceivedNote,
-  setGRNLoading,
-  setGRNError,
-  setSelectedGRN
-} from "@/lib/store/slices/procurementSlice"
-import { procurementApi, GoodsReceivedNote } from "@/lib/api/procurement-api"
+import { procurementApiV2, GoodsReceivedNote } from "@/lib/api/procurement-api-v2"
 import { CiViewTimeline, CiCalendar, CiShop, CiCircleCheck } from "react-icons/ci"
 import { Package, CheckCircle, Clock, AlertCircle, XCircle } from "lucide-react"
 import { toast } from "sonner"
@@ -25,9 +16,10 @@ import { CreateGRNModal } from "./create-grn-modal"
 import { ApprovalDialog } from "./approval-dialog"
 
 export function GoodsReceivedNotes() {
-  const dispatch = useAppDispatch()
   const { permissions } = useProcurementPermissions()
-  const { goodsReceivedNotes, grnLoading } = useAppSelector(state => state.procurement)
+  const [selectedTab, setSelectedTab] = useState('all')
+  const [grns, setGRNs] = useState<GoodsReceivedNote[]>([])
+  const [loading, setLoading] = useState(false)
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   const [viewingGRN, setViewingGRN] = useState<GoodsReceivedNote | null>(null)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
@@ -42,25 +34,40 @@ export function GoodsReceivedNotes() {
 
   const loadGoodsReceivedNotes = async () => {
     try {
-      dispatch(setGRNLoading(true))
-      const response = await procurementApi.getGoodsReceivedNotes()
+      setLoading(true)
+      const response = await procurementApiV2.getGRNs()
       if (response.success && response.data) {
-        dispatch(setGoodsReceivedNotes(response.data))
+        setGRNs(response.data)
       } else {
-        dispatch(setGRNError('Failed to load goods received notes'))
         toast.error("Failed to load goods received notes")
       }
     } catch (error: any) {
-      dispatch(setGRNError(error.message))
       toast.error("Error loading goods received notes", { description: error.message })
     } finally {
-      dispatch(setGRNLoading(false))
+      setLoading(false)
     }
+  }
+
+  const getCurrentData = () => {
+    if (selectedTab === 'all') return grns
+    if (selectedTab === 'received') return grns.filter(grn => grn.status === 'RECEIVED')
+    if (selectedTab === 'partial') return grns.filter(grn => grn.status === 'PARTIALLY_RECEIVED')
+    if (selectedTab === 'approved') return grns.filter(grn => grn.status === 'APPROVED')
+    return grns
+  }
+
+  const getTabCount = (status: string) => {
+    if (status === 'all') return grns.length
+    return grns.filter(grn => {
+      if (status === 'received') return grn.status === 'RECEIVED'
+      if (status === 'partial') return grn.status === 'PARTIALLY_RECEIVED'
+      if (status === 'approved') return grn.status === 'APPROVED'
+      return false
+    }).length
   }
 
   const handleView = (grn: GoodsReceivedNote) => {
     setViewingGRN(grn)
-    dispatch(setSelectedGRN(grn))
     setIsDrawerOpen(true)
   }
 
@@ -69,7 +76,6 @@ export function GoodsReceivedNotes() {
   }
 
   const handleEdit = (grn: GoodsReceivedNote) => {
-    // TODO: Implement edit functionality
     toast.info("Edit functionality coming soon")
   }
 
@@ -80,7 +86,7 @@ export function GoodsReceivedNotes() {
 
     try {
       // TODO: Implement delete API call
-      dispatch(removeGoodsReceivedNote(grn.id))
+      setGRNs(grns.filter(g => g.id !== grn.id))
       toast.success("GRN deleted successfully")
     } catch (error: any) {
       toast.error("Failed to delete GRN", { description: error.message })
@@ -119,7 +125,7 @@ export function GoodsReceivedNotes() {
       key: 'grnNumber',
       label: 'GRN Number',
       sortable: true,
-      render: (value, row) => (
+      render: (value) => (
         <div className="flex items-center gap-2">
           <CiViewTimeline className="w-4 h-4 text-blue-600" />
           <span className="font-medium">{value}</span>
@@ -127,15 +133,21 @@ export function GoodsReceivedNotes() {
       )
     },
     {
-      key: 'purchaseOrder',
+      key: 'poNumber',
       label: 'Purchase Order',
       sortable: true,
       render: (value) => (
         <div className="flex items-center gap-2">
           <CiShop className="w-4 h-4 text-gray-600" />
-          <span>{value?.purchaseOrderNumber || 'N/A'}</span>
+          <span>{value || 'N/A'}</span>
         </div>
       )
+    },
+    {
+      key: 'vendorName',
+      label: 'Vendor',
+      sortable: true,
+      render: (value) => <span>{value || 'N/A'}</span>
     },
     {
       key: 'status',
@@ -152,28 +164,16 @@ export function GoodsReceivedNotes() {
       )
     },
     {
-      key: 'items',
-      label: 'Items Summary',
-      render: (items) => {
-        if (!items || items.length === 0) return <span className="text-gray-500">No items</span>
-
-        const totalReceived = items.reduce((sum: number, item: any) => sum + item.quantityReceived, 0)
-        const totalAccepted = items.reduce((sum: number, item: any) => sum + item.quantityAccepted, 0)
-        const totalRejected = items.reduce((sum: number, item: any) => sum + item.quantityRejected, 0)
-
-        return (
-          <div className="space-y-1">
-            <div className="flex items-center gap-2 text-sm">
-              <Package className="w-3 h-3 text-blue-600" />
-              <span>{totalReceived} received</span>
-            </div>
-            <div className="flex items-center gap-4 text-xs text-gray-600">
-              <span className="text-green-600">{totalAccepted} accepted</span>
-              {totalRejected > 0 && <span className="text-red-600">{totalRejected} rejected</span>}
-            </div>
+      key: 'receivedItems',
+      label: 'Items Received',
+      render: (value, row) => (
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-sm">
+            <Package className="w-3 h-3 text-blue-600" />
+            <span>{value}/{row.totalItems} items</span>
           </div>
-        )
-      }
+        </div>
+      )
     },
     {
       key: 'createdAt',
@@ -189,7 +189,8 @@ export function GoodsReceivedNotes() {
   ]
 
   const filterOptions = [
-    { label: 'Pending Approval', value: 'PENDING_APPROVAL' },
+    { label: 'Received', value: 'RECEIVED' },
+    { label: 'Partially Received', value: 'PARTIALLY_RECEIVED' },
     { label: 'Approved', value: 'APPROVED' },
     { label: 'Rejected', value: 'REJECTED' }
   ]
@@ -239,23 +240,47 @@ export function GoodsReceivedNotes() {
         </div>
       </div>
 
-      {/* Data Table */}
-      <ProcurementDataTable
-        data={goodsReceivedNotes}
-        columns={columns}
-        title="Goods Received Notes"
-        searchPlaceholder="Search GRNs..."
-        filterOptions={filterOptions}
-        onView={handleView}
-        onEdit={permissions.canUpdateGRN ? handleEdit : undefined}
-        onDelete={permissions.canDeleteGRN ? handleDelete : undefined}
-        onCreate={permissions.canCreateGRN ? handleCreate : undefined}
-        onBulkAction={handleBulkAction}
-        bulkActions={filteredBulkActions}
-        loading={grnLoading}
-        onExport={handleExport}
-        emptyMessage="No goods received notes found. Create your first GRN to get started."
-      />
+      {/* Status Tabs */}
+      <Tabs value={selectedTab} onValueChange={setSelectedTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="all" className="flex gap-2">
+            All
+            <Badge variant="secondary">{getTabCount('all')}</Badge>
+          </TabsTrigger>
+          <TabsTrigger value="received" className="flex gap-2">
+            Received
+            <Badge variant="secondary">{getTabCount('received')}</Badge>
+          </TabsTrigger>
+          <TabsTrigger value="partial" className="flex gap-2">
+            Partial
+            <Badge variant="secondary">{getTabCount('partial')}</Badge>
+          </TabsTrigger>
+          <TabsTrigger value="approved" className="flex gap-2">
+            Approved
+            <Badge variant="secondary">{getTabCount('approved')}</Badge>
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value={selectedTab} className="space-y-6">
+          {/* Data Table */}
+          <ProcurementDataTable
+            data={getCurrentData()}
+            columns={columns}
+            title="Goods Received Notes"
+            searchPlaceholder="Search GRNs..."
+            filterOptions={filterOptions}
+            onView={handleView}
+            onEdit={permissions.canUpdateGRN ? handleEdit : undefined}
+            onDelete={permissions.canDeleteGRN ? handleDelete : undefined}
+            onCreate={permissions.canCreateGRN ? handleCreate : undefined}
+            onBulkAction={handleBulkAction}
+            bulkActions={filteredBulkActions}
+            loading={loading}
+            onExport={handleExport}
+            emptyMessage="No goods received notes found. Create your first GRN to get started."
+          />
+        </TabsContent>
+      </Tabs>
 
       {/* View Drawer */}
       <ProcurementDrawer
@@ -292,7 +317,17 @@ export function GoodsReceivedNotes() {
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-600">Purchase Order</label>
-                    <p className="font-medium">{viewingGRN.purchaseOrder?.purchaseOrderNumber || 'N/A'}</p>
+                    <p className="font-medium">{viewingGRN.poNumber || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Vendor</label>
+                    <p className="font-medium">{viewingGRN.vendorName || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Received Date</label>
+                    <p className="font-medium">
+                      {new Date(viewingGRN.receivedDate).toLocaleDateString()}
+                    </p>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-600">Created Date</label>
@@ -304,50 +339,64 @@ export function GoodsReceivedNotes() {
               </CardContent>
             </Card>
 
-            {/* Items with Quality Control */}
+            {/* Items Summary */}
             <Card>
               <CardHeader>
-                <CardTitle>Received Items & Quality Control</CardTitle>
+                <CardTitle>Received Items</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {viewingGRN.items?.map((item, index) => (
-                    <div key={index} className="p-4 border rounded-lg space-y-3">
-                      <div className="flex items-center justify-between">
-                        <h4 className="font-medium">Item {index + 1}</h4>
-                        <Badge className={getQualityStatusColor(item.qualityStatus)}>
-                          {item.qualityStatus}
-                        </Badge>
-                      </div>
+                  {viewingGRN.items && viewingGRN.items.length > 0 ? (
+                    viewingGRN.items.map((item, index) => (
+                      <div key={index} className="p-4 border rounded-lg space-y-3">
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-medium">{item.itemName}</h4>
+                          <Badge className={item.status === 'RECEIVED' ? 'bg-green-100 text-green-800' : item.status === 'REJECTED' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}>
+                            {item.status}
+                          </Badge>
+                        </div>
 
-                      <div className="grid grid-cols-3 gap-4 text-sm">
-                        <div>
-                          <label className="text-gray-600">Quantity Received</label>
-                          <p className="font-medium text-blue-600">{item.quantityReceived}</p>
+                        <div className="grid grid-cols-3 gap-4 text-sm">
+                          <div>
+                            <label className="text-gray-600">PO Quantity</label>
+                            <p className="font-medium text-blue-600">{item.poQuantity}</p>
+                          </div>
+                          <div>
+                            <label className="text-gray-600">Received</label>
+                            <p className="font-medium text-green-600">{item.receivedQuantity}</p>
+                          </div>
+                          <div>
+                            <label className="text-gray-600">Unit</label>
+                            <p className="font-medium">{item.unit}</p>
+                          </div>
                         </div>
-                        <div>
-                          <label className="text-gray-600">Quantity Accepted</label>
-                          <p className="font-medium text-green-600">{item.quantityAccepted}</p>
-                        </div>
-                        <div>
-                          <label className="text-gray-600">Quantity Rejected</label>
-                          <p className="font-medium text-red-600">{item.quantityRejected}</p>
-                        </div>
-                      </div>
 
-                      {item.qualityNotes && (
-                        <div>
-                          <label className="text-sm text-gray-600">Quality Notes</label>
-                          <p className="text-sm bg-gray-50 p-2 rounded mt-1">{item.qualityNotes}</p>
-                        </div>
-                      )}
-                    </div>
-                  )) || (
-                      <p className="text-gray-500 text-center py-4">No items found</p>
-                    )}
+                        {item.rejectionReason && (
+                          <div>
+                            <label className="text-sm text-gray-600">Rejection Reason</label>
+                            <p className="text-sm bg-red-50 p-2 rounded mt-1 text-red-700">{item.rejectionReason}</p>
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-gray-500 text-center py-4">No items found</p>
+                  )}
                 </div>
               </CardContent>
             </Card>
+
+            {/* Notes */}
+            {viewingGRN.notes && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Notes</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-gray-700">{viewingGRN.notes}</p>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Actions */}
             <div className="flex items-center gap-3 pt-4 border-t">
@@ -392,6 +441,7 @@ export function GoodsReceivedNotes() {
           setIsCreateModalOpen(false)
           loadGoodsReceivedNotes()
         }}
+        isInvestee={false}
       />
 
       {/* Approval Dialog */}
