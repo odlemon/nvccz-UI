@@ -33,6 +33,10 @@ import portfolioCompaniesReducer from './slices/portfolioCompaniesSlice'
 import portfolioDashboardReducer from './slices/portfolioDashboardSlice'
 import reconciliationReducer from './slices/reconciliationSlice'
 import shortTermInvestmentsReducer from './slices/shortTermInvestmentsSlice'
+import performanceConfigReducer from './slices/performanceConfigSlice'
+import performanceTasksReducer from './slices/performanceTasksSlice'
+import performanceReviewsReducer from './slices/performanceReviewsSlice'
+import notificationsReducer from './slices/notificationsSlice'
 
 export const store = configureStore({
   reducer: {
@@ -68,6 +72,10 @@ export const store = configureStore({
     zseStocks: zseStocksReducer,
     marketOverview: marketOverviewReducer,
     shortTermInvestments: shortTermInvestmentsReducer,
+    performanceConfig: performanceConfigReducer,
+    performanceTasks: performanceTasksReducer,
+    performanceReviews: performanceReviewsReducer,
+    notifications: notificationsReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

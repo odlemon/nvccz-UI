@@ -5,6 +5,7 @@ import { useSelector, useDispatch } from "react-redux"
 import { AppDispatch, RootState } from "@/lib/store/store"
 import { fetchPerformanceDashboard } from "@/lib/store/slices/performanceSlice"
 import { PerformanceDashboardSkeleton } from "./performance-dashboard-skeleton"
+import { VisionBanner } from "./configuration/vision-banner"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -167,6 +168,9 @@ export function PerformanceDashboardV2() {
     return (
         <div className="min-h-screen bg-[#F6F6F6] p-6 -m-6">
             <div className="space-y-4">
+                {/* Vision Banner */}
+                <VisionBanner />
+
                 {/* Filter Bar */}
                 <div className="flex flex-wrap items-center justify-start gap-3 mb-4">
                     <Select value={selectedWeek} onValueChange={setSelectedWeek}>

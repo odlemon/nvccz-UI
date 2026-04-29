@@ -578,24 +578,13 @@ export const payrollRunsApi = {
   },
 
   generateBankFile: async (id: string, bankTemplateId: string): Promise<Blob> => {
-    // Import getAuthToken from cookies
-    const { getAuthToken } = await import('@/lib/utils/cookies')
-    const token = getAuthToken()
-    
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://nvccz-pi.vercel.app'}/api/payroll/payroll-runs/${id}/bank-file`, {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json', 
-        'Authorization': `Bearer ${token}` 
-      },
-      body: JSON.stringify({ bankTemplateId })
-    })
-    
-    if (!response.ok) {
-      throw new Error(`Failed to generate bank file: ${response.statusText}`)
-    }
-    
-    return response.blob()
+    const requestOptions = { responseType: 'blob' } as RequestInit & { responseType: string }
+
+    return apiClient.post<Blob>(
+      `/payroll/payroll-runs/${id}/bank-file`,
+      { bankTemplateId },
+      requestOptions
+    )
   },
 
   delete: async (id: string): Promise<ApiResponse<void>> => {

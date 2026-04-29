@@ -174,7 +174,7 @@ class ApiClient {
   }
 
   // POST request
-  async post<T>(endpoint: string, data?: any, options?: RequestInit): Promise<T> {
+  async post<T>(endpoint: string, data?: any, options?: RequestInit & { responseType?: string }): Promise<T> {
     return this.makeRequest<T>(endpoint, {
       ...options,
       method: 'POST',
@@ -191,7 +191,7 @@ class ApiClient {
   }
 
   // PUT request
-  async put<T>(endpoint: string, data?: any, options?: RequestInit): Promise<T> {
+  async put<T>(endpoint: string, data?: any, options?: RequestInit & { responseType?: string }): Promise<T> {
     return this.makeRequest<T>(endpoint, {
       ...options,
       method: 'PUT',
@@ -208,7 +208,7 @@ class ApiClient {
   }
 
   // DELETE request
-  async delete<T>(endpoint: string, options?: RequestInit): Promise<T> {
+  async delete<T>(endpoint: string, options?: RequestInit & { responseType?: string }): Promise<T> {
     return this.makeRequest<T>(endpoint, {
       ...options,
       method: 'DELETE',
@@ -216,7 +216,7 @@ class ApiClient {
   }
 
   // PATCH request
-  async patch<T>(endpoint: string, data?: any, options?: RequestInit): Promise<T> {
+  async patch<T>(endpoint: string, data?: any, options?: RequestInit & { responseType?: string }): Promise<T> {
     return this.makeRequest<T>(endpoint, {
       ...options,
       method: 'PATCH',

@@ -1,3 +1,5 @@
+"use client"
+
 import { PerformanceLayout } from "@/components/layout/performance-layout"
 import { TaskManagement } from "@/components/performance/task-management"
 import { ModuleGuard } from "@/lib/permissions"

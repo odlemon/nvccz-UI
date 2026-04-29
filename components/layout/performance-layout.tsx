@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation"
 import { SharedTopbar } from "./shared-topbar"
 import { PerformanceSidebar } from "./performance-sidebar"
 import { MODULE_CONFIG, getModuleByPath } from "@/lib/config/modules"
+import { GlobalRealtimeMount } from "@/components/performance/collaboration/global-realtime-mount"
 
 interface PerformanceLayoutProps {
   children: React.ReactNode
@@ -35,6 +36,7 @@ export function PerformanceLayout({ children }: PerformanceLayoutProps) {
 
   return (
     <div className="min-h-screen bg-background">
+      <GlobalRealtimeMount />
       <SharedTopbar onModuleSelect={handleModuleSelect} currentModule={currentModule} />
 
       <div className="flex">

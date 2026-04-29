@@ -193,6 +193,7 @@ export function DocumentPreviewModal({
   }
 
   const formatDocumentType = (type: string) => {
+    if (!type) return "Document"
     return type.replaceAll('_', ' ').split(' ').map(word => 
       word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
     ).join(' ')

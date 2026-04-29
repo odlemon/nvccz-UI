@@ -1,22 +1,34 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useAppSelector, useAppDispatch } from "@/lib/store"
-import { fetchMyTasks, fetchDepartmentTasks, updateTaskStage } from "@/lib/store/slices/taskSlice"
+import {
+  fetchMyKanbanTasks,
+  setFilters,
+  setSelectedTaskId,
+} from "@/lib/store/slices/performanceTasksSlice"
 import { fetchAvailableDepartments } from "@/lib/store/slices/performanceSlice"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Sheet, SheetContent } from "@/components/ui/sheet"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { CiViewList as List, CiViewBoard as Kanban, CiSearch } from "react-icons/ci"
-import { LayoutGrid, LayoutList } from "lucide-react"
+import { LayoutGrid, LayoutList, Calendar, Tag, Users, AlertTriangle, ListChecks } from "lucide-react"
 import { toast } from "sonner"
-import { TaskCard } from "./task-card"
-import { TaskDrawerView } from "./task-drawer-view"
 import { GoalHierarchyInfo } from "./goal-hierarchy-info"
-import { TaskBoardView } from "./task-board-view"
 import { usePerformancePermissions } from "@/lib/hooks/usePerformancePermissions"
+import { KanbanBoard } from "./kanban/kanban-board"
+import { TaskDetailDialog } from "./kanban/task-detail-dialog"
+import { TaskCreateDialog } from "./kanban/task-create-dialog"
+import { Badge } from "@/components/ui/badge"
+import { Plus } from "lucide-react"
+import { format } from "date-fns"
+import { PerformanceTask } from "@/lib/api/performance-tasks-api"
+import {
+  SingleGoalPicker,
+  PickedGoal,
+} from "./configuration/single-goal-picker"
+import { apiClient } from "@/lib/api/api-client"
 
 type TaskView = "my-tasks" | "department-tasks"
 type ViewMode = "list" | "kanban"
@@ -45,26 +57,53 @@ const TaskPageSkeleton = () => (
 export function TaskManagement() {
   const dispatch = useAppDispatch()
   const { permissions } = usePerformancePermissions()
-  const { tasks, loading: isLoading, error } = useAppSelector((state) => state.tasks)
+  const {
+    tasks,
+    loading: isLoading,
+    error,
+    filters,
+    selectedTaskId,
+  } = useAppSelector((state) => state.performanceTasks)
   const { availableDepartments } = useAppSelector((state) => state.performance)
 
   const [activeTab, setActiveTab] = useState<TaskView>("my-tasks")
   const [viewMode, setViewMode] = useState<ViewMode>("list")
-  const [searchTerm, setSearchTerm] = useState("")
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
-  const [selectedDepartment, setSelectedDepartment] = useState<string | null>(null)
+  const [pickedGoal, setPickedGoal] = useState<PickedGoal | null>(null)
+  const [createOpen, setCreateOpen] = useState(false)
+
+  // Resolve goal title when filters.goalId is set externally
+  useEffect(() => {
+    const id = filters.goalId
+    if (!id) {
+      if (pickedGoal) setPickedGoal(null)
+      return
+    }
+    if (pickedGoal && pickedGoal.id === id) return
+    let cancelled = false
+    apiClient
+      .get<any>(`/performance/goals/${id}`)
+      .then((res) => {
+        if (cancelled) return
+        const goal = res?.data || res?.goal || res
+        if (goal?.id && goal?.title) {
+          setPickedGoal({ id: goal.id, title: goal.title })
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setPickedGoal({ id, title: id })
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [filters.goalId, pickedGoal])
 
   useEffect(() => {
     dispatch(fetchAvailableDepartments())
   }, [dispatch])
 
   useEffect(() => {
-    if (activeTab === "my-tasks") {
-      dispatch(fetchMyTasks())
-    } else if (activeTab === "department-tasks" && selectedDepartment) {
-      dispatch(fetchDepartmentTasks(selectedDepartment))
-    }
-  }, [activeTab, selectedDepartment, dispatch])
+    dispatch(fetchMyKanbanTasks(filters))
+  }, [dispatch, filters])
 
   useEffect(() => {
     if (error) {
@@ -72,34 +111,59 @@ export function TaskManagement() {
     }
   }, [error])
 
-  const filteredTasks = (tasks || []).filter(
-    (task) =>
-      task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      task.description?.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
+  useEffect(() => {
+    if (activeTab === "my-tasks" && filters.department) {
+      dispatch(setFilters({ ...filters, department: undefined }))
+    }
+  }, [activeTab, dispatch, filters])
 
-  const handleUpdateStage = async (taskId: string, stage: string, notes?: string) => {
+  const listTasks = useMemo(() => tasks || [], [tasks])
+
+  const dueLabel = (task: PerformanceTask) => {
+    const due = task.dueDate || task.date
+    if (!due) return null
     try {
-      await dispatch(updateTaskStage({ taskId, stage, notes })).unwrap()
-      toast.success("Task stage updated successfully")
-      // Refresh tasks
-      if (activeTab === "my-tasks") {
-        dispatch(fetchMyTasks())
-      } else if (selectedDepartment) {
-        dispatch(fetchDepartmentTasks(selectedDepartment))
-      }
-    } catch (error) {
-      toast.error("Failed to update task stage")
+      return format(new Date(due), "MMM d, yyyy")
+    } catch {
+      return null
     }
   }
 
-  const handleEditTask = (task: any) => {
-    setSelectedTaskId(task.id)
+  const stageBadgeClass = (stage?: string) => {
+    switch (stage) {
+      case "completed":
+        return "bg-green-100 text-green-800"
+      case "in_progress":
+        return "bg-blue-100 text-blue-800"
+      case "overdue":
+        return "bg-red-100 text-red-800"
+      case "delayed":
+        return "bg-orange-100 text-orange-800"
+      case "amber":
+        return "bg-amber-100 text-amber-800"
+      case "red":
+        return "bg-red-100 text-red-800"
+      case "todo":
+      default:
+        return "bg-gray-100 text-gray-800"
+    }
   }
 
-  const handleDeleteTask = async (taskId: string) => {
-    // Implement delete functionality if needed
-    toast.info("Delete functionality to be implemented")
+  const priorityBadgeClass = (priority?: string) => {
+    switch (priority) {
+      case "critical":
+        return "bg-red-100 text-red-800"
+      case "high":
+        return "bg-orange-100 text-orange-800"
+      case "medium":
+        return "bg-yellow-100 text-yellow-800"
+      case "low":
+        return "bg-green-100 text-green-800"
+      case "urgent":
+        return "bg-purple-100 text-purple-800"
+      default:
+        return "bg-gray-100 text-gray-800"
+    }
   }
 
   return (
@@ -112,6 +176,13 @@ export function TaskManagement() {
             Create, track, and manage performance tasks linked to individual goals
           </p>
         </div>
+        <Button 
+          onClick={() => setCreateOpen(true)}
+          className="rounded-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg transition-all duration-200"
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          Create Task
+        </Button>
       </div>
 
       {/* Goal Hierarchy Info */}
@@ -148,123 +219,287 @@ export function TaskManagement() {
       </div>
 
       {/* Search & Filters */}
-      <div className="flex items-center gap-4">
-        <div className="relative flex-1 max-w-md">
-          <CiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-          <Input
-            placeholder="Search tasks..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 rounded-full"
-          />
-        </div>
-        {activeTab === "department-tasks" && (
-          <Select
-            onValueChange={(value) => {
-              setSelectedDepartment(value)
-              if (value) {
-                dispatch(fetchDepartmentTasks(value))
+      <div className="flex flex-wrap items-center gap-3">
+          <div className="relative flex-1 min-w-[240px] max-w-sm">
+            <CiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <Input
+              placeholder="Search tasks..."
+              value={filters.search || ""}
+              onChange={(e) =>
+                dispatch(
+                  setFilters({
+                    ...filters,
+                    search: e.target.value || undefined,
+                  })
+                )
               }
-            }}
-            value={selectedDepartment || ""}
+              className="pl-10 rounded-full"
+            />
+          </div>
+
+          <Select
+            value={filters.stage || "all"}
+            onValueChange={(value) =>
+              dispatch(
+                setFilters({
+                  ...filters,
+                  stage: value === "all" ? undefined : (value as any),
+                })
+              )
+            }
           >
-            <SelectTrigger className="w-[200px] rounded-full">
-              <SelectValue placeholder="Select Department" />
+            <SelectTrigger className="w-[150px] rounded-full">
+              <SelectValue placeholder="Stage" />
             </SelectTrigger>
             <SelectContent>
-              {availableDepartments?.map((dept: any) => (
-                <SelectItem key={dept.name} value={dept.name}>
-                  {dept.name}
-                </SelectItem>
-              ))}
+              <SelectItem value="all">All stages</SelectItem>
+              <SelectItem value="todo">To Do</SelectItem>
+              <SelectItem value="in_progress">In Progress</SelectItem>
+              <SelectItem value="completed">Completed</SelectItem>
+              <SelectItem value="overdue">Overdue</SelectItem>
+              <SelectItem value="delayed">Delayed</SelectItem>
+              <SelectItem value="amber">Amber</SelectItem>
+              <SelectItem value="red">Red</SelectItem>
             </SelectContent>
           </Select>
-        )}
-        
-        {/* View Toggle Buttons */}
-        <div className="flex items-center gap-1 bg-gray-100 rounded-full p-1">
-          <Button
-            variant={viewMode === "list" ? "default" : "ghost"}
-            size="sm"
-            onClick={() => setViewMode("list")}
-            className={`rounded-full px-4 ${
-              viewMode === "list"
-                ? "bg-white text-blue-600 shadow-sm hover:bg-white"
-                : "text-gray-600 hover:text-gray-900 hover:bg-gray-200"
-            }`}
+
+          <Select
+            value={filters.priority || "all"}
+            onValueChange={(value) =>
+              dispatch(
+                setFilters({
+                  ...filters,
+                  priority: value === "all" ? undefined : (value as any),
+                })
+              )
+            }
           >
-            <LayoutList className="w-4 h-4 mr-2" />
-            List
+            <SelectTrigger className="w-[160px] rounded-full">
+              <SelectValue placeholder="Priority" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All priorities</SelectItem>
+              <SelectItem value="critical">Critical</SelectItem>
+              <SelectItem value="low">Low</SelectItem>
+              <SelectItem value="medium">Medium</SelectItem>
+              <SelectItem value="high">High</SelectItem>
+              <SelectItem value="urgent">Urgent</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {activeTab === "department-tasks" && (
+            <Select
+              value={filters.department || ""}
+              onValueChange={(value) =>
+                dispatch(
+                  setFilters({
+                    ...filters,
+                    department: value || undefined,
+                  })
+                )
+              }
+            >
+              <SelectTrigger className="w-[200px] rounded-full">
+                <SelectValue placeholder="Select Department" />
+              </SelectTrigger>
+              <SelectContent>
+                {availableDepartments?.map((dept: any) => (
+                  <SelectItem key={dept.name} value={dept.name}>
+                    {dept.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          <Input
+            value={filters.performanceCategory || ""}
+            onChange={(e) =>
+              dispatch(
+                setFilters({
+                  ...filters,
+                  performanceCategory: e.target.value || undefined,
+                })
+              )
+            }
+            placeholder="Category"
+            className="rounded-full w-[160px]"
+          />
+
+          <SingleGoalPicker
+            value={pickedGoal}
+            onChange={(g) => {
+              setPickedGoal(g)
+              dispatch(
+                setFilters({
+                  ...filters,
+                  goalId: g?.id || undefined,
+                })
+              )
+            }}
+            placeholder="Filter by goal..."
+            className="w-[200px]"
+          />
+
+          <Button
+            variant={filters.isOverdue ? "default" : "outline"}
+            size="sm"
+            className="rounded-full gap-1"
+            onClick={() =>
+              dispatch(
+                setFilters({
+                  ...filters,
+                  isOverdue: filters.isOverdue ? undefined : true,
+                })
+              )
+            }
+          >
+            <AlertTriangle className="w-3.5 h-3.5" />
+            Overdue
           </Button>
+
           <Button
-            variant={viewMode === "kanban" ? "default" : "ghost"}
+            variant={filters.isPerformanceTask ? "default" : "outline"}
             size="sm"
-            onClick={() => setViewMode("kanban")}
-            className={`rounded-full px-4 ${
-              viewMode === "kanban"
-                ? "bg-white text-blue-600 shadow-sm hover:bg-white"
-                : "text-gray-600 hover:text-gray-900 hover:bg-gray-200"
-            }`}
+            className="rounded-full gap-1"
+            onClick={() =>
+              dispatch(
+                setFilters({
+                  ...filters,
+                  isPerformanceTask: filters.isPerformanceTask ? undefined : true,
+                })
+              )
+            }
           >
-            <LayoutGrid className="w-4 h-4 mr-2" />
-            Kanban
+            <ListChecks className="w-3.5 h-3.5" />
+            Performance
           </Button>
         </div>
+
+      {/* View Toggle Buttons */}
+      <div className="flex items-center gap-1 bg-gray-100 rounded-full p-1 self-start">
+        <Button
+          variant={viewMode === "list" ? "default" : "ghost"}
+          size="sm"
+          onClick={() => setViewMode("list")}
+          className={`rounded-full px-4 ${
+            viewMode === "list"
+              ? "bg-white text-blue-600 shadow-sm hover:bg-white"
+              : "text-gray-600 hover:text-gray-900 hover:bg-gray-200"
+          }`}
+        >
+          <LayoutList className="w-4 h-4 mr-2" />
+          List
+        </Button>
+        <Button
+          variant={viewMode === "kanban" ? "default" : "ghost"}
+          size="sm"
+          onClick={() => setViewMode("kanban")}
+          className={`rounded-full px-4 ${
+            viewMode === "kanban"
+              ? "bg-white text-blue-600 shadow-sm hover:bg-white"
+              : "text-gray-600 hover:text-gray-900 hover:bg-gray-200"
+          }`}
+        >
+          <LayoutGrid className="w-4 h-4 mr-2" />
+          Kanban
+        </Button>
       </div>
 
       {/* Tasks Display */}
       {isLoading ? (
         <TaskPageSkeleton />
-      ) : activeTab === "my-tasks" || (activeTab === "department-tasks" && selectedDepartment) ? (
-        viewMode === "list" ? (
-          <div className="space-y-4">
-            {filteredTasks.length > 0 ? (
-              filteredTasks.map((task) => (
-                <TaskCard key={task.id} task={task} onClick={setSelectedTaskId} />
-              ))
-            ) : (
-              <div className="text-center py-12">
-                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center mx-auto mb-4">
-                  <List className="w-8 h-8 text-gray-400" />
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">No Tasks Found</h3>
-                <p className="text-gray-600 mb-6">
-                  {searchTerm
-                    ? "No tasks match your current search."
-                    : activeTab === "department-tasks"
-                      ? "No tasks found for the selected department."
-                      : "You have no tasks assigned to you."}
-                </p>
-              </div>
-            )}
-          </div>
-        ) : (
-          <TaskBoardView
-            tasks={filteredTasks}
-            loading={isLoading}
-            onUpdateStage={handleUpdateStage}
-            onEditTask={permissions.canUpdateDepartmentTask || permissions.canUpdateAnyTask ? handleEditTask : undefined}
-            onDeleteTask={permissions.canDeleteDepartmentTask || permissions.canDeleteAnyTask ? handleDeleteTask : undefined}
-            onViewTask={(task) => setSelectedTaskId(task.id)}
-          />
-        )
-      ) : activeTab === "department-tasks" && !selectedDepartment ? (
+      ) : activeTab === "department-tasks" && !filters.department ? (
         <div className="text-center py-12">
           <p className="text-gray-600">Please select a department to view tasks.</p>
         </div>
-      ) : null}
+      ) : viewMode === "list" ? (
+        <div className="space-y-4">
+          {listTasks.length > 0 ? (
+            listTasks.map((task) => (
+              <Card
+                key={task.id}
+                className="bg-white border border-gray-200 rounded-2xl shadow-none hover:shadow-lg transition-shadow duration-200 cursor-pointer"
+                onClick={() => dispatch(setSelectedTaskId(task.id))}
+              >
+                <CardContent className="p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="text-base font-medium text-gray-900">
+                        {task.title}
+                      </h3>
+                      {task.description && (
+                        <p className="text-sm text-gray-600 mt-1 line-clamp-2">
+                          {task.description}
+                        </p>
+                      )}
+                    </div>
+                  </div>
 
-      {/* View Drawer */}
-      {selectedTaskId && (
-        <Sheet open={!!selectedTaskId} onOpenChange={(open) => !open && setSelectedTaskId(null)}>
-          <SheetContent className="w-[800px] sm:max-w-[800px] overflow-y-auto">
-            <TaskDrawerView 
-              task={(tasks || []).find((task) => task.id === selectedTaskId)} 
-              onClose={() => setSelectedTaskId(null)}
-            />
-          </SheetContent>
-        </Sheet>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge className={stageBadgeClass(task.stage)}>
+                      {task.stage?.replace("_", " ")}
+                    </Badge>
+                    <Badge className={priorityBadgeClass(task.priority)}>
+                      {task.priority}
+                    </Badge>
+                    {task.isPerformanceTask && (
+                      <Badge variant="outline" className="border-purple-300 text-purple-700">
+                        Performance
+                      </Badge>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-4 text-xs text-gray-500 flex-wrap">
+                    {dueLabel(task) && (
+                      <span className="flex items-center gap-1">
+                        <Calendar className="w-3 h-3" /> {dueLabel(task)}
+                      </span>
+                    )}
+                    {task.department && (
+                      <span className="flex items-center gap-1">
+                        <Tag className="w-3 h-3" /> {task.department}
+                      </span>
+                    )}
+                    {task.team && task.team.length > 0 && (
+                      <span className="flex items-center gap-1">
+                        <Users className="w-3 h-3" /> {task.team.length} assignee
+                        {task.team.length !== 1 ? "s" : ""}
+                      </span>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          ) : (
+            <div className="text-center py-12">
+              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center mx-auto mb-4">
+                <List className="w-8 h-8 text-gray-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">No Tasks Found</h3>
+              <p className="text-gray-600 mb-6">
+                {filters.search
+                  ? "No tasks match your current search."
+                  : activeTab === "department-tasks"
+                    ? "No tasks found for the selected department."
+                    : "You have no tasks assigned to you."}
+              </p>
+            </div>
+          )}
+        </div>
+      ) : (
+        <KanbanBoard />
       )}
+
+      <TaskDetailDialog
+        taskId={selectedTaskId}
+        onClose={() => dispatch(setSelectedTaskId(null))}
+      />
+
+      <TaskCreateDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+      />
     </div>
   )
 }

@@ -3,6 +3,13 @@ import { apiClient } from './api-client'
 interface GetGoalsParams {
   type?: 'company' | 'department' | 'individual' | ''
   department?: string
+  pillarId?: string
+  strategicThemeId?: string
+  scorecardPillar?: string
+  status?: string
+  search?: string
+  assignedToId?: string
+  parentGoalId?: string
 }
 
 export interface GoalActivity {
@@ -96,6 +103,27 @@ export const goalApiService = {
     }
     if (params.department && params.department !== 'all') {
       queryParams.append('department', params.department)
+    }
+    if (params.pillarId && params.pillarId !== 'all') {
+      queryParams.append('pillarId', params.pillarId)
+    }
+    if (params.strategicThemeId && params.strategicThemeId !== 'all') {
+      queryParams.append('strategicThemeId', params.strategicThemeId)
+    }
+    if (params.scorecardPillar && params.scorecardPillar !== 'all') {
+      queryParams.append('scorecardPillar', params.scorecardPillar)
+    }
+    if (params.status && params.status !== 'all') {
+      queryParams.append('status', params.status)
+    }
+    if (params.search) {
+      queryParams.append('search', params.search)
+    }
+    if (params.assignedToId) {
+      queryParams.append('assignedToId', params.assignedToId)
+    }
+    if (params.parentGoalId) {
+      queryParams.append('parentGoalId', params.parentGoalId)
     }
     const queryString = queryParams.toString()
     return apiClient.get(`/performance/goals${queryString ? `?${queryString}` : ''}`)

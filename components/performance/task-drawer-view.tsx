@@ -116,7 +116,6 @@ export function TaskDrawerView({ task, onClose }: TaskDrawerViewProps) {
             <span className="truncate">Task View</span>
           </SheetTitle>
           <div className="flex items-center gap-2 mr-8">
-
             <Button
               onClick={() => setTaskActivityModalOpen(true)}
               className="rounded-full h-10 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white"

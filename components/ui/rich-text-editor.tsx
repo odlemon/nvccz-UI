@@ -1,110 +1,106 @@
 "use client"
 
-import { useEffect } from "react"
-import { EditorContent, useEditor } from "@tiptap/react"
-import StarterKit from "@tiptap/starter-kit"
-import Link from "@tiptap/extension-link"
-import Underline from "@tiptap/extension-underline"
-import CharacterCount from "@tiptap/extension-character-count"
-import Heading from "@tiptap/extension-heading"
-import BulletList from "@tiptap/extension-bullet-list"
-import OrderedList from "@tiptap/extension-ordered-list"
-import ListItem from "@tiptap/extension-list-item"
-import Blockquote from "@tiptap/extension-blockquote"
-import { common, createLowlight } from "lowlight"
-import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight"
-import { Button } from "@/components/ui/button"
+import React, { useState, useEffect, useRef } from "react"
+import dynamic from "next/dynamic"
+import "@uiw/react-md-editor/markdown-editor.css"
+import "@uiw/react-markdown-preview/markdown.css"
+
+// MDEditor must be dynamic for Next.js SSR
+const MDEditor = dynamic(
+  () => import("@uiw/react-md-editor"),
+  { ssr: false }
+)
 
 interface RichTextEditorProps {
   value: string
-  onChange: (html: string) => void
+  onChange: (value: string) => void
   placeholder?: string
+  mentions?: { id: string; label: string }[]
 }
 
-export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorProps) {
-  const lowlight = createLowlight(common)
-  const editor = useEditor({
-    extensions: [
-      StarterKit.configure({ codeBlock: false }),
-      CodeBlockLowlight.configure({ lowlight }),
-      Underline,
-      Link.configure({ openOnClick: true, autolink: true }),
-      Heading.configure({ levels: [1, 2, 3] }),
-      BulletList,
-      OrderedList,
-      ListItem,
-      Blockquote,
-      CharacterCount.configure(),
-    ],
-    content: value || "",
-    editorProps: {
-      attributes: {
-        class: "prose max-w-none min-h-[260px] p-4 outline-none",
-        spellcheck: "true",
-        'data-placeholder': placeholder || "Start typing...",
-      },
-    },
-    onUpdate: ({ editor }) => {
-      onChange(editor.getHTML())
-    },
-    immediatelyRender: false,
-  })
+export function RichTextEditor({ value, onChange, placeholder, mentions = [] }: RichTextEditorProps) {
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null)
+  const [cursorPos, setCursorPos] = useState(0)
+  const [selectedIndex, setSelectedIndex] = useState(0)
+  const containerRef = useRef<HTMLDivElement>(null)
 
+  const handleEditorChange = (val?: string) => {
+    onChange(val || "")
+  }
+
+  // Detect @ mention trigger
   useEffect(() => {
-    if (!editor) return
-    const current = editor.getHTML()
-    if ((value || "") !== current) {
-      editor.commands.setContent(value || "", false)
+    const lastAt = value.lastIndexOf("@", cursorPos - 1)
+    if (lastAt !== -1 && !value.substring(lastAt, cursorPos).includes(" ")) {
+      setMentionQuery(value.substring(lastAt + 1, cursorPos))
+    } else {
+      setMentionQuery(null)
     }
-  }, [value, editor])
+  }, [value, cursorPos])
 
-  if (!editor) return null
+  const filteredMentions = mentions.filter(m => 
+    m.label.toLowerCase().includes((mentionQuery || "").toLowerCase())
+  ).slice(0, 8)
+
+  const insertMention = (mention: { id: string; label: string }) => {
+    const lastAt = value.lastIndexOf("@", cursorPos - 1)
+    const before = value.substring(0, lastAt)
+    const after = value.substring(cursorPos)
+    onChange(`${before}@${mention.label} ${after}`)
+    setMentionQuery(null)
+  }
 
   return (
-    <div className="border rounded-lg">
-      <div className="flex flex-wrap items-center gap-2 p-2 border-b">
-        <Button type="button" variant="outline" size="sm" className="rounded-full" onClick={() => editor.chain().focus().toggleBold().run()} aria-pressed={editor.isActive('bold')}>
-          Bold
-        </Button>
-        <Button type="button" variant="outline" size="sm" className="rounded-full" onClick={() => editor.chain().focus().toggleItalic().run()} aria-pressed={editor.isActive('italic')}>
-          Italic
-        </Button>
-        <Button type="button" variant="outline" size="sm" className="rounded-full" onClick={() => editor.chain().focus().toggleUnderline().run()} aria-pressed={editor.isActive('underline')}>
-          Underline
-        </Button>
-        <Button type="button" variant="outline" size="sm" className="rounded-full" onClick={() => editor.chain().focus().toggleStrike().run()} aria-pressed={editor.isActive('strike')}>
-          Strike
-        </Button>
-        <div className="w-px h-6 bg-gray-200 mx-1" />
-        <Button type="button" variant="outline" size="sm" className="rounded-full" onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} aria-pressed={editor.isActive('heading', { level: 1 })}>
-          H1
-        </Button>
-        <Button type="button" variant="outline" size="sm" className="rounded-full" onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} aria-pressed={editor.isActive('heading', { level: 2 })}>
-          H2
-        </Button>
-        <Button type="button" variant="outline" size="sm" className="rounded-full" onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} aria-pressed={editor.isActive('heading', { level: 3 })}>
-          H3
-        </Button>
-        <div className="w-px h-6 bg-gray-200 mx-1" />
-        <Button type="button" variant="outline" size="sm" className="rounded-full" onClick={() => editor.chain().focus().toggleBulletList().run()} aria-pressed={editor.isActive('bulletList')}>
-          Bullets
-        </Button>
-        <Button type="button" variant="outline" size="sm" className="rounded-full" onClick={() => editor.chain().focus().toggleOrderedList().run()} aria-pressed={editor.isActive('orderedList')}>
-          Numbered
-        </Button>
-        <Button type="button" variant="outline" size="sm" className="rounded-full" onClick={() => editor.chain().focus().toggleBlockquote().run()} aria-pressed={editor.isActive('blockquote')}>
-          Quote
-        </Button>
-        <Button type="button" variant="outline" size="sm" className="rounded-full" onClick={() => editor.chain().focus().toggleCodeBlock().run()} aria-pressed={editor.isActive('codeBlock')}>
-          Code
-        </Button>
-        <div className="ml-auto text-xs text-gray-500 px-2">{editor.storage.characterCount.characters()} chars</div>
-      </div>
-      <EditorContent editor={editor} />
+    <div className="w-full space-y-2 relative" data-color-mode="light" ref={containerRef}>
+      <MDEditor
+        value={value}
+        onChange={handleEditorChange}
+        preview="edit"
+        height={300}
+        textareaProps={{
+          placeholder: placeholder || "Enter Markdown...",
+          onKeyUp: (e: any) => setCursorPos(e.target.selectionStart),
+          onClick: (e: any) => setCursorPos(e.target.selectionStart),
+          onKeyDown: (e: any) => {
+            if (mentionQuery !== null && filteredMentions.length > 0) {
+              if (e.key === "ArrowDown") {
+                e.preventDefault()
+                setSelectedIndex(i => (i + 1) % filteredMentions.length)
+              } else if (e.key === "ArrowUp") {
+                e.preventDefault()
+                setSelectedIndex(i => (i - 1 + filteredMentions.length) % filteredMentions.length)
+              } else if (e.key === "Enter") {
+                e.preventDefault()
+                insertMention(filteredMentions[selectedIndex])
+              } else if (e.key === "Escape") {
+                setMentionQuery(null)
+              }
+            }
+          }
+        }}
+      />
+      
+      {mentionQuery !== null && filteredMentions.length > 0 && (
+        <div className="absolute z-50 bg-white border rounded-lg shadow-xl w-64 max-h-48 overflow-y-auto bottom-full mb-2">
+          <ul className="py-1">
+            {filteredMentions.map((m, i) => (
+              <li key={m.id}>
+                <button
+                  type="button"
+                  className={`w-full text-left px-3 py-2 text-sm transition-colors ${
+                    i === selectedIndex ? "bg-blue-600 text-white" : "hover:bg-blue-50 text-gray-700"
+                  }`}
+                  onClick={() => insertMention(m)}
+                >
+                  {m.label}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   )
 }
 
 export default RichTextEditor
-
-

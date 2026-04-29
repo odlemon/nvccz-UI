@@ -17,8 +17,14 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
   CiEdit,
-  CiTrash,
   CiSearch,
   CiFlag1 as CiFlag,
   CiCirclePlus as CiPlus,
@@ -37,6 +43,13 @@ import { AnimatePresence, motion } from "framer-motion"
 import { cn } from "@/lib/utils"
 import { ChevronDown } from "lucide-react"
 import { usePerformancePermissions } from "@/lib/hooks/usePerformancePermissions"
+import { GoalPillarThemeFilters } from "./goal-pillar-theme-filters"
+import {
+  SearchableGoalSelector,
+  type GoalOption,
+} from "@/components/performance/configuration/searchable-goal-selector"
+import { SearchableUserSelector } from "./searchable-user-selector"
+import type { AppUser } from "@/lib/api/users-api"
 
 const CollapsibleSection = ({
   title,
@@ -94,8 +107,40 @@ export function GoalsManagement() {
     (state) => state.performance,
   )
 
-  const [activeTab, setActiveTab] = useState<"all" | "company" | "department" | "individual">("all")
-  const [searchTerm, setSearchTerm] = useState("")
+  type GoalTypeFilter = "all" | "company" | "department" | "individual"
+  type GoalFilterState = {
+    search: string
+    type: GoalTypeFilter
+    status: string
+    department: string
+    scorecardPillar: string
+    pillarId: string
+    strategicThemeId: string
+  }
+  type GoalFilterParams = {
+    search?: string
+    type?: "" | "company" | "department" | "individual"
+    status?: string
+    department?: string
+    scorecardPillar?: string
+    pillarId?: string
+    strategicThemeId?: string
+    assignedToId?: string
+    parentGoalId?: string
+  }
+
+  const [activeTab, setActiveTab] = useState<GoalTypeFilter>("all")
+  const [filters, setFilters] = useState<GoalFilterState>({
+    search: "",
+    type: "all",
+    status: "all",
+    department: "all",
+    scorecardPillar: "all",
+    pillarId: "all",
+    strategicThemeId: "all",
+  })
+  const [assignedUser, setAssignedUser] = useState<AppUser | null>(null)
+  const [parentGoal, setParentGoal] = useState<GoalOption | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [editingGoal, setEditingGoal] = useState<any>(null)
   const [viewingGoal, setViewingGoal] = useState<any>(null)
@@ -112,13 +157,38 @@ export function GoalsManagement() {
     return "Unknown error"
   }
 
+  const buildGoalParams = (
+    nextFilters = filters,
+    nextAssignedUser = assignedUser,
+    nextParentGoal = parentGoal,
+  ): GoalFilterParams => {
+    const typeParam: "" | "company" | "department" | "individual" =
+      nextFilters.type === "all" ? "" : nextFilters.type
+
+    return {
+    search: nextFilters.search || undefined,
+    type: typeParam,
+    status: nextFilters.status,
+    department: nextFilters.department,
+    scorecardPillar: nextFilters.scorecardPillar,
+    pillarId: nextFilters.pillarId,
+    strategicThemeId: nextFilters.strategicThemeId,
+    assignedToId: nextAssignedUser?.id,
+    parentGoalId: nextParentGoal?.id,
+    }
+  }
+
+  const applyFilters = (nextFilters = filters) => {
+    dispatch(fetchGoals(buildGoalParams(nextFilters, assignedUser, parentGoal)))
+  }
+
   useEffect(() => {
     // Only load initial data once when component mounts
     if (!hasLoadedInitialData.current) {
       const loadInitialData = async () => {
         try {
           // Only fetch if data doesn't exist
-            await dispatch(fetchGoals()).unwrap()
+            await dispatch(fetchGoals(buildGoalParams())).unwrap()
             await dispatch(fetchAvailableDepartments()).unwrap()
             await dispatch(fetchAvailableKPIs()).unwrap()
 
@@ -200,22 +270,42 @@ export function GoalsManagement() {
   }
 
   const handleRefresh = () => {
-    toast.promise(dispatch(fetchGoals()).unwrap(), {
+    toast.promise(dispatch(fetchGoals(buildGoalParams())).unwrap(), {
       loading: "Refreshing goals...",
       success: "Goals refreshed successfully.",
       error: "Failed to refresh goals.",
     })
   }
 
-  const filteredGoals = useMemo(
-    () =>
-      goals.filter(
-        (goal) =>
-          goal.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          goal.description?.toLowerCase().includes(searchTerm.toLowerCase()),
-      ),
-    [goals, searchTerm],
-  )
+  const handleApplyFilters = () => {
+    applyFilters(filters)
+  }
+
+  const handleClearFilters = () => {
+    const reset: GoalFilterState = {
+      search: "",
+      type: "all",
+      status: "all",
+      department: "all",
+      scorecardPillar: "all",
+      pillarId: "all",
+      strategicThemeId: "all",
+    }
+    setFilters(reset)
+    setAssignedUser(null)
+    setParentGoal(null)
+    setActiveTab("all")
+    dispatch(fetchGoals({}))
+  }
+
+  const handleTabChange = (nextTab: GoalTypeFilter) => {
+    const nextFilters = { ...filters, type: nextTab }
+    setActiveTab(nextTab)
+    setFilters(nextFilters)
+    applyFilters(nextFilters)
+  }
+
+  const filteredGoals = useMemo(() => goals, [goals])
 
   const displayGoals = activeTab === "all" ? filteredGoals : filteredGoals.filter((g) => g.type === activeTab)
 
@@ -397,7 +487,7 @@ export function GoalsManagement() {
       <div className="border-b border-gray-200">
         <nav className="flex space-x-6">
           <button
-            onClick={() => setActiveTab("all")}
+            onClick={() => handleTabChange("all")}
             className={`relative flex items-center gap-2 py-3 px-1 text-sm font-normal transition-colors cursor-pointer ${
               activeTab === "all" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500 hover:text-gray-700"
             }`}
@@ -408,7 +498,7 @@ export function GoalsManagement() {
             </Badge>
           </button>
           <button
-            onClick={() => setActiveTab("company")}
+            onClick={() => handleTabChange("company")}
             className={`relative flex items-center gap-2 py-3 px-1 text-sm font-normal transition-colors cursor-pointer ${
               activeTab === "company" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500 hover:text-gray-700"
             }`}
@@ -419,7 +509,7 @@ export function GoalsManagement() {
             </Badge>
           </button>
           <button
-            onClick={() => setActiveTab("department")}
+            onClick={() => handleTabChange("department")}
             className={`relative flex items-center gap-2 py-3 px-1 text-sm font-normal transition-colors cursor-pointer ${
               activeTab === "department"
                 ? "text-blue-600 border-b-2 border-blue-600"
@@ -432,7 +522,7 @@ export function GoalsManagement() {
             </Badge>
           </button>
           <button
-            onClick={() => setActiveTab("individual")}
+            onClick={() => handleTabChange("individual")}
             className={`relative flex items-center gap-2 py-3 px-1 text-sm font-normal transition-colors cursor-pointer ${
               activeTab === "individual"
                 ? "text-blue-600 border-b-2 border-blue-600"
@@ -448,17 +538,126 @@ export function GoalsManagement() {
       </div>
 
       {/* Search */}
-      <div className="flex items-center gap-4">
-        <div className="relative flex-1 max-w-md">
-          <CiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-          <Input
-            placeholder="Search goals..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-      </div>
+      <Card className="border border-gray-200">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <CiViewList className="w-5 h-5" /> Filters
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <span className="text-sm text-gray-600">Search</span>
+              <div className="relative">
+                <CiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <Input
+                  placeholder="Search goals..."
+                  value={filters.search}
+                  onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <span className="text-sm text-gray-600">Status</span>
+              <Select
+                value={filters.status}
+                onValueChange={(value) => setFilters((prev) => ({ ...prev, status: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="All statuses" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All statuses</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="in_progress">In progress</SelectItem>
+                  <SelectItem value="not_started">Not started</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <span className="text-sm text-gray-600">Department</span>
+              <Select
+                value={filters.department}
+                onValueChange={(value) => setFilters((prev) => ({ ...prev, department: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="All departments" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All departments</SelectItem>
+                  {availableDepartments.map((dept: any) => (
+                    <SelectItem key={dept.name} value={dept.name}>
+                      {dept.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <span className="text-sm text-gray-600">Scorecard Pillar</span>
+              <Select
+                value={filters.scorecardPillar}
+                onValueChange={(value) =>
+                  setFilters((prev) => ({ ...prev, scorecardPillar: value }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="All pillars" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All pillars</SelectItem>
+                  <SelectItem value="FINANCIAL">Financial</SelectItem>
+                  <SelectItem value="CUSTOMER">Customer & Market</SelectItem>
+                  <SelectItem value="INTERNAL_OPS">Internal Operations</SelectItem>
+                  <SelectItem value="LEARNING_GROWTH">Learning, Growth & HR</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <span className="text-sm text-gray-600">Assigned To</span>
+              <SearchableUserSelector
+                selectedUser={assignedUser}
+                onChange={setAssignedUser}
+                placeholder="Search assignee..."
+                emptyHint="Search by name or email"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <span className="text-sm text-gray-600">Parent Goal</span>
+              <SearchableGoalSelector
+                selectedGoals={parentGoal ? [parentGoal] : []}
+                onChange={(goals) => setParentGoal(goals[0] || null)}
+                placeholder="Search parent goals..."
+                emptyHint="Search goals to set as parent"
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <GoalPillarThemeFilters
+              pillarId={filters.pillarId}
+              themeId={filters.strategicThemeId}
+              onPillarChange={(value) => setFilters((prev) => ({ ...prev, pillarId: value }))}
+              onThemeChange={(value) => setFilters((prev) => ({ ...prev, strategicThemeId: value }))}
+            />
+
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={handleClearFilters}>
+                Clear
+              </Button>
+              <Button onClick={handleApplyFilters}>Apply Filters</Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {goalError && <p className="text-red-500">{goalError}</p>}
 
@@ -489,7 +688,7 @@ export function GoalsManagement() {
           </div>
           <h3 className="text-lg font-semibold text-gray-900 mb-2">No Goals Found</h3>
           <p className="text-gray-600 mb-6">
-            {searchTerm
+            {filters.search
               ? "No goals match your current search. Try adjusting your search criteria."
               : "Get started by creating your first goal to track performance objectives."}
           </p>

@@ -121,6 +121,13 @@ export interface PerformanceMetrics {
 interface GetGoalsParams {
   type?: 'company' | 'department' | 'individual' | ''
   department?: string
+  pillarId?: string
+  strategicThemeId?: string
+  scorecardPillar?: string
+  status?: string
+  search?: string
+  assignedToId?: string
+  parentGoalId?: string
 }
 
 interface PerformanceState {

@@ -95,7 +95,20 @@ export function usePerformancePermissions() {
     canConductPerformanceReview: canPerformAction(PERFORMANCE_ACTIONS.CONDUCT_PERFORMANCE_REVIEW),
     canViewPerformanceReviews: canPerformAction(PERFORMANCE_ACTIONS.VIEW_PERFORMANCE_REVIEWS),
     canApprovePerformanceReview: canPerformAction(PERFORMANCE_ACTIONS.APPROVE_PERFORMANCE_REVIEW),
-    
+
+    // Configuration & Strategy
+    canEditVisionStatement: canPerformAction(PERFORMANCE_ACTIONS.EDIT_VISION_STATEMENT),
+    canEditPillarWeights: canPerformAction(PERFORMANCE_ACTIONS.EDIT_PILLAR_WEIGHTS),
+    canManageStrategicThemes: canPerformAction(PERFORMANCE_ACTIONS.MANAGE_STRATEGIC_THEMES),
+    canManageStrategies: canPerformAction(PERFORMANCE_ACTIONS.MANAGE_STRATEGIES),
+
+    // Review Cycles & Finalization
+    canCreateReviewCycle: canPerformAction(PERFORMANCE_ACTIONS.CREATE_REVIEW_CYCLE),
+    canFinalizeReview: canPerformAction(PERFORMANCE_ACTIONS.FINALIZE_REVIEW),
+
+    // Bulk Task Operations
+    canBulkUpdateTasks: canPerformAction(PERFORMANCE_ACTIONS.BULK_UPDATE_TASKS),
+
     // Special role checks
     isDepartmentHead: isDepartmentHead(roleCode || ''),
   }), [canPerformAction, roleCode]);

@@ -356,7 +356,7 @@ export function PurchaseRequisitions() {
           <h1 className="text-3xl font-normal">Purchase Requisitions</h1>
           <p className="text-muted-foreground">Create and manage purchase requisitions with approval workflow</p>
         </div>
-        {activeTab === 'investee' && permissions.canCreatePurchaseRequisition ? (
+        {activeTab === 'investee' ? (
           <Button
             onClick={handleCreate}
             className="rounded-full bg-gradient-to-r from-violet-500 to-violet-600 hover:from-violet-600 hover:to-violet-700 text-white"
@@ -364,7 +364,7 @@ export function PurchaseRequisitions() {
             <Plus className="w-4 h-4 mr-2" />
             Create Investee PR
           </Button>
-        ) : permissions.canCreatePurchaseRequisition ? (
+        ) : (
           <Button
             onClick={handleCreate}
             className="rounded-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white"
@@ -372,7 +372,7 @@ export function PurchaseRequisitions() {
             <Plus className="w-4 h-4 mr-2" />
             Create New Requisition
           </Button>
-        ) : null}
+        )}
       </div>
 
       {/* Tabs with new styling */}
