@@ -60,45 +60,45 @@ export function RatingDistributionChart() {
   }, [chartData, totalReviews])
 
   const stats = [
-    { label: "Avg Rating", value: avgRating, icon: TrendingUp, color: "text-blue-600", bg: "bg-blue-50" },
-    { label: "Total Reviews", value: totalReviews.toString(), icon: Users, color: "text-purple-600", bg: "bg-purple-50" },
-    { label: "Finalized", value: totalReviews > 0 ? Math.floor(totalReviews * 0.8).toString() : "0", icon: Target, color: "text-green-600", bg: "bg-green-50" },
+    { label: "Avg Rating", value: avgRating, icon: TrendingUp, color: "text-blue-500", bg: "bg-blue-50/50" },
+    { label: "Total Reviews", value: totalReviews.toString(), icon: Users, color: "text-purple-500", bg: "bg-purple-50/50" },
+    { label: "Finalized", value: totalReviews > 0 ? Math.floor(totalReviews * 0.8).toString() : "0", icon: Target, color: "text-green-500", bg: "bg-green-50/50" },
   ]
 
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {stats.map((stat, i) => (
-          <Card key={i} className="border border-gray-200 shadow-sm bg-white overflow-hidden rounded-xl">
+          <Card key={i} className="border border-gray-100 shadow-none bg-white rounded-xl">
             <CardContent className="p-6 flex items-center gap-4">
-              <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0", stat.bg)}>
-                <stat.icon className={cn("w-5 h-5", stat.color)} />
+              <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 border", stat.bg)}>
+                <stat.icon className={cn("w-4 h-4", stat.color)} />
               </div>
               <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-tight">{stat.label}</p>
-                <p className="text-2xl font-semibold text-gray-900 leading-none mt-1">{stat.value}</p>
+                <p className="text-[10px] font-medium text-gray-400 uppercase tracking-widest">{stat.label}</p>
+                <p className="text-2xl font-medium text-gray-900 leading-none mt-1">{stat.value}</p>
               </div>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      <Card className="border border-gray-200 shadow-sm overflow-hidden rounded-xl bg-white">
-        <CardHeader className="flex flex-row items-center justify-between border-b p-6">
+      <Card className="border border-gray-100 shadow-none rounded-xl bg-white overflow-hidden">
+        <CardHeader className="flex flex-row items-center justify-between border-b border-gray-50 p-6 bg-gray-50/20">
           <div>
-            <CardTitle className="text-xl font-semibold flex items-center gap-3">
-              <BarChart3 className="w-5 h-5 text-blue-600" />
+            <CardTitle className="text-lg font-medium flex items-center gap-3 text-gray-900">
+              <BarChart3 className="w-5 h-5 text-gray-400" />
               Rating Distribution
             </CardTitle>
-            <CardDescription className="text-gray-500 font-normal">Overview of performance scores across the organization.</CardDescription>
+            <CardDescription className="text-gray-400 font-normal text-xs pt-1">Overview of performance scores across the organization.</CardDescription>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-xs font-semibold text-gray-400 uppercase">Filter:</span>
+            <span className="text-[10px] font-medium text-gray-400 uppercase tracking-widest">Filter:</span>
             <Select value={department} onValueChange={setDepartment}>
-              <SelectTrigger className="w-[200px] rounded-full h-10 bg-gray-50 border-gray-200 font-medium">
+              <SelectTrigger className="w-[200px] rounded-full h-9 bg-white border-gray-100 font-medium text-xs">
                 <SelectValue placeholder="Department" />
               </SelectTrigger>
-              <SelectContent className="rounded-xl shadow-xl border-gray-100">
+              <SelectContent className="rounded-xl shadow-lg border-gray-50">
                 <SelectItem value="all">Organization Wide</SelectItem>
                 <SelectItem value="Sales">Sales & Marketing</SelectItem>
                 <SelectItem value="Finance">Finance</SelectItem>
@@ -110,35 +110,35 @@ export function RatingDistributionChart() {
         </CardHeader>
         <CardContent className="p-8">
           {loading ? (
-            <div className="h-[350px] w-full flex flex-col items-center justify-center">
-              <Loader2 className="w-8 h-8 animate-spin text-blue-500 mb-2" />
-              <p className="text-sm text-gray-400 font-normal">Updating distribution...</p>
+            <div className="h-[300px] w-full flex flex-col items-center justify-center">
+              <Loader2 className="w-8 h-8 animate-spin text-blue-500 mb-2 opacity-30" />
+              <p className="text-xs text-gray-300 font-normal">Updating data...</p>
             </div>
           ) : (
             <>
-              <div className="h-[350px] w-full">
+              <div className="h-[300px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f8fafc" />
                     <XAxis 
                       dataKey="rating" 
                       axisLine={false} 
                       tickLine={false} 
-                      tick={{ fill: '#64748b', fontSize: 13, fontWeight: 500 }}
+                      tick={{ fill: '#94a3b8', fontSize: 11, fontWeight: 500 }}
                     />
                     <YAxis 
                       axisLine={false} 
                       tickLine={false} 
-                      tick={{ fill: '#64748b', fontSize: 13 }} 
+                      tick={{ fill: '#94a3b8', fontSize: 11 }} 
                     />
                     <Tooltip 
-                      cursor={{ fill: '#f8fafc', radius: 8 }}
-                      contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', padding: '12px' }}
-                      itemStyle={{ fontWeight: 600, color: '#1e293b' }}
+                      cursor={{ fill: '#f8fafc', radius: 4 }}
+                      contentStyle={{ borderRadius: '12px', border: '1px solid #f1f5f9', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.05)', padding: '10px' }}
+                      itemStyle={{ fontWeight: 500, fontSize: '12px', color: '#64748b' }}
                     />
-                    <Bar dataKey="count" radius={[6, 6, 0, 0]} barSize={40}>
+                    <Bar dataKey="count" radius={[4, 4, 0, 0]} barSize={32}>
                       {chartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
+                        <Cell key={`cell-${index}`} fill={entry.color} opacity={0.8} />
                       ))}
                     </Bar>
                   </BarChart>
@@ -147,10 +147,10 @@ export function RatingDistributionChart() {
               
               <div className="mt-8 flex flex-wrap justify-center gap-6">
                 {chartData.map((d, i) => (
-                  <div key={i} className="flex items-center gap-2.5 px-3 py-1.5 rounded-full bg-gray-50 border border-gray-100">
-                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: d.color }} />
-                    <span className="text-xs font-semibold text-gray-600">Score {d.rating}</span>
-                    <span className="text-xs font-bold text-gray-900 bg-white px-2 py-0.5 rounded-full border border-gray-100">{d.count}</span>
+                  <div key={i} className="flex items-center gap-2.5 px-3 py-1 rounded-full bg-gray-50/50 border border-gray-50">
+                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: d.color, opacity: 0.7 }} />
+                    <span className="text-[10px] font-medium text-gray-500 uppercase tracking-widest">Score {d.rating}</span>
+                    <span className="text-[10px] font-medium text-gray-700 bg-white px-2 py-0 rounded-full border border-gray-100">{d.count}</span>
                   </div>
                 ))}
               </div>

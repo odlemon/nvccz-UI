@@ -32,7 +32,11 @@ import {
   ChevronRight,
   TrendingUp,
   Target,
-  FileSearch
+  FileSearch,
+  Trophy,
+  Lightbulb,
+  MessageSquare,
+  AlertTriangle
 } from "lucide-react"
 import { toast } from "sonner"
 import {
@@ -55,35 +59,35 @@ const REVIEW_STAGES_CONFIG = [
     title: "Self-Review",
     description: "Employee evaluates their own performance and achievements.",
     icon: User,
-    color: "bg-blue-600",
+    color: "bg-blue-500",
   },
   {
     id: "external",
     title: "External Evaluation",
     description: "Objective assessment by external consultants or peers.",
     icon: FileSearch,
-    color: "bg-blue-600",
+    color: "bg-blue-500",
   },
   {
     id: "hr",
     title: "HR Moderation",
     description: "Human Resources reviews and moderates scores for consistency.",
     icon: Shield,
-    color: "bg-blue-600",
+    color: "bg-blue-500",
   },
   {
     id: "manager",
     title: "Manager Assessment",
     description: "Direct manager provides final feedback and ratings.",
     icon: Briefcase,
-    color: "bg-blue-600",
+    color: "bg-blue-500",
   },
   {
     id: "finalized",
     title: "Finalized",
     description: "The review is locked and a permanent PDF record is generated.",
     icon: Award,
-    color: "bg-green-600",
+    color: "bg-green-500",
   },
 ]
 
@@ -145,7 +149,7 @@ export function ReviewForm({ reviewId }: Props) {
 
   if (loading || !currentReview) {
     return (
-      <div className="flex flex-col items-center justify-center py-32 bg-white rounded-xl border border-gray-200">
+      <div className="flex flex-col items-center justify-center py-32 bg-white rounded-xl border-2 border-gray-100">
         <Loader2 className="w-8 h-8 animate-spin text-blue-500 mb-4" />
         <p className="text-sm font-medium text-gray-400">Loading assessment data...</p>
       </div>
@@ -219,12 +223,12 @@ export function ReviewForm({ reviewId }: Props) {
   const automatedProgress = currentReview.performanceSnapshot?.totalProgress || 80.00
 
   return (
-    <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 pb-32">
+    <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 pb-32 px-4">
       {/* Timeline Sidebar */}
       <div className="lg:col-span-4 space-y-6">
         <div className="sticky top-24 space-y-6">
           <div className="space-y-1 px-1">
-            <h2 className="text-xl font-semibold text-gray-900 tracking-tight">Assessment Timeline</h2>
+            <h2 className="text-xl font-medium text-gray-900 tracking-tight">Assessment Timeline</h2>
             <p className="text-sm text-gray-500 font-normal">Track the lifecycle of this performance review.</p>
           </div>
 
@@ -238,43 +242,47 @@ export function ReviewForm({ reviewId }: Props) {
                 <div key={stage.id} className="relative flex items-start group">
                   {index < REVIEW_STAGES_CONFIG.length - 1 && (
                     <div className={cn(
-                      "absolute left-[23px] top-10 w-0.5 h-12 transition-colors",
+                      "absolute left-[20px] top-10 w-0.5 h-12 transition-colors",
                       isCompleted ? "bg-green-500" : "bg-gray-200"
                     )} />
                   )}
 
                   <div className={cn(
-                    "relative z-10 flex items-center justify-center w-12 h-12 rounded-full border-4 border-white shadow-sm transition-all",
-                    isCompleted ? "bg-green-500" : isCurrent ? stage.color : "bg-gray-50"
+                    "relative z-10 flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all shadow-none",
+                    isCompleted ? "bg-green-500 border-green-500" : isCurrent ? "bg-blue-600 border-blue-600" : "bg-white border-gray-200"
                   )}>
                     {isCompleted ? (
                       <CheckCircle2 className="w-5 h-5 text-white" />
                     ) : isCurrent ? (
                       <stage.icon className="w-5 h-5 text-white" />
                     ) : (
-                      <Circle className="w-4 h-4 text-gray-300" />
+                      <Circle className="w-3 h-3 text-gray-300 fill-gray-100" />
                     )}
                   </div>
 
                   <div className="ml-4 flex-1 pt-1 pb-10">
                     <div className={cn(
-                      "p-4 rounded-xl border transition-all",
+                      "p-4 rounded-xl border-2 transition-all shadow-none",
                       isCurrent 
-                        ? "bg-white border-blue-500 shadow-md" 
+                        ? "bg-white border-blue-200" 
                         : isCompleted 
-                          ? "bg-green-50/50 border-green-100" 
+                          ? "bg-green-50/50 border-green-200" 
                           : "bg-transparent border-transparent opacity-50"
                     )}>
                       <div className="flex items-center justify-between gap-2 mb-1">
                         <h3 className={cn(
-                          "font-semibold text-sm",
-                          isCurrent ? "text-blue-600" : isCompleted ? "text-green-700" : "text-gray-400"
+                          "font-medium text-sm",
+                          isCurrent ? "text-blue-700" : isCompleted ? "text-green-800" : "text-gray-400"
                         )}>
                           {stage.title}
                         </h3>
-                        {isCurrent && <Badge className="bg-blue-600 text-[10px] uppercase font-semibold px-2 py-0">Current</Badge>}
+                        {isCurrent && <Badge variant="outline" className="text-blue-600 text-[10px] uppercase font-medium px-2 py-0 border-blue-200 bg-blue-50/50">Current</Badge>}
+                        {isCompleted && <Badge variant="outline" className="text-green-600 text-[10px] uppercase font-medium px-2 py-0 border-green-200 bg-green-50/50">Done</Badge>}
                       </div>
-                      <p className="text-xs text-gray-500 font-normal leading-relaxed">{stage.description}</p>
+                      <p className={cn(
+                        "text-xs leading-relaxed font-normal",
+                        isCurrent ? "text-gray-600" : isCompleted ? "text-green-700/60" : "text-gray-400"
+                      )}>{stage.description}</p>
                     </div>
                   </div>
                 </div>
@@ -282,20 +290,22 @@ export function ReviewForm({ reviewId }: Props) {
             })}
           </div>
 
-          <Card className="border border-gray-200 shadow-sm bg-white rounded-xl p-5 space-y-4">
+          <Card className="border-2 border-gray-200 shadow-none bg-white rounded-xl p-5 space-y-4">
              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-                <span className="text-xs font-semibold text-gray-400 uppercase tracking-tight">Reviewee</span>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-gray-900">{currentReview.reviewee?.firstName} {currentReview.reviewee?.lastName}</span>
-                </div>
+                <span className="text-xs font-medium text-gray-400 uppercase tracking-tight">Reviewee</span>
+                <span className="text-sm font-medium text-gray-700">{currentReview.reviewee?.firstName} {currentReview.reviewee?.lastName}</span>
              </div>
              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-                <span className="text-xs font-semibold text-gray-400 uppercase tracking-tight">Cycle</span>
-                <span className="text-sm font-medium text-gray-900">{currentReview.reviewPeriod || "Annual 2026"}</span>
+                <span className="text-xs font-medium text-gray-400 uppercase tracking-tight">Cycle</span>
+                <span className="text-sm font-medium text-gray-700">{currentReview.reviewPeriod || "Annual 2026"}</span>
+             </div>
+             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                <span className="text-xs font-medium text-gray-400 uppercase tracking-tight">Type</span>
+                <span className="text-sm font-medium text-gray-700">{currentReview.reviewType || "ANNUAL"}</span>
              </div>
              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-gray-400 uppercase tracking-tight">Rating Scale</span>
-                <Badge variant="secondary" className="bg-gray-50 text-gray-500 font-semibold text-[10px] border-none">1-5 SCALE</Badge>
+                <span className="text-xs font-medium text-gray-400 uppercase tracking-tight">Rating Scale</span>
+                <Badge variant="outline" className="bg-gray-50 text-gray-500 font-medium text-[10px] border-gray-200 uppercase">1-5 SCALE</Badge>
              </div>
           </Card>
         </div>
@@ -304,39 +314,39 @@ export function ReviewForm({ reviewId }: Props) {
       {/* Main Evaluation Area */}
       <div className="lg:col-span-8 space-y-6">
         {isLocked && (
-          <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 flex items-center gap-5">
-            <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center">
-              <Lock className="w-6 h-6 text-gray-400" />
+          <div className="bg-gray-50 border-2 border-gray-200 rounded-xl p-6 flex items-center gap-5 shadow-none">
+            <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center border border-gray-200">
+              <Lock className="w-5 h-5 text-gray-500" />
             </div>
             <div className="flex-1">
-              <p className="text-base font-semibold text-gray-900">Document Locked & Finalized</p>
-              <p className="text-sm text-gray-500 font-normal">This review is now a permanent record. No further modifications are permitted.</p>
+              <p className="text-base font-medium text-gray-900">Document Locked & Finalized</p>
+              <p className="text-sm text-gray-500 font-normal">This performance review is now a permanent record. No further modifications are permitted.</p>
             </div>
-            <Button variant="outline" className="rounded-full border-gray-300 font-medium">
+            <Button variant="outline" className="rounded-full border-gray-200 text-gray-600 hover:bg-white font-medium shadow-none">
               <Download className="w-4 h-4 mr-2" /> Download PDF
             </Button>
           </div>
         )}
 
         {/* Quantitative Snapshot Card */}
-        <Card className="border border-gray-200 shadow-sm overflow-hidden rounded-xl bg-white">
+        <Card className="border-2 border-gray-200 shadow-none overflow-hidden rounded-xl bg-white">
           <div className="p-6">
             <div className="flex items-center justify-between mb-6">
               <div className="space-y-1">
-                <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                <CardTitle className="text-lg font-medium flex items-center gap-2 text-gray-900">
                   <TrendingUp className="w-5 h-5 text-blue-500" />
                   Quantitative Snapshot
                 </CardTitle>
                 <p className="text-sm text-gray-500 font-normal">Auto-populated organizational metrics (F.07).</p>
               </div>
               <div className="text-right">
-                <p className="text-3xl font-semibold text-gray-900">{automatedProgress.toFixed(2)}%</p>
-                <p className="text-[10px] uppercase font-semibold text-gray-400 mt-1">Verified Score</p>
+                <p className="text-3xl font-medium text-gray-900">{automatedProgress.toFixed(2)}%</p>
+                <p className="text-[10px] uppercase font-medium text-gray-400 mt-1 tracking-widest">Verified Score</p>
               </div>
             </div>
             <div className="space-y-3">
-              <Progress value={automatedProgress} className="h-2.5 bg-gray-100 rounded-full [&>div]:bg-blue-600" />
-              <div className="flex items-center justify-between text-[10px] font-semibold text-gray-400 px-1 uppercase tracking-wider">
+              <Progress value={automatedProgress} className="h-2 bg-gray-100 rounded-full [&>div]:bg-blue-600" />
+              <div className="flex items-center justify-between text-[10px] font-medium text-gray-400 px-1 uppercase tracking-widest">
                 <span>Progress to target</span>
                 <span>Annualized</span>
               </div>
@@ -348,10 +358,10 @@ export function ReviewForm({ reviewId }: Props) {
         <div className="space-y-6">
           <div className="flex items-center justify-between px-1">
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">Qualitative Evaluation</h3>
+              <h3 className="text-lg font-medium text-gray-900">Qualitative Evaluation</h3>
               <p className="text-sm text-gray-500 font-normal">Provide behavioral evidence and scoring for each pillar.</p>
             </div>
-            <Badge variant="outline" className="rounded-full text-blue-600 border-blue-100 bg-blue-50/30 px-3 py-1 font-semibold text-[10px] tracking-tight">
+            <Badge variant="outline" className="rounded-full border-2 border-gray-200 text-gray-400 px-3 py-1 text-[10px] tracking-tight bg-white">
               F.04 & F.08 COMPLIANT
             </Badge>
           </div>
@@ -364,23 +374,23 @@ export function ReviewForm({ reviewId }: Props) {
               const charColor = len >= MIN_FEEDBACK_LENGTH ? "text-green-600" : len > 0 ? "text-orange-500" : "text-gray-400"
 
               return (
-                <Card key={p.id} className="border border-gray-200 shadow-sm rounded-xl overflow-hidden bg-white">
+                <Card key={p.id} className="border-2 border-gray-200 shadow-none rounded-xl overflow-hidden bg-white hover:border-blue-300 transition-colors">
                   <div className="p-6 space-y-6">
-                    <div className="flex items-start justify-between border-b border-gray-50 pb-4">
+                    <div className="flex items-start justify-between border-b border-gray-100 pb-4">
                       <div className="space-y-1">
-                        <h4 className="text-xl font-semibold text-gray-900 tracking-tight">{p.displayName}</h4>
+                        <h4 className="text-xl font-medium text-gray-900 tracking-tight">{p.displayName}</h4>
                         <p className="text-sm text-gray-500 font-normal">Standardized performance dimension for this role.</p>
                       </div>
                       {pf.rating > 0 && (
-                        <div className="px-4 py-1.5 rounded-lg bg-blue-600 text-white flex items-center gap-2 shadow-sm">
-                          <span className="text-[10px] font-semibold uppercase opacity-80">Score</span>
-                          <span className="text-lg font-bold">{pf.rating}</span>
+                        <div className="px-4 py-1.5 rounded-lg bg-blue-50 text-blue-600 border-2 border-blue-200 flex items-center gap-2">
+                          <span className="text-[10px] font-medium uppercase">Score</span>
+                          <span className="text-lg font-semibold">{pf.rating}</span>
                         </div>
                       )}
                     </div>
 
                     <div className="space-y-3">
-                      <Label className="text-xs font-semibold uppercase tracking-tight text-gray-400">
+                      <Label className="text-xs font-medium uppercase tracking-widest text-gray-400">
                         Evaluation Rating (1-5 Integer Only)
                       </Label>
                       <div className="flex gap-3">
@@ -395,10 +405,10 @@ export function ReviewForm({ reviewId }: Props) {
                               }))
                             }
                             className={cn(
-                              "flex-1 h-12 rounded-lg border font-semibold transition-all text-base",
+                              "flex-1 h-12 rounded-xl border-2 font-medium transition-all text-base shadow-none",
                               pf.rating === r
-                                ? "bg-blue-600 text-white border-blue-600 shadow-md"
-                                : "bg-white border-gray-200 text-gray-500 hover:border-blue-500 hover:text-blue-600",
+                                ? "bg-blue-600 text-white border-blue-700"
+                                : "bg-white border-gray-200 text-gray-400 hover:border-gray-400 hover:text-gray-600",
                               isLocked && "opacity-50 cursor-not-allowed"
                             )}
                           >
@@ -408,12 +418,12 @@ export function ReviewForm({ reviewId }: Props) {
                       </div>
                     </div>
 
-                    <div className="space-y-3">
+                    <div className="space-y-3 pt-2">
                       <div className="flex items-center justify-between">
-                        <Label className="text-xs font-semibold uppercase tracking-tight text-gray-400">
+                        <Label className="text-xs font-medium uppercase tracking-widest text-gray-400">
                           Qualitative Narrative Evidence
                         </Label>
-                        <div className={cn("text-[10px] font-semibold", charColor)}>
+                        <div className={cn("text-[10px] font-medium px-2 py-0.5 rounded-full border border-gray-100", charColor)}>
                           {len} / {MIN_FEEDBACK_LENGTH} MIN CHARACTERS
                         </div>
                       </div>
@@ -429,13 +439,13 @@ export function ReviewForm({ reviewId }: Props) {
                           }
                           rows={4}
                           className={cn(
-                            "rounded-lg border-gray-200 focus:ring-blue-500 focus:border-blue-500 p-4 text-sm font-normal resize-none transition-all placeholder:text-gray-300",
-                            tooShort && "border-orange-200 bg-orange-50/30"
+                            "rounded-xl border-2 border-gray-200 focus:ring-0 focus:border-blue-500 p-4 text-sm font-normal resize-none transition-all placeholder:text-gray-300 shadow-none bg-white",
+                            tooShort && "border-orange-200 bg-orange-50/20"
                           )}
                           placeholder="Provide behavioral examples and evidence..."
                         />
                         {tooShort && (
-                          <p className="text-[11px] font-medium text-orange-600 mt-1.5 flex items-center gap-1.5">
+                          <p className="text-[11px] font-medium text-orange-500 mt-2 flex items-center gap-1.5">
                             <AlertCircle className="w-3.5 h-3.5" />
                             {MIN_FEEDBACK_LENGTH - len} characters remaining
                           </p>
@@ -448,23 +458,102 @@ export function ReviewForm({ reviewId }: Props) {
             })}
           </div>
         </div>
+
+        {/* Narrative Summary */}
+        <div className="space-y-6 pt-6 border-t border-gray-100">
+          <div className="flex items-center gap-2 px-1">
+            <History className="w-5 h-5 text-gray-300" />
+            <h3 className="text-lg font-medium text-gray-900">Narrative Summary</h3>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card className="border-2 border-gray-200 shadow-none rounded-xl p-6 space-y-3 bg-white">
+              <div className="flex items-center gap-2">
+                <Trophy className="w-4 h-4 text-gray-400" />
+                <h4 className="text-xs font-medium text-gray-400 uppercase tracking-widest">Key Achievements</h4>
+              </div>
+              <p className="text-sm text-gray-600 leading-relaxed font-normal">
+                {currentReview.achievements || "No achievements recorded."}
+              </p>
+            </Card>
+
+            <Card className="border-2 border-gray-200 shadow-none rounded-xl p-6 space-y-3 bg-white">
+              <div className="flex items-center gap-2">
+                <Target className="w-4 h-4 text-gray-400" />
+                <h4 className="text-xs font-medium text-gray-400 uppercase tracking-widest">Strengths</h4>
+              </div>
+              <p className="text-sm text-gray-600 leading-relaxed font-normal">
+                {currentReview.strengths || "No strengths recorded."}
+              </p>
+            </Card>
+
+            <Card className="border-2 border-gray-200 shadow-none rounded-xl p-6 space-y-3 bg-white">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-gray-400" />
+                <h4 className="text-xs font-medium text-gray-400 uppercase tracking-widest">Areas for Growth</h4>
+              </div>
+              <p className="text-sm text-gray-600 leading-relaxed font-normal">
+                {currentReview.areasForImprovement || "No areas for improvement recorded."}
+              </p>
+            </Card>
+
+            <Card className="border-2 border-gray-200 shadow-none rounded-xl p-6 space-y-3 bg-white">
+              <div className="flex items-center gap-2">
+                <Lightbulb className="w-4 h-4 text-gray-400" />
+                <h4 className="text-xs font-medium text-gray-400 uppercase tracking-widest">Development Goals</h4>
+              </div>
+              <p className="text-sm text-gray-600 leading-relaxed font-normal">
+                {currentReview.goals || "No goals recorded."}
+              </p>
+            </Card>
+          </div>
+
+          <Card className="border-2 border-gray-200 shadow-none rounded-xl p-6 space-y-4 bg-gray-50/10">
+             <div className="flex items-center gap-2 border-b border-gray-200 pb-2">
+                <MessageSquare className="w-4 h-4 text-gray-400" />
+                <h4 className="text-xs font-medium text-gray-400 uppercase tracking-widest">Feedback Threads</h4>
+             </div>
+             <div className="space-y-6">
+                {currentReview.selfFeedback && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                       <span className="text-[10px] font-medium text-blue-600 uppercase tracking-widest">Employee Feedback</span>
+                    </div>
+                    <p className="text-sm text-gray-600 leading-relaxed pl-4 border-l-2 border-blue-200 font-normal">
+                      {currentReview.selfFeedback}
+                    </p>
+                  </div>
+                )}
+                {currentReview.managerFeedback && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                       <span className="text-[10px] font-medium text-orange-600 uppercase tracking-widest">Manager Feedback</span>
+                    </div>
+                    <p className="text-sm text-gray-600 leading-relaxed pl-4 border-l-2 border-orange-200 font-normal">
+                      {currentReview.managerFeedback}
+                    </p>
+                  </div>
+                )}
+             </div>
+          </Card>
+        </div>
       </div>
 
       {/* Floating Action Bar */}
       {!isLocked && (
-        <div className="fixed bottom-10 left-[60%] -translate-x-1/2 bg-white border border-gray-200 rounded-full px-8 py-3 shadow-xl z-50 flex items-center gap-6">
+        <div className="fixed bottom-10 left-[60%] -translate-x-1/2 bg-white border-2 border-gray-200 rounded-full px-8 py-3 shadow-none z-50 flex items-center gap-8 ring-1 ring-gray-100">
           <div className="flex flex-col">
-            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-tight">Active Stage</span>
-            <span className="text-sm font-semibold text-gray-900 capitalize">{currentReview.currentStage?.replace('_', ' ') || "Processing"}</span>
+            <span className="text-[10px] font-medium text-gray-400 uppercase tracking-widest">Active Stage</span>
+            <span className="text-sm font-medium text-gray-700 capitalize">{currentReview.currentStage?.replace('_', ' ') || "Processing"}</span>
           </div>
           
-          <div className="w-px h-8 bg-gray-100" />
+          <div className="w-px h-8 bg-gray-200" />
 
           <Button
             onClick={handleSubmit}
             disabled={saving}
             variant="ghost"
-            className="rounded-full font-semibold text-gray-500 hover:text-blue-600 h-10 px-6"
+            className="rounded-full font-medium text-gray-500 hover:text-blue-600 h-10 px-6 hover:bg-blue-50 transition-all border border-transparent hover:border-blue-100 shadow-none"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <History className="w-4 h-4 mr-2" />}
             Save Draft
@@ -473,7 +562,7 @@ export function ReviewForm({ reviewId }: Props) {
           <Button
             onClick={handleSubmit}
             disabled={saving}
-            className="rounded-full bg-blue-600 hover:bg-blue-700 shadow-md px-8 h-10 font-semibold uppercase text-[11px] tracking-wider text-white"
+            className="rounded-full bg-blue-600 hover:bg-blue-700 shadow-none px-10 h-10 font-medium text-[12px] text-white transition-all border border-blue-700"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Send className="w-4 h-4 mr-2" />}
             Submit Stage
@@ -483,7 +572,7 @@ export function ReviewForm({ reviewId }: Props) {
             <Button
               onClick={handleFinalize}
               disabled={finalizing}
-              className="rounded-full bg-green-600 hover:bg-green-700 shadow-md px-8 h-10 font-semibold uppercase text-[11px] tracking-wider text-white"
+              className="rounded-full bg-green-600 hover:bg-green-700 shadow-none px-10 h-10 font-medium text-[12px] text-white transition-all border border-green-700"
             >
               {finalizing ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Award className="w-4 h-4 mr-2" />}
               Finalize

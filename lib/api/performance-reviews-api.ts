@@ -60,6 +60,12 @@ export interface ReviewDetail extends ReviewSummary {
   pillarFeedback?: ReviewPillarFeedback[]
   performanceSnapshot?: any
   history?: Array<{ stage: ReviewStage; submittedAt: string; submittedBy: string }>
+  strengths?: string | null
+  areasForImprovement?: string | null
+  achievements?: string | null
+  goals?: string | null
+  managerFeedback?: string | null
+  selfFeedback?: string | null
 }
 
 export interface RatingDistribution {

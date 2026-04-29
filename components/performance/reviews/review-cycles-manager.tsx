@@ -112,7 +112,7 @@ export function ReviewCyclesManager() {
     setProcessingId(id)
     try {
       await apiClient.post(`/performance-reviews/cycles/${id}/initiate`, {})
-      toast.success("Review cycle reminders processed")
+      toast.success("Cycle reminders sent")
       dispatch(fetchReviewCycles())
     } catch (e: any) {
       toast.error("Failed to initiate cycle", { description: e?.message })
@@ -122,14 +122,14 @@ export function ReviewCyclesManager() {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Delete this review cycle?")) return
+    if (!confirm("Delete this cycle?")) return
     setProcessingId(id)
     try {
       await apiClient.delete(`/performance/review-cycles/${id}`)
-      toast.success("Review cycle deleted")
+      toast.success("Cycle deleted")
       dispatch(fetchReviewCycles())
     } catch (e: any) {
-      toast.error("Failed to delete cycle", { description: e?.message })
+      toast.error("Delete failed", { description: e?.message })
     } finally {
       setProcessingId(null)
     }
@@ -148,96 +148,82 @@ export function ReviewCyclesManager() {
     <div className="space-y-6">
       <div className="flex items-center justify-between px-1">
         <div>
-          <h2 className="text-xl font-semibold text-gray-900 tracking-tight">Review Cycles</h2>
-          <p className="text-sm text-gray-500 font-normal">Configure and monitor performance assessment windows.</p>
+          <h2 className="text-xl font-medium text-gray-900 tracking-tight">Review Cycles</h2>
+          <p className="text-sm text-gray-500 font-normal">Configure assessment windows and automation rules.</p>
         </div>
         {permissions.canCreateReviewCycle && (
-          <Button onClick={() => setOpen(true)} className="rounded-full bg-blue-600 hover:bg-blue-700 shadow-sm transition-all gap-2 px-6 h-10 font-medium">
-            <Plus className="w-4 h-4" /> New Cycle
+          <Button onClick={() => setOpen(true)} className="rounded-full bg-blue-600 hover:bg-blue-700 shadow-none transition-all gap-2 px-5 h-9 font-medium text-xs border border-blue-700">
+            <Plus className="w-3.5 h-3.5" /> New Cycle
           </Button>
         )}
       </div>
 
       {loading && cycles.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 bg-white rounded-xl border border-gray-200">
+        <div className="flex flex-col items-center justify-center py-20 bg-white rounded-xl border border-gray-200 shadow-none">
           <Loader2 className="w-8 h-8 animate-spin text-blue-600 mb-4" />
           <p className="text-gray-400 text-sm font-medium">Loading cycles...</p>
         </div>
       ) : cycles.length === 0 ? (
-        <div className="text-center py-20 bg-gray-50/30 border border-dashed rounded-xl border-gray-200">
-          <div className="w-14 h-14 bg-white rounded-xl flex items-center justify-center mx-auto mb-4 border border-gray-200 shadow-sm">
-            <CalendarIcon className="w-7 h-7 text-gray-300" />
+        <div className="text-center py-20 bg-white border-2 border-dashed rounded-xl border-gray-200 shadow-none">
+          <div className="w-14 h-14 bg-gray-50 rounded-xl flex items-center justify-center mx-auto mb-4 border border-gray-200">
+            <CalendarIcon className="w-6 h-6 text-gray-200" />
           </div>
-          <h3 className="text-lg font-semibold text-gray-900">No cycles created yet</h3>
-          <p className="text-sm text-gray-500 mt-1 max-w-xs mx-auto font-normal">Create a cycle to start automating performance reviews.</p>
-          <Button onClick={() => setOpen(true)} variant="outline" className="mt-6 rounded-full border-gray-200 hover:bg-white transition-all text-gray-600">
-            Get Started
-          </Button>
+          <h3 className="text-lg font-medium text-gray-900">No cycles yet</h3>
+          <p className="text-sm text-gray-400 mt-1 max-w-xs mx-auto font-normal">Create a cycle to start automating performance reviews.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {cycles.map((c) => (
-            <Card key={c.id} className="overflow-hidden border border-gray-200 hover:shadow-md transition-all duration-200 rounded-xl bg-white group">
+            <Card key={c.id} className="overflow-hidden border border-gray-200 hover:border-blue-300 transition-all rounded-xl bg-white shadow-none group">
               <CardContent className="p-0">
                 <div className="p-5 space-y-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="space-y-1">
-                      <h3 className="font-semibold text-gray-900 leading-tight text-base transition-colors">{c.title}</h3>
-                      <div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
-                        <CalendarIcon className="w-3.5 h-3.5 text-blue-600" />
+                      <h3 className="font-medium text-gray-900 leading-tight text-base">{c.title}</h3>
+                      <div className="flex items-center gap-2 text-xs text-gray-400 font-normal">
+                        <CalendarIcon className="w-3 h-3" />
                         {format(new Date(c.reviewPeriodStart), "MMM yyyy")} — {format(new Date(c.reviewPeriodEnd), "MMM yyyy")}
                       </div>
                     </div>
-                    <Badge variant="secondary" className={cn(
-                      "rounded-full px-2.5 py-0.5 border font-semibold text-[10px] uppercase",
-                      c.isActive ? "bg-green-50 text-green-700 border-green-200" : "bg-gray-50 text-gray-500 border-gray-200"
+                    <Badge variant="outline" className={cn(
+                      "rounded-full px-2 py-0 border-2 font-medium text-[9px] uppercase tracking-widest",
+                      c.isActive ? "text-green-600 border-green-200 bg-green-50/30" : "text-gray-400 border-gray-200 bg-gray-50/30"
                     )}>
-                      {c.isActive ? "Active" : "Archived"}
+                      {c.isActive ? "Active" : "Draft"}
                     </Badge>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-gray-50/50 p-3 rounded-lg border border-gray-100">
-                      <p className="text-[10px] font-semibold text-gray-500 mb-1 uppercase">
-                        Self Deadline
-                      </p>
-                      <p className="text-xs font-medium text-gray-800">
+                    <div className="bg-gray-50/50 p-2.5 rounded-lg border border-gray-200">
+                      <p className="text-[9px] font-medium text-gray-400 mb-0.5 uppercase tracking-widest">Self Deadline</p>
+                      <p className="text-xs font-medium text-gray-600">
                         {c.selfAssessmentDeadline ? format(new Date(c.selfAssessmentDeadline), "MMM d, yy") : "N/A"}
                       </p>
                     </div>
-                    <div className="bg-gray-50/50 p-3 rounded-lg border border-gray-100">
-                      <p className="text-[10px] font-semibold text-gray-500 mb-1 uppercase">
-                        Final Deadline
-                      </p>
-                      <p className="text-xs font-medium text-gray-800">
+                    <div className="bg-gray-50/50 p-2.5 rounded-lg border border-gray-200">
+                      <p className="text-[9px] font-medium text-gray-400 mb-0.5 uppercase tracking-widest">Final Deadline</p>
+                      <p className="text-xs font-medium text-gray-600">
                         {c.managerReviewDeadline ? format(new Date(c.managerReviewDeadline), "MMM d, yy") : "N/A"}
                       </p>
                     </div>
                   </div>
-
-                  <div className="flex flex-wrap gap-1.5 pt-1">
-                    {c.availableReviewTypes?.map(type => (
-                      <Badge key={type} variant="outline" className="bg-white text-blue-600 border-blue-200 px-2 py-0 rounded text-[10px] font-semibold uppercase">
-                        {type}
-                      </Badge>
-                    ))}
-                  </div>
                 </div>
 
-                <div className="bg-gray-50/50 px-5 py-3 border-t border-gray-100 flex items-center gap-3">
+                <div className="bg-gray-50/30 px-5 py-3 border-t border-gray-200 flex items-center gap-3">
                   <Button 
+                    variant="outline"
                     size="sm" 
-                    className="flex-1 rounded-full text-xs font-semibold gap-2 bg-blue-600 hover:bg-blue-700 shadow-sm transition-all text-white h-8"
+                    className="flex-1 rounded-full text-[11px] font-medium gap-2 border-gray-200 hover:bg-white h-8 text-gray-600 hover:border-gray-300 shadow-none"
                     onClick={() => handleInitiate(c.id)}
                     disabled={processingId === c.id}
                   >
-                    {processingId === c.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-                    Trigger
+                    {processingId === c.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+                    Remind
                   </Button>
                   <Button 
                     size="sm" 
-                    variant="outline" 
-                    className="rounded-full h-8 w-8 p-0 text-gray-400 hover:text-red-600 hover:bg-red-50 hover:border-red-200 border-gray-200 transition-all"
+                    variant="ghost" 
+                    className="rounded-full h-8 w-8 p-0 text-gray-300 hover:text-red-600 hover:bg-red-50 border border-transparent hover:border-red-100"
                     onClick={() => handleDelete(c.id)}
                     disabled={processingId === c.id}
                   >
@@ -251,25 +237,25 @@ export function ReviewCyclesManager() {
       )}
 
       <Dialog open={open} onOpenChange={(val) => { setOpen(val); if(!val) setStep(1); }}>
-        <DialogContent className="sm:max-w-2xl p-0 overflow-hidden border border-gray-200 rounded-2xl shadow-xl bg-white h-[600px] flex flex-col">
-          <DialogHeader className="bg-white border-b p-6 shrink-0">
+        <DialogContent className="sm:max-w-xl p-0 overflow-hidden border border-gray-200 rounded-2xl shadow-none bg-white h-[580px] flex flex-col">
+          <DialogHeader className="bg-white border-b p-6 shrink-0 border-gray-200">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
-                  {step === 1 ? <Layers className="w-5 h-5 text-blue-600" /> : <Settings className="w-5 h-5 text-blue-600" />}
+                <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center border border-gray-200">
+                  {step === 1 ? <Layers className="w-5 h-5 text-gray-400" /> : <Settings className="w-5 h-5 text-gray-400" />}
                 </div>
                 <div>
-                  <DialogTitle className="text-xl font-semibold text-gray-900">
-                    {step === 1 ? "Review Cycle Details" : "Configuration & Targets"}
+                  <DialogTitle className="text-lg font-medium text-gray-900">
+                    {step === 1 ? "Review Cycle Details" : "Configuration"}
                   </DialogTitle>
-                  <DialogDescription className="text-gray-500 font-normal text-xs">
-                    Step {step} of 2: {step === 1 ? "Basic information and period windows" : "Review types and scoring scales"}
+                  <DialogDescription className="text-gray-400 font-normal text-[11px] pt-0.5">
+                    Step {step} of 2: {step === 1 ? "Period windows" : "Rules & scale"}
                   </DialogDescription>
                 </div>
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1.5 bg-gray-50/50 p-1 rounded-full border border-gray-200">
                 {[1, 2].map((s) => (
-                  <div key={s} className={cn("h-1.5 w-8 rounded-full transition-all", s <= step ? "bg-blue-600" : "bg-gray-100")} />
+                  <div key={s} className={cn("h-1 w-6 rounded-full transition-all", s <= step ? "bg-blue-600" : "bg-gray-200")} />
                 ))}
               </div>
             </div>
@@ -280,18 +266,18 @@ export function ReviewCyclesManager() {
               <div className="space-y-6">
                 <div className="grid grid-cols-3 gap-6">
                   <div className="col-span-2 space-y-2">
-                    <Label className="text-xs font-semibold text-gray-400 uppercase tracking-tight">Cycle Title *</Label>
+                    <Label className="text-[10px] font-medium text-gray-400 uppercase tracking-widest">Cycle Title *</Label>
                     <Input
                       value={formData.title}
                       onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                       placeholder="e.g. 2026 Annual Review"
-                      className="rounded-lg h-10 border-gray-200 font-normal"
+                      className="rounded-lg h-10 border-gray-200 font-normal text-sm focus:border-blue-500 shadow-none bg-white"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-xs font-semibold text-gray-400 uppercase tracking-tight">Status</Label>
-                    <div className="flex items-center justify-between h-10 px-3 bg-gray-50 border rounded-lg border-gray-200">
-                      <span className="text-xs font-medium text-gray-600">{formData.isActive ? "Active" : "Draft"}</span>
+                    <Label className="text-[10px] font-medium text-gray-400 uppercase tracking-widest">Status</Label>
+                    <div className="flex items-center justify-between h-10 px-3 bg-white border rounded-lg border-gray-200">
+                      <span className="text-xs font-medium text-gray-500">{formData.isActive ? "Active" : "Draft"}</span>
                       <Switch 
                         checked={formData.isActive} 
                         onCheckedChange={(checked) => setFormData({ ...formData, isActive: checked })}
@@ -302,61 +288,61 @@ export function ReviewCyclesManager() {
 
                 <div className="grid grid-cols-2 gap-6 pt-2">
                   <div className="space-y-2">
-                    <Label className="text-xs font-semibold text-gray-400 uppercase tracking-tight">Review Period Start *</Label>
+                    <Label className="text-[10px] font-medium text-gray-400 uppercase tracking-widest">Period Start *</Label>
                     <DatePicker 
                       value={formData.reviewPeriodStart} 
                       onChange={(date) => setFormData({ ...formData, reviewPeriodStart: date })}
-                      placeholder="Select date"
+                      placeholder="Start date"
                       allowFutureDates
-                      className="rounded-lg h-10 border-gray-200"
+                      className="rounded-lg h-10 border-gray-200 bg-white"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-xs font-semibold text-gray-400 uppercase tracking-tight">Review Period End *</Label>
+                    <Label className="text-[10px] font-medium text-gray-400 uppercase tracking-widest">Period End *</Label>
                     <DatePicker 
                       value={formData.reviewPeriodEnd} 
                       onChange={(date) => setFormData({ ...formData, reviewPeriodEnd: date })}
-                      placeholder="Select date"
+                      placeholder="End date"
                       allowFutureDates
-                      className="rounded-lg h-10 border-gray-200"
+                      className="rounded-lg h-10 border-gray-200 bg-white"
                     />
                   </div>
                 </div>
 
-                <div className="space-y-4 pt-4 border-t">
+                <div className="space-y-4 pt-4 border-t border-gray-200">
                   <div className="flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-gray-400" />
-                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Key Deadlines</span>
+                    <Clock className="w-3.5 h-3.5 text-gray-300" />
+                    <span className="text-[10px] font-medium text-gray-400 uppercase tracking-widest">Deadlines</span>
                   </div>
                   <div className="grid grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <Label className="text-[10px] font-semibold text-gray-500">Self Evaluation</Label>
+                    <div className="space-y-1">
+                      <Label className="text-[9px] font-medium text-gray-400 uppercase tracking-widest">Self</Label>
                       <DatePicker 
                         value={formData.selfAssessmentDeadline} 
                         onChange={(date) => setFormData({ ...formData, selfAssessmentDeadline: date })}
-                        placeholder="Deadline"
+                        placeholder="Date"
                         allowFutureDates
-                        className="rounded-lg h-10 border-gray-200"
+                        className="rounded-lg h-9 border-gray-200 text-xs bg-white"
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label className="text-[10px] font-semibold text-gray-500">Peer Feedback</Label>
+                    <div className="space-y-1">
+                      <Label className="text-[9px] font-medium text-gray-400 uppercase tracking-widest">Peer</Label>
                       <DatePicker 
                         value={formData.peerReviewDeadline} 
                         onChange={(date) => setFormData({ ...formData, peerReviewDeadline: date })}
-                        placeholder="Deadline"
+                        placeholder="Date"
                         allowFutureDates
-                        className="rounded-lg h-10 border-gray-200"
+                        className="rounded-lg h-9 border-gray-200 text-xs bg-white"
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label className="text-[10px] font-semibold text-gray-500">Manager Final</Label>
+                    <div className="space-y-1">
+                      <Label className="text-[9px] font-medium text-gray-400 uppercase tracking-widest">Manager</Label>
                       <DatePicker 
                         value={formData.managerReviewDeadline} 
                         onChange={(date) => setFormData({ ...formData, managerReviewDeadline: date })}
-                        placeholder="Deadline"
+                        placeholder="Date"
                         allowFutureDates
-                        className="rounded-lg h-10 border-gray-200"
+                        className="rounded-lg h-9 border-gray-200 text-xs bg-white"
                       />
                     </div>
                   </div>
@@ -365,87 +351,72 @@ export function ReviewCyclesManager() {
             ) : (
               <div className="space-y-8">
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-1">
-                      <Label className="text-sm font-semibold text-gray-900">Available Review Types</Label>
-                      <p className="text-xs text-gray-500 font-normal">Select which participants are required for this cycle.</p>
-                    </div>
-                  </div>
+                  <Label className="text-[10px] font-medium text-gray-400 uppercase tracking-widest">Review Types</Label>
                   <div className="grid grid-cols-2 gap-3">
-                    {["Self", "Manager", "Peer", "External", "Stakeholder"].map(type => (
+                    {["Self", "Manager", "Peer", "External"].map(type => (
                       <div 
                         key={type} 
                         onClick={() => toggleReviewType(type)}
                         className={cn(
-                          "flex items-center justify-between p-4 rounded-xl border-2 transition-all cursor-pointer",
+                          "flex items-center justify-between p-3.5 rounded-xl border transition-all cursor-pointer shadow-none",
                           formData.availableReviewTypes.includes(type) 
-                            ? "border-blue-600 bg-blue-50/50" 
-                            : "border-gray-100 bg-white hover:border-gray-200"
+                            ? "border-blue-500 bg-blue-50/20" 
+                            : "border-gray-200 bg-white hover:border-gray-300"
                         )}
                       >
-                        <span className={cn("text-sm font-medium", formData.availableReviewTypes.includes(type) ? "text-blue-700" : "text-gray-600")}>
+                        <span className={cn("text-sm font-medium", formData.availableReviewTypes.includes(type) ? "text-blue-700" : "text-gray-500")}>
                           {type} Review
                         </span>
                         <Checkbox 
                           checked={formData.availableReviewTypes.includes(type)}
-                          className="rounded-full border-gray-300"
+                          className="rounded-full border-gray-300 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
                         />
                       </div>
                     ))}
                   </div>
                 </div>
 
-                <div className="space-y-4 pt-4 border-t">
-                  <div className="space-y-1">
-                    <Label className="text-sm font-semibold text-gray-900">Rating Scale Configuration</Label>
-                    <p className="text-xs text-gray-500 font-normal">Standardized scale applied to all evaluation pillars.</p>
-                  </div>
-                  <div className="p-4 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-between">
+                <div className="space-y-4 pt-4 border-t border-gray-200">
+                  <Label className="text-[10px] font-medium text-gray-400 uppercase tracking-widest">Rating Scale</Label>
+                  <div className="p-3.5 bg-white rounded-xl border border-gray-200 flex items-center justify-between shadow-none">
                     <div className="flex items-center gap-3">
-                      <Target className="w-5 h-5 text-gray-400" />
+                      <Target className="w-4 h-4 text-gray-300" />
                       <Input
                         value={formData.reviewRatingScale}
                         onChange={(e) => setFormData({ ...formData, reviewRatingScale: e.target.value })}
-                        className="bg-transparent border-none shadow-none focus-visible:ring-0 h-8 font-semibold text-gray-900 px-0 w-32"
+                        className="bg-transparent border-none shadow-none focus-visible:ring-0 h-8 font-medium text-gray-700 px-0 w-32 text-sm"
                       />
                     </div>
-                    <Badge className="bg-blue-600 text-white font-bold text-[10px]">INTEGER ONLY</Badge>
+                    <Badge variant="outline" className="text-[9px] font-medium text-gray-400 border-gray-200 tracking-widest uppercase">Integer Only</Badge>
                   </div>
-                </div>
-
-                <div className="bg-orange-50/50 p-4 rounded-xl border border-orange-100 flex items-start gap-3">
-                  <Info className="w-4 h-4 text-orange-500 mt-0.5 shrink-0" />
-                  <p className="text-xs text-orange-700 font-medium leading-relaxed">
-                    Triggering this cycle will automatically notify all assigned employees and their respective reviewers. Ensure all deadlines are accurate before proceeding.
-                  </p>
                 </div>
               </div>
             )}
           </div>
 
-          <DialogFooter className="bg-gray-50 p-6 border-t flex items-center justify-between shrink-0">
+          <DialogFooter className="bg-gray-50 p-6 border-t border-gray-200 flex items-center justify-between shrink-0 shadow-none">
             <Button 
               variant="ghost" 
               onClick={() => step === 1 ? setOpen(false) : setStep(1)} 
-              className="rounded-full px-6 font-semibold text-gray-500"
+              className="rounded-full px-6 font-medium text-gray-400 text-xs hover:bg-white border border-transparent hover:border-gray-200"
             >
-              {step === 1 ? "Cancel" : <><ChevronLeft className="w-4 h-4 mr-2" /> Back</>}
+              {step === 1 ? "Cancel" : <><ChevronLeft className="w-3.5 h-3.5 mr-2" /> Back</>}
             </Button>
             
             {step === 1 ? (
               <Button 
                 onClick={() => setStep(2)} 
-                className="rounded-full px-8 h-10 bg-blue-600 hover:bg-blue-700 text-white shadow-md font-semibold"
+                className="rounded-full px-6 h-9 bg-blue-600 hover:bg-blue-700 text-white shadow-none font-medium text-xs border border-blue-700"
               >
-                Next Step <ChevronRight className="w-4 h-4 ml-2" />
+                Continue <ChevronRight className="w-3.5 h-3.5 ml-2" />
               </Button>
             ) : (
               <Button 
                 onClick={handleCreate} 
                 disabled={creating} 
-                className="rounded-full px-10 h-10 bg-blue-600 hover:bg-blue-700 text-white shadow-md font-semibold"
+                className="rounded-full px-8 h-9 bg-blue-600 hover:bg-blue-700 text-white shadow-none font-medium text-xs border border-blue-700"
               >
-                {creating ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Initializing...</> : <><Send className="w-4 h-4 mr-2" /> Create Cycle</>}
+                {creating ? <><Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" /> Processing...</> : <><Send className="w-3.5 h-3.5 mr-2" /> Create Cycle</>}
               </Button>
             )}
           </DialogFooter>
