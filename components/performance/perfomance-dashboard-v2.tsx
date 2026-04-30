@@ -107,11 +107,32 @@ export function PerformanceDashboardV2() {
     // Extract monthly productivity data and mark current month
     const currentMonth = dashboardData?.period?.currentMonth || new Date().getMonth() + 1
     const currentYear = dashboardData?.period?.currentYear || new Date().getFullYear()
-    const monthlyProductivityData = (dashboardData?.monthlyProductivity?.data || []).map((item: any) => ({
-        ...item,
-        tasks: item.taskCompletedRate || 0,
-        isCurrent: item.monthNumber === currentMonth && item.year === currentYear
-    }))
+
+    // Always render Jan -> Dec calendar order for the selected year.
+    // Backend may return a rolling 12-month window; we map it onto a fixed
+    // calendar grid so the X-axis is always Jan, Feb, Mar ... Dec.
+    const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    const apiMonthlyRows: any[] = dashboardData?.monthlyProductivity?.data || []
+    const targetYear = parseInt(selectedYear) || currentYear
+    const monthlyProductivityData = MONTH_LABELS.map((label, idx) => {
+        const monthNumber = idx + 1
+        // Prefer exact match for the selected year; fall back to month-only match
+        // (the rolling window from the API may not include the full target year)
+        const exact = apiMonthlyRows.find(
+            (r: any) => r?.monthNumber === monthNumber && r?.year === targetYear
+        )
+        const monthOnly = exact
+            ? null
+            : apiMonthlyRows.find((r: any) => r?.monthNumber === monthNumber)
+        const item = exact || monthOnly || { monthNumber, year: targetYear, taskCompletedRate: 0 }
+        return {
+            ...item,
+            month: label,
+            monthNumber,
+            tasks: item.taskCompletedRate || 0,
+            isCurrent: monthNumber === currentMonth && (item.year || targetYear) === currentYear,
+        }
+    })
 
     // Extract performance distribution and convert to array format for pie chart
     const perfDist = dashboardData?.performanceDistribution || {}
@@ -612,7 +633,7 @@ export function PerformanceDashboardV2() {
                                             stroke="url(#gaugeGradient)"
                                             strokeWidth="20"
                                             strokeLinecap="round"
-                                            strokeDasharray={`${(budgetPercentage / 100) * 251.2} 251.2`}
+                                            strokeDasharray={`${Math.min(100, budgetPercentage) / 100 * 251.2} 251.2`}
                                         />
                                         <defs>
                                             <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
@@ -622,7 +643,7 @@ export function PerformanceDashboardV2() {
                                             </linearGradient>
                                         </defs>
                                         {/* Tick marks */}
-                                        {[0, 25, 50, 75, 100].map((tick, i) => {
+                                        {[0, 25, 50, 75, 100].map((tick) => {
                                             const angle = (tick / 100) * 180 - 180
                                             const radians = (angle * Math.PI) / 180
                                             const x1 = 100 + 60 * Math.cos(radians)
@@ -645,8 +666,8 @@ export function PerformanceDashboardV2() {
                                         <line
                                             x1="100"
                                             y1="90"
-                                            x2={100 + 55 * Math.cos(((gaugeAngle - 180) * Math.PI) / 180)}
-                                            y2={90 + 55 * Math.sin(((gaugeAngle - 180) * Math.PI) / 180)}
+                                            x2={100 + 55 * Math.cos(((Math.min(180, gaugeAngle) - 180) * Math.PI) / 180)}
+                                            y2={90 + 55 * Math.sin(((Math.min(180, gaugeAngle) - 180) * Math.PI) / 180)}
                                             stroke="#4c1d95"
                                             strokeWidth="3"
                                             strokeLinecap="round"
@@ -654,11 +675,19 @@ export function PerformanceDashboardV2() {
                                         <circle cx="100" cy="90" r="6" fill="#4c1d95" />
                                     </svg>
                                     {/* Labels */}
-                                    <span className="absolute -left-6 bottom-0 text-[10px] font-bold text-muted-foreground">0k</span>
-                                    <span className="absolute -left-8 top-4 text-[10px] font-bold text-muted-foreground">20k</span>
-                                    <span className="absolute left-1/2 -translate-x-1/2 -top-6 text-[10px] font-bold text-muted-foreground">40k</span>
-                                    <span className="absolute -right-8 top-4 text-[10px] font-bold text-muted-foreground">60k</span>
-                                    <span className="absolute -right-6 bottom-0 text-[10px] font-bold text-muted-foreground">80k</span>
+                                    {(() => {
+                                        const formatAmt = (val: number) => val >= 1000 ? `${(val / 1000).toFixed(0)}k` : val.toString();
+                                        const total = budgetData.totalBudget;
+                                        return (
+                                            <>
+                                                <span className="absolute -left-6 bottom-0 text-[10px] font-bold text-muted-foreground">0</span>
+                                                <span className="absolute -left-8 top-4 text-[10px] font-bold text-muted-foreground">{formatAmt(total * 0.25)}</span>
+                                                <span className="absolute left-1/2 -translate-x-1/2 -top-6 text-[10px] font-bold text-muted-foreground">{formatAmt(total * 0.5)}</span>
+                                                <span className="absolute -right-8 top-4 text-[10px] font-bold text-muted-foreground">{formatAmt(total * 0.75)}</span>
+                                                <span className="absolute -right-6 bottom-0 text-[10px] font-bold text-muted-foreground">{formatAmt(total)}</span>
+                                            </>
+                                        );
+                                    })()}
                                 </div>
 
                                 {/* Stats */}

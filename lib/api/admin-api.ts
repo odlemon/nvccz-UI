@@ -121,6 +121,18 @@ export interface BoardVotingMember {
   roleCode: string
   departmentRole: string
   votingPower: number
+  /** When true, the member cannot cast votes regardless of votingPower. */
+  boardVotingDisabled?: boolean
+}
+
+export interface SetBoardVotingDisabledRequest {
+  disabled: boolean
+}
+
+export interface SetBoardVotingDisabledResponse {
+  success: boolean
+  message: string
+  data?: BoardVotingMember
 }
 
 export interface BoardVotingMembersResponse {
@@ -192,6 +204,13 @@ export const adminApiService = {
   async updateVotingPower(userId: string, votingPower: number): Promise<UpdateVotingPowerResponse> {
     const response = await apiClient.put(`/board-reviews/voting-members/${userId}/voting-power`, {
       votingPower
+    })
+    return response
+  },
+
+  async setBoardVotingDisabled(userId: string, disabled: boolean): Promise<SetBoardVotingDisabledResponse> {
+    const response = await apiClient.put(`/board-reviews/voting-members/${userId}/disable`, {
+      disabled,
     })
     return response
   },

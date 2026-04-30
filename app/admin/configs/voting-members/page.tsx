@@ -7,9 +7,14 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Edit, Users, Shield, Loader2, Plus, AlertTriangle } from "lucide-react"
+import { Edit, Users, Shield, Loader2, Plus, AlertTriangle, ShieldOff, ShieldCheck } from "lucide-react"
 import { useAppDispatch, useAppSelector } from "@/lib/store"
-import { fetchBoardVotingMembers, updateVotingPower, fetchUsers } from "@/lib/store/slices/adminSlice"
+import {
+  fetchBoardVotingMembers,
+  updateVotingPower,
+  fetchUsers,
+  setBoardVotingDisabled,
+} from "@/lib/store/slices/adminSlice"
 import { UpdateVotingPowerDialog } from "@/components/admin/update-voting-power-dialog"
 import { toast } from "sonner"
 
@@ -66,6 +71,7 @@ export default function VotingMembers() {
   const [showUpdateDialog, setShowUpdateDialog] = useState(false)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [selectedMember, setSelectedMember] = useState<any | null>(null)
+  const [togglingMemberId, setTogglingMemberId] = useState<string | null>(null)
 
   useEffect(() => {
     dispatch(fetchBoardVotingMembers())
@@ -96,6 +102,24 @@ export default function VotingMembers() {
       toast.error('Failed to update voting power', {
         description: error || 'Please try again.'
       })
+    }
+  }
+
+  const handleToggleVotingDisabled = async (userId: string, nextDisabled: boolean) => {
+    setTogglingMemberId(userId)
+    try {
+      await dispatch(setBoardVotingDisabled({ userId, disabled: nextDisabled })).unwrap()
+      toast.success(
+        nextDisabled
+          ? 'Member has been disabled from voting'
+          : 'Member can now vote'
+      )
+    } catch (error: any) {
+      toast.error('Failed to update voting access', {
+        description: typeof error === 'string' ? error : error?.message || 'Please try again.',
+      })
+    } finally {
+      setTogglingMemberId(null)
     }
   }
 
@@ -269,13 +293,24 @@ export default function VotingMembers() {
                           {member.firstName} {member.lastName}
                         </p>
                         <p className="text-sm text-gray-600">{member.email}</p>
-                        <div className="flex items-center gap-2 mt-1">
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
                           <Badge variant="outline" className="text-xs">
                             {member.departmentRole}
                           </Badge>
                           <Badge variant="outline" className="text-xs">
                             {member.roleCode}
                           </Badge>
+                          {member.boardVotingDisabled ? (
+                            <Badge className="text-xs bg-red-100 text-red-700 border border-red-200 gap-1">
+                              <ShieldOff className="w-3 h-3" />
+                              Disabled
+                            </Badge>
+                          ) : (
+                            <Badge className="text-xs bg-green-100 text-green-700 border border-green-200 gap-1">
+                              <ShieldCheck className="w-3 h-3" />
+                              Can Vote
+                            </Badge>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -291,6 +326,29 @@ export default function VotingMembers() {
                         <p className="text-2xl font-bold text-gray-900">{member.votingPower}%</p>
                         <p className="text-xs text-gray-500">voting power</p>
                       </div>
+
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        disabled={togglingMemberId === member.id}
+                        onClick={() =>
+                          handleToggleVotingDisabled(member.id, !member.boardVotingDisabled)
+                        }
+                        title={member.boardVotingDisabled ? "Enable voting" : "Disable voting"}
+                        className={
+                          member.boardVotingDisabled
+                            ? "text-green-600 hover:text-green-700 hover:bg-green-50"
+                            : "text-red-600 hover:text-red-700 hover:bg-red-50"
+                        }
+                      >
+                        {togglingMemberId === member.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : member.boardVotingDisabled ? (
+                          <ShieldCheck className="w-4 h-4" />
+                        ) : (
+                          <ShieldOff className="w-4 h-4" />
+                        )}
+                      </Button>
 
                       <Button
                         variant="outline"

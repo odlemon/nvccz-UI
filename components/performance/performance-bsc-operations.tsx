@@ -415,58 +415,6 @@ export function PerformanceBscOperations() {
         </div>
       </CardHeader>
       <CardContent className="space-y-6 pt-6">
-        {/* Shared period controls */}
-        <div className="rounded-2xl border border-border bg-gradient-to-br from-slate-50 via-blue-50/40 to-indigo-50/40 p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <CalendarIcon className="w-4 h-4 text-indigo-600" />
-            <span className="text-sm font-semibold text-card-foreground">Reporting Period</span>
-            <Badge variant="outline" className="rounded-full ml-auto">
-              {period.frequency}
-            </Badge>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-            <FormField label="Frequency" required>
-              <Select
-                value={period.frequency}
-                onValueChange={(v) => setPeriod((p) => ({ ...p, frequency: v }))}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="MONTHLY">Monthly</SelectItem>
-                  <SelectItem value="QUARTERLY">Quarterly</SelectItem>
-                  <SelectItem value="ANNUAL">Annual</SelectItem>
-                </SelectContent>
-              </Select>
-            </FormField>
-            <FormField label="Period Label" required>
-              <Input
-                className="rounded-full"
-                value={period.periodLabel}
-                onChange={(e) => setPeriod((p) => ({ ...p, periodLabel: e.target.value }))}
-                placeholder="e.g. 2026-Q1"
-              />
-            </FormField>
-            <FormField label="Period Start">
-              <DatePicker
-                value={period.periodStart}
-                onChange={(d) => setPeriod((p) => ({ ...p, periodStart: d }))}
-                placeholder="Pick start date"
-                allowFutureDates
-              />
-            </FormField>
-            <FormField label="Period End">
-              <DatePicker
-                value={period.periodEnd}
-                onChange={(d) => setPeriod((p) => ({ ...p, periodEnd: d }))}
-                placeholder="Pick end date"
-                allowFutureDates
-              />
-            </FormField>
-          </div>
-        </div>
-
         {/* Tab nav */}
         <div className="flex flex-wrap gap-2 border-b border-border pb-3">
           <Button
@@ -614,7 +562,58 @@ export function PerformanceBscOperations() {
 
         {/* BSC Entry tab */}
         {activeTab === "bsc-entry" && (
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          <div className="space-y-6">
+            <div className="rounded-2xl border border-border bg-gradient-to-br from-slate-50 via-blue-50/40 to-indigo-50/40 p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <CalendarIcon className="w-4 h-4 text-indigo-600" />
+                <span className="text-sm font-semibold text-card-foreground">Reporting Period</span>
+                <Badge variant="outline" className="rounded-full ml-auto">
+                  {period.frequency}
+                </Badge>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                <FormField label="Frequency" required>
+                  <Select
+                    value={period.frequency}
+                    onValueChange={(v) => setPeriod((p) => ({ ...p, frequency: v }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="MONTHLY">Monthly</SelectItem>
+                      <SelectItem value="QUARTERLY">Quarterly</SelectItem>
+                      <SelectItem value="ANNUAL">Annual</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </FormField>
+                <FormField label="Period Label" required>
+                  <Input
+                    className="rounded-full"
+                    value={period.periodLabel}
+                    onChange={(e) => setPeriod((p) => ({ ...p, periodLabel: e.target.value }))}
+                    placeholder="e.g. 2026-Q1"
+                  />
+                </FormField>
+                <FormField label="Period Start">
+                  <DatePicker
+                    value={period.periodStart}
+                    onChange={(d) => setPeriod((p) => ({ ...p, periodStart: d }))}
+                    placeholder="Pick start date"
+                    allowFutureDates
+                  />
+                </FormField>
+                <FormField label="Period End">
+                  <DatePicker
+                    value={period.periodEnd}
+                    onChange={(d) => setPeriod((p) => ({ ...p, periodEnd: d }))}
+                    placeholder="Pick end date"
+                    allowFutureDates
+                  />
+                </FormField>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
             {/* Financial Outcome ROI */}
             <SectionCard
               title="Financial Outcome — ROI"
@@ -1425,11 +1424,63 @@ export function PerformanceBscOperations() {
               </Button>
             </SectionCard>
           </div>
+          </div>
         )}
 
         {/* Workflow tab */}
         {activeTab === "workflow" && (
-          <div className="space-y-5">
+          <div className="space-y-6">
+            <div className="rounded-2xl border border-border bg-gradient-to-br from-slate-50 via-blue-50/40 to-indigo-50/40 p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <CalendarIcon className="w-4 h-4 text-indigo-600" />
+                <span className="text-sm font-semibold text-card-foreground">Reporting Period</span>
+                <Badge variant="outline" className="rounded-full ml-auto">
+                  {period.frequency}
+                </Badge>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                <FormField label="Frequency" required>
+                  <Select
+                    value={period.frequency}
+                    onValueChange={(v) => setPeriod((p) => ({ ...p, frequency: v }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="MONTHLY">Monthly</SelectItem>
+                      <SelectItem value="QUARTERLY">Quarterly</SelectItem>
+                      <SelectItem value="ANNUAL">Annual</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </FormField>
+                <FormField label="Period Label" required>
+                  <Input
+                    className="rounded-full"
+                    value={period.periodLabel}
+                    onChange={(e) => setPeriod((p) => ({ ...p, periodLabel: e.target.value }))}
+                    placeholder="e.g. 2026-Q1"
+                  />
+                </FormField>
+                <FormField label="Period Start">
+                  <DatePicker
+                    value={period.periodStart}
+                    onChange={(d) => setPeriod((p) => ({ ...p, periodStart: d }))}
+                    placeholder="Pick start date"
+                    allowFutureDates
+                  />
+                </FormField>
+                <FormField label="Period End">
+                  <DatePicker
+                    value={period.periodEnd}
+                    onChange={(d) => setPeriod((p) => ({ ...p, periodEnd: d }))}
+                    placeholder="Pick end date"
+                    allowFutureDates
+                  />
+                </FormField>
+              </div>
+            </div>
+            <div className="space-y-5">
             <div className="rounded-xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-purple-50 p-4 text-sm text-indigo-900">
               <p className="font-semibold mb-2">Workflows on this tab</p>
               <ul className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs leading-relaxed">
@@ -1701,6 +1752,7 @@ export function PerformanceBscOperations() {
                 {isActionLoading("load-workflow-history") ? "Loading..." : "Load history for selected goals"}
               </Button>
             </div>
+          </div>
           </div>
         )}
       </CardContent>

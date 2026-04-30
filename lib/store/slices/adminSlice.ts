@@ -181,6 +181,22 @@ export const updateVotingPower = createAsyncThunk(
   }
 )
 
+export const setBoardVotingDisabled = createAsyncThunk(
+  'admin/setBoardVotingDisabled',
+  async (
+    { userId, disabled }: { userId: string; disabled: boolean },
+    { dispatch, rejectWithValue }
+  ) => {
+    try {
+      const response = await adminApiService.setBoardVotingDisabled(userId, disabled)
+      dispatch(fetchBoardVotingMembers())
+      return response
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to update voting access')
+    }
+  }
+)
+
 const adminSlice = createSlice({
   name: 'admin',
   initialState,

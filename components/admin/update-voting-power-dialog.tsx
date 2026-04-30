@@ -46,7 +46,8 @@ export function UpdateVotingPowerDialog({
   }, [isOpen, isCreateMode, member])
 
   const handleSubmit = async () => {
-    if (votingPower < 0 || votingPower > 100) {
+    // 0 is a valid voting power (member is on the board but currently has no voting weight)
+    if (votingPower < 0 || votingPower > 100 || Number.isNaN(votingPower)) {
       return
     }
 
@@ -71,7 +72,9 @@ export function UpdateVotingPowerDialog({
     : currentTotal - (member?.votingPower || 0)
   const availablePower = 100 - otherMembersTotal
   const newTotal = otherMembersTotal + votingPower
-  const isValidTotal = newTotal <= 100 && votingPower > 0
+  // 0 is allowed — member can sit on the board with no current voting weight.
+  const isValidTotal =
+    newTotal <= 100 && votingPower >= 0 && !Number.isNaN(votingPower)
 
   const selectedUser = isCreateMode 
     ? availableUsers.find(u => u.id === selectedUserId)
@@ -197,7 +200,7 @@ export function UpdateVotingPowerDialog({
           </div>
 
           {/* Validation Warning */}
-          {newTotal > 100 && votingPower > 0 && (
+          {newTotal > 100 && (
             <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
               <AlertCircle className="w-4 h-4 text-red-600 mt-0.5 flex-shrink-0" />
               <div>
@@ -205,6 +208,17 @@ export function UpdateVotingPowerDialog({
                 <p className="text-xs text-red-700">
                   Total voting power cannot exceed 100%. Current total would be {newTotal}%.
                   You need to reduce by {newTotal - 100}%.
+                </p>
+              </div>
+            </div>
+          )}
+          {votingPower === 0 && newTotal <= 100 && (
+            <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-semibold text-amber-900">Zero Voting Power</p>
+                <p className="text-xs text-amber-700">
+                  This member will sit on the board with no voting weight. They can be re-weighted later.
                 </p>
               </div>
             </div>
@@ -229,11 +243,10 @@ export function UpdateVotingPowerDialog({
             <Button
               onClick={handleSubmit}
               disabled={
-                submitting || 
-                !isValidTotal || 
-                votingPower <= 0 ||
+                submitting ||
+                !isValidTotal ||
                 (isCreateMode && !selectedUserId) ||
-                (!isCreateMode && member && votingPower === member.votingPower)
+                (!isCreateMode && !!member && votingPower === member.votingPower)
               }
               className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
             >
