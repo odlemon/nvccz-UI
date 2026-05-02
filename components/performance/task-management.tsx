@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import { useAppSelector, useAppDispatch } from "@/lib/store"
 import {
   fetchMyKanbanTasks,
@@ -116,6 +117,26 @@ export function TaskManagement() {
       dispatch(setFilters({ ...filters, department: undefined }))
     }
   }, [activeTab, dispatch, filters])
+
+  // Auto-open the task detail drawer when a `taskId` query param is present
+  // (used by notification deep-links like /performance/tasks?taskId=xxx).
+  // We strip the param from the URL after handling it so reloads / back-nav
+  // don't keep re-opening the drawer.
+  const searchParams = useSearchParams()
+  const pathname = usePathname()
+  const router = useRouter()
+  useEffect(() => {
+    const taskIdFromUrl = searchParams?.get("taskId")
+    if (!taskIdFromUrl) return
+    if (selectedTaskId === taskIdFromUrl) return
+    dispatch(setSelectedTaskId(taskIdFromUrl))
+    // Strip the param from the URL — preserves any other query params
+    const params = new URLSearchParams(searchParams.toString())
+    params.delete("taskId")
+    const next = params.toString()
+    router.replace(`${pathname}${next ? `?${next}` : ""}`, { scroll: false })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
 
   const listTasks = useMemo(() => tasks || [], [tasks])
 

@@ -160,14 +160,16 @@ export function ThreeWayMatchDashboard() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
-          <Zap className="w-8 h-8 text-blue-600" />
-          3-Way Match Dashboard
-        </h1>
-        <p className="text-gray-600 mt-2">
-          Match purchase orders, goods receipts, and vendor invoices to ensure accuracy
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-normal flex items-center gap-2">
+            <Zap className="w-7 h-7 text-blue-600" />
+            3-Way Match Dashboard
+          </h1>
+          <p className="text-muted-foreground">
+            Match purchase orders, goods receipts, and vendor invoices to ensure accuracy
+          </p>
+        </div>
       </div>
 
       {/* Stats */}

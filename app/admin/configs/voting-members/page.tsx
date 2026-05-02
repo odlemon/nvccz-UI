@@ -16,6 +16,16 @@ import {
   setBoardVotingDisabled,
 } from "@/lib/store/slices/adminSlice"
 import { UpdateVotingPowerDialog } from "@/components/admin/update-voting-power-dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { toast } from "sonner"
 
 // Skeleton Loaders
@@ -72,6 +82,10 @@ export default function VotingMembers() {
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [selectedMember, setSelectedMember] = useState<any | null>(null)
   const [togglingMemberId, setTogglingMemberId] = useState<string | null>(null)
+  const [pendingToggle, setPendingToggle] = useState<{
+    member: any
+    nextDisabled: boolean
+  } | null>(null)
 
   useEffect(() => {
     dispatch(fetchBoardVotingMembers())
@@ -332,7 +346,10 @@ export default function VotingMembers() {
                         size="icon"
                         disabled={togglingMemberId === member.id}
                         onClick={() =>
-                          handleToggleVotingDisabled(member.id, !member.boardVotingDisabled)
+                          setPendingToggle({
+                            member,
+                            nextDisabled: !member.boardVotingDisabled,
+                          })
                         }
                         title={member.boardVotingDisabled ? "Enable voting" : "Disable voting"}
                         className={
@@ -392,6 +409,96 @@ export default function VotingMembers() {
           currentTotal={totalVotingPower}
           availableUsers={users.filter(u => !boardVotingMembers.find(m => m.id === u.id)) as any}
         />
+
+        {/* Disable / Enable Voting Power Confirmation */}
+        <AlertDialog
+          open={pendingToggle !== null}
+          onOpenChange={(open) => {
+            if (!open) setPendingToggle(null)
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2">
+                {pendingToggle?.nextDisabled ? (
+                  <>
+                    <ShieldOff className="w-5 h-5 text-red-600" />
+                    Disable voting access?
+                  </>
+                ) : (
+                  <>
+                    <ShieldCheck className="w-5 h-5 text-green-600" />
+                    Enable voting access?
+                  </>
+                )}
+              </AlertDialogTitle>
+              <AlertDialogDescription asChild>
+                <div className="space-y-2 pt-2">
+                  {pendingToggle && (
+                    <p className="text-sm text-gray-700">
+                      <span className="font-semibold">
+                        {pendingToggle.member.firstName} {pendingToggle.member.lastName}
+                      </span>{" "}
+                      ({pendingToggle.member.email})
+                    </p>
+                  )}
+                  {pendingToggle?.nextDisabled ? (
+                    <p className="text-sm">
+                      This member will no longer be able to cast votes on board reviews.
+                      Their voting power of{" "}
+                      <span className="font-semibold">
+                        {pendingToggle.member.votingPower}%
+                      </span>{" "}
+                      remains assigned but will be ignored until voting is re-enabled.
+                    </p>
+                  ) : (
+                    <p className="text-sm">
+                      This member will be able to cast votes on board reviews again,
+                      using their assigned voting power of{" "}
+                      <span className="font-semibold">
+                        {pendingToggle?.member?.votingPower}%
+                      </span>
+                      .
+                    </p>
+                  )}
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={togglingMemberId !== null}>
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction
+                disabled={togglingMemberId !== null}
+                onClick={async (e) => {
+                  e.preventDefault()
+                  if (!pendingToggle) return
+                  await handleToggleVotingDisabled(
+                    pendingToggle.member.id,
+                    pendingToggle.nextDisabled
+                  )
+                  setPendingToggle(null)
+                }}
+                className={
+                  pendingToggle?.nextDisabled
+                    ? "bg-red-600 hover:bg-red-700"
+                    : "bg-green-600 hover:bg-green-700"
+                }
+              >
+                {togglingMemberId === pendingToggle?.member?.id ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    {pendingToggle?.nextDisabled ? "Disabling..." : "Enabling..."}
+                  </>
+                ) : pendingToggle?.nextDisabled ? (
+                  "Disable Voting"
+                ) : (
+                  "Enable Voting"
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </AdminLayout>
   )

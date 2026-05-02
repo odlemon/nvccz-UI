@@ -29,6 +29,7 @@ import {
   CiCircleInfo
 } from "react-icons/ci"
 import { AppSwitcherDropdown } from "./app-switcher-dropdown"
+import { NotificationsBell } from "@/components/notifications/notifications-bell"
 import { useAppDispatch, useAppSelector } from "@/lib/store"
 import { setCurrency } from "@/lib/store/slices/uiSlice"
 import { logoutUser } from "@/lib/store/slices/authSlice"
@@ -134,19 +135,7 @@ export function SharedTopbar({ onModuleSelect, currentModule }: SharedTopbarProp
             )}
 
             {/* Notifications */}
-            {/* <Tooltip>
-            <TooltipTrigger asChild>
-              <div className="p-3 relative cursor-pointer h-12 w-12 flex items-center justify-center rounded-md hover:bg-accent hover:text-accent-foreground transition-colors">
-                <CiBellOn size={30} />
-                <Badge className="absolute -top-1 -right-1 w-6 h-6 p-0 flex items-center justify-center text-xs bg-primary">
-                  3
-                </Badge>
-              </div>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Notifications (3 unread)</p>
-            </TooltipContent>
-          </Tooltip> */}
+            {!isApplicant && <NotificationsBell />}
 
             {/* Calendar */}
             {/* <Tooltip>
