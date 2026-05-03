@@ -21,7 +21,8 @@ jobs:
           key: ${{ secrets.DEV_SSH_KEY }}
           script: |
             cd /var/www/projects/dev
-            git pull origin dev --rebase
+            git fetch origin
+            git reset --hard origin/dev
             npm install
             npm run build
             pm2 restart app-kyntaro-dev || pm2 start npm --name "app-kyntaro-dev" -- start
@@ -39,7 +40,11 @@ jobs:
           key: ${{ secrets.PROD_SSH_KEY }}
           script: |
             cd /var/www/projects/nvccz-new
-            git pull origin main --rebase
+            git fetch origin
+            git reset --hard origin/main
             npm install
             npm run build
             pm2 restart app-kyntaro-prod || pm2 start npm --name "app-kyntaro-prod" -- start
+
+
+            git remote set-url origin git@github.com:GRIdiscrete/nvccz-new.git
