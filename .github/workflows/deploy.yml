@@ -1,0 +1,45 @@
+name: Deploy Next.js App
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+
+jobs:
+
+  deploy-dev:
+    if: github.ref == 'refs/heads/dev'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to Dev Server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEV_HOST }}
+          username: ${{ secrets.DEV_USER }}
+          key: ${{ secrets.DEV_SSH_KEY }}
+          script: |
+            cd /var/www/your-next-app
+            git pull origin dev
+            npm install
+            npm run build
+            pm2 restart app-kyntaro-dev || pm2 start npm --name "app-kyntaro-dev" -- start
+
+  deploy-prod:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to Production Server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          script: |
+            cd /var/www/your-next-app
+            git pull origin main
+            npm install
+            npm run build
+            pm2 restart app-kyntaro-prod || pm2 start npm --name "app-kyntaro-prod" -- start
