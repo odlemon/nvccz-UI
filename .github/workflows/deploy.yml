@@ -20,8 +20,8 @@ jobs:
           username: ${{ secrets.DEV_USER }}
           key: ${{ secrets.DEV_SSH_KEY }}
           script: |
-            cd /var/www/your-next-app
-            git pull origin dev
+            cd /var/www/projects/dev
+            git pull origin dev --rebase
             npm install
             npm run build
             pm2 restart app-kyntaro-dev || pm2 start npm --name "app-kyntaro-dev" -- start
@@ -38,8 +38,8 @@ jobs:
           username: ${{ secrets.PROD_USER }}
           key: ${{ secrets.PROD_SSH_KEY }}
           script: |
-            cd /var/www/your-next-app
-            git pull origin main
+            cd /var/www/projects/nvccz-new
+            git pull origin main --rebase
             npm install
             npm run build
             pm2 restart app-kyntaro-prod || pm2 start npm --name "app-kyntaro-prod" -- start
