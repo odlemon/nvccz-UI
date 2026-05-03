@@ -32,6 +32,7 @@ interface ReconciliationState {
     importedStatement: ImportedBankStatement | null
     importedStatementFileName: string | null
     autoMatchedEntryIds: string[]
+    matchedMapping: Record<string, string> // txId -> entryId
 
     // Action loading states
     savingDraft: boolean
@@ -62,6 +63,7 @@ const initialState: ReconciliationState = {
     importedStatement: null,
     importedStatementFileName: null,
     autoMatchedEntryIds: [],
+    matchedMapping: {},
 
     savingDraft: false,
     finishing: false,
@@ -186,9 +188,10 @@ const reconciliationSlice = createSlice({
                 state.statementEndBalance = statement.closingBalance
             }
         },
-        setAutoMatchedEntryIds(state, action: PayloadAction<string[]>) {
-            state.autoMatchedEntryIds = action.payload
-            state.selectedEntryIds = action.payload
+        setAutoMatchedEntryIds(state, action: PayloadAction<{ matchedEntryIds: string[], matchedMapping: Record<string, string> }>) {
+            state.autoMatchedEntryIds = action.payload.matchedEntryIds
+            state.selectedEntryIds = action.payload.matchedEntryIds
+            state.matchedMapping = action.payload.matchedMapping
         },
         clearActiveSession(state) {
             state.activeSession = null
@@ -203,6 +206,7 @@ const reconciliationSlice = createSlice({
             state.importedStatement = null
             state.importedStatementFileName = null
             state.autoMatchedEntryIds = []
+            state.matchedMapping = {}
         },
         setSelectedEntryIds(state, action: PayloadAction<string[]>) {
             state.selectedEntryIds = action.payload
@@ -261,6 +265,7 @@ const reconciliationSlice = createSlice({
             state.importedStatement = null
             state.importedStatementFileName = null
             state.autoMatchedEntryIds = []
+            state.matchedMapping = {}
             if (session) {
                 state.statementDate = session.statementDate
                 state.statementEndBalance = session.statementEndBalance

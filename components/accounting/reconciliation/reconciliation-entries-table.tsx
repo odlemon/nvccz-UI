@@ -25,13 +25,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ChevronLeft, ChevronRight, CheckCircle, Loader2 } from "lucide-react"
 import { format, parseISO } from "date-fns"
 import { Skeleton } from "@/components/ui/skeleton"
+import { cn } from "@/lib/utils"
 
 interface ReconciliationEntriesTableProps {
   loading?: boolean
   disabled?: boolean
+  className?: string
 }
 
-export function ReconciliationEntriesTable({ loading, disabled }: ReconciliationEntriesTableProps) {
+export function ReconciliationEntriesTable({ loading, disabled, className }: ReconciliationEntriesTableProps) {
   const dispatch = useDispatch<AppDispatch>()
   const entries = useSelector((state: RootState) => state.reconciliation.entries)
   const selectedSet = useSelector(selectSelectedEntryIdsSet)
@@ -64,7 +66,7 @@ export function ReconciliationEntriesTable({ loading, disabled }: Reconciliation
 
   if (loading) {
     return (
-      <div className="border rounded-lg bg-white">
+      <div className={cn("border rounded-lg bg-white", className)}>
         <div className="p-4 space-y-3">
           {[...Array(6)].map((_, i) => (
             <Skeleton key={i} className="h-10 w-full" />
@@ -75,29 +77,31 @@ export function ReconciliationEntriesTable({ loading, disabled }: Reconciliation
   }
 
   return (
-    <div className="border rounded-lg bg-white">
-      {/* Reconcile all / Unreconcile all */}
-      <div className="flex items-center justify-end gap-4 px-4 pt-3 pb-2">
-        <button
-          onClick={() => dispatch(selectAllEntries())}
-          className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
-          disabled={disabled}
-        >
-          Reconcile all
-        </button>
-        <button
-          onClick={() => dispatch(unselectAllEntries())}
-          className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
-          disabled={disabled}
-        >
-          Unreconcile all
-        </button>
+    <div className={cn("border rounded-lg bg-white flex flex-col", className)}>
+      <div className="bg-gray-50 border-b px-4 py-2 text-xs font-semibold uppercase text-gray-500 tracking-wider flex items-center justify-between">
+        <span>Ledger Entries (Cashbook)</span>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => dispatch(selectAllEntries())}
+            className="text-xs text-blue-600 hover:text-blue-800 hover:underline"
+            disabled={disabled}
+          >
+            Reconcile all
+          </button>
+          <button
+            onClick={() => dispatch(unselectAllEntries())}
+            className="text-xs text-blue-600 hover:text-blue-800 hover:underline"
+            disabled={disabled}
+          >
+            Unreconcile all
+          </button>
+        </div>
       </div>
 
-      {/* Table */}
-      <Table>
-        <TableHeader>
-          <TableRow className="bg-gray-50">
+      <div className="overflow-auto flex-1">
+        <Table>
+          <TableHeader className="sticky top-0 bg-white z-10 shadow-sm">
+            <TableRow>
             <TableHead className="w-[110px]">Date</TableHead>
             <TableHead className="w-[120px]">Reference</TableHead>
             <TableHead>Name</TableHead>
@@ -157,6 +161,7 @@ export function ReconciliationEntriesTable({ loading, disabled }: Reconciliation
           )}
         </TableBody>
       </Table>
+    </div>
 
       {/* Pagination */}
       {entries.length > 0 && (

@@ -231,8 +231,7 @@ export const matchStatementTransactionsToEntries = (
   entries: ReconciliationEntry[]
 ) => {
   const unmatchedEntries = entries.filter((entry) => !entry.isReconciled)
-  const usedEntryIds = new Set<string>()
-  const matchedEntryIds: string[] = []
+  const matchedMapping: Record<string, string> = {} // txId -> entryId
 
   for (const tx of statementTransactions) {
     const txSignedAmount = tx.type === "RECEIPT" ? tx.amount : -tx.amount
@@ -276,11 +275,13 @@ export const matchStatementTransactionsToEntries = (
     if (topMatches.length === 1 && bestScore >= 4) {
       matchedEntryIds.push(best.entry.id)
       usedEntryIds.add(best.entry.id)
+      matchedMapping[tx.id] = best.entry.id
     }
   }
 
   return {
     matchedEntryIds,
+    matchedMapping,
     matchedTransactionCount: matchedEntryIds.length,
     unmatchedTransactionCount: Math.max(0, statementTransactions.length - matchedEntryIds.length),
   }

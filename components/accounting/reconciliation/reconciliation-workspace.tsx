@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useRef, ChangeEvent } from "react"
+import { useCallback, useRef, ChangeEvent, useState, useEffect } from "react"
 import { useDispatch, useSelector } from "react-redux"
 import { AppDispatch, RootState } from "@/lib/store/store"
 import {
@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button"
 import { ArrowLeft, Save, CheckCircle, XCircle, Loader2, Download } from "lucide-react"
 import { format, parseISO } from "date-fns"
 import { toast } from "sonner"
+import { cn } from "@/lib/utils"
 import {
   getBankStatementTemplateCSV,
   matchStatementTransactionsToEntries,
@@ -39,6 +40,9 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 
+import { ReconciliationComparisonView } from "./reconciliation-comparison-view"
+import { LayoutGrid, Columns } from "lucide-react"
+
 interface ReconciliationWorkspaceProps {
   selectedBank: CashbookBank | null
   onBack: () => void
@@ -47,6 +51,8 @@ interface ReconciliationWorkspaceProps {
 export function ReconciliationWorkspace({ selectedBank, onBack }: ReconciliationWorkspaceProps) {
   const dispatch = useDispatch<AppDispatch>()
   const importInputRef = useRef<HTMLInputElement | null>(null)
+  const [viewMode, setViewMode] = useState<"standard" | "comparison">("standard")
+
   const {
     activeSession,
     entries,
@@ -67,13 +73,23 @@ export function ReconciliationWorkspace({ selectedBank, onBack }: Reconciliation
 
   const isBusy = savingDraft || finishing || discarding
 
+  // Auto-switch to comparison mode when statement is imported
+  useEffect(() => {
+    if (importedStatement) {
+      setViewMode("comparison")
+    }
+  }, [importedStatement])
+
   const applyAutoMatch = useCallback((nextEntries: typeof entries) => {
     if (!importedStatement || importedStatement.transactions.length === 0) {
       return
     }
 
     const matchResult = matchStatementTransactionsToEntries(importedStatement.transactions, nextEntries)
-    dispatch(setAutoMatchedEntryIds(matchResult.matchedEntryIds))
+    dispatch(setAutoMatchedEntryIds({ 
+      matchedEntryIds: matchResult.matchedEntryIds, 
+      matchedMapping: matchResult.matchedMapping 
+    }))
     toast.success("Statement imported and compared", {
       description: `Matched ${matchResult.matchedTransactionCount} of ${importedStatement.transactions.length} statement transactions.`,
     })
@@ -304,11 +320,44 @@ export function ReconciliationWorkspace({ selectedBank, onBack }: Reconciliation
         onChange={handleStatementFileChange}
       />
 
-      {/* Entries Table */}
-      <ReconciliationEntriesTable
-        loading={entriesLoading}
-        disabled={isBusy || (activeSession?.status === "FINALIZED")}
-      />
+      {/* View Toggle (Only if statement is imported) */}
+      {importedStatement && (
+        <div className="flex items-center justify-end">
+          <div className="flex items-center bg-gray-100 p-1 rounded-lg border">
+            <Button
+              variant={viewMode === "standard" ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("standard")}
+              className={cn("h-8 rounded-md px-3 text-xs", viewMode === "standard" && "shadow-sm border")}
+            >
+              <LayoutGrid className="w-3.5 h-3.5 mr-2" />
+              Standard View
+            </Button>
+            <Button
+              variant={viewMode === "comparison" ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("comparison")}
+              className={cn("h-8 rounded-md px-3 text-xs", viewMode === "comparison" && "shadow-sm border")}
+            >
+              <Columns className="w-3.5 h-3.5 mr-2" />
+              Comparison View
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Entries Table or Comparison View */}
+      {viewMode === "comparison" && importedStatement ? (
+        <ReconciliationComparisonView
+          loading={entriesLoading}
+          disabled={isBusy || (activeSession?.status === "FINALIZED")}
+        />
+      ) : (
+        <ReconciliationEntriesTable
+          loading={entriesLoading}
+          disabled={isBusy || (activeSession?.status === "FINALIZED")}
+        />
+      )}
 
       {/* Totals Footer */}
       <ReconciliationTotalsFooter />
