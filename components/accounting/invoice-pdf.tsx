@@ -1,5 +1,7 @@
 import { Document, Page, View, Text, StyleSheet } from "@react-pdf/renderer"
 import { Invoice } from "@/lib/api/accounting-api"
+import { PdfLetterhead } from "@/components/shared/pdf-letterhead"
+import type { LetterheadAddress } from "@/lib/utils/pdf-letterhead"
 
 const styles = StyleSheet.create({
   page: { padding: 40, fontSize: 10, backgroundColor: "#ffffff", color: "#1f2937" },
@@ -46,7 +48,13 @@ const toNumber = (value: unknown) => {
   return Number.isFinite(numeric) ? numeric : 0
 }
 
-const InvoicePDF = ({ invoice }: { invoice: Invoice }) => {
+const InvoicePDF = ({
+  invoice,
+  letterheadAddress,
+}: {
+  invoice: Invoice
+  letterheadAddress?: LetterheadAddress | null
+}) => {
   const currencySymbol = invoice.currency?.symbol || ""
   const items = invoice.items || []
   const subtotal = invoice.amount ?? invoice.totalAmount
@@ -56,6 +64,7 @@ const InvoicePDF = ({ invoice }: { invoice: Invoice }) => {
   return (
     <Document>
       <Page size="A4" style={styles.page}>
+        <PdfLetterhead address={letterheadAddress} />
         <View style={styles.header}>
           <View>
             <Text style={styles.title}>

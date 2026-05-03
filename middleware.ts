@@ -98,28 +98,39 @@ export function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl
 
-  // Completely bypass middleware for the permissions matrix tool
-  if (pathname.startsWith('/permissions-matrix')) {
+  // Pass-through routes: always render regardless of auth state.
+  // These are public-facing pages reached via shared links (RSVP tokens,
+  // vendor quotation submissions, public tenders, KYC token forms, etc.)
+  // Logged-in users opening these links must NOT be bounced to /admin.
+  const passThroughRoutes = [
+    '/permissions-matrix',
+    '/events/rsvp',           // /events/rsvp/[token] — invitee RSVP page
+    '/events/public',         // /events/public/[id] — public event details
+    '/vendor/quotation/submit', // legacy vendor quotation form
+    '/vendor/invoice/submit',   // legacy vendor invoice form
+    '/vendor-quote',          // /vendor-quote/[rfqNumber]/[requisitionId] — quote submission via shared link
+    '/vendor-portal',         // vendor portal incl. /kyc/[token], /rfq/[rfqNumber], /register
+    '/public-tenders',        // public tender browsing
+    '/applications/form',     // public application form
+  ]
+  if (passThroughRoutes.some((route) => pathname.startsWith(route))) {
     return NextResponse.next()
   }
 
-  // Public routes that don't require authentication
-  const publicRoutes = [
+  // Auth-only public routes: redirect to dashboard if user is already logged in.
+  // (Login/register/forgot-password don't make sense for authenticated users.)
+  const authOnlyPublicRoutes = [
     '/login',
     '/register',
     '/forgot-password',
     '/reset-password',
     '/verify-email',
-    '/applications/form',
-    '/vendor/quotation/submit',
-    '/vendor-portal',
-    '/events/rsvp',
-    '/permissions-matrix'
   ]
-  const isPublicRoute = publicRoutes.some(route => pathname.startsWith(route))
+  const isAuthOnlyPublic = authOnlyPublicRoutes.some((route) =>
+    pathname.startsWith(route)
+  )
 
-  // If accessing public route and authenticated, redirect to appropriate dashboard
-  if (isPublicRoute && token && userProfile) {
+  if (isAuthOnlyPublic && token && userProfile) {
     try {
       const profile = JSON.parse(decodeURIComponent(userProfile.value))
       const roleName = profile.role?.name?.toLowerCase()
@@ -136,14 +147,14 @@ export function middleware(request: NextRequest) {
   }
 
   // If accessing protected route without auth, redirect to login
-  if (!isPublicRoute && !token) {
+  if (!isAuthOnlyPublic && !token) {
     const loginUrl = new URL('/login', request.url)
     loginUrl.searchParams.set('from', pathname)
     return NextResponse.redirect(loginUrl)
   }
 
   // Check role-based access
-  if (!isPublicRoute && token && userProfile) {
+  if (!isAuthOnlyPublic && token && userProfile) {
     try {
       const profile = JSON.parse(decodeURIComponent(userProfile.value))
       const roleName = profile.role?.name?.toLowerCase()

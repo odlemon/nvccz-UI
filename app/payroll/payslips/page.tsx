@@ -13,6 +13,7 @@ import { PayslipTemplate } from "@/components/payroll/payslip-template"
 import { generateAndDownloadPDF } from "@/lib/utils/pdf-generator"
 import { generateAndDownloadSimplePDF } from "@/lib/utils/simple-pdf-generator"
 import { ModuleGuard } from "@/components/permissions/PermissionGuards"
+import { useActiveAddress } from "@/lib/hooks/useActiveAddress"
 
 function PayslipsPage() {
   const dispatch = useAppDispatch()
@@ -25,6 +26,7 @@ function PayslipsPage() {
   const [payslip, setPayslip] = useState<any | null>(null)
   const [generatingPDF, setGeneratingPDF] = useState(false)
   const payslipRef = useRef<HTMLDivElement>(null)
+  const letterheadAddress = useActiveAddress()
 
   useEffect(() => {
     const load = async () => {
@@ -72,7 +74,8 @@ function PayslipsPage() {
       // Try the simple PDF generator first (more reliable)
       await generateAndDownloadSimplePDF(payslip, filename, {
         format: 'a4',
-        orientation: 'portrait'
+        orientation: 'portrait',
+        letterheadAddress,
       })
     } catch (error) {
       console.error('Error generating PDF:', error)

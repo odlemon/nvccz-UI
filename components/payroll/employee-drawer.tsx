@@ -24,16 +24,19 @@ import {
   MapPin,
   Clock,
   CheckCircle,
-  XCircle
+  XCircle,
+  UserX
 } from "lucide-react"
 import { useRolePermissions } from "@/lib/hooks/useRolePermissions"
 import { PAYROLL_ACTIONS } from "@/lib/config/role-permissions"
+import { TerminateEmployeeDialog } from "./terminate-employee-dialog"
 
 interface EmployeeDrawerProps {
   isOpen: boolean
   onClose: () => void
   employee: Employee | null
   onEdit: (employee: Employee) => void
+  onTerminated?: () => void
 }
 
 type TabType = "overview" | "banking" | "salary" | "salary-structures" | "leave-balances"
@@ -66,7 +69,7 @@ const tabs = [
   }
 ]
 
-export function EmployeeDrawer({ isOpen, onClose, employee, onEdit }: EmployeeDrawerProps) {
+export function EmployeeDrawer({ isOpen, onClose, employee, onEdit, onTerminated }: EmployeeDrawerProps) {
   const { hasSpecificAction } = useRolePermissions()
   const [activeTab, setActiveTab] = useState<TabType>("overview")
   const [salaryStructures, setSalaryStructures] = useState<SalaryStructure[]>([])
@@ -77,6 +80,7 @@ export function EmployeeDrawer({ isOpen, onClose, employee, onEdit }: EmployeeDr
   const [editingLeave, setEditingLeave] = useState<LeaveBalance | null>(null)
   const [loading, setLoading] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [isTerminateOpen, setIsTerminateOpen] = useState(false)
 
   // Permission checks
   const canUpdateEmployee = hasSpecificAction('payroll', PAYROLL_ACTIONS.UPDATE_EMPLOYEE)
@@ -274,6 +278,17 @@ export function EmployeeDrawer({ isOpen, onClose, employee, onEdit }: EmployeeDr
               Employee Details
             </SheetTitle>
             <div className="flex items-center gap-2">
+              {employee.isActive && (
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setIsTerminateOpen(true)}
+                  className="rounded-full h-10 w-10 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                  title="Terminate employee"
+                >
+                  <UserX className="w-4 h-4" />
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="icon"
@@ -679,6 +694,17 @@ export function EmployeeDrawer({ isOpen, onClose, employee, onEdit }: EmployeeDr
           onSubmit={handleLeaveSubmit}
           editing={editingLeave}
           employeeId={employee.id}
+        />
+
+        {/* Terminate Employee Dialog */}
+        <TerminateEmployeeDialog
+          isOpen={isTerminateOpen}
+          onClose={() => setIsTerminateOpen(false)}
+          employee={employee}
+          onTerminated={() => {
+            onClose()
+            onTerminated?.()
+          }}
         />
         </div>
       </SheetContent>

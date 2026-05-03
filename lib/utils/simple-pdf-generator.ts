@@ -1,9 +1,11 @@
 import jsPDF from 'jspdf'
+import { addLetterhead, type LetterheadAddress } from '@/lib/utils/pdf-letterhead'
 
 export interface SimplePDFOptions {
   filename?: string
   format?: 'a4' | 'letter'
   orientation?: 'portrait' | 'landscape'
+  letterheadAddress?: LetterheadAddress | null
 }
 
 export const generateSimplePDF = async (
@@ -48,30 +50,16 @@ export const generateSimplePDF = async (
       })
     }
 
-    let yPosition = 20
+    // Company letterhead banner
+    let yPosition = await addLetterhead(
+      pdf,
+      `Payslip for the period of ${formatDate(payslipData.payrollRun.startDate)}`,
+      undefined,
+      options.letterheadAddress
+    )
+    yPosition += 6
 
-    // Header
-    pdf.setFillColor(37, 99, 235) // Blue background
-    pdf.rect(0, 0, 210, 35, 'F')
-
-    pdf.setTextColor(255, 255, 255) // White text
-    pdf.setFontSize(24)
-    pdf.setFont('helvetica', 'bold')
-    pdf.text('Arcus', 20, 18)
-
-    pdf.setFontSize(12)
-    pdf.setFont('helvetica', 'normal')
-    pdf.text('Arcus', 20, 24)
-    pdf.text('Chisapi Cres, Harare, Zimbabwe', 20, 28)
-
-    yPosition = 45
-
-    // Title
-    pdf.setTextColor(0, 0, 0) // Black text
-    pdf.setFontSize(18)
-    pdf.setFont('helvetica', 'bold')
-    pdf.text(`Payslip for the period of ${formatDate(payslipData.payrollRun.startDate)}`, 20, yPosition)
-    yPosition += 20
+    // Employee / payroll info heading
 
     // Employee Information
     pdf.setFontSize(14)

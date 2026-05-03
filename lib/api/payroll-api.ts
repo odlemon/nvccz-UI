@@ -494,6 +494,10 @@ export const employeesApi = {
 
   delete: async (id: string): Promise<ApiResponse<void>> => {
     return apiClient.delete<ApiResponse<void>>(`/payroll/employees/${id}`)
+  },
+
+  terminate: async (id: string, reason: string): Promise<ApiResponse<any>> => {
+    return apiClient.post<ApiResponse<any>>(`/payroll/employees/${id}/terminate`, { reason })
   }
 }
 

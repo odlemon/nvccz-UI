@@ -96,7 +96,8 @@ export const MODULE_CONFIG: ModuleConfig[] = [
       { id: "Dashboard", name: "Dashboard", path: "/portfolio", icon: CiGrid41, description: "Manage your portfolio" },
       { id: "funds", name: "Funds", path: "/portfolio/funds", icon: CiDollar, description: "Manage funds and investments" },
       { id: "capital-calls", name: "Capital Calls", path: "/portfolio/funds/capital-calls", icon: CiCoins1, description: "Fund investment capital calls" },
-      { id: "companies", name: "Companies", path: "/portfolio/companies", icon: CiShop, description: "Manage companies" }
+      { id: "companies", name: "Companies", path: "/portfolio/companies", icon: CiShop, description: "Manage companies" },
+      { id: "reporting-schedule-configs", name: "Reporting Schedules", path: "/portfolio/reporting-schedules", icon: CiCalendar, description: "Manage reporting schedule configurations" }
 
     ],
     // Grouped navigation per requirements

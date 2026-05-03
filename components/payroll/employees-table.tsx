@@ -330,6 +330,7 @@ export function EmployeesTable({ title, description }: EmployeesTableProps) {
         onClose={handleDrawerClose}
         employee={viewingEmployee}
         onEdit={handleEdit}
+        onTerminated={loadEmployees}
       />
     </div>
   );

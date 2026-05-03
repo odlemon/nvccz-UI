@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { procurementApi, ProcurementInvoice } from '@/lib/api/procurement-api'
+import { useActiveAddress } from '@/lib/hooks/useActiveAddress'
 import { accountingApi } from '@/lib/api/accounting-api'
 import { CiFileOn, CiDollar, CiCalendar, CiSearch, CiFilter } from 'react-icons/ci'
 import { FileText, CheckCircle, Clock, AlertCircle, XCircle, Building2, Eye, X, Plus, Banknote } from 'lucide-react'
@@ -65,6 +66,7 @@ export function ProcurementInvoices() {
   const [selectedInvoiceForPayment, setSelectedInvoiceForPayment] = useState<ProcurementInvoice | null>(null)
   const [activeTab, setActiveTab] = useState<'all' | 'received' | 'approved' | 'paid'>('all')
   const [totalCount, setTotalCount] = useState(0)
+  const letterheadAddress = useActiveAddress()
   const [PDFComponents, setPDFComponents] = useState<any>(null)
 
   // Filter states
@@ -492,7 +494,12 @@ export function ProcurementInvoices() {
           <div className="flex items-center gap-2">
             {viewingInvoice && PDFComponents && (
               <PDFComponents.PDFDownloadLink
-                document={<PDFComponents.ProcurementInvoicePDF invoice={viewingInvoice} />}
+                document={
+                  <PDFComponents.ProcurementInvoicePDF
+                    invoice={viewingInvoice}
+                    letterheadAddress={letterheadAddress}
+                  />
+                }
                 fileName={`Invoice-${viewingInvoice.invoiceNumber}-${new Date().toISOString().split("T")[0]}.pdf`}
               >
                 {({ loading: pdfLoading }: any) => (

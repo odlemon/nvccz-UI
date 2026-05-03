@@ -1,5 +1,7 @@
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer"
 import { ProcurementInvoice } from "@/lib/api/procurement-api"
+import { PdfLetterhead } from "@/components/shared/pdf-letterhead"
+import type { LetterheadAddress } from "@/lib/utils/pdf-letterhead"
 
 const styles = StyleSheet.create({
   page: {
@@ -179,9 +181,13 @@ const styles = StyleSheet.create({
 
 interface ProcurementInvoicePDFProps {
   invoice: ProcurementInvoice
+  letterheadAddress?: LetterheadAddress | null
 }
 
-export default function ProcurementInvoicePDF({ invoice }: ProcurementInvoicePDFProps) {
+export default function ProcurementInvoicePDF({
+  invoice,
+  letterheadAddress,
+}: ProcurementInvoicePDFProps) {
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-GB", {
       day: "2-digit",
@@ -203,6 +209,7 @@ export default function ProcurementInvoicePDF({ invoice }: ProcurementInvoicePDF
   return (
     <Document>
       <Page size="A4" style={styles.page}>
+        <PdfLetterhead address={letterheadAddress} />
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>INVOICE</Text>

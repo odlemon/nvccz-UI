@@ -140,6 +140,7 @@ export const PORTFOLIO_ACTIONS = {
   REVIEW_FINANCIAL_REPORT: 'review-financial-report',
   ACCEPT_REPORT: 'accept-report',
   REJECT_REPORT: 'reject-report',
+  MANAGE_REPORTING_SCHEDULE: 'manage-reporting-schedule',
 } as const;
 
 /**
@@ -1807,7 +1808,13 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
       {
         moduleId: 'portfolio-management',
         access: 'full',
-        actions: Object.values(PORTFOLIO_ACTIONS)
+        actions: Object.values(PORTFOLIO_ACTIONS),
+        subModules: {
+          'Dashboard': 'full',
+          'funds': 'full',
+          'companies': 'full',
+          'reporting-schedule-configs': 'full',
+        }
       },
       {
         moduleId: 'application-portal',
@@ -1923,7 +1930,13 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
       {
         moduleId: 'portfolio-management',
         access: 'full',
-        actions: Object.values(PORTFOLIO_ACTIONS)
+        actions: Object.values(PORTFOLIO_ACTIONS),
+        subModules: {
+          'Dashboard': 'full',
+          'funds': 'full',
+          'companies': 'full',
+          'reporting-schedule-configs': 'full',
+        }
       },
       {
         moduleId: 'application-portal',
@@ -2085,7 +2098,13 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
       {
         moduleId: 'portfolio-management',
         access: 'full',
-        actions: Object.values(PORTFOLIO_ACTIONS)
+        actions: Object.values(PORTFOLIO_ACTIONS),
+        subModules: {
+          'Dashboard': 'full',
+          'funds': 'full',
+          'companies': 'full',
+          'reporting-schedule-configs': 'full',
+        }
       },
       {
         moduleId: 'application-portal',
@@ -2147,7 +2166,13 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
       {
         moduleId: 'portfolio-management',
         access: 'full',
-        actions: Object.values(PORTFOLIO_ACTIONS)
+        actions: Object.values(PORTFOLIO_ACTIONS),
+        subModules: {
+          'Dashboard': 'full',
+          'funds': 'full',
+          'companies': 'full',
+          'reporting-schedule-configs': 'full',
+        }
       },
       {
         moduleId: 'application-portal',

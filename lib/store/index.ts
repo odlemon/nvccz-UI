@@ -37,6 +37,7 @@ import performanceConfigReducer from './slices/performanceConfigSlice'
 import performanceTasksReducer from './slices/performanceTasksSlice'
 import performanceReviewsReducer from './slices/performanceReviewsSlice'
 import notificationsReducer from './slices/notificationsSlice'
+import portfolioReportingReducer from './slices/portfolioReportingSlice'
 
 export const store = configureStore({
   reducer: {
@@ -76,6 +77,7 @@ export const store = configureStore({
     performanceTasks: performanceTasksReducer,
     performanceReviews: performanceReviewsReducer,
     notifications: notificationsReducer,
+    portfolioReporting: portfolioReportingReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

@@ -28,6 +28,7 @@ import {
   AlertTriangle
 } from "lucide-react"
 import { Invoice, AccountingCurrency } from "@/lib/api/accounting-api"
+import { useActiveAddress } from "@/lib/hooks/useActiveAddress"
 
 interface InvoiceViewDrawerProps {
   isOpen: boolean
@@ -61,6 +62,7 @@ export function InvoiceViewDrawer({
   const [isCreateCreditNoteOpen, setIsCreateCreditNoteOpen] = useState(false)
   const [isClient, setIsClient] = useState(false)
   const [PDFComponents, setPDFComponents] = useState<any>(null)
+  const letterheadAddress = useActiveAddress()
 
   // Update current invoice when prop changes
   useEffect(() => {
@@ -265,7 +267,12 @@ export function InvoiceViewDrawer({
 
                 {isClient && currentInvoice && PDFComponents && (
                   <PDFComponents.PDFDownloadLink
-                    document={<PDFComponents.InvoicePDF invoice={currentInvoice} />}
+                    document={
+                      <PDFComponents.InvoicePDF
+                        invoice={currentInvoice}
+                        letterheadAddress={letterheadAddress}
+                      />
+                    }
                     fileName={`${currentInvoice.status === 'PAID' ? 'RECEIPT' : currentInvoice.invoiceNumber}.pdf`}
                   >
                     {({ loading: pdfLoading }: any) => (
