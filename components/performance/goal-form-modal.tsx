@@ -1,5 +1,6 @@
 "use client"
 
+import { useMemo } from "react"
 import { useForm, Controller } from "react-hook-form"
 import { yupResolver } from "@hookform/resolvers/yup"
 import * as yup from "yup"
@@ -22,7 +23,6 @@ const goalSchema = yup.object({
     then: (schema) => schema.oneOf(["FINANCIAL", "CUSTOMER", "INTERNAL_OPS", "LEARNING_GROWTH"]).required("Scorecard pillar is required for company goals"),
     otherwise: (schema) => schema.nullable(),
   }),
-  category: yup.string().required("Category is required"),
   targetValue: yup.number().typeError("Target must be a number").required("Target value is required"),
   targetUnit: yup.string().required("Target unit is required"),
   kpiName: yup.string().required("A backing KPI is required"),
@@ -65,7 +65,6 @@ export function GoalFormModal({ isOpen, onClose, goal, onSubmit }: GoalFormModal
       description: goal?.description || "",
       type: goal?.type || "company",
       scorecardPillar: goal?.scorecardPillar || "FINANCIAL",
-      category: goal?.category || "financial",
       targetValue: goal?.targetValue || 0,
       targetUnit: goal?.targetUnit || "USD",
       kpiName: goal?.kpi?.name || "",
@@ -79,6 +78,7 @@ export function GoalFormModal({ isOpen, onClose, goal, onSubmit }: GoalFormModal
   })
 
   const goalType = watch("type")
+  const selectedPillar = watch("scorecardPillar")
 
   const availableParentGoals = Array.isArray(goals)
     ? goals.filter((g) => {
@@ -89,7 +89,25 @@ export function GoalFormModal({ isOpen, onClose, goal, onSubmit }: GoalFormModal
     : []
 
   const validDepartments = Array.isArray(availableDepartments) ? availableDepartments : []
-  const validKPIs = Array.isArray(availableKPIs) ? availableKPIs : []
+  const allKPIs = Array.isArray(availableKPIs) ? availableKPIs : []
+
+  // Filter KPIs based on selected scorecard pillar
+  const validKPIs = useMemo(() => {
+    if (!selectedPillar) return allKPIs
+    return allKPIs.filter((kpi: any) => {
+      const isFinancial = kpi.isFinancial || kpi.hardcodedDetails?.isFinancial
+      switch (selectedPillar) {
+        case "FINANCIAL":
+          return isFinancial
+        case "CUSTOMER":
+        case "INTERNAL_OPS":
+        case "LEARNING_GROWTH":
+          return !isFinancial
+        default:
+          return true
+      }
+    })
+  }, [allKPIs, selectedPillar])
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -136,50 +154,27 @@ export function GoalFormModal({ isOpen, onClose, goal, onSubmit }: GoalFormModal
             )}
           />
 
-          {/* Type, Category */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Controller
-              name="type"
-              control={control}
-              render={({ field }) => (
-                <div className="space-y-2">
-                  <Label>Type *</Label>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <SelectTrigger className={errors.type ? "border-red-500" : ""}>
-                      <SelectValue placeholder="Select type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="company">Company</SelectItem>
-                      <SelectItem value="department">Department</SelectItem>
-                      <SelectItem value="individual">Individual</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {errors.type && <p className="text-sm text-red-600">{getErrorMessage(errors.type)}</p>}
-                </div>
-              )}
-            />
-            <Controller
-              name="category"
-              control={control}
-              render={({ field }) => (
-                <div className="space-y-2">
-                  <Label>Category *</Label>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <SelectTrigger className={errors.category ? "border-red-500" : ""}>
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="financial">Financial</SelectItem>
-                      <SelectItem value="operational">Operational</SelectItem>
-                      <SelectItem value="customer">Customer</SelectItem>
-                      <SelectItem value="growth">Growth</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {errors.category && <p className="text-sm text-red-600">{getErrorMessage(errors.category)}</p>}
-                </div>
-              )}
-            />
-          </div>
+          {/* Type */}
+          <Controller
+            name="type"
+            control={control}
+            render={({ field }) => (
+              <div className="space-y-2">
+                <Label>Type *</Label>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <SelectTrigger className={errors.type ? "border-red-500" : ""}>
+                    <SelectValue placeholder="Select type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="company">Company</SelectItem>
+                    <SelectItem value="department">Department</SelectItem>
+                    <SelectItem value="individual">Individual</SelectItem>
+                  </SelectContent>
+                </Select>
+                {errors.type && <p className="text-sm text-red-600">{getErrorMessage(errors.type)}</p>}
+              </div>
+            )}
+          />
 
           {goalType === "company" && (
             <Controller
@@ -251,7 +246,7 @@ export function GoalFormModal({ isOpen, onClose, goal, onSubmit }: GoalFormModal
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="none">None</SelectItem>
-                          {availableParentGoals.map((g) => (
+                          {availableParentGoals.map((g: any) => (
                             <SelectItem key={g.id} value={g.id}>
                               {g.title}
                             </SelectItem>

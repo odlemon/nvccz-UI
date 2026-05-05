@@ -59,7 +59,7 @@ export function AccountingSidebar() {
   }, [module.subModules, hasSubModuleAccess, isLoading])
 
   return (
-    <aside className="w-64 bg-white border-r border-border h-[calc(100vh-5rem)] overflow-y-auto sticky top-20 z-10">
+    <aside className="w-72 bg-white border-r border-border h-[calc(100vh-5rem)] overflow-y-auto sticky top-20 z-10">
       <div className="p-4 space-y-4">
         {/* Module Header */}
         <div className="flex items-center gap-3 p-3 rounded-lg bg-gradient-to-r from-blue-50 to-blue-100">
@@ -70,7 +70,7 @@ export function AccountingSidebar() {
             <module.icon className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h2 className="text-base text-gray-900">{module.name}</h2>
+            <h2 className="text-lg text-gray-900">{module.name}</h2>
           </div>
         </div>
 
@@ -91,7 +91,7 @@ export function AccountingSidebar() {
                 onClick={() => handleItemClick(subModule.path)}
               >
                 <Icon className="w-5 h-5" />
-                <span className="text-sm">{subModule.name}</span>
+                <span className="text-base">{subModule.name}</span>
               </Button>
             )
           })}

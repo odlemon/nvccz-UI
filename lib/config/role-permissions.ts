@@ -168,6 +168,7 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'expenses': 'full',
           'inventory-accounting': 'full',
           'asset-management': 'full',
+          'short-term-investments': 'full',
           'financial-reports': 'full',
           'accounting-settings': 'full',
         }
@@ -200,6 +201,9 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'procurement-invoices': 'full',
           'goods-received-notes': 'full',
           'payments': 'full',
+          'ai-intake': 'full',
+          'three-way-match': 'full',
+          'cfo-dashboard': 'full',
           'approval-configurations': 'full',
           'my-approvals': 'full',
         }

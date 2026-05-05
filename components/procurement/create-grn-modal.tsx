@@ -19,6 +19,7 @@ interface CreateGRNModalProps {
   onClose: () => void
   onSuccess: () => void
   isInvestee?: boolean
+  initialPurchaseOrderId?: string
 }
 
 interface GRNItem {
@@ -31,14 +32,14 @@ interface GRNItem {
   rejectionReason?: string
 }
 
-export function CreateGRNModal({ isOpen, onClose, onSuccess, isInvestee }: CreateGRNModalProps) {
+export function CreateGRNModal({ isOpen, onClose, onSuccess, isInvestee, initialPurchaseOrderId }: CreateGRNModalProps) {
   const [loading, setLoading] = useState(false)
   const [loadingData, setLoadingData] = useState(false)
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([])
   const { permissions } = useProcurementPermissions()
 
   const [formData, setFormData] = useState({
-    purchaseOrderId: "",
+    purchaseOrderId: initialPurchaseOrderId || "",
     receivedDate: new Date().toISOString().split('T')[0],
     notes: "",
     tolerancePercentage: "5",
@@ -46,39 +47,53 @@ export function CreateGRNModal({ isOpen, onClose, onSuccess, isInvestee }: Creat
     geoLocation: "",
   })
 
-  const [items, setItems] = useState<GRNItem[]>([
-    {
-      poItemId: "",
-      itemName: "",
-      poQuantity: 0,
-      receivedQuantity: 0,
-      unit: "",
-      status: 'PENDING',
-      rejectionReason: ""
-    }
-  ])
+  const [items, setItems] = useState<GRNItem[]>([])
 
   useEffect(() => {
     if (isOpen) {
       loadInitialData()
+      if (initialPurchaseOrderId) {
+        setFormData(prev => ({ ...prev, purchaseOrderId: initialPurchaseOrderId }))
+      }
     }
-  }, [isOpen])
+  }, [isOpen, initialPurchaseOrderId])
 
   const loadInitialData = async () => {
     try {
       setLoadingData(true)
-
-      const response = await procurementApiV2.getPurchaseOrders({
-        status: 'SENT'
-      })
+      const filters: any = { status: 'SENT' }
+      const response = await procurementApiV2.getPurchaseOrders(filters)
       if (response.success && response.data) {
         setPurchaseOrders(response.data)
+        
+        // If we have an initial PO ID, load its items immediately after setting orders
+        if (initialPurchaseOrderId) {
+          const po = response.data.find(p => p.id === initialPurchaseOrderId)
+          if (po) {
+            loadPurchaseOrderItemsFromPO(po)
+          }
+        }
       }
     } catch (error) {
       console.error('Error loading initial data:', error)
       toast.error('Failed to load purchase orders')
     } finally {
       setLoadingData(false)
+    }
+  }
+
+  const loadPurchaseOrderItemsFromPO = (po: PurchaseOrder) => {
+    if (po && po.items) {
+      const poItems: GRNItem[] = po.items.map((item: any, idx: number) => ({
+        poItemId: item.id || `item-${idx}`,
+        itemName: item.itemName,
+        poQuantity: parseInt(item.quantity) || 0,
+        receivedQuantity: parseInt(item.quantity) || 0, // Default to full receipt
+        unit: item.unit || '',
+        status: 'RECEIVED', // Default to received
+        rejectionReason: ""
+      }))
+      setItems(poItems)
     }
   }
 

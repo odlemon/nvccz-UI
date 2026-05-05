@@ -41,7 +41,7 @@ export function TaxRuleDrawer({ isOpen, onClose, taxRule, onEdit }: TaxRuleDrawe
   if (!taxRule) return null
 
   const { hasSpecificAction } = useRolePermissions()
-  const canUpdateTaxRule = hasSpecificAction(PAYROLL_ACTIONS.UPDATE_TAX_RULE)
+  const canUpdateTaxRule = hasSpecificAction('payroll', PAYROLL_ACTIONS.UPDATE_TAX_RULE)
   const taxInfo = TAX_TYPE_INFO[taxRule.type as keyof typeof TAX_TYPE_INFO]
 
   const handleEdit = () => {

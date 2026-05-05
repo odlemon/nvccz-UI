@@ -290,20 +290,6 @@ export function StrategyUploader() {
           )}
         </div>
 
-        {/* Vision banner */}
-        {visionStatement && (
-          <Card className="border-l-4 border-l-blue-500 bg-gradient-to-r from-blue-50 to-indigo-50">
-            <CardContent className="pt-4 pb-4">
-              <p className="text-xs uppercase tracking-wide font-semibold text-blue-700">
-                Active Vision
-              </p>
-              <p className="text-sm italic text-gray-800 mt-1">
-                "{visionStatement}"
-              </p>
-            </CardContent>
-          </Card>
-        )}
-
         {/* Filter bar */}
         <div className="flex items-center gap-3 flex-wrap">
           <div className="relative flex-1 max-w-md">

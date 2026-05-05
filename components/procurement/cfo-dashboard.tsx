@@ -121,7 +121,7 @@ export function CFODashboard() {
           <CardTitle className="flex items-center justify-between">
             <span>Overall Match Rate</span>
             <Badge className="bg-green-100 text-green-800 text-lg px-4 py-2">
-              {dashboardData.matchRate.toFixed(1)}%
+              {(dashboardData.matchRate ?? 0).toFixed(1)}%
             </Badge>
           </CardTitle>
         </CardHeader>
@@ -130,7 +130,7 @@ export function CFODashboard() {
           <div className="w-full bg-gray-100 rounded-full h-4 overflow-hidden">
             <div
               className="bg-gradient-to-r from-green-500 to-green-600 h-full transition-all duration-500"
-              style={{ width: `${Math.min(dashboardData.matchRate, 100)}%` }}
+              style={{ width: `${Math.min(dashboardData.matchRate ?? 0, 100)}%` }}
             />
           </div>
 
@@ -165,7 +165,7 @@ export function CFODashboard() {
           <div className="flex items-end gap-4">
             <div>
               <p className="text-gray-600 text-sm">Total Amount</p>
-              <p className="text-4xl font-bold text-gray-900 mt-2">${dashboardData.totalInvoiceAmount}</p>
+              <p className="text-4xl font-bold text-gray-900 mt-2">${dashboardData.totalInvoiceAmount ?? 0}</p>
             </div>
             <div className="flex-1 h-12 bg-gradient-to-r from-blue-400 to-blue-600 rounded-lg opacity-30" />
           </div>

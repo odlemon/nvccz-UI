@@ -30,8 +30,10 @@ import {
   PickedGoal,
 } from "./configuration/single-goal-picker"
 import { apiClient } from "@/lib/api/api-client"
+import { BscEntryTab } from "./bsc-entry-tab"
+import { WorkflowTab } from "./workflow-tab"
 
-type TaskView = "my-tasks" | "department-tasks"
+type TaskView = "my-tasks" | "department-tasks" | "bsc-entry" | "workflow"
 type ViewMode = "list" | "kanban"
 
 const TaskPageSkeleton = () => (
@@ -118,13 +120,22 @@ export function TaskManagement() {
     }
   }, [activeTab, dispatch, filters])
 
+  const searchParams = useSearchParams()
+  const pathname = usePathname()
+  const router = useRouter()
+
+  // Handle tab from URL
+  useEffect(() => {
+    const tabFromUrl = searchParams?.get("tab")
+    if (tabFromUrl === "bsc-entry" || tabFromUrl === "workflow") {
+      setActiveTab(tabFromUrl as TaskView)
+    }
+  }, [searchParams])
+
   // Auto-open the task detail drawer when a `taskId` query param is present
   // (used by notification deep-links like /performance/tasks?taskId=xxx).
   // We strip the param from the URL after handling it so reloads / back-nav
   // don't keep re-opening the drawer.
-  const searchParams = useSearchParams()
-  const pathname = usePathname()
-  const router = useRouter()
   useEffect(() => {
     const taskIdFromUrl = searchParams?.get("taskId")
     if (!taskIdFromUrl) return
@@ -136,7 +147,7 @@ export function TaskManagement() {
     const next = params.toString()
     router.replace(`${pathname}${next ? `?${next}` : ""}`, { scroll: false })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams])
+  }, [searchParams, selectedTaskId, dispatch])
 
   const listTasks = useMemo(() => tasks || [], [tasks])
 
@@ -188,9 +199,55 @@ export function TaskManagement() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <div className="w-full space-y-6">
+      {/* Tab Navigation */}
+      <div className="border-b border-gray-200">
+        <nav className="flex space-x-8">
+          <button
+            onClick={() => setActiveTab("my-tasks")}
+            className={`relative py-4 px-1 text-sm font-medium transition-colors cursor-pointer ${
+              activeTab === "my-tasks"
+                ? "text-blue-600 border-b-2 border-blue-600"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            My Tasks
+          </button>
+          <button
+            onClick={() => setActiveTab("department-tasks")}
+            className={`relative py-4 px-1 text-sm font-medium transition-colors cursor-pointer ${
+              activeTab === "department-tasks"
+                ? "text-blue-600 border-b-2 border-blue-600"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            Department Tasks
+          </button>
+          <button
+            onClick={() => setActiveTab("bsc-entry")}
+            className={`relative py-4 px-1 text-sm font-medium transition-colors cursor-pointer ${
+              activeTab === "bsc-entry"
+                ? "text-blue-600 border-b-2 border-blue-600"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            BSC Entry
+          </button>
+          <button
+            onClick={() => setActiveTab("workflow")}
+            className={`relative py-4 px-1 text-sm font-medium transition-colors cursor-pointer ${
+              activeTab === "workflow"
+                ? "text-blue-600 border-b-2 border-blue-600"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            Workflow History
+          </button>
+        </nav>
+      </div>
+
+      {(activeTab === "my-tasks" || activeTab === "department-tasks") && (
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl text-gray-900">Task Management</h1>
           <p className="text-gray-600 font-normal">
@@ -205,318 +262,292 @@ export function TaskManagement() {
           Create Task
         </Button>
       </div>
-
-      {/* Goal Hierarchy Info */}
-      <GoalHierarchyInfo tasks={tasks || []} />
-
-      {/* Tab Navigation */}
-      <div className="border-b border-gray-200">
-        <nav className="flex space-x-6">
-          <button
-            onClick={() => setActiveTab("my-tasks")}
-            className={`relative flex items-center gap-2 py-3 px-1 text-sm font-normal transition-colors cursor-pointer ${
-              activeTab === "my-tasks"
-                ? "text-blue-600 border-b-2 border-blue-600"
-                : "text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            <List className="w-4 h-4" />
-            Your Tasks
-          </button>
-          {permissions.canViewDepartmentTasks && (
-          <button
-            onClick={() => setActiveTab("department-tasks")}
-            className={`relative flex items-center gap-2 py-3 px-1 text-sm font-normal transition-colors cursor-pointer ${
-              activeTab === "department-tasks"
-                ? "text-blue-600 border-b-2 border-blue-600"
-                : "text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            <Kanban className="w-4 h-4" />
-            Department Tasks
-          </button>
-          )}
-        </nav>
-      </div>
-
-      {/* Search & Filters */}
-      <div className="flex flex-wrap items-center gap-3">
-          <div className="relative flex-1 min-w-[240px] max-w-sm">
-            <CiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-            <Input
-              placeholder="Search tasks..."
-              value={filters.search || ""}
-              onChange={(e) =>
-                dispatch(
-                  setFilters({
-                    ...filters,
-                    search: e.target.value || undefined,
-                  })
-                )
-              }
-              className="pl-10 rounded-full"
-            />
-          </div>
-
-          <Select
-            value={filters.stage || "all"}
-            onValueChange={(value) =>
-              dispatch(
-                setFilters({
-                  ...filters,
-                  stage: value === "all" ? undefined : (value as any),
-                })
-              )
-            }
-          >
-            <SelectTrigger className="w-[150px] rounded-full">
-              <SelectValue placeholder="Stage" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All stages</SelectItem>
-              <SelectItem value="todo">To Do</SelectItem>
-              <SelectItem value="in_progress">In Progress</SelectItem>
-              <SelectItem value="completed">Completed</SelectItem>
-              <SelectItem value="overdue">Overdue</SelectItem>
-              <SelectItem value="delayed">Delayed</SelectItem>
-              <SelectItem value="amber">Amber</SelectItem>
-              <SelectItem value="red">Red</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select
-            value={filters.priority || "all"}
-            onValueChange={(value) =>
-              dispatch(
-                setFilters({
-                  ...filters,
-                  priority: value === "all" ? undefined : (value as any),
-                })
-              )
-            }
-          >
-            <SelectTrigger className="w-[160px] rounded-full">
-              <SelectValue placeholder="Priority" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All priorities</SelectItem>
-              <SelectItem value="critical">Critical</SelectItem>
-              <SelectItem value="low">Low</SelectItem>
-              <SelectItem value="medium">Medium</SelectItem>
-              <SelectItem value="high">High</SelectItem>
-              <SelectItem value="urgent">Urgent</SelectItem>
-            </SelectContent>
-          </Select>
-
-          {activeTab === "department-tasks" && (
-            <Select
-              value={filters.department || ""}
-              onValueChange={(value) =>
-                dispatch(
-                  setFilters({
-                    ...filters,
-                    department: value || undefined,
-                  })
-                )
-              }
-            >
-              <SelectTrigger className="w-[200px] rounded-full">
-                <SelectValue placeholder="Select Department" />
-              </SelectTrigger>
-              <SelectContent>
-                {availableDepartments?.map((dept: any) => (
-                  <SelectItem key={dept.name} value={dept.name}>
-                    {dept.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-
-          <Input
-            value={filters.performanceCategory || ""}
-            onChange={(e) =>
-              dispatch(
-                setFilters({
-                  ...filters,
-                  performanceCategory: e.target.value || undefined,
-                })
-              )
-            }
-            placeholder="Category"
-            className="rounded-full w-[160px]"
-          />
-
-          <SingleGoalPicker
-            value={pickedGoal}
-            onChange={(g) => {
-              setPickedGoal(g)
-              dispatch(
-                setFilters({
-                  ...filters,
-                  goalId: g?.id || undefined,
-                })
-              )
-            }}
-            placeholder="Filter by goal..."
-            className="w-[200px]"
-          />
-
-          <Button
-            variant={filters.isOverdue ? "default" : "outline"}
-            size="sm"
-            className="rounded-full gap-1"
-            onClick={() =>
-              dispatch(
-                setFilters({
-                  ...filters,
-                  isOverdue: filters.isOverdue ? undefined : true,
-                })
-              )
-            }
-          >
-            <AlertTriangle className="w-3.5 h-3.5" />
-            Overdue
-          </Button>
-
-          <Button
-            variant={filters.isPerformanceTask ? "default" : "outline"}
-            size="sm"
-            className="rounded-full gap-1"
-            onClick={() =>
-              dispatch(
-                setFilters({
-                  ...filters,
-                  isPerformanceTask: filters.isPerformanceTask ? undefined : true,
-                })
-              )
-            }
-          >
-            <ListChecks className="w-3.5 h-3.5" />
-            Performance
-          </Button>
-        </div>
-
-      {/* View Toggle Buttons */}
-      <div className="flex items-center gap-1 bg-gray-100 rounded-full p-1 self-start">
-        <Button
-          variant={viewMode === "list" ? "default" : "ghost"}
-          size="sm"
-          onClick={() => setViewMode("list")}
-          className={`rounded-full px-4 ${
-            viewMode === "list"
-              ? "bg-white text-blue-600 shadow-sm hover:bg-white"
-              : "text-gray-600 hover:text-gray-900 hover:bg-gray-200"
-          }`}
-        >
-          <LayoutList className="w-4 h-4 mr-2" />
-          List
-        </Button>
-        <Button
-          variant={viewMode === "kanban" ? "default" : "ghost"}
-          size="sm"
-          onClick={() => setViewMode("kanban")}
-          className={`rounded-full px-4 ${
-            viewMode === "kanban"
-              ? "bg-white text-blue-600 shadow-sm hover:bg-white"
-              : "text-gray-600 hover:text-gray-900 hover:bg-gray-200"
-          }`}
-        >
-          <LayoutGrid className="w-4 h-4 mr-2" />
-          Kanban
-        </Button>
-      </div>
-
-      {/* Tasks Display */}
-      {isLoading ? (
-        <TaskPageSkeleton />
-      ) : activeTab === "department-tasks" && !filters.department ? (
-        <div className="text-center py-12">
-          <p className="text-gray-600">Please select a department to view tasks.</p>
-        </div>
-      ) : viewMode === "list" ? (
-        <div className="space-y-4">
-          {listTasks.length > 0 ? (
-            listTasks.map((task) => (
-              <Card
-                key={task.id}
-                className="bg-white border border-gray-200 rounded-2xl shadow-none hover:shadow-lg transition-shadow duration-200 cursor-pointer"
-                onClick={() => dispatch(setSelectedTaskId(task.id))}
-              >
-                <CardContent className="p-4 space-y-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h3 className="text-base font-medium text-gray-900">
-                        {task.title}
-                      </h3>
-                      {task.description && (
-                        <p className="text-sm text-gray-600 mt-1 line-clamp-2">
-                          {task.description}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Badge className={stageBadgeClass(task.stage)}>
-                      {task.stage?.replace("_", " ")}
-                    </Badge>
-                    <Badge className={priorityBadgeClass(task.priority)}>
-                      {task.priority}
-                    </Badge>
-                    {task.isPerformanceTask && (
-                      <Badge variant="outline" className="border-purple-300 text-purple-700">
-                        Performance
-                      </Badge>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-4 text-xs text-gray-500 flex-wrap">
-                    {dueLabel(task) && (
-                      <span className="flex items-center gap-1">
-                        <Calendar className="w-3 h-3" /> {dueLabel(task)}
-                      </span>
-                    )}
-                    {task.department && (
-                      <span className="flex items-center gap-1">
-                        <Tag className="w-3 h-3" /> {task.department}
-                      </span>
-                    )}
-                    {task.team && task.team.length > 0 && (
-                      <span className="flex items-center gap-1">
-                        <Users className="w-3 h-3" /> {task.team.length} assignee
-                        {task.team.length !== 1 ? "s" : ""}
-                      </span>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))
-          ) : (
-            <div className="text-center py-12">
-              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center mx-auto mb-4">
-                <List className="w-8 h-8 text-gray-400" />
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">No Tasks Found</h3>
-              <p className="text-gray-600 mb-6">
-                {filters.search
-                  ? "No tasks match your current search."
-                  : activeTab === "department-tasks"
-                    ? "No tasks found for the selected department."
-                    : "You have no tasks assigned to you."}
-              </p>
-            </div>
-          )}
-        </div>
-      ) : (
-        <KanbanBoard />
       )}
 
+      {(activeTab === "my-tasks" || activeTab === "department-tasks") && (
+        <>
+          <GoalHierarchyInfo tasks={tasks || []} />
+
+          <div className="flex flex-wrap items-center gap-3">
+              <div className="relative flex-1 min-w-[240px] max-w-sm">
+                <CiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <Input
+                  placeholder="Search tasks..."
+                  value={filters.search || ""}
+                  onChange={(e) =>
+                    dispatch(
+                      setFilters({
+                        ...filters,
+                        search: e.target.value || undefined,
+                      })
+                    )
+                  }
+                  className="pl-10 rounded-full"
+                />
+              </div>
+
+              <Select
+                value={filters.stage || "all"}
+                onValueChange={(value) =>
+                  dispatch(
+                    setFilters({
+                      ...filters,
+                      stage: value === "all" ? undefined : (value as any),
+                    })
+                  )
+                }
+              >
+                <SelectTrigger className="w-[150px] rounded-full">
+                  <SelectValue placeholder="Stage" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All stages</SelectItem>
+                  <SelectItem value="todo">To Do</SelectItem>
+                  <SelectItem value="in_progress">In Progress</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="overdue">Overdue</SelectItem>
+                  <SelectItem value="delayed">Delayed</SelectItem>
+                  <SelectItem value="amber">Amber</SelectItem>
+                  <SelectItem value="red">Red</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select
+                value={filters.priority || "all"}
+                onValueChange={(value) =>
+                  dispatch(
+                    setFilters({
+                      ...filters,
+                      priority: value === "all" ? undefined : (value as any),
+                    })
+                  )
+                }
+              >
+                <SelectTrigger className="w-[160px] rounded-full">
+                  <SelectValue placeholder="Priority" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All priorities</SelectItem>
+                  <SelectItem value="critical">Critical</SelectItem>
+                  <SelectItem value="low">Low</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="high">High</SelectItem>
+                  <SelectItem value="urgent">Urgent</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {activeTab === "department-tasks" && (
+                <Select
+                  value={filters.department || ""}
+                  onValueChange={(value) =>
+                    dispatch(
+                      setFilters({
+                        ...filters,
+                        department: value || undefined,
+                      })
+                    )
+                  }
+                >
+                  <SelectTrigger className="w-[200px] rounded-full">
+                    <SelectValue placeholder="Select Department" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableDepartments?.map((dept: any) => (
+                      <SelectItem key={dept.name} value={dept.name}>
+                        {dept.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+
+              <Input
+                value={filters.performanceCategory || ""}
+                onChange={(e) =>
+                  dispatch(
+                    setFilters({
+                      ...filters,
+                      performanceCategory: e.target.value || undefined,
+                    })
+                  )
+                }
+                placeholder="Category"
+                className="rounded-full w-[160px]"
+              />
+
+              <SingleGoalPicker
+                value={pickedGoal}
+                onChange={(g) => {
+                  setPickedGoal(g)
+                  dispatch(
+                    setFilters({
+                      ...filters,
+                      goalId: g?.id || undefined,
+                    })
+                  )
+                }}
+                placeholder="Filter by goal..."
+                className="w-[200px]"
+              />
+
+              <Button
+                variant={filters.isOverdue ? "default" : "outline"}
+                size="sm"
+                className="rounded-full gap-1"
+                onClick={() =>
+                  dispatch(
+                    setFilters({
+                      ...filters,
+                      isOverdue: filters.isOverdue ? undefined : true,
+                    })
+                  )
+                }
+              >
+                <AlertTriangle className="w-3.5 h-3.5" />
+                Overdue
+              </Button>
+
+              <Button
+                variant={filters.isPerformanceTask ? "default" : "outline"}
+                size="sm"
+                className="rounded-full gap-1"
+                onClick={() =>
+                  dispatch(
+                    setFilters({
+                      ...filters,
+                      isPerformanceTask: filters.isPerformanceTask ? undefined : true,
+                    })
+                  )
+                }
+              >
+                <ListChecks className="w-3.5 h-3.5" />
+                Performance
+              </Button>
+            </div>
+
+          <div className="flex items-center gap-1 bg-gray-100 rounded-full p-1 self-start">
+            <Button
+              variant={viewMode === "list" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("list")}
+              className={`rounded-full px-4 ${
+                viewMode === "list"
+                  ? "bg-white text-blue-600 shadow-sm hover:bg-white"
+                  : "text-gray-600 hover:text-gray-900 hover:bg-gray-200"
+              }`}
+            >
+              <LayoutList className="w-4 h-4 mr-2" />
+              List
+            </Button>
+            <Button
+              variant={viewMode === "kanban" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("kanban")}
+              className={`rounded-full px-4 ${
+                viewMode === "kanban"
+                  ? "bg-white text-blue-600 shadow-sm hover:bg-white"
+                  : "text-gray-600 hover:text-gray-900 hover:bg-gray-200"
+              }`}
+            >
+              <LayoutGrid className="w-4 h-4 mr-2" />
+              Kanban
+            </Button>
+          </div>
+
+          {isLoading ? (
+            <TaskPageSkeleton />
+          ) : activeTab === "department-tasks" && !filters.department ? (
+            <div className="text-center py-12">
+              <p className="text-gray-600">Please select a department to view tasks.</p>
+            </div>
+          ) : viewMode === "list" ? (
+            <div className="space-y-4">
+              {listTasks.length > 0 ? (
+                listTasks.map((task) => (
+                  <Card
+                    key={task.id}
+                    className="bg-white border border-gray-200 rounded-2xl shadow-none hover:shadow-lg transition-shadow duration-200 cursor-pointer"
+                    onClick={() => dispatch(setSelectedTaskId(task.id))}
+                  >
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <h3 className="text-base font-medium text-gray-900">
+                            {task.title}
+                          </h3>
+                          {task.description && (
+                            <p className="text-sm text-gray-600 mt-1 line-clamp-2">
+                              {task.description}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge className={stageBadgeClass(task.stage)}>
+                          {task.stage?.replace("_", " ")}
+                        </Badge>
+                        <Badge className={priorityBadgeClass(task.priority)}>
+                          {task.priority}
+                        </Badge>
+                        {task.isPerformanceTask && (
+                          <Badge variant="outline" className="border-purple-300 text-purple-700">
+                            Performance
+                          </Badge>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-4 text-xs text-gray-500 flex-wrap">
+                        {dueLabel(task) && (
+                          <span className="flex items-center gap-1">
+                            <Calendar className="w-3 h-3" /> {dueLabel(task)}
+                          </span>
+                        )}
+                        {task.department && (
+                          <span className="flex items-center gap-1">
+                            <Tag className="w-3 h-3" /> {task.department}
+                          </span>
+                        )}
+                        {task.team && task.team.length > 0 && (
+                          <span className="flex items-center gap-1">
+                            <Users className="w-3 h-3" /> {task.team.length} assignee
+                            {task.team.length !== 1 ? "s" : ""}
+                          </span>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+              ) : (
+                <div className="text-center py-12">
+                  <div className="w-16 h-16 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center mx-auto mb-4">
+                    <List className="w-8 h-8 text-gray-400" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">No Tasks Found</h3>
+                  <p className="text-gray-600 mb-6">
+                    {filters.search
+                      ? "No tasks match your current search."
+                      : activeTab === "department-tasks"
+                        ? "No tasks found for the selected department."
+                        : "You have no tasks assigned to you."}
+                  </p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <KanbanBoard />
+          )}
+        </>
+      )}
+
+      {activeTab === "bsc-entry" && <BscEntryTab />}
+      {activeTab === "workflow" && <WorkflowTab />}
+
       <TaskDetailDialog
-        taskId={selectedTaskId}
+        open={!!selectedTaskId}
+        taskId={selectedTaskId || ""}
         onClose={() => dispatch(setSelectedTaskId(null))}
       />
-
       <TaskCreateDialog
         open={createOpen}
         onOpenChange={setCreateOpen}

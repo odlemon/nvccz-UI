@@ -635,7 +635,7 @@ export function CapitalCallsList() {
 
         {/* ── Right panel: LP Summary ── */}
         {selectedFund && lpSummary.length > 0 && isLpPanelOpen && (
-          <aside className="hidden lg:flex w-[360px] shrink-0 overflow-hidden">
+          <aside className="hidden lg:flex w-[480px] shrink-0 overflow-hidden border-l border-border h-full">
             <LpSummaryPanel
               fund={selectedFund}
               lpSummary={lpSummary}

@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { PurchaseOrder } from "@/lib/api/procurement-api-v2"
 import { procurementApiV2 } from "@/lib/api/procurement-api-v2"
 import { PurchaseOrderTimeline } from "./purchase-order-timeline"
-import { Loader2, DollarSign, Calendar, MapPin, Send, Download, RotateCcw, Trash2 } from "lucide-react"
+import { Loader2, DollarSign, Calendar, MapPin, Send, Download, RotateCcw, Trash2, Package, FileText, Clock } from "lucide-react"
 import { format } from "date-fns"
 import { toast } from "sonner"
 import { useProcurementPermissions } from "@/lib/hooks/useProcurementPermissions"
@@ -19,9 +19,10 @@ import { useProcurementPermissions } from "@/lib/hooks/useProcurementPermissions
 interface PODrawerContentProps {
   po: PurchaseOrder
   onSuccess?: () => void
+  onCreateGRN?: (poId: string) => void
 }
 
-export function PODrawerContent({ po, onSuccess }: PODrawerContentProps) {
+export function PODrawerContent({ po, onSuccess, onCreateGRN }: PODrawerContentProps) {
   const dispatch = useAppDispatch()
   const { permissions } = useProcurementPermissions()
   const [sendingPO, setSendingPO] = useState(false)
@@ -103,11 +104,35 @@ export function PODrawerContent({ po, onSuccess }: PODrawerContentProps) {
 
   return (
     <Tabs defaultValue="details" className="w-full">
-      <TabsList className="grid w-full grid-cols-4">
-        <TabsTrigger value="details">Details</TabsTrigger>
-        <TabsTrigger value="lines">Line Items</TabsTrigger>
-        <TabsTrigger value="timeline">Timeline</TabsTrigger>
-        <TabsTrigger value="actions">Actions</TabsTrigger>
+      <TabsList className="flex items-center justify-start gap-8 bg-transparent border-b rounded-none h-12 w-full px-0 mb-6">
+        <TabsTrigger
+          value="details"
+          className="flex items-center gap-2 px-0 pb-3 data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 rounded-none border-b-2 border-transparent transition-all"
+        >
+          <FileText className="w-5 h-5" />
+          <span className="font-medium">Details</span>
+        </TabsTrigger>
+        <TabsTrigger
+          value="lines"
+          className="flex items-center gap-2 px-0 pb-3 data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 rounded-none border-b-2 border-transparent transition-all"
+        >
+          <Package className="w-5 h-5" />
+          <span className="font-medium">Line Items</span>
+        </TabsTrigger>
+        <TabsTrigger
+          value="timeline"
+          className="flex items-center gap-2 px-0 pb-3 data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 rounded-none border-b-2 border-transparent transition-all"
+        >
+          <Clock className="w-5 h-5" />
+          <span className="font-medium">Timeline</span>
+        </TabsTrigger>
+        <TabsTrigger
+          value="actions"
+          className="flex items-center gap-2 px-0 pb-3 data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 rounded-none border-b-2 border-transparent transition-all"
+        >
+          <Send className="w-5 h-5" />
+          <span className="font-medium">Actions</span>
+        </TabsTrigger>
       </TabsList>
 
       {/* Details Tab */}
@@ -283,6 +308,16 @@ export function PODrawerContent({ po, onSuccess }: PODrawerContentProps) {
               <Download className="w-4 h-4" />
               Download PDF
             </Button>
+
+            {(po.status === 'SENT' || po.status === 'PARTIALLY_RECEIVED') && permissions.canCreateGRN && (
+              <Button
+                onClick={() => onCreateGRN?.(po.id)}
+                className="w-full gap-2 gradient-primary text-white"
+              >
+                <Package className="w-4 h-4" />
+                Create GRN
+              </Button>
+            )}
 
             {po.status === 'RECEIVED' && permissions.canCreatePO && (
               <Button

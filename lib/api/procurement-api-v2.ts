@@ -420,30 +420,56 @@ export interface PurchaseOrderItem {
 export interface GoodsReceivedNote {
   id: string
   grnNumber: string
-  poId: string
-  poNumber: string
-  vendorId: string
-  vendorName: string
-  receivedDate: string
+  purchaseOrderId: string
+  purchaseOrder?: PurchaseOrder
   status: 'DRAFT' | 'RECEIVED' | 'PARTIALLY_RECEIVED' | 'APPROVED' | 'REJECTED'
-  totalItems: number
-  receivedItems: number
-  notes?: string
+  receivedDate: string
+  receivedById: string
+  receivedBy?: {
+    id: string
+    firstName: string
+    lastName: string
+    email: string
+  }
+  qualityStatus: 'PENDING' | 'PASSED' | 'FAILED'
+  qualityNotes?: string | null
+  approvedById?: string | null
+  approvedAt?: string | null
+  attachmentUrls?: string[] | null
+  latitude?: number | null
+  longitude?: number | null
+  geoCapturedAt?: string | null
+  submittedByInvestee: boolean
   items: GRNItem[]
   createdAt: string
   updatedAt: string
+  // Virtual/Joined fields for UI
+  poNumber?: string
+  vendorName?: string
+  totalItems?: number
+  receivedItems?: number
 }
 
 export interface GRNItem {
   id: string
   grnId: string
-  poItemId: string
-  itemName: string
-  poQuantity: number
-  receivedQuantity: number
-  unit: string
-  status: 'PENDING' | 'RECEIVED' | 'REJECTED'
-  rejectionReason?: string
+  purchaseOrderItemId: string
+  purchaseOrderItem?: any
+  quantityOrdered: string | number
+  quantityReceived: string | number
+  quantityAccepted: string | number
+  quantityRejected: string | number
+  qualityStatus: 'PENDING' | 'PASSED' | 'FAILED'
+  qualityNotes?: string | null
+  lineType?: string
+  milestoneDescription?: string | null
+  serialNumbers?: string[] | null
+  createdAt: string
+  updatedAt: string
+  // Virtual/Joined fields for UI
+  itemName?: string
+  unit?: string
+  poQuantity?: number
 }
 
 // Invoice Types
@@ -973,10 +999,23 @@ class ProcurementApiServiceV2 {
    * Get all GRNs
    * Required Role: PROC_MGR, PROC_OFF, or WAREHOUSE
    */
-  async getGRNs(filters?: { poId?: string; status?: string; limit?: number; offset?: number }): Promise<ProcurementResponse<GoodsReceivedNote[]>> {
+  async getGRNs(filters?: { 
+    purchaseOrderId?: string; 
+    vendorId?: string; 
+    status?: string; 
+    qualityStatus?: string;
+    submittedByInvestee?: boolean;
+    grnNumber?: string;
+    limit?: number; 
+    offset?: number 
+  }): Promise<ProcurementResponse<GoodsReceivedNote[]>> {
     const params = new URLSearchParams()
-    if (filters?.poId) params.append('poId', filters.poId)
+    if (filters?.purchaseOrderId) params.append('purchaseOrderId', filters.purchaseOrderId)
+    if (filters?.vendorId) params.append('vendorId', filters.vendorId)
     if (filters?.status) params.append('status', filters.status)
+    if (filters?.qualityStatus) params.append('qualityStatus', filters.qualityStatus)
+    if (filters?.submittedByInvestee !== undefined) params.append('submittedByInvestee', filters.submittedByInvestee.toString())
+    if (filters?.grnNumber) params.append('grnNumber', filters.grnNumber)
     if (filters?.limit) params.append('limit', filters.limit.toString())
     if (filters?.offset) params.append('offset', filters.offset.toString())
 

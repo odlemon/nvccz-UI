@@ -268,4 +268,23 @@ export const performanceBscApiService = {
   createEmployeeContract(payload: ContractCreatePayload & { subjectUserId: string }) {
     return apiClient.post("/performance/contracts/employee", payload)
   },
+
+  fetchPerformanceContracts(filters: {
+    contractType?: "BOARD" | "CEO" | "DEPARTMENT" | "EMPLOYEE"
+    status?: string
+    periodYear?: number
+    periodLabel?: string
+    subjectUserId?: string
+    departmentName?: string
+    skip?: number
+    take?: number
+  }) {
+    const params = new URLSearchParams()
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        params.append(key, String(value))
+      }
+    })
+    return apiClient.get(`/performance/contracts?${params.toString()}`)
+  },
 }

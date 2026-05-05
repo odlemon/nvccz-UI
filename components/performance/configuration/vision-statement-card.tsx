@@ -25,7 +25,7 @@ import { extractApiError } from "@/lib/utils/api-error"
 export function VisionStatementCard() {
   const dispatch = useAppDispatch()
   const { permissions } = usePerformancePermissions()
-  const { visionStatement, activeStrategyId } = useAppSelector(
+  const { visionStatement, activeStrategyId, strategies } = useAppSelector(
     (s) => s.performanceConfig
   )
 
@@ -36,6 +36,10 @@ export function VisionStatementCard() {
   useEffect(() => {
     dispatch(fetchVisionStatement())
   }, [dispatch])
+
+  if (!strategies || strategies.length === 0) {
+    return null
+  }
 
   const handleOpen = () => {
     setDraft(visionStatement || "")
@@ -77,16 +81,6 @@ export function VisionStatementCard() {
             <Eye className="w-5 h-5 text-blue-600" />
             <CardTitle className="text-lg">Vision Statement</CardTitle>
           </div>
-          {permissions.canEditVisionStatement && (
-            <Button
-              size="sm"
-              onClick={handleOpen}
-              className="rounded-full gap-1 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white"
-            >
-              <Pencil className="w-3.5 h-3.5" />
-              Edit
-            </Button>
-          )}
         </CardHeader>
         <CardContent>
           {visionStatement ? (
@@ -97,7 +91,7 @@ export function VisionStatementCard() {
             <p className="text-sm text-gray-500">
               No vision statement set yet.
               {permissions.canEditVisionStatement &&
-                " Click Edit to add the organisational vision."}
+                " Open an active strategy cycle below to add the organisational vision."}
             </p>
           )}
         </CardContent>

@@ -66,12 +66,33 @@ const getTypeStyle = (type: string) => {
 
 /** Pick the best deep-link path from a notification's data payload. */
 export const getNotificationPath = (n: AppNotification): string | null => {
-  const d = n.data
-  if (!d) return n.link || null
-  // Prefer task path when modal target is a task
-  if (d.modalTarget === "kanban-task" && d.taskPath) return d.taskPath
-  if (d.modalTarget === "kanban-task" && d.taskId)
-    return `/performance/tasks?taskId=${d.taskId}`
+  const d = n.data || {}
+  
+  // 1. Task-specific deep-linking
+  if (n.type.startsWith("TASK_") || d.taskId || d.modalTarget === "kanban-task") {
+    const taskId = d.taskId || n.relatedEntityId
+    if (taskId) return `/performance/tasks?taskId=${taskId}`
+    if (d.taskPath) return d.taskPath
+  }
+
+  // 2. Review-specific deep-linking
+  if (n.type.startsWith("REVIEW_")) {
+    const reviewId = d.reviewId || (n.relatedEntity === "Review" ? n.relatedEntityId : null)
+    if (reviewId) return `/performance/reviews/${reviewId}`
+    return "/performance/reviews"
+  }
+
+  // 3. Goal-specific
+  if (n.type === "GOAL_PROGRESS" || n.relatedEntity === "Goal") {
+    return "/performance/goals"
+  }
+
+  // 4. Strategy/Cycle
+  if (n.type === "CYCLE_CREATED") {
+    return "/performance/configuration/strategy"
+  }
+
+  // 5. Fallback to explicit paths or link
   return d.path || d.taskPath || n.link || null
 }
 

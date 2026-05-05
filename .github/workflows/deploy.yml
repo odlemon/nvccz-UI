@@ -45,6 +45,3 @@ jobs:
             npm install
             npm run build
             pm2 restart app-kyntaro-prod || pm2 start npm --name "app-kyntaro-prod" -- start
-
-
-            git remote set-url origin git@github.com:GRIdiscrete/nvccz-new.git

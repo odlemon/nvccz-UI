@@ -37,6 +37,7 @@ import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { useAppDispatch, useAppSelector } from "@/lib/store"
 import type { RootState } from "@/lib/store"
+import { useActiveAddress } from "@/lib/hooks/useActiveAddress"
 import { 
   submitPurchaseInvoice, 
   payPurchaseInvoice, 
@@ -143,6 +144,9 @@ export function PurchaseInvoiceViewDrawer({
   const [isPayDialogOpen, setIsPayDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [isClient, setIsClient] = useState(false)
+  const [PDFComponents, setPDFComponents] = useState<any>(null)
+  const letterheadAddress = useActiveAddress()
   
   // Submit form state
   const [submitData, setSubmitData] = useState<SubmitPurchaseInvoiceRequest>({
@@ -169,6 +173,18 @@ export function PurchaseInvoiceViewDrawer({
   useEffect(() => {
     setCurrentInvoice(invoice)
   }, [invoice])
+
+  useEffect(() => {
+    setIsClient(true)
+    import("@react-pdf/renderer").then((pdfModule) => {
+      import("./purchase-invoice-pdf").then((pdfComponent) => {
+        setPDFComponents({
+          PDFDownloadLink: pdfModule.PDFDownloadLink,
+          PurchaseInvoicePDF: pdfComponent.default,
+        })
+      })
+    })
+  }, [])
 
   useEffect(() => {
     if (isOpen && invoice) {
@@ -414,6 +430,30 @@ export function PurchaseInvoiceViewDrawer({
                     <CheckCircle className="w-4 h-4 mr-1" />
                     Record Payment
                   </Button>
+                )}
+
+                {isClient && currentInvoice && PDFComponents && (
+                  <PDFComponents.PDFDownloadLink
+                    document={
+                      <PDFComponents.PurchaseInvoicePDF
+                        invoice={currentInvoice}
+                        letterheadAddress={letterheadAddress}
+                      />
+                    }
+                    fileName={`${currentInvoice.paymentStatus === 'PAID' ? 'RECEIPT' : currentInvoice.invoiceNumber}.pdf`}
+                  >
+                    {({ loading: pdfLoading }: any) => (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="rounded-full"
+                        disabled={pdfLoading}
+                      >
+                        <FileText className={`w-4 h-4 mr-1 ${pdfLoading ? "animate-spin" : ""}`} />
+                        {pdfLoading ? "Generating..." : `Download ${currentInvoice.paymentStatus === 'PAID' ? 'Receipt' : 'PDF'}`}
+                      </Button>
+                    )}
+                  </PDFComponents.PDFDownloadLink>
                 )}
               </div>
             </div>

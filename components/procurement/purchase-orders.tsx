@@ -25,6 +25,7 @@ import { CiShop, CiCalendar, CiDollar, CiUser } from "react-icons/ci"
 import { Building, CheckCircle, Clock, AlertCircle, Truck, Download, Send, FileText, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { CreatePurchaseOrderModal } from "./create-purchase-order-modal"
+import { CreateGRNModal } from "./create-grn-modal"
 import { ApprovalDialog } from "./approval-dialog"
 
 export function PurchaseOrders() {
@@ -39,6 +40,8 @@ export function PurchaseOrders() {
   const [approvalLoading, setApprovalLoading] = useState(false)
   const [selectedOrderForApproval, setSelectedOrderForApproval] = useState<PurchaseOrder | null>(null)
   const [poActionsLoading, setPoActionsLoading] = useState(false)
+  const [isGRNModalOpen, setIsGRNModalOpen] = useState(false)
+  const [preSelectedPOId, setPreSelectedPOId] = useState<string | undefined>(undefined)
 
   useEffect(() => {
     loadPurchaseOrders()
@@ -333,22 +336,46 @@ export function PurchaseOrders() {
 
       {/* Status Tabs */}
       <Tabs value={selectedTab} onValueChange={setSelectedTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="all" className="flex gap-2">
-            All
-            <Badge variant="secondary">{getTabCount('all')}</Badge>
+        <TabsList className="flex items-center justify-start gap-8 bg-transparent border-b rounded-none h-12 w-full px-0">
+          <TabsTrigger 
+            value="all" 
+            className="flex items-center gap-2 px-0 pb-3 data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 rounded-none border-b-2 border-transparent transition-all"
+          >
+            <div className="flex items-center gap-2">
+              <FileText className="w-5 h-5" />
+              <span className="font-medium">All Orders</span>
+            </div>
+            <Badge variant="secondary" className="ml-1 bg-gray-100 text-gray-600 border-none">{getTabCount('all')}</Badge>
           </TabsTrigger>
-          <TabsTrigger value="sent" className="flex gap-2">
-            Sent
-            <Badge variant="secondary">{getTabCount('sent')}</Badge>
+          <TabsTrigger 
+            value="sent" 
+            className="flex items-center gap-2 px-0 pb-3 data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 rounded-none border-b-2 border-transparent transition-all"
+          >
+            <div className="flex items-center gap-2">
+              <Send className="w-5 h-5" />
+              <span className="font-medium">Sent</span>
+            </div>
+            <Badge variant="secondary" className="ml-1 bg-gray-100 text-gray-600 border-none">{getTabCount('sent')}</Badge>
           </TabsTrigger>
-          <TabsTrigger value="received" className="flex gap-2">
-            Received
-            <Badge variant="secondary">{getTabCount('received')}</Badge>
+          <TabsTrigger 
+            value="received" 
+            className="flex items-center gap-2 px-0 pb-3 data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 rounded-none border-b-2 border-transparent transition-all"
+          >
+            <div className="flex items-center gap-2">
+              <Truck className="w-5 h-5" />
+              <span className="font-medium">Received</span>
+            </div>
+            <Badge variant="secondary" className="ml-1 bg-gray-100 text-gray-600 border-none">{getTabCount('received')}</Badge>
           </TabsTrigger>
-          <TabsTrigger value="paid" className="flex gap-2">
-            Paid
-            <Badge variant="secondary">{getTabCount('paid')}</Badge>
+          <TabsTrigger 
+            value="paid" 
+            className="flex items-center gap-2 px-0 pb-3 data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 rounded-none border-b-2 border-transparent transition-all"
+          >
+            <div className="flex items-center gap-2">
+              <CiDollar className="w-5 h-5" />
+              <span className="font-medium">Paid</span>
+            </div>
+            <Badge variant="secondary" className="ml-1 bg-gray-100 text-gray-600 border-none">{getTabCount('paid')}</Badge>
           </TabsTrigger>
         </TabsList>
 
@@ -388,6 +415,10 @@ export function PurchaseOrders() {
               setIsDrawerOpen(false)
               loadPurchaseOrders()
             }}
+            onCreateGRN={(poId) => {
+              setPreSelectedPOId(poId)
+              setIsGRNModalOpen(true)
+            }}
           />
         )}
       </ProcurementDrawer>
@@ -400,6 +431,21 @@ export function PurchaseOrders() {
           setIsCreateModalOpen(false)
           loadPurchaseOrders()
         }}
+      />
+
+      {/* Create GRN Modal Integration */}
+      <CreateGRNModal
+        isOpen={isGRNModalOpen}
+        onClose={() => {
+          setIsGRNModalOpen(false)
+          setPreSelectedPOId(undefined)
+        }}
+        onSuccess={() => {
+          setIsGRNModalOpen(false)
+          setPreSelectedPOId(undefined)
+          loadPurchaseOrders()
+        }}
+        initialPurchaseOrderId={preSelectedPOId}
       />
 
       {/* Approval Dialog */}

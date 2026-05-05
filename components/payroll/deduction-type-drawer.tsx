@@ -19,7 +19,7 @@ export function DeductionTypeDrawer({ isOpen, onClose, deductionType, onEdit }: 
   if (!deductionType) return null
 
   const { hasSpecificAction } = useRolePermissions()
-  const canUpdateDeductionType = hasSpecificAction(PAYROLL_ACTIONS.UPDATE_DEDUCTION_TYPE)
+  const canUpdateDeductionType = hasSpecificAction('payroll', PAYROLL_ACTIONS.UPDATE_DEDUCTION_TYPE)
 
   const handleEdit = () => {
     if (onEdit) {

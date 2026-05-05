@@ -6,6 +6,7 @@ import { AppDispatch, RootState } from "@/lib/store/store"
 import { fetchPerformanceDashboard } from "@/lib/store/slices/performanceSlice"
 import { PerformanceDashboardSkeleton } from "./performance-dashboard-skeleton"
 import { VisionBanner } from "./configuration/vision-banner"
+import { KPIPerformanceAnalysisTab } from "./kpi-performance-analysis-tab"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -805,6 +806,12 @@ export function PerformanceDashboardV2() {
                         </CardContent>
                     </Card>
                 </div>
+
+            </div>
+
+            {/* KPI Performance Analysis - Placed at the absolute end of the dashboard */}
+            <div className="mt-8 bg-white border-none rounded-xl shadow-none p-6">
+                <KPIPerformanceAnalysisTab />
             </div>
         </div>
     )

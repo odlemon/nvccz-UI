@@ -37,9 +37,9 @@ export function TaxRulesTable() {
   const [isDeleting, setIsDeleting] = useState(false)
 
   // Permission checks
-  const canCreateTaxRule = hasSpecificAction(PAYROLL_ACTIONS.CREATE_TAX_RULE)
-  const canUpdateTaxRule = hasSpecificAction(PAYROLL_ACTIONS.UPDATE_TAX_RULE)
-  const canDeleteTaxRule = hasSpecificAction(PAYROLL_ACTIONS.DELETE_TAX_RULE)
+  const canCreateTaxRule = hasSpecificAction('payroll', PAYROLL_ACTIONS.CREATE_TAX_RULE)
+  const canUpdateTaxRule = hasSpecificAction('payroll', PAYROLL_ACTIONS.UPDATE_TAX_RULE)
+  const canDeleteTaxRule = hasSpecificAction('payroll', PAYROLL_ACTIONS.DELETE_TAX_RULE)
 
   // Load tax rules on component mount
   useEffect(() => {

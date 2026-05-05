@@ -153,7 +153,7 @@ export function PortfolioSidebar() {
   }
 
   return (
-    <aside className="w-64 bg-white border-r border-border h-[calc(100vh-5rem)] overflow-y-auto sticky top-20 z-10">
+    <aside className="w-72 bg-white border-r border-border h-[calc(100vh-5rem)] overflow-y-auto sticky top-20 z-10">
       <div className="p-4 space-y-4">
         {/* Module Header */}
         <div className="flex items-center gap-3 p-3 rounded-lg bg-gradient-to-r from-blue-50 to-blue-100">
@@ -164,7 +164,7 @@ export function PortfolioSidebar() {
             <module.icon className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h2 className="text-base text-gray-900">{module.name}</h2>
+            <h2 className="text-lg text-gray-900">{module.name}</h2>
           </div>
         </div>
 
@@ -183,7 +183,7 @@ export function PortfolioSidebar() {
               onClick={() => handleItemClick(dashboardSubModule.path)}
             >
               <dashboardSubModule.icon className="w-5 h-5" />
-              <span className="text-sm">{dashboardSubModule.name}</span>
+              <span className="text-base">{dashboardSubModule.name}</span>
             </Button>
           )}
 
@@ -201,7 +201,7 @@ export function PortfolioSidebar() {
                       className="w-full flex items-center justify-between px-3 py-2 rounded-md hover:bg-gray-50 cursor-pointer"
                       onClick={() => toggleGroup(group.id)}
                     >
-                      <span className="flex items-center gap-2 text-[15px] text-gray-800">
+                      <span className="flex items-center gap-2 text-[17px] text-gray-800">
                         <GroupIcon className="w-5 h-5" />
                         {displayTitle}
                       </span>
@@ -229,7 +229,7 @@ export function PortfolioSidebar() {
                                 onClick={() => handleItemClick(item.path)}
                               >
                                 <Icon className="w-4 h-4" />
-                                <span className="text-[13px]">{item.name}</span>
+                                <span className="text-sm">{item.name}</span>
                               </Button>
                             )
                           })
@@ -274,7 +274,7 @@ export function PortfolioSidebar() {
                     onClick={() => handleItemClick(subModule.path)}
                   >
                     <Icon className="w-5 h-5" />
-                    <span className="text-sm">{subModule.name}</span>
+                    <span className="text-base">{subModule.name}</span>
                   </Button>
                 )
               })}

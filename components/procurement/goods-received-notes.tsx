@@ -10,7 +10,7 @@ import { useProcurementPermissions } from "@/lib/hooks/useProcurementPermissions
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { procurementApiV2, GoodsReceivedNote } from "@/lib/api/procurement-api-v2"
 import { CiViewTimeline, CiCalendar, CiShop, CiCircleCheck } from "react-icons/ci"
-import { Package, CheckCircle, Clock, AlertCircle, XCircle } from "lucide-react"
+import { Package, CheckCircle, Clock, AlertCircle, XCircle, Building } from "lucide-react"
 import { toast } from "sonner"
 import { CreateGRNModal } from "./create-grn-modal"
 import { ApprovalDialog } from "./approval-dialog"
@@ -28,14 +28,32 @@ export function GoodsReceivedNotes() {
   const [selectedGRNForApproval, setSelectedGRNForApproval] = useState<GoodsReceivedNote | null>(null)
   const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false)
 
+  const [filters, setFilters] = useState({
+    status: 'all',
+    purchaseOrderId: '',
+    vendorId: '',
+    qualityStatus: '',
+    grnNumber: ''
+  })
+
   useEffect(() => {
     loadGoodsReceivedNotes()
-  }, [])
+  }, [selectedTab, filters])
 
   const loadGoodsReceivedNotes = async () => {
     try {
       setLoading(true)
-      const response = await procurementApiV2.getGRNs()
+      const apiFilters: any = {
+        limit: 50,
+        offset: 0
+      }
+      if (selectedTab !== 'all') apiFilters.status = selectedTab.toUpperCase()
+      if (filters.purchaseOrderId) apiFilters.purchaseOrderId = filters.purchaseOrderId
+      if (filters.vendorId) apiFilters.vendorId = filters.vendorId
+      if (filters.qualityStatus) apiFilters.qualityStatus = filters.qualityStatus
+      if (filters.grnNumber) apiFilters.grnNumber = filters.grnNumber
+
+      const response = await procurementApiV2.getGRNs(apiFilters)
       if (response.success && response.data) {
         setGRNs(response.data)
       } else {
@@ -128,7 +146,7 @@ export function GoodsReceivedNotes() {
       render: (value) => (
         <div className="flex items-center gap-2">
           <CiViewTimeline className="w-4 h-4 text-blue-600" />
-          <span className="font-medium">{value}</span>
+          <span className="font-medium text-blue-600">{value}</span>
         </div>
       )
     },
@@ -136,10 +154,10 @@ export function GoodsReceivedNotes() {
       key: 'poNumber',
       label: 'Purchase Order',
       sortable: true,
-      render: (value) => (
+      render: (value, row) => (
         <div className="flex items-center gap-2">
           <CiShop className="w-4 h-4 text-gray-600" />
-          <span>{value || 'N/A'}</span>
+          <span className="font-medium">{row.purchaseOrder?.poNumber || value || 'N/A'}</span>
         </div>
       )
     },
@@ -147,13 +165,12 @@ export function GoodsReceivedNotes() {
       key: 'vendorName',
       label: 'Vendor',
       sortable: true,
-      render: (value) => <span>{value || 'N/A'}</span>
+      render: (value, row) => <span className="font-medium text-gray-700">{row.purchaseOrder?.vendor?.name || value || 'N/A'}</span>
     },
     {
       key: 'status',
       label: 'Status',
       sortable: true,
-      filterable: true,
       render: (value) => (
         <Badge className={getStatusColor(value)}>
           <div className="flex items-center gap-1">
@@ -164,20 +181,18 @@ export function GoodsReceivedNotes() {
       )
     },
     {
-      key: 'receivedItems',
-      label: 'Items Received',
-      render: (value, row) => (
-        <div className="space-y-1">
-          <div className="flex items-center gap-2 text-sm">
-            <Package className="w-3 h-3 text-blue-600" />
-            <span>{value}/{row.totalItems} items</span>
-          </div>
-        </div>
+      key: 'qualityStatus',
+      label: 'Quality',
+      sortable: true,
+      render: (value) => (
+        <Badge className={getQualityStatusColor(value)}>
+          {value || 'PENDING'}
+        </Badge>
       )
     },
     {
-      key: 'createdAt',
-      label: 'Created',
+      key: 'receivedDate',
+      label: 'Received Date',
       sortable: true,
       render: (value) => (
         <div className="flex items-center gap-1">
@@ -242,22 +257,46 @@ export function GoodsReceivedNotes() {
 
       {/* Status Tabs */}
       <Tabs value={selectedTab} onValueChange={setSelectedTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="all" className="flex gap-2">
-            All
-            <Badge variant="secondary">{getTabCount('all')}</Badge>
+        <TabsList className="flex items-center justify-start gap-8 bg-transparent border-b rounded-none h-12 w-full px-0">
+          <TabsTrigger 
+            value="all" 
+            className="flex items-center gap-2 px-0 pb-3 data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 rounded-none border-b-2 border-transparent transition-all"
+          >
+            <div className="flex items-center gap-2">
+              <CiViewTimeline className="w-5 h-5" />
+              <span className="font-medium">All GRNs</span>
+            </div>
+            <Badge variant="secondary" className="ml-1 bg-gray-100 text-gray-600 border-none">{getTabCount('all')}</Badge>
           </TabsTrigger>
-          <TabsTrigger value="received" className="flex gap-2">
-            Received
-            <Badge variant="secondary">{getTabCount('received')}</Badge>
+          <TabsTrigger 
+            value="received" 
+            className="flex items-center gap-2 px-0 pb-3 data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 rounded-none border-b-2 border-transparent transition-all"
+          >
+            <div className="flex items-center gap-2">
+              <Clock className="w-5 h-5" />
+              <span className="font-medium">Received</span>
+            </div>
+            <Badge variant="secondary" className="ml-1 bg-gray-100 text-gray-600 border-none">{getTabCount('received')}</Badge>
           </TabsTrigger>
-          <TabsTrigger value="partial" className="flex gap-2">
-            Partial
-            <Badge variant="secondary">{getTabCount('partial')}</Badge>
+          <TabsTrigger 
+            value="partial" 
+            className="flex items-center gap-2 px-0 pb-3 data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 rounded-none border-b-2 border-transparent transition-all"
+          >
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-5 h-5" />
+              <span className="font-medium">Partial</span>
+            </div>
+            <Badge variant="secondary" className="ml-1 bg-gray-100 text-gray-600 border-none">{getTabCount('partial')}</Badge>
           </TabsTrigger>
-          <TabsTrigger value="approved" className="flex gap-2">
-            Approved
-            <Badge variant="secondary">{getTabCount('approved')}</Badge>
+          <TabsTrigger 
+            value="approved" 
+            className="flex items-center gap-2 px-0 pb-3 data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 rounded-none border-b-2 border-transparent transition-all"
+          >
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5" />
+              <span className="font-medium">Approved</span>
+            </div>
+            <Badge variant="secondary" className="ml-1 bg-gray-100 text-gray-600 border-none">{getTabCount('approved')}</Badge>
           </TabsTrigger>
         </TabsList>
 
@@ -291,119 +330,201 @@ export function GoodsReceivedNotes() {
         size="xl"
       >
         {viewingGRN && (
-          <div className="space-y-6">
-            {/* GRN Info */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <CiViewTimeline className="w-5 h-5" />
-                  GRN Information
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">GRN Number</label>
-                    <p className="text-lg font-semibold">{viewingGRN.grnNumber}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Status</label>
-                    <div className="mt-1">
-                      <Badge className={getStatusColor(viewingGRN.status)}>
-                        {getStatusIcon(viewingGRN.status)}
-                        {viewingGRN.status.replace('_', ' ')}
-                      </Badge>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Purchase Order</label>
-                    <p className="font-medium">{viewingGRN.poNumber || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Vendor</label>
-                    <p className="font-medium">{viewingGRN.vendorName || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Received Date</label>
-                    <p className="font-medium">
-                      {new Date(viewingGRN.receivedDate).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Created Date</label>
-                    <p className="font-medium">
-                      {new Date(viewingGRN.createdAt).toLocaleDateString()}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+          <Tabs defaultValue="details" className="w-full">
+            <TabsList className="flex items-center justify-start gap-8 bg-transparent border-b rounded-none h-12 w-full px-0 mb-6">
+              <TabsTrigger 
+                value="details" 
+                className="flex items-center gap-2 px-0 pb-3 data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 rounded-none border-b-2 border-transparent transition-all"
+              >
+                <CiViewTimeline className="w-5 h-5" />
+                <span className="font-medium">GRN Details</span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="items" 
+                className="flex items-center gap-2 px-0 pb-3 data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 rounded-none border-b-2 border-transparent transition-all"
+              >
+                <Package className="w-5 h-5" />
+                <span className="font-medium">Received Items</span>
+              </TabsTrigger>
+            </TabsList>
 
-            {/* Items Summary */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Received Items</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {viewingGRN.items && viewingGRN.items.length > 0 ? (
-                    viewingGRN.items.map((item, index) => (
-                      <div key={index} className="p-4 border rounded-lg space-y-3">
-                        <div className="flex items-center justify-between">
-                          <h4 className="font-medium">{item.itemName}</h4>
-                          <Badge className={item.status === 'RECEIVED' ? 'bg-green-100 text-green-800' : item.status === 'REJECTED' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}>
-                            {item.status}
+            <TabsContent value="details" className="space-y-6">
+              {/* GRN & PO Header */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Card className="bg-blue-50 border-blue-100">
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-blue-100 rounded-lg">
+                        <CiViewTimeline className="w-6 h-6 text-blue-600" />
+                      </div>
+                      <div>
+                        <p className="text-xs text-blue-600 font-medium uppercase tracking-wider">GRN Number</p>
+                        <p className="text-lg font-bold text-blue-900">{viewingGRN.grnNumber}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-purple-50 border-purple-100">
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-purple-100 rounded-lg">
+                        <CiShop className="w-6 h-6 text-purple-600" />
+                      </div>
+                      <div>
+                        <p className="text-xs text-purple-600 font-medium uppercase tracking-wider">Purchase Order</p>
+                        <p className="text-lg font-bold text-purple-900">{viewingGRN.purchaseOrder?.poNumber || viewingGRN.poNumber || 'N/A'}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-amber-50 border-amber-100">
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-amber-100 rounded-lg">
+                        <CheckCircle className="w-6 h-6 text-amber-600" />
+                      </div>
+                      <div>
+                        <p className="text-xs text-amber-600 font-medium uppercase tracking-wider">Status</p>
+                        <Badge className={getStatusColor(viewingGRN.status)}>
+                          {getStatusIcon(viewingGRN.status)}
+                          {viewingGRN.status.replace('_', ' ')}
+                        </Badge>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Detailed Info */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                      <Building className="w-4 h-4 text-gray-500" />
+                      Vendor Information
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <label className="text-xs text-gray-500 uppercase tracking-wider">Vendor Name</label>
+                      <p className="font-semibold text-gray-900">{viewingGRN.purchaseOrder?.vendor?.name || viewingGRN.vendorName || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500 uppercase tracking-wider">Contact Email</label>
+                      <p className="text-sm font-medium text-gray-700">{viewingGRN.purchaseOrder?.vendor?.email || 'N/A'}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                      <CiCalendar className="w-4 h-4 text-gray-500" />
+                      Receipt Details
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-xs text-gray-500 uppercase tracking-wider">Received Date</label>
+                        <p className="font-medium text-gray-900">
+                          {new Date(viewingGRN.receivedDate).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 uppercase tracking-wider">Quality Status</label>
+                        <div className="mt-1">
+                          <Badge className={getQualityStatusColor(viewingGRN.qualityStatus)}>
+                            {viewingGRN.qualityStatus || 'PENDING'}
                           </Badge>
                         </div>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500 uppercase tracking-wider">Received By</label>
+                      <p className="font-medium text-gray-900">{viewingGRN.receivedBy ? `${viewingGRN.receivedBy.firstName} ${viewingGRN.receivedBy.lastName}` : 'N/A'}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
 
-                        <div className="grid grid-cols-3 gap-4 text-sm">
-                          <div>
-                            <label className="text-gray-600">PO Quantity</label>
-                            <p className="font-medium text-blue-600">{item.poQuantity}</p>
+              {/* Notes */}
+              {(viewingGRN.qualityNotes || viewingGRN.notes) && (
+                <Card className="border-l-4 border-l-blue-500">
+                  <CardHeader>
+                    <CardTitle className="text-sm font-semibold">Quality & Audit Notes</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-gray-700 leading-relaxed">{viewingGRN.qualityNotes || viewingGRN.notes}</p>
+                  </CardContent>
+                </Card>
+              )}
+            </TabsContent>
+
+            <TabsContent value="items" className="space-y-4">
+              {viewingGRN.items && viewingGRN.items.length > 0 ? (
+                viewingGRN.items.map((item, index) => (
+                  <Card key={index} className="overflow-hidden border-l-4 border-l-blue-400">
+                    <CardContent className="pt-6 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-blue-50 rounded-lg">
+                            <Package className="w-5 h-5 text-blue-500" />
                           </div>
+                          <h4 className="font-bold text-gray-900">{item.purchaseOrderItem?.itemName || item.itemName || 'Unnamed Item'}</h4>
+                        </div>
+                        <Badge className={getQualityStatusColor(item.qualityStatus)}>
+                          {item.qualityStatus}
+                        </Badge>
+                      </div>
+
+                      <div className="grid grid-cols-4 gap-6 bg-gray-50 p-4 rounded-xl">
+                        <div className="space-y-1">
+                          <label className="text-[10px] text-gray-400 uppercase font-bold tracking-tighter">Ordered</label>
+                          <p className="font-bold text-gray-600 text-lg">{item.purchaseOrderItem?.quantity || item.quantityOrdered || '0'}</p>
+                        </div>
+                        <div className="space-y-1 border-l pl-6">
+                          <label className="text-[10px] text-blue-400 uppercase font-bold tracking-tighter">Received</label>
+                          <p className="font-bold text-blue-600 text-lg">{item.quantityReceived}</p>
+                        </div>
+                        <div className="space-y-1 border-l pl-6">
+                          <label className="text-[10px] text-green-400 uppercase font-bold tracking-tighter">Accepted</label>
+                          <p className="font-bold text-green-600 text-lg">{item.quantityAccepted || '0'}</p>
+                        </div>
+                        <div className="space-y-1 border-l pl-6">
+                          <label className="text-[10px] text-red-400 uppercase font-bold tracking-tighter">Rejected</label>
+                          <p className="font-bold text-red-600 text-lg">{item.quantityRejected || '0'}</p>
+                        </div>
+                      </div>
+
+                      {item.qualityNotes && (
+                        <div className="p-3 bg-amber-50 rounded-lg border border-amber-100 flex gap-2">
+                          <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
                           <div>
-                            <label className="text-gray-600">Received</label>
-                            <p className="font-medium text-green-600">{item.receivedQuantity}</p>
-                          </div>
-                          <div>
-                            <label className="text-gray-600">Unit</label>
-                            <p className="font-medium">{item.unit}</p>
+                            <p className="text-[11px] text-amber-600 font-bold uppercase tracking-wider">Quality Note</p>
+                            <p className="text-sm text-amber-900 leading-snug">{item.qualityNotes}</p>
                           </div>
                         </div>
-
-                        {item.rejectionReason && (
-                          <div>
-                            <label className="text-sm text-gray-600">Rejection Reason</label>
-                            <p className="text-sm bg-red-50 p-2 rounded mt-1 text-red-700">{item.rejectionReason}</p>
-                          </div>
-                        )}
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-gray-500 text-center py-4">No items found</p>
-                  )}
+                      )}
+                    </CardContent>
+                  </Card>
+                ))
+              ) : (
+                <div className="text-center py-12 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
+                  <Package className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-500 font-medium">No items found in this receipt</p>
                 </div>
-              </CardContent>
-            </Card>
-
-            {/* Notes */}
-            {viewingGRN.notes && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Notes</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-gray-700">{viewingGRN.notes}</p>
-                </CardContent>
-              </Card>
-            )}
+              )}
+            </TabsContent>
 
             {/* Actions */}
-            <div className="flex items-center gap-3 pt-4 border-t">
+            <div className="flex items-center gap-3 pt-6 border-t mt-6">
               <Button variant="outline" onClick={() => setIsDrawerOpen(false)}>
                 Close
               </Button>
-              {viewingGRN.status === 'PENDING_APPROVAL' && permissions.canApproveGRN && (
+              {viewingGRN.status === 'RECEIVED' && permissions.canApproveGRN && (
                 <>
                   <Button
                     variant="outline"
@@ -429,7 +550,7 @@ export function GoodsReceivedNotes() {
                 </>
               )}
             </div>
-          </div>
+          </Tabs>
         )}
       </ProcurementDrawer>
 

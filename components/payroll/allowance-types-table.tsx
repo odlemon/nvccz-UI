@@ -37,9 +37,9 @@ export function AllowanceTypesTable() {
   const [isDeleting, setIsDeleting] = useState(false)
 
   // Permission checks
-  const canCreateAllowanceType = hasSpecificAction(PAYROLL_ACTIONS.CREATE_ALLOWANCE_TYPE)
-  const canUpdateAllowanceType = hasSpecificAction(PAYROLL_ACTIONS.UPDATE_ALLOWANCE_TYPE)
-  const canDeleteAllowanceType = hasSpecificAction(PAYROLL_ACTIONS.DELETE_ALLOWANCE_TYPE)
+  const canCreateAllowanceType = hasSpecificAction('payroll', PAYROLL_ACTIONS.CREATE_ALLOWANCE_TYPE)
+  const canUpdateAllowanceType = hasSpecificAction('payroll', PAYROLL_ACTIONS.UPDATE_ALLOWANCE_TYPE)
+  const canDeleteAllowanceType = hasSpecificAction('payroll', PAYROLL_ACTIONS.DELETE_ALLOWANCE_TYPE)
 
   // Load allowance types on component mount
   useEffect(() => {

@@ -37,9 +37,9 @@ export function DeductionTypesTable() {
   const [isDeleting, setIsDeleting] = useState(false)
 
   // Permission checks
-  const canCreateDeductionType = hasSpecificAction(PAYROLL_ACTIONS.CREATE_DEDUCTION_TYPE)
-  const canUpdateDeductionType = hasSpecificAction(PAYROLL_ACTIONS.UPDATE_DEDUCTION_TYPE)
-  const canDeleteDeductionType = hasSpecificAction(PAYROLL_ACTIONS.DELETE_DEDUCTION_TYPE)
+  const canCreateDeductionType = hasSpecificAction('payroll', PAYROLL_ACTIONS.CREATE_DEDUCTION_TYPE)
+  const canUpdateDeductionType = hasSpecificAction('payroll', PAYROLL_ACTIONS.UPDATE_DEDUCTION_TYPE)
+  const canDeleteDeductionType = hasSpecificAction('payroll', PAYROLL_ACTIONS.DELETE_DEDUCTION_TYPE)
 
   // Load deduction types on component mount
   useEffect(() => {

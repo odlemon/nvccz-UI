@@ -63,9 +63,9 @@ export function PayrollRunDrawer({ isOpen, onClose, payrollRun, onEdit, onProces
   const [isProcessing, setIsProcessing] = useState(false)
 
   // Permission checks
-  const canUpdateRun = hasSpecificAction(PAYROLL_ACTIONS.UPDATE_PAYROLL_RUN)
-  const canProcessRun = hasSpecificAction(PAYROLL_ACTIONS.PROCESS_PAYROLL_RUN)
-  const canGenerateBankFile = hasSpecificAction(PAYROLL_ACTIONS.GENERATE_BANK_FILE)
+  const canUpdateRun = hasSpecificAction('payroll', PAYROLL_ACTIONS.UPDATE_PAYROLL_RUN)
+  const canProcessRun = hasSpecificAction('payroll', PAYROLL_ACTIONS.PROCESS_PAYROLL_RUN)
+  const canGenerateBankFile = hasSpecificAction('payroll', PAYROLL_ACTIONS.GENERATE_BANK_FILE)
 
   // Load detailed payroll run data
   const loadDetailedRun = useCallback(async () => {

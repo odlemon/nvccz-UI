@@ -200,27 +200,6 @@ export function KPIForm({ isOpen, onClose, onSubmit, kpi, isLoading = false }: K
             </div>
 
             <div className="space-y-2">
-              <Label>Type *</Label>
-              <Controller
-                name="type"
-                control={control}
-                render={({ field }) => (
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <SelectTrigger className={errors.type ? "border-red-500" : ""}>
-                      <SelectValue placeholder="Select type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Metric">Metric</SelectItem>
-                      <SelectItem value="Percentage">Percentage</SelectItem>
-                      <SelectItem value="Count">Count</SelectItem>
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-              {errors.type && <p className="text-sm text-red-500">{getErrorMessage(errors.type)}</p>}
-            </div>
-
-            <div className="space-y-2">
               <Label>Code *</Label>
               <Controller
                 name="code"
@@ -230,70 +209,6 @@ export function KPIForm({ isOpen, onClose, onSubmit, kpi, isLoading = false }: K
                 )}
               />
               {errors.code && <p className="text-sm text-red-500">{getErrorMessage(errors.code)}</p>}
-            </div>
-
-            <div className="space-y-2">
-              <Label>Weight Value *</Label>
-              <Controller
-                name="weightValue"
-                control={control}
-                render={({ field }) => (
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    {...field}
-                    onChange={(e) => field.onChange(Number.parseFloat(e.target.value) || 0)}
-                    className={errors.weightValue ? "border-red-500" : ""}
-                  />
-                )}
-              />
-              {errors.weightValue && <p className="text-sm text-red-500">{getErrorMessage(errors.weightValue)}</p>}
-            </div>
-
-            <div className="space-y-2">
-              <Label>Department</Label>
-              <Controller
-                name="catalogDepartmentName"
-                control={control}
-                render={({ field }) => (
-                  <Select value={field.value || "none"} onValueChange={field.onChange}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select department" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">None</SelectItem>
-                      {validDepartments.map((dept: any) => (
-                        <SelectItem key={dept.name} value={dept.name}>
-                          {dept.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-              {errors.catalogDepartmentName && (
-                <p className="text-sm text-red-500">{getErrorMessage(errors.catalogDepartmentName)}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label>Status *</Label>
-              <Controller
-                name="isActive"
-                control={control}
-                render={({ field }) => (
-                  <Select value={field.value ? "active" : "inactive"} onValueChange={(v) => field.onChange(v === "active")}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="inactive">Inactive</SelectItem>
-                    </SelectContent>
-                  </Select>
-                )}
-              />
             </div>
 
             <div className="space-y-2">
@@ -416,50 +331,54 @@ export function KPIForm({ isOpen, onClose, onSubmit, kpi, isLoading = false }: K
               </>
             )}
 
-            <div className="space-y-2">
-              <Label>Account Type *</Label>
-              <Controller
-                name="accountType"
-                control={control}
-                render={({ field }) => (
-                  <Select value={field.value || "Expense"} onValueChange={field.onChange}>
-                    <SelectTrigger className={errors.accountType ? "border-red-500" : ""}>
-                      <SelectValue placeholder="Select account type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Asset">Asset</SelectItem>
-                      <SelectItem value="Liability">Liability</SelectItem>
-                      <SelectItem value="Equity">Equity</SelectItem>
-                      <SelectItem value="Revenue">Revenue</SelectItem>
-                      <SelectItem value="Expense">Expense</SelectItem>
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-              {errors.accountType && <p className="text-sm text-red-500">{getErrorMessage(errors.accountType)}</p>}
-            </div>
+            {isFinancial && (
+              <>
+                <div className="space-y-2">
+                  <Label>Account Type *</Label>
+                  <Controller
+                    name="accountType"
+                    control={control}
+                    render={({ field }) => (
+                      <Select value={field.value || "Expense"} onValueChange={field.onChange}>
+                        <SelectTrigger className={errors.accountType ? "border-red-500" : ""}>
+                          <SelectValue placeholder="Select account type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Asset">Asset</SelectItem>
+                          <SelectItem value="Liability">Liability</SelectItem>
+                          <SelectItem value="Equity">Equity</SelectItem>
+                          <SelectItem value="Revenue">Revenue</SelectItem>
+                          <SelectItem value="Expense">Expense</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                  {errors.accountType && <p className="text-sm text-red-500">{getErrorMessage(errors.accountType)}</p>}
+                </div>
 
-            <div className="space-y-2">
-              <Label>Journal Entry Type *</Label>
-              <Controller
-                name="journalEntryType"
-                control={control}
-                render={({ field }) => (
-                  <Select value={field.value || "Debit"} onValueChange={field.onChange}>
-                    <SelectTrigger className={errors.journalEntryType ? "border-red-500" : ""}>
-                      <SelectValue placeholder="Select journal type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Debit">Debit</SelectItem>
-                      <SelectItem value="Credit">Credit</SelectItem>
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-              {errors.journalEntryType && (
-                <p className="text-sm text-red-500">{getErrorMessage(errors.journalEntryType)}</p>
-              )}
-            </div>
+                <div className="space-y-2">
+                  <Label>Journal Entry Type *</Label>
+                  <Controller
+                    name="journalEntryType"
+                    control={control}
+                    render={({ field }) => (
+                      <Select value={field.value || "Debit"} onValueChange={field.onChange}>
+                        <SelectTrigger className={errors.journalEntryType ? "border-red-500" : ""}>
+                          <SelectValue placeholder="Select journal type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Debit">Debit</SelectItem>
+                          <SelectItem value="Credit">Credit</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                  {errors.journalEntryType && (
+                    <p className="text-sm text-red-500">{getErrorMessage(errors.journalEntryType)}</p>
+                  )}
+                </div>
+              </>
+            )}
 
             {isFinancial && (
               <>
@@ -505,7 +424,7 @@ export function KPIForm({ isOpen, onClose, onSubmit, kpi, isLoading = false }: K
               type="button"
               variant="outline"
               onClick={onClose}
-              className="rounded-full bg-gradient-to-br from-gray-50 to-gray-100 hover:from-gray-100 hover:to-gray-200 border-gray-300"
+              className="rounded-full"
             >
               <CiSquareRemove className="w-4 h-4 mr-2" />
               Cancel

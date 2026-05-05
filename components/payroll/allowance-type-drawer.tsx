@@ -19,7 +19,7 @@ export function AllowanceTypeDrawer({ isOpen, onClose, allowanceType, onEdit }: 
   if (!allowanceType) return null
 
   const { hasSpecificAction } = useRolePermissions()
-  const canUpdateAllowanceType = hasSpecificAction(PAYROLL_ACTIONS.UPDATE_ALLOWANCE_TYPE)
+  const canUpdateAllowanceType = hasSpecificAction('payroll', PAYROLL_ACTIONS.UPDATE_ALLOWANCE_TYPE)
 
   const handleEdit = () => {
     if (onEdit) {

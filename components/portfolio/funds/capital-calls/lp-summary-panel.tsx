@@ -18,9 +18,9 @@ function MetricRow({
   value: string
 }) {
   return (
-    <div className="flex items-center justify-between text-sm">
+    <div className="flex items-center justify-between text-base">
       <span className="text-muted-foreground">{label}</span>
-      <span className="font-medium text-card-foreground">{value}</span>
+      <span className="font-semibold text-card-foreground">{value}</span>
     </div>
   )
 }
@@ -44,14 +44,14 @@ export function LpSummaryPanel({
   const calledPct = totalCommitted ? ((totalCalled / totalCommitted) * 100).toFixed(2) : "0.00"
 
   return (
-    <div className="flex h-full flex-col border-l border-border bg-card">
+    <div className="flex h-full w-full flex-col bg-card">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border px-6 py-4 shrink-0">
-        <h2 className="text-base font-semibold text-card-foreground">
+        <h2 className="text-xl font-bold text-card-foreground">
           LP Dashboard
         </h2>
-        <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8">
-          <X className="h-4 w-4" />
+        <Button variant="ghost" size="icon" onClick={onClose} className="h-9 w-9 rounded-full hover:bg-muted ml-auto">
+          <X className="h-5 w-5" />
         </Button>
       </div>
 
@@ -59,13 +59,13 @@ export function LpSummaryPanel({
         <TabsList className="w-full justify-start rounded-none border-b border-border bg-transparent px-6 shrink-0">
           <TabsTrigger
             value="summary"
-            className="rounded-none border-b-2 border-transparent px-3 pb-3 pt-3 text-sm data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+            className="rounded-none border-b-2 border-transparent px-3 pb-3 pt-3 text-base data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
           >
             Summary
           </TabsTrigger>
           <TabsTrigger
             value="lps"
-            className="rounded-none border-b-2 border-transparent px-3 pb-3 pt-3 text-sm data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+            className="rounded-none border-b-2 border-transparent px-3 pb-3 pt-3 text-base data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
           >
             LPs ({lpSummary.length})
           </TabsTrigger>
@@ -79,17 +79,17 @@ export function LpSummaryPanel({
               <Building2 className="h-6 w-6 text-muted-foreground" />
             </div>
             <div>
-              <h3 className="font-semibold text-card-foreground">{fund.name}</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">Capital Calls Overview</p>
+              <h3 className="text-lg font-semibold text-card-foreground">{fund.name}</h3>
+              <p className="text-sm text-muted-foreground mt-0.5">Capital Calls Overview</p>
             </div>
           </div>
 
           {/* Total Capital Committed */}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">
+            <label className="text-sm font-medium text-muted-foreground">
               Total Capital Committed (USD)
             </label>
-            <div className="rounded-lg border border-border bg-background px-4 py-2.5 text-sm font-semibold text-card-foreground">
+            <div className="rounded-lg border border-border bg-background px-4 py-3 text-lg font-bold text-card-foreground">
               {fmtCurrency(totalCommitted, 2)}
             </div>
           </div>
@@ -141,10 +141,10 @@ export function LpSummaryPanel({
                         <Users className="w-4 h-4 text-blue-600" />
                       </div>
                       <div>
-                        <span className="text-sm font-semibold text-card-foreground">
+                        <span className="text-base font-semibold text-card-foreground">
                           {lp.legalName}
                         </span>
-                        <p className="text-[10px] text-muted-foreground">{lp.email}</p>
+                        <p className="text-xs text-muted-foreground">{lp.email}</p>
                       </div>
                     </div>
                     <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
@@ -154,7 +154,7 @@ export function LpSummaryPanel({
 
                   {/* Progress bar */}
                   <div className="space-y-1">
-                    <div className="flex justify-between text-xs text-muted-foreground">
+                    <div className="flex justify-between text-sm text-muted-foreground">
                       <span>Called</span>
                       <span>{pctCalled}%</span>
                     </div>
@@ -167,30 +167,30 @@ export function LpSummaryPanel({
                   </div>
 
                   {/* Metrics */}
-                  <div className="space-y-1.5 text-xs">
+                  <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Commitment</span>
-                      <span className="font-medium">{fmtCurrency(lp.totalCommitment)}</span>
+                      <span className="font-semibold">{fmtCurrency(lp.totalCommitment)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Called</span>
-                      <span className="font-medium">{fmtCurrency(lp.cumulativeCalled)}</span>
+                      <span className="font-semibold">{fmtCurrency(lp.cumulativeCalled)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Received</span>
-                      <span className="font-medium text-emerald-600">
+                      <span className="font-semibold text-emerald-600">
                         {fmtCurrency(lp.amountReceivedTowardCalls)}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Outstanding</span>
-                      <span className="font-medium text-amber-600">
+                      <span className="font-semibold text-amber-600">
                         {fmtCurrency(lp.outstandingCallBalance)}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Uncalled</span>
-                      <span className="font-medium">{fmtCurrency(lp.uncalledCommitmentBalance)}</span>
+                      <span className="font-semibold">{fmtCurrency(lp.uncalledCommitmentBalance)}</span>
                     </div>
                   </div>
                 </div>

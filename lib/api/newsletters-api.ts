@@ -19,6 +19,30 @@ export interface Newsletter {
   author: NewsletterAuthor
 }
 
+export interface NewsletterRecipientUser {
+  id: string
+  firstName: string
+  lastName: string
+  email: string
+  roleName: string
+  selected: boolean
+  excluded: boolean
+}
+
+export interface NewsletterRecipientsConfig {
+  includeUserIds: string[]
+  excludeUserIds: string[]
+  includeEmails: string[]
+  excludeEmails: string[]
+  updatedById: string | null
+  updatedAt: string | null
+}
+
+export interface NewsletterRecipientsResponse {
+  users: NewsletterRecipientUser[]
+  config: NewsletterRecipientsConfig
+}
+
 export const newslettersApi = {
   getAll: async (): Promise<ApiResponse<Newsletter[]>> => {
     return apiClient.get<ApiResponse<Newsletter[]>>('/newsletters')
@@ -32,6 +56,15 @@ export const newslettersApi = {
   delete: async (id: string): Promise<ApiResponse<void>> => {
     return apiClient.delete<ApiResponse<void>>(`/newsletters/${id}`)
   },
+  getRecipientsConfig: async (): Promise<ApiResponse<NewsletterRecipientsResponse>> => {
+    return apiClient.get<ApiResponse<NewsletterRecipientsResponse>>('/newsletters/recipients/config')
+  },
+  updateRecipientsConfig: async (data: {
+    includeUserIds?: string[]
+    excludeUserIds?: string[]
+    includeEmails?: string[]
+    excludeEmails?: string[]
+  }): Promise<ApiResponse<any>> => {
+    return apiClient.put<ApiResponse<any>>('/newsletters/recipients/config', data)
+  },
 }
-
-

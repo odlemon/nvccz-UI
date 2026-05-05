@@ -439,7 +439,6 @@ export function KPIManagement() {
   const mainTabs = [
     { id: "overview", label: "KPIs Overview", icon: CiViewTimeline, gradient: "from-blue-500 to-indigo-600" },
     { id: "financials", label: "Financial KPIs", icon: CiViewBoard, gradient: "from-emerald-500 to-teal-600" },
-    { id: "analysis", label: "Performance Analysis", icon: TrendingUp, gradient: "from-purple-500 to-pink-600" },
   ]
 
   return (

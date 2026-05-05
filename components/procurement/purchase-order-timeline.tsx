@@ -19,7 +19,7 @@ import {
 import { PurchaseOrder } from "@/lib/api/procurement-api"
 
 interface PurchaseOrderTimelineProps {
-  purchaseOrder: PurchaseOrder
+  purchaseOrder?: PurchaseOrder | null
   onUpdateStatus?: (id: string, status: string) => void
   refreshTrigger?: number
 }
@@ -42,9 +42,9 @@ const stages = [
     completedColor: "bg-green-500"
   },
   {
-    id: "CONFIRMED",
-    title: "Confirmed",
-    description: "Vendor has confirmed the purchase order",
+    id: "ACKNOWLEDGED",
+    title: "Acknowledged",
+    description: "Vendor has acknowledged the purchase order",
     icon: CheckCircle,
     color: "bg-purple-500",
     completedColor: "bg-green-500"
@@ -75,11 +75,15 @@ export function PurchaseOrderTimeline({
   const [currentStageIndex, setCurrentStageIndex] = useState(0)
 
   useEffect(() => {
-    const stageIndex = stages.findIndex(stage => stage.id === purchaseOrder.status)
-    setCurrentStageIndex(stageIndex >= 0 ? stageIndex : 0)
-  }, [purchaseOrder.status])
+    if (purchaseOrder?.status) {
+      const stageIndex = stages.findIndex(stage => stage.id === purchaseOrder.status)
+      setCurrentStageIndex(stageIndex >= 0 ? stageIndex : 0)
+    }
+  }, [purchaseOrder?.status])
 
   const getStageStatus = (index: number) => {
+    if (!purchaseOrder?.status) return "upcoming"
+    
     if (purchaseOrder.status === "CANCELLED") {
       return index === 0 ? "completed" : "cancelled"
     }
@@ -90,6 +94,7 @@ export function PurchaseOrderTimeline({
   }
 
   const getStageActions = (stageId: string) => {
+    if (!purchaseOrder) return null
     // Only show actions for the current stage
     if (purchaseOrder.status !== stageId) {
       return null
@@ -112,6 +117,7 @@ export function PurchaseOrderTimeline({
   }
 
   const renderPurchaseOrderDetails = () => {
+    if (!purchaseOrder) return null
     return (
       <div className="space-y-6">
         <Card className="border-l-4 border-l-blue-500">
@@ -125,7 +131,7 @@ export function PurchaseOrderTimeline({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="text-sm text-gray-500">PO Number</label>
-                <p className="text-sm font-medium">{purchaseOrder.orderNumber}</p>
+                <p className="text-sm font-medium">{purchaseOrder.purchaseOrderNumber}</p>
               </div>
               <div>
                 <label className="text-sm text-gray-500">Vendor</label>
@@ -143,7 +149,7 @@ export function PurchaseOrderTimeline({
               </div>
               <div className="md:col-span-2">
                 <label className="text-sm text-gray-500">Notes</label>
-                <p className="text-sm font-medium">{purchaseOrder.notes || 'No notes provided'}</p>
+                <p className="text-sm font-medium">{'No notes provided'}</p>
               </div>
             </div>
           </CardContent>
@@ -161,7 +167,7 @@ export function PurchaseOrderTimeline({
               {purchaseOrder.items?.map((item, index) => (
                 <div key={index} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
                   <div className="flex justify-between mb-2">
-                    <p className="text-sm font-medium">{item.description}</p>
+                    <p className="text-sm font-medium">{item.itemName}</p>
                     <Badge variant="outline" className="text-xs">
                       {item.quantity} {item.unit}
                     </Badge>
