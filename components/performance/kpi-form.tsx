@@ -28,13 +28,7 @@ import { useAppSelector } from "@/lib/store"
 
 const schema = yup.object({
   name: yup.string().required("KPI name is required"),
-  type: yup.string().oneOf(["Percentage", "Metric", "Count"]).required("Type is required"),
   isReverseKpi: yup.boolean().required(),
-  weightValue: yup
-    .number()
-    .typeError("Weight value must be a number")
-    .min(0, "Weight value cannot be negative")
-    .required("Weight value is required"),
   hasUnit: yup.boolean().required(),
   unitCategory: yup.string().nullable(),
   unit: yup.string().nullable(),
@@ -42,22 +36,28 @@ const schema = yup.object({
   unitPosition: yup.string().oneOf(["prefix", "suffix"]).nullable(),
   code: yup.string().required("Code is required"),
   description: yup.string().required("Description is required"),
-  catalogDepartmentName: yup.string().nullable(),
-  accountType: yup
-    .string()
-    .oneOf(["Asset", "Liability", "Equity", "Revenue", "Expense"])
-    .required("Account type is required"),
+  accountType: yup.string().when("isFinancial", {
+    is: true,
+    then: (s) =>
+      s
+        .oneOf(["Asset", "Liability", "Equity", "Revenue", "Expense"])
+        .required("Account type is required for financial KPIs"),
+    otherwise: (s) => s.nullable(),
+  }),
   accountNumber: yup.string().when("isFinancial", {
     is: true,
     then: (s) => s.required("Account number is required for financial KPIs"),
     otherwise: (s) => s.nullable(),
   }),
-  journalEntryType: yup
-    .string()
-    .oneOf(["Debit", "Credit"])
-    .required("Journal entry type is required"),
+  journalEntryType: yup.string().when("isFinancial", {
+    is: true,
+    then: (s) =>
+      s
+        .oneOf(["Debit", "Credit"])
+        .required("Journal entry type is required for financial KPIs"),
+    otherwise: (s) => s.nullable(),
+  }),
   isFinancial: yup.boolean().required(),
-  isActive: yup.boolean().required(),
 })
 
 interface KPIFormProps {

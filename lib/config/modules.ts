@@ -150,20 +150,24 @@ export const MODULE_CONFIG: ModuleConfig[] = [
     color: "oklch(0.58 0.09 260)",
     path: "/performance",
     subModules: [
-      { id: "performance-dashboard", name: "Performance Dashboard", path: "/performance", icon: CiGrid41, description: "Overview and metrics" },
-      { id: "org-bsc", name: "Org BSC", path: "/performance/org-bsc", icon: CiGrid41, description: "Organisational BSC dashboard" },
-      { id: "performance-reviews", name: "Reviews", path: "/performance/reviews", icon: CiFileOn, description: "Unified hub for self-assessments, evaluations, cycles and reports" }
+      { id: "performance-dashboard", name: "Dashboard", path: "/performance", icon: CiGrid41, description: "Overview and metrics" },
+      { id: "org-bsc", name: "Org BSC", path: "/performance/org-bsc", icon: CiGrid41, description: "Organisational BSC dashboard" }
     ],
     groups: [
       {
-        id: "data-entry",
-        title: "Data Entry & Planning",
-        icon: CiViewList,
+        id: "strategy-setup",
+        title: "Company Strategy",
+        icon: CiFileOn,
         items: [
-          { id: "bsc-operations", name: "BSC Operations", path: "/performance/bsc-operations", icon: CiCoins1, description: "BSC data entry, workflow submissions and contract creation hub" },
-          { id: "goals-management", name: "Goals Management", path: "/performance/goals", icon: CiCircleCheck, description: "Goals" },
-          { id: "tasks-management", name: "Tasks Management", path: "/performance/tasks", icon: CiViewList, description: "Tasks" },
-          { id: "kpi-management", name: "KPI Management", path: "/performance/kpis", icon: CiViewTimeline, description: "KPIs" }
+          { id: "config-strategy", name: "Company Strategy", path: "/performance/configuration/strategy", icon: CiFileOn, description: "Vision and strategy cycles" }
+        ]
+      },
+      {
+        id: "themes",
+        title: "Themes",
+        icon: CiViewTable,
+        items: [
+          { id: "config-themes", name: "Themes", path: "/performance/configuration/themes", icon: CiViewTable, description: "Strategic themes and goal tagging" }
         ]
       },
       {
@@ -175,13 +179,53 @@ export const MODULE_CONFIG: ModuleConfig[] = [
         ]
       },
       {
+        id: "goals",
+        title: "Goals",
+        icon: CiCircleCheck,
+        items: [
+          { id: "goals-management", name: "Goals", path: "/performance/goals", icon: CiCircleCheck, description: "Goals" }
+        ]
+      },
+      {
+        id: "department-goals",
+        title: "Departmental Goals",
+        icon: CiViewBoard,
+        items: [
+          { id: "department-scorecards", name: "Departmental Goals", path: "/performance/department-scorecards", icon: CiViewBoard, description: "Department performance scorecards" }
+        ]
+      },
+      {
+        id: "tasks",
+        title: "Tasks",
+        icon: CiViewList,
+        items: [
+          { id: "tasks-management", name: "Tasks", path: "/performance/tasks", icon: CiViewList, description: "Tasks" }
+        ]
+      },
+      {
+        id: "kpi",
+        title: "KPI Management",
+        icon: CiViewTimeline,
+        items: [
+          { id: "kpi-management", name: "KPI Management", path: "/performance/kpis", icon: CiViewTimeline, description: "KPIs" },
+          { id: "bsc-operations", name: "BSC Operations", path: "/performance/bsc-operations", icon: CiCoins1, description: "BSC data entry, workflow submissions and contract creation hub" }
+        ]
+      },
+      {
+        id: "reviews",
+        title: "Reviews",
+        icon: CiFileOn,
+        items: [
+          { id: "performance-reviews", name: "Reviews", path: "/performance/reviews", icon: CiFileOn, description: "Unified hub for self-assessments, evaluations, cycles and reports" }
+        ]
+      },
+      {
         id: "scorecards",
-        title: "Scorecard Generation",
+        title: "Scorecards",
         icon: CiViewBoard,
         items: [
           { id: "board-scorecards", name: "Board Scorecards", path: "/performance/board-scorecards", icon: IoStatsChartOutline, description: "Board contract scorecards" },
           { id: "ceo-scorecards", name: "CEO Scorecards", path: "/performance/ceo-scorecards", icon: CiTrophy, description: "CEO contract scorecards" },
-          { id: "department-scorecards", name: "Department Scorecards", path: "/performance/department-scorecards", icon: CiViewBoard, description: "Department performance scorecards" },
           { id: "user-scorecards", name: "Employee Scorecards", path: "/performance/user-scorecards", icon: CiViewTable, description: "User performance scorecards" }
         ]
       },
@@ -191,9 +235,7 @@ export const MODULE_CONFIG: ModuleConfig[] = [
         icon: CiSettings,
         items: [
           { id: "departments-management", name: "Departments", path: "/performance/departments", icon: CiUser, description: "Department management" },
-          { id: "config-pillars", name: "BSC Pillars", path: "/performance/configuration/pillars", icon: CiViewBoard, description: "BSC pillars and goal weights" },
-          { id: "config-strategy", name: "Strategy", path: "/performance/configuration/strategy", icon: CiFileOn, description: "Vision and strategy cycles" },
-          { id: "config-themes", name: "Themes", path: "/performance/configuration/themes", icon: CiViewTable, description: "Strategic themes and goal tagging" }
+          { id: "config-pillars", name: "BSC Pillars", path: "/performance/configuration/pillars", icon: CiViewBoard, description: "BSC pillars and goal weights" }
         ]
       }
     ]
