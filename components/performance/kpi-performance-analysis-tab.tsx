@@ -20,21 +20,57 @@ import { Badge } from "@/components/ui/badge"
 import { DatePicker } from "@/components/ui/date-picker"
 import { ProcurementDataTable } from "@/components/procurement/procurement-data-table"
 import { toast } from "sonner"
-import { format, startOfMonth, endOfMonth } from "date-fns"
+import { format, startOfMonth, endOfMonth, startOfYear, endOfYear } from "date-fns"
 import { CiTrophy, CiViewTimeline } from "react-icons/ci"
 import { TbTarget } from "react-icons/tb"
 import { TrendingUp, TrendingDown, Minus } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 
-function getDefaultDateRange() {
+const MONTHS = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+]
+
+function getDefaultDateRange(selectedMonth?: string, selectedYear?: string) {
   const now = new Date()
+  const yearNumber = Number.parseInt(selectedYear ?? "", 10)
+  const resolvedYear = Number.isFinite(yearNumber) ? yearNumber : now.getFullYear()
+
+  if (!selectedMonth || selectedMonth === "All") {
+    const start = startOfYear(new Date(resolvedYear, 0, 1))
+    const end = endOfYear(new Date(resolvedYear, 11, 31))
+    return {
+      startDate: format(start, "yyyy-MM-dd"),
+      endDate: format(end, "yyyy-MM-dd"),
+    }
+  }
+
+  const monthIndex = MONTHS.indexOf(selectedMonth)
+  const resolvedMonth = monthIndex >= 0 ? monthIndex : now.getMonth()
+  const monthDate = new Date(resolvedYear, resolvedMonth, 1)
   return {
-    startDate: format(startOfMonth(now), "yyyy-MM-dd"),
-    endDate: format(endOfMonth(now), "yyyy-MM-dd"),
+    startDate: format(startOfMonth(monthDate), "yyyy-MM-dd"),
+    endDate: format(endOfMonth(monthDate), "yyyy-MM-dd"),
   }
 }
 
-export function KPIPerformanceAnalysisTab() {
+export function KPIPerformanceAnalysisTab({
+  selectedMonth,
+  selectedYear,
+}: {
+  selectedMonth?: string
+  selectedYear?: string
+}) {
   const dispatch = useAppDispatch()
   const { 
     availableKPIs, 
@@ -45,12 +81,16 @@ export function KPIPerformanceAnalysisTab() {
   } = useAppSelector((state) => state.performance)
   
   const [filters, setFilters] = useState(() => {
-    const { startDate, endDate } = getDefaultDateRange()
+    const { startDate, endDate } = getDefaultDateRange(selectedMonth, selectedYear)
     return { kpiId: "all", department: "all", startDate, endDate }
   })
   
-  const [startDate, setStartDate] = useState<Date | undefined>(new Date(getDefaultDateRange().startDate))
-  const [endDate, setEndDate] = useState<Date | undefined>(new Date(getDefaultDateRange().endDate))
+  const [startDate, setStartDate] = useState<Date | undefined>(
+    new Date(getDefaultDateRange(selectedMonth, selectedYear).startDate)
+  )
+  const [endDate, setEndDate] = useState<Date | undefined>(
+    new Date(getDefaultDateRange(selectedMonth, selectedYear).endDate)
+  )
 
   useEffect(() => {
     dispatch(fetchAvailableKPIs())
@@ -87,7 +127,7 @@ export function KPIPerformanceAnalysisTab() {
   }
 
   const handleResetFilters = () => {
-    const { startDate: defaultStart, endDate: defaultEnd } = getDefaultDateRange()
+    const { startDate: defaultStart, endDate: defaultEnd } = getDefaultDateRange(selectedMonth, selectedYear)
     setFilters({ kpiId: "all", department: "all", startDate: defaultStart, endDate: defaultEnd })
     setStartDate(new Date(defaultStart))
     setEndDate(new Date(defaultEnd))
@@ -97,8 +137,9 @@ export function KPIPerformanceAnalysisTab() {
     let count = 0
     if (filters.kpiId && filters.kpiId !== "all") count++
     if (filters.department && filters.department !== "all") count++
-    if (filters.startDate !== getDefaultDateRange().startDate) count++
-    if (filters.endDate !== getDefaultDateRange().endDate) count++
+    const { startDate: defaultStart, endDate: defaultEnd } = getDefaultDateRange(selectedMonth, selectedYear)
+    if (filters.startDate !== defaultStart) count++
+    if (filters.endDate !== defaultEnd) count++
     return count
   }
 

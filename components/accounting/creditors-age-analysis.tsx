@@ -266,7 +266,7 @@ export function CreditorsAgeAnalysis() {
                           <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-700">
                             {currency}
                           </span>
-                          <span className="text-gray-400 text-[11px]">subtotal</span>
+                          <span className="text-gray-400 text-[11px]">Total</span>
                         </div>
                       </td>
                       <td />

@@ -1339,7 +1339,12 @@ class ProcurementApiServiceV2 {
   // SUITE 06: AI INVOICE INTAKE, 3-WAY MATCH & VERIFICATION
   // ============================================================================
 
-  async createInvoiceIntake(data: { documentUrl: string; vendorId?: string }): Promise<ProcurementResponse<InvoiceIntake>> {
+  async createInvoiceIntake(data: {
+    documentUrl: string
+    vendorId?: string
+    sourcePurchaseOrderId?: string
+    goodsReceivedNoteId?: string
+  }): Promise<ProcurementResponse<InvoiceIntake>> {
     return apiClient.post<ProcurementResponse<InvoiceIntake>>('/procurement/suite06/intakes', data)
   }
 

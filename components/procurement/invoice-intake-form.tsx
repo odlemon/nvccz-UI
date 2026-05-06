@@ -1,14 +1,16 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { procurementApiV2, InvoiceIntake, ExtractedInvoiceData } from "@/lib/api/procurement-api-v2"
-import { Loader2, Upload, FileText, Zap, Check, AlertCircle } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { accountingApi, Vendor } from "@/lib/api/accounting-api"
+import { procurementApiV2, ExtractedInvoiceData, GoodsReceivedNote, PurchaseOrder } from "@/lib/api/procurement-api-v2"
+import { Loader2, Upload, FileText, Zap, Check } from "lucide-react"
 import { toast } from "sonner"
 
 interface InvoiceIntakeFormProps {
@@ -20,10 +22,113 @@ interface InvoiceIntakeFormProps {
 export function InvoiceIntakeForm({ isOpen, onClose, onSuccess }: InvoiceIntakeFormProps) {
   const [step, setStep] = useState<'upload' | 'extract' | 'review'>('upload')
   const [loading, setLoading] = useState(false)
+  const [loadingData, setLoadingData] = useState(false)
+  const [loadingRelations, setLoadingRelations] = useState(false)
   const [extractLoading, setExtractLoading] = useState(false)
   const [documentUrl, setDocumentUrl] = useState("")
+  const [vendorId, setVendorId] = useState("")
+  const [sourcePurchaseOrderId, setSourcePurchaseOrderId] = useState("")
+  const [goodsReceivedNoteId, setGoodsReceivedNoteId] = useState("")
+  const [vendors, setVendors] = useState<Vendor[]>([])
+  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([])
+  const [goodsReceivedNotes, setGoodsReceivedNotes] = useState<GoodsReceivedNote[]>([])
   const [intakeId, setIntakeId] = useState<string | null>(null)
   const [extractedData, setExtractedData] = useState<ExtractedInvoiceData | null>(null)
+
+  useEffect(() => {
+    if (!isOpen) return
+
+    const loadVendors = async () => {
+      setLoadingData(true)
+      try {
+        const vendorsResponse = await accountingApi.getVendors({ isActive: true })
+        if (vendorsResponse.success && vendorsResponse.data) {
+          setVendors(vendorsResponse.data)
+        }
+      } catch (error: any) {
+        toast.error("Failed to load vendors", { description: error.message })
+      } finally {
+        setLoadingData(false)
+      }
+    }
+
+    loadVendors()
+  }, [isOpen])
+
+  useEffect(() => {
+    if (!isOpen) return
+
+    if (!vendorId) {
+      setPurchaseOrders([])
+      setGoodsReceivedNotes([])
+      setSourcePurchaseOrderId("")
+      setGoodsReceivedNoteId("")
+      return
+    }
+
+    const loadVendorRelations = async () => {
+      setLoadingRelations(true)
+      try {
+        const [poResponse, grnResponse] = await Promise.all([
+          procurementApiV2.getPurchaseOrders({ vendorId }),
+          procurementApiV2.getGRNs({ vendorId }),
+        ])
+
+        if (poResponse.success && poResponse.data) {
+          setPurchaseOrders(poResponse.data)
+        }
+
+        if (grnResponse.success && grnResponse.data) {
+          setGoodsReceivedNotes(grnResponse.data)
+        }
+      } catch (error: any) {
+        toast.error("Failed to load purchase orders or GRNs", { description: error.message })
+      } finally {
+        setLoadingRelations(false)
+      }
+    }
+
+    setSourcePurchaseOrderId("")
+    setGoodsReceivedNoteId("")
+    loadVendorRelations()
+  }, [vendorId, isOpen])
+
+  useEffect(() => {
+    if (!isOpen) return
+
+    if (!sourcePurchaseOrderId) {
+      return
+    }
+
+    const loadGrnsByPo = async () => {
+      setLoadingRelations(true)
+      try {
+        const response = await procurementApiV2.getGRNs({ purchaseOrderId: sourcePurchaseOrderId })
+        if (response.success && response.data) {
+          setGoodsReceivedNotes(response.data)
+        }
+      } catch (error: any) {
+        toast.error("Failed to load GRNs", { description: error.message })
+      } finally {
+        setLoadingRelations(false)
+      }
+    }
+
+    setGoodsReceivedNoteId("")
+    loadGrnsByPo()
+  }, [sourcePurchaseOrderId, isOpen])
+
+  useEffect(() => {
+    if (!sourcePurchaseOrderId && purchaseOrders.length === 1) {
+      setSourcePurchaseOrderId(purchaseOrders[0].id)
+    }
+  }, [purchaseOrders, sourcePurchaseOrderId])
+
+  useEffect(() => {
+    if (!goodsReceivedNoteId && goodsReceivedNotes.length === 1) {
+      setGoodsReceivedNoteId(goodsReceivedNotes[0].id)
+    }
+  }, [goodsReceivedNotes, goodsReceivedNoteId])
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -33,11 +138,32 @@ export function InvoiceIntakeForm({ isOpen, onClose, onSuccess }: InvoiceIntakeF
       return
     }
 
+    if (!vendorId) {
+      toast.error("Please select a vendor")
+      return
+    }
+
     setLoading(true)
     try {
-      const response = await procurementApiV2.createInvoiceIntake({
-        documentUrl
-      })
+      const payload: {
+        documentUrl: string
+        vendorId: string
+        sourcePurchaseOrderId?: string
+        goodsReceivedNoteId?: string
+      } = {
+        documentUrl,
+        vendorId,
+      }
+
+      if (sourcePurchaseOrderId) {
+        payload.sourcePurchaseOrderId = sourcePurchaseOrderId
+      }
+
+      if (goodsReceivedNoteId) {
+        payload.goodsReceivedNoteId = goodsReceivedNoteId
+      }
+
+      const response = await procurementApiV2.createInvoiceIntake(payload)
 
       if (response.success && response.data) {
         setIntakeId(response.data.id)
@@ -119,10 +245,24 @@ export function InvoiceIntakeForm({ isOpen, onClose, onSuccess }: InvoiceIntakeF
   const handleClose = () => {
     setStep('upload')
     setDocumentUrl("")
+    setVendorId("")
+    setSourcePurchaseOrderId("")
+    setGoodsReceivedNoteId("")
     setIntakeId(null)
     setExtractedData(null)
     onClose()
   }
+
+  const filteredPurchaseOrders = purchaseOrders
+  const filteredGoodsReceivedNotes = sourcePurchaseOrderId
+    ? goodsReceivedNotes.filter((grn) => grn.purchaseOrderId === sourcePurchaseOrderId)
+    : goodsReceivedNotes
+
+  useEffect(() => {
+    if (!goodsReceivedNoteId && filteredGoodsReceivedNotes.length === 1) {
+      setGoodsReceivedNoteId(filteredGoodsReceivedNotes[0].id)
+    }
+  }, [filteredGoodsReceivedNotes, goodsReceivedNoteId])
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -184,6 +324,81 @@ export function InvoiceIntakeForm({ isOpen, onClose, onSuccess }: InvoiceIntakeF
                     <p className="text-xs text-gray-500 mt-1">
                       Provide a URL to a PDF or image of the vendor invoice
                     </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="vendorId">Vendor *</Label>
+                      <Select
+                        value={vendorId}
+                        onValueChange={(value) => setVendorId(value)}
+                      >
+                        <SelectTrigger id="vendorId" className="rounded-lg">
+                          <SelectValue placeholder={loadingData ? "Loading vendors..." : "Select vendor"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {vendors.map((vendor) => (
+                            <SelectItem key={vendor.id} value={vendor.id}>
+                              {vendor.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="sourcePurchaseOrderId">Purchase Order</Label>
+                      <Select
+                        value={sourcePurchaseOrderId || "none"}
+                        onValueChange={(value) => setSourcePurchaseOrderId(value === "none" ? "" : value)}
+                        disabled={loadingRelations}
+                      >
+                        <SelectTrigger id="sourcePurchaseOrderId" className="rounded-lg">
+                          <SelectValue
+                            placeholder={
+                              loadingRelations
+                                ? "Loading purchase orders..."
+                                : "Select purchase order"
+                            }
+                          />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">None</SelectItem>
+                          {filteredPurchaseOrders.map((po) => (
+                            <SelectItem key={po.id} value={po.id}>
+                              {po.poNumber} - {po.vendorName}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="goodsReceivedNoteId">Goods Received Note</Label>
+                      <Select
+                        value={goodsReceivedNoteId || "none"}
+                        onValueChange={(value) => setGoodsReceivedNoteId(value === "none" ? "" : value)}
+                        disabled={loadingRelations || (!vendorId && !sourcePurchaseOrderId)}
+                      >
+                        <SelectTrigger id="goodsReceivedNoteId" className="rounded-lg">
+                          <SelectValue
+                            placeholder={
+                              loadingRelations
+                                ? "Loading GRNs..."
+                                : "Select goods received note"
+                            }
+                          />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">None</SelectItem>
+                          {filteredGoodsReceivedNotes.map((grn) => (
+                            <SelectItem key={grn.id} value={grn.id}>
+                              {grn.grnNumber} {grn.poNumber ? `- ${grn.poNumber}` : ""}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
 
                   <div className="flex gap-3">

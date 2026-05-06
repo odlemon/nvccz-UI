@@ -840,7 +840,10 @@ export function PerformanceDashboardV2() {
 
                 {activeView === "kpi-analytics" && (
                     <div className="bg-white border-none rounded-xl shadow-none p-6">
-                        <KPIPerformanceAnalysisTab />
+                        <KPIPerformanceAnalysisTab
+                            selectedMonth={selectedMonth}
+                            selectedYear={selectedYear}
+                        />
                     </div>
                 )}
 

@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from "react"
 import { useSelector, useDispatch } from "react-redux"
 import { AppDispatch, RootState } from "@/lib/store/store"
 import { fetchPayrollDashboard } from "@/lib/store/slices/payrollSlice"
+import { departmentApiService, type Department } from "@/lib/api/department-api"
 import { PayrollDashboardSkeleton } from "./payroll-dashboard-skeleton"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -49,6 +50,7 @@ export function PayrollDashboardV2() {
     const [selectedStatus, setSelectedStatus] = useState("all")
     const [selectedMonth, setSelectedMonth] = useState("all")
     const [selectedYear, setSelectedYear] = useState("2026")
+    const [departments, setDepartments] = useState<Department[]>([])
 
     // Fetch dashboard data on mount and when filters change
     useEffect(() => {
@@ -58,6 +60,23 @@ export function PayrollDashboardV2() {
             currencyId: 'USD'
         }))
     }, [dispatch, selectedMonth, selectedYear])
+
+    // Load real system departments for the filter
+    useEffect(() => {
+        let cancelled = false
+        departmentApiService
+            .getDepartments({ isActive: true })
+            .then((res) => {
+                if (cancelled) return
+                setDepartments(res?.departments || [])
+            })
+            .catch(() => {
+                if (!cancelled) setDepartments([])
+            })
+        return () => {
+            cancelled = true
+        }
+    }, [])
 
     // Use only API data - Define all hooks BEFORE conditional returns
     const totalPayrollValue = dashboardData?.metrics?.totalPayrollThisMonth?.value || 0
@@ -76,7 +95,9 @@ export function PayrollDashboardV2() {
     // Filter payroll list based on search and filters
     const filteredPayroll = payrollList.filter((item: any) => {
         const matchesSearch = searchQuery === "" || item.name?.toLowerCase().includes(searchQuery.toLowerCase())
-        const matchesDepartment = selectedDepartment === "all" || item.department?.toLowerCase() === selectedDepartment.toLowerCase()
+        const matchesDepartment =
+            selectedDepartment === "all" ||
+            (item.department || "").toLowerCase() === selectedDepartment.toLowerCase()
         const matchesStatus = selectedStatus === "all" || item.status?.toLowerCase() === selectedStatus.toLowerCase()
         return matchesSearch && matchesDepartment && matchesStatus
     })
@@ -359,17 +380,16 @@ export function PayrollDashboardV2() {
                                     />
                                 </div>
                                 <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-                                    <SelectTrigger className="w-40 h-10 rounded-full border-gray-200 bg-white shadow-none text-xs font-bold ring-0 focus:ring-0">
+                                    <SelectTrigger className="w-48 h-10 rounded-full border-gray-200 bg-white shadow-none text-xs font-bold ring-0 focus:ring-0">
                                         <SelectValue placeholder="Department" />
                                     </SelectTrigger>
                                     <SelectContent className="rounded-2xl border-gray-200 shadow-xl">
                                         <SelectItem value="all">All Departments</SelectItem>
-                                        <SelectItem value="it">IT</SelectItem>
-                                        <SelectItem value="marketing">Marketing</SelectItem>
-                                        <SelectItem value="finance">Finance</SelectItem>
-                                        <SelectItem value="hr">HR</SelectItem>
-                                        <SelectItem value="engineering">Engineering</SelectItem>
-                                        <SelectItem value="operations">Operations</SelectItem>
+                                        {departments.map((dept) => (
+                                            <SelectItem key={dept.id} value={dept.name}>
+                                                {dept.name}
+                                            </SelectItem>
+                                        ))}
                                     </SelectContent>
                                 </Select>
                                 <Select value={selectedStatus} onValueChange={setSelectedStatus}>

@@ -79,9 +79,9 @@ export function CreatePurchaseOrderModal({ isOpen, onClose, onSuccess, preSelect
       setLoadingData(true)
 
       // Load vendors
-      const vendorsResponse = await accountingApi.vendors.getAll()
+      const vendorsResponse = await accountingApi.getVendors({ isActive: true })
       if (vendorsResponse.success && vendorsResponse.data) {
-        setVendors(vendorsResponse.data.filter(v => v.isActive))
+        setVendors(vendorsResponse.data)
       }
 
       // Load requisitions (approved ones)
