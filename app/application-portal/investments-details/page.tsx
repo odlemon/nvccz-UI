@@ -222,7 +222,19 @@ export default function InvestmentDetailsPage() {
                     <BarChart3 className="w-4 h-4 text-indigo-500" />
                     Fund
                   </label>
-                  <p className="font-medium mt-1">{investment.investment.fund}</p>
+                  <p className="font-medium mt-1">
+                    {investment.investment.fund.name || '—'}
+                  </p>
+                  {investment.investment.fund.description && (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {investment.investment.fund.description}
+                    </p>
+                  )}
+                  {investment.investment.fund.totalAmount && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Fund size: ${Number(investment.investment.fund.totalAmount).toLocaleString()}
+                    </p>
+                  )}
                 </div>
               )}
               {investment.investment.startDate && (

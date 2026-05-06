@@ -5,49 +5,61 @@ import { procurementApiV2, GoodsReceivedNote } from "@/lib/api/procurement-api-v
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ProcurementDataTable, Column } from "@/components/procurement/procurement-data-table"
 import { CreateGRNModal } from "@/components/procurement/create-grn-modal"
 import { ProcurementDrawer } from "@/components/procurement/procurement-drawer"
-import { Loader2, Package, TrendingUp, AlertCircle, Calendar } from "lucide-react"
+import { Loader2, Package, TrendingUp, AlertCircle, Search, ChevronLeft, ChevronRight } from "lucide-react"
 import { format } from "date-fns"
 import { toast } from "sonner"
-import { CiViewTimeline, CiShop, CiCalendar } from "react-icons/ci"
-import { Building, CheckCircle, Clock, XCircle } from "lucide-react"
+import { CiViewTimeline, CiCalendar } from "react-icons/ci"
+import { Building, CheckCircle, Clock } from "lucide-react"
+
+const STATUS_OPTIONS = ['DRAFT', 'RECEIVED', 'PARTIALLY_RECEIVED', 'APPROVED', 'REJECTED'] as const
+const PAGE_SIZE = 50
 
 export function InvesteeGRNPage() {
   const [grns, setGRNs] = useState<GoodsReceivedNote[]>([])
+  const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   const [viewingGRN, setViewingGRN] = useState<GoodsReceivedNote | null>(null)
 
   const [selectedTab, setSelectedTab] = useState('all')
-  const [filters, setFilters] = useState({
-    purchaseOrderId: '',
-    status: 'all',
-    grnNumber: ''
-  })
+  const [purchaseOrderFilter, setPurchaseOrderFilter] = useState('')
+  const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [offset, setOffset] = useState(0)
+
+  // Reset to first page when tab/filters change
+  useEffect(() => {
+    setOffset(0)
+  }, [selectedTab, purchaseOrderFilter, statusFilter])
 
   useEffect(() => {
     loadGRNs()
-  }, [selectedTab, filters])
+  }, [selectedTab, purchaseOrderFilter, statusFilter, offset])
 
   const loadGRNs = async () => {
     try {
       setLoading(true)
-      const apiFilters: any = {
-        limit: 50,
-        offset: 0,
-        submittedByInvestee: true
-      }
-      if (selectedTab !== 'all') apiFilters.status = selectedTab.toUpperCase()
-      if (filters.purchaseOrderId) apiFilters.purchaseOrderId = filters.purchaseOrderId
-      if (filters.grnNumber) apiFilters.grnNumber = filters.grnNumber
+      // Tab takes precedence over the explicit status filter
+      let status: string | undefined
+      if (selectedTab === 'approved') status = 'APPROVED'
+      else if (selectedTab === 'pending') status = 'RECEIVED'
+      else if (statusFilter !== 'all') status = statusFilter
 
-      const response = await procurementApiV2.getGRNs(apiFilters)
+      const response = await procurementApiV2.getApplicantGRNs({
+        limit: PAGE_SIZE,
+        offset,
+        purchaseOrderId: purchaseOrderFilter || undefined,
+        status,
+      })
       if (response.success && response.data) {
-        setGRNs(response.data)
+        setGRNs(response.data.items || [])
+        setTotal(response.data.total || 0)
       }
     } catch (error) {
       toast.error("Failed to load GRNs")
@@ -55,6 +67,9 @@ export function InvesteeGRNPage() {
       setLoading(false)
     }
   }
+
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const currentPage = Math.floor(offset / PAGE_SIZE) + 1
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -190,12 +205,54 @@ export function InvesteeGRNPage() {
         </TabsList>
 
         <TabsContent value="all" className="space-y-4">
-          <div className="flex justify-end">
+          {/* Filter bar */}
+          <div className="flex flex-wrap items-end gap-3 justify-between">
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-gray-600">Purchase Order</label>
+                <div className="relative">
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <Input
+                    placeholder="Search by PO id..."
+                    className="pl-9 h-10 w-64 rounded-full border-gray-200"
+                    value={purchaseOrderFilter}
+                    onChange={(e) => setPurchaseOrderFilter(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-gray-600">Status</label>
+                <Select value={statusFilter} onValueChange={setStatusFilter} disabled={selectedTab !== 'all'}>
+                  <SelectTrigger className="w-48 h-10 rounded-full border-gray-200">
+                    <SelectValue placeholder="All statuses" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All statuses</SelectItem>
+                    {STATUS_OPTIONS.map(s => (
+                      <SelectItem key={s} value={s}>{s.replace('_', ' ')}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {(purchaseOrderFilter || statusFilter !== 'all') && (
+                <Button
+                  variant="ghost"
+                  className="h-10 rounded-full text-xs text-gray-600"
+                  onClick={() => {
+                    setPurchaseOrderFilter('')
+                    setStatusFilter('all')
+                  }}
+                >
+                  Clear filters
+                </Button>
+              )}
+            </div>
             <Button onClick={() => setIsCreateModalOpen(true)} className="gradient-primary text-white">
               <Package className="w-4 h-4 mr-2" />
               Create GRN
             </Button>
           </div>
+
           <ProcurementDataTable
             data={grns}
             columns={columns}
@@ -208,11 +265,45 @@ export function InvesteeGRNPage() {
             loading={false}
             emptyMessage="No goods received notes created yet"
           />
+
+          {/* Pagination */}
+          {total > PAGE_SIZE && (
+            <div className="flex items-center justify-between pt-2">
+              <p className="text-xs text-gray-500">
+                Showing {offset + 1}–{Math.min(offset + PAGE_SIZE, total)} of {total}
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full"
+                  disabled={offset === 0}
+                  onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
+                >
+                  <ChevronLeft className="w-4 h-4 mr-1" />
+                  Previous
+                </Button>
+                <span className="text-xs text-gray-600">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full"
+                  disabled={offset + PAGE_SIZE >= total}
+                  onClick={() => setOffset(offset + PAGE_SIZE)}
+                >
+                  Next
+                  <ChevronRight className="w-4 h-4 ml-1" />
+                </Button>
+              </div>
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="approved" className="space-y-4">
           <ProcurementDataTable
-            data={grns.filter(g => g.status === 'APPROVED')}
+            data={grns}
             columns={columns}
             title="Approved GRNs"
             searchPlaceholder="Search approved GRNs..."
@@ -227,7 +318,7 @@ export function InvesteeGRNPage() {
 
         <TabsContent value="pending" className="space-y-4">
           <ProcurementDataTable
-            data={grns.filter(g => g.status === 'RECEIVED' || g.status === 'PARTIALLY_RECEIVED')}
+            data={grns}
             columns={columns}
             title="Pending GRNs"
             searchPlaceholder="Search pending GRNs..."

@@ -25,6 +25,8 @@ export function InvoiceIntakeForm({ isOpen, onClose, onSuccess }: InvoiceIntakeF
   const [loadingData, setLoadingData] = useState(false)
   const [loadingRelations, setLoadingRelations] = useState(false)
   const [extractLoading, setExtractLoading] = useState(false)
+  const [uploadMode, setUploadMode] = useState<'file' | 'url'>('file')
+  const [documentFile, setDocumentFile] = useState<File | null>(null)
   const [documentUrl, setDocumentUrl] = useState("")
   const [vendorId, setVendorId] = useState("")
   const [sourcePurchaseOrderId, setSourcePurchaseOrderId] = useState("")
@@ -133,7 +135,11 @@ export function InvoiceIntakeForm({ isOpen, onClose, onSuccess }: InvoiceIntakeF
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!documentUrl.trim()) {
+    if (uploadMode === 'file' && !documentFile) {
+      toast.error("Please select an invoice document to upload")
+      return
+    }
+    if (uploadMode === 'url' && !documentUrl.trim()) {
       toast.error("Please enter a document URL")
       return
     }
@@ -145,23 +151,16 @@ export function InvoiceIntakeForm({ isOpen, onClose, onSuccess }: InvoiceIntakeF
 
     setLoading(true)
     try {
-      const payload: {
-        documentUrl: string
-        vendorId: string
-        sourcePurchaseOrderId?: string
-        goodsReceivedNoteId?: string
-      } = {
-        documentUrl,
+      const payload: Parameters<typeof procurementApiV2.createInvoiceIntake>[0] = {
         vendorId,
       }
-
-      if (sourcePurchaseOrderId) {
-        payload.sourcePurchaseOrderId = sourcePurchaseOrderId
+      if (uploadMode === 'file' && documentFile) {
+        payload.documentFile = documentFile
+      } else if (uploadMode === 'url') {
+        payload.documentUrl = documentUrl
       }
-
-      if (goodsReceivedNoteId) {
-        payload.goodsReceivedNoteId = goodsReceivedNoteId
-      }
+      if (sourcePurchaseOrderId) payload.sourcePurchaseOrderId = sourcePurchaseOrderId
+      if (goodsReceivedNoteId) payload.goodsReceivedNoteId = goodsReceivedNoteId
 
       const response = await procurementApiV2.createInvoiceIntake(payload)
 
@@ -244,6 +243,8 @@ export function InvoiceIntakeForm({ isOpen, onClose, onSuccess }: InvoiceIntakeF
 
   const handleClose = () => {
     setStep('upload')
+    setUploadMode('file')
+    setDocumentFile(null)
     setDocumentUrl("")
     setVendorId("")
     setSourcePurchaseOrderId("")
@@ -311,19 +312,66 @@ export function InvoiceIntakeForm({ isOpen, onClose, onSuccess }: InvoiceIntakeF
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleUpload} className="space-y-4">
-                  <div>
-                    <Label htmlFor="documentUrl">Document URL *</Label>
-                    <Input
-                      id="documentUrl"
-                      type="url"
-                      value={documentUrl}
-                      onChange={(e) => setDocumentUrl(e.target.value)}
-                      placeholder="https://example.com/invoice.pdf"
-                      required
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Provide a URL to a PDF or image of the vendor invoice
-                    </p>
+                  <div className="space-y-2">
+                    <Label>Invoice Document *</Label>
+                    <div className="inline-flex bg-gray-100 rounded-full p-1">
+                      <button
+                        type="button"
+                        onClick={() => setUploadMode('file')}
+                        className={`px-4 h-8 rounded-full text-xs font-semibold transition-colors ${
+                          uploadMode === 'file'
+                            ? 'bg-white text-gray-900 shadow-sm'
+                            : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                      >
+                        Upload file
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setUploadMode('url')}
+                        className={`px-4 h-8 rounded-full text-xs font-semibold transition-colors ${
+                          uploadMode === 'url'
+                            ? 'bg-white text-gray-900 shadow-sm'
+                            : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                      >
+                        From URL
+                      </button>
+                    </div>
+
+                    {uploadMode === 'file' ? (
+                      <div>
+                        <Input
+                          id="documentFile"
+                          type="file"
+                          accept="application/pdf,image/*"
+                          onChange={(e) => setDocumentFile(e.target.files?.[0] || null)}
+                        />
+                        {documentFile ? (
+                          <p className="text-xs text-gray-600 mt-1">
+                            Selected: <span className="font-medium">{documentFile.name}</span>{' '}
+                            ({(documentFile.size / 1024).toFixed(1)} KB)
+                          </p>
+                        ) : (
+                          <p className="text-xs text-gray-500 mt-1">
+                            Choose a PDF or image of the vendor invoice
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <div>
+                        <Input
+                          id="documentUrl"
+                          type="url"
+                          value={documentUrl}
+                          onChange={(e) => setDocumentUrl(e.target.value)}
+                          placeholder="https://example.com/invoice.pdf"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          Public URL to a PDF or image of the vendor invoice
+                        </p>
+                      </div>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

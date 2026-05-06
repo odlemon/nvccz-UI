@@ -6,7 +6,9 @@ import { InvesteeGRNPage } from "@/components/user-application-portal/investee-g
 export default function InvesteeGRNRoute() {
   return (
     <ApplicationPortalLayout>
-      <InvesteeGRNPage />
+      <div className="p-6">
+          <InvesteeGRNPage />
+      </div>
     </ApplicationPortalLayout>
   )
 }

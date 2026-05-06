@@ -239,7 +239,7 @@ export function STIDashboard() {
                     formatter={(value: number) => [`$${formatNumber(value)}`, "Interest"]}
                     labelFormatter={(label) => {
                       const found = dailyYieldData.find((item) => item.day === String(label))
-                      return found ? `Day ${label} (${found.fullDate})` : `Day ${label}`
+                      return found ? ` (${found.fullDate})` : `n/a`
                     }}
                     contentStyle={{ borderRadius: 12, border: "1px solid #e2e8f0", fontSize: 12 }}
                   />

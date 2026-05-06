@@ -161,7 +161,7 @@ export function ReviewForm({ reviewId }: Props) {
   const validateAll = (): { valid: boolean; error?: string } => {
     for (const [_, pf] of Object.entries(pillarFeedback)) {
       if (!pf.rating || pf.rating < 1 || pf.rating > 5) {
-        return { valid: false, error: "All ratings must be between 1 and 5" }
+        return { valid: false, error: "All ratings must be between 1 and 6" }
       }
       if (!Number.isInteger(pf.rating)) {
         return { valid: false, error: "Ratings must be integers" }

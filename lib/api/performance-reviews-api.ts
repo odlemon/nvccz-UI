@@ -126,7 +126,7 @@ export const performanceReviewsApi = {
     data: { stage: ReviewStage; pillarFeedback: ReviewPillarFeedback[] }
   ) =>
     apiClient.post<{ success: boolean; data: ReviewDetail }>(
-      `/performance-reviews/${id}/submit`,
+      `/performance-reviews/${id}/complete-stage`,
       data
     ),
 

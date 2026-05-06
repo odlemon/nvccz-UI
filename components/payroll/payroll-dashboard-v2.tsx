@@ -4,7 +4,8 @@ import { useState, useMemo, useEffect } from "react"
 import { useSelector, useDispatch } from "react-redux"
 import { AppDispatch, RootState } from "@/lib/store/store"
 import { fetchPayrollDashboard } from "@/lib/store/slices/payrollSlice"
-import { departmentApiService, type Department } from "@/lib/api/department-api"
+import { fetchAvailableDepartments } from "@/lib/store/slices/performanceSlice"
+import type { Department } from "@/lib/api/department-api"
 import { PayrollDashboardSkeleton } from "./payroll-dashboard-skeleton"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -43,14 +44,16 @@ import {
 export function PayrollDashboardV2() {
     const dispatch = useDispatch<AppDispatch>()
     const { dashboardData, dashboardLoading } = useSelector((state: RootState) => state.payroll)
-    
+    const { availableDepartments } = useSelector((state: RootState) => state.performance)
+
     const [showAlert, setShowAlert] = useState(true)
     const [searchQuery, setSearchQuery] = useState("")
     const [selectedDepartment, setSelectedDepartment] = useState("all")
     const [selectedStatus, setSelectedStatus] = useState("all")
     const [selectedMonth, setSelectedMonth] = useState("all")
     const [selectedYear, setSelectedYear] = useState("2026")
-    const [departments, setDepartments] = useState<Department[]>([])
+    const [currentPage, setCurrentPage] = useState(1)
+    const itemsPerPage = 10
 
     // Fetch dashboard data on mount and when filters change
     useEffect(() => {
@@ -61,22 +64,10 @@ export function PayrollDashboardV2() {
         }))
     }, [dispatch, selectedMonth, selectedYear])
 
-    // Load real system departments for the filter
+    // Load departments from Redux
     useEffect(() => {
-        let cancelled = false
-        departmentApiService
-            .getDepartments({ isActive: true })
-            .then((res) => {
-                if (cancelled) return
-                setDepartments(res?.departments || [])
-            })
-            .catch(() => {
-                if (!cancelled) setDepartments([])
-            })
-        return () => {
-            cancelled = true
-        }
-    }, [])
+        dispatch(fetchAvailableDepartments())
+    }, [dispatch])
 
     // Use only API data - Define all hooks BEFORE conditional returns
     const totalPayrollValue = dashboardData?.metrics?.totalPayrollThisMonth?.value || 0
@@ -95,12 +86,22 @@ export function PayrollDashboardV2() {
     // Filter payroll list based on search and filters
     const filteredPayroll = payrollList.filter((item: any) => {
         const matchesSearch = searchQuery === "" || item.name?.toLowerCase().includes(searchQuery.toLowerCase())
-        const matchesDepartment =
-            selectedDepartment === "all" ||
-            (item.department || "").toLowerCase() === selectedDepartment.toLowerCase()
+        const itemDept = (item.department || "").trim().toLowerCase()
+        const selectedDept = selectedDepartment === "all" ? "" : selectedDepartment.trim().toLowerCase()
+        const matchesDepartment = selectedDepartment === "all" || itemDept === selectedDept
         const matchesStatus = selectedStatus === "all" || item.status?.toLowerCase() === selectedStatus.toLowerCase()
         return matchesSearch && matchesDepartment && matchesStatus
     })
+
+    // Pagination calculations
+    const totalPages = Math.ceil(filteredPayroll.length / itemsPerPage)
+    const startIndex = (currentPage - 1) * itemsPerPage
+    const paginatedPayroll = filteredPayroll.slice(startIndex, startIndex + itemsPerPage)
+
+    // Reset to page 1 when filters change
+    useEffect(() => {
+        setCurrentPage(1)
+    }, [searchQuery, selectedDepartment, selectedStatus])
 
     const getStatusBadge = (status: string) => {
         switch (status) {
@@ -385,8 +386,8 @@ export function PayrollDashboardV2() {
                                     </SelectTrigger>
                                     <SelectContent className="rounded-2xl border-gray-200 shadow-xl">
                                         <SelectItem value="all">All Departments</SelectItem>
-                                        {departments.map((dept) => (
-                                            <SelectItem key={dept.id} value={dept.name}>
+                                        {availableDepartments.map((dept: any) => (
+                                            <SelectItem key={dept.name} value={dept.name}>
                                                 {dept.name}
                                             </SelectItem>
                                         ))}
@@ -405,14 +406,16 @@ export function PayrollDashboardV2() {
                                 </Select>
                             </div>
                         </div>
+                        {filteredPayroll.length > 0 && (
+                            <div className="text-xs text-muted-foreground mt-4">
+                                Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, filteredPayroll.length)} of {filteredPayroll.length} records
+                            </div>
+                        )}
                     </CardHeader>
                     <CardContent>
                         <Table>
                             <TableHeader>
                                 <TableRow className="border-border">
-                                    <TableHead className="text-muted-foreground">
-                                        <input type="checkbox" className="rounded border-border" />
-                                    </TableHead>
                                     <TableHead className="text-muted-foreground">Name</TableHead>
                                     <TableHead className="text-muted-foreground">Department</TableHead>
                                     <TableHead className="text-muted-foreground">Pay Date</TableHead>
@@ -424,12 +427,9 @@ export function PayrollDashboardV2() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {filteredPayroll.length > 0 ? (
-                                    filteredPayroll.map((employee: any) => (
+                                {paginatedPayroll.length > 0 ? (
+                                    paginatedPayroll.map((employee: any) => (
                                         <TableRow key={employee.employeeId} className="border-border">
-                                            <TableCell>
-                                                <input type="checkbox" className="rounded border-border" />
-                                            </TableCell>
                                             <TableCell>
                                                 <div className="flex items-center gap-3">
                                                     <Avatar className="w-8 h-8">
@@ -455,13 +455,40 @@ export function PayrollDashboardV2() {
                                     ))
                                 ) : (
                                     <TableRow>
-                                        <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                                             No payroll records found
                                         </TableCell>
                                     </TableRow>
                                 )}
                             </TableBody>
                         </Table>
+                        {filteredPayroll.length > itemsPerPage && (
+                            <div className="flex items-center justify-between px-6 py-4 border-t border-border">
+                                <div className="text-xs text-muted-foreground">
+                                    Page {currentPage} of {totalPages}
+                                </div>
+                                <div className="flex gap-2">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                                        disabled={currentPage === 1}
+                                        className="h-9 px-3 rounded-lg"
+                                    >
+                                        Previous
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                                        disabled={currentPage === totalPages}
+                                        className="h-9 px-3 rounded-lg"
+                                    >
+                                        Next
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
             </div>

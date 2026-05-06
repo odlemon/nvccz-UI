@@ -5,14 +5,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Save, X, Package, CheckCircle, XCircle, FileText, MapPin, Upload, AlertCircle } from "lucide-react"
+import { Save, X, Package, FileText, AlertCircle } from "lucide-react"
 import { toast } from "sonner"
 import { useProcurementPermissions } from "@/lib/hooks/useProcurementPermissions"
 import { procurementApiV2, PurchaseOrder } from "@/lib/api/procurement-api-v2"
+
+type QualityStatus = 'PASSED' | 'FAILED' | 'PARTIAL'
 
 interface CreateGRNModalProps {
   isOpen: boolean
@@ -23,13 +24,27 @@ interface CreateGRNModalProps {
 }
 
 interface GRNItem {
-  poItemId: string
+  purchaseOrderItemId: string
   itemName: string
   poQuantity: number
-  receivedQuantity: number
   unit: string
-  status: 'PENDING' | 'RECEIVED' | 'REJECTED'
-  rejectionReason?: string
+  quantityReceived: number
+  quantityAccepted: number
+  quantityRejected: number
+  qualityStatus: QualityStatus
+}
+
+const emptyForm = () => ({
+  purchaseOrderId: "",
+  receivedDate: new Date().toISOString().split('T')[0],
+  tolerancePercentage: "5",
+})
+
+const deriveQualityStatus = (received: number, accepted: number, rejected: number): QualityStatus => {
+  if (received <= 0) return 'PASSED'
+  if (rejected === 0 && accepted >= received) return 'PASSED'
+  if (accepted === 0 && rejected >= received) return 'FAILED'
+  return 'PARTIAL'
 }
 
 export function CreateGRNModal({ isOpen, onClose, onSuccess, isInvestee, initialPurchaseOrderId }: CreateGRNModalProps) {
@@ -38,202 +53,198 @@ export function CreateGRNModal({ isOpen, onClose, onSuccess, isInvestee, initial
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([])
   const { permissions } = useProcurementPermissions()
 
-  const [formData, setFormData] = useState({
-    purchaseOrderId: initialPurchaseOrderId || "",
-    receivedDate: new Date().toISOString().split('T')[0],
-    notes: "",
-    tolerancePercentage: "5",
-    attachmentUrl: "",
-    geoLocation: "",
-  })
-
+  const [formData, setFormData] = useState(emptyForm())
   const [items, setItems] = useState<GRNItem[]>([])
 
   useEffect(() => {
-    if (isOpen) {
-      loadInitialData()
-      if (initialPurchaseOrderId) {
-        setFormData(prev => ({ ...prev, purchaseOrderId: initialPurchaseOrderId }))
-      }
+    if (!isOpen) return
+    loadInitialData()
+    if (initialPurchaseOrderId) {
+      setFormData(prev => ({ ...prev, purchaseOrderId: initialPurchaseOrderId }))
     }
   }, [isOpen, initialPurchaseOrderId])
 
   const loadInitialData = async () => {
     try {
       setLoadingData(true)
-      const filters: any = { status: 'SENT' }
-      const response = await procurementApiV2.getPurchaseOrders(filters)
+      const response = await procurementApiV2.getPurchaseOrders({ status: 'SENT' })
       if (response.success && response.data) {
         setPurchaseOrders(response.data)
-        
-        // If we have an initial PO ID, load its items immediately after setting orders
         if (initialPurchaseOrderId) {
           const po = response.data.find(p => p.id === initialPurchaseOrderId)
-          if (po) {
-            loadPurchaseOrderItemsFromPO(po)
-          }
+          if (po) hydrateItemsFromPO(po, true)
         }
       }
     } catch (error) {
-      console.error('Error loading initial data:', error)
+      console.error('Error loading purchase orders:', error)
       toast.error('Failed to load purchase orders')
     } finally {
       setLoadingData(false)
     }
   }
 
-  const loadPurchaseOrderItemsFromPO = (po: PurchaseOrder) => {
-    if (po && po.items) {
-      const poItems: GRNItem[] = po.items.map((item: any, idx: number) => ({
-        poItemId: item.id || `item-${idx}`,
+  const hydrateItemsFromPO = (po: PurchaseOrder, prefill: boolean) => {
+    if (!po?.items) return
+    const next: GRNItem[] = po.items.map((item: any, idx: number) => {
+      const ordered = parseInt(item.quantity) || 0
+      const received = prefill ? ordered : 0
+      const accepted = prefill ? ordered : 0
+      return {
+        purchaseOrderItemId: item.id || `item-${idx}`,
         itemName: item.itemName,
-        poQuantity: parseInt(item.quantity) || 0,
-        receivedQuantity: parseInt(item.quantity) || 0, // Default to full receipt
+        poQuantity: ordered,
         unit: item.unit || '',
-        status: 'RECEIVED', // Default to received
-        rejectionReason: ""
-      }))
-      setItems(poItems)
-    }
+        quantityReceived: received,
+        quantityAccepted: accepted,
+        quantityRejected: 0,
+        qualityStatus: deriveQualityStatus(received, accepted, 0),
+      }
+    })
+    setItems(next)
   }
 
-  const handleInputChange = (field: string, value: string) => {
+  const handleInputChange = (field: keyof ReturnType<typeof emptyForm>, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }))
   }
 
-  const handleItemChange = (index: number, field: keyof GRNItem, value: string | number) => {
-    const updatedItems = [...items]
-    updatedItems[index] = { ...updatedItems[index], [field]: value }
-    setItems(updatedItems)
+  const updateItem = (index: number, patch: Partial<GRNItem>) => {
+    setItems(prev => {
+      const next = [...prev]
+      const merged = { ...next[index], ...patch }
+      // If received/accepted/rejected changed and qualityStatus wasn't manually overridden in this patch,
+      // recompute it so the badge stays in sync with the numbers.
+      if (!('qualityStatus' in patch)) {
+        merged.qualityStatus = deriveQualityStatus(
+          merged.quantityReceived,
+          merged.quantityAccepted,
+          merged.quantityRejected,
+        )
+      }
+      next[index] = merged
+      return next
+    })
   }
 
-  const loadPurchaseOrderItems = (poId: string) => {
+  const handlePOSelect = (poId: string) => {
+    handleInputChange('purchaseOrderId', poId)
     const selectedPO = purchaseOrders.find(po => po.id === poId)
-    if (selectedPO && selectedPO.items) {
-      const poItems: GRNItem[] = selectedPO.items.map((item: any, idx: number) => ({
-        poItemId: item.id || `item-${idx}`,
-        itemName: item.itemName,
-        poQuantity: parseInt(item.quantity) || 0,
-        receivedQuantity: 0,
-        unit: item.unit || '',
-        status: 'PENDING',
-        rejectionReason: ""
-      }))
-      setItems(poItems)
-      toast.success("Purchase order items loaded successfully")
-    }
-  }
-
-  const getQualityStatusColor = (status: string) => {
-    switch (status) {
-      case 'RECEIVED': return 'bg-green-100 text-green-800'
-      case 'REJECTED': return 'bg-red-100 text-red-800'
-      case 'PENDING': return 'bg-yellow-100 text-yellow-800'
-      default: return 'bg-gray-100 text-gray-800'
-    }
+    if (selectedPO) hydrateItemsFromPO(selectedPO, false)
   }
 
   const calculateOverDelivery = () => {
-    const selectedPO = purchaseOrders.find(po => po.id === formData.purchaseOrderId)
-    if (!selectedPO) return { hasOverDelivery: false, percentage: 0 }
-
     const tolerance = parseFloat(formData.tolerancePercentage) || 0
     const totalOrdered = items.reduce((sum, item) => sum + item.poQuantity, 0)
-    const totalReceived = items.reduce((sum, item) => sum + item.receivedQuantity, 0)
-    const overDeliveryPercentage = totalOrdered > 0 ? ((totalReceived - totalOrdered) / totalOrdered) * 100 : 0
-
+    const totalReceived = items.reduce((sum, item) => sum + item.quantityReceived, 0)
+    const overDeliveryPercentage =
+      totalOrdered > 0 ? ((totalReceived - totalOrdered) / totalOrdered) * 100 : 0
     return {
       hasOverDelivery: overDeliveryPercentage > tolerance,
-      percentage: Math.round(overDeliveryPercentage * 100) / 100
+      percentage: Math.round(overDeliveryPercentage * 100) / 100,
     }
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-
-    if (!formData.purchaseOrderId) {
-      toast.error("Please select a purchase order")
-      return
-    }
-
-    if (items.some(item => item.receivedQuantity < 0)) {
-      toast.error("Received quantity cannot be negative")
-      return
-    }
-
-    // Check over-delivery tolerance
-    const overDelivery = calculateOverDelivery()
-    if (overDelivery.hasOverDelivery) {
-      if (!confirm(`Over-delivery detected (${overDelivery.percentage}% above tolerance). Continue?`)) {
-        return
-      }
-    }
-
-    // Check permissions
-    if (!permissions.canCreateGRN) {
-      toast.error('You do not have permission to create GRNs')
-      return
-    }
-
+  const submitGRN = async () => {
     setLoading(true)
     try {
-      const grnData = {
+      const payload = {
         purchaseOrderId: formData.purchaseOrderId,
-        receivedDate: formData.receivedDate,
+        receivedDate: new Date(formData.receivedDate).toISOString(),
         items: items.map(item => ({
-          poItemId: item.poItemId,
-          receivedQuantity: item.receivedQuantity,
-          status: item.status,
-          rejectionReason: item.rejectionReason
+          purchaseOrderItemId: item.purchaseOrderItemId,
+          quantityReceived: item.quantityReceived,
+          quantityAccepted: item.quantityAccepted,
+          quantityRejected: item.quantityRejected,
+          qualityStatus: item.qualityStatus,
         })),
-        notes: formData.notes,
-        tolerancePercentage: parseFloat(formData.tolerancePercentage),
-        attachmentUrl: formData.attachmentUrl || undefined,
-        geoLocation: formData.geoLocation || undefined,
       }
 
-      const response = await procurementApiV2.createGRN(grnData)
+      const response = isInvestee
+        ? await procurementApiV2.createApplicantGRN(payload)
+        : await procurementApiV2.createGRN(payload)
 
       if (response.success) {
-        toast.success("Goods Received Note created successfully!")
+        toast.success('Goods Received Note created successfully')
         onSuccess()
         handleClose()
       } else {
-        toast.error(response.message || "Failed to create GRN")
+        toast.error(response.message || 'Failed to create GRN')
       }
     } catch (error: any) {
-      toast.error("Error creating GRN", { description: error.message })
+      toast.error('Error creating GRN', { description: error?.message })
     } finally {
       setLoading(false)
     }
   }
 
+  const validate = (): string | null => {
+    if (!formData.purchaseOrderId) return 'Please select a purchase order'
+    if (items.length === 0) return 'No items to receive'
+    for (const item of items) {
+      if (item.quantityReceived < 0 || item.quantityAccepted < 0 || item.quantityRejected < 0) {
+        return 'Quantities cannot be negative'
+      }
+      if (item.quantityAccepted + item.quantityRejected > item.quantityReceived) {
+        return `${item.itemName}: accepted + rejected cannot exceed received`
+      }
+    }
+    return null
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    const validationError = validate()
+    if (validationError) {
+      toast.error(validationError)
+      return
+    }
+
+    if (!permissions.canCreateGRN) {
+      toast.error('You do not have permission to create GRNs')
+      return
+    }
+
+    const overDelivery = calculateOverDelivery()
+    if (overDelivery.hasOverDelivery) {
+      toast.warning(
+        `Over-delivery detected (${overDelivery.percentage}% above tolerance)`,
+        {
+          description: 'Continue submitting this GRN?',
+          duration: 10000,
+          action: {
+            label: 'Continue',
+            onClick: () => {
+              void submitGRN()
+            },
+          },
+          cancel: { label: 'Cancel', onClick: () => {} },
+        }
+      )
+      return
+    }
+
+    await submitGRN()
+  }
+
   const handleClose = () => {
-    setFormData({
-      purchaseOrderId: "",
-      receivedDate: new Date().toISOString().split('T')[0],
-      notes: "",
-      tolerancePercentage: "5",
-      attachmentUrl: "",
-      geoLocation: "",
-    })
-    setItems([{
-      poItemId: "",
-      itemName: "",
-      poQuantity: 0,
-      receivedQuantity: 0,
-      unit: "",
-      status: 'PENDING',
-      rejectionReason: ""
-    }])
+    setFormData(emptyForm())
+    setItems([])
     onClose()
   }
 
   const overDeliveryWarning = calculateOverDelivery()
 
+  const qualityStatusColor = (status: QualityStatus) => {
+    switch (status) {
+      case 'PASSED': return 'bg-green-100 text-green-800'
+      case 'FAILED': return 'bg-red-100 text-red-800'
+      case 'PARTIAL': return 'bg-amber-100 text-amber-800'
+    }
+  }
+
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-2xl font-semibold flex items-center gap-2">
             <Package className="w-6 h-6" />
@@ -242,27 +253,24 @@ export function CreateGRNModal({ isOpen, onClose, onSuccess, isInvestee, initial
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Basic Information */}
+          {/* Receipt Information */}
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Receipt Information</CardTitle>
             </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <Label htmlFor="purchaseOrderId">Purchase Order *</Label>
                 <Select
                   value={formData.purchaseOrderId}
-                  onValueChange={(value) => {
-                    handleInputChange("purchaseOrderId", value)
-                    loadPurchaseOrderItems(value)
-                  }}
+                  onValueChange={handlePOSelect}
                   disabled={loadingData}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder={loadingData ? "Loading purchase orders..." : "Select purchase order"} />
+                    <SelectValue placeholder={loadingData ? 'Loading purchase orders...' : 'Select purchase order'} />
                   </SelectTrigger>
                   <SelectContent>
-                    {purchaseOrders.map((po) => (
+                    {purchaseOrders.map(po => (
                       <SelectItem key={po.id} value={po.id}>
                         <div className="flex items-center gap-2">
                           <FileText className="w-4 h-4" />
@@ -280,7 +288,7 @@ export function CreateGRNModal({ isOpen, onClose, onSuccess, isInvestee, initial
                   id="receivedDate"
                   type="date"
                   value={formData.receivedDate}
-                  onChange={(e) => handleInputChange("receivedDate", e.target.value)}
+                  onChange={(e) => handleInputChange('receivedDate', e.target.value)}
                   required
                 />
               </div>
@@ -294,33 +302,23 @@ export function CreateGRNModal({ isOpen, onClose, onSuccess, isInvestee, initial
                   max="100"
                   step="0.1"
                   value={formData.tolerancePercentage}
-                  onChange={(e) => handleInputChange("tolerancePercentage", e.target.value)}
+                  onChange={(e) => handleInputChange('tolerancePercentage', e.target.value)}
                   placeholder="5"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="geoLocation">Geo Location (optional)</Label>
-                <Input
-                  id="geoLocation"
-                  value={formData.geoLocation}
-                  onChange={(e) => handleInputChange("geoLocation", e.target.value)}
-                  placeholder="e.g., lat,lng or warehouse location"
                 />
               </div>
             </CardContent>
           </Card>
 
-          {/* Over-Delivery Warning */}
+          {/* Over-Delivery Warning (passive banner — actual confirm on submit uses a toast) */}
           {overDeliveryWarning.percentage !== 0 && (
-            <Card className={overDeliveryWarning.hasOverDelivery ? "border-l-4 border-l-red-500" : "border-l-4 border-l-amber-500"}>
+            <Card className={overDeliveryWarning.hasOverDelivery ? 'border-l-4 border-l-red-500' : 'border-l-4 border-l-amber-500'}>
               <CardContent className="pt-6 flex items-start gap-3">
-                <AlertCircle className={overDeliveryWarning.hasOverDelivery ? "text-red-600 mt-0.5" : "text-amber-600 mt-0.5"} />
+                <AlertCircle className={overDeliveryWarning.hasOverDelivery ? 'text-red-600 mt-0.5' : 'text-amber-600 mt-0.5'} />
                 <div>
-                  <p className={overDeliveryWarning.hasOverDelivery ? "text-red-900 font-medium" : "text-amber-900 font-medium"}>
-                    {overDeliveryWarning.hasOverDelivery ? "Over-Delivery Exceeds Tolerance" : "Warning: Over-Delivery Detected"}
+                  <p className={overDeliveryWarning.hasOverDelivery ? 'text-red-900 font-medium' : 'text-amber-900 font-medium'}>
+                    {overDeliveryWarning.hasOverDelivery ? 'Over-Delivery Exceeds Tolerance' : 'Over-Delivery Detected'}
                   </p>
-                  <p className={overDeliveryWarning.hasOverDelivery ? "text-red-800 text-sm" : "text-amber-800 text-sm"}>
+                  <p className={overDeliveryWarning.hasOverDelivery ? 'text-red-800 text-sm' : 'text-amber-800 text-sm'}>
                     Received quantity is {overDeliveryWarning.percentage}% above ordered quantity (tolerance: {formData.tolerancePercentage}%)
                   </p>
                 </div>
@@ -328,7 +326,7 @@ export function CreateGRNModal({ isOpen, onClose, onSuccess, isInvestee, initial
             </Card>
           )}
 
-          {/* Items Quality Control */}
+          {/* Items & Quality */}
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Items & Quality Control</CardTitle>
@@ -337,108 +335,102 @@ export function CreateGRNModal({ isOpen, onClose, onSuccess, isInvestee, initial
               {items.length === 0 ? (
                 <p className="text-gray-500 text-center py-4">Select a purchase order to load items</p>
               ) : (
-                items.map((item, index) => (
-                  <div key={index} className="border rounded-lg p-4 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h4 className="font-medium flex items-center gap-2">
-                        <Package className="w-4 h-4" />
-                        {item.itemName}
-                      </h4>
-                      <Badge className={getQualityStatusColor(item.status)}>
-                        {item.status}
-                      </Badge>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div>
-                        <Label>Quantity Ordered</Label>
-                        <div className="flex items-center h-10 px-3 border rounded-md bg-gray-50">
-                          <span className="font-medium">{item.poQuantity}</span>
-                        </div>
+                items.map((item, index) => {
+                  const sumMismatch = item.quantityAccepted + item.quantityRejected !== item.quantityReceived
+                  return (
+                    <div key={item.purchaseOrderItemId || index} className="border rounded-lg p-4 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-medium flex items-center gap-2">
+                          <Package className="w-4 h-4" />
+                          {item.itemName}
+                          {item.unit && <span className="text-xs text-gray-500">({item.unit})</span>}
+                        </h4>
+                        <Badge className={qualityStatusColor(item.qualityStatus)}>
+                          {item.qualityStatus}
+                        </Badge>
                       </div>
 
-                      <div>
-                        <Label>Quantity Received *</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          value={item.receivedQuantity}
-                          onChange={(e) => handleItemChange(index, "receivedQuantity", parseInt(e.target.value) || 0)}
-                        />
-                      </div>
-
-                      <div>
-                        <Label>Unit</Label>
-                        <div className="flex items-center h-10 px-3 border rounded-md bg-gray-50">
-                          <span className="font-medium">{item.unit}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <Label>Status</Label>
-                        <Select
-                          value={item.status}
-                          onValueChange={(value: 'PENDING' | 'RECEIVED' | 'REJECTED') => handleItemChange(index, "status", value)}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="PENDING">Pending Inspection</SelectItem>
-                            <SelectItem value="RECEIVED">Received & Accepted</SelectItem>
-                            <SelectItem value="REJECTED">Rejected</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      {item.status === 'REJECTED' && (
+                      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                         <div>
-                          <Label>Rejection Reason</Label>
-                          <Textarea
-                            value={item.rejectionReason || ''}
-                            onChange={(e) => handleItemChange(index, "rejectionReason", e.target.value)}
-                            placeholder="Reason for rejection..."
-                            rows={2}
+                          <Label>Ordered</Label>
+                          <div className="flex items-center h-10 px-3 border rounded-md bg-gray-50">
+                            <span className="font-medium">{item.poQuantity}</span>
+                          </div>
+                        </div>
+                        <div>
+                          <Label>Received *</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={item.quantityReceived}
+                            onChange={(e) => {
+                              const received = parseInt(e.target.value) || 0
+                              updateItem(index, {
+                                quantityReceived: received,
+                                quantityAccepted: received,
+                                quantityRejected: 0,
+                              })
+                            }}
                           />
                         </div>
+                        <div>
+                          <Label>Accepted</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            max={item.quantityReceived}
+                            value={item.quantityAccepted}
+                            onChange={(e) => {
+                              const accepted = parseInt(e.target.value) || 0
+                              const rejected = Math.max(0, item.quantityReceived - accepted)
+                              updateItem(index, { quantityAccepted: accepted, quantityRejected: rejected })
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <Label>Rejected</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            max={item.quantityReceived}
+                            value={item.quantityRejected}
+                            onChange={(e) => {
+                              const rejected = parseInt(e.target.value) || 0
+                              const accepted = Math.max(0, item.quantityReceived - rejected)
+                              updateItem(index, { quantityRejected: rejected, quantityAccepted: accepted })
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <Label>Quality Status</Label>
+                          <Select
+                            value={item.qualityStatus}
+                            onValueChange={(value: QualityStatus) =>
+                              updateItem(index, { qualityStatus: value })
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="PASSED">Passed</SelectItem>
+                              <SelectItem value="PARTIAL">Partial</SelectItem>
+                              <SelectItem value="FAILED">Failed</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
+                      {sumMismatch && (
+                        <p className="text-xs text-red-600 flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3" />
+                          Accepted + rejected ({item.quantityAccepted + item.quantityRejected}) does not match received ({item.quantityReceived})
+                        </p>
                       )}
                     </div>
-                  </div>
-                ))
+                  )
+                })
               )}
-            </CardContent>
-          </Card>
-
-          {/* Additional Information */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Additional Information</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="attachmentUrl">Attachment URL (optional)</Label>
-                <Input
-                  id="attachmentUrl"
-                  type="url"
-                  value={formData.attachmentUrl}
-                  onChange={(e) => handleInputChange("attachmentUrl", e.target.value)}
-                  placeholder="https://..."
-                />
-                <p className="text-xs text-gray-500 mt-1">Link to GRN document, photo, or quality report</p>
-              </div>
-
-              <div>
-                <Label htmlFor="notes">General Notes</Label>
-                <Textarea
-                  id="notes"
-                  value={formData.notes}
-                  onChange={(e) => handleInputChange("notes", e.target.value)}
-                  placeholder="Any additional notes about the goods receipt..."
-                  rows={3}
-                />
-              </div>
             </CardContent>
           </Card>
 

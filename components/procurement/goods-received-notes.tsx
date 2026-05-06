@@ -98,17 +98,23 @@ export function GoodsReceivedNotes() {
   }
 
   const handleDelete = async (grn: GoodsReceivedNote) => {
-    if (!confirm(`Are you sure you want to delete GRN ${grn.grnNumber}?`)) {
-      return
-    }
-
-    try {
-      // TODO: Implement delete API call
-      setGRNs(grns.filter(g => g.id !== grn.id))
-      toast.success("GRN deleted successfully")
-    } catch (error: any) {
-      toast.error("Failed to delete GRN", { description: error.message })
-    }
+    toast.warning(`Delete GRN ${grn.grnNumber}?`, {
+      description: 'This action cannot be undone.',
+      duration: 10000,
+      action: {
+        label: 'Delete',
+        onClick: async () => {
+          try {
+            // TODO: Implement delete API call
+            setGRNs(grns.filter(g => g.id !== grn.id))
+            toast.success(`GRN ${grn.grnNumber} deleted`)
+          } catch (error: any) {
+            toast.error("Failed to delete GRN", { description: error.message })
+          }
+        },
+      },
+      cancel: { label: 'Cancel', onClick: () => {} },
+    })
   }
 
   const getStatusIcon = (status: string) => {

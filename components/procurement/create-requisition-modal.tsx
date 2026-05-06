@@ -10,11 +10,23 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { FileText, DollarSign, Plus, Trash2, Building2, AlertCircle } from "lucide-react"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command"
+import { FileText, DollarSign, Plus, Trash2, Building2, AlertCircle, Check, ChevronsUpDown, Briefcase } from "lucide-react"
 import { toast } from "sonner"
+import { cn } from "@/lib/utils"
 import { useProcurementPermissions } from "@/lib/hooks/useProcurementPermissions"
 import { procurementApi, CreateRequisitionRequest, PurchaseRequisition } from "@/lib/api/procurement-api"
-import { departmentApiService, Department } from "@/lib/api/department-api"
+import { procurementApiV2 } from "@/lib/api/procurement-api-v2"
+import { portfolioCompaniesApi, type PortfolioCompany } from "@/lib/api/portfolio-companies-api"
+import { fundsApi, type Fund } from "@/lib/api/funds-api"
 import { useAppDispatch, useAppSelector } from "@/lib/store"
 import { fetchAvailableDepartments } from "@/lib/store/slices/performanceSlice"
 
@@ -49,6 +61,8 @@ export function CreateRequisitionModal({ isOpen, onClose, onSuccess, editMode = 
     drawdownRequestAmount?: number
     sourcingCategory?: string
     useOfFundsDocumentUrl?: string
+    portfolioCompanyId?: string
+    fundId?: string
   }>({
     title: '',
     description: '',
@@ -58,6 +72,8 @@ export function CreateRequisitionModal({ isOpen, onClose, onSuccess, editMode = 
     drawdownRequestAmount: undefined,
     sourcingCategory: '',
     useOfFundsDocumentUrl: '',
+    portfolioCompanyId: '',
+    fundId: '',
     items: [{
       itemName: '',
       description: '',
@@ -66,11 +82,58 @@ export function CreateRequisitionModal({ isOpen, onClose, onSuccess, editMode = 
     }]
   })
 
+  // Portfolio companies + funds — only loaded when in investee mode
+  const [portfolioCompanies, setPortfolioCompanies] = useState<PortfolioCompany[]>([])
+  const [funds, setFunds] = useState<Fund[]>([])
+  const [companyPickerOpen, setCompanyPickerOpen] = useState(false)
+  const [fundPickerOpen, setFundPickerOpen] = useState(false)
+  const [companiesLoading, setCompaniesLoading] = useState(false)
+  const [fundsLoading, setFundsLoading] = useState(false)
+
+  const selectedCompany = portfolioCompanies.find(c => c.id === formData.portfolioCompanyId)
+  const selectedFund = funds.find(f => f.id === formData.fundId)
+
   useEffect(() => {
     if (isOpen) {
       loadInitialData()
     }
   }, [isOpen, editMode, requisitionId])
+
+  // Load portfolio companies + funds when entering investee mode
+  useEffect(() => {
+    if (!isOpen || !isInvesteeMode) return
+
+    let cancelled = false
+    setCompaniesLoading(true)
+    portfolioCompaniesApi.getAllWithInvestments()
+      .then(res => {
+        if (cancelled) return
+        setPortfolioCompanies(res?.data || [])
+      })
+      .catch(() => {
+        if (!cancelled) setPortfolioCompanies([])
+      })
+      .finally(() => {
+        if (!cancelled) setCompaniesLoading(false)
+      })
+
+    setFundsLoading(true)
+    fundsApi.getAll({ limit: 100 })
+      .then(res => {
+        if (cancelled) return
+        setFunds(res?.data?.funds || [])
+      })
+      .catch(() => {
+        if (!cancelled) setFunds([])
+      })
+      .finally(() => {
+        if (!cancelled) setFundsLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [isOpen, isInvesteeMode])
 
   const loadInitialData = async () => {
     try {
@@ -161,6 +224,14 @@ export function CreateRequisitionModal({ isOpen, onClose, onSuccess, editMode = 
     }
 
     if (isInvesteeMode) {
+      if (!formData.portfolioCompanyId) {
+        toast.error('Please select a portfolio company')
+        return
+      }
+      if (!formData.fundId) {
+        toast.error('Please link a fund to this drawdown')
+        return
+      }
       if (!formData.drawdownRequestAmount || formData.drawdownRequestAmount <= 0) {
         toast.error('Please enter a valid drawdown request amount')
         return
@@ -203,6 +274,27 @@ export function CreateRequisitionModal({ isOpen, onClose, onSuccess, editMode = 
       if (editMode && requisitionId) {
         await procurementApi.updateRequisition(requisitionId, formData)
         toast.success('Purchase requisition updated successfully')
+      } else if (isInvesteeMode) {
+        await procurementApiV2.createApplicantRequisition({
+          title: formData.title,
+          description: formData.description,
+          department: formData.department,
+          priority: formData.priority,
+          justification: formData.justification,
+          portfolioCompanyId: formData.portfolioCompanyId,
+          fundId: formData.fundId,
+          useOfFundsDocumentUrl: formData.useOfFundsDocumentUrl || '',
+          sourcingCategory: formData.sourcingCategory || '',
+          drawdownRequestAmount: formData.drawdownRequestAmount || 0,
+          items: formData.items.map(it => ({
+            itemName: it.itemName,
+            description: it.description,
+            quantity: it.quantity,
+            unit: it.unit,
+            specifications: it.specifications || {},
+          })),
+        })
+        toast.success('Investee drawdown request created successfully')
       } else {
         await procurementApi.createRequisition(formData)
         toast.success('Purchase requisition created successfully')
@@ -220,6 +312,8 @@ export function CreateRequisitionModal({ isOpen, onClose, onSuccess, editMode = 
         drawdownRequestAmount: undefined,
         sourcingCategory: '',
         useOfFundsDocumentUrl: '',
+        portfolioCompanyId: '',
+        fundId: '',
         items: [{
           itemName: '',
           description: '',
@@ -356,6 +450,136 @@ export function CreateRequisitionModal({ isOpen, onClose, onSuccess, editMode = 
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Portfolio Company *</Label>
+                      <Popover open={companyPickerOpen} onOpenChange={setCompanyPickerOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={companyPickerOpen}
+                            disabled={companiesLoading}
+                            className="w-full justify-between rounded-lg font-normal"
+                          >
+                            <span className="flex items-center gap-2 truncate">
+                              <Building2 className="w-4 h-4 text-violet-500 shrink-0" />
+                              {selectedCompany
+                                ? selectedCompany.name
+                                : companiesLoading
+                                  ? 'Loading companies...'
+                                  : 'Search and select company...'}
+                            </span>
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[--radix-popover-trigger-width] min-w-[320px] p-0">
+                          <Command>
+                            <CommandInput placeholder="Search company by name or industry..." />
+                            <CommandList>
+                              <CommandEmpty>
+                                {companiesLoading ? 'Loading...' : 'No portfolio company found'}
+                              </CommandEmpty>
+                              <CommandGroup>
+                                {portfolioCompanies.map((company) => (
+                                  <CommandItem
+                                    key={company.id}
+                                    value={`${company.name} ${company.industry} ${company.registrationNumber}`}
+                                    onSelect={() => {
+                                      setFormData(prev => ({
+                                        ...prev,
+                                        portfolioCompanyId: company.id,
+                                        // Auto-link the fund the company is associated with, if any
+                                        fundId: company.fund?.id || prev.fundId,
+                                      }))
+                                      setCompanyPickerOpen(false)
+                                    }}
+                                  >
+                                    <Check
+                                      className={cn(
+                                        'mr-2 h-4 w-4',
+                                        formData.portfolioCompanyId === company.id ? 'opacity-100' : 'opacity-0',
+                                      )}
+                                    />
+                                    <div className="flex flex-col">
+                                      <span className="font-medium">{company.name}</span>
+                                      <span className="text-xs text-gray-500">
+                                        {company.industry}
+                                        {company.fund?.name ? ` • ${company.fund.name}` : ''}
+                                      </span>
+                                    </div>
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Fund *</Label>
+                      <Popover open={fundPickerOpen} onOpenChange={setFundPickerOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={fundPickerOpen}
+                            disabled={fundsLoading}
+                            className="w-full justify-between rounded-lg font-normal"
+                          >
+                            <span className="flex items-center gap-2 truncate">
+                              <Briefcase className="w-4 h-4 text-violet-500 shrink-0" />
+                              {selectedFund
+                                ? selectedFund.name
+                                : fundsLoading
+                                  ? 'Loading funds...'
+                                  : 'Search and select fund...'}
+                            </span>
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[--radix-popover-trigger-width] min-w-[320px] p-0">
+                          <Command>
+                            <CommandInput placeholder="Search fund by name..." />
+                            <CommandList>
+                              <CommandEmpty>
+                                {fundsLoading ? 'Loading...' : 'No fund found'}
+                              </CommandEmpty>
+                              <CommandGroup>
+                                {funds.map((fund) => (
+                                  <CommandItem
+                                    key={fund.id}
+                                    value={`${fund.name} ${fund.description || ''}`}
+                                    onSelect={() => {
+                                      setFormData(prev => ({ ...prev, fundId: fund.id }))
+                                      setFundPickerOpen(false)
+                                    }}
+                                  >
+                                    <Check
+                                      className={cn(
+                                        'mr-2 h-4 w-4',
+                                        formData.fundId === fund.id ? 'opacity-100' : 'opacity-0',
+                                      )}
+                                    />
+                                    <div className="flex flex-col">
+                                      <span className="font-medium">{fund.name}</span>
+                                      {fund.status && (
+                                        <span className="text-xs text-gray-500">{fund.status}</span>
+                                      )}
+                                    </div>
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  </div>
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="drawdownRequestAmount">Drawdown Request Amount *</Label>

@@ -1032,6 +1032,59 @@ class ProcurementApiServiceV2 {
     return apiClient.post<ProcurementResponse<GoodsReceivedNote>>('/procurement/goods-received-notes', data)
   }
 
+  // ---- Applicant / Investee GRN endpoints (portfolio-scoped) ------------------
+
+  /**
+   * List investee GRNs (portfolio-scoped).
+   * Endpoint: GET /applicant/procurement/goods-received-notes
+   * Server returns { items, total, limit, offset } under `data`.
+   */
+  async getApplicantGRNs(filters?: {
+    purchaseOrderId?: string
+    status?: string
+    limit?: number
+    offset?: number
+  }): Promise<ProcurementResponse<{ items: GoodsReceivedNote[]; total: number; limit: number; offset: number }>> {
+    const params = new URLSearchParams()
+    params.append('limit', String(filters?.limit ?? 50))
+    params.append('offset', String(filters?.offset ?? 0))
+    if (filters?.purchaseOrderId) params.append('purchaseOrderId', filters.purchaseOrderId)
+    if (filters?.status) params.append('status', filters.status)
+    return apiClient.get<ProcurementResponse<{ items: GoodsReceivedNote[]; total: number; limit: number; offset: number }>>(
+      `/applicant/procurement/goods-received-notes?${params.toString()}`
+    )
+  }
+
+  /**
+   * Get an investee GRN by id (portfolio-scoped).
+   */
+  async getApplicantGRN(id: string): Promise<ProcurementResponse<GoodsReceivedNote>> {
+    return apiClient.get<ProcurementResponse<GoodsReceivedNote>>(
+      `/applicant/procurement/goods-received-notes/${id}`
+    )
+  }
+
+  /**
+   * Create an investee GRN. PO must belong to applicant portfolio PR.
+   * Payload shape: { purchaseOrderId, receivedDate (ISO), items: [{ purchaseOrderItemId, quantityReceived, quantityAccepted, quantityRejected, qualityStatus }] }
+   */
+  async createApplicantGRN(data: {
+    purchaseOrderId: string
+    receivedDate: string
+    items: Array<{
+      purchaseOrderItemId: string
+      quantityReceived: number
+      quantityAccepted: number
+      quantityRejected: number
+      qualityStatus: 'PASSED' | 'FAILED' | 'PARTIAL'
+    }>
+  }): Promise<ProcurementResponse<GoodsReceivedNote>> {
+    return apiClient.post<ProcurementResponse<GoodsReceivedNote>>(
+      '/applicant/procurement/goods-received-notes',
+      data
+    )
+  }
+
   // ============================================================================
   // INVOICES & PAYMENTS
   // ============================================================================
@@ -1339,13 +1392,36 @@ class ProcurementApiServiceV2 {
   // SUITE 06: AI INVOICE INTAKE, 3-WAY MATCH & VERIFICATION
   // ============================================================================
 
+  /**
+   * Create a Suite 06 invoice intake. Accepts either:
+   *  - `documentFile` (File) — sent as multipart/form-data under `document`
+   *  - `documentUrl` (string) — sent as JSON
+   * Other fields go through as form fields / JSON properties.
+   */
   async createInvoiceIntake(data: {
-    documentUrl: string
+    documentFile?: File
+    documentUrl?: string
     vendorId?: string
     sourcePurchaseOrderId?: string
     goodsReceivedNoteId?: string
   }): Promise<ProcurementResponse<InvoiceIntake>> {
-    return apiClient.post<ProcurementResponse<InvoiceIntake>>('/procurement/suite06/intakes', data)
+    if (data.documentFile) {
+      const fd = new FormData()
+      fd.append('document', data.documentFile)
+      if (data.vendorId) fd.append('vendorId', data.vendorId)
+      if (data.sourcePurchaseOrderId) fd.append('sourcePurchaseOrderId', data.sourcePurchaseOrderId)
+      if (data.goodsReceivedNoteId) fd.append('goodsReceivedNoteId', data.goodsReceivedNoteId)
+      return apiClient.postFormData<ProcurementResponse<InvoiceIntake>>(
+        '/procurement/suite06/intakes',
+        fd,
+      )
+    }
+
+    const { documentFile, ...jsonPayload } = data
+    return apiClient.post<ProcurementResponse<InvoiceIntake>>(
+      '/procurement/suite06/intakes',
+      jsonPayload,
+    )
   }
 
   async getInvoiceIntake(id: string): Promise<ProcurementResponse<InvoiceIntake>> {
@@ -1459,12 +1535,10 @@ export interface QuantityVariance {
 }
 
 export interface CFODashboardData {
-  totalBills: number
-  matchedBills: number
-  disputedBills: number
-  pendingVerification: number
-  totalInvoiceAmount: string
-  matchRate: number
+  vendorBillsMatched: number
+  vendorBillsDisputed: number
+  intakesPendingHumanVerification: number
+  totalIntakes: number
 }
 
 // Export singleton instance
@@ -1491,6 +1565,8 @@ export interface CreateApplicantRequisitionRequest {
   drawdownRequestAmount: number
   useOfFundsDocumentUrl: string
   department: string
+  portfolioCompanyId?: string
+  fundId?: string
   items: {
     itemName: string
     description: string
