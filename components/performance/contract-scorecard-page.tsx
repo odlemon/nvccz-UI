@@ -18,6 +18,15 @@ import { toast } from "sonner"
 import { CiFileOn } from "react-icons/ci"
 import { RefreshCw, Plus, Sparkles } from "lucide-react"
 import ContractScorecardPDF from "./contract-scorecard-pdf-document"
+import {
+  BalancedScorecardView,
+  HeatMapLegend,
+  computeHeat,
+  colorForPillar,
+  type BSCViewColumn,
+  type BSCViewRow,
+  type BSCViewPerspective,
+} from "./balanced-scorecard-view"
 
 interface ContractScorecardPageProps {
   type: "CEO" | "BOARD"
@@ -114,12 +123,103 @@ export function ContractScorecardPage({ type }: ContractScorecardPageProps) {
   }
 
   const scoreValue = data?.scores?.finalScore ?? "N/A"
+  const performanceLabel = data?.scores?.performanceLabel
   const warnings = data?.warnings ?? []
   const sectionEntries = Object.entries(data?.sections ?? {})
   const agreedRatings = data?.agreedRatingsSummary ?? data?.document?.agreedRatingsSummary ?? []
   const subjectTitle = type === "CEO" ? data?.ceo?.title : data?.board?.chairpersonTitle
   const subjectName = type === "CEO" ? data?.ceo?.name : data?.board?.chairpersonName
-  const sectionTables = Object.entries(data?.document?.sectionTables ?? {})
+
+  // ── Format helpers + BSC rows ───────────────────────────────────────────────
+  const toNumber = (v: unknown) => {
+    const n = typeof v === "string" ? Number.parseFloat(v) : Number(v)
+    return Number.isFinite(n) ? n : 0
+  }
+  const fmtNumber = (v: unknown, fb = "—") => {
+    if (v === null || v === undefined || v === "") return fb
+    const n = typeof v === "string" ? Number.parseFloat(v) : Number(v)
+    if (!Number.isFinite(n)) return fb
+    if (Math.abs(n) >= 1000) return n.toLocaleString(undefined, { maximumFractionDigits: 0 })
+    return n.toLocaleString(undefined, { maximumFractionDigits: 2 })
+  }
+  const fmtWeight = (v: unknown) => {
+    if (v === null || v === undefined || v === "") return "—"
+    const n = typeof v === "string" ? Number.parseFloat(v) : Number(v)
+    if (!Number.isFinite(n)) return "—"
+    const pct = n > 1 ? n : n * 100
+    return `${pct.toFixed(0)}%`
+  }
+
+  const bscPerspectives: BSCViewPerspective[] = []
+  const bscRows: BSCViewRow[] = []
+
+  for (const [key, section] of sectionEntries as Array<[string, any]>) {
+    const sectionLabel = section?.label || `Section ${key}`
+    const perspectiveId = `sec-${key}`
+    bscPerspectives.push({
+      id: perspectiveId,
+      name: sectionLabel,
+      color: colorForPillar(sectionLabel),
+      weight: fmtWeight(section?.weight),
+    })
+
+    const indicators: any[] = Array.isArray(section?.indicators) ? section.indicators : []
+
+    if (indicators.length === 0) {
+      const heat = computeHeat({
+        status: section?.performanceLabel,
+        progress: toNumber(section?.sectionScore),
+      })
+      bscRows.push({
+        perspectiveId,
+        heat,
+        values: {
+          objective: sectionLabel,
+          measure: "—",
+          target: "—",
+          actual: "—",
+          weight: fmtWeight(section?.weight),
+          rating: fmtNumber(section?.sectionScore),
+          weighted: fmtNumber(section?.sectionScore),
+        },
+      })
+      continue
+    }
+
+    for (const ind of indicators) {
+      const target = ind.targetValue
+      const actual = ind.computedActual
+      const heat = computeHeat({
+        progress: ind.progressPct !== null && ind.progressPct !== undefined ? toNumber(ind.progressPct) : null,
+        target: target !== null && target !== undefined ? toNumber(target) : null,
+        actual: actual !== null && actual !== undefined ? toNumber(actual) : null,
+        isReverseKpi: !!ind.isReverseKpi,
+      })
+      bscRows.push({
+        perspectiveId,
+        heat,
+        values: {
+          objective: ind.indicatorName || "—",
+          measure: ind.formulaType || ind.unit || "—",
+          target: fmtNumber(target),
+          actual: fmtNumber(actual),
+          weight: fmtWeight(ind.effectiveWeight ?? ind.weight),
+          rating: fmtNumber(ind.rawRating),
+          weighted: fmtNumber(ind.weightedScore),
+        },
+      })
+    }
+  }
+
+  const bscColumns: BSCViewColumn[] = [
+    { key: "objective", label: "Strategic Objective / Indicator", bold: true, width: "32%" },
+    { key: "measure", label: "Measure", width: "14%" },
+    { key: "target", label: "Target", align: "right", width: "9%" },
+    { key: "actual", label: "Actual", align: "right", heat: true, width: "9%" },
+    { key: "weight", label: "Weight", align: "right", width: "8%" },
+    { key: "rating", label: "Rating", align: "right", width: "8%" },
+    { key: "weighted", label: "Weighted", align: "right", heat: true, width: "10%" },
+  ]
 
   return (
     <div className="space-y-6 p-6">
@@ -227,68 +327,64 @@ export function ContractScorecardPage({ type }: ContractScorecardPageProps) {
             </Card>
           )}
 
+          {/* Balanced Scorecard — perspectives as colored bands, indicators as rows,
+              with heat-mapped Actual / Weighted cells. */}
           <Card>
-            <CardHeader><CardTitle>Section Breakdown</CardTitle></CardHeader>
+            <CardHeader>
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <CardTitle>Balanced Scorecard</CardTitle>
+                {performanceLabel && (
+                  <Badge variant="outline" className="rounded-full">
+                    Overall: {performanceLabel}
+                  </Badge>
+                )}
+              </div>
+            </CardHeader>
             <CardContent className="space-y-3">
-              {sectionEntries.length === 0 && <p className="text-sm text-muted-foreground">No section payload available yet.</p>}
-              {sectionEntries.map(([key, value]: [string, any]) => (
-                <div key={key} className="rounded-lg border p-3">
-                  <div className="flex items-center justify-between">
-                    <p className="font-medium">{key} - {value?.label || "Section"}</p>
-                    <Badge variant="outline">{value?.performanceLabel || "N/A"}</Badge>
-                  </div>
-                  <div className="mt-2 text-sm text-muted-foreground grid gap-1 md:grid-cols-3">
-                    <p>Weight: {Number(value?.weight || 0) * 100}%</p>
-                    <p>Score: {value?.sectionScore ?? "N/A"}</p>
-                    <p>Indicators: {value?.indicators?.length ?? 0}</p>
-                  </div>
-                </div>
-              ))}
+              {bscRows.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No section payload available yet. Generate the scorecard to populate indicators.
+                </p>
+              ) : (
+                <>
+                  <BalancedScorecardView
+                    perspectives={bscPerspectives}
+                    rows={bscRows}
+                    columns={bscColumns}
+                  />
+                  <HeatMapLegend className="pt-1" />
+                </>
+              )}
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader><CardTitle>Agreed Ratings Summary</CardTitle></CardHeader>
-            <CardContent className="space-y-2">
-              {agreedRatings.length === 0 && <p className="text-sm text-muted-foreground">No ratings summary available.</p>}
-              {agreedRatings.map((item: { section: string; heading: string; sectionScore: number; label: string }, idx: number) => (
-                <div key={`${item.section}-${idx}`} className="rounded-lg border p-3 flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">{item.heading}</p>
-                    <p className="text-xs text-muted-foreground">Section {item.section}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-semibold">{item.sectionScore}</p>
-                    <p className="text-xs text-muted-foreground">{item.label}</p>
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader><CardTitle>Document Section Tables</CardTitle></CardHeader>
-            <CardContent className="space-y-3">
-              {sectionTables.length === 0 && <p className="text-sm text-muted-foreground">No document section tables available.</p>}
-              {sectionTables.map(([sectionKey, section]: [string, any]) => (
-                <div key={sectionKey} className="rounded-lg border p-3">
-                  <div className="flex items-center justify-between">
-                    <p className="font-medium">{section.sectionLabel || sectionKey}</p>
-                    <Badge variant="outline">{section.performanceLabel || "N/A"}</Badge>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">Section score: {section.sectionScore ?? "N/A"}</p>
-                  <div className="mt-2 grid gap-2">
-                    {(section.rows || []).slice(0, 3).map((row: any, idx: number) => (
-                      <div key={`${sectionKey}-row-${idx}`} className="rounded-md bg-muted/40 p-2 text-xs">
-                        <p className="font-medium">{row.indicatorName || `Indicator ${idx + 1}`}</p>
-                        <p className="text-muted-foreground">Target: {row.target ?? "N/A"} | Actual: {row.computedActual ?? "N/A"} | Score: {row.weightedScore ?? "N/A"}</p>
+          {agreedRatings.length > 0 && (
+            <Card>
+              <CardHeader><CardTitle>Agreed Ratings Summary</CardTitle></CardHeader>
+              <CardContent className="space-y-2">
+                {agreedRatings.map(
+                  (
+                    item: { section: string; heading: string; sectionScore: number; label: string },
+                    idx: number,
+                  ) => (
+                    <div
+                      key={`${item.section}-${idx}`}
+                      className="rounded-lg border p-3 flex items-center justify-between"
+                    >
+                      <div>
+                        <p className="font-medium">{item.heading}</p>
+                        <p className="text-xs text-muted-foreground">Section {item.section}</p>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+                      <div className="text-right">
+                        <p className="font-semibold">{item.sectionScore}</p>
+                        <p className="text-xs text-muted-foreground">{item.label}</p>
+                      </div>
+                    </div>
+                  ),
+                )}
+              </CardContent>
+            </Card>
+          )}
         </>
       )}
     </div>

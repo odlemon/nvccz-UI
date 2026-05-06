@@ -1,10 +1,17 @@
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer"
 import { PerformancePdfLetterhead } from "./pdf-letterhead"
+import {
+  BalancedScorecardTable,
+  HeatMapLegend,
+  computeHeat,
+  colorForPillar,
+  type BSCColumn,
+  type BSCRow,
+  type BSCPerspective,
+} from "./balanced-scorecard-pdf-table"
 
 const COLORS = {
   primary: "#2563eb",
-  primaryDark: "#1e40af",
-  accent: "#6366f1",
   slate900: "#0f172a",
   slate700: "#334155",
   slate500: "#64748b",
@@ -17,37 +24,25 @@ const COLORS = {
 }
 
 const styles = StyleSheet.create({
-  page: { paddingTop: 36, paddingBottom: 44, paddingHorizontal: 32, fontFamily: "Helvetica", fontSize: 9, color: COLORS.slate700 },
-
-  // Header
-  headerBand: {
-    backgroundColor: COLORS.primary,
-    marginHorizontal: -32,
-    marginTop: -36,
-    paddingHorizontal: 32,
-    paddingVertical: 20,
-    marginBottom: 18,
-  },
-  headerType: { fontSize: 9, color: COLORS.white, opacity: 0.85, letterSpacing: 1, marginBottom: 4 },
-  headerTitle: { fontSize: 22, color: COLORS.white, fontWeight: "bold", marginBottom: 4 },
-  headerSubtitle: { fontSize: 10, color: COLORS.white, opacity: 0.95 },
-  headerPill: {
-    marginTop: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    backgroundColor: "rgba(255,255,255,0.18)",
-    alignSelf: "flex-start",
-    borderRadius: 10,
+  page: {
+    paddingTop: 36,
+    paddingBottom: 44,
+    paddingHorizontal: 28,
+    fontFamily: "Helvetica",
     fontSize: 9,
-    color: COLORS.white,
+    color: COLORS.slate700,
   },
-
-  // Section
   section: { marginBottom: 14 },
-  sectionTitle: { fontSize: 12, fontWeight: "bold", color: COLORS.slate900, marginBottom: 8, paddingBottom: 4, borderBottomWidth: 1, borderBottomColor: COLORS.slate300 },
-
-  // Summary KPI row
-  summaryGrid: { flexDirection: "row", gap: 8, marginBottom: 10 },
+  sectionTitle: {
+    fontSize: 12,
+    fontWeight: "bold",
+    color: COLORS.slate900,
+    marginBottom: 8,
+    paddingBottom: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.slate300,
+  },
+  summaryGrid: { flexDirection: "row", gap: 8, marginBottom: 12 },
   summaryCard: {
     flex: 1,
     borderWidth: 1,
@@ -56,48 +51,32 @@ const styles = StyleSheet.create({
     padding: 10,
     backgroundColor: COLORS.slate100,
   },
-  summaryLabel: { fontSize: 7, color: COLORS.slate500, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 },
+  summaryLabel: {
+    fontSize: 7,
+    color: COLORS.slate500,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
   summaryValue: { fontSize: 14, color: COLORS.slate900, fontWeight: "bold" },
   summaryValuePrimary: { fontSize: 16, color: COLORS.primary, fontWeight: "bold" },
-
-  // Generic row
   row: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 3 },
   rowLabel: { fontSize: 9, color: COLORS.slate500 },
   rowValue: { fontSize: 9, color: COLORS.slate900, fontWeight: "bold" },
-
-  // Table
-  table: { borderWidth: 1, borderColor: COLORS.slate300, borderRadius: 4, overflow: "hidden" },
-  tableHeader: { flexDirection: "row", backgroundColor: COLORS.primary },
-  tableHeaderCell: { padding: 6, fontSize: 8, color: COLORS.white, fontWeight: "bold" },
-  tableRow: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: COLORS.slate300, backgroundColor: COLORS.white },
-  tableRowAlt: { backgroundColor: COLORS.slate100 },
-  tableCell: { padding: 6, fontSize: 8, color: COLORS.slate700 },
-  tableCellBold: { padding: 6, fontSize: 8, color: COLORS.slate900, fontWeight: "bold" },
-
-  // Indicator card
-  indicatorCard: {
-    borderWidth: 1,
-    borderColor: COLORS.slate300,
-    borderRadius: 4,
+  warningBox: {
+    borderLeftWidth: 3,
+    borderLeftColor: COLORS.amber,
+    backgroundColor: "#fffbeb",
     padding: 8,
+    borderRadius: 4,
     marginBottom: 5,
-    backgroundColor: COLORS.white,
   },
-  indicatorHeader: { flexDirection: "row", justifyContent: "space-between", marginBottom: 4 },
-  indicatorName: { fontSize: 9, color: COLORS.slate900, fontWeight: "bold", flex: 1 },
-  indicatorBadge: { fontSize: 7, color: COLORS.white, backgroundColor: COLORS.primary, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 3 },
-  indicatorMeta: { fontSize: 8, color: COLORS.slate500 },
-
-  // Warning / info box
-  warningBox: { borderLeftWidth: 3, borderLeftColor: COLORS.amber, backgroundColor: "#fffbeb", padding: 8, borderRadius: 4, marginBottom: 5 },
   warningText: { fontSize: 8, color: "#92400e" },
-
-  // Footer
   footer: {
     position: "absolute",
     bottom: 20,
-    left: 32,
-    right: 32,
+    left: 28,
+    right: 28,
     borderTopWidth: 1,
     borderTopColor: COLORS.slate300,
     paddingTop: 6,
@@ -127,6 +106,27 @@ const scoreColor = (score: any) => {
   return COLORS.red
 }
 
+const toNumber = (value: unknown) => {
+  const n = typeof value === "string" ? Number.parseFloat(value) : Number(value)
+  return Number.isFinite(n) ? n : 0
+}
+
+const fmtNumber = (value: unknown, fallback = "—") => {
+  if (value === null || value === undefined || value === "") return fallback
+  const n = typeof value === "string" ? Number.parseFloat(value) : Number(value)
+  if (!Number.isFinite(n)) return fallback
+  if (Math.abs(n) >= 1000) return n.toLocaleString(undefined, { maximumFractionDigits: 0 })
+  return n.toLocaleString(undefined, { maximumFractionDigits: 2 })
+}
+
+const fmtWeight = (value: unknown) => {
+  if (value === null || value === undefined || value === "") return "—"
+  const n = typeof value === "string" ? Number.parseFloat(value) : Number(value)
+  if (!Number.isFinite(n)) return "—"
+  const pct = n > 1 ? n : n * 100
+  return `${pct.toFixed(0)}%`
+}
+
 interface ContractScorecardPDFProps {
   data: any
   type: "CEO" | "BOARD"
@@ -140,15 +140,93 @@ export default function ContractScorecardPDF({ data, type, activeAddress }: Cont
   const subjectTitle = type === "CEO" ? data?.ceo?.title : data?.board?.chairpersonTitle
   const warnings: string[] = data?.warnings || []
   const sections = Object.entries(data?.sections || {}) as Array<[string, any]>
-  const agreed: any[] = data?.agreedRatingsSummary || data?.document?.agreedRatingsSummary || []
   const periodLabel = data?.contract?.periodLabel || "—"
+
+  // Build BSC perspectives + rows from contract sections.
+  // Each section becomes a perspective; its indicators become rows.
+  // If a section has no indicators we still emit a single summary row so the
+  // section doesn't disappear from the scorecard.
+  const perspectives: BSCPerspective[] = []
+  const bscRows: BSCRow[] = []
+
+  for (const [key, section] of sections) {
+    const sectionLabel = section?.label || `Section ${key}`
+    const perspectiveId = `sec-${key}`
+    perspectives.push({
+      id: perspectiveId,
+      name: sectionLabel,
+      color: colorForPillar(sectionLabel),
+      weight: fmtWeight(section?.weight),
+    })
+
+    const indicators: any[] = Array.isArray(section?.indicators) ? section.indicators : []
+
+    if (indicators.length === 0) {
+      const heat = computeHeat({
+        status: section?.performanceLabel,
+        progress: toNumber(section?.sectionScore),
+      })
+      bscRows.push({
+        perspectiveId,
+        heat,
+        values: {
+          objective: sectionLabel,
+          measure: "—",
+          target: "—",
+          actual: "—",
+          weight: fmtWeight(section?.weight),
+          rating: fmtNumber(section?.sectionScore),
+          weighted: fmtNumber(section?.sectionScore),
+        },
+      })
+      continue
+    }
+
+    for (const ind of indicators) {
+      const target = ind.targetValue
+      const actual = ind.computedActual
+      const heat = computeHeat({
+        progress: ind.progressPct !== null && ind.progressPct !== undefined ? toNumber(ind.progressPct) : null,
+        target: target !== null && target !== undefined ? toNumber(target) : null,
+        actual: actual !== null && actual !== undefined ? toNumber(actual) : null,
+        isReverseKpi: !!ind.isReverseKpi,
+      })
+      bscRows.push({
+        perspectiveId,
+        heat,
+        values: {
+          objective: ind.indicatorName || "—",
+          measure: ind.formulaType || ind.unit || "—",
+          target: fmtNumber(target),
+          actual: fmtNumber(actual),
+          weight: fmtWeight(ind.effectiveWeight ?? ind.weight),
+          rating: fmtNumber(ind.rawRating),
+          weighted: fmtNumber(ind.weightedScore),
+        },
+      })
+    }
+  }
+
+  const columns: BSCColumn[] = [
+    { key: "objective", label: "Strategic Objective / Indicator", flex: 2.6, bold: true },
+    { key: "measure", label: "Measure", flex: 1.4 },
+    { key: "target", label: "Target", flex: 1, align: "right" },
+    { key: "actual", label: "Actual", flex: 1, align: "right", heat: true },
+    { key: "weight", label: "Weight", flex: 0.8, align: "right" },
+    { key: "rating", label: "Rating", flex: 0.8, align: "right" },
+    { key: "weighted", label: "Weighted", flex: 0.9, align: "right", heat: true },
+  ]
 
   return (
     <Document>
-      <Page size="A4" style={styles.page} wrap>
+      <Page size="A4" orientation="landscape" style={styles.page} wrap>
         <PerformancePdfLetterhead
           title={data?.contract?.title || `${type} Contract ${periodLabel}`}
-          subtitle={subjectName ? `${subjectName}${subjectTitle ? ` - ${subjectTitle}` : ""}` : "Contract party not assigned"}
+          subtitle={
+            subjectName
+              ? `${subjectName}${subjectTitle ? ` — ${subjectTitle}` : ""}`
+              : "Contract party not assigned"
+          }
           periodLabel={periodLabel}
           activeAddress={activeAddress}
         />
@@ -212,75 +290,16 @@ export default function ContractScorecardPDF({ data, type, activeAddress }: Cont
           )}
         </View>
 
-        {/* Section breakdown table */}
-        {sections.length > 0 && (
+        {/* Balanced Scorecard */}
+        {bscRows.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Section Breakdown</Text>
-            <View style={styles.table}>
-              <View style={styles.tableHeader}>
-                <Text style={[styles.tableHeaderCell, { flex: 0.6 }]}>#</Text>
-                <Text style={[styles.tableHeaderCell, { flex: 3 }]}>Section</Text>
-                <Text style={[styles.tableHeaderCell, { flex: 1 }]}>Weight</Text>
-                <Text style={[styles.tableHeaderCell, { flex: 1 }]}>Indicators</Text>
-                <Text style={[styles.tableHeaderCell, { flex: 1 }]}>Score</Text>
-                <Text style={[styles.tableHeaderCell, { flex: 1.4 }]}>Label</Text>
-              </View>
-              {sections.map(([key, section], idx) => (
-                <View
-                  key={key}
-                  style={[styles.tableRow, idx % 2 === 1 ? styles.tableRowAlt : {}]}
-                >
-                  <Text style={[styles.tableCell, { flex: 0.6 }]}>{key}</Text>
-                  <Text style={[styles.tableCellBold, { flex: 3 }]}>
-                    {section?.label || "Section"}
-                  </Text>
-                  <Text style={[styles.tableCell, { flex: 1 }]}>
-                    {Math.round((Number(section?.weight) || 0) * 100)}%
-                  </Text>
-                  <Text style={[styles.tableCell, { flex: 1 }]}>
-                    {section?.indicators?.length ?? 0}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.tableCellBold,
-                      { flex: 1, color: scoreColor(section?.sectionScore) },
-                    ]}
-                  >
-                    {section?.sectionScore ?? "—"}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.tableCell,
-                      { flex: 1.4, color: labelColor(section?.performanceLabel) },
-                    ]}
-                  >
-                    {section?.performanceLabel || "—"}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          </View>
-        )}
-
-        {/* Agreed ratings summary */}
-        {agreed.length > 0 && (
-          <View style={styles.section} wrap={false}>
-            <Text style={styles.sectionTitle}>Agreed Ratings Summary</Text>
-            {agreed.slice(0, 12).map((item: any, idx: number) => (
-              <View key={`${item.section || "item"}-${idx}`} style={styles.indicatorCard}>
-                <View style={styles.indicatorHeader}>
-                  <Text style={styles.indicatorName}>
-                    {item.heading || item.section || "Item"}
-                  </Text>
-                  <Text style={[styles.indicatorBadge, { backgroundColor: scoreColor(item.sectionScore) }]}>
-                    {item.sectionScore ?? "—"}
-                  </Text>
-                </View>
-                <Text style={styles.indicatorMeta}>
-                  Section: {item.section || "N/A"} · {item.label || "No label"}
-                </Text>
-              </View>
-            ))}
+            <Text style={styles.sectionTitle}>Balanced Scorecard</Text>
+            <BalancedScorecardTable
+              perspectives={perspectives}
+              rows={bscRows}
+              columns={columns}
+            />
+            <HeatMapLegend />
           </View>
         )}
 
@@ -296,7 +315,6 @@ export default function ContractScorecardPDF({ data, type, activeAddress }: Cont
           </View>
         )}
 
-        {/* Fixed footer */}
         <View style={styles.footer} fixed>
           <Text>NVCCZ Performance Management · Generated {new Date().toLocaleString()}</Text>
           <Text render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} />
