@@ -197,18 +197,28 @@ export interface MentionUser {
   email: string
 }
 
+const buildTaskFilterQuery = (filters?: MyTasksFilters) =>
+  filters
+    ? "?" +
+      new URLSearchParams(
+        Object.entries(filters)
+          .filter(([_, v]) => v !== undefined && v !== "" && v !== null)
+          .map(([k, v]) => [k, String(v)]) as [string, string][]
+      ).toString()
+    : ""
+
 export const performanceTasksApi = {
   getMyTasks: (filters?: MyTasksFilters) => {
-    const qs = filters
-      ? "?" +
-        new URLSearchParams(
-          Object.entries(filters)
-            .filter(([_, v]) => v !== undefined && v !== "" && v !== null)
-            .map(([k, v]) => [k, String(v)]) as [string, string][]
-        ).toString()
-      : ""
+    const qs = buildTaskFilterQuery(filters)
     return apiClient.get<{ success: boolean; count: number; tasks: PerformanceTask[] }>(
       `/tasks/my${qs}`
+    )
+  },
+
+  getDepartmentTasks: (filters?: MyTasksFilters) => {
+    const qs = buildTaskFilterQuery(filters)
+    return apiClient.get<{ success: boolean; count: number; tasks: PerformanceTask[] }>(
+      `/tasks${qs}`
     )
   },
 

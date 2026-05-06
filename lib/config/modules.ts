@@ -155,7 +155,6 @@ export const MODULE_CONFIG: ModuleConfig[] = [
       { id: "config-themes", name: "Themes", path: "/performance/configuration/themes", icon: CiViewTable, description: "Strategic themes and goal tagging" },
       { id: "performance-contracts", name: "Performance Contracts", path: "/performance/contracts", icon: CiMedal, description: "CEO, Board, Department and Employee BSC contracts" },
       { id: "goals-management", name: "Goals", path: "/performance/goals", icon: CiCircleCheck, description: "Goals" },
-      { id: "department-scorecards", name: "Departmental Goals", path: "/performance/department-scorecards", icon: CiViewBoard, description: "Department performance scorecards" },
       { id: "tasks-management", name: "Tasks", path: "/performance/tasks", icon: CiViewList, description: "Tasks" },
       { id: "performance-reviews", name: "Reviews", path: "/performance/reviews", icon: CiFileOn, description: "Unified hub for self-assessments, evaluations, cycles and reports" },
     ],
@@ -166,6 +165,7 @@ export const MODULE_CONFIG: ModuleConfig[] = [
         icon: IoStatsChartOutline,
         items: [
           { id: "org-bsc", name: "Org BSC", path: "/performance/org-bsc", icon: CiGrid41, description: "Organisational BSC dashboard" },
+          { id: "department-scorecards", name: "Department Performance Scorecard", path: "/performance/department-scorecards", icon: CiViewBoard, description: "Department performance scorecards" },
           { id: "board-scorecards", name: "Board Scorecards", path: "/performance/board-scorecards", icon: IoStatsChartOutline, description: "Board contract scorecards" },
           { id: "ceo-scorecards", name: "CEO Scorecards", path: "/performance/ceo-scorecards", icon: CiTrophy, description: "CEO contract scorecards" },
           { id: "user-scorecards", name: "Employee Scorecards", path: "/performance/user-scorecards", icon: CiViewTable, description: "User performance scorecards" },

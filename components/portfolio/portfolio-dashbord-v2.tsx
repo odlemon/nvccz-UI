@@ -51,10 +51,7 @@ export function PortfolioDashboardV2() {
 
     const [searchQuery, setSearchQuery] = useState("")
     const [selectedFund, setSelectedFund] = useState("all")
-    const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({
-        from: new Date(2016, 0, 1),
-        to: new Date(2025, 11, 31)
-    })
+    const [asOfDate, setAsOfDate] = useState<Date>(() => new Date())
 
     useEffect(() => {
         dispatch(fetchFunds())
@@ -62,14 +59,13 @@ export function PortfolioDashboardV2() {
 
     // Fetch dashboard data on mount and when filters change
     useEffect(() => {
-        const currentYear = new Date().getFullYear()
         dispatch(fetchPortfolioDashboard({
-            year: currentYear,
+            year: asOfDate.getFullYear(),
             fundId: selectedFund !== "all" ? selectedFund : undefined,
             currencyId: 'USD',
-            asOfDate: dateRange.to ? format(dateRange.to, 'yyyy-MM-dd') : undefined
+            asOfDate: format(asOfDate, 'yyyy-MM-dd')
         }))
-    }, [dispatch, selectedFund, dateRange])
+    }, [dispatch, selectedFund, asOfDate])
 
     // All hooks MUST be called before conditional returns
     // Use API data
@@ -168,9 +164,7 @@ export function PortfolioDashboardV2() {
                             <PopoverTrigger asChild>
                                 <Button variant="outline" className="h-11 px-5 rounded-full gap-2 border-gray-200 bg-white hover:bg-gray-50 font-bold text-xs shadow-none">
                                     <Calendar className="w-4 h-4 text-foreground" />
-                                    {dateRange.from && dateRange.to
-                                        ? `${format(dateRange.from, "dd MMM yyyy")}`
-                                        : "Select Date"}
+                                    {format(asOfDate, "dd MMM yyyy")}
                                     <ChevronDown className="w-4 h-4 text-muted-foreground ml-1" />
                                 </Button>
                             </PopoverTrigger>
@@ -178,8 +172,8 @@ export function PortfolioDashboardV2() {
                                 <CalendarComponent
                                     initialFocus
                                     mode="single"
-                                    selected={dateRange.from}
-                                    onSelect={(d) => setDateRange(prev => ({ ...prev, from: d }))}
+                                    selected={asOfDate}
+                                    onSelect={(d) => d && setAsOfDate(d)}
                                 />
                             </PopoverContent>
                         </Popover>

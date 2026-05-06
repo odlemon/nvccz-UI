@@ -257,11 +257,17 @@ export function KPIManagement() {
   }
 
   // Filter KPIs based on search term
-  const filteredKPIs = availableKPIs.filter((kpi) =>
-    kpi.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    kpi.hardcodedDetails?.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    kpi.hardcodedDetails?.code?.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const filteredKPIs = availableKPIs.filter((kpi: any) => {
+    const q = searchTerm.toLowerCase()
+    if (!q) return true
+    return (
+      kpi.name?.toLowerCase().includes(q) ||
+      (kpiDescription(kpi) ?? "").toLowerCase().includes(q) ||
+      (kpiCode(kpi) ?? "").toLowerCase().includes(q) ||
+      (kpiPillar(kpi) ?? "").toLowerCase().includes(q) ||
+      (kpiDepartment(kpi) ?? "").toLowerCase().includes(q)
+    )
+  })
 
   // Pagination logic for overview
   const totalPages = Math.ceil(filteredKPIs.length / itemsPerPage)
@@ -345,6 +351,33 @@ export function KPIManagement() {
     return row.unitSymbol ?? row.unit ?? "N/A"
   }
 
+  // Field accessors — new API surfaces values at top level with hardcodedDetails as fallback
+  const kpiCode = (kpi: any) => kpi?.code ?? kpi?.hardcodedDetails?.code ?? null
+  const kpiDescription = (kpi: any) =>
+    kpi?.catalogDescription ?? kpi?.hardcodedDetails?.description ?? null
+  const kpiDepartment = (kpi: any) =>
+    kpi?.catalogDepartmentName ?? kpi?.hardcodedDetails?.department ?? null
+  const kpiAccountType = (kpi: any) =>
+    kpi?.accountType ?? kpi?.hardcodedDetails?.accountType ?? null
+  const kpiAccountNumber = (kpi: any) =>
+    kpi?.accountNumber ?? kpi?.hardcodedDetails?.accountNumber ?? null
+  const kpiJournalType = (kpi: any) =>
+    kpi?.journalEntryType ?? kpi?.hardcodedDetails?.journalEntryType ?? null
+  const kpiIsFinancial = (kpi: any) =>
+    Boolean(kpi?.isFinancial || kpi?.hardcodedDetails?.isFinancial)
+  const kpiPillar = (kpi: any) => kpi?.scorecardPillar ?? null
+
+  const getPillarColor = (pillar: string | null) => {
+    if (!pillar) return "bg-gray-100 text-gray-700"
+    const colors: Record<string, string> = {
+      "Internal Operations": "bg-amber-100 text-amber-800",
+      "Customer & Market": "bg-pink-100 text-pink-800",
+      "Learning, Growth & HR": "bg-emerald-100 text-emerald-800",
+      "Financial": "bg-indigo-100 text-indigo-800",
+    }
+    return colors[pillar] ?? "bg-slate-100 text-slate-700"
+  }
+
   const financialColumns = [
     { key: "name", label: "KPI", sortable: true },
     {
@@ -407,23 +440,23 @@ export function KPIManagement() {
 
     const headers = [
       "KPI",
-      "Account Type",
-      "Type",
+      "Code",
+      "Pillar",
       "Department",
-      "Weight",
-      "Unit",
+      "Account Type",
       "Account #",
       "Journal",
+      "Unit",
     ]
     const rows = financialKPIs.map((item) => [
       item.name,
-      item.hardcodedDetails?.accountType ?? "",
-      item.type,
-      item.departmentId ?? "",
-      item.weightValue,
+      kpiCode(item) ?? "",
+      kpiPillar(item) ?? "",
+      kpiDepartment(item) ?? "",
+      kpiAccountType(item) ?? "",
+      kpiAccountNumber(item) ?? "",
+      kpiJournalType(item) ?? "",
       item.unit ?? "",
-      item.hardcodedDetails?.accountNumber ?? "",
-      item.hardcodedDetails?.journalEntryType ?? "",
     ])
 
     const csv = [headers, ...rows].map((line) => line.join(",")).join("\n")
@@ -758,27 +791,45 @@ export function KPIManagement() {
                     </div>
                     <CardTitle className="text-base font-semibold line-clamp-2">{kpi.name}</CardTitle>
                     <div className="flex items-center gap-2 flex-wrap mt-2">
-                      <Badge className="text-xs">{kpi.type}</Badge>
                       {kpi.isActive && <Badge className="bg-green-100 text-green-800 text-xs">Active</Badge>}
-                      {kpi.hardcodedDetails?.isFinancial && (
+                      {kpiIsFinancial(kpi) && (
                         <Badge className="bg-indigo-100 text-indigo-800 text-xs">Financial</Badge>
+                      )}
+                      {kpi.isReverseKpi && (
+                        <Badge className="bg-rose-100 text-rose-800 text-xs">Reverse</Badge>
                       )}
                     </div>
                   </CardHeader>
                   <CardContent>
                     <p className="text-sm text-gray-600 line-clamp-2 mb-3">
-                      {kpi.hardcodedDetails?.description || 'No description available'}
+                      {kpiDescription(kpi) || 'No description available'}
                     </p>
                     <div className="space-y-2">
-                      <div className="flex justify-between text-xs">
-                        <span className="text-gray-500">Weight</span>
-                        <span className="font-medium">{(parseFloat(kpi.weightValue) * 100).toFixed(0)}%</span>
-                      </div>
-                      {kpi.hardcodedDetails?.accountType && (
+                      {kpiPillar(kpi) && (
+                        <div className="flex justify-between items-center text-xs gap-2">
+                          <span className="text-gray-500">Pillar</span>
+                          <Badge className={`${getPillarColor(kpiPillar(kpi))} text-xs`}>
+                            {kpiPillar(kpi)}
+                          </Badge>
+                        </div>
+                      )}
+                      {kpiDepartment(kpi) && (
                         <div className="flex justify-between text-xs">
+                          <span className="text-gray-500">Department</span>
+                          <span className="font-medium text-gray-800">{kpiDepartment(kpi)}</span>
+                        </div>
+                      )}
+                      {kpiCode(kpi) && (
+                        <div className="flex justify-between text-xs gap-2">
+                          <span className="text-gray-500">Code</span>
+                          <span className="font-mono text-gray-700 truncate">{kpiCode(kpi)}</span>
+                        </div>
+                      )}
+                      {kpiAccountType(kpi) && (
+                        <div className="flex justify-between items-center text-xs">
                           <span className="text-gray-500">Account Type</span>
-                          <Badge className={`${getAccountTypeColor(kpi.hardcodedDetails.accountType)} text-xs`}>
-                            {kpi.hardcodedDetails.accountType}
+                          <Badge className={`${getAccountTypeColor(kpiAccountType(kpi))} text-xs`}>
+                            {kpiAccountType(kpi)}
                           </Badge>
                         </div>
                       )}
@@ -927,26 +978,56 @@ export function KPIManagement() {
                       </div>
                       <CardTitle className="text-base font-semibold line-clamp-2">{kpi.name}</CardTitle>
                       <div className="flex items-center gap-2 flex-wrap mt-2">
-                        <Badge className="text-xs">{kpi.type}</Badge>
                         {kpi.isActive && <Badge className="bg-green-100 text-green-800 text-xs">Active</Badge>}
                         <Badge className="bg-indigo-100 text-indigo-800 text-xs">Financial</Badge>
+                        {kpi.isReverseKpi && (
+                          <Badge className="bg-rose-100 text-rose-800 text-xs">Reverse</Badge>
+                        )}
                       </div>
                     </CardHeader>
                     <CardContent>
                       <p className="text-sm text-gray-600 line-clamp-2 mb-3">
-                        {kpi.hardcodedDetails?.description || 'No description available'}
+                        {kpiDescription(kpi) || 'No description available'}
                       </p>
                       <div className="space-y-2">
-                        <div className="flex justify-between text-xs">
-                          <span className="text-gray-500">Weight</span>
-                          <span className="font-medium">{formatWeight(kpi.weightValue)}</span>
-                        </div>
-                        {kpi.hardcodedDetails?.accountType && (
-                          <div className="flex justify-between text-xs">
-                            <span className="text-gray-500">Account Type</span>
-                            <Badge className={`${getAccountTypeColor(kpi.hardcodedDetails.accountType)} text-xs`}>
-                              {kpi.hardcodedDetails.accountType}
+                        {kpiPillar(kpi) && (
+                          <div className="flex justify-between items-center text-xs gap-2">
+                            <span className="text-gray-500">Pillar</span>
+                            <Badge className={`${getPillarColor(kpiPillar(kpi))} text-xs`}>
+                              {kpiPillar(kpi)}
                             </Badge>
+                          </div>
+                        )}
+                        {kpiDepartment(kpi) && (
+                          <div className="flex justify-between text-xs">
+                            <span className="text-gray-500">Department</span>
+                            <span className="font-medium text-gray-800">{kpiDepartment(kpi)}</span>
+                          </div>
+                        )}
+                        {kpiCode(kpi) && (
+                          <div className="flex justify-between text-xs gap-2">
+                            <span className="text-gray-500">Code</span>
+                            <span className="font-mono text-gray-700 truncate">{kpiCode(kpi)}</span>
+                          </div>
+                        )}
+                        {kpiAccountType(kpi) && (
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-gray-500">Account Type</span>
+                            <Badge className={`${getAccountTypeColor(kpiAccountType(kpi))} text-xs`}>
+                              {kpiAccountType(kpi)}
+                            </Badge>
+                          </div>
+                        )}
+                        {kpiAccountNumber(kpi) && (
+                          <div className="flex justify-between text-xs">
+                            <span className="text-gray-500">Account #</span>
+                            <span className="font-mono text-gray-700">{kpiAccountNumber(kpi)}</span>
+                          </div>
+                        )}
+                        {kpiJournalType(kpi) && (
+                          <div className="flex justify-between text-xs">
+                            <span className="text-gray-500">Journal</span>
+                            <span className="font-medium text-gray-800">{kpiJournalType(kpi)}</span>
                           </div>
                         )}
                       </div>

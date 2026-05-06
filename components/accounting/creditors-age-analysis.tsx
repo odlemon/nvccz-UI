@@ -49,6 +49,8 @@ export function CreditorsAgeAnalysis() {
 
   const vendors: any[] = data?.vendors || []
   const grandTotal = data?.grandTotal
+  const grandTotalMixedCurrency: boolean = Boolean(data?.grandTotalMixedCurrency)
+  const grandTotalNote: string | undefined = data?.grandTotalNote
   const totalsByCurrency: Record<string, any> = data?.totalsByCurrency || {}
   const bucketLabels = data?.bucketShortColumnTitles || {
     current: "Current",
@@ -94,6 +96,11 @@ export function CreditorsAgeAnalysis() {
           ) : (
             <p className="text-sm text-gray-400 mt-0.5">Select a date and click Generate</p>
           )}
+          {grandTotalMixedCurrency && grandTotalNote && (
+            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              {grandTotalNote}
+            </div>
+          )}
         </div>
 
         <CardContent className="p-0">
@@ -138,6 +145,8 @@ export function CreditorsAgeAnalysis() {
 
                 {vendors.map((vendor) => {
                   const isExpanded = expandedVendors.has(vendor.vendorId)
+                  const isMultiCurrency = Boolean(vendor.multiCurrencyVendor)
+                  const perCurrency: Record<string, any> = vendor.perCurrencyVendorTotals || {}
                   return (
                     <Fragment key={vendor.vendorId}>
                       {/* Vendor summary row */}
@@ -151,19 +160,55 @@ export function CreditorsAgeAnalysis() {
                               ? <ChevronDown className="w-4 h-4 shrink-0 text-gray-400" />
                               : <ChevronRight className="w-4 h-4 shrink-0 text-gray-400" />
                             }
-                            {vendor.vendorName}
+                            <span>{vendor.vendorName}</span>
+                            {isMultiCurrency && (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700 shrink-0">
+                                Multi-currency
+                              </span>
+                            )}
                           </div>
                         </td>
                         <td className="px-3 py-3" />
                         <td className="px-3 py-3" />
-                        <td className={`${tdAmt} font-medium`}>{fmt(vendor.total)}</td>
-                        <td className={tdAmt}>{fmt(vendor.vatTotal)}</td>
-                        <td className={tdAmt}>{fmt(vendor.current)}</td>
-                        <td className={tdAmt}>{fmt(vendor.days1To30)}</td>
-                        <td className={tdAmt}>{fmt(vendor.days31To60)}</td>
-                        <td className={tdAmt}>{fmt(vendor.days61To90)}</td>
-                        <td className={tdAmt}>{fmt(vendor.over90)}</td>
+                        {isMultiCurrency ? (
+                          <td className={`${tdAmt} text-gray-400 italic text-xs`} colSpan={7}>
+                            See per-currency breakdown
+                          </td>
+                        ) : (
+                          <>
+                            <td className={`${tdAmt} font-medium`}>{fmt(vendor.total)}</td>
+                            <td className={tdAmt}>{fmt(vendor.vatTotal)}</td>
+                            <td className={tdAmt}>{fmt(vendor.current)}</td>
+                            <td className={tdAmt}>{fmt(vendor.days1To30)}</td>
+                            <td className={tdAmt}>{fmt(vendor.days31To60)}</td>
+                            <td className={tdAmt}>{fmt(vendor.days61To90)}</td>
+                            <td className={tdAmt}>{fmt(vendor.over90)}</td>
+                          </>
+                        )}
                       </tr>
+
+                      {/* Per-currency vendor totals (multi-currency vendors only) */}
+                      {isMultiCurrency && Object.entries(perCurrency).map(([currency, totals]: [string, any]) => (
+                        <tr key={`${vendor.vendorId}-${currency}`} className="border-b bg-blue-50/30 text-gray-700 text-xs">
+                          <td className="pl-11 pr-3 py-2">
+                            <div className="flex items-center gap-2">
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-700">
+                                {currency}
+                              </span>
+                              <span className="text-gray-400 text-[11px]">subtotal</span>
+                            </div>
+                          </td>
+                          <td />
+                          <td />
+                          <td className="text-right tabular-nums px-3 py-2 font-medium">{fmt(totals.total)}</td>
+                          <td className="text-right tabular-nums px-3 py-2">{fmt(totals.vatTotal)}</td>
+                          <td className="text-right tabular-nums px-3 py-2">{fmt(totals.current)}</td>
+                          <td className="text-right tabular-nums px-3 py-2">{fmt(totals.days1To30)}</td>
+                          <td className="text-right tabular-nums px-3 py-2">{fmt(totals.days31To60)}</td>
+                          <td className="text-right tabular-nums px-3 py-2">{fmt(totals.days61To90)}</td>
+                          <td className="text-right tabular-nums px-3 py-2">{fmt(totals.over90)}</td>
+                        </tr>
+                      ))}
 
                       {/* Expanded individual bill rows */}
                       {isExpanded && vendor.bills?.map((bill: any) => (
@@ -235,8 +280,8 @@ export function CreditorsAgeAnalysis() {
                       <td className="text-right tabular-nums px-3 py-2">{fmt(totals.over90)}</td>
                     </tr>
                   ))}
-                  {/* Grand Total */}
-                  {grandTotal && (
+                  {/* Grand Total — hidden when totals span multiple currencies */}
+                  {grandTotal && !grandTotalMixedCurrency && (
                     <tr className="font-bold text-gray-900 border-t-2 border-gray-400">
                       <td className="px-4 py-3 text-sm">Grand Total</td>
                       <td />

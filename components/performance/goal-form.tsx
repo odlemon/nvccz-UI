@@ -107,9 +107,23 @@ export function GoalForm({ departmentId, isOpen, onClose, onSuccess }: GoalFormP
     mode: "onChange"
   })
 
+  const getErrorText = (error: unknown) => {
+    if (typeof error === "string") return error
+    if (error && typeof error === "object") {
+      const maybeError = error as any
+      if (typeof maybeError?.response?.message === "string") return maybeError.response.message
+      if (typeof maybeError?.response?.error === "string") return maybeError.response.error
+      if (Array.isArray(maybeError?.response?.errors) && maybeError.response.errors.length) {
+        return maybeError.response.errors.map((e: any) => e?.message || String(e)).join(", ")
+      }
+      if (typeof maybeError?.message === "string") return maybeError.message
+    }
+    return "Failed to create goal"
+  }
+
   const onSubmit = async (data: GoalFormData) => {
     if (isSubmitting) return
-    
+
     setIsSubmitting(true)
     try {
       await departmentApiService.createGoal({
@@ -121,7 +135,7 @@ export function GoalForm({ departmentId, isOpen, onClose, onSuccess }: GoalFormP
       onSuccess()
     } catch (error: any) {
       console.error('Failed to create goal:', error)
-      toast.error(error.message || "Failed to create goal")
+      toast.error(getErrorText(error))
     } finally {
       setIsSubmitting(false)
     }

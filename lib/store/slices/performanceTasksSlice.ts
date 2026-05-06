@@ -34,6 +34,14 @@ export const fetchMyKanbanTasks = createAsyncThunk(
   }
 )
 
+export const fetchDepartmentKanbanTasks = createAsyncThunk(
+  "performanceTasks/fetchDepartment",
+  async (filters: MyTasksFilters | undefined) => {
+    const res = await performanceTasksApi.getDepartmentTasks(filters)
+    return res.tasks || []
+  }
+)
+
 export const createKanbanTask = createAsyncThunk(
   "performanceTasks/create",
   async (data: Partial<PerformanceTask> & { title: string; team: string[] }) => {
@@ -172,6 +180,18 @@ const slice = createSlice({
         state.tasks = action.payload
       })
       .addCase(fetchMyKanbanTasks.rejected, (state, action) => {
+        state.loading = false
+        state.error = action.error.message || "Failed to load tasks"
+      })
+      .addCase(fetchDepartmentKanbanTasks.pending, (state) => {
+        state.loading = true
+        state.error = null
+      })
+      .addCase(fetchDepartmentKanbanTasks.fulfilled, (state, action) => {
+        state.loading = false
+        state.tasks = action.payload
+      })
+      .addCase(fetchDepartmentKanbanTasks.rejected, (state, action) => {
         state.loading = false
         state.error = action.error.message || "Failed to load tasks"
       })

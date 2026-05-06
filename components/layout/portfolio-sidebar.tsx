@@ -153,7 +153,7 @@ export function PortfolioSidebar() {
   }
 
   return (
-    <aside className="w-72 bg-white border-r border-border h-[calc(100vh-5rem)] overflow-y-auto sticky top-20 z-10">
+    <aside className="w-64 bg-white border-r border-border h-[calc(100vh-5rem)] overflow-y-auto sticky top-20 z-10">
       <div className="p-4 space-y-4">
         {/* Module Header */}
         <div className="flex items-center gap-3 p-3 rounded-lg bg-gradient-to-r from-blue-50 to-blue-100">
@@ -164,7 +164,7 @@ export function PortfolioSidebar() {
             <module.icon className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h2 className="text-lg text-gray-900">{module.name}</h2>
+            <h2 className="text-sm font-semibold text-gray-900">{module.name}</h2>
           </div>
         </div>
 
@@ -175,15 +175,15 @@ export function PortfolioSidebar() {
             <Button
               variant="ghost"
               className={cn(
-                "w-full justify-start gap-3 h-10 cursor-pointer rounded-full transition-all duration-200 text-gray-800",
+                "w-full justify-start gap-3 h-9 cursor-pointer rounded-full transition-all duration-200 text-gray-800",
                 "hover:bg-gradient-to-r hover:from-orange-50 hover:to-amber-100",
                 activeItemId === dashboardSubModule.id &&
                   "bg-gradient-to-r from-orange-500 to-amber-600 text-white shadow-lg",
               )}
               onClick={() => handleItemClick(dashboardSubModule.path)}
             >
-              <dashboardSubModule.icon className="w-5 h-5" />
-              <span className="text-base">{dashboardSubModule.name}</span>
+              <dashboardSubModule.icon className="w-4 h-4" />
+              <span className="text-sm">{dashboardSubModule.name}</span>
             </Button>
           )}
 
@@ -201,14 +201,14 @@ export function PortfolioSidebar() {
                       className="w-full flex items-center justify-between px-3 py-2 rounded-md hover:bg-gray-50 cursor-pointer"
                       onClick={() => toggleGroup(group.id)}
                     >
-                      <span className="flex items-center gap-2 text-[17px] text-gray-800">
-                        <GroupIcon className="w-5 h-5" />
+                      <span className="flex items-center gap-2 text-sm font-medium text-gray-800">
+                        <GroupIcon className="w-4 h-4" />
                         {displayTitle}
                       </span>
                       {collapsed ? (
-                        <CiCirclePlus className="w-5 h-5 text-gray-500" />
+                        <CiCirclePlus className="w-4 h-4 text-gray-500" />
                       ) : (
-                        <CiCircleMinus className="w-5 h-5 text-gray-500" />
+                        <CiCircleMinus className="w-4 h-4 text-gray-500" />
                       )}
                     </button>
                     {!collapsed && (
@@ -222,14 +222,14 @@ export function PortfolioSidebar() {
                                 key={item.id}
                                 variant="ghost"
                                 className={cn(
-                                  "w-full justify-start gap-3 h-9 cursor-pointer rounded-full transition-all duration-200 text-gray-700",
+                                  "w-full justify-start gap-3 h-8 cursor-pointer rounded-full transition-all duration-200 text-gray-700",
                                   "hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100 hover:rounded-full",
                                   active && "bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg rounded-full",
                                 )}
                                 onClick={() => handleItemClick(item.path)}
                               >
-                                <Icon className="w-4 h-4" />
-                                <span className="text-sm">{item.name}</span>
+                                <Icon className="w-3.5 h-3.5" />
+                                <span className="text-xs">{item.name}</span>
                               </Button>
                             )
                           })
@@ -238,14 +238,14 @@ export function PortfolioSidebar() {
                             key={group.id}
                             variant="ghost"
                             className={cn(
-                              "w-full justify-start gap-3 h-9 cursor-pointer rounded-full transition-all duration-200 text-gray-700",
+                              "w-full justify-start gap-3 h-8 cursor-pointer rounded-full transition-all duration-200 text-gray-700",
                               "hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100 hover:rounded-full",
                               activeItemId === group.id && "bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg rounded-full",
                             )}
                             onClick={() => handleItemClick(group.path!)}
                           >
-                            <GroupIcon className="w-4 h-4" />
-                            <span className="text-[13px]">{group.title}</span>
+                            <GroupIcon className="w-3.5 h-3.5" />
+                            <span className="text-xs">{group.title}</span>
                           </Button>
                         ) : null}
                       </div>
@@ -267,14 +267,14 @@ export function PortfolioSidebar() {
                     key={subModule.id}
                     variant="ghost"
                     className={cn(
-                      "w-full justify-start gap-3 h-10 cursor-pointer rounded-full transition-all duration-200 text-gray-800",
+                      "w-full justify-start gap-3 h-9 cursor-pointer rounded-full transition-all duration-200 text-gray-800",
                       "hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100 hover:rounded-full",
                       active && "bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg rounded-full",
                     )}
                     onClick={() => handleItemClick(subModule.path)}
                   >
-                    <Icon className="w-5 h-5" />
-                    <span className="text-base">{subModule.name}</span>
+                    <Icon className="w-4 h-4" />
+                    <span className="text-sm">{subModule.name}</span>
                   </Button>
                 )
               })}

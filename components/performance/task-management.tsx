@@ -5,6 +5,7 @@ import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import { useAppSelector, useAppDispatch } from "@/lib/store"
 import {
   fetchMyKanbanTasks,
+  fetchDepartmentKanbanTasks,
   setFilters,
   setSelectedTaskId,
 } from "@/lib/store/slices/performanceTasksSlice"
@@ -105,8 +106,12 @@ export function TaskManagement() {
   }, [dispatch])
 
   useEffect(() => {
-    dispatch(fetchMyKanbanTasks(filters))
-  }, [dispatch, filters])
+    if (activeTab === "department-tasks") {
+      dispatch(fetchDepartmentKanbanTasks(filters))
+    } else if (activeTab === "my-tasks") {
+      dispatch(fetchMyKanbanTasks(filters))
+    }
+  }, [dispatch, filters, activeTab])
 
   useEffect(() => {
     if (error) {

@@ -11,6 +11,7 @@ import { RichTextEditor } from "@/components/ui/rich-text-editor"
 export interface NewsletterFormValues {
   title: string
   content: string
+  imageFile?: File | null
   imageUrl?: string | null
 }
 
@@ -19,40 +20,73 @@ interface NewsletterFormProps {
   onClose: () => void
   onSubmit: (values: NewsletterFormValues) => Promise<void> | void
   mode?: 'create' | 'edit'
-  initialValues?: Partial<NewsletterFormValues>
+  initialValues?: Partial<Pick<NewsletterFormValues, 'title' | 'content' | 'imageUrl'>>
 }
 
 export function NewsletterForm({ open, onClose, onSubmit, mode = 'create', initialValues }: NewsletterFormProps) {
   const [title, setTitle] = useState("")
   const [content, setContent] = useState("")
-  const [imageUrl, setImageUrl] = useState<string>("")
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string>("")
+  const [existingImageUrl, setExistingImageUrl] = useState<string>("")
   const [submitting, setSubmitting] = useState(false)
-  const [isPicking, setIsPicking] = useState(false)
   const fileInputId = "newsletter-image-input"
 
   useEffect(() => {
     if (open && initialValues) {
       if (typeof initialValues.title === 'string') setTitle(initialValues.title)
       if (typeof initialValues.content === 'string') setContent(initialValues.content)
-      if (typeof initialValues.imageUrl === 'string') setImageUrl(initialValues.imageUrl)
+      if (typeof initialValues.imageUrl === 'string') {
+        setExistingImageUrl(initialValues.imageUrl)
+        setImagePreview(initialValues.imageUrl)
+      }
     }
-    if (!open && mode === 'create') {
-      setTitle("")
-      setContent("")
-      setImageUrl("")
+    if (!open) {
+      if (imagePreview && imageFile) {
+        URL.revokeObjectURL(imagePreview)
+      }
+      if (mode === 'create') {
+        setTitle("")
+        setContent("")
+      }
+      setImageFile(null)
+      setImagePreview("")
+      setExistingImageUrl("")
     }
   }, [open])
+
+  const handleFileChange = (file: File | null) => {
+    if (imagePreview && imageFile) {
+      URL.revokeObjectURL(imagePreview)
+    }
+    if (file) {
+      setImageFile(file)
+      setImagePreview(URL.createObjectURL(file))
+    } else {
+      setImageFile(null)
+      setImagePreview(existingImageUrl)
+    }
+  }
+
+  const handleRemoveImage = () => {
+    if (imagePreview && imageFile) {
+      URL.revokeObjectURL(imagePreview)
+    }
+    setImageFile(null)
+    setImagePreview("")
+    setExistingImageUrl("")
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSubmitting(true)
     try {
-      await onSubmit({ title, content, imageUrl: imageUrl || null })
-      if (mode === 'create') {
-        setTitle("")
-        setContent("")
-        setImageUrl("")
-      }
+      await onSubmit({
+        title,
+        content,
+        imageFile,
+        imageUrl: imageFile ? null : (existingImageUrl || null),
+      })
       onClose()
     } finally {
       setSubmitting(false)
@@ -83,47 +117,36 @@ export function NewsletterForm({ open, onClose, onSubmit, mode = 'create', initi
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="imageUrl">Image URL (optional)</Label>
-            <Input
-              id="imageUrl"
-              placeholder="https://..."
-              value={imageUrl}
-              onChange={(e) => setImageUrl(e.target.value)}
-              className="rounded-full"
-            />
+            <Label htmlFor={fileInputId}>Image (optional)</Label>
             <div className="flex items-center gap-2">
               <input
                 id={fileInputId}
                 type="file"
                 accept="image/*"
                 className="hidden"
-                onChange={(e) => {
-                  const f = e.target.files?.[0]
-                  if (f) {
-                    const url = URL.createObjectURL(f)
-                    setImageUrl(url)
-                  }
-                }}
+                onChange={(e) => handleFileChange(e.target.files?.[0] || null)}
               />
               <Button
                 type="button"
                 variant="outline"
                 className="rounded-full"
-                onClick={() => {
-                  if (!submitting) {
-                    document.getElementById(fileInputId)?.click()
-                  }
-                }}
+                disabled={submitting}
+                onClick={() => document.getElementById(fileInputId)?.click()}
               >
-                Upload Image
+                {imagePreview ? 'Change Image' : 'Upload Image'}
               </Button>
-              {imageUrl ? (
-                <Button type="button" variant="ghost" className="rounded-full" onClick={() => setImageUrl("")}>Remove</Button>
+              {imagePreview ? (
+                <Button type="button" variant="ghost" className="rounded-full" onClick={handleRemoveImage} disabled={submitting}>
+                  Remove
+                </Button>
+              ) : null}
+              {imageFile ? (
+                <span className="text-xs text-gray-500 truncate max-w-[240px]">{imageFile.name}</span>
               ) : null}
             </div>
-            {imageUrl ? (
+            {imagePreview ? (
               <div className="mt-2">
-                <img src={imageUrl} alt="Preview" className="h-24 w-24 rounded-lg object-cover border" />
+                <img src={imagePreview} alt="Preview" className="h-24 w-24 rounded-lg object-cover border" />
               </div>
             ) : null}
           </div>

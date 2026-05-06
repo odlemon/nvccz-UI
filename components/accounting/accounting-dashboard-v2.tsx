@@ -128,8 +128,12 @@ export function AccountingDashboardV2() {
     }
 
     const opProfitData = dashboardData?.monthlyData || []
-    const assetsGridData = dashboardData?.assets?.detailed || []
+    // The asset distribution / list uses the high-level summary breakdown (which now includes
+    // "other assets" categories like recoverable VAT, fixed-asset register overlap, short-term
+    // investments). Fall back to detailed if summary is unavailable.
+    const assetsSummaryData = dashboardData?.assets?.summary || []
     const assetsDetailedData = dashboardData?.assets?.detailed || []
+    const assetsGridData = assetsSummaryData.length > 0 ? assetsSummaryData : assetsDetailedData
     const liabilitiesEquityData = dashboardData?.liabilitiesEquity?.summary || []
     const expensesChartData = dashboardData?.expenses || []
 
@@ -534,12 +538,15 @@ export function AccountingDashboardV2() {
                         <CardContent className="p-5">
                             <div className="space-y-6">
                                 {assetsGridData.length > 0 ? (
-                                    assetsGridData.slice(0, 5).map((asset: any, index: number) => (
+                                    assetsGridData.slice(0, 8).map((asset: any, index: number) => (
                                         <div key={index} className="flex items-center gap-4">
                                             <div className="w-1.5 h-10 rounded-full" style={{ backgroundColor: ASSET_GRID_COLORS[index % ASSET_GRID_COLORS.length] }}></div>
                                             <div className="flex-1">
                                                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{asset.category}</p>
-                                                <p className="text-xl font-normal text-foreground mt-1 tracking-tight">{currencySymbol}{asset.amount.toLocaleString()}</p>
+                                                <p className="text-xl font-normal text-foreground mt-1 tracking-tight">{currencySymbol}{(asset.amount ?? 0).toLocaleString()}</p>
+                                                {typeof asset.percent === 'number' && (
+                                                    <p className="text-[11px] font-medium text-muted-foreground/70 mt-0.5">{asset.percent.toFixed(1)}% of total</p>
+                                                )}
                                             </div>
                                         </div>
                                     ))
@@ -567,42 +574,54 @@ export function AccountingDashboardV2() {
                         <CardContent className="p-5">
                             {assetsGridData.length > 0 ? (
                                 <div className="flex flex-col h-[450px] overflow-hidden rounded-md">
-                                    {[0, 1, 2, 3].map((rowIdx) => {
-                                        const rowWidths = [
+                                    {(() => {
+                                        const rowWidthPatterns = [
                                             ['55%', '45%'],
                                             ['42%', '58%'],
                                             ['60%', '40%'],
-                                            ['48%', '52%']
-                                        ][rowIdx];
-
-                                        return (
-                                            <div key={rowIdx} className={`flex flex-1 ${rowIdx !== 3 ? 'border-b border-white/20' : ''}`}>
-                                                {[0, 1].map((colIdx) => {
-                                                    const dataIdx = rowIdx * 2 + colIdx;
-                                                    const item = assetsGridData[dataIdx];
-                                                    if (!item) return null;
-
-                                                    return (
-                                                        <div
-                                                            key={colIdx}
-                                                            className="flex flex-col items-center justify-center p-3 transition-colors"
-                                                            style={{
-                                                                backgroundColor: ASSET_GRID_COLORS[dataIdx % ASSET_GRID_COLORS.length],
-                                                                width: rowWidths[colIdx]
-                                                            }}
-                                                        >
-                                                            <span className="text-[10px] font-medium text-white/90 uppercase tracking-wider text-center leading-tight mb-1">
-                                                                {item.category}
-                                                            </span>
-                                                            <span className="text-xl font-light text-white tracking-tight">
-                                                                {currencySymbol}{item.amount.toLocaleString()}
-                                                            </span>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        );
-                                    })}
+                                            ['48%', '52%'],
+                                            ['52%', '48%'],
+                                        ]
+                                        const rowCount = Math.ceil(assetsGridData.length / 2)
+                                        return Array.from({ length: rowCount }).map((_, rowIdx) => {
+                                            const left = assetsGridData[rowIdx * 2]
+                                            const right = assetsGridData[rowIdx * 2 + 1]
+                                            const widths = rowWidthPatterns[rowIdx % rowWidthPatterns.length]
+                                            const isLast = rowIdx === rowCount - 1
+                                            return (
+                                                <div key={rowIdx} className={`flex flex-1 ${!isLast ? 'border-b border-white/20' : ''}`}>
+                                                    {[left, right].map((item: any, colIdx: number) => {
+                                                        if (!item) return null
+                                                        const dataIdx = rowIdx * 2 + colIdx
+                                                        // If this row only has one item, give it the full width
+                                                        const width = !right && colIdx === 0 ? '100%' : widths[colIdx]
+                                                        return (
+                                                            <div
+                                                                key={colIdx}
+                                                                className="flex flex-col items-center justify-center p-3 transition-colors"
+                                                                style={{
+                                                                    backgroundColor: ASSET_GRID_COLORS[dataIdx % ASSET_GRID_COLORS.length],
+                                                                    width,
+                                                                }}
+                                                            >
+                                                                <span className="text-[10px] font-medium text-white/90 uppercase tracking-wider text-center leading-tight mb-1">
+                                                                    {item.category}
+                                                                </span>
+                                                                <span className="text-xl font-light text-white tracking-tight">
+                                                                    {currencySymbol}{(item.amount ?? 0).toLocaleString()}
+                                                                </span>
+                                                                {typeof item.percent === 'number' && (
+                                                                    <span className="text-[10px] font-medium text-white/80 mt-0.5">
+                                                                        {item.percent.toFixed(1)}%
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        )
+                                                    })}
+                                                </div>
+                                            )
+                                        })
+                                    })()}
                                 </div>
                             ) : (
                                 <div className="flex flex-col items-center justify-center h-[450px] text-center">

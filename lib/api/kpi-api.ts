@@ -23,6 +23,7 @@ export interface KPICreateRequest {
   isFinancial?: boolean
   weightValue: number
   isActive: boolean
+  pillarId?: string | null
 }
 
 export interface KPIUpdateRequest {
@@ -48,6 +49,7 @@ export interface KPIUpdateRequest {
   isFinancial?: boolean
   weightValue?: number
   isActive?: boolean
+  pillarId?: string | null
 }
 
 export interface KPI {

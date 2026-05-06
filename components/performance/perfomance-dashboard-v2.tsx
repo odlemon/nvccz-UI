@@ -51,6 +51,7 @@ export function PerformanceDashboardV2() {
     const [selectedWeek, setSelectedWeek] = useState("Week 1")
     const [selectedYear, setSelectedYear] = useState("2026")
     const [selectedMonth, setSelectedMonth] = useState("January")
+    const [activeView, setActiveView] = useState<"dashboard" | "kpi-analytics">("dashboard")
 
     // Fetch dashboard data on mount and when filters change
     useEffect(() => {
@@ -193,6 +194,33 @@ export function PerformanceDashboardV2() {
                 {/* Vision Banner */}
                 <VisionBanner />
 
+                {/* View Switch */}
+                <div className="flex items-center justify-between flex-wrap gap-3">
+                    <div className="flex flex-col gap-1.5">
+                        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">View</span>
+                        <div className="flex bg-white rounded-full p-1 border border-gray-200">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className={`rounded-full h-8 px-4 text-xs font-semibold ${activeView === "dashboard" ? "bg-[#1a3a4a] text-white hover:bg-[#1a3a4a]/90" : "text-muted-foreground hover:bg-gray-50"}`}
+                                onClick={() => setActiveView("dashboard")}
+                            >
+                                Dashboard
+                            </Button>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className={`rounded-full h-8 px-4 text-xs font-semibold ${activeView === "kpi-analytics" ? "bg-[#1a3a4a] text-white hover:bg-[#1a3a4a]/90" : "text-muted-foreground hover:bg-gray-50"}`}
+                                onClick={() => setActiveView("kpi-analytics")}
+                            >
+                                KPI Analytics
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+
+                {activeView === "dashboard" && (
+                <>
                 {/* Filter Bar */}
                 <div className="flex flex-wrap items-center justify-start gap-3 mb-4">
                     <Select value={selectedWeek} onValueChange={setSelectedWeek}>
@@ -807,11 +835,15 @@ export function PerformanceDashboardV2() {
                     </Card>
                 </div>
 
-            </div>
+                </>
+                )}
 
-            {/* KPI Performance Analysis - Placed at the absolute end of the dashboard */}
-            <div className="mt-8 bg-white border-none rounded-xl shadow-none p-6">
-                <KPIPerformanceAnalysisTab />
+                {activeView === "kpi-analytics" && (
+                    <div className="bg-white border-none rounded-xl shadow-none p-6">
+                        <KPIPerformanceAnalysisTab />
+                    </div>
+                )}
+
             </div>
         </div>
     )

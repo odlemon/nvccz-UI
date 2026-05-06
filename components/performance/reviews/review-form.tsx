@@ -391,10 +391,10 @@ export function ReviewForm({ reviewId }: Props) {
 
                     <div className="space-y-3">
                       <Label className="text-xs font-medium uppercase tracking-widest text-gray-400">
-                        Evaluation Rating (1-5 Integer Only)
+                        Evaluation Rating (1-6 Integer Only)
                       </Label>
                       <div className="flex gap-3">
-                        {[1, 2, 3, 4, 5].map((r) => (
+                        {[1, 2, 3, 4, 5,6].map((r) => (
                           <button
                             key={r}
                             disabled={isLocked}

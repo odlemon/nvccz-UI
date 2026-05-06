@@ -59,7 +59,7 @@ export function AccountingSidebar() {
   }, [module.subModules, hasSubModuleAccess, isLoading])
 
   return (
-    <aside className="w-72 bg-white border-r border-border h-[calc(100vh-5rem)] overflow-y-auto sticky top-20 z-10">
+    <aside className="w-64 bg-white border-r border-border h-[calc(100vh-5rem)] overflow-y-auto sticky top-20 z-10">
       <div className="p-4 space-y-4">
         {/* Module Header */}
         <div className="flex items-center gap-3 p-3 rounded-lg bg-gradient-to-r from-blue-50 to-blue-100">
@@ -70,7 +70,7 @@ export function AccountingSidebar() {
             <module.icon className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h2 className="text-lg text-gray-900">{module.name}</h2>
+            <h2 className="text-sm font-semibold text-gray-900">{module.name}</h2>
           </div>
         </div>
 
@@ -84,14 +84,14 @@ export function AccountingSidebar() {
                 key={subModule.id}
                 variant="ghost"
                 className={cn(
-                  "w-full justify-start gap-3 h-12 cursor-pointer rounded-full transition-all duration-200 text-gray-800",
+                  "w-full justify-start gap-3 h-9 cursor-pointer rounded-full transition-all duration-200 text-gray-800",
                   "hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100 hover:rounded-full",
                   active && "bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg rounded-full",
                 )}
                 onClick={() => handleItemClick(subModule.path)}
               >
-                <Icon className="w-5 h-5" />
-                <span className="text-base">{subModule.name}</span>
+                <Icon className="w-4 h-4" />
+                <span className="text-sm">{subModule.name}</span>
               </Button>
             )
           })}

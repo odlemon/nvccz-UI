@@ -96,7 +96,7 @@ export function PerformanceSidebar() {
     setCollapsedGroups((prev) => ({ ...prev, [id]: !prev[id] }))
 
   return (
-    <aside className="w-72 bg-white border-r border-border h-[calc(100vh-5rem)] overflow-y-auto sticky top-20 z-10">
+    <aside className="w-64 bg-white border-r border-border h-[calc(100vh-5rem)] overflow-y-auto sticky top-20 z-10">
       <div className="p-4 space-y-4">
         {/* Module Header */}
         <div className="flex items-center gap-3 p-3 rounded-lg bg-gradient-to-r from-purple-50 to-purple-100">
@@ -107,7 +107,7 @@ export function PerformanceSidebar() {
             <module.icon className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h2 className="text-lg text-gray-900">{module.name}</h2>
+            <h2 className="text-sm font-semibold text-gray-900">{module.name}</h2>
           </div>
         </div>
 
@@ -121,14 +121,14 @@ export function PerformanceSidebar() {
                 key={subModule.id}
                 onClick={() => router.push(subModule.path)}
                 className={cn(
-                  "w-full flex items-center gap-3 h-10 cursor-pointer rounded-full transition-all duration-200 text-gray-800 px-3",
+                  "w-full flex items-center gap-3 h-9 cursor-pointer rounded-full transition-all duration-200 text-gray-800 px-3",
                   "hover:bg-gradient-to-r hover:from-purple-50 hover:to-purple-100",
                   active &&
                     "bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg"
                 )}
               >
-                <Icon className="w-5 h-5 flex-shrink-0" />
-                <span className="text-base font-normal text-left">{subModule.name}</span>
+                <Icon className="w-4 h-4 flex-shrink-0" />
+                <span className="text-sm font-normal text-left">{subModule.name}</span>
               </button>
             )
           })}
@@ -146,14 +146,14 @@ export function PerformanceSidebar() {
                     className="w-full flex items-center justify-between px-3 py-2 rounded-md hover:bg-gray-50 cursor-pointer"
                     onClick={() => toggleGroup(group.id)}
                   >
-                    <span className="flex items-center gap-2 text-[17px] font-medium text-gray-800">
-                      {group.icon ? <group.icon className="w-5 h-5" /> : <CiSettings className="w-5 h-5" />}
+                    <span className="flex items-center gap-2 text-sm font-medium text-gray-800">
+                      {group.icon ? <group.icon className="w-4 h-4" /> : <CiSettings className="w-4 h-4" />}
                       <span className="text-left">{group.title}</span>
                     </span>
                     {collapsed ? (
-                      <CiCirclePlus className="w-5 h-5 text-gray-500 ml-2" />
+                      <CiCirclePlus className="w-4 h-4 text-gray-500 ml-2" />
                     ) : (
-                      <CiCircleMinus className="w-5 h-5 text-gray-500 ml-2" />
+                      <CiCircleMinus className="w-4 h-4 text-gray-500 ml-2" />
                     )}
                   </button>
                   {!collapsed && (
@@ -166,14 +166,14 @@ export function PerformanceSidebar() {
                             key={item.id}
                             onClick={() => router.push(item.path)}
                             className={cn(
-                              "w-full flex items-center justify-start gap-3 h-9 cursor-pointer rounded-full transition-all duration-200 text-gray-700 px-3 text-left",
+                              "w-full flex items-center justify-start gap-3 h-8 cursor-pointer rounded-full transition-all duration-200 text-gray-700 px-3 text-left",
                               "hover:bg-gradient-to-r hover:from-purple-50 hover:to-purple-100",
                               active &&
                                 "bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg"
                             )}
                           >
-                            <Icon className="w-4 h-4 flex-shrink-0" />
-                            <span className="text-sm text-left flex-1">{item.name}</span>
+                            <Icon className="w-3.5 h-3.5 flex-shrink-0" />
+                            <span className="text-xs text-left flex-1">{item.name}</span>
                           </button>
                         )
                       })}

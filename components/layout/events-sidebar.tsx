@@ -35,7 +35,7 @@ export function EventsSidebar() {
             <module.icon className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h2 className="text-base text-gray-900">{module.name}</h2>
+            <h2 className="text-sm font-semibold text-gray-900">{module.name}</h2>
           </div>
         </div>
 
@@ -51,12 +51,12 @@ export function EventsSidebar() {
                 key={subModule.id}
                 href={subModule.path}
                 className={cn(
-                  "flex items-center gap-3 h-12 cursor-pointer rounded-full transition-all duration-200 text-gray-800 px-3",
+                  "flex items-center gap-3 h-9 cursor-pointer rounded-full transition-all duration-200 text-gray-800 px-3",
                   "hover:bg-gradient-to-r hover:from-purple-50 hover:to-purple-100 hover:rounded-full",
                   active && "bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg rounded-full",
                 )}
               >
-                <Icon className="w-5 h-5" />
+                <Icon className="w-4 h-4" />
                 <span className="text-sm font-normal">{subModule.name}</span>
               </Link>
             )

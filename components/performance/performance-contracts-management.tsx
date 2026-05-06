@@ -540,7 +540,7 @@ export function PerformanceContractsManagement() {
           })}
         </div>
 
-        {/* Active Contracts List */}}
+        {/* Active Contracts List */}
         <div className="rounded-2xl border border-border bg-card overflow-hidden">
           <div className="bg-primary px-5 py-3 flex items-center justify-between">
             <h3 className="text-sm font-semibold text-primary-foreground">

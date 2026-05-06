@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { useForm, Controller } from "react-hook-form"
 import { yupResolver } from "@hookform/resolvers/yup"
 import * as yup from "yup"
@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/dialog"
 import { CiFloppyDisk, CiSquareRemove } from "react-icons/ci"
 import { useAppSelector } from "@/lib/store"
+import { performanceConfigApi, type ScorecardPillar } from "@/lib/api/performance-config-api"
 
 const schema = yup.object({
   name: yup.string().required("KPI name is required"),
@@ -58,6 +59,7 @@ const schema = yup.object({
     otherwise: (s) => s.nullable(),
   }),
   isFinancial: yup.boolean().required(),
+  pillarId: yup.string().required("Scorecard pillar is required"),
 })
 
 interface KPIFormProps {
@@ -76,6 +78,28 @@ const getErrorMessage = (error: any) => {
 export function KPIForm({ isOpen, onClose, onSubmit, kpi, isLoading = false }: KPIFormProps) {
   const { availableDepartments } = useAppSelector((state) => state.performance)
   const validDepartments = Array.isArray(availableDepartments) ? availableDepartments : []
+  const [pillars, setPillars] = useState<ScorecardPillar[]>([])
+  const [pillarsLoading, setPillarsLoading] = useState(false)
+
+  useEffect(() => {
+    if (!isOpen) return
+    let cancelled = false
+    const load = async () => {
+      setPillarsLoading(true)
+      try {
+        const res = await performanceConfigApi.getScorecardPillars()
+        if (!cancelled) setPillars(Array.isArray(res?.data) ? res.data : [])
+      } catch (e) {
+        if (!cancelled) setPillars([])
+      } finally {
+        if (!cancelled) setPillarsLoading(false)
+      }
+    }
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [isOpen])
 
   const {
     control,
@@ -103,6 +127,7 @@ export function KPIForm({ isOpen, onClose, onSubmit, kpi, isLoading = false }: K
       journalEntryType: "Debit",
       isFinancial: false,
       isActive: true,
+      pillarId: "",
     },
   })
 
@@ -129,6 +154,7 @@ export function KPIForm({ isOpen, onClose, onSubmit, kpi, isLoading = false }: K
         journalEntryType: kpi.journalEntryType || kpi.hardcodedDetails?.journalEntryType || "Debit",
         isFinancial: Boolean(kpi.isFinancial ?? kpi.hardcodedDetails?.isFinancial ?? false),
         isActive: Boolean(kpi.isActive ?? true),
+        pillarId: kpi.pillarId || kpi.scorecardPillarId || "",
       })
     } else {
       reset({
@@ -149,6 +175,7 @@ export function KPIForm({ isOpen, onClose, onSubmit, kpi, isLoading = false }: K
         journalEntryType: "Debit",
         isFinancial: false,
         isActive: true,
+        pillarId: "",
       })
     }
   }, [kpi, reset])
@@ -165,6 +192,7 @@ export function KPIForm({ isOpen, onClose, onSubmit, kpi, isLoading = false }: K
       accountType: data.accountType,
       accountNumber: data.isFinancial ? data.accountNumber : null,
       journalEntryType: data.journalEntryType,
+      pillarId: data.pillarId || null,
     }
 
     onSubmit(payload)
@@ -209,6 +237,32 @@ export function KPIForm({ isOpen, onClose, onSubmit, kpi, isLoading = false }: K
                 )}
               />
               {errors.code && <p className="text-sm text-red-500">{getErrorMessage(errors.code)}</p>}
+            </div>
+
+            <div className="space-y-2">
+              <Label>Scorecard Pillar *</Label>
+              <Controller
+                name="pillarId"
+                control={control}
+                render={({ field }) => (
+                  <Select value={field.value || ""} onValueChange={field.onChange} disabled={pillarsLoading}>
+                    <SelectTrigger className={errors.pillarId ? "border-red-500" : ""}>
+                      <SelectValue placeholder={pillarsLoading ? "Loading pillars..." : "Select pillar"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {pillars.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.displayName}
+                        </SelectItem>
+                      ))}
+                      {pillars.length === 0 && !pillarsLoading && (
+                        <div className="px-2 py-1.5 text-sm text-gray-500">No pillars available</div>
+                      )}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              {errors.pillarId && <p className="text-sm text-red-500">{getErrorMessage(errors.pillarId)}</p>}
             </div>
 
             <div className="space-y-2">

@@ -132,7 +132,7 @@ export function ModuleSidebar({ currentModule, activeItem, onItemSelect }: Modul
             <module.icon className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h2 className="text-base text-gray-900">{module.name}</h2>
+            <h2 className="text-sm font-semibold text-gray-900">{module.name}</h2>
           </div>
         </div>
 
@@ -149,14 +149,14 @@ export function ModuleSidebar({ currentModule, activeItem, onItemSelect }: Modul
                     className="w-full flex items-center justify-between px-3 py-2 rounded-md hover:bg-gray-50 cursor-pointer"
                     onClick={() => toggleGroup(group.id)}
                   >
-                    <span className="flex items-center gap-2 text-[15px] text-gray-800">
-                      <GroupIcon className="w-5 h-5" />
+                    <span className="flex items-center gap-2 text-sm font-medium text-gray-800">
+                      <GroupIcon className="w-4 h-4" />
                       {group.title}
                     </span>
                     {collapsed ? (
-                      <CiCirclePlus className="w-5 h-5 text-gray-500" />
+                      <CiCirclePlus className="w-4 h-4 text-gray-500" />
                     ) : (
-                      <CiCircleMinus className="w-5 h-5 text-gray-500" />
+                      <CiCircleMinus className="w-4 h-4 text-gray-500" />
                     )}
                   </button>
                   {!collapsed && (
@@ -169,14 +169,14 @@ export function ModuleSidebar({ currentModule, activeItem, onItemSelect }: Modul
                             key={item.id}
                             variant="ghost"
                             className={cn(
-                              "w-full justify-start gap-3 h-9 cursor-pointer rounded-full transition-all duration-200 text-gray-700",
+                              "w-full justify-start gap-3 h-8 cursor-pointer rounded-full transition-all duration-200 text-gray-700",
                               "hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100 hover:rounded-full",
                               active && "bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg rounded-full",
                             )}
                             onClick={() => handleItemClick(item.path, item.id)}
                           >
-                            <Icon className="w-4 h-4" />
-                            <span className="text-[13px]">{item.name}</span>
+                            <Icon className="w-3.5 h-3.5" />
+                            <span className="text-xs">{item.name}</span>
                           </Button>
                         )
                       })}
@@ -195,13 +195,13 @@ export function ModuleSidebar({ currentModule, activeItem, onItemSelect }: Modul
                     key={subModule.id}
                     variant="ghost"
                     className={cn(
-                      "w-full justify-start gap-3 h-12 cursor-pointer rounded-full transition-all duration-200 text-gray-800",
+                      "w-full justify-start gap-3 h-9 cursor-pointer rounded-full transition-all duration-200 text-gray-800",
                       "hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100 hover:rounded-full",
                       active && "bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg rounded-full",
                     )}
                     onClick={() => handleItemClick(subModule.path, subModule.id)}
                   >
-                    <Icon className="w-5 h-5" />
+                    <Icon className="w-4 h-4" />
                     <span className="text-sm">{subModule.name}</span>
                   </Button>
                 )

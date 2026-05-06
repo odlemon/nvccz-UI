@@ -87,14 +87,23 @@ export function NewsletterTab() {
   const handleSubmit = async (values: NewsletterFormValues) => {
     try {
       if (editing) {
-        const res = await newslettersApi.update(editing.id, { title: values.title, content: values.content, imageUrl: values.imageUrl ?? null })
+        const res = await newslettersApi.update(editing.id, {
+          title: values.title,
+          content: values.content,
+          image: values.imageFile ?? null,
+          imageUrl: values.imageFile ? undefined : (values.imageUrl ?? null),
+        })
         if (res.success && res.data) {
           setNewsletterData(prev => prev.map(n => n.id === editing.id ? (res.data as any) : n))
           toast.success('Newsletter updated successfully')
         }
         setEditing(null)
       } else {
-        const res = await newslettersApi.create({ title: values.title, content: values.content, imageUrl: values.imageUrl ?? null })
+        const res = await newslettersApi.create({
+          title: values.title,
+          content: values.content,
+          image: values.imageFile ?? null,
+        })
         if (res.success && res.data) {
           setNewsletterData(prev => [res.data as any, ...prev])
           toast.success('Newsletter created successfully')
