@@ -9,18 +9,12 @@ import type { Department } from "@/lib/api/department-api"
 import { PayrollDashboardSkeleton } from "./payroll-dashboard-skeleton"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table"
+import { Input } from "@/components/ui/input"
+import { ProcurementDataTable, type Column } from "@/components/procurement/procurement-data-table"
+import { Search } from "lucide-react"
 import {
     LineChart,
     Line,
@@ -34,10 +28,8 @@ import {
 } from "recharts"
 import {
     Calendar,
-    MoreVertical,
     Download,
     Plus,
-    Search,
     ArrowUpRight,
 } from "lucide-react"
 
@@ -52,8 +44,6 @@ export function PayrollDashboardV2() {
     const [selectedStatus, setSelectedStatus] = useState("all")
     const [selectedMonth, setSelectedMonth] = useState("all")
     const [selectedYear, setSelectedYear] = useState("2026")
-    const [currentPage, setCurrentPage] = useState(1)
-    const itemsPerPage = 10
 
     // Fetch dashboard data on mount and when filters change
     useEffect(() => {
@@ -83,26 +73,6 @@ export function PayrollDashboardV2() {
     const deptDistribution = dashboardData?.departmentDistribution || []
     const payrollList = dashboardData?.payrollList || []
 
-    // Filter payroll list based on search and filters
-    const filteredPayroll = payrollList.filter((item: any) => {
-        const matchesSearch = searchQuery === "" || item.name?.toLowerCase().includes(searchQuery.toLowerCase())
-        const itemDept = (item.department || "").trim().toLowerCase()
-        const selectedDept = selectedDepartment === "all" ? "" : selectedDepartment.trim().toLowerCase()
-        const matchesDepartment = selectedDepartment === "all" || itemDept === selectedDept
-        const matchesStatus = selectedStatus === "all" || item.status?.toLowerCase() === selectedStatus.toLowerCase()
-        return matchesSearch && matchesDepartment && matchesStatus
-    })
-
-    // Pagination calculations
-    const totalPages = Math.ceil(filteredPayroll.length / itemsPerPage)
-    const startIndex = (currentPage - 1) * itemsPerPage
-    const paginatedPayroll = filteredPayroll.slice(startIndex, startIndex + itemsPerPage)
-
-    // Reset to page 1 when filters change
-    useEffect(() => {
-        setCurrentPage(1)
-    }, [searchQuery, selectedDepartment, selectedStatus])
-
     const getStatusBadge = (status: string) => {
         switch (status) {
             case "Paid":
@@ -115,6 +85,57 @@ export function PayrollDashboardV2() {
                 return <Badge variant="outline" className="rounded-full px-3">{status}</Badge>
         }
     }
+
+    // Apply department + status + name-only search filters before handing the data
+    // to ProcurementDataTable. Pagination/sort are handled by the table itself.
+    const tableRows = useMemo(() => {
+        const selectedDept = selectedDepartment.trim().toLowerCase()
+        const selectedStat = selectedStatus.trim().toLowerCase()
+        const nameQuery = searchQuery.trim().toLowerCase()
+        return payrollList
+            .filter((item: any) => {
+                const itemDept = (item.department || "").trim().toLowerCase()
+                const itemStat = (item.status || "").trim().toLowerCase()
+                const matchesDepartment = selectedDepartment === "all" || itemDept === selectedDept
+                const matchesStatus = selectedStatus === "all" || itemStat === selectedStat
+                const matchesName = !nameQuery || (item.name || "").toLowerCase().includes(nameQuery)
+                return matchesDepartment && matchesStatus && matchesName
+            })
+            .map((item: any, idx: number) => ({
+                id: item.employeeId || `payroll-${idx}`,
+                name: item.name || "",
+                department: item.department || "",
+                payDate: item.payDate || "",
+                status: item.status || "",
+                baseSalary: item.baseSalary ?? 0,
+                bonuses: item.bonuses ?? 0,
+                totalSalary: item.totalSalary ?? 0,
+            }))
+    }, [payrollList, selectedDepartment, selectedStatus, searchQuery])
+
+    const payrollColumns: Column<typeof tableRows[number]>[] = useMemo(() => [
+        {
+            key: "name",
+            label: "Name",
+            sortable: true,
+            render: (_value, row) => (
+                <div className="flex items-center gap-3">
+                    <Avatar className="w-8 h-8">
+                        <AvatarFallback className="bg-muted text-foreground text-xs">
+                            {row.name?.substring(0, 2).toUpperCase() || "EM"}
+                        </AvatarFallback>
+                    </Avatar>
+                    <span className="font-medium text-foreground">{row.name}</span>
+                </div>
+            ),
+        },
+        { key: "department", label: "Department", sortable: true, render: (v) => <span className="text-muted-foreground">{v || "-"}</span> },
+        { key: "payDate", label: "Pay Date", sortable: true, render: (v) => <span className="text-muted-foreground">{v || "-"}</span> },
+        { key: "status", label: "Status", sortable: true, render: (v) => getStatusBadge(v) },
+        { key: "baseSalary", label: "Base Salary", sortable: true, render: (v) => <span className="text-foreground">${(v ?? 0).toLocaleString()}</span> },
+        { key: "bonuses", label: "Bonuses", sortable: true, render: (v) => <span className="text-foreground">${(v ?? 0).toLocaleString()}</span> },
+        { key: "totalSalary", label: "Total Salary", sortable: true, render: (v) => <span className="font-semibold text-foreground">${(v ?? 0).toLocaleString()}</span> },
+    ], [])
 
     // Show skeleton while loading - AFTER all hooks
     if (dashboardLoading) {
@@ -366,131 +387,61 @@ export function PayrollDashboardV2() {
                 </div>
 
                 {/* Payroll List */}
-                <Card className="bg-white border-none rounded-xl shadow-none mt-6">
-                    <CardHeader className="px-6 pt-6 pb-0">
-                        <div className="flex items-center justify-between">
-                            <CardTitle className="text-lg font-semibold text-foreground">Payroll List</CardTitle>
-                            <div className="flex items-center gap-3">
-                                <div className="relative">
-                                    <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                                    <Input
-                                        placeholder="Search employee"
-                                        className="pl-9 h-10 w-48 rounded-full border-gray-200 bg-white shadow-none text-xs font-semibold ring-0 focus:ring-0"
-                                        value={searchQuery}
-                                        onChange={(e) => setSearchQuery(e.target.value)}
-                                    />
-                                </div>
-                                <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-                                    <SelectTrigger className="w-48 h-10 rounded-full border-gray-200 bg-white shadow-none text-xs font-bold ring-0 focus:ring-0">
-                                        <SelectValue placeholder="Department" />
-                                    </SelectTrigger>
-                                    <SelectContent className="rounded-2xl border-gray-200 shadow-xl">
-                                        <SelectItem value="all">All Departments</SelectItem>
-                                        {availableDepartments.map((dept: any) => (
-                                            <SelectItem key={dept.name} value={dept.name}>
-                                                {dept.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                                <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                                    <SelectTrigger className="w-32 h-10 rounded-full border-gray-200 bg-white shadow-none text-xs font-bold ring-0 focus:ring-0">
-                                        <SelectValue placeholder="Status" />
-                                    </SelectTrigger>
-                                    <SelectContent className="rounded-2xl border-gray-200 shadow-xl">
-                                        <SelectItem value="all">All Status</SelectItem>
-                                        <SelectItem value="paid">Paid</SelectItem>
-                                        <SelectItem value="pending">Pending</SelectItem>
-                                        <SelectItem value="processing">Processing</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
+                <div className="mt-6 space-y-3">
+                    {/* Filter bar — kept in the parent so the search input is never affected by
+                        the data-table's internal re-mounts (key changes / sort / pagination state). */}
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                        <div className="relative">
+                            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                                placeholder="Search employee name..."
+                                className="pl-9 h-10 w-56 rounded-full border-gray-200 bg-white shadow-none text-xs font-semibold ring-0 focus:ring-0"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                            />
                         </div>
-                        {filteredPayroll.length > 0 && (
-                            <div className="text-xs text-muted-foreground mt-4">
-                                Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, filteredPayroll.length)} of {filteredPayroll.length} records
-                            </div>
-                        )}
-                    </CardHeader>
-                    <CardContent>
-                        <Table>
-                            <TableHeader>
-                                <TableRow className="border-border">
-                                    <TableHead className="text-muted-foreground">Name</TableHead>
-                                    <TableHead className="text-muted-foreground">Department</TableHead>
-                                    <TableHead className="text-muted-foreground">Pay Date</TableHead>
-                                    <TableHead className="text-muted-foreground">Status</TableHead>
-                                    <TableHead className="text-muted-foreground">Base Salary</TableHead>
-                                    <TableHead className="text-muted-foreground">Bonuses</TableHead>
-                                    <TableHead className="text-muted-foreground">Total Salary</TableHead>
-                                    <TableHead className="text-muted-foreground">Actions</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {paginatedPayroll.length > 0 ? (
-                                    paginatedPayroll.map((employee: any) => (
-                                        <TableRow key={employee.employeeId} className="border-border">
-                                            <TableCell>
-                                                <div className="flex items-center gap-3">
-                                                    <Avatar className="w-8 h-8">
-                                                        <AvatarFallback className="bg-muted text-foreground text-xs">
-                                                            {employee.name?.substring(0, 2).toUpperCase() || 'EM'}
-                                                        </AvatarFallback>
-                                                    </Avatar>
-                                                    <span className="font-medium text-foreground">{employee.name}</span>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell className="text-muted-foreground">{employee.department}</TableCell>
-                                            <TableCell className="text-muted-foreground">{employee.payDate || '-'}</TableCell>
-                                            <TableCell>{getStatusBadge(employee.status)}</TableCell>
-                                            <TableCell className="text-foreground">${employee.baseSalary?.toLocaleString() || 0}</TableCell>
-                                            <TableCell className="text-foreground">${employee.bonuses?.toLocaleString() || 0}</TableCell>
-                                            <TableCell className="font-semibold text-foreground">${employee.totalSalary?.toLocaleString() || 0}</TableCell>
-                                            <TableCell>
-                                                <Button variant="ghost" size="icon" className="w-8 h-8 rounded-lg">
-                                                    <MoreVertical className="w-4 h-4" />
-                                                </Button>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))
-                                ) : (
-                                    <TableRow>
-                                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                                            No payroll records found
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
-                        {filteredPayroll.length > itemsPerPage && (
-                            <div className="flex items-center justify-between px-6 py-4 border-t border-border">
-                                <div className="text-xs text-muted-foreground">
-                                    Page {currentPage} of {totalPages}
-                                </div>
-                                <div className="flex gap-2">
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                                        disabled={currentPage === 1}
-                                        className="h-9 px-3 rounded-lg"
-                                    >
-                                        Previous
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                                        disabled={currentPage === totalPages}
-                                        className="h-9 px-3 rounded-lg"
-                                    >
-                                        Next
-                                    </Button>
-                                </div>
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
+                        <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
+                            <SelectTrigger className="w-48 h-10 rounded-full border-gray-200 bg-white shadow-none text-xs font-bold ring-0 focus:ring-0">
+                                <SelectValue placeholder="Department" />
+                            </SelectTrigger>
+                            <SelectContent className="rounded-2xl border-gray-200 shadow-xl">
+                                <SelectItem value="all">All Departments</SelectItem>
+                                {availableDepartments.map((dept: any) => (
+                                    <SelectItem key={dept.name} value={dept.name}>
+                                        {dept.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                            <SelectTrigger className="w-32 h-10 rounded-full border-gray-200 bg-white shadow-none text-xs font-bold ring-0 focus:ring-0">
+                                <SelectValue placeholder="Status" />
+                            </SelectTrigger>
+                            <SelectContent className="rounded-2xl border-gray-200 shadow-xl">
+                                <SelectItem value="all">All Status</SelectItem>
+                                <SelectItem value="Paid">Paid</SelectItem>
+                                <SelectItem value="Pending">Pending</SelectItem>
+                                <SelectItem value="Processing">Processing</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <ProcurementDataTable
+                        // Reset internal sort/pagination when ANY filter changes — including search.
+                        // Safe now because the search input lives in the parent and isn't unmounted
+                        // by this remount.
+                        key={`${selectedDepartment}-${selectedStatus}-${searchQuery}`}
+                        data={tableRows}
+                        columns={payrollColumns}
+                        title="Payroll List"
+                        showSearch={false}
+                        showFilters={false}
+                        showActions={false}
+                        exportable={false}
+                        pageSize={10}
+                        emptyMessage="No payroll records found"
+                    />
+                </div>
             </div>
         </div >
     )

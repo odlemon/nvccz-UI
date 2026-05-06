@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import {
   Sheet,
@@ -12,33 +12,22 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { 
-  CiCircleCheck,
-  CiCalendar,
-  CiSquareRemove,
-  CiEdit,
-  CiTrash,
-  CiCircleCheck as CiTarget,
-  CiCircleCheck as CiChart,
-  CiViewList as CiList
-} from "react-icons/ci"
-import { 
-  User, 
-  Target, 
+import { Progress } from "@/components/ui/progress"
+import {
+  User,
+  Target,
   List,
-  Edit,
   X,
-  TrendingUp, 
-  Building2, 
-  DollarSign,
+  Building2,
   Calendar,
-  Hash,
-  FileText,
-  BarChart3
+  BarChart3,
+  Loader2,
+  Percent,
+  DollarSign,
+  Flag,
 } from "lucide-react"
 import { KPI } from "@/lib/store/slices/performanceSlice"
-import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer"
-import { format } from "date-fns"
+import { goalApiService } from "@/lib/api/goal-api"
 
 interface KPIViewDrawerProps {
   isOpen: boolean
@@ -65,6 +54,37 @@ const tabs = [
 
 export function KPIViewDrawer({ isOpen, onClose, kpi, onEdit, onDelete }: KPIViewDrawerProps) {
   const [activeTab, setActiveTab] = useState<TabType>("kpi")
+  const [goals, setGoals] = useState<any[]>([])
+  const [goalsLoading, setGoalsLoading] = useState(false)
+  const [goalsError, setGoalsError] = useState<string | null>(null)
+
+  // Reset + fetch goals whenever the drawer opens for a different KPI
+  useEffect(() => {
+    if (!isOpen || !kpi?.id) {
+      setGoals([])
+      return
+    }
+    let cancelled = false
+    setGoalsLoading(true)
+    setGoalsError(null)
+    goalApiService
+      .getGoalsByKpi(kpi.id)
+      .then((res) => {
+        if (cancelled) return
+        setGoals(Array.isArray(res?.goals) ? res.goals : [])
+      })
+      .catch((err: any) => {
+        if (cancelled) return
+        setGoalsError(err?.message || 'Failed to load goals')
+        setGoals([])
+      })
+      .finally(() => {
+        if (!cancelled) setGoalsLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [isOpen, kpi?.id])
 
   if (!kpi) return null
 
@@ -98,6 +118,27 @@ export function KPIViewDrawer({ isOpen, onClose, kpi, onEdit, onDelete }: KPIVie
     }
   }
 
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'completed': return 'bg-blue-100 text-blue-800'
+      case 'active': return 'bg-green-100 text-green-800'
+      case 'in_progress': return 'bg-yellow-100 text-yellow-800'
+      case 'inactive': return 'bg-gray-100 text-gray-800'
+      case 'cancelled': return 'bg-red-100 text-red-800'
+      default: return 'bg-gray-100 text-gray-800'
+    }
+  }
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'critical': return 'bg-red-100 text-red-800 border-red-200'
+      case 'high': return 'bg-orange-100 text-orange-800 border-orange-200'
+      case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200'
+      case 'low': return 'bg-green-100 text-green-800 border-green-200'
+      default: return 'bg-gray-100 text-gray-800 border-gray-200'
+    }
+  }
+
   const getFrequencyColor = (frequency: string) => {
     switch (frequency) {
       case 'daily': return 'bg-red-100 text-red-800'
@@ -108,8 +149,6 @@ export function KPIViewDrawer({ isOpen, onClose, kpi, onEdit, onDelete }: KPIVie
       default: return 'bg-gray-100 text-gray-800'
     }
   }
-
-  const weightValue = parseFloat(kpi.weightValue) * 100
 
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>
@@ -167,22 +206,6 @@ export function KPIViewDrawer({ isOpen, onClose, kpi, onEdit, onDelete }: KPIVie
                       {kpi.isActive ? "Active" : "Inactive"}
                     </Badge>
                   </div>
-                </div>
-              </div>
-            </div>
-            
-            {/* Weight Value Progress Bar */}
-            <div className="mt-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-gray-700">Weight Value</span>
-                <span className="text-sm font-bold text-gray-900">{weightValue.toFixed(0)}%</span>
-              </div>
-              <div className="relative">
-                <div className="h-4 bg-gray-200 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-full transition-all duration-300"
-                    style={{ width: `${weightValue}%` }}
-                  />
                 </div>
               </div>
             </div>
@@ -248,10 +271,6 @@ export function KPIViewDrawer({ isOpen, onClose, kpi, onEdit, onDelete }: KPIVie
                     <div>
                       <label className="text-sm font-normal text-gray-500">Unit</label>
                       <p className="text-sm font-medium text-gray-900 mt-1">{kpi.unit || 'N/A'}</p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-normal text-gray-500">Weight Value</label>
-                      <p className="text-sm font-medium text-gray-900 mt-1">{weightValue.toFixed(0)}%</p>
                     </div>
                     <div>
                       <label className="text-sm font-normal text-gray-500">Status</label>
@@ -362,48 +381,149 @@ export function KPIViewDrawer({ isOpen, onClose, kpi, onEdit, onDelete }: KPIVie
                 <div className="border border-gray-200 rounded-lg p-4">
                   <h3 className="text-lg font-normal text-gray-900 flex items-center gap-2 mb-4">
                     <List className="w-5 h-5" />
-                    Performance Goals ({kpi._count?.performanceGoals || 0})
+                    Performance Goals ({goals.length})
                   </h3>
-                  <div className="space-y-3">
-                    {kpi.performanceGoals && kpi.performanceGoals.length > 0 ? (
-                      <>
-                        {kpi.performanceGoals.map((goal, index) => (
-                          <div key={index} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                            <div className="flex items-center justify-between">
-                              <span className="font-medium text-gray-900">{goal.title}</span>
-                              <Badge className={
-                                goal.status === 'active' ? 'bg-green-100 text-green-800' :
-                                goal.status === 'completed' ? 'bg-blue-100 text-blue-800' :
-                                goal.status === 'in_progress' ? 'bg-yellow-100 text-yellow-800' :
-                                'bg-gray-100 text-gray-800'
-                              }>
-                                {goal.status}
-                              </Badge>
-                            </div>
-                            <div className="text-sm text-gray-500 mt-1">
-                              Stage: {goal.stage}
-                            </div>
-                          </div>
-                        ))}
-                        <div className="mt-4 text-center">
-                          <Button 
-                            variant="outline" 
-                            className="rounded-full bg-gradient-to-br from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
-                          >
-                            View More Goals
-                          </Button>
-                        </div>
-                      </>
-                    ) : (
-                      <div className="text-center py-8">
-                        <div className="w-16 h-16 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center mx-auto mb-4">
-                          <Target className="w-8 h-8 text-gray-400" />
-                        </div>
-                        <h3 className="text-lg font-semibold text-gray-900 mb-2">No Goals Found</h3>
-                        <p className="text-gray-600">This KPI doesn't have any associated performance goals yet.</p>
+
+                  {goalsLoading ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
+                    </div>
+                  ) : goalsError ? (
+                    <div className="text-center py-8 text-sm text-red-600">{goalsError}</div>
+                  ) : goals.length === 0 ? (
+                    <div className="text-center py-8">
+                      <div className="w-16 h-16 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center mx-auto mb-4">
+                        <Target className="w-8 h-8 text-gray-400" />
                       </div>
-                    )}
-                  </div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">No Goals Found</h3>
+                      <p className="text-gray-600">This KPI doesn't have any associated performance goals yet.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {goals.map((goal: any) => {
+                        const progress = parseFloat(goal.progressPercentage ?? goal.percentValueAchieved ?? '0') || 0
+                        const isMonetary = goal.monetaryValue !== null && goal.monetaryValue !== undefined && goal.monetaryValue !== ''
+                        const isPercent = !isMonetary && goal.percentValue !== null && goal.percentValue !== undefined && goal.percentValue !== ''
+                        const unitSymbol = goal.kpi?.unitSymbol || goal.targetUnit || '$'
+                        const fmtCurrency = (v: any) => {
+                          const n = parseFloat(v ?? '0') || 0
+                          return `${unitSymbol}${n.toLocaleString()}`
+                        }
+                        const fmtPercent = (v: any) => `${(parseFloat(v ?? '0') || 0).toFixed(2)}%`
+                        const startDate = goal.startDate ? new Date(goal.startDate).toLocaleDateString() : null
+                        const endDate = goal.endDate ? new Date(goal.endDate).toLocaleDateString() : null
+
+                        return (
+                          <Card key={goal.id} className="border border-gray-200">
+                            <CardContent className="p-4 space-y-3">
+                              {/* Title row */}
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex-1 min-w-0">
+                                  <h4 className="font-medium text-gray-900 truncate">{goal.title}</h4>
+                                  {goal.description && (
+                                    <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{goal.description}</p>
+                                  )}
+                                </div>
+                                <Badge className={getStatusColor(goal.status)}>
+                                  {String(goal.status).replace('_', ' ')}
+                                </Badge>
+                              </div>
+
+                              {/* Meta badges */}
+                              <div className="flex items-center gap-2 flex-wrap text-xs">
+                                <Badge variant="outline" className="capitalize">{goal.type}</Badge>
+                                <Badge variant="outline" className="capitalize">{String(goal.stage).replace('_', ' ')}</Badge>
+                                <Badge variant="outline" className={`capitalize ${getPriorityColor(goal.priority)}`}>
+                                  {goal.priority}
+                                </Badge>
+                                {goal.scorecardPillar && (
+                                  <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                                    <Flag className="w-3 h-3 mr-1" />
+                                    {goal.scorecardPillar}
+                                  </Badge>
+                                )}
+                                {goal.departmentName && (
+                                  <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+                                    <Building2 className="w-3 h-3 mr-1" />
+                                    {goal.departmentName}
+                                  </Badge>
+                                )}
+                              </div>
+
+                              {/* Values */}
+                              <div className="grid grid-cols-2 gap-3 text-xs">
+                                {isMonetary && (
+                                  <>
+                                    <div className="bg-gray-50 rounded p-2">
+                                      <div className="text-[10px] uppercase tracking-wide text-gray-500 flex items-center gap-1">
+                                        <DollarSign className="w-3 h-3" /> Monetary Target
+                                      </div>
+                                      <p className="font-semibold text-gray-900 mt-0.5">{fmtCurrency(goal.monetaryValue)}</p>
+                                    </div>
+                                    <div className="bg-gray-50 rounded p-2">
+                                      <div className="text-[10px] uppercase tracking-wide text-gray-500 flex items-center gap-1">
+                                        <DollarSign className="w-3 h-3" /> Achieved
+                                      </div>
+                                      <p className="font-semibold text-green-700 mt-0.5">{fmtCurrency(goal.monetaryValueAchieved)}</p>
+                                    </div>
+                                  </>
+                                )}
+                                {isPercent && (
+                                  <>
+                                    <div className="bg-gray-50 rounded p-2">
+                                      <div className="text-[10px] uppercase tracking-wide text-gray-500 flex items-center gap-1">
+                                        <Percent className="w-3 h-3" /> Percent Target
+                                      </div>
+                                      <p className="font-semibold text-gray-900 mt-0.5">{fmtPercent(goal.percentValue)}</p>
+                                    </div>
+                                    <div className="bg-gray-50 rounded p-2">
+                                      <div className="text-[10px] uppercase tracking-wide text-gray-500 flex items-center gap-1">
+                                        <Percent className="w-3 h-3" /> Achieved
+                                      </div>
+                                      <p className="font-semibold text-green-700 mt-0.5">{fmtPercent(goal.percentValueAchieved)}</p>
+                                    </div>
+                                  </>
+                                )}
+                                {goal.targetValue && (
+                                  <div className="bg-gray-50 rounded p-2">
+                                    <div className="text-[10px] uppercase tracking-wide text-gray-500">Target Value</div>
+                                    <p className="font-semibold text-gray-900 mt-0.5">{fmtCurrency(goal.targetValue)}</p>
+                                  </div>
+                                )}
+                                <div className="bg-gray-50 rounded p-2">
+                                  <div className="text-[10px] uppercase tracking-wide text-gray-500">Current Value</div>
+                                  <p className="font-semibold text-blue-700 mt-0.5">{fmtCurrency(goal.currentValue)}</p>
+                                </div>
+                              </div>
+
+                              {/* Progress */}
+                              <div>
+                                <div className="flex items-center justify-between mb-1.5">
+                                  <span className="text-xs text-gray-500">Progress</span>
+                                  <span className="text-xs font-bold text-gray-900">{progress.toFixed(2)}%</span>
+                                </div>
+                                <Progress value={Math.min(progress, 100)} className="h-2" />
+                              </div>
+
+                              {/* Footer meta */}
+                              <div className="flex items-center justify-between text-[11px] text-gray-500 pt-1 border-t">
+                                <span className="flex items-center gap-1">
+                                  <Calendar className="w-3 h-3" />
+                                  {startDate || '—'} → {endDate || '—'}
+                                </span>
+                                {goal.assignedTo && (
+                                  <span className="flex items-center gap-1">
+                                    <User className="w-3 h-3" />
+                                    {goal.assignedTo.firstName} {goal.assignedTo.lastName}
+                                  </span>
+                                )}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
             )}

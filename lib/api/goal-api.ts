@@ -134,6 +134,12 @@ export const goalApiService = {
     return apiClient.get(`/performance/goals/${goalId}`)
   },
 
+  // Get all performance goals associated with a given KPI id.
+  // Backend response: { success, count, goals: GoalDetailed[] }
+  async getGoalsByKpi(kpiId: string): Promise<{ success: boolean; count: number; goals: any[] }> {
+    return apiClient.get(`/performance/goals/by-kpi/${kpiId}`)
+  },
+
   // Create a new performance goal
   async createGoal(goalData: any): Promise<any> {
     return apiClient.post('/performance/goals', goalData)

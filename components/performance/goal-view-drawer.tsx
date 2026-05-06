@@ -220,8 +220,18 @@ export function GoalViewDrawer({ goal, isOpen, onClose, onEdit, onDelete, onBrea
     return "bg-red-500"
   }
 
-  // Calculate actual progress percentage with NaN protection
-  const progressPercentage = parseNumericValue(goal.percentValueAchieved || goal.progressPercentage)
+  // Goal value-mode: a goal is either monetary OR percent. Prefer the field that's set.
+  const isMonetaryGoal =
+    goal.monetaryValue !== null && goal.monetaryValue !== undefined && goal.monetaryValue !== ''
+  const isPercentGoal =
+    !isMonetaryGoal &&
+    goal.percentValue !== null && goal.percentValue !== undefined && goal.percentValue !== ''
+
+  // Use the API-provided progressPercentage as the source of truth for the goal's progress.
+  // Fall back to percentValueAchieved if the API didn't include it.
+  const progressPercentage = parseNumericValue(
+    (goal as any).progressPercentage ?? goal.percentValueAchieved,
+  )
 
   const taskColumns: Column<any>[] = [
     { key: 'title', label: 'Task Title', sortable: true },
@@ -477,7 +487,7 @@ export function GoalViewDrawer({ goal, isOpen, onClose, onEdit, onDelete, onBrea
                     </div>
                   </div>
 
-                  {/* Values Section */}
+                  {/* Values Section — monetary OR percent, never both */}
                   <div className="border border-gray-200 rounded-lg p-4">
                     <h3 className="text-lg font-normal text-gray-900 flex items-center gap-2 mb-4">
                       <Target className="w-5 h-5" />
@@ -487,7 +497,7 @@ export function GoalViewDrawer({ goal, isOpen, onClose, onEdit, onDelete, onBrea
                       <div>
                         <label className="text-sm font-normal text-gray-500">Target Value</label>
                         <p className="text-lg font-semibold text-gray-900 mt-1">
-                          {goal.targetValue 
+                          {goal.targetValue
                             ? formatCurrency(goal.targetValue, goal.kpi?.unitSymbol || goal.targetUnit || '$')
                             : 'Not Set'}
                         </p>
@@ -498,34 +508,45 @@ export function GoalViewDrawer({ goal, isOpen, onClose, onEdit, onDelete, onBrea
                           {formatCurrency(goal.currentValue, goal.kpi?.unitSymbol || goal.targetUnit || '$')}
                         </p>
                       </div>
-                      {goal.monetaryValue !== null && (
-                        <div>
-                          <label className="text-sm font-normal text-gray-500">Monetary Target</label>
-                          <p className="text-lg font-semibold text-gray-900 mt-1">
-                            {formatCurrency(goal.monetaryValue)}
-                          </p>
-                        </div>
+
+                      {isMonetaryGoal && (
+                        <>
+                          <div>
+                            <label className="text-sm font-normal text-gray-500">Monetary Target</label>
+                            <p className="text-lg font-semibold text-gray-900 mt-1">
+                              {formatCurrency(goal.monetaryValue)}
+                            </p>
+                          </div>
+                          <div>
+                            <label className="text-sm font-normal text-gray-500">Monetary Achieved</label>
+                            <p className="text-lg font-semibold text-green-600 mt-1">
+                              {formatCurrency(goal.monetaryValueAchieved)}
+                            </p>
+                          </div>
+                        </>
                       )}
-                      {(goal.monetaryValue !== null || goal.monetaryValueAchieved) && (
-                        <div>
-                          <label className="text-sm font-normal text-gray-500">Monetary Achieved</label>
-                          <p className="text-lg font-semibold text-green-600 mt-1">
-                            {formatCurrency(goal.monetaryValueAchieved)}
-                          </p>
-                        </div>
+
+                      {isPercentGoal && (
+                        <>
+                          <div>
+                            <label className="text-sm font-normal text-gray-500">Percentage Target</label>
+                            <p className="text-lg font-semibold text-gray-900 mt-1">
+                              {formatPercentage(goal.percentValue)}
+                            </p>
+                          </div>
+                          <div>
+                            <label className="text-sm font-normal text-gray-500">Percentage Achieved</label>
+                            <p className="text-lg font-semibold text-green-600 mt-1">
+                              {formatPercentage(goal.percentValueAchieved)}
+                            </p>
+                          </div>
+                        </>
                       )}
-                      {goal.percentValue !== null && (
-                        <div>
-                          <label className="text-sm font-normal text-gray-500">Percentage Target</label>
-                          <p className="text-lg font-semibold text-gray-900 mt-1">
-                            {formatPercentage(goal.percentValue)}
-                          </p>
-                        </div>
-                      )}
-                      <div>
-                        <label className="text-sm font-normal text-gray-500">Percentage Achieved</label>
-                        <p className="text-lg font-semibold text-green-600 mt-1">
-                          {formatPercentage(goal.percentValueAchieved)}
+
+                      <div className="md:col-span-2 pt-2">
+                        <label className="text-sm font-normal text-gray-500">Progress</label>
+                        <p className="text-lg font-semibold text-gray-900 mt-1">
+                          {progressPercentage.toFixed(2)}%
                         </p>
                       </div>
                     </div>
@@ -640,79 +661,76 @@ export function GoalViewDrawer({ goal, isOpen, onClose, onEdit, onDelete, onBrea
               {/* Progress Tab */}
               {activeTab === "progress" && (
                 <div className="space-y-4">
-                  {/* Progress Overview */}
+                  {/* Progress Overview — show monetary OR percent block, never both */}
                   <div className="border border-gray-200 rounded-lg p-4">
                     <h3 className="text-lg font-normal text-gray-900 flex items-center gap-2 mb-4">
                       <Percent className="w-5 h-5" />
                       Progress Overview
                     </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {/* Monetary Values */}
-                      <div className="space-y-4">
-                        <div>
-                          <label className="text-sm font-normal text-gray-500">Monetary Target</label>
-                          <div className="flex items-center gap-2 mt-1">
-                            <DollarSign className="w-5 h-5 text-green-600" />
-                            <span className="text-2xl font-bold">
-                              {formatCurrency(goal.monetaryValue)}
-                            </span>
+                    <div className="space-y-6">
+                      {isMonetaryGoal && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div>
+                            <label className="text-sm font-normal text-gray-500">Monetary Target</label>
+                            <div className="flex items-center gap-2 mt-1">
+                              <DollarSign className="w-5 h-5 text-green-600" />
+                              <span className="text-2xl font-bold">
+                                {formatCurrency(goal.monetaryValue)}
+                              </span>
+                            </div>
+                          </div>
+                          <div>
+                            <label className="text-sm font-normal text-gray-500">Monetary Achieved</label>
+                            <div className="flex items-center gap-2 mt-1">
+                              <DollarSign className="w-5 h-5 text-blue-600" />
+                              <span className="text-2xl font-bold">
+                                {formatCurrency(goal.monetaryValueAchieved)}
+                              </span>
+                            </div>
                           </div>
                         </div>
-                        <div>
-                          <label className="text-sm font-normal text-gray-500">Monetary Achieved</label>
-                          <div className="flex items-center gap-2">
-                            <DollarSign className="w-5 h-5 text-blue-600" />
-                            <span className="text-2xl font-bold">
-                              {formatCurrency(goal.monetaryValueAchieved)}
-                            </span>
+                      )}
+
+                      {isPercentGoal && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div>
+                            <label className="text-sm font-normal text-gray-500">Percentage Target</label>
+                            <div className="flex items-center gap-2 mt-1">
+                              <Percent className="w-5 h-5 text-blue-600" />
+                              <span className="text-2xl font-bold">
+                                {formatPercentage(goal.percentValue)}
+                              </span>
+                            </div>
+                          </div>
+                          <div>
+                            <label className="text-sm font-normal text-gray-500">Percentage Achieved</label>
+                            <div className="flex items-center gap-2 mt-1">
+                              <Percent className="w-5 h-5 text-green-600" />
+                              <span className="text-2xl font-bold">
+                                {formatPercentage(goal.percentValueAchieved)}
+                              </span>
+                            </div>
                           </div>
                         </div>
-                        {goal.monetaryValue && parseNumericValue(goal.monetaryValue) > 0 && (
-                          <div className="pt-2">
-                            <label className="text-sm font-normal text-gray-500 mb-2 block">Monetary Progress</label>
-                            <Progress 
-                              value={(parseNumericValue(goal.monetaryValueAchieved) / parseNumericValue(goal.monetaryValue)) * 100} 
-                              className="h-2"
-                            />
-                          </div>
-                        )}
-                      </div>
-                      
-                      {/* Percentage Values */}
-                      <div className="space-y-4">
-                        <div>
-                          <label className="text-sm font-normal text-gray-500">Percentage Target</label>
-                          <div className="flex items-center gap-2 mt-1">
-                            <Percent className="w-5 h-5 text-blue-600" />
-                            <span className="text-2xl font-bold">
-                              {formatPercentage(goal.percentValue)}
-                            </span>
-                          </div>
+                      )}
+
+                      {/* Goal Progress — driven by API progressPercentage */}
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <label className="text-sm font-normal text-gray-500">Goal Progress</label>
+                          <span className="text-sm font-bold text-gray-900">
+                            {progressPercentage.toFixed(2)}%
+                          </span>
                         </div>
-                        <div>
-                          <label className="text-sm font-normal text-gray-500">Percentage Achieved</label>
-                          <div className="flex items-center gap-2">
-                            <Percent className="w-5 h-5 text-green-600" />
-                            <span className="text-2xl font-bold">
-                              {formatPercentage(goal.percentValueAchieved)}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="pt-2">
-                          <label className="text-sm font-normal text-gray-500 mb-2 block">Overall Progress</label>
-                          <Progress 
-                            value={progressPercentage} 
-                            className="h-2"
-                          />
-                        </div>
+                        <Progress value={Math.min(progressPercentage, 100)} className="h-2" />
                       </div>
 
                       {/* Target and Current Values */}
-                      <div className="col-span-2 grid grid-cols-2 gap-4 pt-4 border-t">
+                      <div className="grid grid-cols-2 gap-4 pt-4 border-t">
                         <div>
                           <label className="text-sm font-normal text-gray-500">Target Value</label>
                           <p className="text-2xl font-bold mt-1">
-                            {goal.targetValue 
+                            {goal.targetValue
                               ? formatCurrency(goal.targetValue, goal.kpi?.unitSymbol || goal.targetUnit || '$')
                               : formatCurrency(0, goal.kpi?.unitSymbol || goal.targetUnit || '$')}
                           </p>
