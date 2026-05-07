@@ -259,15 +259,9 @@ export function CreateRequisitionModal({ isOpen, onClose, onSuccess, editMode = 
       }
     }
 
-    // Check permissions
-    if (editMode && !permissions.canUpdatePurchaseRequisition) {
-      toast.error('You do not have permission to update purchase requisitions')
-      return
-    }
-    if (!editMode && !permissions.canCreatePurchaseRequisition) {
-      toast.error('You do not have permission to create purchase requisitions')
-      return
-    }
+    // Permissions intentionally not gated client-side — anyone authenticated
+    // can submit a requisition. The backend enforces its own auth/role checks
+    // on the create/update endpoints.
 
     try {
       setLoading(true)
@@ -762,12 +756,13 @@ export function CreateRequisitionModal({ isOpen, onClose, onSuccess, editMode = 
         </form>
 
         <div className="flex justify-end gap-3 pt-6 border-t">
-          <Button variant="outline" onClick={onClose} disabled={loading} className="rounded-full">
+          <Button type="button" variant="outline" onClick={onClose} disabled={loading} className="rounded-full">
             Cancel
           </Button>
           <Button
+            type="button"
             onClick={handleSubmit}
-            disabled={loading || (editMode ? !permissions.canUpdatePurchaseRequisition : !permissions.canCreatePurchaseRequisition)}
+            disabled={loading}
             className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-full"
           >
             {loading ? (editMode ? 'Updating...' : 'Creating...') : (editMode ? 'Update Requisition' : 'Create Requisition')}

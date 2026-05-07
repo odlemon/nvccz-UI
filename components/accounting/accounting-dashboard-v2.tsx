@@ -127,7 +127,11 @@ export function AccountingDashboardV2() {
         netChange: dashboardData?.metrics?.netProfit?.changePercent || 0,
     }
 
-    const opProfitData = dashboardData?.monthlyData || []
+    // Charts plot only the KPIs the API actually returns:
+    //   month, revenue, cogs, grossProfit, grossProfitPercent, netProfit.
+    // No derived "growth" or "net margin" series are added — those weren't
+    // part of the source payload and produced misleading lines.
+    const chartData = dashboardData?.monthlyData || []
     // The asset distribution / list uses the high-level summary breakdown (which now includes
     // "other assets" categories like recoverable VAT, fixed-asset register overlap, short-term
     // investments). Fall back to detailed if summary is unavailable.
@@ -413,9 +417,9 @@ export function AccountingDashboardV2() {
                             </div>
                         </CardHeader>
                         <CardContent className="p-5 pt-2">
-                            {opProfitData.length > 0 ? (
+                            {chartData.length > 0 ? (
                             <ResponsiveContainer width="100%" height={300}>
-                                <ComposedChart data={opProfitData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                                <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                                     <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} dy={10} />
                                     <YAxis
@@ -423,7 +427,7 @@ export function AccountingDashboardV2() {
                                         tick={{ fontSize: 11, fill: '#94a3b8' }}
                                         axisLine={false}
                                         tickLine={false}
-                                        tickFormatter={(v) => `${currencySymbol}${(v / 1000000).toFixed(0)}M`}
+                                        tickFormatter={(v) => `${currencySymbol}${(v / 1000000).toFixed(1)}M`}
                                     />
                                     <YAxis
                                         yAxisId="right"
@@ -435,14 +439,16 @@ export function AccountingDashboardV2() {
                                     />
                                     <Tooltip
                                         contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                        formatter={(value: number | undefined, name: string | undefined) => {
-                                            if (name === 'percent') return [`${value}%`, 'Margin']
-                                            return [`${currencySymbol}${((value || 0) / 1000000).toFixed(1)}M`, name === 'value' ? 'Profit' : 'COGS']
+                                        formatter={(value: any, name: any) => {
+                                            const num = Number(value) || 0
+                                            if (name === 'grossProfitPercent') return [`${num}%`, 'Gross margin']
+                                            const label = name === 'grossProfit' ? 'Gross profit' : name === 'cogs' ? 'COGS' : String(name)
+                                            return [formatCurrency(num), label]
                                         }}
                                     />
-                                    <Bar yAxisId="left" dataKey="value" fill="#fbbf24" radius={[6, 6, 0, 0]} barSize={12} />
+                                    <Bar yAxisId="left" dataKey="grossProfit" fill="#fbbf24" radius={[6, 6, 0, 0]} barSize={12} />
                                     <Bar yAxisId="left" dataKey="cogs" fill="#ef4444" radius={[6, 6, 0, 0]} barSize={12} />
-                                    <Line yAxisId="right" type="monotone" dataKey="percent" stroke="#10b981" strokeWidth={3} dot={{ fill: '#10b981', r: 4, strokeWidth: 0 }} activeDot={{ r: 6 }} />
+                                    <Bar yAxisId="right" dataKey="grossProfitPercent" fill="#10b981" radius={[6, 6, 0, 0]} barSize={8} />
                                 </ComposedChart>
                             </ResponsiveContainer>
                             ) : (
@@ -471,45 +477,31 @@ export function AccountingDashboardV2() {
                                         <div className="w-2 h-2 rounded-full bg-[#10b981]"></div>
                                         <span>Gross Profit</span>
                                     </div>
-                                    <div className="flex items-center gap-1.5">
-                                        <div className="w-2 h-2 rounded-full bg-[#facc15]"></div>
-                                        <span>Growth (%)</span>
-                                    </div>
                                 </div>
                             </div>
                         </CardHeader>
                         <CardContent className="p-5 pt-2">
-                            {opProfitData.length > 0 ? (
+                            {chartData.length > 0 ? (
                             <ResponsiveContainer width="100%" height={300}>
-                                <ComposedChart data={opProfitData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                                <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                                     <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} dy={10} />
                                     <YAxis
-                                        yAxisId="left"
                                         tick={{ fontSize: 11, fill: '#94a3b8' }}
                                         axisLine={false}
                                         tickLine={false}
                                         tickFormatter={(v) => `${currencySymbol}${(v / 1000).toFixed(0)}k`}
                                     />
-                                    <YAxis
-                                        yAxisId="right"
-                                        orientation="right"
-                                        tick={{ fontSize: 11, fill: '#94a3b8' }}
-                                        axisLine={false}
-                                        tickLine={false}
-                                        tickFormatter={(v) => `${v}%`}
-                                    />
                                     <Tooltip
                                         contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                        formatter={(value: number | undefined, name: string | undefined) => {
-                                            if (name === "netPercent" || name === "grossPercent") return [`${value}%`, name === "netPercent" ? "Net Profit %" : "Gross Profit %"]
-                                            return [formatCurrency(value || 0), name === "netProfit" ? "Net Profit" : "Gross Profit"]
+                                        formatter={(value: any, name: any) => {
+                                            const num = Number(value) || 0
+                                            const label = name === "netProfit" ? "Net Profit" : name === "grossProfit" ? "Gross Profit" : String(name)
+                                            return [formatCurrency(num), label]
                                         }}
                                     />
-                                    <Bar yAxisId="left" dataKey="netProfit" fill="#065f46" radius={[4, 4, 0, 0]} barSize={10} />
-                                    <Bar yAxisId="left" dataKey="grossProfit" fill="#10b981" radius={[4, 4, 0, 0]} barSize={10} />
-                                    <Line yAxisId="right" type="monotone" dataKey="netPercent" stroke="#facc15" strokeWidth={2} dot={{ fill: '#facc15', r: 3 }} />
-                                    <Line yAxisId="right" type="monotone" dataKey="grossPercent" stroke="#facc15" strokeWidth={2} dot={{ fill: '#facc15', r: 3 }} strokeDasharray="5 5" />
+                                    <Bar dataKey="netProfit" fill="#065f46" radius={[4, 4, 0, 0]} barSize={10} />
+                                    <Bar dataKey="grossProfit" fill="#10b981" radius={[4, 4, 0, 0]} barSize={10} />
                                 </ComposedChart>
                             </ResponsiveContainer>
                             ) : (

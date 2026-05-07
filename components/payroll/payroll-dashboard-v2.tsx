@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useMemo, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { useSelector, useDispatch } from "react-redux"
 import { AppDispatch, RootState } from "@/lib/store/store"
 import { fetchPayrollDashboard } from "@/lib/store/slices/payrollSlice"
@@ -35,6 +36,7 @@ import {
 
 export function PayrollDashboardV2() {
     const dispatch = useDispatch<AppDispatch>()
+    const router = useRouter()
     const { dashboardData, dashboardLoading } = useSelector((state: RootState) => state.payroll)
     const { availableDepartments } = useSelector((state: RootState) => state.performance)
 
@@ -72,6 +74,48 @@ export function PayrollDashboardV2() {
     })) || []
     const deptDistribution = dashboardData?.departmentDistribution || []
     const payrollList = dashboardData?.payrollList || []
+
+    // Export the current dashboard payroll list as CSV. Disabled when there
+    // is nothing to export (the button hides itself in that case).
+    const handleExportPayroll = () => {
+        if (!payrollList.length) return
+        const headers = [
+            "Employee",
+            "Department",
+            "Pay Date",
+            "Status",
+            "Base Salary",
+            "Bonuses",
+            "Total Salary",
+        ]
+        const escapeCsv = (v: unknown) => {
+            const s = v === null || v === undefined ? "" : String(v)
+            return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+        }
+        const rows = payrollList.map((item: any) => [
+            item.name ?? "",
+            item.department ?? "",
+            item.payDate ?? "",
+            item.status ?? "",
+            item.baseSalary ?? 0,
+            item.bonuses ?? 0,
+            item.totalSalary ?? 0,
+        ])
+        const csv = [headers, ...rows]
+            .map((line) => line.map(escapeCsv).join(","))
+            .join("\n")
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement("a")
+        link.href = url
+        const periodLabel =
+            selectedMonth !== "all" ? `${selectedYear}-${selectedMonth.padStart(2, "0")}` : selectedYear
+        link.download = `payroll-${periodLabel}.csv`
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        URL.revokeObjectURL(url)
+    }
 
     const getStatusBadge = (status: string) => {
         switch (status) {
@@ -179,11 +223,20 @@ export function PayrollDashboardV2() {
                             </SelectContent>
                         </Select>
 
-                        <Button variant="outline" className="h-11 px-5 rounded-full gap-2 border-gray-200 bg-white hover:bg-gray-50 font-semibold text-xs shadow-none group">
-                            <Download className="w-4 h-4 group-hover:translate-y-[-1px] transition-transform" />
-                            Export Payroll
-                        </Button>
-                        <Button className="h-11 px-6 rounded-full gap-2 bg-[#4f77ff] hover:bg-[#4f77ff]/90 font-semibold text-xs shadow-md">
+                        {payrollList.length > 0 && (
+                            <Button
+                                variant="outline"
+                                onClick={handleExportPayroll}
+                                className="h-11 px-5 rounded-full gap-2 border-gray-200 bg-white hover:bg-gray-50 font-semibold text-xs shadow-none group"
+                            >
+                                <Download className="w-4 h-4 group-hover:translate-y-[-1px] transition-transform" />
+                                Export Payroll
+                            </Button>
+                        )}
+                        <Button
+                            onClick={() => router.push("/payroll/runs")}
+                            className="h-11 px-6 rounded-full gap-2 bg-[#4f77ff] hover:bg-[#4f77ff]/90 font-semibold text-xs shadow-md"
+                        >
                             <Plus className="w-4 h-4" />
                             Add a New Payroll
                         </Button>

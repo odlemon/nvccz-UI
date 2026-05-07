@@ -214,7 +214,7 @@ export function FundsList() {
 
         {/* ── Right panel: Holding Details ── */}
         {selectedFund && (
-          <aside className="hidden lg:flex w-[360px] shrink-0 overflow-hidden">
+          <aside className="hidden lg:flex w-[400px] shrink-0">
             <HoldingDetails
               fund={selectedFund}
               onClose={() => setSelectedFund(null)}

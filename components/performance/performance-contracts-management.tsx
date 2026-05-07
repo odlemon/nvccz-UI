@@ -9,6 +9,8 @@ import {
 import { applicationsApi, type InvestmentUser } from "@/lib/api/applications-api"
 import { scorecardApiService } from "@/lib/api/scorecard-service"
 import { performanceBscApiService } from "@/lib/api/performance-bsc-api"
+import { companyProfileApi, type CompanyAddress } from "@/lib/api/company-profile-api"
+import PerformanceContractPDF from "./performance-contract-pdf-document"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -52,7 +54,9 @@ import {
   Eye,
   X,
   FileText,
+  Printer,
 } from "lucide-react"
+import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 
 type ContractType = "BOARD" | "CEO" | "DEPARTMENT" | "EMPLOYEE"
@@ -142,6 +146,7 @@ function defaultForm(year: number): ContractFormState {
 
 export function PerformanceContractsManagement() {
   const dispatch = useAppDispatch()
+  const router = useRouter()
   const { availableDepartments, availableDepartmentsLoading, bscOperationLoading } =
     useAppSelector((s) => s.performance)
 
@@ -173,6 +178,34 @@ export function PerformanceContractsManagement() {
   // Drawer
   const [selectedContract, setSelectedContract] = useState<any | null>(null)
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
+
+  // PDF export wiring (lazy-loaded so @react-pdf/renderer doesn't run on the
+  // server) and the active company address used for the letterhead.
+  const [isClient, setIsClient] = useState(false)
+  const [PDFDownloadLink, setPDFDownloadLink] = useState<any>(null)
+  const [activeAddress, setActiveAddress] = useState<CompanyAddress | null>(null)
+
+  useEffect(() => {
+    setIsClient(true)
+    import("@react-pdf/renderer")
+      .then((pdfModule) => setPDFDownloadLink(() => pdfModule.PDFDownloadLink))
+      .catch(() => {})
+    companyProfileApi.getActiveAddress().then((a) => setActiveAddress(a)).catch(() => {})
+  }, [])
+
+  // Route the user to the scorecard view that matches the contract type.
+  const handleGoToScorecard = () => {
+    if (!selectedContract) return
+    const t = String(selectedContract.contractType || "").toUpperCase()
+    const route =
+      t === "CEO" ? "/performance/ceo-scorecards" :
+      t === "BOARD" ? "/performance/board-scorecards" :
+      t === "DEPARTMENT" ? "/performance/department-scorecards" :
+      t === "EMPLOYEE" || t === "USER" ? "/performance/user-scorecards" :
+      "/performance/contracts"
+    router.push(route)
+    setIsDrawerOpen(false)
+  }
 
   useEffect(() => {
     dispatch(fetchAvailableDepartments())
@@ -931,42 +964,78 @@ export function PerformanceContractsManagement() {
 
       {/* Contract Detail Drawer */}
       <Sheet open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
-        <SheetContent className="sm:max-w-2xl overflow-y-auto p-0 border-l-2 border-gray-100">
+        <SheetContent className="sm:max-w-2xl overflow-y-auto p-5">
           {selectedContract && (
-            <div className="flex flex-col h-full bg-white">
-              <SheetHeader className="bg-gradient-to-r from-blue-600 to-indigo-700 p-8 text-white shrink-0 relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-8 opacity-10">
-                  <FileText className="w-32 h-32 rotate-12" />
-                </div>
-                <div className="relative z-10 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <Badge className="bg-white/20 hover:bg-white/30 text-white border-none px-3 py-1 text-[10px] uppercase tracking-widest font-bold">
-                      {selectedContract.contractType} CONTRACT
-                    </Badge>
-                    <button 
-                      onClick={() => setIsDrawerOpen(false)}
-                      className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all border border-white/20"
-                    >
-                      <X className="w-5 h-5 text-white" />
-                    </button>
-                  </div>
-                  <SheetTitle className="text-3xl font-light text-white tracking-tight leading-tight">
-                    {selectedContract.title || `${selectedContract.contractType} Contract`}
+            <>
+              <SheetHeader>
+                <div className="flex items-center justify-between gap-3">
+                  <SheetTitle className="flex items-center gap-3 truncate">
+                    <FileText className="w-6 h-6 text-blue-600 shrink-0" />
+                    <span className="truncate">
+                      {selectedContract.title || `${selectedContract.contractType} Contract`}
+                    </span>
                   </SheetTitle>
-                  <div className="flex items-center gap-6 text-blue-100/80">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4" />
-                      <span className="text-sm font-medium">{selectedContract.periodLabel}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Building2 className="w-4 h-4" />
-                      <span className="text-sm font-medium">{selectedContract.departmentName || "N/A"}</span>
-                    </div>
+                  <div className="flex items-center gap-2 mr-8 shrink-0">
+                    <Button
+                      onClick={handleGoToScorecard}
+                      className="rounded-full h-10 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white"
+                    >
+                      <Eye className="w-4 h-4 mr-2" />
+                      Scorecard
+                    </Button>
+                    {isClient && PDFDownloadLink && (
+                      <PDFDownloadLink
+                        document={
+                          <PerformanceContractPDF
+                            contract={selectedContract}
+                            activeAddress={activeAddress}
+                          />
+                        }
+                        fileName={`${(selectedContract.contractType || "contract")
+                          .toString()
+                          .toLowerCase()}-contract-${selectedContract.periodLabel || ""}-${new Date()
+                          .toISOString()
+                          .split("T")[0]}.pdf`}
+                      >
+                        {({ loading: pdfLoading }: any) => (
+                          <Button
+                            disabled={pdfLoading}
+                            className="rounded-full h-10 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white"
+                          >
+                            <Printer className={`w-4 h-4 mr-2 ${pdfLoading ? "animate-spin" : ""}`} />
+                            {pdfLoading ? "Preparing..." : "Export PDF"}
+                          </Button>
+                        )}
+                      </PDFDownloadLink>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setIsDrawerOpen(false)}
+                      className="rounded-full h-10 w-10 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+                    >
+                      <X className="w-5 h-5" />
+                    </Button>
                   </div>
                 </div>
               </SheetHeader>
 
-              <div className="flex-1 p-8 space-y-8 overflow-y-auto custom-scrollbar">
+              {/* Header meta row */}
+              <div className="mt-3 flex items-center gap-3 flex-wrap">
+                <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 border-none px-3 py-1 text-[10px] uppercase tracking-widest font-bold">
+                  {selectedContract.contractType} Contract
+                </Badge>
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <Calendar className="w-4 h-4" />
+                  <span>{selectedContract.periodLabel}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <Building2 className="w-4 h-4" />
+                  <span>{selectedContract.departmentName || "N/A"}</span>
+                </div>
+              </div>
+
+              <div className="mt-6 space-y-8">
                 {/* Status Section */}
                 <section className="space-y-4">
                   <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">Lifecycle Status</h4>
@@ -1106,16 +1175,7 @@ export function PerformanceContractsManagement() {
                    </div>
                 </section>
               </div>
-
-              <div className="p-8 bg-gray-50 border-t border-gray-100 shrink-0 flex gap-4">
-                 <Button className="flex-1 rounded-2xl h-12 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-none border-b-4 border-blue-800 active:border-b-0 active:translate-y-1 transition-all">
-                    GO TO SCORECARD
-                 </Button>
-                 <Button variant="outline" className="flex-1 rounded-2xl h-12 bg-white border-2 border-gray-200 text-gray-600 font-semibold text-xs shadow-none hover:bg-gray-50">
-                    PRINT CONTRACT
-                 </Button>
-              </div>
-            </div>
+            </>
           )}
         </SheetContent>
       </Sheet>

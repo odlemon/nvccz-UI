@@ -146,8 +146,6 @@ export function BalancedScorecardView({
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr className="bg-gray-200/70 text-gray-800">
-            {/* Empty cell over the pillar column */}
-            <th className="w-[34px] border-r border-gray-300" aria-label="Perspective" />
             {columns.map((col, idx) => (
               <th
                 key={col.key}
@@ -169,8 +167,27 @@ export function BalancedScorecardView({
             const bg = p.color ?? colorForPillar(p.name)
             return (
               <Fragment key={p.id}>
+                {/* Perspective banner — full-width colored row with the
+                    perspective name (and optional weight) shown horizontally. */}
+                <tr>
+                  <td
+                    colSpan={columns.length}
+                    className="px-3 py-1.5"
+                    style={{ backgroundColor: bg }}
+                  >
+                    <div className="flex items-center gap-3 text-white">
+                      <span className="text-xs font-bold tracking-[0.18em] uppercase">
+                        {p.name}
+                      </span>
+                      {p.weight !== undefined && p.weight !== null && p.weight !== "" && (
+                        <span className="text-[10px] font-medium opacity-90">
+                          Weight: {p.weight}
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                </tr>
                 {prows.map((row, rowIdx) => {
-                  const isFirst = rowIdx === 0
                   const isLast = rowIdx === prows.length - 1
                   const heat: HeatLevel = row.heat ?? "neutral"
                   return (
@@ -181,25 +198,6 @@ export function BalancedScorecardView({
                         !isLast && "border-b border-gray-200",
                       )}
                     >
-                      {isFirst && (
-                        <td
-                          rowSpan={prows.length}
-                          className="border-r border-gray-300 align-middle p-0"
-                          style={{ backgroundColor: bg }}
-                        >
-                          <div
-                            className="h-full flex items-center justify-center px-1 py-3 text-[10px] font-bold tracking-[0.18em] text-white"
-                            style={{
-                              writingMode: "vertical-rl",
-                              transform: "rotate(180deg)",
-                              minHeight: 64,
-                            }}
-                          >
-                            {p.name.toUpperCase()}
-                            {p.weight ? ` · ${p.weight}` : ""}
-                          </div>
-                        </td>
-                      )}
                       {columns.map((col, colIdx) => {
                         const v = row.values[col.key]
                         const isHeat = !!col.heat
@@ -225,7 +223,7 @@ export function BalancedScorecardView({
                 {gIdx < grouped.length - 1 && (
                   <tr aria-hidden="true">
                     <td
-                      colSpan={columns.length + 1}
+                      colSpan={columns.length}
                       className="bg-white"
                       style={{ height: 4 }}
                     />
