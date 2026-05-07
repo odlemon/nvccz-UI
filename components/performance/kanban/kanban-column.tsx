@@ -111,16 +111,4 @@ export const COLUMNS: ColumnConfig[] = [
     gradient: "from-green-500 to-green-600",
     countColor: "bg-white/20 text-white",
   },
-  {
-    id: "amber",
-    label: "Amber",
-    gradient: "from-amber-500 to-yellow-500",
-    countColor: "bg-white/20 text-white",
-  },
-  {
-    id: "red",
-    label: "Red",
-    gradient: "from-red-500 to-rose-600",
-    countColor: "bg-white/20 text-white",
-  },
 ]

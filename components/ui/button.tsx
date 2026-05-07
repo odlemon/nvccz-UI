@@ -11,8 +11,27 @@ const buttonVariants = cva(
       variant: {
         default:
           "bg-primary text-primary-foreground shadow-xs hover:bg-primary/90",
+        // Primary brand gradient — purple/indigo. The default for any
+        // primary action (Save, Submit, primary Create flows).
         gradient:
-          "text-white shadow-xs bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 focus-visible:ring-blue-500/30",
+          "text-white shadow-xs bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 focus-visible:ring-purple-500/30",
+        // CRUD-coded gradient variants. Use these consistently so users
+        // can read intent at a glance:
+        //   create  → emerald  (new resource)
+        //   update  → amber    (edit/save changes on an existing resource)
+        //   info    → blue     (view / non-destructive secondary action)
+        //   warning → amber    (alias for update; emphasises caution)
+        //   danger  → rose     (delete / irreversible)
+        "gradient-create":
+          "text-white shadow-xs bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 focus-visible:ring-emerald-500/30",
+        "gradient-update":
+          "text-white shadow-xs bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 focus-visible:ring-amber-500/30",
+        "gradient-info":
+          "text-white shadow-xs bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 focus-visible:ring-blue-500/30",
+        "gradient-warning":
+          "text-white shadow-xs bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-600 hover:to-yellow-700 focus-visible:ring-amber-500/30",
+        "gradient-danger":
+          "text-white shadow-xs bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 focus-visible:ring-rose-500/30",
         destructive:
           "bg-destructive text-white shadow-xs hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60",
         outline:

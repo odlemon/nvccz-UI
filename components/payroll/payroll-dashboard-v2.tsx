@@ -68,10 +68,31 @@ export function PayrollDashboardV2() {
     const totalEmployeesChange = dashboardData?.metrics?.totalEmployeesPaid?.change || 0
     const averageSalaryValue = dashboardData?.metrics?.averageSalary?.value || 0
     const averageSalaryChange = dashboardData?.metrics?.averageSalary?.change || 0
-    const monthlyTrendData = dashboardData?.monthlyTrend?.map((item: any) => ({
-        month: item.month,
-        value: item.totalPayroll
-    })) || []
+    // When a specific year is selected, plot the months of that year. When
+    // "All Years" is selected, fold the same monthly trend into yearly totals
+    // so the X axis shows years instead of months.
+    const trendIsYearly = selectedYear === "all"
+    const monthlyTrendData = useMemo(() => {
+        const raw: any[] = dashboardData?.monthlyTrend || []
+        if (raw.length === 0) return []
+
+        if (trendIsYearly) {
+            const byYear = new Map<number, number>()
+            for (const row of raw) {
+                const y = Number(row.year)
+                if (!Number.isFinite(y)) continue
+                byYear.set(y, (byYear.get(y) || 0) + Number(row.totalPayroll || 0))
+            }
+            return Array.from(byYear.entries())
+                .sort(([a], [b]) => a - b)
+                .map(([year, total]) => ({ label: String(year), value: total }))
+        }
+
+        return raw.map((item: any) => ({
+            label: item.month,
+            value: Number(item.totalPayroll || 0),
+        }))
+    }, [dashboardData?.monthlyTrend, trendIsYearly])
     const deptDistribution = dashboardData?.departmentDistribution || []
     const payrollList = dashboardData?.payrollList || []
 
@@ -308,7 +329,9 @@ export function PayrollDashboardV2() {
                         <CardHeader className="pb-0 pt-6 px-6">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <CardTitle className="text-lg font-semibold text-foreground">Monthly Payroll Trend</CardTitle>
+                                    <CardTitle className="text-lg font-semibold text-foreground">
+                                        {trendIsYearly ? "Yearly Payroll Trend" : "Monthly Payroll Trend"}
+                                    </CardTitle>
                                     <div className="mt-4">
                                         <p className="text-4xl font-normal text-foreground mt-1 tracking-tight">${totalPayrollValue.toLocaleString()}</p>
                                         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mt-1">
@@ -332,7 +355,7 @@ export function PayrollDashboardV2() {
                                     <LineChart data={monthlyTrendData} margin={{ top: 5, right: 10, left: 10, bottom: 0 }}>
                                         <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                                         <XAxis
-                                            dataKey="month"
+                                            dataKey="label"
                                             tick={{ fontSize: 11, fontWeight: '500', fill: '#94a3b8' }}
                                             axisLine={false}
                                             tickLine={false}

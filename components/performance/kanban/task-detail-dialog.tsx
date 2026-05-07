@@ -74,8 +74,6 @@ const STAGE_BADGE_CLASS: Record<string, string> = {
   completed: "bg-green-100 text-green-800",
   overdue: "bg-red-100 text-red-800",
   delayed: "bg-orange-100 text-orange-800",
-  amber: "bg-amber-100 text-amber-800",
-  red: "bg-red-100 text-red-800",
 }
 
 const PRIORITY_BADGE_CLASS: Record<string, string> = {

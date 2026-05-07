@@ -52,8 +52,8 @@ export function EventsSidebar() {
                 href={subModule.path}
                 className={cn(
                   "flex items-center gap-3 h-9 cursor-pointer rounded-full transition-all duration-200 text-gray-800 px-3",
-                  "hover:bg-gradient-to-r hover:from-purple-50 hover:to-purple-100 hover:rounded-full",
-                  active && "bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg rounded-full",
+                  !active && "hover:bg-gradient-to-r hover:from-purple-50 hover:to-purple-100 hover:rounded-full",
+                  active && "bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg rounded-full hover:from-purple-600 hover:to-purple-700",
                 )}
               >
                 <Icon className="w-4 h-4" />

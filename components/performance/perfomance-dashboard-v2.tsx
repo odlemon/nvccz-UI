@@ -48,7 +48,6 @@ export function PerformanceDashboardV2() {
     
     console.log('Redux State - Performance:', { performanceDashboardData, performanceDashboardLoading })
     
-    const [selectedWeek, setSelectedWeek] = useState("Week 1")
     const [selectedYear, setSelectedYear] = useState("2026")
     const [selectedMonth, setSelectedMonth] = useState("January")
     const [activeView, setActiveView] = useState<"dashboard" | "kpi-analytics">("dashboard")
@@ -80,23 +79,23 @@ export function PerformanceDashboardV2() {
     // Extract summary cards data
     const summaryCards = dashboardData?.summaryCards || {}
     const statsData = {
-        pendingTasks: { 
-            value: summaryCards?.pendingTasks?.value || 0, 
-            change: summaryCards?.pendingTasks?.changePercent ? `${summaryCards.pendingTasks.changePercent > 0 ? '+' : ''}${summaryCards.pendingTasks.changePercent}%` : "+0%", 
-            progress: summaryCards?.pendingTasks?.progress ? summaryCards.pendingTasks.progress * 100 : 0, 
-            total: summaryCards?.pendingTasks?.total || 50 
+        pendingTasks: {
+            value: summaryCards?.pendingTasks?.value || 0,
+            change: summaryCards?.pendingTasks?.changePercent ? `${summaryCards.pendingTasks.changePercent > 0 ? '+' : ''}${summaryCards.pendingTasks.changePercent}%` : "+0%",
+            progress: summaryCards?.pendingTasks?.progress ? summaryCards.pendingTasks.progress * 100 : 0,
+            total: summaryCards?.pendingTasks?.total ?? 0
         },
-        inProgress: { 
-            value: summaryCards?.inProgress?.value || 0, 
-            change: summaryCards?.inProgress?.changePercent ? `${summaryCards.inProgress.changePercent > 0 ? '+' : ''}${summaryCards.inProgress.changePercent}%` : "+0%", 
-            progress: summaryCards?.inProgress?.progress ? summaryCards.inProgress.progress * 100 : 0, 
-            total: summaryCards?.inProgress?.total || 50 
+        inProgress: {
+            value: summaryCards?.inProgress?.value || 0,
+            change: summaryCards?.inProgress?.changePercent ? `${summaryCards.inProgress.changePercent > 0 ? '+' : ''}${summaryCards.inProgress.changePercent}%` : "+0%",
+            progress: summaryCards?.inProgress?.progress ? summaryCards.inProgress.progress * 100 : 0,
+            total: summaryCards?.inProgress?.total ?? 0
         },
-        completed: { 
-            value: summaryCards?.completed?.value || 0, 
-            change: summaryCards?.completed?.changePercent ? `${summaryCards.completed.changePercent > 0 ? '+' : ''}${summaryCards.completed.changePercent}%` : "-0%", 
-            progress: summaryCards?.completed?.progress ? summaryCards.completed.progress * 100 : 0, 
-            total: summaryCards?.completed?.total || 50 
+        completed: {
+            value: summaryCards?.completed?.value || 0,
+            change: summaryCards?.completed?.changePercent ? `${summaryCards.completed.changePercent > 0 ? '+' : ''}${summaryCards.completed.changePercent}%` : "-0%",
+            progress: summaryCards?.completed?.progress ? summaryCards.completed.progress * 100 : 0,
+            total: summaryCards?.completed?.total ?? 0
         },
         completionRate: { 
             value: `${summaryCards?.completionRate?.value || 0}%`, 
@@ -223,17 +222,6 @@ export function PerformanceDashboardV2() {
                 <>
                 {/* Filter Bar */}
                 <div className="flex flex-wrap items-center justify-start gap-3 mb-4">
-                    <Select value={selectedWeek} onValueChange={setSelectedWeek}>
-                        <SelectTrigger className="w-[120px] h-9 bg-white border-gray-200 rounded-full shadow-none font-bold text-xs ring-0 focus:ring-0">
-                            <SelectValue placeholder="Week" />
-                        </SelectTrigger>
-                        <SelectContent className="rounded-xl border-gray-200 shadow-xl">
-                            <SelectItem value="All" className="font-medium text-xs">All Weeks</SelectItem>
-                            {["Week 1", "Week 2", "Week 3", "Week 4"].map(w => (
-                                <SelectItem key={w} value={w} className="font-medium text-xs">{w}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
 
                     <Select value={selectedMonth} onValueChange={setSelectedMonth}>
                         <SelectTrigger className="w-[120px] h-9 bg-white border-gray-200 rounded-full shadow-none font-bold text-xs ring-0 focus:ring-0">
@@ -722,7 +710,7 @@ export function PerformanceDashboardV2() {
                                 {/* Stats */}
                                 <div className="grid grid-cols-3 gap-4 w-full text-center">
                                     <div>
-                                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Total Budget</p>
+                                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Budget</p>
                                         <p className="text-xl font-semibold text-foreground tracking-tight">${budgetData.totalBudget.toLocaleString()}</p>
                                     </div>
                                     <div>

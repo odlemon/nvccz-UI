@@ -122,9 +122,9 @@ export function PerformanceSidebar() {
                 onClick={() => router.push(subModule.path)}
                 className={cn(
                   "w-full flex items-center gap-3 h-9 cursor-pointer rounded-full transition-all duration-200 text-gray-800 px-3",
-                  "hover:bg-gradient-to-r hover:from-purple-50 hover:to-purple-100",
+                  !active && "hover:bg-gradient-to-r hover:from-purple-50 hover:to-purple-100",
                   active &&
-                    "bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg"
+                    "bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg hover:from-purple-600 hover:to-purple-700"
                 )}
               >
                 <Icon className="w-4 h-4 flex-shrink-0" />
@@ -167,9 +167,9 @@ export function PerformanceSidebar() {
                             onClick={() => router.push(item.path)}
                             className={cn(
                               "w-full flex items-center justify-start gap-3 h-8 cursor-pointer rounded-full transition-all duration-200 text-gray-700 px-3 text-left",
-                              "hover:bg-gradient-to-r hover:from-purple-50 hover:to-purple-100",
+                              !active && "hover:bg-gradient-to-r hover:from-purple-50 hover:to-purple-100",
                               active &&
-                                "bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg"
+                                "bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg hover:from-purple-600 hover:to-purple-700"
                             )}
                           >
                             <Icon className="w-3.5 h-3.5 flex-shrink-0" />

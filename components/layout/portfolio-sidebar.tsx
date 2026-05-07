@@ -176,9 +176,9 @@ export function PortfolioSidebar() {
               variant="ghost"
               className={cn(
                 "w-full justify-start gap-3 h-9 cursor-pointer rounded-full transition-all duration-200 text-gray-800",
-                "hover:bg-gradient-to-r hover:from-orange-50 hover:to-amber-100",
+                activeItemId !== dashboardSubModule.id && "hover:bg-gradient-to-r hover:from-orange-50 hover:to-amber-100",
                 activeItemId === dashboardSubModule.id &&
-                  "bg-gradient-to-r from-orange-500 to-amber-600 text-white shadow-lg",
+                  "bg-gradient-to-r from-orange-500 to-amber-600 text-white shadow-lg hover:from-orange-600 hover:to-amber-700",
               )}
               onClick={() => handleItemClick(dashboardSubModule.path)}
             >
@@ -223,8 +223,8 @@ export function PortfolioSidebar() {
                                 variant="ghost"
                                 className={cn(
                                   "w-full justify-start gap-3 h-8 cursor-pointer rounded-full transition-all duration-200 text-gray-700",
-                                  "hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100 hover:rounded-full",
-                                  active && "bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg rounded-full",
+                                  !active && "hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100 hover:rounded-full",
+                                  active && "bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg rounded-full hover:from-blue-600 hover:to-blue-700",
                                 )}
                                 onClick={() => handleItemClick(item.path)}
                               >
@@ -239,8 +239,8 @@ export function PortfolioSidebar() {
                             variant="ghost"
                             className={cn(
                               "w-full justify-start gap-3 h-8 cursor-pointer rounded-full transition-all duration-200 text-gray-700",
-                              "hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100 hover:rounded-full",
-                              activeItemId === group.id && "bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg rounded-full",
+                              activeItemId !== group.id && "hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100 hover:rounded-full",
+                              activeItemId === group.id && "bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg rounded-full hover:from-blue-600 hover:to-blue-700",
                             )}
                             onClick={() => handleItemClick(group.path!)}
                           >
@@ -268,8 +268,8 @@ export function PortfolioSidebar() {
                     variant="ghost"
                     className={cn(
                       "w-full justify-start gap-3 h-9 cursor-pointer rounded-full transition-all duration-200 text-gray-800",
-                      "hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100 hover:rounded-full",
-                      active && "bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg rounded-full",
+                      !active && "hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100 hover:rounded-full",
+                      active && "bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg rounded-full hover:from-blue-600 hover:to-blue-700",
                     )}
                     onClick={() => handleItemClick(subModule.path)}
                   >

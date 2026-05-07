@@ -211,8 +211,6 @@ export function TaskEditDialog({ open, task, onOpenChange, onSaved }: Props) {
                   <SelectItem value="overdue">Overdue</SelectItem>
                   <SelectItem value="delayed">Delayed</SelectItem>
                   <SelectItem value="completed">Complete</SelectItem>
-                  <SelectItem value="amber">Amber</SelectItem>
-                  <SelectItem value="red">Red</SelectItem>
                 </SelectContent>
               </Select>
             </div>

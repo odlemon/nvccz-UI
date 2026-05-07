@@ -31,8 +31,6 @@ const STAGES: { value: TaskStage; label: string }[] = [
   { value: "overdue", label: "Overdue" },
   { value: "delayed", label: "Delayed" },
   { value: "completed", label: "Complete" },
-  { value: "amber", label: "Amber" },
-  { value: "red", label: "Red" },
 ]
 
 export function TaskBulkActionsBar({ selectedIds, onClear }: Props) {

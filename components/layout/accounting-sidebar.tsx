@@ -85,8 +85,8 @@ export function AccountingSidebar() {
                 variant="ghost"
                 className={cn(
                   "w-full justify-start gap-3 h-9 cursor-pointer rounded-full transition-all duration-200 text-gray-800",
-                  "hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100 hover:rounded-full",
-                  active && "bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg rounded-full",
+                  !active && "hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100 hover:rounded-full",
+                  active && "bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg rounded-full hover:from-blue-600 hover:to-blue-700",
                 )}
                 onClick={() => handleItemClick(subModule.path)}
               >

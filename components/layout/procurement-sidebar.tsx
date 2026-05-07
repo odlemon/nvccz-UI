@@ -88,8 +88,8 @@ export function ProcurementSidebar() {
                 variant="ghost"
                 className={cn(
                   "w-full justify-start gap-3 h-9 cursor-pointer rounded-full transition-all duration-200 text-gray-800",
-                  "hover:bg-gradient-to-r hover:from-orange-50 hover:to-orange-100 hover:rounded-full",
-                  active && "bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg rounded-full",
+                  !active && "hover:bg-gradient-to-r hover:from-orange-50 hover:to-orange-100 hover:rounded-full",
+                  active && "bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg rounded-full hover:from-orange-600 hover:to-orange-700",
                 )}
                 onClick={() => handleItemClick(subModule.path)}
               >

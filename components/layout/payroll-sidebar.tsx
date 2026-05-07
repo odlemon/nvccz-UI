@@ -97,8 +97,8 @@ export function PayrollSidebar() {
                 variant="ghost"
                 className={cn(
                   "w-full justify-start gap-3 h-9 cursor-pointer rounded-full transition-all duration-200 text-gray-800",
-                  "hover:bg-gradient-to-r hover:from-green-50 hover:to-green-100 hover:rounded-full",
-                  active && "bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg rounded-full",
+                  !active && "hover:bg-gradient-to-r hover:from-green-50 hover:to-green-100 hover:rounded-full",
+                  active && "bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg rounded-full hover:from-green-600 hover:to-green-700",
                 )}
                 onClick={() => handleItemClick(subModule.path)}
               >

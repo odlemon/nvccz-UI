@@ -51,13 +51,6 @@ export function PortfolioOverview() {
       icon: FileText,
     },
     {
-      title: "Active Companies",
-      value: companies.length.toString(),
-      change: `of ${companies.length}`,
-      trend: "up",
-      icon: Building2,
-    },
-    {
       title: "Total Disbursed",
       value: `$${(metrics.totalDisbursed / 1000).toFixed(1)}K`,
       change: `${funds.reduce((sum, f) => sum + (f.fundDisbursements?.length || 0), 0)} txns`,

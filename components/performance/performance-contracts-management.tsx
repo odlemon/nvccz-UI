@@ -61,52 +61,73 @@ import { toast } from "sonner"
 
 type ContractType = "BOARD" | "CEO" | "DEPARTMENT" | "EMPLOYEE"
 
+type ButtonVariant =
+  | "gradient"
+  | "gradient-create"
+  | "gradient-update"
+  | "gradient-info"
+  | "gradient-warning"
+  | "gradient-danger"
+
 interface ContractTypeMeta {
   type: ContractType
   title: string
+  ctaLabel: string
   description: string
   icon: React.ElementType
+  // Background gradient for the strip on top of the card.
   gradient: string
   iconBg: string
   iconColor: string
+  // Maps to the global Button variant so the call-to-action picks up the
+  // shared CRUD gradient styling.
+  buttonVariant: ButtonVariant
 }
 
 const CONTRACT_TYPES: ContractTypeMeta[] = [
   {
     type: "BOARD",
     title: "Board Contract",
+    ctaLabel: "Create Board",
     description: "One active Board PC per calendar year.",
     icon: Users,
     gradient: "from-purple-500 to-indigo-600",
     iconBg: "bg-purple-100",
     iconColor: "text-purple-600",
+    buttonVariant: "gradient",
   },
   {
     type: "CEO",
     title: "CEO Contract",
+    ctaLabel: "Create CEO",
     description: "Auto-resolves the CEO user; override supported.",
     icon: Crown,
     gradient: "from-amber-500 to-orange-600",
     iconBg: "bg-amber-100",
     iconColor: "text-amber-600",
+    buttonVariant: "gradient-update",
   },
   {
     type: "DEPARTMENT",
     title: "Department Contract",
+    ctaLabel: "Create Dept",
     description: "One per department per calendar year.",
     icon: Building2,
     gradient: "from-emerald-500 to-teal-600",
     iconBg: "bg-emerald-100",
     iconColor: "text-emerald-600",
+    buttonVariant: "gradient-create",
   },
   {
     type: "EMPLOYEE",
     title: "Employee Contract",
+    ctaLabel: "Create Employee",
     description: "One per employee per calendar year.",
     icon: User,
     gradient: "from-blue-500 to-cyan-600",
     iconBg: "bg-blue-100",
     iconColor: "text-blue-600",
+    buttonVariant: "gradient-info",
   },
 ]
 
@@ -537,37 +558,42 @@ export function PerformanceContractsManagement() {
           </div>
         </div>
 
-        {/* Contract type cards */}
+        {/* Contract type cards — uniform layout: equal heights, single-line
+            description, action button anchored to the bottom of every card. */}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
           {CONTRACT_TYPES.map((ct) => {
             const Icon = ct.icon
             return (
               <div
                 key={ct.type}
-                className="rounded-2xl border border-border bg-card overflow-hidden hover:shadow-lg transition-shadow"
+                className="rounded-2xl border border-border bg-card overflow-hidden hover:shadow-lg transition-shadow flex flex-col h-full"
               >
                 <div className={`h-1.5 bg-gradient-to-r ${ct.gradient}`} />
-                <div className="p-5 space-y-4">
+                <div className="p-5 flex flex-col flex-1 gap-4">
                   <div
                     className={`w-12 h-12 rounded-full ${ct.iconBg} flex items-center justify-center`}
                   >
                     <Icon className={`w-6 h-6 ${ct.iconColor}`} />
                   </div>
-                  <div>
-                    <h3 className="text-base font-semibold text-card-foreground">
+                  <div className="min-w-0">
+                    <h3 className="text-base font-semibold text-card-foreground truncate">
                       {ct.title}
                     </h3>
-                    <p className="text-xs text-muted-foreground mt-0.5">
+                    <p
+                      className="text-xs text-muted-foreground mt-0.5 truncate"
+                      title={ct.description}
+                    >
                       {ct.description}
                     </p>
                   </div>
                   <Button
                     onClick={() => openDialog(ct.type)}
-                    className={`w-full rounded-full gap-1.5 bg-gradient-to-r ${ct.gradient} text-white`}
+                    variant={ct.buttonVariant}
                     size="sm"
+                    className="w-full rounded-full gap-1.5 mt-auto"
                   >
                     <Plus className="w-4 h-4" />
-                    Create {ct.type === "EMPLOYEE" ? "Employee" : ct.type === "DEPARTMENT" ? "Dept" : ct.title.split(" ")[0]}
+                    {ct.ctaLabel}
                   </Button>
                 </div>
               </div>
@@ -647,15 +673,15 @@ export function PerformanceContractsManagement() {
 
                 {/* Pagination */}
                 {contracts.length > itemsPerPage && (
-                  <div className="flex items-center justify-between px-5 py-3 bg-muted/20">
+                  <div className="flex items-center justify-between gap-3 px-5 py-3 bg-muted/20">
                     <span className="text-xs text-muted-foreground">
                       Showing {((currentPage - 1) * itemsPerPage) + 1}–{Math.min(currentPage * itemsPerPage, contracts.length)} of {contracts.length}
                     </span>
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-2">
                       <Button
                         variant="outline"
                         size="sm"
-                        className="h-8 w-8 p-0 rounded-full"
+                        className="h-9 w-9 p-0 rounded-full"
                         disabled={currentPage === 1}
                         onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                       >
@@ -668,7 +694,7 @@ export function PerformanceContractsManagement() {
                             key={page}
                             variant={page === currentPage ? "default" : "outline"}
                             size="sm"
-                            className="h-8 w-8 p-0 rounded-full"
+                            className="h-9 w-9 p-0 rounded-full"
                             onClick={() => setCurrentPage(page)}
                           >
                             {page}
@@ -677,7 +703,7 @@ export function PerformanceContractsManagement() {
                       <Button
                         variant="outline"
                         size="sm"
-                        className="h-8 w-8 p-0 rounded-full"
+                        className="h-9 w-9 p-0 rounded-full"
                         disabled={currentPage >= Math.ceil(contracts.length / itemsPerPage)}
                         onClick={() => setCurrentPage((p) => p + 1)}
                       >
@@ -950,7 +976,8 @@ export function PerformanceContractsManagement() {
               <Button
                 onClick={handleSubmit}
                 disabled={bscOperationLoading}
-                className={`rounded-full gap-1.5 text-white bg-gradient-to-r ${meta?.gradient || "from-blue-500 to-blue-600"}`}
+                variant={meta?.buttonVariant ?? "gradient-create"}
+                className="rounded-full gap-1.5"
               >
                 {bscOperationLoading && (
                   <Loader2 className="w-4 h-4 animate-spin" />

@@ -176,10 +176,6 @@ export function TaskManagement() {
         return "bg-red-100 text-red-800"
       case "delayed":
         return "bg-orange-100 text-orange-800"
-      case "amber":
-        return "bg-amber-100 text-amber-800"
-      case "red":
-        return "bg-red-100 text-red-800"
       case "todo":
       default:
         return "bg-gray-100 text-gray-800"
@@ -312,8 +308,6 @@ export function TaskManagement() {
                   <SelectItem value="completed">Completed</SelectItem>
                   <SelectItem value="overdue">Overdue</SelectItem>
                   <SelectItem value="delayed">Delayed</SelectItem>
-                  <SelectItem value="amber">Amber</SelectItem>
-                  <SelectItem value="red">Red</SelectItem>
                 </SelectContent>
               </Select>
 

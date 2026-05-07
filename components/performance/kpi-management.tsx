@@ -256,17 +256,24 @@ export function KPIManagement() {
     handleViewKPI(kpi)
   }
 
-  // Filter KPIs based on search term
-  const filteredKPIs = availableKPIs.filter((kpi: any) => {
-    const q = searchTerm.toLowerCase()
+  // Filter KPIs based on search term. Defensive guards: bail out if the
+  // KPI list is not an array (Redux can transiently dispatch undefined),
+  // skip null/undefined items, and stringify each comparable value before
+  // calling toLowerCase so a non-string field can't throw.
+  const filteredKPIs = (Array.isArray(availableKPIs) ? availableKPIs : []).filter((kpi: any) => {
+    if (!kpi) return false
+    const q = (searchTerm || "").toLowerCase().trim()
     if (!q) return true
-    return (
-      kpi.name?.toLowerCase().includes(q) ||
-      (kpiDescription(kpi) ?? "").toLowerCase().includes(q) ||
-      (kpiCode(kpi) ?? "").toLowerCase().includes(q) ||
-      (kpiPillar(kpi) ?? "").toLowerCase().includes(q) ||
-      (kpiDepartment(kpi) ?? "").toLowerCase().includes(q)
-    )
+    const haystack = [
+      kpi.name,
+      kpiDescription(kpi),
+      kpiCode(kpi),
+      kpiPillar(kpi),
+      kpiDepartment(kpi),
+    ]
+      .map((v) => (v == null ? "" : String(v).toLowerCase()))
+      .join(" ")
+    return haystack.includes(q)
   })
 
   // Pagination logic for overview
@@ -751,43 +758,45 @@ export function KPIManagement() {
                       <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${getTypeColor(kpi.type)} flex items-center justify-center shadow-md`}>
                         <BarChart3 className="w-5 h-5 text-white" />
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="rounded-full w-8 h-8 p-0 bg-blue-500 hover:bg-blue-600 text-white"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleViewKPI(kpi)
-                        }}
-                      >
-                        <CiViewList className="w-4 h-4" />
-                      </Button>
-                      {permissions.canUpdateKPI && (
+                      <div className="flex items-center gap-2">
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="rounded-full w-8 h-8 p-0 bg-amber-500 hover:bg-amber-600 text-white"
+                          className="rounded-full w-8 h-8 p-0 bg-blue-500 hover:bg-blue-600 text-white"
                           onClick={(e) => {
                             e.stopPropagation()
-                            handleOpenEditKPI(kpi)
+                            handleViewKPI(kpi)
                           }}
                         >
-                          <Pencil className="w-4 h-4" />
+                          <CiViewList className="w-4 h-4" />
                         </Button>
-                      )}
-                      {permissions.canDeleteKPI && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="rounded-full w-8 h-8 p-0 bg-red-500 hover:bg-red-600 text-white"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleRequestDeleteKPI(kpi)
-                          }}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      )}
+                        {permissions.canUpdateKPI && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="rounded-full w-8 h-8 p-0 bg-amber-500 hover:bg-amber-600 text-white"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleOpenEditKPI(kpi)
+                            }}
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                        )}
+                        {permissions.canDeleteKPI && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="rounded-full w-8 h-8 p-0 bg-red-500 hover:bg-red-600 text-white"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleRequestDeleteKPI(kpi)
+                            }}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
                     </div>
                     <CardTitle className="text-base font-semibold line-clamp-2">{kpi.name}</CardTitle>
                     <div className="flex items-center gap-2 flex-wrap mt-2">
@@ -938,43 +947,45 @@ export function KPIManagement() {
                         <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${getTypeColor(kpi.type)} flex items-center justify-center shadow-md`}>
                           <BarChart3 className="w-5 h-5 text-white" />
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="rounded-full w-8 h-8 p-0 bg-blue-500 hover:bg-blue-600 text-white"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleViewKPI(kpi)
-                          }}
-                        >
-                          <CiViewList className="w-4 h-4" />
-                        </Button>
-                        {permissions.canUpdateKPI && (
+                        <div className="flex items-center gap-2">
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="rounded-full w-8 h-8 p-0 bg-amber-500 hover:bg-amber-600 text-white"
+                            className="rounded-full w-8 h-8 p-0 bg-blue-500 hover:bg-blue-600 text-white"
                             onClick={(e) => {
                               e.stopPropagation()
-                              handleOpenEditKPI(kpi)
+                              handleViewKPI(kpi)
                             }}
                           >
-                            <Pencil className="w-4 h-4" />
+                            <CiViewList className="w-4 h-4" />
                           </Button>
-                        )}
-                        {permissions.canDeleteKPI && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="rounded-full w-8 h-8 p-0 bg-red-500 hover:bg-red-600 text-white"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleRequestDeleteKPI(kpi)
-                            }}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        )}
+                          {permissions.canUpdateKPI && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="rounded-full w-8 h-8 p-0 bg-amber-500 hover:bg-amber-600 text-white"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleOpenEditKPI(kpi)
+                              }}
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                          )}
+                          {permissions.canDeleteKPI && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="rounded-full w-8 h-8 p-0 bg-red-500 hover:bg-red-600 text-white"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleRequestDeleteKPI(kpi)
+                              }}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
                       </div>
                       <CardTitle className="text-base font-semibold line-clamp-2">{kpi.name}</CardTitle>
                       <div className="flex items-center gap-2 flex-wrap mt-2">

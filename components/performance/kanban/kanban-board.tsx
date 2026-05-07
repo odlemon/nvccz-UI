@@ -100,6 +100,8 @@ export function KanbanBoard() {
       overdue: [],
       delayed: [],
       completed: [],
+      // Amber/Red retained as keys to satisfy the TaskStage type but are
+      // never displayed as columns or stage filters.
       amber: [],
       red: [],
     }

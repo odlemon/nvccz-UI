@@ -223,13 +223,6 @@ export function PurchaseRequisitions() {
     }
   }
 
-  const getStatusProgress = (status: string) => {
-    const statusOrder = ['DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'CONVERTED_TO_PO', 'DELIVERED']
-    const currentIndex = statusOrder.indexOf(status)
-    if (currentIndex === -1) return 0
-    return Math.round((currentIndex / (statusOrder.length - 1)) * 100)
-  }
-
   const columns: Column<PurchaseRequisition>[] = [
     {
       key: 'requisitionNumber',
@@ -258,22 +251,16 @@ export function PurchaseRequisitions() {
     },
     {
       key: 'status',
-      label: 'Status & Progress',
+      label: 'Status',
       sortable: true,
       filterable: true,
-      render: (value, row) => (
-        <div className="space-y-2">
-          <Badge className={getStatusColor(value)}>
-            <div className="flex items-center gap-1">
-              {getStatusIcon(value)}
-              {value.replace('_', ' ')}
-            </div>
-          </Badge>
-          <div className="w-full">
-            <Progress value={getStatusProgress(value)} className="h-1" />
-            <span className="text-xs text-gray-500">{getStatusProgress(value)}%</span>
+      render: (value) => (
+        <Badge className={getStatusColor(value)}>
+          <div className="flex items-center gap-1">
+            {getStatusIcon(value)}
+            {value.replace('_', ' ')}
           </div>
-        </div>
+        </Badge>
       )
     },
     {
