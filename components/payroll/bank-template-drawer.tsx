@@ -83,9 +83,9 @@ export function BankTemplateDrawer({ isOpen, onClose, bankTemplate, onEdit, onEx
             <div className="flex items-center gap-2">
               {onEdit && canUpdateBankTemplate && (
                 <Button
-                  variant="ghost"
+                  variant="gradient-update"
                   size="sm"
-                  className="rounded-full w-9 h-9 p-0 gradient-primary text-white"
+                  className="rounded-full w-9 h-9 p-0 shadow-sm"
                   onClick={handleEdit}
                   title="Edit Bank Template"
                 >
@@ -94,9 +94,9 @@ export function BankTemplateDrawer({ isOpen, onClose, bankTemplate, onEdit, onEx
               )}
               {onExport && (
                 <Button
-                  variant="ghost"
+                  variant="gradient-info"
                   size="sm"
-                  className="rounded-full w-9 h-9 p-0 bg-blue-50 text-blue-600 hover:bg-blue-100"
+                  className="rounded-full w-9 h-9 p-0 shadow-sm"
                   onClick={() => onExport(bankTemplate)}
                   title="Export Bank Template"
                 >

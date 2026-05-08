@@ -820,7 +820,8 @@ export function InvoicesManagement() {
           {activeMainTab === "invoices" && canCreateInvoice && (
             <Button
               onClick={handleCreateInvoiceClick}
-              className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-full px-6"
+              variant="gradient-create"
+              className="rounded-full h-10 px-6"
             >
               <Plus className="w-4 h-4 mr-2" />
               Create Invoice
@@ -829,7 +830,8 @@ export function InvoicesManagement() {
           {activeMainTab === "credit-notes" && canCreateInvoice && (
             <Button
               onClick={() => setIsCreateCreditNoteModalOpen(true)}
-              className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 rounded-full px-6"
+              variant="gradient-danger"
+              className="rounded-full h-10 px-6"
             >
               <Plus className="w-4 h-4 mr-2" />
               Create Credit Note

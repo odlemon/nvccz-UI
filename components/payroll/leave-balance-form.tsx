@@ -171,10 +171,15 @@ export function LeaveBalanceForm({ isOpen, onClose, onSubmit, editing, employeeI
           </div>
 
           <div className="flex justify-end gap-3 pt-6 border-t">
-            <Button type="button" variant="outline" onClick={handleClose} disabled={isSubmitting}>
+            <Button type="button" variant="outline" onClick={handleClose} disabled={isSubmitting} className="rounded-full h-10 px-6">
               Cancel
             </Button>
-            <Button type="submit" className="gradient-primary" disabled={isSubmitting}>
+            <Button
+              type="submit"
+              variant={editing ? "gradient-update" : "gradient-create"}
+              className="rounded-full h-10 px-6 shadow-sm"
+              disabled={isSubmitting}
+            >
               {isSubmitting ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />

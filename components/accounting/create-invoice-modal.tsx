@@ -291,8 +291,8 @@ export function CreateInvoiceModal({
                 <Button
                   type="button"
                   size="sm"
-                  variant="ghost"
-                  className="h-7 px-2 text-xs"
+                  variant="outline"
+                  className="h-7 px-3 text-[10px] rounded-full border-blue-200 hover:bg-blue-50 text-blue-600"
                   onClick={() => setIsCreateCustomerModalOpen(true)}
                   disabled={isLoading}
                 >
@@ -375,7 +375,7 @@ export function CreateInvoiceModal({
                   <Button
                     variant="outline"
                     className={cn(
-                      "w-full justify-start text-left font-normal",
+                      "w-full justify-start text-left font-normal rounded-full h-10 px-4",
                       !formData.transactionDate && "text-muted-foreground",
                       errors.transactionDate && "border-red-500"
                     )}
@@ -435,7 +435,7 @@ export function CreateInvoiceModal({
                 variant="outline"
                 onClick={addItem}
                 disabled={isLoading}
-                className="rounded-full"
+                className="rounded-full h-8 px-4 border-gray-300"
               >
                 <Plus className="w-4 h-4 mr-1" />
                 Add Item
@@ -590,14 +590,15 @@ export function CreateInvoiceModal({
               variant="outline"
               onClick={onClose}
               disabled={isLoading}
-              className="rounded-full px-6"
+              className="rounded-full px-6 h-10"
             >
               Cancel
             </Button>
             <Button
               type="submit"
               disabled={isLoading}
-              className="rounded-full px-6 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-lg transition-all duration-200"
+              variant={isEditing ? "gradient-update" : "gradient-create"}
+              className="rounded-full px-6 h-10 shadow-lg transition-all duration-200"
             >
               {isLoading ? (
                 <>

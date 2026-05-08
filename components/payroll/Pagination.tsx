@@ -19,8 +19,8 @@ export function Pagination({ page, totalPages, onChange }: { page: number; total
     <div className="flex items-center justify-between mt-4">
       <div className="text-sm text-gray-600">Page {page} of {totalPages}</div>
       <div className="flex gap-2">
-        <Button disabled={page === 1} onClick={() => onChange(page - 1)} variant="outline" className="rounded-full">Prev</Button>
-        <Button disabled={page === totalPages} onClick={() => onChange(page + 1)} className="rounded-full">Next</Button>
+        <Button disabled={page === 1} onClick={() => onChange(page - 1)} variant="outline" className="rounded-full h-9 px-4">Prev</Button>
+        <Button disabled={page === totalPages} onClick={() => onChange(page + 1)} variant="outline" className="rounded-full h-9 px-4">Next</Button>
       </div>
     </div>
   )

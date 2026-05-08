@@ -160,7 +160,7 @@ export function UnrealizedFxGainsView() {
             <Calendar mode="single" selected={asOfDate} onSelect={(d) => d && setAsOfDate(d)} initialFocus />
           </PopoverContent>
         </Popover>
-        <Button onClick={handleGenerate} disabled={loading} className="rounded-full">
+        <Button onClick={handleGenerate} disabled={loading} variant="gradient-create" className="rounded-full h-10 px-6">
           {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
           Generate
         </Button>

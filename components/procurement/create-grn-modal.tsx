@@ -436,11 +436,11 @@ export function CreateGRNModal({ isOpen, onClose, onSuccess, isInvestee, initial
 
           {/* Actions */}
           <div className="flex items-center justify-end gap-3 pt-6 border-t">
-            <Button type="button" variant="outline" onClick={handleClose} disabled={loading}>
+            <Button type="button" variant="outline" onClick={handleClose} disabled={loading} className="rounded-full h-10 px-6">
               <X className="w-4 h-4 mr-2" />
               Cancel
             </Button>
-            <Button type="submit" disabled={loading || !permissions.canCreateGRN} className="gradient-primary text-white">
+            <Button type="submit" disabled={loading || !permissions.canCreateGRN} variant="gradient-create" className="rounded-full h-10 px-6 shadow-sm">
               {loading ? (
                 <>
                   <div className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin" />

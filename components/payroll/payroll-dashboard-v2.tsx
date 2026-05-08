@@ -246,9 +246,9 @@ export function PayrollDashboardV2() {
 
                         {payrollList.length > 0 && (
                             <Button
-                                variant="outline"
+                                variant="gradient-info"
                                 onClick={handleExportPayroll}
-                                className="h-11 px-5 rounded-full gap-2 border-gray-200 bg-white hover:bg-gray-50 font-semibold text-xs shadow-none group"
+                                className="h-10 px-6 rounded-full gap-2 shadow-sm font-semibold text-xs group"
                             >
                                 <Download className="w-4 h-4 group-hover:translate-y-[-1px] transition-transform" />
                                 Export Payroll
@@ -256,7 +256,8 @@ export function PayrollDashboardV2() {
                         )}
                         <Button
                             onClick={() => router.push("/payroll/runs")}
-                            className="h-11 px-6 rounded-full gap-2 bg-[#4f77ff] hover:bg-[#4f77ff]/90 font-semibold text-xs shadow-md"
+                            variant="gradient-create"
+                            className="h-10 px-6 rounded-full gap-2 shadow-sm font-semibold text-xs"
                         >
                             <Plus className="w-4 h-4" />
                             Add a New Payroll

@@ -63,7 +63,7 @@ export function FinancialReportReviewModal({ isOpen, onClose, report }: Financia
               <Button variant="destructive" onClick={() => handleSubmit('REJECT')} disabled={loading}>
                 {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />} Reject
               </Button>
-              <Button onClick={() => handleSubmit('ACCEPT')} disabled={loading} className="bg-green-600 hover:bg-green-700">
+              <Button onClick={() => handleSubmit('ACCEPT')} disabled={loading} variant="gradient-create">
                 {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />} Accept
               </Button>
             </>

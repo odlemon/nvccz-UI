@@ -114,10 +114,11 @@ export function CreateActivityModal({ isOpen, onClose, task, onSuccess }: Create
             >
               Cancel
             </Button>
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
+              variant="gradient"
               disabled={isSubmitting}
-              className="rounded-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800"
+              className="rounded-full"
             >
               {isSubmitting ? (
                 <>

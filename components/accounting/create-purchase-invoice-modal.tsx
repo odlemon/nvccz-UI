@@ -281,8 +281,8 @@ export function CreatePurchaseInvoiceModal({
                 <Button
                   type="button"
                   size="sm"
-                  variant="ghost"
-                  className="h-7 px-2 text-xs"
+                  variant="outline"
+                  className="h-7 px-3 text-[10px] rounded-full border-blue-200 hover:bg-blue-50 text-blue-600"
                   onClick={() => setIsCreateVendorModalOpen(true)}
                   disabled={isLoading}
                 >
@@ -453,7 +453,7 @@ export function CreatePurchaseInvoiceModal({
                 variant="outline"
                 onClick={addItem}
                 disabled={isLoading}
-                className="rounded-full"
+                className="rounded-full h-8 px-4 border-gray-300"
               >
                 <Plus className="w-4 h-4 mr-1" />
                 Add Item
@@ -630,14 +630,15 @@ export function CreatePurchaseInvoiceModal({
               variant="outline"
               onClick={onClose}
               disabled={isLoading}
-              className="rounded-full px-6"
+              className="rounded-full px-6 h-10"
             >
               Cancel
             </Button>
             <Button
               type="submit"
               disabled={isLoading}
-              className="rounded-full px-6 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-lg transition-all duration-200"
+              variant={isEditing ? "gradient-update" : "gradient-create"}
+              className="rounded-full px-6 h-10"
             >
               {isLoading ? (
                 <>

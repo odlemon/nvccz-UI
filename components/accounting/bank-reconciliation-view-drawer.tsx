@@ -172,7 +172,8 @@ export function BankReconciliationViewDrawer({
                 {/* Action Buttons - Top Right */}
                 <div className="mt-4 flex justify-end gap-3">
                     <Button
-                        className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-full shadow-sm"
+                        variant="gradient-info"
+                        className="rounded-full h-10 px-6 shadow-sm"
                         size="sm"
                         onClick={() => toast.info("Download statement feature coming soon")}
                     >

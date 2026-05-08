@@ -499,12 +499,14 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, editingEmployee, loadi
               variant="outline"
               onClick={handleClose}
               disabled={loading || isSubmitting}
+              className="rounded-full h-10 px-6"
             >
               Cancel
             </Button>
             <Button
               type="submit"
-              className="gradient-primary"
+              variant={editingEmployee ? "gradient-update" : "gradient-create"}
+              className="rounded-full h-10 px-6 shadow-sm"
               disabled={loading || isSubmitting}
             >
               {isSubmitting ? (

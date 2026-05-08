@@ -144,8 +144,9 @@ export function GoalWeightsEditor({ pillarId, pillarName, onClose }: Props) {
               </Badge>
               <Button
                 onClick={handleSave}
+                variant="gradient"
                 disabled={!validation.valid || saving || includedCount === 0}
-                className="rounded-full h-10 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white"
+                className="rounded-full h-10"
               >
                 {saving ? (
                   <Loader2 className="w-4 h-4 animate-spin mr-2" />
@@ -155,10 +156,10 @@ export function GoalWeightsEditor({ pillarId, pillarName, onClose }: Props) {
                 Save
               </Button>
               <Button
-                variant="ghost"
                 size="icon"
                 onClick={onClose}
-                className="rounded-full h-10 w-10 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-lg"
+                variant="gradient-danger"
+                className="rounded-full h-10 w-10 shadow-lg"
               >
                 <X className="w-5 h-5" />
               </Button>

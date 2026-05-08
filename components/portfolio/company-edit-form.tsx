@@ -121,18 +121,19 @@ export function CompanyEditForm({ formData, setFormData, onSubmit, onCancel }: C
       </Card>
 
       <div className="flex justify-end gap-3">
-        <Button 
-          type="button" 
-          variant="outline" 
+        <Button
+          type="button"
+          variant="outline"
           onClick={onCancel}
-          className="rounded-full h-10 px-6 bg-gradient-to-r from-gray-50 to-gray-100 hover:from-gray-100 hover:to-gray-200"
+          className="rounded-full h-10 px-6"
         >
           <X className="w-4 h-4 mr-2" />
           Cancel
         </Button>
-        <Button 
+        <Button
           type="submit"
-          className="rounded-full h-10 px-6 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+          variant="gradient-update"
+          className="rounded-full h-10 px-6"
         >
           <Save className="w-4 h-4 mr-2" />
           Save Changes

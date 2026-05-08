@@ -152,7 +152,7 @@ export function CreateContraEntryModal({ isOpen, onClose, contraConfig }: Create
             <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
               Cancel
             </Button>
-            <Button type="submit" disabled={loading} className="bg-gradient-to-r from-blue-500 to-blue-600 text-white">
+            <Button type="submit" disabled={loading} variant={contraConfig ? "gradient-update" : "gradient-create"}>
               {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               {contraConfig ? "Update" : "Configure"}
             </Button>

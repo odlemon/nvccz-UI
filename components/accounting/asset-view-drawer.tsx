@@ -187,7 +187,8 @@ export function AssetViewDrawer({ isOpen, onClose, asset, onAssetUpdated }: Asse
             {permissions.canCalcDepreciation && (
             <Button 
               onClick={() => setIsCalculateModalOpen(true)}
-              className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-full shadow-sm"
+              variant="gradient-info"
+              className="rounded-full shadow-sm"
               size="sm"
             >
               <Calculator className="w-4 h-4 mr-2" />
@@ -197,7 +198,8 @@ export function AssetViewDrawer({ isOpen, onClose, asset, onAssetUpdated }: Asse
             {permissions.canRevalueAsset && (
             <Button 
               onClick={() => setIsRevalueModalOpen(true)}
-              className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-full shadow-sm"
+              variant="gradient-update"
+              className="rounded-full shadow-sm"
               size="sm"
             >
               <TrendingUp className="w-4 h-4 mr-2" />
@@ -206,9 +208,9 @@ export function AssetViewDrawer({ isOpen, onClose, asset, onAssetUpdated }: Asse
             )}
             {permissions.canDisposeAsset && (
             <Button 
-              variant="outline" 
+              variant="gradient-danger"
               onClick={() => setIsDisposeModalOpen(true)}
-              className="border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 rounded-full shadow-sm"
+              className="rounded-full shadow-sm"
               size="sm"
             >
               <Trash2 className="w-4 h-4 mr-2" />
@@ -262,7 +264,13 @@ export function AssetViewDrawer({ isOpen, onClose, asset, onAssetUpdated }: Asse
                           <Button size="sm" variant="outline" onClick={() => setIsEditing(false)}>
                             Cancel
                           </Button>
-                          <Button size="sm" onClick={handleUpdate} disabled={updating}>
+                          <Button 
+                            size="sm" 
+                            variant="gradient"
+                            className="rounded-full"
+                            onClick={handleUpdate} 
+                            disabled={updating}
+                          >
                             {updating ? 'Saving...' : 'Save'}
                           </Button>
                         </>
@@ -433,7 +441,8 @@ export function AssetViewDrawer({ isOpen, onClose, asset, onAssetUpdated }: Asse
                                   <Button
                                     size="sm"
                                     onClick={() => handlePostDepreciation(record.id)}
-                                    className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-full"
+                                    variant="gradient-create"
+                                    className="rounded-full"
                                     disabled={postingDepreciation}
                                   >
                                     {postingDepreciation && selectedDepreciationId === record.id ? (

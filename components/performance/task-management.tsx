@@ -255,9 +255,10 @@ export function TaskManagement() {
             Create, track, and manage performance tasks linked to individual goals
           </p>
         </div>
-        <Button 
+        <Button
           onClick={() => setCreateOpen(true)}
-          className="rounded-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg transition-all duration-200"
+          variant="gradient-create"
+          className="rounded-full shadow-lg transition-all duration-200"
         >
           <Plus className="w-4 h-4 mr-2" />
           Create Task

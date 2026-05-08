@@ -236,9 +236,9 @@ function LoginForm() {
                 <Button
                   type="submit"
                   disabled={isLoading}
-                  variant="gradient"
+                  variant="gradient-info"
                   size="lg"
-                  className="w-full rounded-full cursor-pointer"
+                  className="w-full rounded-full cursor-pointer h-12 shadow-md"
                 >
                   {isLoading ? (
                     <>
@@ -259,9 +259,9 @@ function LoginForm() {
               >
                 <Button
                   type="button"
-                  variant="gradient"
+                  variant="gradient-info"
                   size="lg"
-                  className="w-full rounded-full cursor-pointer"
+                  className="w-full rounded-full cursor-pointer h-12 shadow-md"
                   disabled={isLoading}
                   onClick={() => router.push('/applications/form')}
                 >

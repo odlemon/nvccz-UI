@@ -553,7 +553,7 @@ export function TrialBalanceView() {
           <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">Failed to Load Trial Balance</h3>
           <p className="text-gray-600 mb-4">{trialBalanceError || trialBalanceSummaryError}</p>
-          <Button onClick={loadTrialBalanceData}>
+          <Button onClick={loadTrialBalanceData} className="rounded-full h-10 px-6">
             <RefreshCw className="w-4 h-4 mr-2" />
             Try Again
           </Button>
@@ -606,7 +606,7 @@ export function TrialBalanceView() {
             <Button
               size="sm"
               variant={reportMode === "single" ? "default" : "ghost"}
-              className="rounded-full"
+              className="rounded-full h-8 px-4"
               onClick={() => setReportMode("single")}
             >
               Single
@@ -614,7 +614,7 @@ export function TrialBalanceView() {
             <Button
               size="sm"
               variant={reportMode === "consolidated" ? "default" : "ghost"}
-              className="rounded-full"
+              className="rounded-full h-8 px-4"
               onClick={() => setReportMode("consolidated")}
             >
               Consolidated
@@ -692,7 +692,7 @@ export function TrialBalanceView() {
           <Button 
             onClick={handleExportCSV}
             variant="outline" 
-            className="rounded-full"
+            className="rounded-full h-10 px-6"
             disabled={reportMode === "single" ? !trialBalance : !consolidatedTrialBalance}
           >
             <Download className="w-4 h-4 mr-2" />
@@ -702,7 +702,7 @@ export function TrialBalanceView() {
           <Button 
             onClick={handleExportPDF}
             variant="outline" 
-            className="rounded-full"
+            className="rounded-full h-10 px-6"
             disabled={(reportMode === "single" ? !trialBalance : !consolidatedTrialBalance) || generatingPDF}
           >
             {generatingPDF ? (
@@ -721,7 +721,8 @@ export function TrialBalanceView() {
           <Button 
             onClick={reportMode === "single" ? loadTrialBalanceData : loadConsolidatedTrialBalance} 
             disabled={trialBalanceLoading || trialBalanceSummaryLoading || isConsolidating}
-            className="rounded-full"
+            variant="gradient-info"
+            className="rounded-full h-10 px-6"
           >
             <RefreshCw className={cn(
               "w-4 h-4 mr-2",

@@ -51,10 +51,10 @@ const DEFAULT_PERIOD: PeriodFields = {
 
 const toNum = (v: string) => Number(v || 0)
 
-const GRADIENT_EMERALD = "rounded-full gap-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white"
-const GRADIENT_AMBER = "rounded-full gap-1.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white"
-const GRADIENT_BLUE = "rounded-full gap-1.5 bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white"
-const GRADIENT_PURPLE = "rounded-full gap-1.5 bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white"
+// Shared className additions for the action buttons in this hub. Colour comes
+// from the Button `variant` prop now (gradient-create / -update / -info / etc.)
+// so these only carry layout / sizing concerns.
+const ACTION_BTN_CLASS = "rounded-full gap-1.5"
 
 interface SectionCardProps {
   title: string
@@ -219,7 +219,7 @@ export function WorkflowTab() {
             <Textarea value={varianceNarrative} onChange={(e) => setVarianceNarrative(e.target.value)} placeholder="Explain why actual spend differs from plan..." rows={4} className="rounded-xl border-2" />
           </FormField>
           <div className="flex gap-2 pt-2">
-            <Button size="sm" className={GRADIENT_AMBER} onClick={() => void safeRun("variance", "Variance report", runCreateVariance)} disabled={Boolean(actionLoadingKey)}>
+            <Button size="sm" variant="gradient-update" className={ACTION_BTN_CLASS} onClick={() => void safeRun("variance", "Variance report", runCreateVariance)} disabled={Boolean(actionLoadingKey)}>
               {isActionLoading("variance") ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
               Submit Narrative
             </Button>
@@ -240,7 +240,7 @@ export function WorkflowTab() {
           <FormField label="Attachment">
             <Input type="file" onChange={(e) => setStatFile(e.target.files?.[0] || null)} className="rounded-xl border-2 cursor-pointer" />
           </FormField>
-          <Button size="sm" className={GRADIENT_PURPLE} onClick={() => void safeRun("stat", "Statutory submission", runCreateStatutorySubmission)} disabled={Boolean(actionLoadingKey)}>
+          <Button size="sm" variant="gradient" className={ACTION_BTN_CLASS} onClick={() => void safeRun("stat", "Statutory submission", runCreateStatutorySubmission)} disabled={Boolean(actionLoadingKey)}>
              Submit Evidence
           </Button>
         </SectionCard>
@@ -267,7 +267,8 @@ export function WorkflowTab() {
           </FormField>
           <Button
             size="sm"
-            className={GRADIENT_EMERALD}
+            variant="gradient-create"
+            className={ACTION_BTN_CLASS}
             onClick={() => void safeRun("signoff", "Manager sign-off", () => performanceBscApiService.managerSignOffStatutorySubmission(signoffSubmissionId, { note: signoffNote }))}
             disabled={!signoffSubmissionId || Boolean(actionLoadingKey)}
           >
@@ -285,7 +286,8 @@ export function WorkflowTab() {
           </FormField>
           <Button
             size="sm"
-            className={GRADIENT_BLUE}
+            variant="gradient-info"
+            className={ACTION_BTN_CLASS}
             onClick={() => void safeRun("training", "Training certificate", () => performanceBscApiService.recordTrainingCertificate({ goalId: trainingGoalId, incrementBy: toNum(trainingIncrement), ...periodPayload() }))}
             disabled={!trainingGoalId || Boolean(actionLoadingKey)}
           >

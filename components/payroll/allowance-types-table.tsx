@@ -285,7 +285,8 @@ export function AllowanceTypesTable() {
           {canCreateAllowanceType && (
             <Button 
               onClick={handleCreate}
-              className="rounded-full gradient-primary text-white font-normal"
+              variant="gradient-create"
+              className="rounded-full h-10 px-6 shadow-sm font-normal"
             >
               <Building className="w-4 h-4 mr-2" />
               Create Allowance Type

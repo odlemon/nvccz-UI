@@ -420,7 +420,7 @@ export function CreateInstrumentModal({ open, onOpenChange, onCreated }: CreateI
 
             <div className="flex justify-end gap-3 pt-2">
               <Button variant="outline" className="rounded-full h-10 px-5 text-xs font-semibold" onClick={() => onOpenChange(false)}>Cancel</Button>
-              <Button className="rounded-full h-10 px-5 text-xs font-semibold bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white" onClick={handleNext}>
+              <Button variant="gradient-info" className="rounded-full h-10 px-5 text-xs font-semibold" onClick={handleNext}>
                 Next: Accounting setup →
               </Button>
             </div>
@@ -507,7 +507,7 @@ export function CreateInstrumentModal({ open, onOpenChange, onCreated }: CreateI
               <Button variant="outline" className="rounded-full h-10 px-5 text-xs font-semibold" onClick={() => setStep(1)}>← Back</Button>
               <div className="flex gap-3">
                 <Button variant="outline" className="rounded-full h-10 px-5 text-xs font-semibold" onClick={() => onOpenChange(false)}>Cancel</Button>
-                <Button className="rounded-full h-10 px-5 text-xs font-semibold bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white" onClick={handleSubmit} disabled={isSubmitting}>
+                <Button variant="gradient-create" className="rounded-full h-10 px-5 text-xs font-semibold" onClick={handleSubmit} disabled={isSubmitting}>
                   {isSubmitting ? "Creating..." : "Create Investment"}
                 </Button>
               </div>

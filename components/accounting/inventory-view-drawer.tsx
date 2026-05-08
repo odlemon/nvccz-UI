@@ -133,7 +133,8 @@ export function InventoryViewDrawer({ isOpen, onClose, onItemUpdated }: Inventor
           <div className="mt-4 flex justify-end gap-3 px-6">
             <Button
               onClick={handleOpenMovement}
-              className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-full shadow-sm"
+              variant="gradient-create"
+              className="rounded-full h-8 px-4"
               size="sm"
             >
               <Plus className="w-4 h-4 mr-2" />
@@ -144,7 +145,7 @@ export function InventoryViewDrawer({ isOpen, onClose, onItemUpdated }: Inventor
               variant="outline"
               onClick={onClose}
               size="sm"
-              className="rounded-full"
+              className="rounded-full h-8 px-4"
             >
               Close
             </Button>
@@ -304,8 +305,8 @@ export function InventoryViewDrawer({ isOpen, onClose, onItemUpdated }: Inventor
                 </select>
               </div>
               <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={()=>setIsCogsOpen(false)}>Cancel</Button>
-                <Button onClick={handleCalculateCogs} disabled={cogsLoading} className="bg-gradient-to-r from-green-500 to-green-600 text-white rounded-full">
+                <Button variant="outline" onClick={()=>setIsCogsOpen(false)} className="rounded-full h-10 px-6">Cancel</Button>
+                <Button onClick={handleCalculateCogs} disabled={cogsLoading} variant="gradient-info" className="rounded-full h-10 px-6">
                   {cogsLoading ? 'Calculating...' : 'Calculate'}
                 </Button>
               </div>
@@ -339,8 +340,8 @@ export function InventoryViewDrawer({ isOpen, onClose, onItemUpdated }: Inventor
                 <Textarea value={adjustForm.notes} onChange={e=>setAdjustForm({...adjustForm, notes: e.target.value})} />
               </div>
               <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={()=>setIsAdjustOpen(false)}>Cancel</Button>
-                <Button onClick={handleAdjustment} disabled={adjustmentLoading} className="bg-gradient-to-r from-green-500 to-green-600 text-white rounded-full">
+                <Button variant="outline" onClick={()=>setIsAdjustOpen(false)} className="rounded-full h-10 px-6">Cancel</Button>
+                <Button onClick={handleAdjustment} disabled={adjustmentLoading} variant="gradient-update" className="rounded-full h-10 px-6">
                   {adjustmentLoading ? 'Saving...' : 'Save Adjustment'}
                 </Button>
               </div>

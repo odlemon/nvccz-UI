@@ -241,12 +241,12 @@ export function MyApprovals() {
           <div className="flex items-center gap-2">
             <Button
               size="sm"
-              variant="outline"
+              variant="gradient-update"
               onClick={(e) => {
                 e.stopPropagation()
                 handleApprove(row)
               }}
-              className="text-green-600 border-green-200 hover:bg-green-50"
+              className="rounded-full h-8 px-4 shadow-sm"
             >
               <Pen className="w-3 h-3 mr-1" />
               Sign & Approve
@@ -415,16 +415,16 @@ export function MyApprovals() {
 
             {/* Actions */}
             <div className="flex items-center gap-3 pt-4 border-t">
-              <Button variant="outline" onClick={() => setIsDrawerOpen(false)}>
+              <Button variant="outline" onClick={() => setIsDrawerOpen(false)} className="rounded-full h-10 px-6">
                 Close
               </Button>
               {viewingRequest.status === 'PENDING' && (
                 <>
                   {permissions.canRejectRequest && (
                     <Button
-                      variant="outline"
+                      variant="gradient-danger"
                       onClick={() => handleReject(viewingRequest)}
-                      className="text-red-600 border-red-200 hover:bg-red-50"
+                      className="rounded-full h-10 px-6 shadow-sm"
                       disabled={processingApproval}
                     >
                       <AlertCircle className="w-4 h-4 mr-2" />
@@ -434,7 +434,8 @@ export function MyApprovals() {
                   {permissions.canApproveRequest && (
                     <Button
                       onClick={() => handleApprove(viewingRequest)}
-                      className="gradient-primary text-white"
+                      variant="gradient-create"
+                      className="rounded-full h-10 px-6 shadow-sm"
                       disabled={processingApproval}
                     >
                       <Pen className="w-4 h-4 mr-2" />

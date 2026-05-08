@@ -98,17 +98,17 @@ export function EventsGridView() {
             </div>
 
             <div className="pt-4 border-t">
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  router.push(`/events/${event.id}`)
-                }}
-              >
-                View Details
-              </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full rounded-full h-9"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    router.push(`/events/${event.id}`)
+                  }}
+                >
+                  View Details
+                </Button>
             </div>
           </CardContent>
         </Card>

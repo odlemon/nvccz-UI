@@ -80,7 +80,7 @@ export default function QuarterlyUpdatesPage() {
             <h1 className="text-3xl font-bold text-gray-900">Quarterly Updates</h1>
             <p className="text-gray-600 mt-1">Review and manage portfolio company quarterly reports</p>
           </div>
-          <Button className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600">
+          <Button variant="gradient-update">
             <Plus className="w-4 h-4 mr-2" />
             Request Update
           </Button>
@@ -144,10 +144,9 @@ export default function QuarterlyUpdatesPage() {
             {statuses.map((status) => (
               <Button
                 key={status}
-                variant={selectedStatus === status ? "default" : "outline"}
+                variant={selectedStatus === status ? "gradient-update" : "outline"}
                 size="sm"
                 onClick={() => setSelectedStatus(status)}
-                className={selectedStatus === status ? "bg-amber-500 hover:bg-amber-600" : ""}
               >
                 {status}
               </Button>

@@ -667,7 +667,8 @@ export function PayablesManagement() {
           {permissions.canCreatePayable && (
             <Button
               onClick={handleCreateInvoiceClick}
-              className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 rounded-full px-6"
+              variant="gradient-create"
+              className="rounded-full px-6 h-10"
             >
               <Plus className="w-4 h-4 mr-2" />
               Create Purchase Invoice
@@ -759,7 +760,7 @@ export function PayablesManagement() {
                               <Button
                                 variant="outline"
                                 className={cn(
-                                  "w-full h-9 justify-start text-left font-normal",
+                                  "w-full h-9 justify-start text-left font-normal rounded-full",
                                   !currentFilters[option.key] && "text-muted-foreground"
                                 )}
                               >
@@ -791,6 +792,7 @@ export function PayablesManagement() {
                     <Button
                       variant="outline"
                       size="sm"
+                      className="rounded-full h-8"
                       onClick={() => {
                         setCurrentFilters({})
                         resetFilters()

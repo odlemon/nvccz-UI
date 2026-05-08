@@ -265,7 +265,8 @@ export function BankReconciliationUploadModal({
               Download Template
             </Button>
             <Button
-              className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-full px-8 flex items-center"
+              variant="gradient-info"
+              className="rounded-full px-8 flex items-center"
               onClick={handleUpload}
               disabled={localLoading || loading || !uploadFile || !bankId}
             >

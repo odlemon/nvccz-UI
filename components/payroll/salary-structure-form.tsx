@@ -368,12 +368,14 @@ export function SalaryStructureForm({
               variant="outline"
               onClick={handleClose}
               disabled={isSubmitting}
+              className="rounded-full h-10 px-6"
             >
               Cancel
             </Button>
             <Button
               type="submit"
-              className="gradient-primary"
+              variant={editingStructure ? "gradient-update" : "gradient-create"}
+              className="rounded-full h-10 px-6 shadow-sm"
               disabled={isSubmitting || loadingAllowanceTypes}
             >
               {isSubmitting ? (

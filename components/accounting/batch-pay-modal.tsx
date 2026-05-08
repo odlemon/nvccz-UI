@@ -163,7 +163,7 @@ export function BatchPayModal({ isOpen, onClose, onSuccess, selectedInvoices }: 
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
-                  className={cn("w-full justify-start text-left font-normal")}
+                  className={cn("w-full justify-start text-left font-normal rounded-full h-10 px-4")}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
                   {format(paymentDate, "dd/MM/yyyy")}
@@ -203,10 +203,10 @@ export function BatchPayModal({ isOpen, onClose, onSuccess, selectedInvoices }: 
         </div>
 
         <div className="flex justify-end gap-3 pt-4 border-t">
-          <Button variant="outline" onClick={onClose} disabled={isLoading} className="rounded-full">
+          <Button variant="outline" onClick={onClose} disabled={isLoading} className="rounded-full h-10 px-6">
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={isLoading} className="rounded-full">
+          <Button onClick={handleSubmit} disabled={isLoading} variant="gradient-create" className="rounded-full h-10 px-6">
             {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
             Pay {selectedInvoices.length} Invoice(s)
           </Button>

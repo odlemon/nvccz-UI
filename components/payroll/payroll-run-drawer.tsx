@@ -335,7 +335,8 @@ export function PayrollRunDrawer({ isOpen, onClose, payrollRun, onEdit, onProces
                   {payrollRun.status === 'DRAFT' && canProcessRun && (
                     <Button
                       onClick={handleProcess}
-                      className="gradient-primary text-white"
+                      variant="gradient-create"
+                      className="rounded-full h-10 px-6 shadow-sm"
                     >
                       <Play className="w-4 h-4 mr-2" />
                       Process Payroll
@@ -344,7 +345,8 @@ export function PayrollRunDrawer({ isOpen, onClose, payrollRun, onEdit, onProces
                   {payrollRun.status === 'COMPLETED' && canGenerateBankFile && (
                     <Button
                       onClick={() => setIsBankFileDialogOpen(true)}
-                      className="gradient-primary text-white"
+                      variant="gradient-info"
+                      className="rounded-full h-10 px-6 shadow-sm"
                     >
                       <Download className="w-4 h-4 mr-2" />
                       Generate Bank File
@@ -354,6 +356,7 @@ export function PayrollRunDrawer({ isOpen, onClose, payrollRun, onEdit, onProces
                     <Button
                       variant="outline"
                       onClick={handleEdit}
+                      className="rounded-full h-10 px-6"
                     >
                       <Edit className="w-4 h-4 mr-2" />
                       Edit Run
@@ -593,13 +596,14 @@ export function PayrollRunDrawer({ isOpen, onClose, payrollRun, onEdit, onProces
               variant="outline"
               onClick={() => setIsProcessOpen(false)}
               disabled={isProcessing}
-              className="rounded-full"
+              className="rounded-full h-10 px-6"
             >
               Cancel
             </Button>
             <Button
               type="button"
-              className="gradient-primary text-white rounded-full"
+              variant="gradient-create"
+              className="rounded-full h-10 px-6 shadow-sm"
               disabled={isProcessing}
               onClick={async () => {
                 if (!payrollRun) return

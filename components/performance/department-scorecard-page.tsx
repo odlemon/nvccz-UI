@@ -162,7 +162,8 @@ export function DepartmentScorecardsPage() {
           <Button
             onClick={handleRefresh}
             size="sm"
-            className="rounded-full gap-1.5 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white"
+            variant="gradient-info"
+            className="rounded-full gap-1.5"
             disabled={loading}
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
@@ -176,7 +177,8 @@ export function DepartmentScorecardsPage() {
               {({ loading: pdfLoading }: any) => (
                 <Button
                   size="sm"
-                  className="rounded-full gap-1.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white"
+                  variant="gradient-update"
+                  className="rounded-full gap-1.5"
                   disabled={pdfLoading}
                 >
                   <CiFileOn className={`w-3.5 h-3.5 ${pdfLoading ? "animate-spin" : ""}`} />

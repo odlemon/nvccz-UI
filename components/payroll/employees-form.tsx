@@ -290,14 +290,15 @@ export function EmployeesForm({ isOpen, onClose, onSubmit, editingEmployee, load
               type="button"
               variant="outline"
               onClick={handleClose}
-              className="rounded-full"
+              className="rounded-full h-10 px-6"
               disabled={loading}
             >
               Cancel
             </Button>
             <Button
               type="submit"
-              className="rounded-full gradient-primary text-white"
+              variant={editingEmployee ? "gradient-update" : "gradient-create"}
+              className="rounded-full h-10 px-6 shadow-sm"
               disabled={loading}
             >
               {loading ? 'Saving...' : editingEmployee ? 'Update Employee' : 'Create Employee'}

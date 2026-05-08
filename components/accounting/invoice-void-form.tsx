@@ -138,15 +138,15 @@ export function InvoiceVoidForm({
                 variant="outline"
                 onClick={onClose}
                 disabled={isLoading}
-                className="rounded-full"
+                className="rounded-full h-10 px-6"
               >
                 Cancel
               </Button>
               <Button
                 type="submit"
-                variant="destructive"
+                variant="gradient-danger"
                 disabled={isLoading}
-                className="rounded-full"
+                className="rounded-full h-10 px-6 shadow-sm"
               >
                 {isLoading && (
                   <div className="w-4 h-4 mr-2 border-2 border-current border-t-transparent rounded-full animate-spin" />

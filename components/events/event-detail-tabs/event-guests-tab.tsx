@@ -162,12 +162,16 @@ export function EventGuestsTab({ eventId }: EventGuestsTabProps) {
         <Button
           variant="outline"
           onClick={() => setIsBulkDialogOpen(true)}
-          className="gap-2 rounded-full"
+          className="gap-2 rounded-full h-10 px-6"
         >
           <Upload size={18} />
           Bulk Upload
         </Button>
-        <Button onClick={() => setIsAddDialogOpen(true)} className="gap-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-full">
+        <Button 
+          onClick={() => setIsAddDialogOpen(true)} 
+          variant="gradient-create"
+          className="gap-2 rounded-full h-10 px-6 shadow-sm"
+        >
           <CiCirclePlus size={20} />
           Add Guest
         </Button>
@@ -224,7 +228,8 @@ export function EventGuestsTab({ eventId }: EventGuestsTabProps) {
                   ) : guest.rsvpStatus === "ACCEPTED" ? (
                     <Button
                       size="sm"
-                      className="w-full gap-2"
+                      variant="gradient-info"
+                      className="w-full gap-2 rounded-full h-9 shadow-sm"
                       onClick={() => handleCheckIn(guest.id)}
                     >
                       <CiCircleCheck size={18} />
@@ -235,7 +240,7 @@ export function EventGuestsTab({ eventId }: EventGuestsTabProps) {
 
                 {/* Collapsible Details */}
                 <CollapsibleTrigger asChild>
-                  <Button variant="ghost" className="w-full justify-center gap-2 border-t rounded-none">
+                  <Button variant="ghost" className="w-full justify-center gap-2 border-t rounded-none h-10">
                     <span className="text-sm">View Details</span>
                     <ChevronDown size={16} />
                   </Button>
@@ -300,7 +305,11 @@ export function EventGuestsTab({ eventId }: EventGuestsTabProps) {
           <div className="text-center">
             <CiUser size={48} className="mx-auto text-muted-foreground mb-4" />
             <p className="text-muted-foreground">No guests found</p>
-            <Button onClick={() => setIsAddDialogOpen(true)} className="mt-4 gap-2">
+            <Button 
+              onClick={() => setIsAddDialogOpen(true)} 
+              variant="gradient-create"
+              className="mt-4 gap-2 rounded-full h-10 px-6 shadow-sm"
+            >
               <CiCirclePlus size={20} />
               Add First Guest
             </Button>

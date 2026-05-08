@@ -139,7 +139,7 @@ export function DisposeAssetModal({ isOpen, onClose, asset, onSuccess }: Dispose
                   <Button
                     variant="outline"
                     className={cn(
-                      "w-full justify-start text-left font-normal rounded-full",
+                      "w-full justify-start text-left font-normal rounded-full h-10 px-4",
                       !disposalDate && "text-muted-foreground"
                     )}
                   >
@@ -223,14 +223,15 @@ export function DisposeAssetModal({ isOpen, onClose, asset, onSuccess }: Dispose
               type="button" 
               variant="outline" 
               onClick={onClose}
-              className="rounded-full"
+              className="rounded-full h-10 px-6"
             >
               Cancel
             </Button>
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               disabled={loading}
-              className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-full shadow-sm"
+              variant="gradient-danger"
+              className="rounded-full h-10 px-6"
             >
               {loading ? 'Disposing...' : 'Dispose Asset'}
             </Button>

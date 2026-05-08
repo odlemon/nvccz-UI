@@ -114,13 +114,14 @@ export function BankFileDialog({ isOpen, onClose, payrollRunId, payrollRunName }
           </div>
           
           <div className="flex justify-end gap-2 pt-4">
-            <Button variant="outline" onClick={onClose} disabled={isGenerating}>
+            <Button variant="outline" onClick={onClose} disabled={isGenerating} className="rounded-full h-10 px-6">
               Cancel
             </Button>
             <Button 
               onClick={handleGenerate} 
               disabled={!selectedTemplateId || isGenerating}
-              className="flex items-center gap-2"
+              variant="gradient-create"
+              className="flex items-center gap-2 rounded-full h-10 px-6 shadow-sm"
             >
               {isGenerating ? (
                 <Loader2 className="w-4 h-4 animate-spin" />

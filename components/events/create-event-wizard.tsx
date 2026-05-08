@@ -475,23 +475,24 @@ export function CreateEventWizard({ isOpen, onClose, initialDate, editMode = fal
         </form>
 
         <div className="flex justify-end gap-3 pt-6 border-t">
-          <Button variant="outline" onClick={handleClose} disabled={loading} className="rounded-full">
+          <Button variant="outline" onClick={handleClose} disabled={loading} className="rounded-full h-10 px-6">
             Cancel
           </Button>
           <Button
             onClick={handleSubmit(onSubmit)}
             disabled={loading}
-            className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-full"
+            variant={editMode ? "gradient-update" : "gradient-create"}
+            className="rounded-full h-10 px-6 shadow-sm"
           >
             {loading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Creating...
+                {editMode ? "Updating..." : "Creating..."}
               </>
             ) : (
               <>
                 <CiCircleCheck className="mr-2 h-4 w-4" />
-                Create Event
+                {editMode ? "Update Event" : "Create Event"}
               </>
             )}
           </Button>

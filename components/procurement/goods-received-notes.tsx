@@ -527,14 +527,14 @@ export function GoodsReceivedNotes() {
 
             {/* Actions */}
             <div className="flex items-center gap-3 pt-6 border-t mt-6">
-              <Button variant="outline" onClick={() => setIsDrawerOpen(false)}>
+              <Button variant="outline" onClick={() => setIsDrawerOpen(false)} className="rounded-full h-10 px-6">
                 Close
               </Button>
               {viewingGRN.status === 'RECEIVED' && permissions.canApproveGRN && (
                 <>
                   <Button
-                    variant="outline"
-                    className="text-red-600 border-red-200 hover:bg-red-50"
+                    variant="gradient-danger"
+                    className="rounded-full h-10 px-6 shadow-sm"
                     onClick={() => {
                       setSelectedGRNForApproval(viewingGRN)
                       setIsRejectDialogOpen(true)
@@ -544,7 +544,8 @@ export function GoodsReceivedNotes() {
                     Reject
                   </Button>
                   <Button
-                    className="gradient-primary text-white"
+                    variant="gradient-create"
+                    className="rounded-full h-10 px-6 shadow-sm"
                     onClick={() => {
                       setSelectedGRNForApproval(viewingGRN)
                       setIsApprovalDialogOpen(true)

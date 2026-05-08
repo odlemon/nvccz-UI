@@ -29,10 +29,10 @@ export function ApprovalDialog({
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={loading}>Cancel</AlertDialogCancel>
+          <AlertDialogCancel disabled={loading} className="rounded-full h-10 px-6">Cancel</AlertDialogCancel>
           <Button
-            variant="default"
-            className="gradient-primary text-white"
+            variant="gradient-create"
+            className="rounded-full h-10 px-6 shadow-sm"
             onClick={onConfirm}
             disabled={loading}
           >

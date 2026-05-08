@@ -75,18 +75,9 @@ const DEFAULT_PERIOD: PeriodFields = {
 
 const toNum = (v: string) => Number(v || 0)
 
-const GRADIENT_PRIMARY =
-  "rounded-full gap-1.5 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white"
-const GRADIENT_EMERALD =
-  "rounded-full gap-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white"
-const GRADIENT_AMBER =
-  "rounded-full gap-1.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white"
-const GRADIENT_BLUE =
-  "rounded-full gap-1.5 bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white"
-const GRADIENT_PURPLE =
-  "rounded-full gap-1.5 bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white"
-const GRADIENT_ROSE =
-  "rounded-full gap-1.5 bg-gradient-to-r from-rose-500 to-red-600 hover:from-rose-600 hover:to-red-700 text-white"
+// Layout-only className for the action buttons in this hub. Colour now comes
+// from the Button `variant` prop (gradient / gradient-create / -update etc.).
+const ACTION_BTN_CLASS = "rounded-full gap-1.5"
 
 interface SectionCardProps {
   title: string
@@ -522,7 +513,8 @@ export function PerformanceBscOperations() {
             <div className="flex flex-wrap gap-2">
               <Button
                 size="sm"
-                className={GRADIENT_PURPLE}
+                variant="gradient"
+                className={ACTION_BTN_CLASS}
                 onClick={() => void runCreateContract("BOARD")}
                 disabled={Boolean(actionLoadingKey)}
               >
@@ -531,7 +523,8 @@ export function PerformanceBscOperations() {
               </Button>
               <Button
                 size="sm"
-                className={GRADIENT_AMBER}
+                variant="gradient-update"
+                className={ACTION_BTN_CLASS}
                 onClick={() => void runCreateContract("CEO")}
                 disabled={Boolean(actionLoadingKey)}
               >
@@ -540,7 +533,8 @@ export function PerformanceBscOperations() {
               </Button>
               <Button
                 size="sm"
-                className={GRADIENT_EMERALD}
+                variant="gradient-create"
+                className={ACTION_BTN_CLASS}
                 onClick={() => void runCreateContract("DEPARTMENT")}
                 disabled={Boolean(actionLoadingKey)}
               >
@@ -549,7 +543,8 @@ export function PerformanceBscOperations() {
               </Button>
               <Button
                 size="sm"
-                className={GRADIENT_BLUE}
+                variant="gradient-info"
+                className={ACTION_BTN_CLASS}
                 onClick={() => void runCreateContract("EMPLOYEE")}
                 disabled={Boolean(actionLoadingKey)}
               >
@@ -662,7 +657,8 @@ export function PerformanceBscOperations() {
               </div>
               <Button
                 size="sm"
-                className={GRADIENT_EMERALD}
+                variant="gradient-create"
+                className={ACTION_BTN_CLASS}
                 onClick={() => void safeRun("roi-entry", "ROI entry", runSubmitRoi)}
                 disabled={Boolean(actionLoadingKey)}
               >
@@ -710,7 +706,8 @@ export function PerformanceBscOperations() {
               </div>
               <Button
                 size="sm"
-                className={GRADIENT_BLUE}
+                variant="gradient-info"
+                className={ACTION_BTN_CLASS}
                 onClick={() =>
                   void safeRun("funding-rate", "Funding rate", async () => {
                     await performanceBscApiService.recordInternalProcessFundingRate({
@@ -764,7 +761,8 @@ export function PerformanceBscOperations() {
               </div>
               <Button
                 size="sm"
-                className={GRADIENT_PURPLE}
+                variant="gradient"
+                className={ACTION_BTN_CLASS}
                 onClick={() =>
                   void safeRun("stakeholder-survey", "Stakeholder survey", async () => {
                     await performanceBscApiService.recordStakeholderSurvey({
@@ -817,7 +815,8 @@ export function PerformanceBscOperations() {
               </FormField>
               <Button
                 size="sm"
-                className={GRADIENT_PRIMARY}
+                variant="gradient"
+                className={ACTION_BTN_CLASS}
                 onClick={() =>
                   void safeRun("partnership-mou", "Partnership MoU", async () => {
                     await performanceBscApiService.recordPartnershipsSigned({
@@ -881,7 +880,8 @@ export function PerformanceBscOperations() {
               </FormField>
               <Button
                 size="sm"
-                className={GRADIENT_EMERALD}
+                variant="gradient-create"
+                className={ACTION_BTN_CLASS}
                 onClick={() =>
                   void safeRun("customer-charter", "Customer charter", async () => {
                     await performanceBscApiService.recordServiceDeliveryCustomerCharter({
@@ -935,7 +935,8 @@ export function PerformanceBscOperations() {
               </FormField>
               <Button
                 size="sm"
-                className={GRADIENT_BLUE}
+                variant="gradient-info"
+                className={ACTION_BTN_CLASS}
                 onClick={() =>
                   void safeRun("jobs-aggregate", "Jobs aggregate", async () => {
                     await performanceBscApiService.recordJobsCreatedAggregate({
@@ -991,7 +992,8 @@ export function PerformanceBscOperations() {
               </FormField>
               <Button
                 size="sm"
-                className={GRADIENT_AMBER}
+                variant="gradient-update"
+                className={ACTION_BTN_CLASS}
                 onClick={() =>
                   void safeRun("budget-alignment", "Budget alignment", async () => {
                     await performanceBscApiService.recordResourceBudgetAlignment({
@@ -1043,7 +1045,8 @@ export function PerformanceBscOperations() {
               </FormField>
               <Button
                 size="sm"
-                className={GRADIENT_ROSE}
+                variant="gradient"
+                className={ACTION_BTN_CLASS}
                 onClick={() =>
                   void safeRun("inclusion-diversity", "Inclusion diversity", async () => {
                     await performanceBscApiService.recordInclusionDiversityReporting({
@@ -1097,7 +1100,8 @@ export function PerformanceBscOperations() {
               </FormField>
               <Button
                 size="sm"
-                className={GRADIENT_PRIMARY}
+                variant="gradient"
+                className={ACTION_BTN_CLASS}
                 onClick={() =>
                   void safeRun("gl-period-push", "Accounting period GL push", async () => {
                     if (!period.periodStart || !period.periodEnd) {
@@ -1155,7 +1159,8 @@ export function PerformanceBscOperations() {
               </FormField>
               <Button
                 size="sm"
-                className={GRADIENT_AMBER}
+                variant="gradient-update"
+                className={ACTION_BTN_CLASS}
                 onClick={() =>
                   void safeRun("statutory-output", "Statutory output", async () => {
                     await performanceBscApiService.recordStatutoryReportsOutput({
@@ -1206,7 +1211,8 @@ export function PerformanceBscOperations() {
               </div>
               <Button
                 size="sm"
-                className={GRADIENT_PURPLE}
+                variant="gradient"
+                className={ACTION_BTN_CLASS}
                 onClick={() =>
                   void safeRun("governance-checklist", "Governance checklist", async () => {
                     await performanceBscApiService.recordGovernanceChecklistScore({
@@ -1258,7 +1264,8 @@ export function PerformanceBscOperations() {
               </div>
               <Button
                 size="sm"
-                className={GRADIENT_EMERALD}
+                variant="gradient-create"
+                className={ACTION_BTN_CLASS}
                 onClick={() =>
                   void safeRun("procurement-compliance", "Procurement compliance", async () => {
                     await performanceBscApiService.recordProcurementPlanCompliance({
@@ -1308,7 +1315,8 @@ export function PerformanceBscOperations() {
               </div>
               <Button
                 size="sm"
-                className={GRADIENT_PRIMARY}
+                variant="gradient"
+                className={ACTION_BTN_CLASS}
                 onClick={() =>
                   void safeRun("ease-of-business", "Ease of doing business", async () => {
                     await performanceBscApiService.recordEaseOfDoingBusinessProgress({
@@ -1357,7 +1365,8 @@ export function PerformanceBscOperations() {
               </div>
               <Button
                 size="sm"
-                className={GRADIENT_BLUE}
+                variant="gradient-info"
+                className={ACTION_BTN_CLASS}
                 onClick={() =>
                   void safeRun("skills-development", "Skills development", async () => {
                     await performanceBscApiService.recordSkillsDevelopmentProgress({
@@ -1406,7 +1415,8 @@ export function PerformanceBscOperations() {
               </div>
               <Button
                 size="sm"
-                className={GRADIENT_ROSE}
+                variant="gradient"
+                className={ACTION_BTN_CLASS}
                 onClick={() =>
                   void safeRun("csr-participation", "CSR participation", async () => {
                     await performanceBscApiService.recordCsrParticipationRate({
@@ -1536,7 +1546,8 @@ export function PerformanceBscOperations() {
                 <div className="flex gap-2 flex-wrap">
                   <Button
                     size="sm"
-                    className={GRADIENT_AMBER}
+                    variant="gradient-update"
+                className={ACTION_BTN_CLASS}
                     onClick={() => void safeRun("budget-variance-report", "Budget variance report", runCreateVariance)}
                     disabled={Boolean(actionLoadingKey)}
                   >
@@ -1593,7 +1604,8 @@ export function PerformanceBscOperations() {
                 <div className="flex gap-2 flex-wrap">
                   <Button
                     size="sm"
-                    className={GRADIENT_PURPLE}
+                    variant="gradient"
+                className={ACTION_BTN_CLASS}
                     onClick={() => void safeRun("statutory-submission", "Statutory submission", runCreateStatutorySubmission)}
                     disabled={Boolean(actionLoadingKey)}
                   >
@@ -1678,7 +1690,8 @@ export function PerformanceBscOperations() {
                 </FormField>
                 <Button
                   size="sm"
-                  className={GRADIENT_EMERALD}
+                  variant="gradient-create"
+                className={ACTION_BTN_CLASS}
                   onClick={() =>
                     void safeRun("manager-signoff", "Manager sign-off", async () => {
                       if (!signoffSubmissionId) throw new Error("Enter submission ID")
@@ -1719,7 +1732,8 @@ export function PerformanceBscOperations() {
                 </FormField>
                 <Button
                   size="sm"
-                  className={GRADIENT_BLUE}
+                  variant="gradient-info"
+                className={ACTION_BTN_CLASS}
                   onClick={() =>
                     void safeRun("training-certificate", "Training certificate", async () => {
                       await performanceBscApiService.recordTrainingCertificate({

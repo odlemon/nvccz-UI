@@ -357,13 +357,15 @@ export function InvoiceDrawerContent({ invoice, onUpdate, onProcessPayment, onCl
               variant="outline"
               onClick={() => setShowApproveDialog(false)}
               disabled={approving}
+              className="rounded-full h-10 px-6"
             >
               Cancel
             </Button>
             <Button
               onClick={handleApprove}
               disabled={approving}
-              className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white"
+              variant="gradient-create"
+              className="rounded-full h-10 px-6 shadow-sm"
             >
               {approving ? 'Approving...' : 'Approve Invoice'}
             </Button>

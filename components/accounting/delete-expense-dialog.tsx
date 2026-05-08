@@ -12,6 +12,8 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Loader2, Trash2 } from "lucide-react"
 import { Expense } from "@/lib/api/accounting-api"
+import { buttonVariants } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 
 interface DeleteExpenseDialogProps {
   isOpen: boolean
@@ -60,7 +62,7 @@ export function DeleteExpenseDialog({
           <AlertDialogAction
             onClick={onConfirm}
             disabled={isLoading}
-            className="rounded-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700"
+            className={cn(buttonVariants({ variant: "gradient-danger" }), "rounded-full")}
           >
             {isLoading ? (
               <>

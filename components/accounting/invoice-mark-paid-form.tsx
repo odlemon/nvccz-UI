@@ -216,14 +216,15 @@ export function InvoiceMarkPaidForm({
                 variant="outline"
                 onClick={onClose}
                 disabled={isLoading}
-                className="rounded-full"
+                className="rounded-full h-10 px-6"
               >
                 Cancel
               </Button>
               <Button
                 type="submit"
                 disabled={isLoading}
-                className="rounded-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700"
+                variant="gradient-create"
+                className="rounded-full h-10 px-6"
               >
                 {isLoading && (
                   <div className="w-4 h-4 mr-2 border-2 border-current border-t-transparent rounded-full animate-spin" />

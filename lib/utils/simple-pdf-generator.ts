@@ -59,107 +59,120 @@ export const generateSimplePDF = async (
     )
     yPosition += 6
 
-    // Employee / payroll info heading
+    // Helper function to draw a data row
+    const drawDataRow = (label: string, value: string, x: number, y: number, width: number) => {
+      pdf.setFont('helvetica', 'normal')
+      pdf.text(label, x, y)
+      pdf.setFont('helvetica', 'bold')
+      pdf.text(value, x + width, y, { align: 'right' })
+    }
 
-    // Employee Information
+    // Employee and Payroll Info Grid
     pdf.setFontSize(14)
     pdf.setFont('helvetica', 'bold')
-    pdf.text('Employee Information', 20, yPosition)
+    pdf.text('Employee & Payroll Information', 20, yPosition)
+    yPosition += 10
+
+    // Draw info in two columns
+    pdf.setFontSize(9)
+    const leftColX = 20
+    const rightColX = 110
+    const colWidth = 70
+
+    drawDataRow('Employee ID:', payslipData.employee.employeeNumber, leftColX, yPosition, colWidth)
+    drawDataRow('Pay Period:', payslipData.payrollRun.payPeriod, rightColX, yPosition, colWidth)
+    yPosition += 6
+
+    drawDataRow('Name:', `${payslipData.employee.user.firstName} ${payslipData.employee.user.lastName}`, leftColX, yPosition, colWidth)
+    drawDataRow('Start Date:', formatDate(payslipData.payrollRun.startDate), rightColX, yPosition, colWidth)
+    yPosition += 6
+
+    drawDataRow('Email:', payslipData.employee.user.email, leftColX, yPosition, colWidth)
+    drawDataRow('End Date:', formatDate(payslipData.payrollRun.endDate), rightColX, yPosition, colWidth)
+    yPosition += 6
+
+    drawDataRow('Bank:', payslipData.employee.bankName, leftColX, yPosition, colWidth)
+    drawDataRow('Status:', payslipData.payrollRun.status, rightColX, yPosition, colWidth)
+    yPosition += 6
+
+    drawDataRow('Account:', payslipData.employee.accountNumber, leftColX, yPosition, colWidth)
+    drawDataRow('Currency:', payslipData.currency?.code || 'USD', rightColX, yPosition, colWidth)
     yPosition += 15
 
-    pdf.setFontSize(10)
-    pdf.setFont('helvetica', 'normal')
-    pdf.text(`Employee ID: ${payslipData.employee.employeeNumber}`, 20, yPosition)
-    pdf.text(`Name: ${payslipData.employee.user.firstName} ${payslipData.employee.user.lastName}`, 20, yPosition + 5)
-    pdf.text(`Email: ${payslipData.employee.user.email}`, 20, yPosition + 10)
-    pdf.text(`Bank: ${payslipData.employee.bankName}`, 20, yPosition + 15)
-    pdf.text(`Account: ${payslipData.employee.accountNumber}`, 20, yPosition + 20)
-
-    // Payroll Information
-    pdf.text(`Pay Period: ${payslipData.payrollRun.payPeriod}`, 110, yPosition)
-    pdf.text(`Start Date: ${formatDate(payslipData.payrollRun.startDate)}`, 110, yPosition + 5)
-    pdf.text(`End Date: ${formatDate(payslipData.payrollRun.endDate)}`, 110, yPosition + 10)
-    pdf.text(`Status: ${payslipData.payrollRun.status}`, 110, yPosition + 15)
-    pdf.text(`Currency: ${payslipData.currency?.code}`, 110, yPosition + 20)
-
-    yPosition += 40
-
     // Earnings and Deductions Table
-    const tableStartY = yPosition
     const tableWidth = 170
-    const colWidth = tableWidth / 2
+    const halfWidth = tableWidth / 2
 
-    // Table headers
-    pdf.setFillColor(248, 250, 252) // Light gray background
-    pdf.rect(20, tableStartY, colWidth, 10, 'F')
-    pdf.rect(20 + colWidth, tableStartY, colWidth, 10, 'F')
-
+    // Headers
+    pdf.setFillColor(243, 244, 246)
+    pdf.rect(20, yPosition, tableWidth, 10, 'F')
     pdf.setTextColor(0, 0, 0)
-    pdf.setFontSize(12)
+    pdf.setFontSize(11)
     pdf.setFont('helvetica', 'bold')
-    pdf.text('Earnings', 25, tableStartY + 7)
-    pdf.text('Deductions', 25 + colWidth, tableStartY + 7)
+    pdf.text('Earnings', 25, yPosition + 7)
+    pdf.text('Deductions', 25 + halfWidth, yPosition + 7)
+    yPosition += 14
 
-    yPosition = tableStartY + 12
-
-    // Earnings rows
+    // Data rows
     const earnings = [
       { label: 'Basic Salary', amount: parseFloat(payslipData.employee.basicSalary) },
-      { label: 'Housing Allowance', amount: 0 },
-      { label: 'Transport Allowance', amount: 0 },
-      { label: 'Overtime', amount: 0 }
+      { label: 'Allowances', amount: parseFloat(payslipData.totalAllowances || 0) },
     ]
 
     const deductions = [
-      { label: 'PAYE', amount: parseFloat(payslipData.totalDeductions) * 0.6 },
-      { label: 'NSSA', amount: parseFloat(payslipData.totalDeductions) * 0.3 },
-      { label: 'AIDS Levy', amount: parseFloat(payslipData.totalDeductions) * 0.1 }
+      { label: 'Statutory Deductions', amount: parseFloat(payslipData.totalDeductions || 0) },
     ]
 
     pdf.setFontSize(10)
     pdf.setFont('helvetica', 'normal')
 
-    // Draw earnings
-    earnings.forEach((earning, index) => {
-      const rowY = yPosition + (index * 6)
-      pdf.text(earning.label, 25, rowY)
-      pdf.text(formatCurrency(earning.amount), 25 + colWidth - 30, rowY)
-    })
+    const maxRows = Math.max(earnings.length, deductions.length)
+    for (let i = 0; i < maxRows; i++) {
+      const rowY = yPosition + (i * 7)
+      
+      if (earnings[i]) {
+        pdf.text(earnings[i].label, 25, rowY)
+        pdf.text(formatCurrency(earnings[i].amount), 25 + halfWidth - 10, rowY, { align: 'right' })
+      }
+      
+      if (deductions[i]) {
+        pdf.text(deductions[i].label, 25 + halfWidth, rowY)
+        pdf.text(formatCurrency(deductions[i].amount), 25 + tableWidth - 10, rowY, { align: 'right' })
+      }
+    }
 
-    // Draw deductions
-    deductions.forEach((deduction, index) => {
-      const rowY = yPosition + (index * 6)
-      pdf.text(deduction.label, 25 + colWidth, rowY)
-      pdf.text(formatCurrency(deduction.amount), 25 + colWidth + colWidth - 30, rowY)
-    })
+    yPosition += (maxRows * 7) + 5
 
-    yPosition += Math.max(earnings.length, deductions.length) * 6 + 15
+    // Sub-totals
+    pdf.setDrawColor(209, 213, 219)
+    pdf.line(20, yPosition, 190, yPosition)
+    yPosition += 8
 
-    // Totals
     pdf.setFont('helvetica', 'bold')
-    pdf.setFillColor(229, 231, 235) // Gray background
-    pdf.rect(20, yPosition, colWidth, 10, 'F')
-    pdf.rect(20 + colWidth, yPosition, colWidth, 10, 'F')
+    pdf.text('Total Earnings', 25, yPosition)
+    pdf.text(formatCurrency(payslipData.grossPay), 25 + halfWidth - 10, yPosition, { align: 'right' })
+    
+    pdf.text('Total Deductions', 25 + halfWidth, yPosition)
+    pdf.text(formatCurrency(payslipData.totalDeductions), 25 + tableWidth - 10, yPosition, { align: 'right' })
+    
+    yPosition += 15
 
-    pdf.text('Total Earnings', 25, yPosition + 7)
-    pdf.text(formatCurrency(payslipData.grossPay), 25 + colWidth - 30, yPosition + 7)
-    pdf.text('Total Deductions', 25 + colWidth, yPosition + 7)
-    pdf.text(formatCurrency(payslipData.totalDeductions), 25 + colWidth + colWidth - 30, yPosition + 7)
-
-    yPosition += 25
-
-    // Net Pay
-    pdf.setFillColor(239, 246, 255) // Light blue background
-    pdf.rect(20, yPosition, 170, 15, 'F')
-    pdf.setFontSize(16)
+    // Net Pay Block - Standard Professional Style
+    pdf.setFillColor(37, 99, 235) // Primary Blue
+    pdf.rect(20, yPosition, 170, 20, 'F')
+    
+    pdf.setTextColor(255, 255, 255)
+    pdf.setFontSize(14)
     pdf.setFont('helvetica', 'bold')
-    pdf.text('Net Pay (Rounded)', 25, yPosition + 8)
+    pdf.text('Net Pay (Rounded)', 25, yPosition + 12)
+    
     pdf.setFontSize(20)
-    pdf.text(formatCurrency(payslipData.netPay), 25, yPosition + 15)
-
-    yPosition += 30
+    pdf.text(formatCurrency(payslipData.netPay), 185, yPosition + 12, { align: 'right' })
+    
+    yPosition += 35
 
     // Signatures
+    pdf.setTextColor(0, 0, 0)
     pdf.setFontSize(10)
     pdf.setFont('helvetica', 'normal')
     pdf.text('Employer\'s Signature', 20, yPosition)
@@ -167,13 +180,13 @@ export const generateSimplePDF = async (
     pdf.line(20, yPosition + 2, 100, yPosition + 2)
     pdf.line(110, yPosition + 2, 190, yPosition + 2)
 
-    yPosition += 15
+    yPosition += 20
 
     // Footer
     pdf.setFontSize(8)
-    pdf.setTextColor(107, 114, 128) // Gray text
-    pdf.text('This payslip is computer generated and does not require a signature.', 20, yPosition)
-    pdf.text(`Generated on ${formatDate(new Date().toISOString())}`, 20, yPosition + 5)
+    pdf.setTextColor(107, 114, 128)
+    pdf.text('This payslip is computer generated and does not require a signature.', 105, yPosition, { align: 'center' })
+    pdf.text(`Generated on ${formatDate(new Date().toISOString())}`, 105, yPosition + 5, { align: 'center' })
 
     // Generate blob
     const pdfBlob = pdf.output('blob')

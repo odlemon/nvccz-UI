@@ -219,7 +219,7 @@ export function RFQDrawerContent({ rfq }: RFQDrawerContentProps) {
                       variant="outline"
                       size="sm"
                       onClick={() => setExtendDeadlineOpen(true)}
-                      className="gap-2"
+                      className="gap-2 rounded-full h-9 px-4"
                     >
                       <Clock className="w-4 h-4" /> Extend
                     </Button>
@@ -273,7 +273,7 @@ export function RFQDrawerContent({ rfq }: RFQDrawerContentProps) {
                       size="sm"
                       variant="ghost"
                       onClick={handleCopyPublicLink}
-                      className="gap-1"
+                      className="gap-1 rounded-full h-8 px-3"
                     >
                       {copied ? (
                         <>
@@ -324,6 +324,7 @@ export function RFQDrawerContent({ rfq }: RFQDrawerContentProps) {
                         variant="ghost"
                         size="sm"
                         onClick={() => toggleVendor(vendor.id)}
+                        className="rounded-full h-9"
                       >
                         {expandedVendors[vendor.id] ? (
                           <ChevronUp className="h-4 w-4" />
@@ -385,7 +386,7 @@ export function RFQDrawerContent({ rfq }: RFQDrawerContentProps) {
       {/* Quotations Tab */}
       <TabsContent value="quotations" className="space-y-4">
         {quotations.length > 0 && (rfq.status === 'SENT' || rfq.status === 'CLOSED') && (
-          <Button onClick={() => setMatrixOpen(true)} className="gap-2">
+          <Button onClick={() => setMatrixOpen(true)} variant="gradient-info" className="gap-2 rounded-full h-10 px-6 shadow-sm">
             <BarChart2 className="w-4 h-4" /> View Comparison Matrix
           </Button>
         )}
@@ -441,12 +442,14 @@ export function RFQDrawerContent({ rfq }: RFQDrawerContentProps) {
               />
             </div>
             <div className="flex gap-3 justify-end">
-              <Button variant="outline" onClick={() => setExtendDeadlineOpen(false)}>
+              <Button variant="outline" onClick={() => setExtendDeadlineOpen(false)} className="rounded-full h-10 px-6">
                 Cancel
               </Button>
               <Button
                 onClick={handleExtendDeadline}
                 disabled={extendingDeadline || !newDeadline}
+                variant="gradient-create"
+                className="rounded-full h-10 px-6 shadow-sm"
               >
                 {extendingDeadline ? 'Extending...' : 'Extend Deadline'}
               </Button>

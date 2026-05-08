@@ -449,7 +449,7 @@ export function InventoryManagement() {
         <div className="flex items-center gap-3">
           <CurrencyFilter />
           {canCreateInventory && (
-            <Button onClick={openCreateModal} className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-full px-6">
+            <Button onClick={openCreateModal} variant="gradient-create" className="rounded-full h-10 px-6">
               <Plus className="w-4 h-4 mr-2" /> New Item
             </Button>
           )}

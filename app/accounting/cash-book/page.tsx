@@ -305,13 +305,14 @@ function CashbookPage() {
               <Download className="w-4 h-4 mr-2" />
               Export Cashbook Audit
             </Button>
-            `<Button
+            <Button
               onClick={() => setIsProcessCashbookOpen(true)}
-              className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-full hover:from-blue-700 hover:to-blue-800"
+              variant="gradient-info"
+              className="rounded-full"
             >
               <BookOpen className="w-4 h-4 mr-2" />
               Process Cashbook
-            </Button>`
+            </Button>
           </div>
         </div>
 
@@ -523,7 +524,8 @@ function CashbookPage() {
               />
               <Button
                 onClick={() => setIsTransferModalOpen(true)}
-                className="bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-full"
+                variant="gradient-create"
+                className="rounded-full"
               >
                 <Plus className="w-4 h-4 mr-2" />
                 Create Transfer

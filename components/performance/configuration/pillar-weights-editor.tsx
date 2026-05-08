@@ -247,8 +247,9 @@ export function PillarWeightsEditor() {
           <div className="flex justify-end">
             <Button
               onClick={handleSave}
+              variant="gradient"
               disabled={!validation.valid || saving}
-              className="rounded-full gap-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-md"
+              className="rounded-full gap-2 shadow-md"
             >
               {saving ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -299,8 +300,9 @@ export function PillarWeightsEditor() {
             </Button>
             <Button
               onClick={handleRenameSave}
+              variant="gradient"
               disabled={renaming || !renameDraft.trim()}
-              className="rounded-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white"
+              className="rounded-full"
             >
               {renaming ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
               Save

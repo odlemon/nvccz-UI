@@ -129,9 +129,10 @@ export function ThreeWayMatchDashboard() {
         return (
           <Button
             size="sm"
-            variant={hasMatch ? 'outline' : 'default'}
+            variant={hasMatch ? 'outline' : 'gradient-info'}
             disabled={matchingId === value}
             onClick={() => handleRunMatch(value)}
+            className="rounded-full h-8 px-4 shadow-sm"
           >
             {matchingId === value ? (
               <>
@@ -247,8 +248,8 @@ export function ThreeWayMatchDashboard() {
 
                   <Button
                     size="sm"
-                    variant="outline"
-                    className="text-red-600 hover:bg-red-50 mt-2"
+                    variant="gradient-danger"
+                    className="rounded-full h-9 px-4 shadow-sm"
                   >
                     Review & Resolve
                   </Button>

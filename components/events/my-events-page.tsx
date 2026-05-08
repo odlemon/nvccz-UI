@@ -35,7 +35,11 @@ export function MyEventsPage() {
           <h1 className="text-3xl font-normal text-gray-900">Events Management</h1>
           <p className="text-gray-600">Manage and track all your events</p>
         </div>
-        <Button onClick={() => setIsWizardOpen(true)} className="rounded-full gradient-primary text-white">
+        <Button 
+          onClick={() => setIsWizardOpen(true)} 
+          variant="gradient-create"
+          className="rounded-full h-10 px-6 shadow-sm"
+        >
           <CiCirclePlus size={20} className="mr-2" />
           Create Event
         </Button>
@@ -58,7 +62,10 @@ export function MyEventsPage() {
             variant={viewMode === "list" ? "default" : "outline"}
             size="sm"
             onClick={() => dispatch(setViewMode("list"))}
-            className={`gap-2 rounded-full ${viewMode === "list" ? "gradient-primary text-white" : ""}`}
+            className={cn(
+              "gap-2 rounded-full h-9 px-4",
+              viewMode === "list" && "gradient-primary text-white"
+            )}
           >
             <CiViewList size={18} />
             List
@@ -67,7 +74,10 @@ export function MyEventsPage() {
             variant={viewMode === "grid" ? "default" : "outline"}
             size="sm"
             onClick={() => dispatch(setViewMode("grid"))}
-            className={`gap-2 rounded-full ${viewMode === "grid" ? "gradient-primary text-white" : ""}`}
+            className={cn(
+              "gap-2 rounded-full h-9 px-4",
+              viewMode === "grid" && "gradient-primary text-white"
+            )}
           >
             <CiViewBoard size={18} />
             Grid
@@ -76,7 +86,10 @@ export function MyEventsPage() {
             variant={viewMode === "calendar" ? "default" : "outline"}
             size="sm"
             onClick={() => dispatch(setViewMode("calendar"))}
-            className={`gap-2 rounded-full ${viewMode === "calendar" ? "gradient-primary text-white" : ""}`}
+            className={cn(
+              "gap-2 rounded-full h-9 px-4",
+              viewMode === "calendar" && "gradient-primary text-white"
+            )}
           >
             <CiCalendar size={18} />
             Calendar

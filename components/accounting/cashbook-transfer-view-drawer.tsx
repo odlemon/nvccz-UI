@@ -314,7 +314,7 @@ export function CashbookTransferViewDrawer({ isOpen, onClose, transfer, onTransf
                             <Button type="button" variant="outline" onClick={() => setReverseDialogOpen(false)} className="rounded-full">
                                 Cancel
                             </Button>
-                            <Button type="submit" disabled={reversing} className="bg-gradient-to-r from-red-500 to-red-600 text-white rounded-full">
+                            <Button type="submit" disabled={reversing} variant="gradient-danger" className="rounded-full">
                                 {reversing ? "Reversing..." : "Reverse"}
                             </Button>
                         </div>

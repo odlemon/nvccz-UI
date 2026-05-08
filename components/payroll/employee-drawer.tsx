@@ -280,20 +280,20 @@ export function EmployeeDrawer({ isOpen, onClose, employee, onEdit, onTerminated
             <div className="flex items-center gap-2">
               {employee.isActive && (
                 <Button
-                  variant="outline"
+                  variant="gradient-danger"
                   size="icon"
                   onClick={() => setIsTerminateOpen(true)}
-                  className="rounded-full h-10 w-10 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                  className="rounded-full h-10 w-10 shadow-sm"
                   title="Terminate employee"
                 >
                   <UserX className="w-4 h-4" />
                 </Button>
               )}
               <Button
-                variant="outline"
+                variant="gradient-update"
                 size="icon"
                 onClick={handleEdit}
-                className="rounded-full h-10 w-10"
+                className="rounded-full h-10 w-10 shadow-sm"
               >
                 <Edit className="w-4 h-4" />
               </Button>
@@ -575,7 +575,8 @@ export function EmployeeDrawer({ isOpen, onClose, employee, onEdit, onTerminated
                   </h3>
                   <Button
                     onClick={handleCreateStructure}
-                    className="rounded-full gradient-primary text-white font-normal"
+                    variant="gradient-create"
+                    className="rounded-full h-10 px-6 shadow-sm font-normal"
                   >
                     <CreditCard className="w-4 h-4 mr-2" />
                     Create Structure
@@ -654,7 +655,11 @@ export function EmployeeDrawer({ isOpen, onClose, employee, onEdit, onTerminated
                     <Calendar className="w-5 h-5" />
                     Leave Balances
                   </h3>
-                  <Button onClick={handleCreateLeave} className="rounded-full gradient-primary text-white font-normal">
+                  <Button 
+                    onClick={handleCreateLeave} 
+                    variant="gradient-create"
+                    className="rounded-full h-10 px-6 shadow-sm font-normal"
+                  >
                     <Calendar className="w-4 h-4 mr-2" />
                     Set Leave Balance
                   </Button>

@@ -62,9 +62,9 @@ export function TaxRuleDrawer({ isOpen, onClose, taxRule, onEdit }: TaxRuleDrawe
             <div className="flex items-center gap-2">
               {onEdit && canUpdateTaxRule && (
                 <Button
-                  variant="ghost"
+                  variant="gradient-update"
                   size="sm"
-                  className="rounded-full w-9 h-9 p-0 gradient-primary text-white"
+                  className="rounded-full w-9 h-9 p-0 shadow-sm"
                   onClick={handleEdit}
                   title="Edit Tax Rule"
                 >

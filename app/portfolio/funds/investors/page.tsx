@@ -86,7 +86,7 @@ export default function InvestorsPage() {
             <h1 className="text-3xl font-bold text-gray-900">Investors</h1>
             <p className="text-gray-600 mt-1">Manage your investor relationships and commitments</p>
           </div>
-          <Button className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600">
+          <Button variant="gradient-create">
             <Plus className="w-4 h-4 mr-2" />
             Add Investor
           </Button>
@@ -164,10 +164,9 @@ export default function InvestorsPage() {
                 {investorTypes.map((type) => (
                   <Button
                     key={type}
-                    variant={selectedType === type ? "default" : "outline"}
+                    variant={selectedType === type ? "gradient" : "outline"}
                     size="sm"
                     onClick={() => setSelectedType(type)}
-                    className={selectedType === type ? "bg-amber-500 hover:bg-amber-600" : ""}
                   >
                     {type}
                   </Button>

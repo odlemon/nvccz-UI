@@ -294,7 +294,8 @@ export function EmployeesTable({ title, description }: EmployeesTableProps) {
         {canCreateEmployee && (
           <Button
             onClick={handleCreate}
-            className="rounded-full gradient-primary text-white font-normal"
+            variant="gradient-create"
+            className="rounded-full h-10 px-6 shadow-sm font-normal"
           >
             <Plus className="w-4 h-4 mr-2" />
             Create Employee

@@ -87,9 +87,9 @@ export default function ForgotPasswordPage() {
 
               <Button
                 onClick={() => router.push('/login')}
-                variant="gradient"
+                variant="outline"
                 size="lg"
-                className="w-full rounded-full"
+                className="w-full rounded-full h-12"
               >
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Back to Login
@@ -158,9 +158,9 @@ export default function ForgotPasswordPage() {
                 <Button
                   type="submit"
                   disabled={isSubmitting}
-                  variant="gradient"
+                  variant="gradient-info"
                   size="lg"
-                  className="w-full rounded-full"
+                  className="w-full rounded-full h-12 shadow-md"
                 >
                   {isSubmitting ? (
                     <>

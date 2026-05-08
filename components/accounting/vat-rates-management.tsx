@@ -134,7 +134,7 @@ export function VatRatesManagement() {
           <Button
             variant="outline"
             size="sm"
-            className="h-7 text-xs rounded-full"
+            className="h-8 text-xs rounded-full px-4"
             onClick={e => { e.stopPropagation(); handleSetActive(row) }}
           >
             Set Active

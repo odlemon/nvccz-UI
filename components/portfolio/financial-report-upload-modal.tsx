@@ -213,7 +213,7 @@ export function FinancialReportUploadModal({ isOpen, onClose }: FinancialReportU
             </div>
             <div className="flex justify-end gap-2 pt-4 border-t">
               <Button type="button" variant="outline" onClick={handleClose} className="rounded-full">Cancel</Button>
-              <Button type="submit" disabled={loading} className="rounded-full bg-gradient-to-r from-blue-500 to-blue-600 text-white">
+              <Button type="submit" disabled={loading} variant="gradient-info" className="rounded-full">
                 {loading ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
@@ -273,7 +273,7 @@ export function FinancialReportUploadModal({ isOpen, onClose }: FinancialReportU
 
             <div className="flex justify-end gap-2 pt-4 border-t">
               <Button type="button" variant="outline" onClick={() => setStep(1)} className="rounded-full">Back</Button>
-              <Button type="submit" disabled={loading} className="rounded-full bg-gradient-to-r from-blue-500 to-blue-600 text-white">
+              <Button type="submit" disabled={loading} variant="gradient" className="rounded-full">
                 {loading ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (

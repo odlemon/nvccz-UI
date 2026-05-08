@@ -149,13 +149,14 @@ export function LiquidateInstrumentModal({
         <DialogFooter className="gap-3">
           <Button
             variant="outline"
-            className="rounded-full h-10 px-5 text-xs font-semibold"
+            className="rounded-full h-10 px-6"
             onClick={() => onOpenChange(false)}
           >
             Cancel
           </Button>
           <Button
-            className="rounded-full h-10 px-5 text-xs font-semibold bg-[#4f77ff] hover:bg-[#4f77ff]/90"
+            variant="gradient-update"
+            className="rounded-full h-10 px-6"
             onClick={handleSubmit}
             disabled={isSubmitting}
           >

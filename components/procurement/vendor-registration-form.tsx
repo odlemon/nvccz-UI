@@ -492,7 +492,7 @@ export function VendorRegistrationForm() {
                   size="sm"
                   onClick={() => remove(index)}
                   disabled={bankFields.length === 1}
-                  className="gap-2"
+                  className="gap-2 rounded-full h-9 px-4"
                 >
                   <Trash2 className="w-4 h-4" />
                   Remove
@@ -607,7 +607,7 @@ export function VendorRegistrationForm() {
           <Button
             type="button"
             variant="outline"
-            className="gap-2 rounded-full"
+            className="gap-2 rounded-full h-10 px-6"
             onClick={() => append({
               bankName: '',
               accountName: '',
@@ -723,7 +723,8 @@ export function VendorRegistrationForm() {
             <div className="pt-2 flex justify-end">
               <Button
                 type="button"
-                className="rounded-full h-11 px-6 gap-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white"
+                className="rounded-full h-11 px-8 gap-2 shadow-sm"
+                variant="gradient-create"
                 onClick={submitKyc}
                 disabled={uploadingKyc || !kycToken}
               >
@@ -809,7 +810,8 @@ export function VendorRegistrationForm() {
                     type="button"
                     onClick={moveBack}
                     disabled={step === 1 || loading}
-                    className="gap-2 rounded-full h-11 px-6 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white disabled:opacity-50"
+                    variant="outline"
+                    className="gap-2 rounded-full h-11 px-8 disabled:opacity-50"
                   >
                     <ChevronLeft size={18} />
                     Previous
@@ -819,7 +821,8 @@ export function VendorRegistrationForm() {
                     type="button"
                     disabled={loading}
                     onClick={moveNext}
-                    className="rounded-full h-11 px-6 gap-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white"
+                    variant="gradient-create"
+                    className="rounded-full h-11 px-8 gap-2 shadow-sm"
                   >
                     {loading ? (
                       <>
@@ -861,10 +864,10 @@ export function VendorRegistrationForm() {
             <Button type="button" variant="outline" onClick={() => {
               setIsUploadConfirmOpen(false)
               setPendingUpload(null)
-            }} disabled={Boolean(uploadingDocCode)}>
+            }} disabled={Boolean(uploadingDocCode)} className="rounded-full h-10 px-6">
               Cancel
             </Button>
-            <Button type="button" onClick={confirmAndUploadDocument} disabled={Boolean(uploadingDocCode)}>
+            <Button type="button" onClick={confirmAndUploadDocument} disabled={Boolean(uploadingDocCode)} variant="gradient-create" className="rounded-full h-10 px-6 shadow-sm">
               {uploadingDocCode ? (
                 <span className="inline-flex items-center gap-2">
                   <Loader2 className="w-4 h-4 animate-spin" />

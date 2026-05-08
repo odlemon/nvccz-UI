@@ -459,7 +459,7 @@ export function ProcurementDashboard() {
               <CardDescription>Latest procurement requests</CardDescription>
             </div>
             <Link href="/procurement/requisitions">
-              <Button variant="outline" size="sm" className="rounded-full">
+              <Button variant="outline" size="sm" className="rounded-full h-9 px-4">
                 View All
                 <ArrowUpRight className="w-4 h-4 ml-1" />
               </Button>
@@ -500,7 +500,7 @@ export function ProcurementDashboard() {
               <CardDescription>Latest invoice activity</CardDescription>
             </div>
             <Link href="/procurement/invoices">
-              <Button variant="outline" size="sm" className="rounded-full">
+              <Button variant="outline" size="sm" className="rounded-full h-9 px-4">
                 View All
                 <ArrowUpRight className="w-4 h-4 ml-1" />
               </Button>
@@ -546,7 +546,7 @@ export function ProcurementDashboard() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
             {permissions.canCreatePurchaseRequisition && (
               <Link href="/procurement/requisitions">
-                <Button variant="outline" className="w-full rounded-full bg-white hover:bg-gray-50 h-11">
+                <Button variant="outline" className="w-full rounded-full bg-white hover:bg-gray-50 h-11 px-8">
                   <FileText className="w-4 h-4 mr-2" />
                   New Requisition
                 </Button>
@@ -554,7 +554,7 @@ export function ProcurementDashboard() {
             )}
             {moduleAccess.rfq !== 'none' && (
               <Link href="/procurement/rfq">
-                <Button variant="outline" className="w-full rounded-full bg-white hover:bg-gray-50 h-11">
+                <Button variant="outline" className="w-full rounded-full bg-white hover:bg-gray-50 h-11 px-8">
                   <ShoppingCart className="w-4 h-4 mr-2" />
                   Manage RFQs
                 </Button>
@@ -562,7 +562,7 @@ export function ProcurementDashboard() {
             )}
             {moduleAccess.quotations !== 'none' && (
               <Link href="/procurement/quotations">
-                <Button variant="outline" className="w-full rounded-full bg-white hover:bg-gray-50 h-11">
+                <Button variant="outline" className="w-full rounded-full bg-white hover:bg-gray-50 h-11 px-8">
                   <FileCheck className="w-4 h-4 mr-2" />
                   Review Quotations
                 </Button>
@@ -570,7 +570,7 @@ export function ProcurementDashboard() {
             )}
             {moduleAccess.invoices !== 'none' && (
               <Link href="/procurement/invoices">
-                <Button variant="outline" className="w-full rounded-full bg-white hover:bg-gray-50 h-11">
+                <Button variant="outline" className="w-full rounded-full bg-white hover:bg-gray-50 h-11 px-8">
                   <Package className="w-4 h-4 mr-2" />
                   Process Invoices
                 </Button>

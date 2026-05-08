@@ -204,7 +204,7 @@ export function CreateCreditNoteModal({ isOpen, onClose, onSuccess, preSelectedI
                   <Button
                     variant="outline"
                     className={cn(
-                      "w-full justify-start text-left font-normal rounded-full",
+                      "w-full justify-start text-left font-normal rounded-full h-10 px-4",
                       !creditNoteDate && "text-muted-foreground"
                     )}
                   >
@@ -317,14 +317,15 @@ export function CreateCreditNoteModal({ isOpen, onClose, onSuccess, preSelectedI
               type="button" 
               variant="outline" 
               onClick={onClose}
-              className="rounded-full"
+              className="rounded-full h-10 px-6"
             >
               Cancel
             </Button>
             <Button 
               type="submit" 
               disabled={loading}
-              className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-full shadow-sm"
+              variant="gradient-danger"
+              className="rounded-full h-10 px-6"
             >
               {loading ? 'Creating...' : 'Create Credit Note'}
             </Button>

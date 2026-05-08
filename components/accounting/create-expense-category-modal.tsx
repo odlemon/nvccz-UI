@@ -215,7 +215,8 @@ export function CreateExpenseCategoryModal({
             <Button
               type="submit"
               disabled={isLoading}
-              className="rounded-full px-6 bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white shadow-lg transition-all duration-200"
+              variant={isEditing ? "gradient-update" : "gradient-create"}
+              className="rounded-full px-6"
             >
               {isLoading ? (
                 <>

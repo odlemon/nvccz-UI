@@ -83,9 +83,9 @@ export function AllowanceTypeDrawer({ isOpen, onClose, allowanceType, onEdit }: 
             <div className="flex items-center gap-2">
               {onEdit && canUpdateAllowanceType && (
                 <Button
-                  variant="ghost"
+                  variant="gradient-update"
                   size="sm"
-                  className="rounded-full w-9 h-9 p-0 gradient-primary text-white"
+                  className="rounded-full w-9 h-9 p-0 shadow-sm"
                   onClick={handleEdit}
                   title="Edit Allowance Type"
                 >

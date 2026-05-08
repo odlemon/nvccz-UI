@@ -243,7 +243,8 @@ export function ContractScorecardPage({ type }: ContractScorecardPageProps) {
           </Select>
           <Button
             size="sm"
-            className="rounded-full gap-1.5 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white"
+            variant="gradient"
+            className="rounded-full gap-1.5"
             onClick={() => void handleCreateContract()}
             disabled={creatingContract || loading}
           >
@@ -262,7 +263,8 @@ export function ContractScorecardPage({ type }: ContractScorecardPageProps) {
           </Button>
           <Button
             size="sm"
-            className="rounded-full gap-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white"
+            variant="gradient-create"
+            className="rounded-full gap-1.5"
             onClick={() => void handleGenerate()}
             disabled={generating}
           >
@@ -277,7 +279,8 @@ export function ContractScorecardPage({ type }: ContractScorecardPageProps) {
               {({ loading: pdfLoading }: any) => (
                 <Button
                   size="sm"
-                  className="rounded-full gap-1.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white"
+                  variant="gradient-update"
+                  className="rounded-full gap-1.5"
                   disabled={pdfLoading}
                 >
                   <CiFileOn className={`w-3.5 h-3.5 ${pdfLoading ? "animate-spin" : ""}`} />

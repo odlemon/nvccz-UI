@@ -130,7 +130,7 @@ export function CreatePeriodLockoutModal({ isOpen, onClose, period }: CreatePeri
             <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
               Cancel
             </Button>
-            <Button type="submit" disabled={loading} className="bg-gradient-to-r from-blue-500 to-blue-600 text-white">
+            <Button type="submit" disabled={loading} variant={period ? "gradient-update" : "gradient"}>
               {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               {period ? "Update" : formData.isLocked ? "Lock Period" : "Unlock Period"}
             </Button>

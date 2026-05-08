@@ -143,7 +143,7 @@ export function CreateExchangeRateModal({
               <Label>Effective Date</Label>
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-full justify-start text-left font-normal rounded-full">
+                  <Button variant="outline" className="w-full justify-start text-left font-normal rounded-full h-10 px-4">
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {effectiveDate ? format(effectiveDate, "PPP") : "Select date"}
                   </Button>
@@ -161,8 +161,10 @@ export function CreateExchangeRateModal({
           </div>
 
           <div className="flex justify-end gap-2 pt-4">
-            <Button variant="outline" onClick={onClose}>Cancel</Button>
-            <Button type="submit" disabled={loading}>{loading ? "Saving..." : initial ? "Save" : "Create"}</Button>
+            <Button variant="outline" onClick={onClose} className="rounded-full h-10 px-6">Cancel</Button>
+            <Button type="submit" disabled={loading} variant={initial ? "gradient-update" : "gradient-create"} className="rounded-full h-10 px-6 shadow-sm">
+              {loading ? "Saving..." : initial ? "Save" : "Create"}
+            </Button>
           </div>
         </form>
       </DialogContent>
@@ -200,9 +202,9 @@ export function ViewExchangeRateModal({
           <div><strong>Effective Date:</strong> {new Date(exchangeRate.date).toLocaleDateString()}</div>
           <div><strong>Notes:</strong> {exchangeRate.notes || '-'}</div>
           <div className="flex justify-end gap-2 pt-4">
-            {onEdit && <Button variant="outline" onClick={() => onEdit(exchangeRate)}>Edit</Button>}
-            {onDelete && <Button variant="destructive" onClick={() => onDelete(exchangeRate)}>Delete</Button>}
-            <Button onClick={onClose}>Close</Button>
+            {onEdit && <Button variant="outline" onClick={() => onEdit(exchangeRate)} className="rounded-full h-10 px-6">Edit</Button>}
+            {onDelete && <Button variant="gradient-danger" onClick={() => onDelete(exchangeRate)} className="rounded-full h-10 px-6 shadow-sm">Delete</Button>}
+            <Button onClick={onClose} variant="outline" className="rounded-full h-10 px-6">Close</Button>
           </div>
         </div>
       </DialogContent>

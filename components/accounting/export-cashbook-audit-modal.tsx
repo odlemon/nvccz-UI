@@ -143,7 +143,7 @@ export function ExportCashbookAuditModal({ isOpen, onClose, banks }: ExportCashb
                         <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
                             Cancel
                         </Button>
-                        <Button type="submit" disabled={loading} className="bg-gradient-to-r from-blue-500 to-blue-600 text-white">
+                        <Button type="submit" disabled={loading} variant="gradient-info">
                             {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
                             Export
                         </Button>

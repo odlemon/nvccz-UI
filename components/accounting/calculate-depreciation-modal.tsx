@@ -114,15 +114,15 @@ export function CalculateDepreciationModal({ isOpen, onClose, asset, onSuccess }
           </div>
 
           {/* Mode toggle */}
-          <div className="flex rounded-full border overflow-hidden">
+          <div className="flex rounded-full border border-gray-200 bg-gray-50/50 p-1">
             <button
               type="button"
               onClick={() => setMode("single")}
               className={cn(
-                "flex-1 flex items-center justify-center gap-1.5 px-4 py-2 text-sm font-medium transition-colors",
+                "flex-1 flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-full transition-all duration-200",
                 mode === "single"
-                  ? "bg-blue-600 text-white"
-                  : "bg-white text-gray-600 hover:bg-gray-50"
+                  ? "bg-white text-blue-600 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
               )}
             >
               <Calculator className="w-3.5 h-3.5" />
@@ -132,10 +132,10 @@ export function CalculateDepreciationModal({ isOpen, onClose, asset, onSuccess }
               type="button"
               onClick={() => setMode("range")}
               className={cn(
-                "flex-1 flex items-center justify-center gap-1.5 px-4 py-2 text-sm font-medium transition-colors",
+                "flex-1 flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-full transition-all duration-200",
                 mode === "range"
-                  ? "bg-blue-600 text-white"
-                  : "bg-white text-gray-600 hover:bg-gray-50"
+                  ? "bg-white text-blue-600 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
               )}
             >
               <CalendarRange className="w-3.5 h-3.5" />
@@ -153,7 +153,7 @@ export function CalculateDepreciationModal({ isOpen, onClose, asset, onSuccess }
                     <Button
                       type="button"
                       variant="outline"
-                      className="w-full justify-start text-left font-normal rounded-full mt-1"
+                      className="w-full justify-start text-left font-normal rounded-full mt-1 h-10 px-4"
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {format(depreciationDate, "PPP")}
@@ -201,7 +201,7 @@ export function CalculateDepreciationModal({ isOpen, onClose, asset, onSuccess }
                         type="button"
                         variant="outline"
                         className={cn(
-                          "w-full justify-start text-left font-normal rounded-full mt-1 text-sm",
+                          "w-full justify-start text-left font-normal rounded-full mt-1 text-sm h-10 px-4",
                           !startDate && "text-muted-foreground"
                         )}
                       >
@@ -229,7 +229,7 @@ export function CalculateDepreciationModal({ isOpen, onClose, asset, onSuccess }
                         type="button"
                         variant="outline"
                         className={cn(
-                          "w-full justify-start text-left font-normal rounded-full mt-1 text-sm",
+                          "w-full justify-start text-left font-normal rounded-full mt-1 text-sm h-10 px-4",
                           !endDate && "text-muted-foreground"
                         )}
                       >
@@ -272,13 +272,14 @@ export function CalculateDepreciationModal({ isOpen, onClose, asset, onSuccess }
           )}
 
           <div className="flex justify-end gap-3 pt-2 border-t">
-            <Button type="button" variant="outline" onClick={onClose} className="rounded-full">
+            <Button type="button" variant="outline" onClick={onClose} className="rounded-full h-10 px-6">
               Cancel
             </Button>
             <Button
               type="submit"
               disabled={loading}
-              className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-full shadow-sm"
+              variant="gradient-create"
+              className="rounded-full h-10 px-6 shadow-sm"
             >
               {loading
                 ? "Processing..."

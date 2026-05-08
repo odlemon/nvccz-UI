@@ -95,8 +95,8 @@ export function StockMovementModal({ isOpen, onClose, itemId, onSuccess }: Stock
           </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t">
-            <Button type="button" variant="outline" onClick={onClose} className="rounded-full">Cancel</Button>
-            <Button type="submit" disabled={loading} className="rounded-full">{loading ? 'Saving...' : 'Record'}</Button>
+            <Button type="button" variant="outline" onClick={onClose} className="rounded-full h-10 px-6">Cancel</Button>
+            <Button type="submit" disabled={loading} variant="gradient-update" className="rounded-full h-10 px-6">{loading ? 'Saving...' : 'Record Movement'}</Button>
           </div>
         </form>
       </DialogContent>

@@ -132,9 +132,9 @@ export function CashbookEntryViewDrawer({ isOpen, onClose, entry }) {
 						</SheetTitle>
 						<Button
 							onClick={() => setShowContraDialog(true)}
-							variant="outline"
+							variant="gradient-create"
 							size="sm"
-							className="gap-2 rounded-full bg-gradient-to-r from-indigo-500 to-indigo-600 text-white hover:from-indigo-600 hover:to-indigo-700 border-0"
+							className="gap-2 rounded-full h-8 px-4 border-0"
 							disabled={entry.status !== "POSTED"}
 						>
 							<FileSignature className="w-4 h-4" />
@@ -483,7 +483,8 @@ export function CashbookEntryViewDrawer({ isOpen, onClose, entry }) {
 								handleGenerateContra()
 							}}
 							disabled={generatingContra}
-							className="rounded-full bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700"
+							variant="gradient-create"
+							className="rounded-full h-10 px-6"
 						>
 							{generatingContra ? (
 								<>

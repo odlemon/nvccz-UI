@@ -300,12 +300,14 @@ export function PayrollRunForm({
               variant="outline"
               onClick={handleClose}
               disabled={isSubmitting}
+              className="rounded-full h-10 px-6"
             >
               Cancel
             </Button>
             <Button
               type="submit"
-              className="gradient-primary"
+              variant={editingRun ? "gradient-update" : "gradient-create"}
+              className="rounded-full h-10 px-6 shadow-sm"
               disabled={isSubmitting}
             >
               {isSubmitting ? (

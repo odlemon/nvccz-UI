@@ -282,14 +282,15 @@ export function CreateAccountModal({ isOpen, onClose, onSuccess, account }: Crea
               variant="outline"
               onClick={onClose}
               disabled={isLoading}
-              className="rounded-full px-6"
+              className="rounded-full px-6 h-10"
             >
               Cancel
             </Button>
             <Button
               type="submit"
               disabled={isLoading}
-              className="rounded-full px-6 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white shadow-lg transition-all duration-200"
+              variant={isEditing ? "gradient-update" : "gradient-create"}
+              className="rounded-full px-6 h-10"
             >
               {isLoading ? (
                 <>

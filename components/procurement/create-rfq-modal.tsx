@@ -443,7 +443,7 @@ export function CreateRFQModal({ isOpen, onClose, onSuccess, preSelectedRequisit
                 onClick={addItem}
                 variant="outline"
                 size="sm"
-                className="rounded-full"
+                className="rounded-full h-9 px-4"
               >
                 <Plus className="w-4 h-4 mr-2" />
                 Add Item
@@ -537,13 +537,14 @@ export function CreateRFQModal({ isOpen, onClose, onSuccess, preSelectedRequisit
         </form>
 
         <div className="flex justify-end gap-3 pt-6 border-t">
-          <Button variant="outline" onClick={onClose} disabled={loading} className="rounded-full">
+          <Button variant="outline" onClick={onClose} disabled={loading} className="rounded-full h-10 px-6">
             Cancel
           </Button>
           <Button
             onClick={handleSubmit}
             disabled={loading || !permissions.canCreateRFQ}
-            className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-full"
+            variant="gradient-create"
+            className="rounded-full h-10 px-6 shadow-sm"
           >
             {loading ? 'Creating...' : 'Create RFQ'}
           </Button>

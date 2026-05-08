@@ -252,14 +252,15 @@ export function AllowanceTypesForm({ isOpen, onClose, onSubmit, editingType, loa
               type="button"
               variant="outline"
               onClick={handleClose}
-              className="rounded-full"
+              className="rounded-full h-10 px-6"
             >
               Cancel
             </Button>
             <Button
               type="submit"
+              variant={editingType ? "gradient-update" : "gradient-create"}
               disabled={loading}
-              className="rounded-full gradient-primary text-white"
+              className="rounded-full h-10 px-6 shadow-sm"
             >
               {loading ? 'Saving...' : editingType ? 'Update Type' : 'Create Type'}
             </Button>

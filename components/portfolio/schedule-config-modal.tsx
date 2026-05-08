@@ -330,7 +330,7 @@ export function ScheduleConfigModal({ isOpen, onClose, config }: ScheduleConfigM
             <Button type="button" variant="ghost" onClick={onClose} disabled={loading}>
               Cancel
             </Button>
-            <Button type="submit" disabled={loading} className="bg-blue-600 hover:bg-blue-700 text-white min-w-[120px]">
+            <Button type="submit" variant="gradient" disabled={loading} className="min-w-[120px]">
               {loading ? (
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />

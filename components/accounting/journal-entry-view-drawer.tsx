@@ -349,7 +349,8 @@ export function JournalEntryViewDrawer({
                   <div className="flex gap-2">
                     <Button
                       size="sm"
-                      className="rounded-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 px-4 shadow-sm"
+                      variant="gradient-create"
+                      className="rounded-full px-4 h-9 shadow-sm"
                       onClick={() => setShowPostDialog(true)}
                       disabled={isPostingJournalEntry || isVoidingJournalEntry || !isBalanced}
                     >
@@ -359,7 +360,7 @@ export function JournalEntryViewDrawer({
                     <Button
                       size="sm"
                       variant="outline"
-                      className="rounded-full border-red-200 text-red-600 hover:bg-red-50 px-4 shadow-sm"
+                      className="rounded-full border-red-200 text-red-600 hover:bg-red-50 px-4 h-9 shadow-sm"
                       onClick={() => setShowVoidDialog(true)}
                       disabled={isPostingJournalEntry || isVoidingJournalEntry}
                     >
@@ -373,7 +374,7 @@ export function JournalEntryViewDrawer({
                   <Button
                     size="sm"
                     variant="outline"
-                    className="rounded-full border-red-200 text-red-600 hover:bg-red-50 px-4 shadow-sm"
+                    className="rounded-full border-red-200 text-red-600 hover:bg-red-50 px-4 h-9 shadow-sm"
                     onClick={() => setShowVoidDialog(true)}
                     disabled={isPostingJournalEntry || isVoidingJournalEntry}
                   >
@@ -587,7 +588,7 @@ export function JournalEntryViewDrawer({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isPostingJournalEntry}>
+            <AlertDialogCancel disabled={isPostingJournalEntry} className="rounded-full h-10 px-6">
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
@@ -596,7 +597,7 @@ export function JournalEntryViewDrawer({
                 handlePostEntry()
               }}
               disabled={isPostingJournalEntry || !isBalanced}
-              className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
+              className={cn(buttonVariants({ variant: "gradient-create" }), "rounded-full h-10 px-6")}
             >
               {isPostingJournalEntry ? (
                 <div className="flex items-center gap-2">
@@ -643,7 +644,7 @@ export function JournalEntryViewDrawer({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isVoidingJournalEntry}>
+            <AlertDialogCancel disabled={isVoidingJournalEntry} className="rounded-full h-10 px-6">
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
@@ -652,7 +653,7 @@ export function JournalEntryViewDrawer({
                 handleVoidEntry()
               }}
               disabled={isVoidingJournalEntry}
-              className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700"
+              className={cn(buttonVariants({ variant: "gradient-danger" }), "rounded-full h-10 px-6")}
             >
               {isVoidingJournalEntry ? (
                 <div className="flex items-center gap-2">

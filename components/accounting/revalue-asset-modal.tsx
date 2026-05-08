@@ -123,7 +123,7 @@ export function RevalueAssetModal({ isOpen, onClose, asset, onSuccess }: Revalue
                   <Button
                     variant="outline"
                     className={cn(
-                      "w-full justify-start text-left font-normal rounded-full",
+                      "w-full justify-start text-left font-normal rounded-full h-10 px-4",
                       !revaluationDate && "text-muted-foreground"
                     )}
                   >
@@ -207,14 +207,15 @@ export function RevalueAssetModal({ isOpen, onClose, asset, onSuccess }: Revalue
               type="button" 
               variant="outline" 
               onClick={onClose}
-              className="rounded-full"
+              className="rounded-full h-10 px-6"
             >
               Cancel
             </Button>
             <Button 
               type="submit" 
               disabled={loading}
-              className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-full shadow-sm"
+              variant="gradient-update"
+              className="rounded-full h-10 px-6 shadow-sm"
             >
               {loading ? 'Revaluing...' : 'Revalue Asset'}
             </Button>

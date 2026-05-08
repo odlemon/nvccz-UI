@@ -98,7 +98,7 @@ export function CFODashboard() {
             Executive summary of invoice matching and procurement status
           </p>
         </div>
-        <Button variant="outline" onClick={loadDashboard} className="rounded-full">
+        <Button variant="outline" onClick={loadDashboard} className="rounded-full h-10 px-6">
           <RefreshCw className="w-4 h-4 mr-2" />
           Refresh
         </Button>

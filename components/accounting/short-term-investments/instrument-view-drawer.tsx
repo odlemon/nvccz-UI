@@ -297,11 +297,11 @@ export function InstrumentViewDrawer({ instrument, open, onOpenChange }: Instrum
             {/* Action Buttons */}
             {src.status === "ACTIVE" && (
               <div className="flex flex-wrap gap-2 mt-3">
-                <Button size="sm" className="rounded-full h-8 text-xs gap-1.5 bg-gradient-to-r from-blue-500 to-indigo-600 text-white" onClick={() => setIsLiquidateOpen(true)}>
+                <Button size="sm" variant="gradient-info" className="rounded-full h-8 text-xs gap-1.5" onClick={() => setIsLiquidateOpen(true)}>
                   <DollarSign className="w-3.5 h-3.5" /> Liquidate
                 </Button>
                 {pendingAccruals.length > 0 && (
-                  <Button size="sm" className="rounded-full h-8 text-xs gap-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white" onClick={handleApproveAll} disabled={approvingAll}>
+                  <Button size="sm" variant="gradient-create" className="rounded-full h-8 text-xs gap-1.5" onClick={handleApproveAll} disabled={approvingAll}>
                     {approvingAll ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
                     Approve all ({pendingAccruals.length})
                   </Button>
@@ -436,7 +436,7 @@ export function InstrumentViewDrawer({ instrument, open, onOpenChange }: Instrum
                     </div>
                     <div className="flex justify-end gap-2">
                       <Button variant="ghost" size="sm" className="h-7 text-[10px] rounded-full" onClick={() => setShowAddRate(false)}>Cancel</Button>
-                      <Button size="sm" className="h-7 text-[10px] rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white" onClick={handleAddRate} disabled={addingRate}>
+                      <Button size="sm" variant="gradient-update" className="h-7 text-[10px] rounded-full" onClick={handleAddRate} disabled={addingRate}>
                         {addingRate ? "Saving..." : "Save rate"}
                       </Button>
                     </div>
@@ -479,7 +479,8 @@ export function InstrumentViewDrawer({ instrument, open, onOpenChange }: Instrum
                 {src.status === "ACTIVE" && pendingAccruals.length > 0 && (
                   <Button
                     size="sm"
-                    className="rounded-full h-7 text-[10px] gap-1 bg-gradient-to-r from-emerald-500 to-teal-600 text-white"
+                    variant="gradient-create"
+                    className="rounded-full h-7 text-[10px] gap-1 shadow-sm"
                     onClick={handleApproveAll}
                     disabled={approvingAll}
                   >

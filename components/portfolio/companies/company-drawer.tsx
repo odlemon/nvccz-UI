@@ -788,7 +788,8 @@ export function CompanyDrawer() {
                                 <AlertDialogTrigger asChild>
                                   <Button
                                     size="sm"
-                                    className="rounded-full bg-gradient-to-r from-green-500 to-emerald-600 text-white"
+                                    variant="gradient-create"
+                                    className="rounded-full"
                                     disabled={selectedReportIds.length === 0 || bulkReviewLoading}
                                   >
                                     Bulk Accept
@@ -886,7 +887,7 @@ export function CompanyDrawer() {
                                   <Eye className="w-3 h-3 mr-1" /> View
                                 </Button>
                                 {report.status === 'PENDING' && canReviewReports && (
-                                  <Button size="xs" onClick={() => handleReviewClick(report)} className="rounded-full bg-gradient-to-r from-green-500 to-emerald-600 text-white px-3 py-1">
+                                  <Button size="xs" variant="gradient-create" onClick={() => handleReviewClick(report)} className="rounded-full px-3 py-1">
                                     <Check className="w-3 h-3 mr-1" /> Review
                                   </Button>
                                 )}

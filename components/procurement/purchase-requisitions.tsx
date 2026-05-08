@@ -346,7 +346,8 @@ export function PurchaseRequisitions() {
         {activeTab === 'investee' ? (
           <Button
             onClick={handleCreate}
-            className="rounded-full bg-gradient-to-r from-violet-500 to-violet-600 hover:from-violet-600 hover:to-violet-700 text-white"
+            variant="gradient-create"
+            className="rounded-full h-10 px-6 shadow-sm"
           >
             <Plus className="w-4 h-4 mr-2" />
             Create Investee PR
@@ -354,7 +355,8 @@ export function PurchaseRequisitions() {
         ) : (
           <Button
             onClick={handleCreate}
-            className="rounded-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white"
+            variant="gradient-create"
+            className="rounded-full h-10 px-6 shadow-sm"
           >
             <Plus className="w-4 h-4 mr-2" />
             Create New Requisition
@@ -480,7 +482,7 @@ export function PurchaseRequisitions() {
                     setPriorityFilter('all')
                     setCurrentPage(1)
                   }}
-                  className="rounded-full"
+                  className="rounded-full h-9 px-4"
                 >
                   Clear Filters
                 </Button>
@@ -491,7 +493,7 @@ export function PurchaseRequisitions() {
             <Button
               variant="outline"
               onClick={() => handleExport(getCurrentData())}
-              className="rounded-full"
+              className="rounded-full h-9 px-4"
             >
               <FileText className="w-4 h-4 mr-2" />
               Export
@@ -537,10 +539,10 @@ export function PurchaseRequisitions() {
           <>
             {viewingRequisition?.status === 'DRAFT' && permissions.canUpdatePurchaseRequisition && (
               <Button
-                variant="outline"
+                variant="gradient-update"
                 size="sm"
                 onClick={() => setIsEditModalOpen(true)}
-                className="h-8 px-3 rounded-full bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 text-white border-0"
+                className="h-8 px-4 rounded-full shadow-sm"
               >
                 <Edit className="w-3 h-3 mr-1" />
                 Edit

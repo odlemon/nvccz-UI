@@ -208,7 +208,8 @@ export function InvoiceViewDrawer({
                 {currentInvoice.status === 'DRAFT' && onSend && (
                   <Button
                     size="sm"
-                    className="rounded-full bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700"
+                    variant="gradient-info"
+                    className="rounded-full h-8 px-4"
                     onClick={handleSendClick}
                     disabled={isLoading}
                   >
@@ -220,7 +221,8 @@ export function InvoiceViewDrawer({
                 {currentInvoice.status === 'SENT' && onMarkAsPaid && (
                   <Button
                     size="sm"
-                    className="rounded-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700"
+                    variant="gradient-create"
+                    className="rounded-full h-8 px-4"
                     onClick={handleMarkAsPaidClick}
                     disabled={isLoading}
                   >
@@ -233,7 +235,7 @@ export function InvoiceViewDrawer({
                   <Button
                     size="sm"
                     variant="outline"
-                    className="rounded-full border-red-200 text-red-600 hover:bg-red-50"
+                    className="rounded-full h-8 px-4 border-red-200 text-red-600 hover:bg-red-50"
                     onClick={handleVoidClick}
                     disabled={isLoading}
                   >
@@ -246,7 +248,7 @@ export function InvoiceViewDrawer({
                   <Button
                     size="sm"
                     variant="outline"
-                    className="rounded-full"
+                    className="rounded-full h-8 px-4"
                     onClick={() => onEdit(currentInvoice)}
                     disabled={isLoading}
                   >
@@ -257,7 +259,8 @@ export function InvoiceViewDrawer({
                 {(invoice?.status === 'SENT' || invoice?.status === 'PAID') && (
                   <Button 
                     onClick={() => setIsCreateCreditNoteOpen(true)}
-                    className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-full shadow-sm"
+                    variant="gradient-danger"
+                    className="rounded-full h-8 px-4"
                     size="sm"
                   >
                     <CreditCard className="w-4 h-4 mr-2" />
@@ -279,7 +282,7 @@ export function InvoiceViewDrawer({
                       <Button
                         size="sm"
                         variant="outline"
-                        className="rounded-full"
+                        className="rounded-full h-8 px-4"
                         disabled={pdfLoading}
                       >
                         <FileText className={`w-4 h-4 mr-1 ${pdfLoading ? "animate-spin" : ""}`} />

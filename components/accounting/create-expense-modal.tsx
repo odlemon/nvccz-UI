@@ -288,7 +288,7 @@ export function CreateExpenseModal({
                   <Button
                     variant="outline"
                     className={cn(
-                      "w-full justify-start text-left font-normal",
+                      "w-full justify-start text-left font-normal rounded-full h-10 px-4",
                       !formData.transactionDate && "text-muted-foreground",
                       errors.transactionDate && "border-red-500"
                     )}
@@ -392,14 +392,15 @@ export function CreateExpenseModal({
               variant="outline"
               onClick={onClose}
               disabled={isLoading}
-              className="rounded-full px-6"
+              className="rounded-full px-6 h-10"
             >
               Cancel
             </Button>
             <Button
               type="submit"
               disabled={isLoading}
-              className="rounded-full px-6 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-lg transition-all duration-200"
+              variant={isEditing ? "gradient-update" : "gradient-create"}
+              className="rounded-full px-6 h-10"
             >
               {isLoading ? (
                 <>

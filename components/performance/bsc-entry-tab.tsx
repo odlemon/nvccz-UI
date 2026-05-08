@@ -58,11 +58,9 @@ const DEFAULT_PERIOD: PeriodFields = {
 
 const toNum = (v: string) => Number(v || 0)
 
-const GRADIENT_EMERALD = "rounded-full gap-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white"
-const GRADIENT_AMBER = "rounded-full gap-1.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white"
-const GRADIENT_BLUE = "rounded-full gap-1.5 bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white"
-const GRADIENT_PURPLE = "rounded-full gap-1.5 bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white"
-const GRADIENT_ROSE = "rounded-full gap-1.5 bg-gradient-to-r from-rose-500 to-red-600 hover:from-rose-600 hover:to-red-700 text-white"
+// Colour now comes from the Button `variant` prop. This shared className only
+// keeps layout / sizing tokens that pair well with the gradient variants.
+const ACTION_BTN_CLASS = "rounded-full gap-1.5"
 
 interface SectionCardProps {
   title: string
@@ -292,7 +290,7 @@ export function BscEntryTab() {
           <FormField label="Currency">
             <CurrencySelect value={currencyCode} onChange={setCurrencyCode} />
           </FormField>
-          <Button size="sm" className={GRADIENT_EMERALD} onClick={() => void safeRun("roi", "ROI Data", runSubmitRoi)} disabled={Boolean(actionLoadingKey)}>
+          <Button size="sm" variant="gradient-create" className={ACTION_BTN_CLASS} onClick={() => void safeRun("roi", "ROI Data", runSubmitRoi)} disabled={Boolean(actionLoadingKey)}>
             {isActionLoading("roi") ? <Loader2 className="w-4 h-4 animate-spin" /> : <TrendingUp className="w-4 h-4" />}
             {isActionLoading("roi") ? "Submitting..." : "Submit ROI Data"}
           </Button>
@@ -316,7 +314,8 @@ export function BscEntryTab() {
           </FormField>
           <Button
             size="sm"
-            className={GRADIENT_BLUE}
+            variant="gradient-info"
+            className={ACTION_BTN_CLASS}
             onClick={() => void safeRun("funding", "Funding data", async () => {
               await performanceBscApiService.submitBscFundingResources({
                 goalId: fundingGoalId,
@@ -349,7 +348,8 @@ export function BscEntryTab() {
           </div>
           <Button
             size="sm"
-            className={GRADIENT_AMBER}
+            variant="gradient-update"
+            className={ACTION_BTN_CLASS}
             onClick={() => void safeRun("budget", "Budget data", async () => {
               await performanceBscApiService.submitBscBudgetAlignment({
                 goalId: budgetGoalId,
@@ -379,7 +379,8 @@ export function BscEntryTab() {
           </div>
           <Button
             size="sm"
-            className={GRADIENT_ROSE}
+            variant="gradient"
+            className={ACTION_BTN_CLASS}
             onClick={() => void safeRun("survey", "Survey score", async () => {
               await performanceBscApiService.submitBscCustomerSatisfaction({
                 goalId: surveyGoalId,

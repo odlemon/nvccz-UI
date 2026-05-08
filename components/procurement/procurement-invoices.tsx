@@ -309,7 +309,8 @@ export function ProcurementInvoices() {
         {permissions.canCreateInvoice && (
           <Button
             onClick={handleCreate}
-            className="rounded-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white"
+            variant="gradient-create"
+            className="rounded-full h-10 px-6 shadow-sm"
           >
             <Plus className="w-4 h-4 mr-2" />
             Create New Invoice
@@ -452,7 +453,7 @@ export function ProcurementInvoices() {
                     setVendorFilter('all')
                     setCurrentPage(1)
                   }}
-                  className="rounded-full"
+                  className="rounded-full h-9 px-4"
                 >
                   Clear Filters
                 </Button>
@@ -507,7 +508,7 @@ export function ProcurementInvoices() {
                     variant="outline"
                     size="sm"
                     disabled={pdfLoading}
-                    className="h-8 rounded-full bg-gradient-to-r from-purple-50 to-indigo-50 hover:from-purple-100 hover:to-indigo-100 border-purple-200"
+                    className="h-8 rounded-full h-9 px-4 shadow-sm"
                   >
                     <CiFileOn className={`w-4 h-4 mr-2 ${pdfLoading ? "animate-spin" : ""}`} />
                     {pdfLoading ? "..." : "Export PDF"}
@@ -522,7 +523,8 @@ export function ProcurementInvoices() {
                   // This would trigger the approve dialog in the drawer content
                   // We'll need to pass this as a ref or use a different approach
                 }}
-                className="h-8 rounded-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white"
+                variant="gradient-create"
+                className="h-9 px-4 rounded-full shadow-sm"
               >
                 <CheckCircle className="w-4 h-4 mr-2" />
                 Approve
@@ -532,7 +534,8 @@ export function ProcurementInvoices() {
               <Button
                 size="sm"
                 onClick={() => handleProcessPayment(viewingInvoice)}
-                className="h-8 rounded-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white"
+                variant="gradient-info"
+                className="h-9 px-4 rounded-full shadow-sm"
               >
                 <Banknote className="w-4 h-4 mr-2" />
                 Payment

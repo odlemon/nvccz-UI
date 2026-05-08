@@ -375,8 +375,9 @@ export function GoalFormModal({ isOpen, onClose, goal, onSubmit }: GoalFormModal
             </Button>
             <Button
               type="submit"
+              variant={goal ? "gradient-update" : "gradient-create"}
               disabled={isSubmitting}
-              className="rounded-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white"
+              className="rounded-full"
             >
               {isSubmitting ? (
                 <>

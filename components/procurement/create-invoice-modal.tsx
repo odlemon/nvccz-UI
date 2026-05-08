@@ -242,7 +242,7 @@ export function CreateInvoiceModal({ isOpen, onClose, onSuccess }: CreateInvoice
                     onClick={handleOCRProcessing}
                     disabled={!uploadedFile}
                     variant="outline"
-                    className="flex items-center gap-2"
+                    className="flex items-center gap-2 rounded-full h-10 px-6"
                   >
                     <Zap className="w-4 h-4" />
                     Process OCR
@@ -346,7 +346,7 @@ export function CreateInvoiceModal({ isOpen, onClose, onSuccess }: CreateInvoice
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-lg">Invoice Items</CardTitle>
-              <Button type="button" onClick={addItem} variant="outline" size="sm">
+               <Button type="button" onClick={addItem} variant="outline" size="sm" className="rounded-full h-9 px-4">
                 <Plus className="w-4 h-4 mr-2" />
                 Add Item
               </Button>
@@ -465,11 +465,11 @@ export function CreateInvoiceModal({ isOpen, onClose, onSuccess }: CreateInvoice
 
           {/* Actions */}
           <div className="flex items-center justify-end gap-3 pt-6 border-t">
-            <Button type="button" variant="outline" onClick={handleClose} disabled={loading}>
+            <Button type="button" variant="outline" onClick={handleClose} disabled={loading} className="rounded-full h-10 px-6">
               <X className="w-4 h-4 mr-2" />
               Cancel
             </Button>
-            <Button type="submit" disabled={loading || !permissions.canCreateInvoice} className="gradient-primary text-white">
+            <Button type="submit" disabled={loading || !permissions.canCreateInvoice} variant="gradient-create" className="rounded-full h-10 px-6 shadow-sm">
               {loading ? (
                 <>
                   <div className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin" />

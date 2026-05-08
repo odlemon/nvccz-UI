@@ -1098,7 +1098,7 @@ export function ProcessCashbookModal({
                               type="button"
                               size="icon"
                               variant="ghost"
-                              className="h-7 w-7 hover:bg-red-100 hover:text-red-700"
+                              className="h-7 w-7 hover:bg-red-100 hover:text-red-700 rounded-full"
                               onClick={() => handleDeleteRow(index)}
                             >
                               <Trash2 className="w-4 h-4" />
@@ -1115,36 +1115,36 @@ export function ProcessCashbookModal({
                 <div className="flex gap-3 flex-wrap">
                   <Button
                     type="button"
-                    variant="outline"
+                    variant="gradient-danger"
                     size="sm"
                     onClick={() => handleDeleteRow(fields.length - 1)}
-                    className="gap-2 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-full"
+                    className="gap-2 rounded-full h-8"
                   >
-                    Delete <kbd className="px-2 py-1 text-xs bg-muted rounded text-black">Ctrl+D</kbd>
+                    Delete <kbd className="px-2 py-1 text-xs bg-muted/20 rounded text-white">Ctrl+D</kbd>
                   </Button>
                   <Button
                     type="button"
-                    variant="outline"
+                    variant="gradient-create"
                     size="sm"
                     onClick={() => handleAddRow(fields.length - 1)}
-                    className="gap-2 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-full"
+                    className="gap-2 rounded-full h-8"
                   >
-                    Insert <kbd className="px-2 py-1 text-xs bg-muted rounded text-black">Ctrl+I</kbd>
+                    Insert <kbd className="px-2 py-1 text-xs bg-muted/20 rounded text-white">Ctrl+I</kbd>
                   </Button>
                   <Button
                     type="button"
-                    variant="outline"
+                    variant="gradient-info"
                     size="sm"
                     onClick={openMatchingModal}
-                    className="gap-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-full"
+                    className="gap-2 rounded-full h-8"
                   >
-                    Match <kbd className="px-2 py-1 text-xs bg-muted rounded text-black">F7</kbd>
+                    Match <kbd className="px-2 py-1 text-xs bg-muted/20 rounded text-white">F7</kbd>
                   </Button>
-                  <Button type="button" variant="outline" size="sm" className="gap-2 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-full">
-                    Reconcile <kbd className="px-2 py-1 text-xs bg-muted rounded text-black">F7</kbd>
+                  <Button type="button" variant="gradient" size="sm" className="gap-2 rounded-full h-8">
+                    Reconcile <kbd className="px-2 py-1 text-xs bg-muted/20 rounded text-white">F7</kbd>
                   </Button>
-                  <Button type="button" variant="outline" size="sm" className="gap-2 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white rounded-full">
-                    Inc / Exc <kbd className="px-2 py-1 text-xs bg-muted rounded text-black">F9</kbd>
+                  <Button type="button" variant="gradient-warning" size="sm" className="gap-2 rounded-full h-8">
+                    Inc / Exc <kbd className="px-2 py-1 text-xs bg-muted/20 rounded text-white">F9</kbd>
                   </Button>
                 </div>
 
@@ -1157,11 +1157,11 @@ export function ProcessCashbookModal({
                       className="w-[180px] text-right font-mono bg-muted font-semibold"
                     />
                   </div>
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    size="sm" 
-                    className="whitespace-nowrap bg-gradient-to-r from-green-500 to-green-600 text-white rounded-full hover:from-green-600 hover:to-green-700" 
+                  <Button
+                    type="button"
+                    variant="gradient-info"
+                    size="sm"
+                    className="whitespace-nowrap rounded-full h-9 px-4"
                     onClick={() => {
                       const link = document.createElement('a')
                       link.href = '/sample-cashbook-transactions.csv'
@@ -1172,10 +1172,10 @@ export function ProcessCashbookModal({
                   >
                     Download Template
                   </Button>
-                  <Button type="button" variant="outline" size="sm" className="whitespace-nowrap bg-gradient-to-r from-gray-500 to-gray-600 text-white rounded-full" onClick={() => setImportOpen(true)}>
+                  <Button type="button" variant="outline" size="sm" className="whitespace-nowrap rounded-full h-9 px-4" onClick={() => setImportOpen(true)}>
                     Import Batch
                   </Button>
-                  <Button type="button" onClick={handleSave} className="gap-2 whitespace-nowrap bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-full">
+                  <Button type="button" onClick={handleSave} variant="gradient" className="gap-2 whitespace-nowrap rounded-full h-9 px-6">
                     <Save className="w-4 h-4" />
                     Save Batch
                   </Button>
@@ -1200,10 +1200,10 @@ export function ProcessCashbookModal({
             </p>
           </div>
           <div className="flex justify-end gap-3">
-            <Button variant="outline" onClick={() => setConfirmOpen(false)} className="rounded-full">
+            <Button variant="outline" onClick={() => setConfirmOpen(false)} className="rounded-full h-10 px-6">
               Cancel
             </Button>
-            <Button onClick={handleConfirmSave} disabled={saving} className="bg-gradient-to-r from-green-500 to-green-600 text-white rounded-full">
+            <Button onClick={handleConfirmSave} disabled={saving} variant="gradient-create" className="rounded-full h-10 px-6">
               {saving ? "Submitting..." : "Confirm"}
             </Button>
           </div>
@@ -1227,7 +1227,7 @@ export function ProcessCashbookModal({
                 type="button" 
                 variant="outline" 
                 size="sm"
-                className="w-full"
+                className="w-full rounded-full h-9"
                 onClick={() => {
                   const link = document.createElement('a')
                   link.href = '/sample-cashbook-transactions.csv'
@@ -1250,10 +1250,10 @@ export function ProcessCashbookModal({
             )}
           </div>
           <div className="flex justify-end gap-3">
-            <Button variant="outline" onClick={() => setImportOpen(false)} className="rounded-full">
+            <Button variant="outline" onClick={() => setImportOpen(false)} className="rounded-full h-10 px-6">
               Cancel
             </Button>
-            <Button onClick={handleImport} disabled={!importFile} className="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-full">
+            <Button onClick={handleImport} disabled={!importFile} variant="gradient-info" className="rounded-full h-10 px-6">
               Import
             </Button>
           </div>
@@ -1274,7 +1274,7 @@ export function ProcessCashbookModal({
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
-                    className="w-full justify-between"
+                    className="w-full justify-between rounded-full h-10 px-4"
                     disabled={isFetchingTransactions}
                   >
                     {isFetchingTransactions ? (
@@ -1490,14 +1490,15 @@ export function ProcessCashbookModal({
                   setOpenItems([])
                   setSelectedAllocations([])
                 }}
-                className="rounded-full"
+                className="rounded-full h-10 px-6"
               >
                 Cancel
               </Button>
               <Button
                 onClick={handleMatchingConfirm}
                 disabled={!selectedTransactionId || selectedAllocations.length === 0 || matchingSubmitting}
-                className="rounded-full bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 disabled:opacity-70"
+                variant="gradient"
+                className="rounded-full h-10 px-6 disabled:opacity-70"
               >
                 {matchingSubmitting ? (
                   <>

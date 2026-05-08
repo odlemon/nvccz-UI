@@ -292,7 +292,7 @@ export function PeriodLockoutTab() {
         <AlertCircle className="w-12 h-12 text-gray-400 mb-4" />
         <h3 className="text-lg font-medium text-gray-900 mb-2">No Fiscal Calendar Data</h3>
         <p className="text-gray-600 mb-4">Could not load the fiscal calendar.</p>
-        <Button onClick={handleRefresh}>
+        <Button onClick={handleRefresh} variant="gradient-info" className="rounded-full h-10 px-6 shadow-sm">
           <RefreshCw className="w-4 h-4 mr-2" />
           Retry
         </Button>
@@ -341,7 +341,7 @@ export function PeriodLockoutTab() {
             <Button
               variant="outline"
               size="sm"
-              className="rounded-full"
+              className="rounded-full h-9 px-4"
               onClick={handleRefresh}
               disabled={fiscalCalendarLoading}
             >
@@ -399,7 +399,7 @@ export function PeriodLockoutTab() {
             )}
 
             {hasDraftChanges && (
-              <Button variant="ghost" size="sm" className="rounded-full text-gray-500" onClick={handleDiscardDraft}>
+              <Button variant="ghost" size="sm" className="rounded-full h-9 px-4 text-gray-500" onClick={handleDiscardDraft}>
                 Discard
               </Button>
             )}
@@ -407,7 +407,7 @@ export function PeriodLockoutTab() {
             <Button
               variant="outline"
               size="sm"
-              className="rounded-full"
+              className="rounded-full h-9 px-4"
               onClick={handleSaveDraft}
               disabled={!hasDraftChanges || isSaving}
             >
@@ -417,7 +417,8 @@ export function PeriodLockoutTab() {
 
             <Button
               size="sm"
-              className="rounded-full bg-gradient-to-r from-blue-500 to-blue-600 text-white"
+              variant="gradient-create"
+              className="rounded-full h-9 px-4 shadow-sm"
               onClick={() => setCommitModalOpen(true)}
               disabled={isCommitting}
             >
@@ -612,7 +613,7 @@ export function PeriodLockoutTab() {
               <Button
                 variant="outline"
                 size="sm"
-                className="rounded-full"
+                className="rounded-full h-9 px-4"
                 onClick={() => dispatch(fetchFiscalAuditLog({ take: 100, skip: 0 }))}
                 disabled={fiscalAuditLoading}
               >
@@ -766,14 +767,11 @@ export function PeriodLockoutTab() {
           )}
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setLockModalOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setLockModalOpen(false)} className="rounded-full h-10 px-6">Cancel</Button>
             <Button
               onClick={confirmLockChange}
-              className={cn(
-                lockModalTarget?.newStatus === "LOCKED"
-                  ? "bg-red-600 hover:bg-red-700 text-white"
-                  : "bg-green-600 hover:bg-green-700 text-white"
-              )}
+              variant={lockModalTarget?.newStatus === "LOCKED" ? "gradient-danger" : "gradient-create"}
+              className="rounded-full h-10 px-6 shadow-sm"
             >
               {lockModalTarget?.newStatus === "LOCKED" ? (
                 <><Lock className="w-4 h-4 mr-1" /> Add Lock to Draft</>

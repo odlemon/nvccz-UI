@@ -208,7 +208,7 @@ export function CreateCashbookTransferModal({ isOpen, onClose, banks, onSuccess 
                         <Button type="button" variant="outline" onClick={onClose} className="rounded-full">
                             Cancel
                         </Button>
-                        <Button type="submit" disabled={loading} className="bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-full shadow-sm">
+                        <Button type="submit" disabled={loading} variant="gradient-create" className="rounded-full">
                             {loading ? "Creating..." : "Create Transfer"}
                         </Button>
                     </div>

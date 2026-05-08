@@ -248,7 +248,8 @@ export function VendorApprovalDrawer({ vendor, open, onOpenChange, onApprovalCha
                 <Button
                   onClick={handleApprove}
                   disabled={approving}
-                  className="gap-2 bg-green-600 hover:bg-green-700 rounded-full"
+                  variant="gradient-create"
+                  className="gap-2 rounded-full h-10 px-6 shadow-sm"
                   size="sm"
                 >
                   {approving && <Loader2 className="w-4 h-4 animate-spin" />}
@@ -258,8 +259,8 @@ export function VendorApprovalDrawer({ vendor, open, onOpenChange, onApprovalCha
                 <Button
                   onClick={() => setShowRejectDialog(true)}
                   disabled={rejecting}
-                  variant="destructive"
-                  className="gap-2 rounded-full"
+                  variant="gradient-danger"
+                  className="gap-2 rounded-full h-10 px-6 shadow-sm"
                   size="sm"
                 >
                   {rejecting && <Loader2 className="w-4 h-4 animate-spin" />}
@@ -335,7 +336,8 @@ export function VendorApprovalDrawer({ vendor, open, onOpenChange, onApprovalCha
                         setShowBankDialog(true)
                       }}
                       size="sm"
-                      className="gap-2"
+                      variant="gradient-create"
+                      className="gap-2 rounded-full h-9 px-4 shadow-sm"
                     >
                       <Plus className="w-4 h-4" />
                       Add Bank
@@ -394,7 +396,7 @@ export function VendorApprovalDrawer({ vendor, open, onOpenChange, onApprovalCha
                   <div className="flex justify-between items-center">
                     <h3 className="font-semibold">KYC Documents</h3>
                     <label className="cursor-pointer">
-                      <Button size="sm" className="gap-2" asChild>
+                      <Button size="sm" variant="gradient-info" className="gap-2 rounded-full h-9 px-4 shadow-sm" asChild>
                         <span>
                           <Plus className="w-4 h-4" />
                           Upload
@@ -498,8 +500,8 @@ export function VendorApprovalDrawer({ vendor, open, onOpenChange, onApprovalCha
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowBankDialog(false)}>Cancel</Button>
-            <Button onClick={handleAddBank} disabled={loading}>
+            <Button variant="outline" onClick={() => setShowBankDialog(false)} className="rounded-full h-10 px-6">Cancel</Button>
+            <Button onClick={handleAddBank} disabled={loading} variant="gradient-create" className="rounded-full h-10 px-6 shadow-sm">
               {loading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
               {editingBank ? 'Update' : 'Add'} Bank
             </Button>
@@ -525,11 +527,11 @@ export function VendorApprovalDrawer({ vendor, open, onOpenChange, onApprovalCha
             />
           </div>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={rejecting}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={rejecting} className="rounded-full h-10 px-6">Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleReject}
               disabled={rejecting || !rejectionReason.trim()}
-              className="bg-red-600 hover:bg-red-700"
+              className="rounded-full h-10 px-6 bg-red-600 hover:bg-red-700 text-white"
             >
               {rejecting && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
               Reject Vendor

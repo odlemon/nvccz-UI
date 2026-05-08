@@ -279,7 +279,7 @@ export function CreateJournalEntryModal({
                       <Button
                         variant="outline"
                         className={cn(
-                          "w-full justify-start text-left font-normal border hover:border-blue-300 h-10 text-sm rounded-full",
+                          "w-full justify-start text-left font-normal border hover:border-blue-300 h-10 text-sm rounded-full px-4",
                           !journalDate && "text-muted-foreground"
                         )}
                       >
@@ -375,7 +375,7 @@ export function CreateJournalEntryModal({
                     <Scale className="w-5 h-5" />
                     Journal Entries
                   </CardTitle>
-                  <Button type="button" variant="outline" size="sm" onClick={addLine} className="border-purple-200 hover:bg-purple-50 rounded-full">
+                  <Button type="button" variant="outline" size="sm" onClick={addLine} className="border-purple-200 hover:bg-purple-50 rounded-full h-8 px-4">
                     <Plus className="w-4 h-4 mr-2" />
                     Add Line
                   </Button>
@@ -483,7 +483,7 @@ export function CreateJournalEntryModal({
                             variant="ghost"
                             size="sm"
                             onClick={() => removeLine(line.id)}
-                            className="p-2 hover:bg-red-50 text-red-500 hover:text-red-700 h-10 w-10 rounded-full"
+                            className="p-2 hover:bg-red-50 text-red-500 hover:text-red-700 h-10 w-10 rounded-full flex items-center justify-center"
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>
@@ -540,14 +540,14 @@ export function CreateJournalEntryModal({
 
             {/* Actions */}
             <div className="flex justify-end gap-3 pt-6 border-t">
-              <Button type="button" variant="outline" onClick={handleClose} size="lg" className="rounded-full">
+              <Button type="button" variant="outline" onClick={handleClose} className="rounded-full h-10 px-6">
                 Cancel
               </Button>
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 disabled={loading || !isBalanced() || getTotalDebits() === 0}
-                size="lg"
-                className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 rounded-full"
+                variant="gradient-create"
+                className="rounded-full h-10 px-6"
               >
                 {loading ? (
                   <div className="flex items-center gap-2">

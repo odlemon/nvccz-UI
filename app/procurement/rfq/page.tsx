@@ -258,7 +258,8 @@ export default function RFQPage() {
             {permissions.canCreateRFQ && (
               <Button
                 onClick={handleCreate}
-                className="rounded-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white"
+                variant="gradient-create"
+                className="rounded-full h-10 px-6 shadow-sm"
               >
                 <Plus className="w-4 h-4 mr-2" />
                 Create RFQ
@@ -353,7 +354,7 @@ export default function RFQPage() {
                         setStatusFilter('all')
                         setCurrentPage(1)
                       }}
-                      className="rounded-full"
+                      className="rounded-full h-9 px-4"
                     >
                       Clear Filters
                     </Button>

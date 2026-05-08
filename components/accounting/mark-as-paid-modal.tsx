@@ -122,7 +122,7 @@ export function MarkAsPaidModal({
                 <Button
                   variant="outline"
                   className={cn(
-                    "w-full justify-start text-left font-normal",
+                    "w-full justify-start text-left font-normal rounded-full h-10",
                     !paymentDate && "text-muted-foreground"
                   )}
                   disabled={isLoading}
@@ -153,14 +153,15 @@ export function MarkAsPaidModal({
               variant="outline"
               onClick={onClose}
               disabled={isLoading}
-              className="rounded-full px-6"
+              className="rounded-full px-6 h-10"
             >
               Cancel
             </Button>
             <Button
               type="submit"
               disabled={isLoading}
-              className="rounded-full px-6 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg transition-all duration-200"
+              variant="gradient-update"
+              className="rounded-full px-6 h-10"
             >
               {isLoading ? (
                 <>

@@ -96,7 +96,7 @@ export function ApprovalConfigurations() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Approval Configurations</h1>
+          <h1 className="text-3xl font-normal">Approval Configurations</h1>
           <p className="text-muted-foreground mt-1">
             Configure department-based approval workflows for procurement processes
           </p>
@@ -151,8 +151,8 @@ export function ApprovalConfigurations() {
                     </div>
                     {permissions.canUpdateApprovalConfig && (
                       <Button
-                        variant="outline"
-                        className="w-full mt-2 rounded-full"
+                        variant="gradient-update"
+                        className="w-full mt-2 rounded-full h-10 px-6 shadow-sm"
                         onClick={() => handleConfigure(department, config)}
                       >
                         <Edit className="w-4 h-4 mr-2" />
@@ -167,7 +167,8 @@ export function ApprovalConfigurations() {
                     </p>
                     {permissions.canCreateApprovalConfig && (
                       <Button
-                        className="w-full rounded-full"
+                        variant="gradient-create"
+                        className="w-full rounded-full h-10 px-6 shadow-sm"
                         onClick={() => handleConfigure(department)}
                       >
                         <Plus className="w-4 h-4 mr-2" />
@@ -458,7 +459,7 @@ function ConfigurationModal({ open, onOpenChange, department, existingConfig, on
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <Label className="text-base">Approval Stages</Label>
-              <Button type="button" variant="outline" size="sm" onClick={addStage} className="rounded-full">
+              <Button type="button" variant="outline" size="sm" onClick={addStage} className="rounded-full h-9 px-4">
                 <Plus className="w-4 h-4 mr-1" />
                 Add Stage
               </Button>
@@ -598,7 +599,7 @@ function ConfigurationModal({ open, onOpenChange, department, existingConfig, on
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="w-full rounded-full"
+                    className="w-full rounded-full h-9"
                     onClick={() => addStep(stageIndex)}
                   >
                     <Plus className="w-4 h-4 mr-1" />
@@ -620,13 +621,14 @@ function ConfigurationModal({ open, onOpenChange, department, existingConfig, on
           </div>
 
           <div className="flex items-center justify-end gap-3 pt-4 border-t">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="rounded-full">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="rounded-full h-10 px-6">
               Cancel
             </Button>
             <Button
               type="submit"
+              variant={existingConfig ? "gradient-update" : "gradient-create"}
               disabled={loading || (existingConfig ? !permissions.canUpdateApprovalConfig : !permissions.canCreateApprovalConfig)}
-              className="rounded-full"
+              className="rounded-full h-10 px-6 shadow-sm"
             >
               {loading ? 'Saving...' : existingConfig ? 'Update Configuration' : 'Create Configuration'}
             </Button>

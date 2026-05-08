@@ -132,7 +132,11 @@ export function EventExpensesTab({ eventId }: EventExpensesTabProps) {
           <h3 className="text-lg font-semibold">Event Expenses</h3>
           <p className="text-sm text-muted-foreground">Track all expenses for this event</p>
         </div>
-        <Button onClick={() => setIsAddDialogOpen(true)} className="gap-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-full">
+        <Button 
+          onClick={() => setIsAddDialogOpen(true)} 
+          variant="gradient-create"
+          className="gap-2 rounded-full h-10 px-6 shadow-sm"
+        >
           <CiCirclePlus size={20} />
           Record Expense
         </Button>
@@ -193,7 +197,11 @@ export function EventExpensesTab({ eventId }: EventExpensesTabProps) {
           <div className="text-center py-12">
             <CiDollar size={48} className="mx-auto text-muted-foreground mb-4" />
             <p className="text-muted-foreground">No expenses recorded yet</p>
-            <Button onClick={() => setIsAddDialogOpen(true)} className="mt-4 gap-2">
+            <Button 
+              onClick={() => setIsAddDialogOpen(true)} 
+              variant="gradient-create"
+              className="mt-4 gap-2 rounded-full h-10 px-6 shadow-sm"
+            >
               <CiCirclePlus size={20} />
               Record First Expense
             </Button>

@@ -382,7 +382,7 @@ export function CreateCashbookPaymentModal({ isOpen, onClose, bank, onSuccess })
             <Button type="button" variant="outline" onClick={onClose} className="rounded-full">
               Cancel
             </Button>
-            <Button type="submit" disabled={loading} className="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-full shadow-sm">
+            <Button type="submit" disabled={loading} variant="gradient-create" className="rounded-full">
               {loading ? "Creating..." : "Create Payment"}
             </Button>
           </div>

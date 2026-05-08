@@ -450,10 +450,10 @@ export function InvoiceIntakeForm({ isOpen, onClose, onSuccess }: InvoiceIntakeF
                   </div>
 
                   <div className="flex gap-3">
-                    <Button type="button" variant="outline" onClick={handleClose} disabled={loading}>
+                    <Button type="button" variant="outline" onClick={handleClose} disabled={loading} className="rounded-full h-10 px-6">
                       Cancel
                     </Button>
-                    <Button type="submit" disabled={loading} className="gradient-primary text-white">
+                    <Button type="submit" disabled={loading} variant="gradient-create" className="rounded-full h-10 px-6 shadow-sm">
                       {loading ? (
                         <>
                           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -486,13 +486,14 @@ export function InvoiceIntakeForm({ isOpen, onClose, onSuccess }: InvoiceIntakeF
                 </div>
 
                 <div className="flex gap-3">
-                  <Button type="button" variant="outline" onClick={handleClose} disabled={extractLoading}>
+                  <Button type="button" variant="outline" onClick={handleClose} disabled={extractLoading} className="rounded-full h-10 px-6">
                     Cancel
                   </Button>
                   <Button
                     onClick={handleExtract}
                     disabled={extractLoading}
-                    className="gradient-primary text-white"
+                    variant="gradient-create"
+                    className="rounded-full h-10 px-6 shadow-sm"
                   >
                     {extractLoading ? (
                       <>
@@ -575,14 +576,14 @@ export function InvoiceIntakeForm({ isOpen, onClose, onSuccess }: InvoiceIntakeF
               </Card>
 
               <div className="flex gap-3">
-                <Button type="button" variant="outline" onClick={handleClose} disabled={loading}>
+                <Button type="button" variant="outline" onClick={handleClose} disabled={loading} className="rounded-full h-10 px-6">
                   Cancel
                 </Button>
                 <Button
                   variant="outline"
                   onClick={handleVerify}
                   disabled={loading}
-                  className="flex-1"
+                  className="flex-1 rounded-full h-10 px-6"
                 >
                   {loading ? (
                     <>
@@ -599,7 +600,8 @@ export function InvoiceIntakeForm({ isOpen, onClose, onSuccess }: InvoiceIntakeF
                 <Button
                   onClick={handleCreateBill}
                   disabled={loading}
-                  className="gradient-primary text-white flex-1"
+                  variant="gradient-create"
+                  className="flex-1 rounded-full h-10 px-6 shadow-sm"
                 >
                   {loading ? (
                     <>

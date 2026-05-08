@@ -148,7 +148,7 @@ export function BankTransactionMatchesModal({
                           {match.status}
                         </Badge>
                       </div>
-                      <Button variant="ghost" size="icon">
+                      <Button variant="ghost" size="icon" className="rounded-full">
                         {expanded === match.id ? <ChevronUp /> : <ChevronDown />}
                       </Button>
                     </CardHeader>
@@ -161,7 +161,8 @@ export function BankTransactionMatchesModal({
                           </div>
                           <Button
                             size="sm"
-                            className="bg-gradient-to-r from-green-500 to-green-600 text-white rounded-full"
+                            variant="gradient-create"
+                            className="rounded-full h-9 px-4"
                             onClick={() => handleApproveClick(match)}
                             disabled={approveLoading}
                           >

@@ -100,14 +100,15 @@ export function VoidInvoiceModal({
                 variant="outline"
                 onClick={onClose}
                 disabled={isLoading}
-                className="rounded-full px-6"
+                className="rounded-full px-6 h-10"
               >
                 Cancel
               </Button>
               <Button
                 type="submit"
                 disabled={isLoading}
-                className="rounded-full px-6 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-lg transition-all duration-200"
+                variant="gradient-danger"
+                className="rounded-full px-6 h-10"
               >
                 {isLoading ? (
                   <>

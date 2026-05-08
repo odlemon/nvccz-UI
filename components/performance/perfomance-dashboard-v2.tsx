@@ -48,8 +48,16 @@ export function PerformanceDashboardV2() {
     
     console.log('Redux State - Performance:', { performanceDashboardData, performanceDashboardLoading })
     
-    const [selectedYear, setSelectedYear] = useState("2026")
-    const [selectedMonth, setSelectedMonth] = useState("January")
+    // current yearh and month for default filter values
+    const currentDate = new Date()    
+    const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear().toString())
+
+    //current month name for default filter value
+    const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+    const [selectedMonth, setSelectedMonth] = useState(monthNames[currentDate.getMonth()])
+
+    // const [selectedYear, setSelectedYear] = useState("2026")
+    // const [selectedMonth, setSelectedMonth] = useState("January")
     const [activeView, setActiveView] = useState<"dashboard" | "kpi-analytics">("dashboard")
 
     // Fetch dashboard data on mount and when filters change

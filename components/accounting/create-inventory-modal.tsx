@@ -304,14 +304,14 @@ export function CreateInventoryModal({
           </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t">
-            <Button type="button" variant="outline" onClick={onClose} className="rounded-full">Cancel</Button>
+            <Button type="button" variant="outline" onClick={onClose} className="rounded-full h-10 px-6">Cancel</Button>
 
             <Button
               type="submit"
               disabled={loading}
-              className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-full shadow-sm flex items-center"
+              variant={isEdit ? "gradient-update" : "gradient-create"}
+              className="rounded-full flex items-center h-10 px-6"
             >
-              {/* circular spinner when loading */}
               {loading && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2 inline-block" />}
               {loading ? (isEdit ? 'Saving...' : 'Creating...') : (isEdit ? 'Save Changes' : 'Create Item')}
             </Button>

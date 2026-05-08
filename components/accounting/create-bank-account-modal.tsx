@@ -214,7 +214,7 @@ export function CreateBankAccountModal({ isOpen, onClose, onSuccess, bank, isEdi
                 <Button
                   variant="outline"
                   role="combobox"
-                  className="w-full justify-between font-normal"
+                  className="w-full justify-between font-normal rounded-full h-10 px-4"
                   disabled={isLoading || glAccountsLoading}
                 >
                   {formData.glAccountId
@@ -297,12 +297,17 @@ export function CreateBankAccountModal({ isOpen, onClose, onSuccess, bank, isEdi
         </div>
 
         <div className="flex justify-end gap-3 pt-4 border-t">
-          <Button variant="outline" onClick={onClose} disabled={isLoading} className="rounded-full">
+          <Button variant="outline" onClick={onClose} disabled={isLoading} className="rounded-full h-10 px-6">
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={isLoading} className="rounded-full">
+          <Button 
+            onClick={handleSubmit} 
+            disabled={isLoading} 
+            variant={isEditing ? "gradient-update" : "gradient-create"}
+            className="rounded-full h-10 px-6"
+          >
             {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-            {isEditing ? "Update" : "Create"}
+            {isEditing ? "Update Account" : "Create Account"}
           </Button>
         </div>
       </DialogContent>

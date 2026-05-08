@@ -413,7 +413,8 @@ function DueDiligenceSingleView() {
         <Button
           onClick={nextStep}
           disabled={currentStep === stepperSteps.length - 1}
-          className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white flex items-center gap-2"
+          variant="gradient"
+          className="flex items-center gap-2"
         >
           Next
           <ChevronRight className="w-4 h-4" />

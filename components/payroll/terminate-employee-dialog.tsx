@@ -116,14 +116,14 @@ export function TerminateEmployeeDialog({
         </div>
 
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={loading} className="rounded-full">
+          <AlertDialogCancel disabled={loading} className="rounded-full h-10 px-6">
             Cancel
           </AlertDialogCancel>
           <Button
-            variant="destructive"
+            variant="gradient-danger"
             onClick={handleTerminate}
             disabled={loading || !reason.trim()}
-            className="rounded-full"
+            className="rounded-full h-10 px-6 shadow-sm"
           >
             {loading ? (
               <>

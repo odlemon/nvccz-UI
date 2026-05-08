@@ -130,24 +130,24 @@ function UsersDataTable({
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
                     <Button
-                      variant="ghost"
+                      variant="gradient-update"
                       size="icon"
                       onClick={(e) => {
                         e.stopPropagation()
                         onEdit(row)
                       }}
-                      className="rounded-full h-9 w-9 p-0 bg-gradient-to-br from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-md hover:shadow-lg transition-all duration-200"
+                      className="rounded-full h-8 w-8 p-0 shadow-sm"
                     >
                       <Edit className="w-4 h-4" />
                     </Button>
                     <Button
-                      variant="ghost"
+                      variant="gradient-danger"
                       size="icon"
                       onClick={(e) => {
                         e.stopPropagation()
                         onDelete(row)
                       }}
-                      className="rounded-full h-9 w-9 p-0 bg-gradient-to-br from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-md hover:shadow-lg transition-all duration-200"
+                      className="rounded-full h-8 w-8 p-0 shadow-sm"
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>
@@ -390,20 +390,24 @@ export function UsersTable() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl text-gray-900">User Management</h1>
-          <p className="text-gray-600 font-normal">Manage system users, roles, and permissions</p>
+          <h1 className="text-3xl font-normal text-gray-900">User Management</h1>
+          <p className="text-gray-600">Manage system users, roles, and permissions</p>
         </div>
         <div className="flex items-center gap-3">
           <Button 
             onClick={handleRefresh}
             disabled={usersLoading}
             variant="outline"
-            className="rounded-full"
+            className="rounded-full h-10 px-6"
           >
             <RefreshCw className={`w-4 h-4 mr-2 ${usersLoading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
-          <Button onClick={handleCreate} className="rounded-full gradient-primary">
+          <Button 
+            onClick={handleCreate} 
+            variant="gradient-create"
+            className="rounded-full h-10 px-6 shadow-sm"
+          >
             <Plus className="w-4 h-4 mr-2" />
             Create User
           </Button>

@@ -289,7 +289,7 @@ export function BankTemplatesForm({ isOpen, onClose, onSubmit, editingTemplate, 
                 variant="outline"
                 size="sm"
                 onClick={addColumn}
-                className="rounded-full"
+                className="rounded-full h-9 px-4"
               >
                 <Plus className="w-4 h-4 mr-1" />
                 Add Column
@@ -349,14 +349,15 @@ export function BankTemplatesForm({ isOpen, onClose, onSubmit, editingTemplate, 
               type="button"
               variant="outline"
               onClick={handleClose}
-              className="rounded-full"
+              className="rounded-full h-10 px-6"
             >
               Cancel
             </Button>
             <Button
               type="submit"
+              variant={editingTemplate ? "gradient-update" : "gradient-create"}
               disabled={loading}
-              className="rounded-full gradient-primary text-white"
+              className="rounded-full h-10 px-6 shadow-sm"
             >
               {loading ? 'Saving...' : editingTemplate ? 'Update Template' : 'Create Template'}
             </Button>

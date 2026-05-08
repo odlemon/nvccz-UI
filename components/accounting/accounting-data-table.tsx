@@ -139,9 +139,10 @@ export function AccountingDataTable<T extends { id: string }>({
             </Badge>
           </CardTitle>
           {onCreate && (
-            <Button 
-              onClick={onCreate} 
-              className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-full px-6"
+            <Button
+              onClick={onCreate}
+              variant="gradient-create"
+              className="rounded-full px-6"
             >
               <div className="w-4 h-4 mr-2 bg-white/20 rounded-full flex items-center justify-center">
                 <Plus className="w-3 h-3" />

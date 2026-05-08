@@ -291,7 +291,7 @@ export function ProcurementDataTable<T extends { id: string }>({
           <CardTitle className="text-xl font-semibold">{title}</CardTitle>
           <div className="flex items-center gap-2">
             {onCreate && (
-              <Button onClick={onCreate} className="gradient-primary text-white">
+              <Button onClick={onCreate} variant="gradient-create" className="rounded-full h-10 px-6 shadow-sm">
                 <Plus className="w-4 h-4 mr-2" />
                 Create New
               </Button>

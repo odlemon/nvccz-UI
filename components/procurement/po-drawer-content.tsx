@@ -284,7 +284,8 @@ export function PODrawerContent({ po, onSuccess, onCreateGRN }: PODrawerContentP
               <Button
                 onClick={handleSendPO}
                 disabled={sendingPO}
-                className="w-full gap-2"
+                variant="gradient-info"
+                className="w-full gap-2 rounded-full h-10 px-6 shadow-sm"
               >
                 {sendingPO ? (
                   <>
@@ -303,7 +304,7 @@ export function PODrawerContent({ po, onSuccess, onCreateGRN }: PODrawerContentP
             <Button
               onClick={handleDownloadPDF}
               variant="outline"
-              className="w-full gap-2"
+              className="w-full gap-2 rounded-full h-10 px-6"
             >
               <Download className="w-4 h-4" />
               Download PDF
@@ -312,7 +313,8 @@ export function PODrawerContent({ po, onSuccess, onCreateGRN }: PODrawerContentP
             {(po.status === 'SENT' || po.status === 'PARTIALLY_RECEIVED') && permissions.canCreateGRN && (
               <Button
                 onClick={() => onCreateGRN?.(po.id)}
-                className="w-full gap-2 gradient-primary text-white"
+                variant="gradient-create"
+                className="w-full gap-2 rounded-full h-10 px-6 shadow-sm"
               >
                 <Package className="w-4 h-4" />
                 Create GRN
@@ -324,7 +326,7 @@ export function PODrawerContent({ po, onSuccess, onCreateGRN }: PODrawerContentP
                 onClick={handleConvertToBill}
                 disabled={convertingBill}
                 variant="outline"
-                className="w-full gap-2"
+                className="w-full gap-2 rounded-full h-10 px-6"
               >
                 {convertingBill ? (
                   <>
@@ -345,7 +347,7 @@ export function PODrawerContent({ po, onSuccess, onCreateGRN }: PODrawerContentP
                 onClick={handleGRNReturn}
                 disabled={grnLoading}
                 variant="outline"
-                className="w-full gap-2 text-red-600 border-red-300 hover:bg-red-50"
+                className="w-full gap-2 text-red-600 border-red-300 hover:bg-red-50 rounded-full h-10 px-6"
               >
                 {grnLoading ? (
                   <>

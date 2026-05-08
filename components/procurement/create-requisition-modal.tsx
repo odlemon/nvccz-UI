@@ -455,7 +455,7 @@ export function CreateRequisitionModal({ isOpen, onClose, onSuccess, editMode = 
                             role="combobox"
                             aria-expanded={companyPickerOpen}
                             disabled={companiesLoading}
-                            className="w-full justify-between rounded-lg font-normal"
+                            className="w-full justify-between rounded-full h-10 px-6 font-normal"
                           >
                             <span className="flex items-center gap-2 truncate">
                               <Building2 className="w-4 h-4 text-violet-500 shrink-0" />
@@ -522,7 +522,7 @@ export function CreateRequisitionModal({ isOpen, onClose, onSuccess, editMode = 
                             role="combobox"
                             aria-expanded={fundPickerOpen}
                             disabled={fundsLoading}
-                            className="w-full justify-between rounded-lg font-normal"
+                            className="w-full justify-between rounded-full h-10 px-6 font-normal"
                           >
                             <span className="flex items-center gap-2 truncate">
                               <Briefcase className="w-4 h-4 text-violet-500 shrink-0" />
@@ -662,7 +662,7 @@ export function CreateRequisitionModal({ isOpen, onClose, onSuccess, editMode = 
                 onClick={addItem}
                 variant="outline"
                 size="sm"
-                className="rounded-full"
+                className="rounded-full h-9 px-4"
               >
                 <Plus className="w-4 h-4 mr-2" />
                 Add Item
@@ -756,14 +756,15 @@ export function CreateRequisitionModal({ isOpen, onClose, onSuccess, editMode = 
         </form>
 
         <div className="flex justify-end gap-3 pt-6 border-t">
-          <Button type="button" variant="outline" onClick={onClose} disabled={loading} className="rounded-full">
+          <Button type="button" variant="outline" onClick={onClose} disabled={loading} className="rounded-full h-10 px-6">
             Cancel
           </Button>
           <Button
             type="button"
             onClick={handleSubmit}
             disabled={loading}
-            className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-full"
+            variant={editMode ? "gradient-update" : "gradient-create"}
+            className="rounded-full h-10 px-6 shadow-sm"
           >
             {loading ? (editMode ? 'Updating...' : 'Creating...') : (editMode ? 'Update Requisition' : 'Create Requisition')}
           </Button>

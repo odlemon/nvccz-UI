@@ -35,24 +35,76 @@ import {
   Plus,
   Pencil,
   Trash2,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react"
 import { CiRedo, CiViewList, CiViewTimeline, CiViewBoard, CiCircleCheck, CiUser } from "react-icons/ci"
 import { KPIViewDrawer } from "./kpi-view-drawer"
 import { KPIManagementSkeleton } from "./kpi-skeleton"
 import { KPIForm } from "./kpi-form"
 import { KPIConfirmDeleteModal } from "./kpi-confirm-delete-modal"
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination"
 import { cn } from "@/lib/utils"
 import { ProcurementDataTable } from "@/components/procurement/procurement-data-table"
 import { KPIPerformanceAnalysisTab } from "./kpi-performance-analysis-tab"
 import { usePerformancePermissions } from "@/lib/hooks/usePerformancePermissions"
+
+// Field accessors — new API surfaces values at top level with hardcodedDetails as fallback
+const kpiCode = (kpi: any) => kpi?.code ?? kpi?.hardcodedDetails?.code ?? null
+const kpiDescription = (kpi: any) =>
+  kpi?.catalogDescription ?? kpi?.hardcodedDetails?.description ?? null
+const kpiDepartment = (kpi: any) =>
+  kpi?.catalogDepartmentName ?? kpi?.hardcodedDetails?.department ?? null
+const kpiAccountType = (kpi: any) =>
+  kpi?.accountType ?? kpi?.hardcodedDetails?.accountType ?? null
+const kpiAccountNumber = (kpi: any) =>
+  kpi?.accountNumber ?? kpi?.hardcodedDetails?.accountNumber ?? null
+const kpiJournalType = (kpi: any) =>
+  kpi?.journalEntryType ?? kpi?.hardcodedDetails?.journalEntryType ?? null
+const kpiIsFinancial = (kpi: any) =>
+  Boolean(kpi?.isFinancial || kpi?.hardcodedDetails?.isFinancial)
+const kpiPillar = (kpi: any) => kpi?.scorecardPillar ?? null
+
+const getTypeColor = (type: string) => {
+  const colors: Record<string, string> = {
+    'Percentage': 'from-blue-500 to-blue-600',
+    'Metric': 'from-purple-500 to-purple-600',
+    'Count': 'from-green-500 to-green-600'
+  }
+  return colors[type] || 'from-gray-500 to-gray-600'
+}
+
+const getAccountTypeColor = (type: string) => {
+  const colors: Record<string, string> = {
+    'Asset': 'bg-green-100 text-green-800',
+    'Liability': 'bg-red-100 text-red-800',
+    'Equity': 'bg-purple-100 text-purple-800',
+    'Revenue': 'bg-blue-100 text-blue-800',
+    'Expense': 'bg-orange-100 text-orange-800'
+  }
+  return colors[type] || 'bg-gray-100 text-gray-800'
+}
+
+const getPillarColor = (pillar: string | null) => {
+  if (!pillar) return "bg-gray-100 text-gray-700"
+  const colors: Record<string, string> = {
+    "Internal Operations": "bg-amber-100 text-amber-800",
+    "Customer & Market": "bg-pink-100 text-pink-800",
+    "Learning, Growth & HR": "bg-emerald-100 text-emerald-800",
+    "Financial": "bg-indigo-100 text-indigo-800",
+  }
+  return colors[pillar] ?? "bg-slate-100 text-slate-700"
+}
+
+const formatWeight = (value: string | number) => {
+  const numeric = typeof value === "string" ? parseFloat(value) : value
+  if (Number.isNaN(numeric)) return "–"
+  return `${(numeric * 100).toFixed(0)}%`
+}
+
+const formatUnit = (row: any) => {
+  if (!row.hasUnit) return "—"
+  return row.unitSymbol ?? row.unit ?? "N/A"
+}
 
 export function KPIManagement() {
   const dispatch = useAppDispatch()
@@ -87,8 +139,8 @@ export function KPIManagement() {
   // Account types for filtering
   const accountTypes = ['Asset', 'Liability', 'Equity', 'Revenue', 'Expense']
 
-  const totalKPIs = kpiStatistics?.total ?? availableKPIs.length
-  const activeKPIs = availableKPIs.filter((kpi) => kpi.isActive).length
+  const totalKPIs = kpiStatistics?.total ?? (Array.isArray(availableKPIs) ? availableKPIs.length : 0)
+  const activeKPIs = (Array.isArray(availableKPIs) ? availableKPIs : []).filter((kpi: any) => kpi?.isActive).length
   const financialKPIsCount = kpiStatistics?.financial ?? 0
   const nonFinancialKPIs = kpiStatistics?.nonFinancial ?? 0
   const departmentCoverage = kpiStatistics?.byDepartment?.length ?? 0
@@ -283,10 +335,10 @@ export function KPIManagement() {
   const paginatedKPIs = filteredKPIs.slice(startIndex, endIndex)
 
   // Pagination logic for financial KPIs
-  const financialTotalPages = Math.ceil(financialKPIs.length / financialItemsPerPage)
+  const financialTotalPages = Math.ceil((Array.isArray(financialKPIs) ? financialKPIs.length : 0) / financialItemsPerPage)
   const financialStartIndex = (financialCurrentPage - 1) * financialItemsPerPage
   const financialEndIndex = financialStartIndex + financialItemsPerPage
-  const paginatedFinancialKPIs = financialKPIs.slice(financialStartIndex, financialEndIndex)
+  const paginatedFinancialKPIs = (Array.isArray(financialKPIs) ? financialKPIs : []).slice(financialStartIndex, financialEndIndex)
 
   // Reset to first page when filters change
   useEffect(() => {
@@ -316,25 +368,7 @@ export function KPIManagement() {
     return count
   }
 
-  const getTypeColor = (type: string) => {
-    const colors: Record<string, string> = {
-      'Percentage': 'from-blue-500 to-blue-600',
-      'Metric': 'from-purple-500 to-purple-600',
-      'Count': 'from-green-500 to-green-600'
-    }
-    return colors[type] || 'from-gray-500 to-gray-600'
-  }
 
-  const getAccountTypeColor = (type: string) => {
-    const colors: Record<string, string> = {
-      'Asset': 'bg-green-100 text-green-800',
-      'Liability': 'bg-red-100 text-red-800',
-      'Equity': 'bg-purple-100 text-purple-800',
-      'Revenue': 'bg-blue-100 text-blue-800',
-      'Expense': 'bg-orange-100 text-orange-800'
-    }
-    return colors[type] || 'bg-gray-100 text-gray-800'
-  }
 
   const departmentNameLookup = useMemo(() => {
     // Add null check and ensure availableDepartments is an array
@@ -347,43 +381,12 @@ export function KPIManagement() {
   // Add safe check for any other uses of availableDepartments
   const validDepartments = Array.isArray(availableDepartments) ? availableDepartments : []
 
-  const formatWeight = (value: string | number) => {
-    const numeric = typeof value === "string" ? parseFloat(value) : value
-    if (Number.isNaN(numeric)) return "–"
-    return `${(numeric * 100).toFixed(0)}%`
-  }
 
-  const formatUnit = (row: any) => {
-    if (!row.hasUnit) return "—"
-    return row.unitSymbol ?? row.unit ?? "N/A"
-  }
 
   // Field accessors — new API surfaces values at top level with hardcodedDetails as fallback
-  const kpiCode = (kpi: any) => kpi?.code ?? kpi?.hardcodedDetails?.code ?? null
-  const kpiDescription = (kpi: any) =>
-    kpi?.catalogDescription ?? kpi?.hardcodedDetails?.description ?? null
-  const kpiDepartment = (kpi: any) =>
-    kpi?.catalogDepartmentName ?? kpi?.hardcodedDetails?.department ?? null
-  const kpiAccountType = (kpi: any) =>
-    kpi?.accountType ?? kpi?.hardcodedDetails?.accountType ?? null
-  const kpiAccountNumber = (kpi: any) =>
-    kpi?.accountNumber ?? kpi?.hardcodedDetails?.accountNumber ?? null
-  const kpiJournalType = (kpi: any) =>
-    kpi?.journalEntryType ?? kpi?.hardcodedDetails?.journalEntryType ?? null
-  const kpiIsFinancial = (kpi: any) =>
-    Boolean(kpi?.isFinancial || kpi?.hardcodedDetails?.isFinancial)
-  const kpiPillar = (kpi: any) => kpi?.scorecardPillar ?? null
 
-  const getPillarColor = (pillar: string | null) => {
-    if (!pillar) return "bg-gray-100 text-gray-700"
-    const colors: Record<string, string> = {
-      "Internal Operations": "bg-amber-100 text-amber-800",
-      "Customer & Market": "bg-pink-100 text-pink-800",
-      "Learning, Growth & HR": "bg-emerald-100 text-emerald-800",
-      "Financial": "bg-indigo-100 text-indigo-800",
-    }
-    return colors[pillar] ?? "bg-slate-100 text-slate-700"
-  }
+
+
 
   const financialColumns = [
     { key: "name", label: "KPI", sortable: true },
@@ -440,7 +443,7 @@ export function KPIManagement() {
   ]
 
   const exportFinancialKPIs = () => {
-    if (!financialKPIs.length) {
+    if (!Array.isArray(financialKPIs) || !financialKPIs.length) {
       toast.info("No financial KPIs to export")
       return
     }
@@ -493,7 +496,8 @@ export function KPIManagement() {
           {permissions.canCreateKPI && (
             <Button
               onClick={handleOpenCreateKPI}
-              className="rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
+              variant="gradient-create"
+              className="rounded-full"
             >
               <Plus className="w-4 h-4 mr-2" />
               Create KPI
@@ -864,18 +868,24 @@ export function KPIManagement() {
           {/* Pagination */}
           {!loading && !error && totalPages > 1 && (
             <div className="flex items-center justify-between mt-8">
-              <div className="text-sm text-gray-600">
+              <div className="text-sm text-gray-600 font-medium">
                 Showing {startIndex + 1} to {Math.min(endIndex, filteredKPIs.length)} of {filteredKPIs.length} KPIs
               </div>
-              <Pagination>
-                <PaginationContent>
-                  <PaginationItem>
-                    <PaginationPrevious 
-                      onClick={() => handlePageChange(currentPage - 1)}
-                      className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                    />
-                  </PaginationItem>
-                  
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  className={cn(
+                    "rounded-full h-9 px-4",
+                    currentPage === 1 && "pointer-events-none opacity-50"
+                  )}
+                >
+                  <ChevronLeft className="w-4 h-4 mr-1" />
+                  Previous
+                </Button>
+                
+                <div className="flex items-center gap-1">
                   {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
                     let pageNum
                     if (totalPages <= 5) {
@@ -887,27 +897,39 @@ export function KPIManagement() {
                     } else {
                       pageNum = currentPage - 2 + i
                     }
+                    
+                    const isActive = currentPage === pageNum
+                    
                     return (
-                      <PaginationItem key={pageNum}>
-                        <PaginationLink
-                          onClick={() => handlePageChange(pageNum)}
-                          isActive={currentPage === pageNum}
-                          className="cursor-pointer"
-                        >
-                          {pageNum}
-                        </PaginationLink>
-                      </PaginationItem>
+                      <Button
+                        key={pageNum}
+                        variant={isActive ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => handlePageChange(pageNum)}
+                        className={cn(
+                          "w-9 h-9 p-0 rounded-full",
+                          isActive ? "bg-blue-600 text-white hover:bg-blue-700" : "hover:bg-gray-100"
+                        )}
+                      >
+                        {pageNum}
+                      </Button>
                     )
                   })}
-                  
-                  <PaginationItem>
-                    <PaginationNext 
-                      onClick={() => handlePageChange(currentPage + 1)}
-                      className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                    />
-                  </PaginationItem>
-                </PaginationContent>
-              </Pagination>
+                </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  className={cn(
+                    "rounded-full h-9 px-4",
+                    currentPage === totalPages && "pointer-events-none opacity-50"
+                  )}
+                >
+                  Next
+                  <ChevronRight className="w-4 h-4 ml-1" />
+                </Button>
+              </div>
             </div>
           )}
         </div>
@@ -933,7 +955,7 @@ export function KPIManagement() {
           {/* Financial KPIs Grid */}
           {financialKPIsLoading ? (
             <KPIManagementSkeleton />
-          ) : financialKPIs.length > 0 ? (
+          ) : (Array.isArray(financialKPIs) && financialKPIs.length > 0) ? (
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {paginatedFinancialKPIs.map((kpi) => (
@@ -1050,18 +1072,24 @@ export function KPIManagement() {
               {/* Pagination for Financial KPIs */}
               {financialTotalPages > 1 && (
                 <div className="flex items-center justify-between mt-8">
-                  <div className="text-sm text-gray-600">
-                    Showing {financialStartIndex + 1} to {Math.min(financialEndIndex, financialKPIs.length)} of {financialKPIs.length} Financial KPIs
+                  <div className="text-sm text-gray-600 font-medium">
+                    Showing {financialStartIndex + 1} to {Math.min(financialEndIndex, Array.isArray(financialKPIs) ? financialKPIs.length : 0)} of {Array.isArray(financialKPIs) ? financialKPIs.length : 0} Financial KPIs
                   </div>
-                  <Pagination>
-                    <PaginationContent>
-                      <PaginationItem>
-                        <PaginationPrevious 
-                          onClick={() => handleFinancialPageChange(financialCurrentPage - 1)}
-                          className={financialCurrentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                        />
-                      </PaginationItem>
-                      
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleFinancialPageChange(financialCurrentPage - 1)}
+                      className={cn(
+                        "rounded-full h-9 px-4",
+                        financialCurrentPage === 1 && "pointer-events-none opacity-50"
+                      )}
+                    >
+                      <ChevronLeft className="w-4 h-4 mr-1" />
+                      Previous
+                    </Button>
+                    
+                    <div className="flex items-center gap-1">
                       {Array.from({ length: Math.min(financialTotalPages, 5) }, (_, i) => {
                         let pageNum
                         if (financialTotalPages <= 5) {
@@ -1073,27 +1101,39 @@ export function KPIManagement() {
                         } else {
                           pageNum = financialCurrentPage - 2 + i
                         }
+                        
+                        const isActive = financialCurrentPage === pageNum
+                        
                         return (
-                          <PaginationItem key={pageNum}>
-                            <PaginationLink
-                              onClick={() => handleFinancialPageChange(pageNum)}
-                              isActive={financialCurrentPage === pageNum}
-                              className="cursor-pointer"
-                            >
-                              {pageNum}
-                            </PaginationLink>
-                          </PaginationItem>
+                          <Button
+                            key={pageNum}
+                            variant={isActive ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => handleFinancialPageChange(pageNum)}
+                            className={cn(
+                              "w-9 h-9 p-0 rounded-full",
+                              isActive ? "bg-blue-600 text-white hover:bg-blue-700" : "hover:bg-gray-100"
+                            )}
+                          >
+                            {pageNum}
+                          </Button>
                         )
                       })}
-                      
-                      <PaginationItem>
-                        <PaginationNext 
-                          onClick={() => handleFinancialPageChange(financialCurrentPage + 1)}
-                          className={financialCurrentPage === financialTotalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                        />
-                      </PaginationItem>
-                    </PaginationContent>
-                  </Pagination>
+                    </div>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleFinancialPageChange(financialCurrentPage + 1)}
+                      className={cn(
+                        "rounded-full h-9 px-4",
+                        financialCurrentPage === financialTotalPages && "pointer-events-none opacity-50"
+                      )}
+                    >
+                      Next
+                      <ChevronRight className="w-4 h-4 ml-1" />
+                    </Button>
+                  </div>
                 </div>
               )}
             </>

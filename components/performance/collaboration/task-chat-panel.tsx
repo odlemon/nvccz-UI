@@ -289,7 +289,8 @@ export function TaskChatPanel({ taskId, onPreview }: Props) {
             onClick={handleSend}
             disabled={sending || (!content.trim() && pendingFiles.length === 0)}
             size="sm"
-            className="rounded-full gap-1 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white"
+            variant="gradient"
+            className="rounded-full gap-1"
           >
             {sending ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" />

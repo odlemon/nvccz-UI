@@ -123,30 +123,7 @@ export function QuotationDrawerContent({ quotation, onUpdate }: QuotationDrawerC
             </Badge>
           </div>
 
-          {/* Action Buttons */}
-          {canReview && (
-            <div className="flex gap-3 pt-4 border-t">
-              {permissions.canAcceptQuotation && (
-                <Button
-                  onClick={() => setShowAcceptDialog(true)}
-                  className="flex-1 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-full"
-                >
-                  <CheckCircle className="w-4 h-4 mr-2" />
-                  Accept Quotation
-                </Button>
-              )}
-              {permissions.canRejectQuotation && (
-                <Button
-                  onClick={() => setShowRejectDialog(true)}
-                  variant="outline"
-                  className="flex-1 border-red-300 text-red-600 hover:bg-red-50 rounded-full"
-                >
-                  <XCircle className="w-4 h-4 mr-2" />
-                  Reject
-                </Button>
-              )}
-            </div>
-          )}
+          
 
           {quotation.status === 'REJECTED' && quotation.rejectionReason && (
             <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
@@ -324,6 +301,32 @@ export function QuotationDrawerContent({ quotation, onUpdate }: QuotationDrawerC
         </CardContent>
       </Card>
 
+      {/* Action Buttons */}
+          {canReview && (
+            <div className="flex gap-3 pt-4 border-t">
+              {permissions.canAcceptQuotation && (
+                <Button
+                  onClick={() => setShowAcceptDialog(true)}
+                  variant="gradient-create"
+                  className="flex-1 rounded-full h-10 px-6 shadow-sm"
+                >
+                  <CheckCircle className="w-4 h-4 mr-2" />
+                  Accept Quotation
+                </Button>
+              )}
+              {permissions.canRejectQuotation && (
+                <Button
+                  onClick={() => setShowRejectDialog(true)}
+                  variant="outline"
+                  className="flex-1 border-red-300 text-red-600 hover:bg-red-50 rounded-full h-10 px-6"
+                >
+                  <XCircle className="w-4 h-4 mr-2" />
+                  Reject
+                </Button>
+              )}
+            </div>
+          )}
+
       {/* Accept Dialog */}
       <Dialog open={showAcceptDialog} onOpenChange={setShowAcceptDialog}>
         <DialogContent>
@@ -355,13 +358,14 @@ export function QuotationDrawerContent({ quotation, onUpdate }: QuotationDrawerC
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAcceptDialog(false)} disabled={processing}>
+            <Button variant="outline" onClick={() => setShowAcceptDialog(false)} disabled={processing} className="rounded-full h-10 px-6">
               Cancel
             </Button>
             <Button
               onClick={handleAccept}
               disabled={processing}
-              className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700"
+              variant="gradient-create"
+              className="rounded-full h-10 px-6 shadow-sm"
             >
               {processing ? 'Processing...' : 'Confirm Accept'}
             </Button>
@@ -405,13 +409,14 @@ export function QuotationDrawerContent({ quotation, onUpdate }: QuotationDrawerC
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowRejectDialog(false)} disabled={processing}>
+            <Button variant="outline" onClick={() => setShowRejectDialog(false)} disabled={processing} className="rounded-full h-10 px-6">
               Cancel
             </Button>
             <Button
               onClick={handleReject}
               disabled={processing}
-              variant="destructive"
+              variant="gradient-danger"
+              className="rounded-full h-10 px-6 shadow-sm"
             >
               {processing ? 'Processing...' : 'Confirm Reject'}
             </Button>

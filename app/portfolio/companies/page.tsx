@@ -41,7 +41,6 @@ export default function CompaniesPage() {
   })
 
   const totalCompanies = companies.length
-  const activeCompanies = companies.filter(c => c.status === 'ACTIVE').length
   const totalInvestment = companies.reduce((sum, c) => sum + (Number(c.totalInvested) || 0), 0)
   const avgPerformance = companies.length > 0 ? (totalInvestment / companies.length) : 0
 
@@ -92,13 +91,13 @@ export default function CompaniesPage() {
 
         {/* Stats Cards */}
         {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            {[1, 2, 3, 4].map((i) => (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {[1, 2, 3].map((i) => (
               <Skeleton key={i} className="h-32 rounded-2xl" />
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <Card className="rounded-2xl border border-border bg-card shadow-sm">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-4">
@@ -113,19 +112,7 @@ export default function CompaniesPage() {
               </CardContent>
             </Card>
 
-            <Card className="rounded-2xl border border-border bg-card shadow-sm">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="w-12 h-12 rounded-full border border-border bg-muted/40 flex items-center justify-center">
-                    <TrendingUp className="w-6 h-6 text-gray-700" />
-                  </div>
-                  <div className="text-right">
-                    <p className="text-muted-foreground text-sm font-medium">Active Companies</p>
-                    <p className="text-3xl font-normal text-gray-900">{activeCompanies}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+
 
             <Card className="rounded-2xl border border-border bg-card shadow-sm">
               <CardContent className="p-6">
@@ -176,12 +163,12 @@ export default function CompaniesPage() {
                 {sectors.map((sector) => (
                   <Button
                     key={sector}
-                    variant={selectedSector === sector ? "default" : "outline"}
+                    variant={selectedSector === sector ? "gradient" : "outline"}
                     size="sm"
                     onClick={() => setSelectedSector(sector)}
-                    className={selectedSector === sector 
-                      ? "bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-full border-0 whitespace-nowrap" 
-                      : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50 rounded-full whitespace-nowrap"
+                    className={selectedSector === sector
+                      ? "rounded-full whitespace-nowrap"
+                      : "rounded-full whitespace-nowrap"
                     }
                   >
                     {sector}

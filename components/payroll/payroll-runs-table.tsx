@@ -305,7 +305,8 @@ export function PayrollRunsTable() {
         </div>
         <Button
           onClick={handleCreate}
-          className="rounded-full gradient-primary text-white font-normal"
+          variant="gradient-create"
+          className="rounded-full h-10 px-6 shadow-sm font-normal"
         >
           <Plus className="w-4 h-4 mr-2" />
           Create Payroll Run
@@ -335,7 +336,7 @@ export function PayrollRunsTable() {
               className="h-10 w-[160px]"
             />
             {(periodStart || periodEnd) && (
-              <Button variant="outline" onClick={() => { setPeriodStart(null); setPeriodEnd(null) }} className="rounded-full h-10">
+              <Button variant="outline" onClick={() => { setPeriodStart(null); setPeriodEnd(null) }} className="rounded-full h-10 px-6">
                 Clear
               </Button>
             )}
@@ -351,12 +352,12 @@ export function PayrollRunsTable() {
             {row.status === 'DRAFT' && canProcessRun && (
               <Button
                 size="sm"
-                variant="outline"
+                variant="gradient-create"
                 onClick={(e) => {
                   e.stopPropagation()
                   handleProcess(row)
                 }}
-                className="h-8 px-3 text-xs"
+                className="h-8 px-4 text-xs rounded-full shadow-sm"
               >
                 <Play className="w-3 h-3 mr-1" />
                 Process
@@ -406,16 +407,16 @@ export function PayrollRunsTable() {
               variant="outline"
               onClick={() => setIsDeleteOpen(false)}
               disabled={isDeleting}
-              className="rounded-full"
+              className="rounded-full h-10 px-6"
             >
               Cancel
             </Button>
             <Button
               type="button"
-              variant="destructive"
+              variant="gradient-danger"
               onClick={handleDeleteConfirm}
               disabled={isDeleting}
-              className="rounded-full"
+              className="rounded-full h-10 px-6 shadow-sm"
             >
               {isDeleting ? (
                 <>

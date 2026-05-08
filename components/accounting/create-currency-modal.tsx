@@ -154,7 +154,7 @@ export function CreateCurrencyModal({ isOpen, onClose, onSuccess, currency }: Cr
                 value={formData.code}
                 onChange={(e) => handleInputChange('code', e.target.value)}
                 placeholder="e.g., USD, EUR, ZWL"
-                className={errors.code ? 'border-red-500' : ''}
+                className={cn("rounded-full h-10", errors.code ? 'border-red-500' : '')}
                 maxLength={10}
               />
               {errors.code && (
@@ -172,7 +172,7 @@ export function CreateCurrencyModal({ isOpen, onClose, onSuccess, currency }: Cr
                 value={formData.name}
                 onChange={(e) => handleInputChange('name', e.target.value)}
                 placeholder="e.g., US Dollar, Euro, Zimbabwean Dollar"
-                className={errors.name ? 'border-red-500' : ''}
+                className={cn("rounded-full h-10", errors.name ? 'border-red-500' : '')}
                 maxLength={100}
               />
               {errors.name && (
@@ -190,7 +190,7 @@ export function CreateCurrencyModal({ isOpen, onClose, onSuccess, currency }: Cr
                 value={formData.symbol}
                 onChange={(e) => handleInputChange('symbol', e.target.value)}
                 placeholder="e.g., $, €, Z$"
-                className={errors.symbol ? 'border-red-500' : ''}
+                className={cn("rounded-full h-10", errors.symbol ? 'border-red-500' : '')}
                 maxLength={10}
               />
               {errors.symbol && (
@@ -230,10 +230,10 @@ export function CreateCurrencyModal({ isOpen, onClose, onSuccess, currency }: Cr
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
+            <Button type="button" variant="outline" onClick={onClose} disabled={loading} className="rounded-full h-10 px-6">
               Cancel
             </Button>
-            <Button type="submit" disabled={loading}>
+            <Button type="submit" disabled={loading} variant={isEditing ? "gradient-update" : "gradient-create"} className="rounded-full h-10 px-6">
               {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               {isEditing ? 'Update Currency' : 'Create Currency'}
             </Button>

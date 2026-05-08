@@ -48,14 +48,14 @@ export function ConfirmationDialog({
         <AlertDialogFooter>
           <AlertDialogCancel 
             onClick={onClose}
-            className="rounded-full"
+            className="rounded-full h-10 px-6"
             disabled={loading}
           >
             {cancelText}
           </AlertDialogCancel>
           <AlertDialogAction
             onClick={onConfirm}
-            className="rounded-full bg-red-600 hover:bg-red-700 text-white"
+            className="rounded-full h-10 px-6 bg-red-600 hover:bg-red-700 text-white shadow-sm"
             disabled={loading}
           >
             {loading ? 'Deleting...' : confirmText}

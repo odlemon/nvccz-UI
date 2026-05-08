@@ -183,7 +183,7 @@ export function CashbookBatchViewDrawer({ isOpen, onClose, batch, onBatchUpdate 
                                 </Badge>
                             </SheetTitle>
                             {batch.status !== "POSTED" && (
-                                <Button onClick={() => setPostConfirmOpen(true)} className="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-full">
+                                <Button onClick={() => setPostConfirmOpen(true)} variant="gradient-create" className="rounded-full h-10 px-6">
                                     Post Batch
                                 </Button>
                             )}
@@ -287,10 +287,10 @@ export function CashbookBatchViewDrawer({ isOpen, onClose, batch, onBatchUpdate 
                         </p>
                     </div>
                     <div className="flex justify-end gap-3">
-                        <Button variant="outline" onClick={() => setPostConfirmOpen(false)} className="rounded-full">
+                        <Button variant="outline" onClick={() => setPostConfirmOpen(false)} className="rounded-full h-10 px-6">
                             Cancel
                         </Button>
-                        <Button onClick={handlePostBatch} disabled={posting} className="bg-gradient-to-r from-green-500 to-green-600 text-white rounded-full">
+                        <Button onClick={handlePostBatch} disabled={posting} variant="gradient-create" className="rounded-full h-10 px-6">
                             {posting ? "Posting..." : "Confirm"}
                         </Button>
                     </div>
@@ -348,7 +348,7 @@ export function CashbookBatchViewDrawer({ isOpen, onClose, batch, onBatchUpdate 
                                             <Button
                                                 variant="outline"
                                                 className={cn(
-                                                    "w-full justify-start text-left font-normal rounded-full",
+                                                    "w-full justify-start text-left font-normal rounded-full h-10 px-4",
                                                     !field.value && "text-muted-foreground"
                                                 )}
                                             >
@@ -372,10 +372,10 @@ export function CashbookBatchViewDrawer({ isOpen, onClose, batch, onBatchUpdate 
                             )}
                         </div>
                         <div className="flex justify-end gap-3">
-                            <Button type="button" variant="outline" onClick={() => setReverseDialogOpen(false)} className="rounded-full">
+                            <Button type="button" variant="outline" onClick={() => setReverseDialogOpen(false)} className="rounded-full h-10 px-6">
                                 Cancel
                             </Button>
-                            <Button type="submit" disabled={reversing} className="bg-gradient-to-r from-red-500 to-red-600 text-white rounded-full">
+                            <Button type="submit" disabled={reversing} variant="gradient-danger" className="rounded-full h-10 px-6">
                                 {reversing ? "Reversing..." : "Reverse"}
                             </Button>
                         </div>

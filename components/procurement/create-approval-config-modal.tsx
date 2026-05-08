@@ -270,7 +270,7 @@ export function CreateApprovalConfigModal({ isOpen, onClose, onSuccess }: Create
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-lg">Approval Stages</CardTitle>
-              <Button type="button" onClick={addStage} variant="outline" size="sm">
+              <Button type="button" onClick={addStage} variant="outline" size="sm" className="rounded-full h-9 px-4">
                 <Plus className="w-4 h-4 mr-2" />
                 Add Stage
               </Button>
@@ -322,6 +322,7 @@ export function CreateApprovalConfigModal({ isOpen, onClose, onSuccess }: Create
                         onClick={() => addStep(stageIndex)}
                         variant="outline"
                         size="sm"
+                        className="rounded-full h-9 px-4"
                       >
                         <Plus className="w-3 h-3 mr-1" />
                         Add Step
@@ -467,11 +468,11 @@ export function CreateApprovalConfigModal({ isOpen, onClose, onSuccess }: Create
 
           {/* Actions */}
           <div className="flex items-center justify-end gap-3 pt-6 border-t">
-            <Button type="button" variant="outline" onClick={handleClose} disabled={loading}>
+            <Button type="button" variant="outline" onClick={handleClose} disabled={loading} className="rounded-full h-10 px-6">
               <X className="w-4 h-4 mr-2" />
               Cancel
             </Button>
-            <Button type="submit" disabled={loading || !permissions.canManageApprovalConfigs} className="gradient-primary text-white">
+            <Button type="submit" disabled={loading || !permissions.canManageApprovalConfigs} variant="gradient-create" className="rounded-full h-10 px-6 shadow-sm">
               {loading ? (
                 <>
                   <div className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin" />

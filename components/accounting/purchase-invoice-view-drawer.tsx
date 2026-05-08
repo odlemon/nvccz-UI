@@ -103,13 +103,15 @@ function ConfirmationDialog({
                 variant="outline"
                 onClick={onClose}
                 disabled={isLoading}
+                className="rounded-full h-10 px-6"
               >
                 {cancelText}
               </Button>
               <Button
-                variant={variant === "destructive" ? "destructive" : "default"}
+                variant={variant === "destructive" ? "gradient-danger" : "gradient-create"}
                 onClick={onConfirm}
                 disabled={isLoading}
+                className="rounded-full h-10 px-6 shadow-sm"
               >
                 {isLoading ? (
                   <>
@@ -389,7 +391,7 @@ export function PurchaseInvoiceViewDrawer({
                     <Button
                       size="sm"
                       variant="outline"
-                      className="rounded-full"
+                      className="rounded-full h-8 px-4"
                       onClick={handleEditClick}
                       disabled={loading}
                     >
@@ -400,7 +402,7 @@ export function PurchaseInvoiceViewDrawer({
                     <Button
                       size="sm"
                       variant="outline"
-                      className="rounded-full border-red-200 text-red-600 hover:bg-red-50"
+                      className="rounded-full h-8 px-4 border-red-200 text-red-600 hover:bg-red-50"
                       onClick={handleDeleteClick}
                       disabled={loading}
                     >
@@ -410,7 +412,8 @@ export function PurchaseInvoiceViewDrawer({
                     
                     <Button
                       size="sm"
-                      className="rounded-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
+                      variant="gradient-info"
+                      className="rounded-full h-8 px-4 shadow-sm"
                       onClick={handleSubmitClick}
                       disabled={loading}
                     >
@@ -423,7 +426,8 @@ export function PurchaseInvoiceViewDrawer({
                 {currentInvoice.status === 'POSTED' && currentInvoice.paymentStatus === 'PENDING' && (
                   <Button
                     size="sm"
-                    className="rounded-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700"
+                    variant="gradient-create"
+                    className="rounded-full h-8 px-4 shadow-sm"
                     onClick={handlePayClick}
                     disabled={loading}
                   >
@@ -446,7 +450,7 @@ export function PurchaseInvoiceViewDrawer({
                       <Button
                         size="sm"
                         variant="outline"
-                        className="rounded-full"
+                        className="rounded-full h-8 px-4"
                         disabled={pdfLoading}
                       >
                         <FileText className={`w-4 h-4 mr-1 ${pdfLoading ? "animate-spin" : ""}`} />
@@ -958,7 +962,7 @@ export function PurchaseInvoiceViewDrawer({
                     <Button
                       variant="outline"
                       className={cn(
-                        "w-full justify-start text-left font-normal",
+                        "w-full justify-start text-left font-normal rounded-full h-10 px-4",
                         !paymentData.paymentDate && "text-muted-foreground"
                       )}
                     >

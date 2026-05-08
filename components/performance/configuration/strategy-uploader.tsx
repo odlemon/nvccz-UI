@@ -283,7 +283,8 @@ export function StrategyUploader() {
           {permissions.canManageStrategies && (
             <Button
               onClick={() => setCreateOpen(true)}
-              className="rounded-full gap-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-md"
+              variant="gradient-create"
+              className="rounded-full gap-2 shadow-md"
             >
               <Plus className="w-4 h-4" /> New Cycle
             </Button>
@@ -497,8 +498,9 @@ export function StrategyUploader() {
             </Button>
             <Button
               onClick={handleCreate}
+              variant="gradient-create"
               disabled={creating || !pillarWeightsValidation.valid}
-              className="rounded-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white"
+              className="rounded-full"
             >
               {creating ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
               Create Cycle
@@ -548,8 +550,9 @@ export function StrategyUploader() {
                           drawerStrategyId &&
                           fileInputs.current[drawerStrategyId]?.click()
                         }
+                        variant="gradient"
                         disabled={uploadingId === drawerStrategyId}
-                        className="rounded-full h-10 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white"
+                        className="rounded-full h-10"
                       >
                         {uploadingId === drawerStrategyId ? (
                           <Loader2 className="w-4 h-4 animate-spin mr-2" />
@@ -560,13 +563,15 @@ export function StrategyUploader() {
                       </Button>
                       <Button
                         onClick={() => setEditMode(true)}
-                        className="rounded-full h-10 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white"
+                        variant="gradient-update"
+                        className="rounded-full h-10"
                       >
                         <Pencil className="w-4 h-4 mr-2" /> Edit
                       </Button>
                       <Button
                         onClick={() => setArchiveConfirmId(drawerStrategyId)}
-                        className="rounded-full h-10 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white"
+                        variant="gradient-warning"
+                        className="rounded-full h-10"
                       >
                         <Archive className="w-4 h-4 mr-2" /> Archive
                       </Button>
@@ -583,8 +588,9 @@ export function StrategyUploader() {
                     </Button>
                     <Button
                       onClick={handleSaveEdit}
+                      variant="gradient"
                       disabled={savingEdit || !editValidation.valid}
-                      className="rounded-full h-10 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white"
+                      className="rounded-full h-10"
                     >
                       {savingEdit ? (
                         <Loader2 className="w-4 h-4 animate-spin mr-2" />
@@ -596,10 +602,10 @@ export function StrategyUploader() {
                   </>
                 )}
                 <Button
-                  variant="ghost"
                   size="icon"
                   onClick={() => setDrawerStrategyId(null)}
-                  className="rounded-full h-10 w-10 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-lg"
+                  variant="gradient-danger"
+                  className="rounded-full h-10 w-10 shadow-lg"
                 >
                   <X className="w-5 h-5" />
                 </Button>
@@ -796,8 +802,9 @@ export function StrategyUploader() {
             </Button>
             <Button
               onClick={handleArchive}
+              variant="gradient-warning"
               disabled={!!archivingId}
-              className="rounded-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white"
+              className="rounded-full"
             >
               {archivingId ? (
                 <Loader2 className="w-4 h-4 animate-spin mr-2" />

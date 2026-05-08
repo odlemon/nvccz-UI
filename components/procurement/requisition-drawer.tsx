@@ -421,7 +421,7 @@ export function RequisitionDrawer({ requisition, open, onOpenChange }: Requisiti
             <Separator />
             <div className="flex gap-2">
               {canSubmit && (permissions.canCreatePurchaseRequisition || permissions.canUpdatePurchaseRequisition) && (
-                <Button onClick={handleSubmit} disabled={isSubmitting} className="flex-1">
+                <Button onClick={handleSubmit} disabled={isSubmitting} variant="gradient-create" className="flex-1 rounded-full h-10 px-6 shadow-sm">
                   <Send className="mr-2 h-4 w-4" />
                   Submit for Approval
                 </Button>
@@ -432,7 +432,8 @@ export function RequisitionDrawer({ requisition, open, onOpenChange }: Requisiti
                   <Button
                     onClick={() => setShowApproveDialog(true)}
                     disabled={isSubmitting}
-                    className="flex-1 bg-green-600 hover:bg-green-700"
+                    variant="gradient-create"
+                    className="flex-1 rounded-full h-10 px-6 shadow-sm"
                   >
                     <CheckCircle2 className="mr-2 h-4 w-4" />
                     Approve
@@ -440,8 +441,8 @@ export function RequisitionDrawer({ requisition, open, onOpenChange }: Requisiti
                   <Button
                     onClick={() => setShowRejectDialog(true)}
                     disabled={isSubmitting}
-                    variant="destructive"
-                    className="flex-1"
+                    variant="gradient-danger"
+                    className="flex-1 rounded-full h-10 px-6 shadow-sm"
                   >
                     <XCircle className="mr-2 h-4 w-4" />
                     Reject
@@ -450,7 +451,7 @@ export function RequisitionDrawer({ requisition, open, onOpenChange }: Requisiti
               )}
 
               {isApproved && permissions.canCreateRFQ && (
-                <Button className="flex-1" variant="outline">
+                <Button className="flex-1 rounded-full h-10 px-6" variant="outline">
                   Create RFQ
                 </Button>
               )}
@@ -470,8 +471,8 @@ export function RequisitionDrawer({ requisition, open, onOpenChange }: Requisiti
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleApprove} disabled={isSubmitting}>
+            <AlertDialogCancel className="rounded-full h-10 px-6">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleApprove} disabled={isSubmitting} className="rounded-full h-10 px-6 bg-gradient-create shadow-sm">
               {isSubmitting ? 'Approving...' : 'Approve'}
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -497,11 +498,11 @@ export function RequisitionDrawer({ requisition, open, onOpenChange }: Requisiti
             />
           </div>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel className="rounded-full h-10 px-6">Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleReject}
               disabled={isSubmitting || !rejectionReason.trim()}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-gradient-danger hover:from-red-600 hover:to-red-700 rounded-full h-10 px-6 shadow-sm text-white border-0"
             >
               {isSubmitting ? 'Rejecting...' : 'Reject'}
             </AlertDialogAction>

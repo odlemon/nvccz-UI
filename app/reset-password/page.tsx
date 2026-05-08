@@ -110,9 +110,9 @@ export default function ResetPasswordPage() {
             <div className="space-y-4">
               <Button
                 onClick={() => router.push("/forgot-password")}
-                variant="gradient"
+                variant="gradient-info"
                 size="lg"
-                className="w-full rounded-full"
+                className="w-full rounded-full h-12 shadow-md"
               >
                 Request New Reset Link
               </Button>
@@ -120,7 +120,7 @@ export default function ResetPasswordPage() {
                 onClick={() => router.push("/login")}
                 variant="outline"
                 size="lg"
-                className="w-full rounded-full"
+                className="w-full rounded-full h-12"
               >
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Back to Login
@@ -153,9 +153,9 @@ export default function ResetPasswordPage() {
 
             <Button
               onClick={() => router.push("/login")}
-              variant="gradient"
+              variant="gradient-info"
               size="lg"
-              className="w-full rounded-full"
+              className="w-full rounded-full h-12 shadow-md"
             >
               Go to Login
             </Button>
@@ -256,9 +256,9 @@ export default function ResetPasswordPage() {
             {/* Submit Button */}
             <Button
               type="submit"
-              variant="gradient"
+              variant="gradient-info"
               size="lg"
-              className="w-full rounded-full mt-6"
+              className="w-full rounded-full mt-6 h-12 shadow-md"
               disabled={isSubmitting || !newPassword || !confirmPassword}
             >
               {isSubmitting ? (

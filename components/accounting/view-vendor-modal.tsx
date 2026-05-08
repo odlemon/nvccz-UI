@@ -337,12 +337,12 @@ export function VendorViewDrawer({ isOpen, onClose, vendor, onVendorUpdated }: V
             </div>
 
             {isBlacklisted ? (
-              <Button variant="outline" className="gap-2" disabled={loadingBlacklistAction} onClick={() => openReasonModal("unblacklist")}>
+              <Button variant="outline" className="gap-2 rounded-full h-10 px-6" disabled={loadingBlacklistAction} onClick={() => openReasonModal("unblacklist")}>
                 {loadingBlacklistAction ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
                 Unblacklist
               </Button>
             ) : (
-              <Button variant="destructive" className="gap-2" disabled={loadingBlacklistAction} onClick={() => openReasonModal("blacklist")}>
+              <Button variant="gradient-danger" className="gap-2 rounded-full h-10 px-6" disabled={loadingBlacklistAction} onClick={() => openReasonModal("blacklist")}>
                 {loadingBlacklistAction ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldAlert className="w-4 h-4" />}
                 Blacklist
               </Button>
@@ -538,7 +538,7 @@ export function VendorViewDrawer({ isOpen, onClose, vendor, onVendorUpdated }: V
                           </TableCell>
                           <TableCell>{doc.uploadedAt ? format(new Date(doc.uploadedAt), "PPP p") : "-"}</TableCell>
                           <TableCell className="text-right">
-                            <Button variant="outline" size="sm" className="gap-2" onClick={() => downloadKycDocument(doc.id, doc.fileName)}>
+                            <Button variant="outline" size="sm" className="gap-2 rounded-full h-8 px-4" onClick={() => downloadKycDocument(doc.id, doc.fileName)}>
                               <Download className="w-3 h-3" />
                               Download
                             </Button>
@@ -570,10 +570,10 @@ export function VendorViewDrawer({ isOpen, onClose, vendor, onVendorUpdated }: V
                 />
               </div>
               <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setIsReasonModalOpen(false)} disabled={loadingBlacklistAction}>
+                <Button variant="outline" onClick={() => setIsReasonModalOpen(false)} disabled={loadingBlacklistAction} className="rounded-full h-10 px-6">
                   Cancel
                 </Button>
-                <Button onClick={submitBlacklistAction} disabled={loadingBlacklistAction || !actionReason.trim()}>
+                <Button onClick={submitBlacklistAction} disabled={loadingBlacklistAction || !actionReason.trim()} variant={reasonMode === "blacklist" ? "gradient-danger" : "gradient-create"} className="rounded-full h-10 px-6">
                   {loadingBlacklistAction ? (
                     <span className="inline-flex items-center gap-2">
                       <Loader2 className="w-4 h-4 animate-spin" />

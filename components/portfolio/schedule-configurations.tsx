@@ -102,7 +102,7 @@ export function ScheduleConfigurations() {
           </p>
         </div>
         {canManage && (
-          <Button onClick={handleCreate} className="bg-blue-600 hover:bg-blue-700 text-white rounded-full px-6">
+          <Button onClick={handleCreate} variant="gradient-create" className="rounded-full px-6">
             <Plus className="w-4 h-4 mr-2" />
             New Configuration
           </Button>

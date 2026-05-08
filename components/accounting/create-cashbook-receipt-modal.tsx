@@ -382,7 +382,7 @@ export function CreateCashbookReceiptModal({ isOpen, onClose, bank, onSuccess })
             <Button type="button" variant="outline" onClick={onClose} className="rounded-full">
               Cancel
             </Button>
-            <Button type="submit" disabled={loading} className="bg-gradient-to-r from-green-500 to-green-600 text-white rounded-full shadow-sm">
+            <Button type="submit" disabled={loading} variant="gradient-create" className="rounded-full">
               {loading ? "Creating..." : "Create Receipt"}
             </Button>
           </div>

@@ -136,7 +136,11 @@ export function EventsDashboard() {
           <h1 className="text-3xl font-normal">Events Dashboard</h1>
           <p className="text-muted-foreground">Manage and track all your events</p>
         </div>
-        <Button onClick={() => router.push("/events/my-events")} className="rounded-full gradient-primary text-white">
+        <Button 
+          onClick={() => router.push("/events/my-events")} 
+          variant="gradient-create"
+          className="rounded-full h-10 px-6 shadow-sm"
+        >
           <CiCirclePlus size={20} className="mr-2" />
           Create Event
         </Button>
@@ -208,7 +212,7 @@ export function EventsDashboard() {
               </h3>
               <p className="text-sm text-muted-foreground">Next 10 scheduled events</p>
             </div>
-            <Button variant="outline" onClick={() => router.push("/events/my-events")} className="rounded-full">
+            <Button variant="outline" onClick={() => router.push("/events/my-events")} className="rounded-full h-9 px-4">
               View All
             </Button>
           </div>
@@ -247,10 +251,15 @@ export function EventsDashboard() {
                         ) : null}
                       </div>
                     </div>
-                    <Button variant="ghost" size="sm" onClick={(e) => {
-                      e.stopPropagation()
-                      router.push(`/events/${event.id}`)
-                    }}>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        router.push(`/events/${event.id}`)
+                      }}
+                      className="rounded-full h-8 px-4"
+                    >
                       View Details
                     </Button>
                   </div>
@@ -261,7 +270,11 @@ export function EventsDashboard() {
             <div className="text-center py-12">
               <CiCalendar size={48} className="mx-auto text-muted-foreground mb-4" />
               <p className="text-muted-foreground">No upcoming events</p>
-              <Button onClick={() => router.push("/events/my-events")} className="mt-4 gap-2">
+              <Button 
+                onClick={() => router.push("/events/my-events")} 
+                variant="gradient-create"
+                className="mt-4 gap-2 rounded-full h-10 px-6 shadow-sm"
+              >
                 <CiCirclePlus size={20} />
                 Create First Event
               </Button>

@@ -137,7 +137,7 @@ export function EventDetailPage({ eventId }: EventDetailPageProps) {
             variant="outline"
             size="icon"
             onClick={() => router.back()}
-            className="rounded-full"
+            className="rounded-full h-10 w-10"
           >
             <CiCircleChevLeft size={20} />
           </Button>
@@ -159,19 +159,19 @@ export function EventDetailPage({ eventId }: EventDetailPageProps) {
         
         <div className="flex items-center gap-2">
           <Button
-            variant="outline"
+            variant="gradient-update"
             size="sm"
             onClick={() => setIsEditDialogOpen(true)}
-            className="gap-2 rounded-full"
+            className="gap-2 rounded-full h-10 px-6 shadow-sm"
           >
             <CiEdit size={18} />
             Edit Event
           </Button>
           <Button
-            variant="destructive"
+            variant="gradient-danger"
             size="sm"
             onClick={handleDelete}
-            className="gap-2 rounded-full"
+            className="gap-2 rounded-full h-10 px-6 shadow-sm"
           >
             <CiTrash size={18} />
             Delete

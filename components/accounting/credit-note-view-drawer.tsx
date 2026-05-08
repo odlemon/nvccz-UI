@@ -114,9 +114,10 @@ export function CreditNoteViewDrawer({ isOpen, onClose, creditNote, onRefresh }:
           {/* Action Buttons */}
           <div className="mt-4 flex justify-end gap-3">
             {creditNote.status === 'DRAFT' && (
-              <Button 
+              <Button
                 onClick={() => setIsSendConfirmOpen(true)}
-                className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white rounded-full shadow-sm"
+                variant="gradient"
+                className="rounded-full"
                 size="sm"
                 disabled={sendingCreditNote}
               >
@@ -125,9 +126,10 @@ export function CreditNoteViewDrawer({ isOpen, onClose, creditNote, onRefresh }:
               </Button>
             )}
             {(creditNote.status === 'SENT' && parseFloat(creditNote.remainingAmount) > 0) && (
-              <Button 
+              <Button
                 onClick={() => setIsApplyConfirmOpen(true)}
-                className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-full shadow-sm"
+                variant="gradient-create"
+                className="rounded-full"
                 size="sm"
                 disabled={applyingCreditNote}
               >

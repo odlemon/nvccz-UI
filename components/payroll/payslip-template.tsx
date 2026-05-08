@@ -53,62 +53,54 @@ export const PayslipTemplate = forwardRef<HTMLDivElement, PayslipTemplateProps>(
         </div>
 
         {/* Employee and Payroll Details */}
-        <div className="grid grid-cols-2 gap-8 mb-8">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">Employee Information</h3>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Employee ID:</span>
-                <span className="font-medium">{payslip.employee.employeeNumber}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Name:</span>
-                <span className="font-medium">{payslip.employee.user.firstName} {payslip.employee.user.lastName}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Email:</span>
-                <span className="font-medium">{payslip.employee.user.email}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Bank Name:</span>
-                <span className="font-medium">{payslip.employee.bankName}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Branch Code:</span>
-                <span className="font-medium">{payslip.employee.branchCode}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Account Number:</span>
-                <span className="font-medium">{payslip.employee.accountNumber}</span>
-              </div>
+        <div className="grid grid-cols-2 gap-12 mb-10 pb-8 border-b border-gray-100">
+          <div className="space-y-3">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-gray-400 mb-4">Employee Information</h3>
+            <div className="flex justify-between items-baseline border-b border-gray-50 pb-1">
+              <span className="text-gray-500 text-sm">Employee ID:</span>
+              <span className="font-bold text-gray-900">{payslip.employee.employeeNumber}</span>
+            </div>
+            <div className="flex justify-between items-baseline border-b border-gray-50 pb-1">
+              <span className="text-gray-500 text-sm">Name:</span>
+              <span className="font-bold text-gray-900">{payslip.employee.user.firstName} {payslip.employee.user.lastName}</span>
+            </div>
+            <div className="flex justify-between items-baseline border-b border-gray-50 pb-1">
+              <span className="text-gray-500 text-sm">Email:</span>
+              <span className="font-bold text-gray-900">{payslip.employee.user.email}</span>
+            </div>
+            <div className="flex justify-between items-baseline border-b border-gray-50 pb-1">
+              <span className="text-gray-500 text-sm">Bank Name:</span>
+              <span className="font-bold text-gray-900">{payslip.employee.bankName}</span>
+            </div>
+            <div className="flex justify-between items-baseline border-b border-gray-50 pb-1">
+              <span className="text-gray-500 text-sm">Account Number:</span>
+              <span className="font-bold text-gray-900">{payslip.employee.accountNumber}</span>
             </div>
           </div>
 
-          <div>
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">Payroll Information</h3>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Pay Period:</span>
-                <span className="font-medium">{payslip.payrollRun.payPeriod}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Start Date:</span>
-                <span className="font-medium">{formatDate(payslip.payrollRun.startDate)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">End Date:</span>
-                <span className="font-medium">{formatDate(payslip.payrollRun.endDate)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Status:</span>
-                <Badge variant={payslip.payrollRun.status === 'COMPLETED' ? 'default' : 'secondary'}>
-                  {payslip.payrollRun.status}
-                </Badge>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Currency:</span>
-                <span className="font-medium">{payslip.currency?.code}</span>
-              </div>
+          <div className="space-y-3">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-gray-400 mb-4">Payroll Information</h3>
+            <div className="flex justify-between items-baseline border-b border-gray-50 pb-1">
+              <span className="text-gray-500 text-sm">Pay Period:</span>
+              <span className="font-bold text-gray-900">{payslip.payrollRun.payPeriod}</span>
+            </div>
+            <div className="flex justify-between items-baseline border-b border-gray-50 pb-1">
+              <span className="text-gray-500 text-sm">Start Date:</span>
+              <span className="font-bold text-gray-900">{formatDate(payslip.payrollRun.startDate)}</span>
+            </div>
+            <div className="flex justify-between items-baseline border-b border-gray-50 pb-1">
+              <span className="text-gray-500 text-sm">End Date:</span>
+              <span className="font-bold text-gray-900">{formatDate(payslip.payrollRun.endDate)}</span>
+            </div>
+            <div className="flex justify-between items-baseline border-b border-gray-50 pb-1">
+              <span className="text-gray-500 text-sm">Status:</span>
+              <Badge variant={payslip.payrollRun.status === 'COMPLETED' ? 'default' : 'secondary'} className="rounded-full px-3">
+                {payslip.payrollRun.status}
+              </Badge>
+            </div>
+            <div className="flex justify-between items-baseline border-b border-gray-50 pb-1">
+              <span className="text-gray-500 text-sm">Currency:</span>
+              <span className="font-bold text-gray-900">{payslip.currency?.code || 'USD'}</span>
             </div>
           </div>
         </div>
@@ -184,14 +176,14 @@ export const PayslipTemplate = forwardRef<HTMLDivElement, PayslipTemplateProps>(
 
         {/* Net Pay */}
         <div className="text-center mb-8">
-          <div className="rounded-lg p-6" style={{
-            backgroundColor: '#eff6ff',
-            border: '2px solid #dbeafe'
+          <div className="rounded-xl p-8 flex items-center justify-between" style={{
+            backgroundColor: '#2563eb',
+            color: '#ffffff'
           }}>
-            <h3 className="text-xl font-bold mb-2" style={{ color: '#1e40af' }}>Net Pay (Rounded)</h3>
-            <div className="text-3xl font-bold" style={{ color: '#1e3a8a' }}>{formatCurrency(payslip.netPay)}</div>
-            <p className="text-sm mt-2" style={{ color: '#6b7280' }}>(All figures in {payslip.currency?.code})</p>
+            <h3 className="text-xl font-bold">Net Pay (Rounded)</h3>
+            <div className="text-4xl font-bold">{formatCurrency(payslip.netPay)}</div>
           </div>
+          <p className="text-sm mt-2 text-gray-500">(All figures in {payslip.currency?.code || 'USD'})</p>
         </div>
 
         {/* Signatures */}

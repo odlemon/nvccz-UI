@@ -91,12 +91,12 @@ export function FinancialStatementsView() {
               </div>
               <div className="flex gap-2">
                 {canUploadReport && (
-                  <Button onClick={() => setUploadModalOpen(true)} className="rounded-full bg-gradient-to-r from-blue-500 to-blue-600 text-white"><Upload className="w-4 h-4 mr-2" /> Upload Report</Button>
+                  <Button onClick={() => setUploadModalOpen(true)} variant="gradient-info" className="rounded-full"><Upload className="w-4 h-4 mr-2" /> Upload Report</Button>
                 )}
                 {canSubmitReports && (
                   <AlertDialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
                     <AlertDialogTrigger asChild>
-                      <Button disabled={selectedReports.length === 0 || loading} className="rounded-full bg-gradient-to-r from-green-500 to-green-600 text-white">
+                      <Button disabled={selectedReports.length === 0 || loading} variant="gradient" className="rounded-full">
                         <Send className="w-4 h-4 mr-2" /> Submit Selected ({selectedReports.length})
                       </Button>
                     </AlertDialogTrigger>

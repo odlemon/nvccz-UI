@@ -298,10 +298,11 @@ export function DepartmentBreakdownModal({ isOpen, onClose, parentGoal, onSubmit
             >
               Cancel
             </Button>
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
+              variant="gradient"
               disabled={selectedDepartments.length === 0 || isSubmitting || availableDepartmentsLoading}
-              className="rounded-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800"
+              className="rounded-full"
             >
               {isSubmitting ? (
                 <>

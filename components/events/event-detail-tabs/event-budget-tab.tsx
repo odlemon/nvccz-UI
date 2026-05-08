@@ -206,14 +206,19 @@ export function EventBudgetTab({ eventId }: EventBudgetTabProps) {
                 setApprovalForm({ approvedBudget: totalEstimated.toString(), notes: "" })
                 setIsApproveDialogOpen(true)
               }}
-              className="gap-2 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 rounded-full"
+              variant="gradient-create"
+              className="gap-2 rounded-full h-10 px-6 shadow-sm"
               disabled={currentEventBudgetItems.length === 0}
             >
               <CiCircleCheck size={20} />
               Approve Budget
             </Button>
           )}
-          <Button onClick={() => setIsAddDialogOpen(true)} className="gap-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-full">
+          <Button 
+            onClick={() => setIsAddDialogOpen(true)} 
+            variant="gradient-info"
+            className="gap-2 rounded-full h-10 px-6 shadow-sm"
+          >
             <CiCirclePlus size={20} />
             Add Item
           </Button>
@@ -284,7 +289,11 @@ export function EventBudgetTab({ eventId }: EventBudgetTabProps) {
         {currentEventBudgetItems.length === 0 && (
           <div className="text-center py-12">
             <p className="text-muted-foreground">No budget items yet</p>
-            <Button onClick={() => setIsAddDialogOpen(true)} className="mt-4 gap-2">
+            <Button 
+              onClick={() => setIsAddDialogOpen(true)} 
+              variant="gradient-info"
+              className="mt-4 gap-2 rounded-full h-10 px-6 shadow-sm"
+            >
               <CiCirclePlus size={20} />
               Add First Item
             </Button>
@@ -339,13 +348,14 @@ export function EventBudgetTab({ eventId }: EventBudgetTabProps) {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsApproveDialogOpen(false)} disabled={approving} className="rounded-full">
+            <Button variant="outline" onClick={() => setIsApproveDialogOpen(false)} disabled={approving} className="rounded-full h-10 px-6">
               Cancel
             </Button>
             <Button 
               onClick={handleApproveBudget} 
               disabled={approving}
-              className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 rounded-full"
+              variant="gradient-create"
+              className="rounded-full h-10 px-6 shadow-sm"
             >
               {approving ? (
                 <>

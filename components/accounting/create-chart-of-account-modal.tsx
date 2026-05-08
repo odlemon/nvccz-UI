@@ -156,6 +156,7 @@ export function CreateChartOfAccountModal({
                 onChange={(e) => setFormData(prev => ({ ...prev, accountNo: e.target.value }))}
                 placeholder="e.g., 1000"
                 required
+                className="rounded-full h-10 px-4"
               />
             </div>
             
@@ -167,6 +168,7 @@ export function CreateChartOfAccountModal({
                 onChange={(e) => setFormData(prev => ({ ...prev, accountName: e.target.value }))}
                 placeholder="e.g., Cash"
                 required
+                className="rounded-full h-10 px-4"
               />
             </div>
           </div>
@@ -246,14 +248,15 @@ export function CreateChartOfAccountModal({
               variant="outline"
               onClick={onClose}
               disabled={loading}
-              className="flex-1"
+              className="flex-1 rounded-full h-10"
             >
               Cancel
             </Button>
             <Button
               type="submit"
               disabled={loading}
-              className="flex-1 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700"
+              variant={isEdit ? "gradient-update" : "gradient-create"}
+              className="flex-1 rounded-full h-10"
             >
               {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               {isEdit ? 'Update Account' : 'Create Account'}

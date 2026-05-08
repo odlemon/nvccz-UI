@@ -434,14 +434,15 @@ export function TaxRulesForm({ isOpen, onClose, onSubmit, editingRule, loading =
               type="button"
               variant="outline"
               onClick={handleClose}
-              className="rounded-full"
+              className="rounded-full h-10 px-6"
             >
               Cancel
             </Button>
             <Button
               type="submit"
+              variant={editingRule ? "gradient-update" : "gradient-create"}
               disabled={loading}
-              className="rounded-full gradient-primary text-white"
+              className="rounded-full h-10 px-6 shadow-sm"
             >
               {loading ? 'Saving...' : editingRule ? 'Update Rule' : 'Create Rule'}
             </Button>
