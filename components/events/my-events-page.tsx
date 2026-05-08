@@ -12,6 +12,7 @@ import { EventsGridView } from "./events-grid-view"
 import { EventsCalendarView } from "./events-calendar-view"
 import { CreateEventWizard } from "./create-event-wizard"
 import { EventsListSkeleton } from "./events-skeleton"
+import { cn } from "@/lib/utils"
 
 export function MyEventsPage() {
   const router = useRouter()
