@@ -25,6 +25,7 @@ import {
   MoreHorizontal,
   Plus
 } from "lucide-react"
+import { cn } from "@/lib/utils"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 
 export interface Column<T> {
@@ -514,38 +515,55 @@ export function ProcurementDataTable<T extends { id: string }>({
                     variant="outline"
                     size="sm"
                     onClick={() => handlePageChange(currentPageNumber - 1)}
-                    disabled={currentPageNumber === 1}
+                    className={cn(
+                      "rounded-full w-9 h-9 p-0",
+                      currentPageNumber === 1 && "pointer-events-none opacity-50"
+                    )}
                   >
                     <ChevronLeft className="w-4 h-4" />
-                    Previous
                   </Button>
                   
-                  {/* Page number input */}
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-600">Page</span>
-                    <Input
-                      type="number"
-                      min={1}
-                      max={totalPages}
-                      value={currentPageNumber}
-                      onChange={(e) => {
-                        const page = parseInt(e.target.value)
-                        if (!isNaN(page)) {
-                          handleGoToPage(page)
-                        }
-                      }}
-                      className="w-16 h-8 text-center"
-                    />
-                    <span className="text-sm text-gray-600">of {totalPages}</span>
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                      let pageNum
+                      if (totalPages <= 5) {
+                        pageNum = i + 1
+                      } else if (currentPageNumber <= 3) {
+                        pageNum = i + 1
+                      } else if (currentPageNumber >= totalPages - 2) {
+                        pageNum = totalPages - 4 + i
+                      } else {
+                        pageNum = currentPageNumber - 2 + i
+                      }
+                      
+                      const isActive = currentPageNumber === pageNum
+                      
+                      return (
+                        <Button
+                          key={pageNum}
+                          variant={isActive ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => handleGoToPage(pageNum)}
+                          className={cn(
+                            "w-9 h-9 p-0 rounded-full",
+                            isActive ? "bg-blue-600 text-white hover:bg-blue-700" : "hover:bg-gray-100"
+                          )}
+                        >
+                          {pageNum}
+                        </Button>
+                      )
+                    })}
                   </div>
 
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => handlePageChange(currentPageNumber + 1)}
-                    disabled={currentPageNumber === totalPages}
+                    className={cn(
+                      "rounded-full w-9 h-9 p-0",
+                      currentPageNumber === totalPages && "pointer-events-none opacity-50"
+                    )}
                   >
-                    Next
                     <ChevronRight className="w-4 h-4" />
                   </Button>
                 </div>

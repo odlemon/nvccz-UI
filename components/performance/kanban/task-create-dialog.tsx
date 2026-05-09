@@ -409,10 +409,15 @@ export function TaskCreateDialog({ open, onOpenChange }: Props) {
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} className="rounded-full">
             Cancel
           </Button>
-          <Button onClick={handleCreate} disabled={creating || !title.trim()}>
+          <Button 
+            onClick={handleCreate} 
+            disabled={creating || !title.trim()}
+            variant="gradient-create"
+            className="rounded-full"
+          >
             {creating ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
             Create Task
           </Button>

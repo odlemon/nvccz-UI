@@ -9,7 +9,8 @@ import {
   Calculator,
   Tag,
   Landmark,
-  Percent
+  Percent,
+  Lock
 } from "lucide-react"
 import { ExchangeRatesManagement } from "./exchange-rates-management"
 import { cn } from "@/lib/utils"
@@ -19,6 +20,7 @@ import { ExpenseCategoriesManagement } from "./expense-categories-management"
 import { BankAccountsManagement } from "./bank-accounts-management"
 import { AccountingSettingsSkeleton } from "./accounting-settings-skeleton"
 import { VatRatesManagement } from "./vat-rates-management"
+import { PeriodLockoutTab } from "./tabs/period-lockout-tab"
 
 const tabs = [
   {
@@ -62,6 +64,13 @@ const tabs = [
     icon: Percent,
     description: "Manage VAT rates",
     gradient: "from-orange-400 to-orange-600"
+  },
+  {
+    id: "period-lockout",
+    label: "Period Lockout",
+    icon: Lock,
+    description: "Lock accounting periods",
+    gradient: "from-red-400 to-red-600"
   }
 ]
 
@@ -87,6 +96,8 @@ export function AccountingSettings() {
         return <BankAccountsManagement />
       case "vat-rates":
         return <VatRatesManagement />
+      case "period-lockout":
+        return <PeriodLockoutTab />
       default:
         return <CurrenciesManagement />
     }
@@ -110,7 +121,6 @@ export function AccountingSettings() {
 
             <div className="flex space-x-1 min-w-max ">
               {tabs.map((tab) => {
-                const Icon = tab.icon
                 const isActive = activeTab === tab.id
                 
                 return (
@@ -118,19 +128,13 @@ export function AccountingSettings() {
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
                     className={cn(
-                      "flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-t-lg border-b-2 transition-all duration-200",
+                      "flex items-center px-3 py-2 text-[11px] font-semibold rounded-t-lg border-b-2 transition-all duration-200",
                       isActive
-                        ? "text-blue-600 border-blue-600"
+                        ? "text-blue-600 border-blue-600 bg-blue-50/50"
                         : "text-gray-600 border-transparent hover:text-gray-900 hover:border-gray-300"
                     )}
                   >
-                    <div className={cn(
-                      "w-6 h-6 rounded-full flex items-center justify-center bg-gradient-to-br transition-all duration-200",
-                      isActive ? tab.gradient : "from-gray-300 to-gray-400"
-                    )}>
-                      <Icon className="w-3 h-3 text-white" />
-                    </div>
-                    <span>{tab.label}</span>
+                    <span className="whitespace-nowrap">{tab.label}</span>
                   </button>
                 )
               })}

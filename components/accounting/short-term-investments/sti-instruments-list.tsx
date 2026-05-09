@@ -166,7 +166,8 @@ export function STIInstrumentsList({ onCreateNew }: STIInstrumentsListProps) {
                 </SelectContent>
               </Select>
               <Button
-                className="h-9 px-4 rounded-full gap-2 bg-[#4f77ff] hover:bg-[#4f77ff]/90 font-semibold text-xs shadow-md"
+                variant="gradient-create"
+                className="h-9 px-5 rounded-full gap-2 font-semibold text-xs"
                 onClick={onCreateNew}
               >
                 <Plus className="w-3.5 h-3.5" />
@@ -327,9 +328,9 @@ export function STIInstrumentsList({ onCreateNew }: STIInstrumentsListProps) {
                   .map((p) => (
                     <Button
                       key={p}
-                      variant={p === page ? "default" : "outline"}
+                      variant={p === page ? "gradient" : "outline"}
                       size="sm"
-                      className={`h-8 w-8 p-0 rounded-full text-xs ${p === page ? "bg-[#1a3a4a] text-white" : ""}`}
+                      className="h-8 w-8 p-0 rounded-full text-xs"
                       onClick={() => setPage(p)}
                     >
                       {p}

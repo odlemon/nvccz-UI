@@ -84,28 +84,28 @@ export function BoardReviewModal({ isOpen, onClose, applicationId, onSuccess }: 
   }
 
   const handleSubmit = async () => {
+    if (!hasExistingData) {
+      toast.error('Board review must be initiated first with a memorandum document')
+      return
+    }
+
     try {
       setLoading(true)
-      if (hasExistingData) {
-        // Update existing board review
-        const updateData: BoardReviewUpdateRequest = {
-          recommendationReport: formData.recommendationReport,
-          decisionReason: formData.decisionReason,
-          nextSteps: formData.nextSteps,
-          overallScore: formData.overallScore,
-          finalComments: formData.finalComments
-        }
-        await boardReviewApi.update(applicationId, updateData)
-        toast.success('Board review updated successfully')
-      } else {
-        // Create new board review
-        await boardReviewApi.create(applicationId, formData)
-        toast.success('Board review created successfully')
+      // Update existing board review
+      const updateData: BoardReviewUpdateRequest = {
+        recommendationReport: formData.recommendationReport,
+        decisionReason: formData.decisionReason,
+        nextSteps: formData.nextSteps,
+        overallScore: formData.overallScore,
+        finalComments: formData.finalComments
       }
+      await boardReviewApi.update(applicationId, updateData)
+      toast.success('Board review updated successfully')
+      
       onSuccess?.()
       onClose()
     } catch (error: any) {
-      toast.error(`Failed to ${hasExistingData ? 'update' : 'create'} board review`, { description: error.message })
+      toast.error('Failed to update board review', { description: error.message })
     } finally {
       setLoading(false)
     }

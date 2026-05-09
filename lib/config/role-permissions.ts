@@ -214,7 +214,7 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
         subModules: {
           'Dashboard': 'read',
           'funds': 'read',
-          'companies': 'read',
+          'companies': 'none',
           'applications-dashboard': 'read',
           'applications-all': 'read',
         }
@@ -261,12 +261,23 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           PERFORMANCE_ACTIONS.APPROVE_PERFORMANCE_REVIEW,
         ],
         subModules: {
-          'dashboard': 'full',
-          'kpiManagement': 'full',
-          'goalsManagement': 'full',
-          'taskManagement': 'full',
-          'departmentScorecard': 'full',
-          'userScorecard': 'full',
+          'performance-dashboard': 'full',
+          'kpi-management': 'full',
+          'goals-management': 'full',
+          'tasks-management': 'full',
+          'department-scorecards': 'full',
+          'user-scorecards': 'full',
+          'config-strategy': 'full',
+          'config-themes': 'full',
+          'performance-contracts': 'full',
+          'performance-reviews': 'full',
+          'org-bsc': 'full',
+          'board-scorecards': 'full',
+          'ceo-scorecards': 'full',
+          'bsc-entry': 'full',
+          'workflow-history': 'full',
+          'departments-management': 'full',
+          'config-pillars': 'full',
         }
       },
       {

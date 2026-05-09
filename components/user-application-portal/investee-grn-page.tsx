@@ -14,6 +14,7 @@ import { ProcurementDrawer } from "@/components/procurement/procurement-drawer"
 import { Loader2, Package, TrendingUp, AlertCircle, Search, ChevronLeft, ChevronRight } from "lucide-react"
 import { format } from "date-fns"
 import { toast } from "sonner"
+import { cn } from "@/lib/utils"
 import { CiViewTimeline, CiCalendar } from "react-icons/ci"
 import { Building, CheckCircle, Clock } from "lucide-react"
 
@@ -267,34 +268,66 @@ export function InvesteeGRNPage() {
           />
 
           {/* Pagination */}
-          {total > PAGE_SIZE && (
-            <div className="flex items-center justify-between pt-2">
-              <p className="text-xs text-gray-500">
-                Showing {offset + 1}–{Math.min(offset + PAGE_SIZE, total)} of {total}
-              </p>
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-8">
+              <div className="text-sm text-gray-600 font-medium">
+                Showing {offset + 1} to {Math.min(offset + PAGE_SIZE, total)} of {total} Entries
+              </div>
               <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
                   size="sm"
-                  className="rounded-full"
-                  disabled={offset === 0}
                   onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
+                  className={cn(
+                    "rounded-full w-9 h-9 p-0",
+                    currentPage === 1 && "pointer-events-none opacity-50"
+                  )}
                 >
-                  <ChevronLeft className="w-4 h-4 mr-1" />
-                  Previous
+                  <ChevronLeft className="w-4 h-4" />
                 </Button>
-                <span className="text-xs text-gray-600">
-                  Page {currentPage} of {totalPages}
-                </span>
+                
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                    let pageNum
+                    if (totalPages <= 5) {
+                      pageNum = i + 1
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i
+                    } else {
+                      pageNum = currentPage - 2 + i
+                    }
+                    
+                    const isActive = currentPage === pageNum
+                    
+                    return (
+                      <Button
+                        key={pageNum}
+                        variant={isActive ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setOffset((pageNum - 1) * PAGE_SIZE)}
+                        className={cn(
+                          "w-9 h-9 p-0 rounded-full",
+                          isActive ? "bg-blue-600 text-white hover:bg-blue-700" : "hover:bg-gray-100"
+                        )}
+                      >
+                        {pageNum}
+                      </Button>
+                    )
+                  })}
+                </div>
+
                 <Button
                   variant="outline"
                   size="sm"
-                  className="rounded-full"
-                  disabled={offset + PAGE_SIZE >= total}
                   onClick={() => setOffset(offset + PAGE_SIZE)}
+                  className={cn(
+                    "rounded-full w-9 h-9 p-0",
+                    currentPage === totalPages && "pointer-events-none opacity-50"
+                  )}
                 >
-                  Next
-                  <ChevronRight className="w-4 h-4 ml-1" />
+                  <ChevronRight className="w-4 h-4" />
                 </Button>
               </div>
             </div>

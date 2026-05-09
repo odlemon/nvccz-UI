@@ -623,9 +623,9 @@ function PortfolioHoldingsTable({
               ).map((p) => (
                 <Button
                   key={p}
-                  variant={p === page ? "default" : "outline"}
+                  variant={p === page ? "gradient" : "outline"}
                   size="sm"
-                  className={`h-8 w-8 p-0 rounded-full text-xs ${p === page ? "bg-[#1a3a4a] text-white" : ""}`}
+                  className="h-8 w-8 p-0 rounded-full text-xs"
                   onClick={() => setPage(p)}
                 >
                   {p}

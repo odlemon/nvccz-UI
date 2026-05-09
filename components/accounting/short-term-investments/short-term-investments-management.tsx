@@ -58,7 +58,8 @@ export function ShortTermInvestmentsManagement() {
           </div>
           <div className="flex items-center gap-3">
             <Button
-              className="h-10 px-5 rounded-full gap-2 bg-[#4f77ff] hover:bg-[#4f77ff]/90 font-semibold text-xs shadow-md"
+              variant="gradient-create"
+              className="h-10 px-6 rounded-full gap-2 font-semibold text-xs"
               onClick={() => setIsCreateOpen(true)}
             >
               <Plus className="w-4 h-4" />

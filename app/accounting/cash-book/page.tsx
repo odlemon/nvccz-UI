@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react"
 import { useDispatch, useSelector } from "react-redux"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Plus, FileText, BarChart3, TrendingUp, BookOpen, Settings, Lock, FileSignature, Download, Search } from "lucide-react"
+import { Plus, FileText, BarChart3, TrendingUp, BookOpen, Settings, FileSignature, Download, Search } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { format, startOfWeek, endOfWeek } from "date-fns"
 import { cn } from "@/lib/utils"
@@ -37,7 +37,6 @@ import { ProcurementDataTable } from "@/components/procurement/procurement-data-
 import { CashbookBatchViewDrawer } from "@/components/accounting/cashbook-batch-view-drawer"
 import { CashbookTransferViewDrawer } from "@/components/accounting/cashbook-transfer-view-drawer"
 import { EntryTypesTab } from "@/components/accounting/tabs/entry-types-tab"
-import { PeriodLockoutTab } from "@/components/accounting/tabs/period-lockout-tab"
 import { ContraEntriesTab } from "@/components/accounting/tabs/contra-entries-tab"
 import { ExportCashbookAuditModal } from "@/components/accounting/export-cashbook-audit-modal"
 
@@ -62,13 +61,12 @@ const mainTabs = [
   { id: 'batch', label: 'Batch', icon: BarChart3, gradient: 'from-green-500 to-green-600' },
   { id: 'transfers', label: 'Cashbook Transfers', icon: TrendingUp, gradient: 'from-purple-500 to-purple-600' },
   { id: 'entry-types', label: 'Entry Types', icon: Settings, gradient: 'from-orange-500 to-orange-600' },
-  { id: 'period-lockout', label: 'Period Lockout', icon: Lock, gradient: 'from-red-500 to-red-600' },
   { id: 'contra-entries', label: 'Contra Entries', icon: FileSignature, gradient: 'from-indigo-500 to-indigo-600' },
 ]
 
 function CashbookPage() {
   const dispatch = useDispatch<AppDispatch>()
-  const [activeTab, setActiveTab] = useState<'single' | 'batch' | 'transfers' | 'entry-types' | 'period-lockout' | 'contra-entries'>('single')
+  const [activeTab, setActiveTab] = useState<'single' | 'batch' | 'transfers' | 'entry-types' | 'contra-entries'>('single')
   const [isProcessCashbookOpen, setIsProcessCashbookOpen] = useState(false)
   const [isExportAuditModalOpen, setIsExportAuditModalOpen] = useState(false)
   const [singleSubTab, setSingleSubTab] = useState<'receipts' | 'payments'>('receipts')
@@ -547,7 +545,6 @@ function CashbookPage() {
         )}
 
         {activeTab === 'entry-types' && <EntryTypesTab />}
-        {activeTab === 'period-lockout' && <PeriodLockoutTab />}
         {activeTab === 'contra-entries' && <ContraEntriesTab />}
 
         {/* Modals */}

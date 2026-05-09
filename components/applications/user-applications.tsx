@@ -22,7 +22,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { CiSearch, CiViewList, CiRedo, CiFileOn, CiUser, CiDollar, CiCalendar, CiCircleCheck } from "react-icons/ci"
 import { Progress } from "@/components/ui/progress"
-import { FileText, Users, CheckCircle, Clock, AlertCircle, Building2 } from "lucide-react"
+import { FileText, Users, CheckCircle, Clock, AlertCircle, Building2, ChevronLeft, ChevronRight } from "lucide-react"
+import { cn } from "@/lib/utils"
 import { ApplicationTimeline } from "./application-timeline"
 import { DueDiligenceConfirmationDialog } from "./due-diligence-confirmation-dialog"
 import { CompleteDueDiligenceConfirmationDialog } from "./complete-due-diligence-confirmation-dialog"
@@ -486,12 +487,66 @@ export function UserApplications() {
 
       {/* Pagination */}
       {!loading && totalPages > 1 && (
-        <div className="flex items-center justify-between mt-6">
-          <div className="text-sm text-gray-600">Showing {startIndex + 1} to {Math.min(endIndex, filtered.length)} of {filtered.length} applications</div>
+        <div className="flex items-center justify-between mt-8">
+          <div className="text-sm text-gray-600 font-medium">
+            Showing {startIndex + 1} to {Math.min(endIndex, filtered.length)} of {filtered.length} Applications
+          </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" disabled={currentPage === 1} onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}>Prev</Button>
-            <div className="text-sm">Page {currentPage} of {totalPages}</div>
-            <Button variant="outline" size="sm" disabled={currentPage === totalPages} onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}>Next</Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              className={cn(
+                "rounded-full w-9 h-9 p-0",
+                currentPage === 1 && "pointer-events-none opacity-50"
+              )}
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            
+            <div className="flex items-center gap-1">
+              {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                let pageNum
+                if (totalPages <= 5) {
+                  pageNum = i + 1
+                } else if (currentPage <= 3) {
+                  pageNum = i + 1
+                } else if (currentPage >= totalPages - 2) {
+                  pageNum = totalPages - 4 + i
+                } else {
+                  pageNum = currentPage - 2 + i
+                }
+                
+                const isActive = currentPage === pageNum
+                
+                return (
+                  <Button
+                    key={pageNum}
+                    variant={isActive ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setCurrentPage(pageNum)}
+                    className={cn(
+                      "w-9 h-9 p-0 rounded-full",
+                      isActive ? "bg-blue-600 text-white hover:bg-blue-700" : "hover:bg-gray-100"
+                    )}
+                  >
+                    {pageNum}
+                  </Button>
+                )
+              })}
+            </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              className={cn(
+                "rounded-full w-9 h-9 p-0",
+                currentPage === totalPages && "pointer-events-none opacity-50"
+              )}
+            >
+              <ChevronRight className="w-4 h-4" />
+            </Button>
           </div>
         </div>
       )}

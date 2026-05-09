@@ -42,7 +42,7 @@ export function CreateAssetModal({ isOpen, onClose, onSuccess }: CreateAssetModa
   const { chartOfAccounts } = useSelector((state: RootState) => state.accounting)
   const [loading, setLoading] = useState(false)
   const [purchaseDate, setPurchaseDate] = useState<Date>(new Date())
-  
+
   const [formData, setFormData] = useState({
     assetName: '',
     assetCode: '',
@@ -76,7 +76,7 @@ export function CreateAssetModal({ isOpen, onClose, onSuccess }: CreateAssetModa
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!formData.assetName || !formData.assetCode || !formData.cost) {
       toast.error('Please fill in all required fields')
       return
@@ -89,7 +89,7 @@ export function CreateAssetModal({ isOpen, onClose, onSuccess }: CreateAssetModa
 
     try {
       setLoading(true)
-      
+
       const assetData = {
         ...formData,
         cost: parseFloat(formData.cost),
@@ -97,7 +97,7 @@ export function CreateAssetModal({ isOpen, onClose, onSuccess }: CreateAssetModa
       }
 
       const response = await accountingApi.createAsset(assetData)
-      
+
       if (response.success) {
         toast.success('Asset created successfully')
         resetForm()
@@ -112,20 +112,20 @@ export function CreateAssetModal({ isOpen, onClose, onSuccess }: CreateAssetModa
     }
   }
 
-  const assetAccounts = chartOfAccounts.filter(account => 
+  const assetAccounts = chartOfAccounts.filter(account =>
     account.accountType === 'Fixed Asset' || account.accountType === 'Current Asset'
   )
-  const depreciationAccounts = chartOfAccounts.filter(account => 
+  const depreciationAccounts = chartOfAccounts.filter(account =>
     account.accountType === 'Contra-Asset'
   )
-  const expenseAccounts = chartOfAccounts.filter(account => 
+  const expenseAccounts = chartOfAccounts.filter(account =>
     account.accountType === 'Expense'
   )
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-hidden overflow-y-auto rounded-2xl">
-        <DialogHeader>/
+        <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Package className="w-5 h-5" />
             Create New Asset
@@ -140,7 +140,7 @@ export function CreateAssetModal({ isOpen, onClose, onSuccess }: CreateAssetModa
               <Input
                 id="assetName"
                 value={formData.assetName}
-                onChange={(e) => setFormData({...formData, assetName: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, assetName: e.target.value })}
                 required
                 className="rounded-full"
               />
@@ -150,7 +150,7 @@ export function CreateAssetModal({ isOpen, onClose, onSuccess }: CreateAssetModa
               <Input
                 id="assetCode"
                 value={formData.assetCode}
-                onChange={(e) => setFormData({...formData, assetCode: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, assetCode: e.target.value })}
                 required
                 className="rounded-full"
               />
@@ -162,7 +162,7 @@ export function CreateAssetModal({ isOpen, onClose, onSuccess }: CreateAssetModa
             <Textarea
               id="description"
               value={formData.description}
-              onChange={(e) => setFormData({...formData, description: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               className="rounded-2xl"
             />
           </div>
@@ -176,7 +176,7 @@ export function CreateAssetModal({ isOpen, onClose, onSuccess }: CreateAssetModa
                 type="number"
                 step="0.01"
                 value={formData.cost}
-                onChange={(e) => setFormData({...formData, cost: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, cost: e.target.value })}
                 required
                 className="rounded-full"
               />
@@ -188,7 +188,7 @@ export function CreateAssetModal({ isOpen, onClose, onSuccess }: CreateAssetModa
                 type="number"
                 min="1"
                 value={formData.usefulLifeYears}
-                onChange={(e) => setFormData({...formData, usefulLifeYears: parseInt(e.target.value)})}
+                onChange={(e) => setFormData({ ...formData, usefulLifeYears: parseInt(e.target.value) })}
                 required
                 className="rounded-full"
               />
@@ -223,9 +223,9 @@ export function CreateAssetModal({ isOpen, onClose, onSuccess }: CreateAssetModa
 
           <div>
             <Label>Depreciation Method</Label>
-            <Select 
-              value={formData.depreciationMethod} 
-              onValueChange={(value) => setFormData({...formData, depreciationMethod: value})}
+            <Select
+              value={formData.depreciationMethod}
+              onValueChange={(value) => setFormData({ ...formData, depreciationMethod: value })}
             >
               <SelectTrigger className="rounded-full">
                 <SelectValue />
@@ -240,13 +240,13 @@ export function CreateAssetModal({ isOpen, onClose, onSuccess }: CreateAssetModa
           {/* Account Mapping */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold">Account Mapping</h3>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <Label>Asset Account *</Label>
-                <Select 
-                  value={formData.assetAccountId} 
-                  onValueChange={(value) => setFormData({...formData, assetAccountId: value})}
+                <Select
+                  value={formData.assetAccountId}
+                  onValueChange={(value) => setFormData({ ...formData, assetAccountId: value })}
                 >
                   <SelectTrigger className="rounded-full">
                     <SelectValue placeholder="Select asset account" />
@@ -263,9 +263,9 @@ export function CreateAssetModal({ isOpen, onClose, onSuccess }: CreateAssetModa
 
               <div>
                 <Label>Accumulated Depreciation Account *</Label>
-                <Select 
-                  value={formData.accumulatedDepreciationAccountId} 
-                  onValueChange={(value) => setFormData({...formData, accumulatedDepreciationAccountId: value})}
+                <Select
+                  value={formData.accumulatedDepreciationAccountId}
+                  onValueChange={(value) => setFormData({ ...formData, accumulatedDepreciationAccountId: value })}
                 >
                   <SelectTrigger className="rounded-full">
                     <SelectValue placeholder="Select depreciation account" />
@@ -282,9 +282,9 @@ export function CreateAssetModal({ isOpen, onClose, onSuccess }: CreateAssetModa
 
               <div>
                 <Label>Depreciation Expense Account *</Label>
-                <Select 
-                  value={formData.depreciationExpenseAccountId} 
-                  onValueChange={(value) => setFormData({...formData, depreciationExpenseAccountId: value})}
+                <Select
+                  value={formData.depreciationExpenseAccountId}
+                  onValueChange={(value) => setFormData({ ...formData, depreciationExpenseAccountId: value })}
                 >
                   <SelectTrigger className="rounded-full">
                     <SelectValue placeholder="Select expense account" />
@@ -308,7 +308,7 @@ export function CreateAssetModal({ isOpen, onClose, onSuccess }: CreateAssetModa
               <Input
                 id="location"
                 value={formData.location}
-                onChange={(e) => setFormData({...formData, location: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                 className="rounded-full"
               />
             </div>
@@ -317,7 +317,7 @@ export function CreateAssetModal({ isOpen, onClose, onSuccess }: CreateAssetModa
               <Input
                 id="vendor"
                 value={formData.vendor}
-                onChange={(e) => setFormData({...formData, vendor: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, vendor: e.target.value })}
                 className="rounded-full"
               />
             </div>
@@ -325,16 +325,16 @@ export function CreateAssetModal({ isOpen, onClose, onSuccess }: CreateAssetModa
 
           {/* Actions */}
           <div className="flex justify-end gap-3 pt-4 border-t">
-            <Button 
-              type="button" 
-              variant="outline" 
+            <Button
+              type="button"
+              variant="outline"
               onClick={onClose}
               className="rounded-full h-10 px-6"
             >
               Cancel
             </Button>
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               disabled={loading}
               variant="gradient-create"
               className="rounded-full h-10 px-6"

@@ -156,10 +156,10 @@ function PayslipsPage() {
                 </Select>
               </div>
               <div className="flex items-end gap-2">
-                <Button onClick={handleSearch} className="rounded-full" disabled={loading || !employeeId || !payrollRunId}>
+                <Button onClick={handleSearch} variant="gradient" className="rounded-full h-10 px-6 font-semibold text-xs" disabled={loading || !employeeId || !payrollRunId}>
                   {loading ? 'Searching...' : 'Search Payslip'}
                 </Button>
-                <Button type="button" variant="outline" className="rounded-full" onClick={() => { setEmployeeId(''); setPayrollRunId(''); setPayslip(null); }} disabled={loading}>
+                <Button type="button" variant="outline" className="rounded-full h-10 px-5 font-semibold text-xs" onClick={() => { setEmployeeId(''); setPayrollRunId(''); setPayslip(null); }} disabled={loading}>
                   Clear
                 </Button>
               </div>
@@ -175,17 +175,18 @@ function PayslipsPage() {
               <div className="flex gap-3">
                 <Button 
                   onClick={handleGeneratePDF} 
-                  className="rounded-full gradient-primary text-white" 
+                  variant="gradient-info"
+                  className="rounded-full h-10 px-6 gap-2 font-semibold text-xs" 
                   disabled={generatingPDF}
                 >
                   {generatingPDF ? (
                     <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      <Loader2 className="w-4 h-4 animate-spin" />
                       Generating PDF...
                     </>
                   ) : (
                     <>
-                      <FileText className="w-4 h-4 mr-2" />
+                      <FileText className="w-4 h-4" />
                       Generate PDF
                     </>
                   )}
@@ -193,9 +194,10 @@ function PayslipsPage() {
                 {payslip?.pdfPath && (
                   <Button 
                     onClick={handleDownloadPdf} 
-                    className="rounded-full bg-green-600 hover:bg-green-700 text-white"
+                    variant="gradient-create"
+                    className="rounded-full h-10 px-6 gap-2 font-semibold text-xs"
                   >
-                    <Download className="w-4 h-4 mr-2" />
+                    <Download className="w-4 h-4" />
                     Download Existing PDF
                   </Button>
                 )}

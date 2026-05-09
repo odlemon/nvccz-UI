@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Eye, Copy, ChevronUp, ChevronDown } from "lucide-react"
+import { Plus, Eye, Copy, ChevronUp, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
@@ -217,22 +217,67 @@ export function CashbookDataTable({
       </table>
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="p-4 flex justify-between items-center">
-          <Button
-            variant="outline"
-            onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-            disabled={currentPage === 1}
-          >
-            Previous
-          </Button>
-          <span>Page {currentPage} of {totalPages}</span>
-          <Button
-            variant="outline"
-            onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-            disabled={currentPage === totalPages}
-          >
-            Next
-          </Button>
+        <div className="p-4 flex items-center justify-between border-t border-gray-100">
+          <div className="text-sm text-gray-600 font-medium">
+            Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, Array.isArray(entries) ? entries.length : 0)} of {Array.isArray(entries) ? entries.length : 0} Entries
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+              className={cn(
+                "rounded-full w-9 h-9 p-0",
+                currentPage === 1 && "pointer-events-none opacity-50"
+              )}
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            
+            <div className="flex items-center gap-1">
+              {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                let pageNum
+                if (totalPages <= 5) {
+                  pageNum = i + 1
+                } else if (currentPage <= 3) {
+                  pageNum = i + 1
+                } else if (currentPage >= totalPages - 2) {
+                  pageNum = totalPages - 4 + i
+                } else {
+                  pageNum = currentPage - 2 + i
+                }
+                
+                const isActive = currentPage === pageNum
+                
+                return (
+                  <Button
+                    key={pageNum}
+                    variant={isActive ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setCurrentPage(pageNum)}
+                    className={cn(
+                      "w-9 h-9 p-0 rounded-full",
+                      isActive ? "bg-blue-600 text-white hover:bg-blue-700" : "hover:bg-gray-100"
+                    )}
+                  >
+                    {pageNum}
+                  </Button>
+                )
+              })}
+            </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+              className={cn(
+                "rounded-full w-9 h-9 p-0",
+                currentPage === totalPages && "pointer-events-none opacity-50"
+              )}
+            >
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
       )}
     </div>

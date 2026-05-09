@@ -15,6 +15,8 @@ export interface BoardReviewData {
   overallScore: string
   finalComments: string
   status: 'IN_PROGRESS' | 'COMPLETED'
+  memorandumUrl?: string
+  documentUrl?: string
   createdAt: string
   updatedAt: string
   completedAt: string | null
@@ -96,9 +98,16 @@ export interface BoardReviewResponse {
 }
 
 class BoardReviewApiService {
-  // Create board review
-  async create(applicationId: string, data: BoardReviewCreateRequest): Promise<BoardReviewResponse> {
-    return apiClient.post<BoardReviewResponse>(`/board-reviews/${applicationId}`, data)
+  // Create board review with memorandum document
+  async create(applicationId: string, document: File): Promise<BoardReviewResponse> {
+    const formData = new FormData()
+    formData.append('document', document)
+    
+    return apiClient.post<BoardReviewResponse>(`/board-reviews/${applicationId}`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      }
+    })
   }
 
   // Get board review by application ID

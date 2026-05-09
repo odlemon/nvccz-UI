@@ -213,6 +213,30 @@ export function BoardReviewSection({
               </p>
             </div>
           </div>
+
+          {(data.memorandumUrl || data.documentUrl) && (
+            <div className="mt-6 pt-4 border-t">
+              <label className="text-sm text-gray-500 block mb-2 font-medium uppercase tracking-wider">Board Review Documents</label>
+              <div className="flex items-center gap-3 p-3 bg-purple-50 rounded-lg border border-purple-100">
+                <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
+                  <FileText className="w-6 h-6 text-purple-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-900 truncate">Investment Memorandum</p>
+                  <p className="text-xs text-gray-500">Final memorandum for board review</p>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="rounded-full bg-white border-purple-200 text-purple-600 hover:bg-purple-50"
+                  onClick={() => window.open(data.memorandumUrl || data.documentUrl, '_blank')}
+                >
+                  <Play className="w-3 h-3 mr-1.5 rotate-90" />
+                  View IM
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

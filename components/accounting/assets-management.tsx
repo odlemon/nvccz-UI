@@ -483,8 +483,8 @@ export function AssetsManagement() {
           <p className="text-muted-foreground">Manage fixed assets and depreciation</p>
         </div>
         {canCreateAsset && (
-          <Button onClick={() => setIsCreateModalOpen(true)} className="rounded-full">
-            <Plus className="w-4 h-4 mr-2" />
+          <Button onClick={() => setIsCreateModalOpen(true)} variant="gradient-create" className="rounded-full h-10 px-6 gap-2 font-semibold text-xs">
+            <Plus className="w-4 h-4" />
             New Asset
           </Button>
         )}
@@ -493,17 +493,17 @@ export function AssetsManagement() {
       {/* View Toggle */}
       <div className="flex gap-2">
         <Button
-          variant={assetsView === "list" ? "default" : "outline"}
+          variant={assetsView === "list" ? "gradient" : "outline"}
           onClick={() => setAssetsView("list")}
-          className="rounded-full"
+          className="rounded-full h-9 px-5 font-semibold text-xs"
           size="sm"
         >
           Asset List
         </Button>
         <Button
-          variant={assetsView === "register" ? "default" : "outline"}
+          variant={assetsView === "register" ? "gradient" : "outline"}
           onClick={() => setAssetsView("register")}
-          className="rounded-full"
+          className="rounded-full h-9 px-5 font-semibold text-xs"
           size="sm"
         >
           Asset Register
