@@ -94,12 +94,6 @@ export const COLUMNS: ColumnConfig[] = [
     countColor: "bg-white/20 text-white",
   },
   {
-    id: "overdue",
-    label: "Overdue",
-    gradient: "from-red-500 to-rose-600",
-    countColor: "bg-white/20 text-white",
-  },
-  {
     id: "delayed",
     label: "Delayed",
     gradient: "from-orange-500 to-orange-600",
@@ -109,6 +103,12 @@ export const COLUMNS: ColumnConfig[] = [
     id: "completed",
     label: "Complete",
     gradient: "from-green-500 to-green-600",
+    countColor: "bg-white/20 text-white",
+  },
+  {
+    id: "overdue",
+    label: "Overdue",
+    gradient: "from-red-500 to-rose-600",
     countColor: "bg-white/20 text-white",
   },
 ]

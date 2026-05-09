@@ -1231,6 +1231,8 @@ export interface JournalEntryFilters {
   currencyId?: string
   page?: number
   limit?: number
+  startDate?: string
+  endDate?: string
 }
 // --- ACCOUNTING API ---
 class AccountingApiService {
@@ -1301,10 +1303,22 @@ class AccountingApiService {
       params.append('limit', filters.limit.toString())
     }
 
+    if (filters?.startDate) {
+      params.append('startDate', filters.startDate)
+    }
+
+    if (filters?.endDate) {
+      params.append('endDate', filters.endDate)
+    }
+
     const queryString = params.toString()
-    const url = queryString
-      ? `/accounting/journal-entries?${queryString}`
+    
+    // Use the date range endpoint if both dates are provided
+    const endpoint = (filters?.startDate && filters?.endDate) 
+      ? '/accounting/journal-entries/by-date-range' 
       : '/accounting/journal-entries'
+      
+    const url = queryString ? `${endpoint}?${queryString}` : endpoint
 
     return apiClient.get<AccountingResponse<JournalEntry[]>>(url)
   }

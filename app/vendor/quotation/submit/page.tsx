@@ -371,14 +371,14 @@ export default function VendorQuotationSubmissionPage() {
                 </ul>
               </div>
 
-              {/* Action Button */}
               <div className="text-center pt-4">
                 <Button
-                  onClick={() => window.location.href = '/'}
+                  onClick={() => window.close()}
                   className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-8 py-6 text-lg rounded-full"
                 >
                   Close
                 </Button>
+                <p className="text-xs text-gray-500 mt-4">You can now safely close this window.</p>
               </div>
             </CardContent>
           </Card>

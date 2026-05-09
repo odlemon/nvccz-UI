@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { 
   Calculator, 
@@ -207,6 +209,8 @@ export function GeneralLedger() {
   // Filters
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
+  const [startDate, setStartDate] = useState<Date | undefined>(undefined)
+  const [endDate, setEndDate] = useState<Date | undefined>(undefined)
   const [isFiltersOpen, setIsFiltersOpen] = useState(false)
   
   // Debounced search
@@ -226,7 +230,7 @@ export function GeneralLedger() {
     if (activeTab === "journal") {
       loadJournalEntries()
     }
-  }, [activeTab, debouncedSearch, statusFilter, selectedCurrencyId])
+  }, [activeTab, debouncedSearch, statusFilter, startDate, endDate, selectedCurrencyId])
 
   const loadJournalEntries = useCallback(async () => {
     setLoading(true)
@@ -243,6 +247,14 @@ export function GeneralLedger() {
       // Only add status if it's not "all"
       if (statusFilter !== "all") {
         filters.status = statusFilter as 'PENDING' | 'POSTED' | 'VOID'
+      }
+
+      if (startDate) {
+        filters.startDate = format(startDate, 'yyyy-MM-dd')
+      }
+
+      if (endDate) {
+        filters.endDate = format(endDate, 'yyyy-MM-dd')
       }
 
       console.log('Loading journal entries with filters:', filters)
@@ -275,7 +287,7 @@ export function GeneralLedger() {
     } finally {
       setLoading(false)
     }
-  }, [debouncedSearch, statusFilter])
+  }, [debouncedSearch, statusFilter, startDate, endDate, selectedCurrencyId])
 
   // Group entries by date
   const groupedEntries = journalEntries.reduce((groups: GroupedEntry[], entry) => {
@@ -347,6 +359,8 @@ export function GeneralLedger() {
     setSearchQuery("")
     setStatusFilter("all")
     setDebouncedSearch("")
+    setStartDate(undefined)
+    setEndDate(undefined)
   }
 
   const getStats = () => {
@@ -370,7 +384,7 @@ export function GeneralLedger() {
   const stats = getStats()
 
   // Check if filters are active
-  const hasActiveFilters = debouncedSearch !== "" || statusFilter !== "all"
+  const hasActiveFilters = debouncedSearch !== "" || statusFilter !== "all" || !!startDate || !!endDate
 
   const handleExportCSV = () => {
     if (journalEntries.length === 0) {
@@ -407,7 +421,10 @@ export function GeneralLedger() {
             Export CSV
           </Button>
           {canCreateJournal && (
-            <Button onClick={() => setIsCreateModalOpen(true)}>
+            <Button 
+              className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full shadow-md hover:shadow-lg transition-all"
+              onClick={() => setIsCreateModalOpen(true)}
+            >
               <Plus className="w-4 h-4 mr-2" />
               New Journal Entry
             </Button>
@@ -517,6 +534,60 @@ export function GeneralLedger() {
                             </SelectContent>
                           </Select>
                         </div>
+                        
+                        {/* Start Date */}
+                        <div className="space-y-2">
+                          <Label className="text-xs font-medium text-gray-700">Start Date</Label>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant={"outline"}
+                                className={cn(
+                                  "w-full justify-start text-left font-normal rounded-full text-sm",
+                                  !startDate && "text-muted-foreground"
+                                )}
+                              >
+                                <Calendar className="mr-2 h-4 w-4" />
+                                {startDate ? format(startDate, "PPP") : <span>Pick a date</span>}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <CalendarComponent
+                                mode="single"
+                                selected={startDate}
+                                onSelect={setStartDate}
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+
+                        {/* End Date */}
+                        <div className="space-y-2">
+                          <Label className="text-xs font-medium text-gray-700">End Date</Label>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant={"outline"}
+                                className={cn(
+                                  "w-full justify-start text-left font-normal rounded-full text-sm",
+                                  !endDate && "text-muted-foreground"
+                                )}
+                              >
+                                <Calendar className="mr-2 h-4 w-4" />
+                                {endDate ? format(endDate, "PPP") : <span>Pick a date</span>}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <CalendarComponent
+                                mode="single"
+                                selected={endDate}
+                                onSelect={setEndDate}
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
 
                         {/* Clear Filters */}
                         <div className="flex items-end">
@@ -546,6 +617,16 @@ export function GeneralLedger() {
                               Status: {statusOptions.find(o => o.value === statusFilter)?.label}
                             </Badge>
                           )}
+                          {startDate && (
+                            <Badge variant="outline" className="text-xs">
+                              From: {format(startDate, 'yyyy-MM-dd')}
+                            </Badge>
+                          )}
+                          {endDate && (
+                            <Badge variant="outline" className="text-xs">
+                              To: {format(endDate, 'yyyy-MM-dd')}
+                            </Badge>
+                          )}
                         </div>
                       )}
                     </CardContent>
@@ -573,7 +654,10 @@ export function GeneralLedger() {
                         Clear Filters
                       </Button>
                     ) : canCreateJournal ? (
-                      <Button onClick={() => setIsCreateModalOpen(true)}>
+                      <Button 
+                        className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full shadow-md hover:shadow-lg transition-all"
+                        onClick={() => setIsCreateModalOpen(true)}
+                      >
                         <Plus className="w-4 h-4 mr-2" />
                         Create Journal Entry
                       </Button>

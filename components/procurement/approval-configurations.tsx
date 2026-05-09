@@ -110,7 +110,7 @@ export function ApprovalConfigurations() {
           const isConfigured = !!config
 
           return (
-            <Card key={department.id} className={`hover:shadow-lg transition-shadow ${isConfigured ? 'border-green-200' : 'border-orange-200'}`}>
+            <Card key={department.id} className={`flex flex-col h-full hover:shadow-lg transition-shadow ${isConfigured ? 'border-green-200' : 'border-orange-200'}`}>
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-2">
@@ -130,50 +130,59 @@ export function ApprovalConfigurations() {
                   )}
                 </div>
                 {department.description && (
-                  <CardDescription className="text-sm">{department.description}</CardDescription>
+                  <CardDescription className="text-sm line-clamp-2">{department.description}</CardDescription>
                 )}
               </CardHeader>
-              <CardContent>
+              <CardContent className="flex flex-col flex-1">
                 {isConfigured && config ? (
-                  <div className="space-y-3">
-                    <div className="text-sm">
-                      <span className="font-medium">Configuration:</span> {config.name}
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      {config.stages.length} approval stage(s) configured
-                    </div>
-                    <div className="flex flex-wrap gap-1">
-                      {config.stages.map((stage, index) => (
-                        <Badge key={index} variant="outline" className="text-xs">
-                          {stage.stageType.replace(/_/g, ' ')}
-                        </Badge>
-                      ))}
+                  <div className="flex flex-col flex-1">
+                    <div className="space-y-3 flex-1">
+                      <div className="text-sm">
+                        <span className="font-medium text-gray-700">Configuration:</span>
+                        <p className="text-muted-foreground mt-0.5">{config.name}</p>
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {config.stages.length} approval stage(s) configured
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {config.stages.map((stage, index) => (
+                          <Badge key={index} variant="outline" className="text-[10px] uppercase bg-gray-50">
+                            {stage.stageType.replace(/_/g, ' ')}
+                          </Badge>
+                        ))}
+                      </div>
                     </div>
                     {permissions.canUpdateApprovalConfig && (
-                      <Button
-                        variant="gradient-update"
-                        className="w-full mt-2 rounded-full h-10 px-6 shadow-sm"
-                        onClick={() => handleConfigure(department, config)}
-                      >
-                        <Edit className="w-4 h-4 mr-2" />
-                        Update Configuration
-                      </Button>
+                      <div className="mt-6">
+                        <Button
+                          variant="gradient-update"
+                          className="w-full rounded-full h-10 px-6 shadow-sm"
+                          onClick={() => handleConfigure(department, config)}
+                        >
+                          <Edit className="w-4 h-4 mr-2" />
+                          Update Configuration
+                        </Button>
+                      </div>
                     )}
                   </div>
                 ) : (
-                  <div className="space-y-3">
-                    <p className="text-sm text-muted-foreground">
-                      No approval workflow configured for this department yet.
-                    </p>
+                  <div className="flex flex-col flex-1">
+                    <div className="flex-1">
+                      <p className="text-sm text-muted-foreground">
+                        No approval workflow configured for this department yet.
+                      </p>
+                    </div>
                     {permissions.canCreateApprovalConfig && (
-                      <Button
-                        variant="gradient-create"
-                        className="w-full rounded-full h-10 px-6 shadow-sm"
-                        onClick={() => handleConfigure(department)}
-                      >
-                        <Plus className="w-4 h-4 mr-2" />
-                        Configure Approval Flow
-                      </Button>
+                      <div className="mt-6">
+                        <Button
+                          variant="gradient-create"
+                          className="w-full rounded-full h-10 px-6 shadow-sm"
+                          onClick={() => handleConfigure(department)}
+                        >
+                          <Plus className="w-4 h-4 mr-2" />
+                          Configure Approval Flow
+                        </Button>
+                      </div>
                     )}
                   </div>
                 )}

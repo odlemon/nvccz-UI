@@ -1436,12 +1436,26 @@ class ProcurementApiServiceV2 {
     return apiClient.patch<ProcurementResponse<InvoiceIntake>>(`/procurement/suite06/intakes/${id}/verify`)
   }
 
-  async createDraftBillFromIntake(id: string): Promise<ProcurementResponse<ProcurementInvoice>> {
-    return apiClient.post<ProcurementResponse<ProcurementInvoice>>(`/procurement/suite06/intakes/${id}/create-draft-bill`)
+  async createDraftBillFromIntake(id: string, data?: { invoiceNumberOverride?: string, invoiceDateOverride?: string }): Promise<ProcurementResponse<ProcurementInvoice>> {
+    return apiClient.post<ProcurementResponse<ProcurementInvoice>>(`/procurement/suite06/intakes/${id}/create-draft-bill`, data || {})
   }
 
   async getVerificationQueue(take: number = 50): Promise<ProcurementResponse<InvoiceIntake[]>> {
     return apiClient.get<ProcurementResponse<InvoiceIntake[]>>(`/procurement/suite06/verification-queue?take=${take}`)
+  }
+
+  async getSuite06Intakes(filters?: { vendorId?: string; status?: string; take?: number; skip?: number }): Promise<ProcurementResponse<Suite06IntakesResponse>> {
+    const params = new URLSearchParams()
+    if (filters?.take) params.append('take', filters.take.toString())
+    else params.append('take', '50')
+    
+    if (filters?.skip) params.append('skip', filters.skip.toString())
+    else params.append('skip', '0')
+    
+    if (filters?.vendorId) params.append('vendorId', filters.vendorId)
+    if (filters?.status && filters.status !== 'all') params.append('status', filters.status)
+    
+    return apiClient.get<ProcurementResponse<Suite06IntakesResponse>>(`/procurement/suite06/intakes?${params.toString()}`)
   }
 
   async upsertFieldCorrections(data: VendorFieldCorrections): Promise<ProcurementResponse<any>> {
@@ -1470,6 +1484,45 @@ export interface InvoiceIntake {
   extractedData?: ExtractedInvoiceData
   createdAt: string
   updatedAt: string
+}
+
+export interface IntakeItemV2 {
+  id: string
+  intakeNumber: string
+  documentUrl: string
+  rawExtractedText: string | null
+  extractedPayloadJson: any | null
+  status: 'DRAFT' | 'EXTRACTED' | 'VERIFIED' | 'MATCHED' | 'DRAFT_BILL' | 'ERROR'
+  overallConfidence: string | null
+  vendorId: string | null
+  sourcePurchaseOrderId: string | null
+  goodsReceivedNoteId: string | null
+  purchaseInvoiceId: string | null
+  taxParseStatus: string | null
+  createdById: string
+  createdAt: string
+  updatedAt: string
+  vendor: {
+    id: string
+    name: string
+    bpNumber: string | null
+  } | null
+  sourcePurchaseOrder: {
+    id: string
+    poNumber: string
+  } | null
+  goodsReceivedNote: {
+    id: string
+    grnNumber: string
+  } | null
+  purchaseInvoice: any | null
+}
+
+export interface Suite06IntakesResponse {
+  items: IntakeItemV2[]
+  total: number
+  skip: number
+  take: number
 }
 
 export interface ExtractedInvoiceData {

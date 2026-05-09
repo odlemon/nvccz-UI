@@ -50,16 +50,18 @@ function ManualRow({
       </td>
       {([0,1,2] as const).map(col => (
         <td key={col} className="py-1 px-1 text-right w-36">
-          <input
-            type="number"
-            value={vals[col] || ""}
-            onChange={e => set(col, parseFloat(e.target.value) || 0)}
-            readOnly={readOnly}
-            className={`w-32 text-right px-2 py-1 rounded border text-sm focus:outline-none focus:ring-1 ${
-              readOnly ? "bg-gray-50 border-gray-200 text-gray-500 cursor-not-allowed"
-                       : "border-red-300 bg-white focus:border-red-500 focus:ring-red-200"
-            }`}
-          />
+          {readOnly ? (
+            <span className="inline-block w-32 text-right px-2 py-1 rounded border border-gray-200 bg-gray-50 text-gray-500 text-sm">
+              {fmt(vals[col])}
+            </span>
+          ) : (
+            <input
+              type="number"
+              value={vals[col] || ""}
+              onChange={e => set(col, parseFloat(e.target.value) || 0)}
+              className="w-32 text-right px-2 py-1 rounded border border-red-300 bg-white text-sm focus:outline-none focus:ring-1 focus:border-red-500 focus:ring-red-200"
+            />
+          )}
         </td>
       ))}
     </tr>

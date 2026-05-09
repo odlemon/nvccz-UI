@@ -71,7 +71,7 @@ export function TaskManagement() {
   const { availableDepartments } = useAppSelector((state) => state.performance)
 
   const [activeTab, setActiveTab] = useState<TaskView>("my-tasks")
-  const [viewMode, setViewMode] = useState<ViewMode>("list")
+  const [viewMode, setViewMode] = useState<ViewMode>("kanban")
   const [pickedGoal, setPickedGoal] = useState<PickedGoal | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
 
@@ -306,9 +306,9 @@ export function TaskManagement() {
                   <SelectItem value="all">All stages</SelectItem>
                   <SelectItem value="todo">To Do</SelectItem>
                   <SelectItem value="in_progress">In Progress</SelectItem>
+                  <SelectItem value="delayed">Delayed</SelectItem>
                   <SelectItem value="completed">Completed</SelectItem>
                   <SelectItem value="overdue">Overdue</SelectItem>
-                  <SelectItem value="delayed">Delayed</SelectItem>
                 </SelectContent>
               </Select>
 

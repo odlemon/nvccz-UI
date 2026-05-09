@@ -877,12 +877,11 @@ export function KPIManagement() {
                   size="sm"
                   onClick={() => handlePageChange(currentPage - 1)}
                   className={cn(
-                    "rounded-full h-9 px-4",
+                    "rounded-full w-9 h-9 p-0",
                     currentPage === 1 && "pointer-events-none opacity-50"
                   )}
                 >
-                  <ChevronLeft className="w-4 h-4 mr-1" />
-                  Previous
+                  <ChevronLeft className="w-4 h-4" />
                 </Button>
                 
                 <div className="flex items-center gap-1">
@@ -922,12 +921,11 @@ export function KPIManagement() {
                   size="sm"
                   onClick={() => handlePageChange(currentPage + 1)}
                   className={cn(
-                    "rounded-full h-9 px-4",
+                    "rounded-full w-9 h-9 p-0",
                     currentPage === totalPages && "pointer-events-none opacity-50"
                   )}
                 >
-                  Next
-                  <ChevronRight className="w-4 h-4 ml-1" />
+                  <ChevronRight className="w-4 h-4" />
                 </Button>
               </div>
             </div>
@@ -1081,12 +1079,11 @@ export function KPIManagement() {
                       size="sm"
                       onClick={() => handleFinancialPageChange(financialCurrentPage - 1)}
                       className={cn(
-                        "rounded-full h-9 px-4",
+                        "rounded-full w-9 h-9 p-0",
                         financialCurrentPage === 1 && "pointer-events-none opacity-50"
                       )}
                     >
-                      <ChevronLeft className="w-4 h-4 mr-1" />
-                      Previous
+                      <ChevronLeft className="w-4 h-4" />
                     </Button>
                     
                     <div className="flex items-center gap-1">
@@ -1126,12 +1123,11 @@ export function KPIManagement() {
                       size="sm"
                       onClick={() => handleFinancialPageChange(financialCurrentPage + 1)}
                       className={cn(
-                        "rounded-full h-9 px-4",
+                        "rounded-full w-9 h-9 p-0",
                         financialCurrentPage === financialTotalPages && "pointer-events-none opacity-50"
                       )}
                     >
-                      Next
-                      <ChevronRight className="w-4 h-4 ml-1" />
+                      <ChevronRight className="w-4 h-4" />
                     </Button>
                   </div>
                 </div>

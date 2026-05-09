@@ -446,9 +446,9 @@ export function AccountingDashboardV2() {
                                             return [formatCurrency(num), label]
                                         }}
                                     />
-                                    <Bar yAxisId="left" dataKey="grossProfit" fill="#fbbf24" radius={[6, 6, 0, 0]} barSize={12} />
-                                    <Bar yAxisId="left" dataKey="cogs" fill="#ef4444" radius={[6, 6, 0, 0]} barSize={12} />
-                                    <Bar yAxisId="right" dataKey="grossProfitPercent" fill="#10b981" radius={[6, 6, 0, 0]} barSize={8} />
+                                    <Bar yAxisId="left" dataKey="grossProfit" fill="#fbbf24" barSize={12} />
+                                    <Bar yAxisId="left" dataKey="cogs" fill="#ef4444" barSize={12} />
+                                    <Bar yAxisId="right" dataKey="grossProfitPercent" fill="#10b981" barSize={8} />
                                 </ComposedChart>
                             </ResponsiveContainer>
                             ) : (
@@ -500,8 +500,8 @@ export function AccountingDashboardV2() {
                                             return [formatCurrency(num), label]
                                         }}
                                     />
-                                    <Bar dataKey="netProfit" fill="#065f46" radius={[4, 4, 0, 0]} barSize={10} />
-                                    <Bar dataKey="grossProfit" fill="#10b981" radius={[4, 4, 0, 0]} barSize={10} />
+                                    <Bar dataKey="netProfit" fill="#065f46" barSize={10} />
+                                    <Bar dataKey="grossProfit" fill="#10b981" barSize={10} />
                                 </ComposedChart>
                             </ResponsiveContainer>
                             ) : (

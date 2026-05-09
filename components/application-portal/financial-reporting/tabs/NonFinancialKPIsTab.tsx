@@ -48,16 +48,18 @@ function KPIRow({ label, field, data, onChange, readOnly, suffix, description }:
       <td className="py-2 px-3 text-xs text-gray-400">{description}</td>
       <td className="py-1 pr-2 text-right">
         <div className="flex items-center justify-end gap-1">
-          <input
-            type="number"
-            value={(data[field] as number) || ""}
-            onChange={e => onChange({ ...data, [field]: parseFloat(e.target.value) || 0 })}
-            readOnly={readOnly}
-            className={`w-28 text-right px-2 py-1.5 rounded border text-sm focus:outline-none focus:ring-1 ${
-              readOnly ? "bg-gray-50 border-gray-200 text-gray-500 cursor-not-allowed"
-                       : "border-red-300 bg-white focus:border-red-500 focus:ring-red-200"
-            }`}
-          />
+          {readOnly ? (
+            <span className="inline-block w-28 text-right px-2 py-1.5 rounded border border-gray-200 bg-gray-50 text-gray-500 text-sm">
+              {(data[field] as number)?.toLocaleString() || "0"}
+            </span>
+          ) : (
+            <input
+              type="number"
+              value={(data[field] as number) || ""}
+              onChange={e => onChange({ ...data, [field]: parseFloat(e.target.value) || 0 })}
+              className="w-28 text-right px-2 py-1.5 rounded border border-red-300 bg-white text-sm focus:outline-none focus:ring-1 focus:border-red-500 focus:ring-red-200"
+            />
+          )}
           {suffix && <span className="text-xs text-gray-400 w-5 shrink-0">{suffix}</span>}
         </div>
       </td>

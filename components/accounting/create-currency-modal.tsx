@@ -9,6 +9,7 @@ import { Switch } from "@/components/ui/switch"
 import { Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { AccountingCurrency, CreateCurrencyRequest, accountingApi } from "@/lib/api/accounting-api"
+import { cn } from "@/lib/utils"
 
 interface CreateCurrencyModalProps {
   isOpen: boolean

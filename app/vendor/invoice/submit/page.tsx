@@ -326,7 +326,7 @@ export default function VendorInvoiceSubmissionPage() {
                 </div>
                 {submittedData.taxPercentage > 0 && (
                   <div className="flex justify-between items-center text-gray-700">
-                    <span>Tax ({submittedData.taxPercentage}%):</span>
+                    <span>Vat ({submittedData.taxPercentage}%):</span>
                     <span className="font-medium">{submittedData.currencyCode} {parseFloat(submittedData.taxAmount).toFixed(2)}</span>
                   </div>
                 )}
@@ -363,14 +363,14 @@ export default function VendorInvoiceSubmissionPage() {
                 </ul>
               </div>
 
-              {/* Action Button */}
               <div className="text-center pt-4">
                 <Button
-                  onClick={() => window.location.href = '/'}
+                  onClick={() => window.close()}
                   className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-8 py-6 text-lg rounded-full"
                 >
                   Close
                 </Button>
+                <p className="text-xs text-gray-500 mt-4">You can now safely close this window.</p>
               </div>
             </CardContent>
           </Card>
@@ -467,7 +467,7 @@ export default function VendorInvoiceSubmissionPage() {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="taxPercentage" className="mb-2 block">Tax Percentage (%)</Label>
+                  <Label htmlFor="taxPercentage" className="mb-2 block">Vat Percentage (%)</Label>
                   <Input
                     id="taxPercentage"
                     type="number"
@@ -599,7 +599,7 @@ export default function VendorInvoiceSubmissionPage() {
                 </div>
                 {parseFloat(taxPercentage) > 0 && (
                   <div className="flex justify-between items-center text-gray-700">
-                    <span>Tax ({taxPercentage}%):</span>
+                    <span>Vat ({taxPercentage}%):</span>
                     <span className="font-medium">{calculateTax()}</span>
                   </div>
                 )}

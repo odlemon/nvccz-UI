@@ -202,12 +202,15 @@ export function RSVPPage({ token, initialStatus }: RSVPPageProps) {
                 </div>
               )}
 
-              <Button
-                onClick={() => window.location.href = process.env.NEXT_PUBLIC_ORGANIZATION_URL || '/'}
-                className="w-full h-12 text-base font-semibold bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 rounded-full"
-              >
-                Back to {getOrgName()}
-              </Button>
+              <div className="space-y-4">
+                <Button
+                  onClick={() => window.close()}
+                  className="w-full h-12 text-base font-semibold bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 rounded-full"
+                >
+                  Close
+                </Button>
+                <p className="text-center text-xs text-gray-500">You can now safely close this window.</p>
+              </div>
             </CardContent>
           </Card>
         </motion.div>

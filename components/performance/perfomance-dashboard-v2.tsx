@@ -173,19 +173,19 @@ export function PerformanceDashboardV2() {
     const employeeOfMonth = {
         name: eotm.name || "",
         role: eotm.department || eotm.role || "",
-        totalTimeWorked: eotm.totalTimeWorked ? `${eotm.totalTimeWorked} hours` : "0 hours",
-        activeTime: eotm.timeBreakdown?.activeTime || 0,
-        extraTime: eotm.timeBreakdown?.extraTime || 0,
-        pauseTime: eotm.timeBreakdown?.pauseTime || 0,
         email: eotm.email || "",
-        phone: eotm.phone || ""
+        taskCount: eotm.taskCount || 0,
+        tasksCompleted: eotm.tasksCompleted || 0,
+        tasksInProgress: eotm.tasksInProgress || 0,
+        tasksPending: eotm.tasksPending || 0,
+        completionRate: eotm.completionRate || 0
     }
 
-    // Calculate time percentages for employee of the month
-    const totalTime = employeeOfMonth.activeTime + employeeOfMonth.extraTime + employeeOfMonth.pauseTime
-    const activeTimePercent = totalTime > 0 ? (employeeOfMonth.activeTime / totalTime) * 100 : 0
-    const extraTimePercent = totalTime > 0 ? (employeeOfMonth.extraTime / totalTime) * 100 : 0
-    const pauseTimePercent = totalTime > 0 ? (employeeOfMonth.pauseTime / totalTime) * 100 : 0
+    // Calculate task percentages for employee of the month
+    const totalTasks = employeeOfMonth.taskCount
+    const completedPercent = totalTasks > 0 ? (employeeOfMonth.tasksCompleted / totalTasks) * 100 : 0
+    const inProgressPercent = totalTasks > 0 ? (employeeOfMonth.tasksInProgress / totalTasks) * 100 : 0
+    const pendingPercent = totalTasks > 0 ? (employeeOfMonth.tasksPending / totalTasks) * 100 : 0
 
     const budgetPercentage = budgetData.totalBudget > 0 ? (budgetData.totalSpend / budgetData.totalBudget) * 100 : 0
     const gaugeAngle = (budgetPercentage / 100) * 180
@@ -767,8 +767,8 @@ export function PerformanceDashboardV2() {
 
                             <div className="space-y-6">
                                 <div className="flex items-center justify-between">
-                                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Total time worked</span>
-                                    <span className="text-sm font-semibold text-foreground">{employeeOfMonth.totalTimeWorked}</span>
+                                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Total Tasks</span>
+                                    <span className="text-sm font-semibold text-foreground">{employeeOfMonth.taskCount}</span>
                                 </div>
 
                                 <div className="space-y-4">
@@ -777,7 +777,7 @@ export function PerformanceDashboardV2() {
                                         <div
                                             className="h-full rounded-lg"
                                             style={{
-                                                width: `${activeTimePercent}%`,
+                                                width: `${completedPercent}%`,
                                                 backgroundColor: '#4c1d95',
                                                 backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 8px, rgba(255,255,255,0.05) 8px, rgba(255,255,255,0.05) 16px)'
                                             }}
@@ -785,7 +785,7 @@ export function PerformanceDashboardV2() {
                                         <div
                                             className="h-full rounded-lg opacity-60"
                                             style={{
-                                                width: `${extraTimePercent}%`,
+                                                width: `${inProgressPercent}%`,
                                                 backgroundColor: '#6d28d9',
                                                 backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 8px, rgba(255,255,255,0.05) 8px, rgba(255,255,255,0.05) 16px)'
                                             }}
@@ -793,7 +793,7 @@ export function PerformanceDashboardV2() {
                                         <div
                                             className="h-full rounded-lg opacity-30"
                                             style={{
-                                                width: `${pauseTimePercent}%`,
+                                                width: `${pendingPercent}%`,
                                                 backgroundColor: '#8b5cf6',
                                                 backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 8px, rgba(255,255,255,0.05) 8px, rgba(255,255,255,0.05) 16px)'
                                             }}
@@ -803,27 +803,26 @@ export function PerformanceDashboardV2() {
                                     <div className="flex items-center gap-6">
                                         <div className="flex items-center gap-2">
                                             <div className="w-2.5 h-2.5 rounded-full bg-[#4c1d95]" />
-                                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Active Time</span>
+                                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Completed</span>
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <div className="w-2.5 h-2.5 rounded-full bg-[#6d28d9]" />
-                                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Extra Time</span>
+                                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">In Progress</span>
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <div className="w-2.5 h-2.5 rounded-full bg-[#8b5cf6]" />
-                                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Pause Time</span>
+                                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Pending</span>
                                         </div>
                                     </div>
                                 </div>
 
                                 <div className="space-y-2 pt-2 border-t border-gray-50">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-[10px] font-bold text-muted-foreground w-12 uppercase">Email</span>
-                                        <span className="text-xs font-bold text-foreground">{employeeOfMonth.email}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-xs font-medium text-muted-foreground">Phone:</span>
-                                        <span className="text-xs font-bold text-foreground">{employeeOfMonth.phone}</span>
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[10px] font-bold text-muted-foreground w-12 uppercase">Email</span>
+                                            <span className="text-xs font-bold text-foreground">{employeeOfMonth.email}</span>
+                                        </div>
+                                        <span className="text-xs font-bold text-[#4c1d95] bg-[#4c1d95]/10 px-2 py-1 rounded-full">{employeeOfMonth.completionRate}% Completion</span>
                                     </div>
                                 </div>
                             </div>

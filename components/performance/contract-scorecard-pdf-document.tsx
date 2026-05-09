@@ -316,7 +316,7 @@ export default function ContractScorecardPDF({ data, type, activeAddress }: Cont
         )}
 
         <View style={styles.footer} fixed>
-          <Text>NVCCZ Performance Management · Generated {new Date().toLocaleString()}</Text>
+          <Text> Generated {new Date().toLocaleString()}</Text>
           <Text render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} />
         </View>
       </Page>
