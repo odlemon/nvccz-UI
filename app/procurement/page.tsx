@@ -4,11 +4,16 @@ import { ProcurementLayout } from "@/components/layout/procurement-layout"
 import { ProcurementDashboard } from "@/components/procurement/procurement-dashboard"
 import { ModuleGuard } from "@/lib/permissions"
 import { useProcurementPermissions } from "@/lib/permissions"
+import { useAppSelector } from "@/lib/store"
 
 export default function ProcurementPage() {
   const { isLoading } = useProcurementPermissions()
+  const { userDetails, isFetchingDetails } = useAppSelector(state => state.auth)
 
-  if (isLoading) {
+  // Wait for user details to load before evaluating permissions — otherwise
+  // ModuleGuard transiently renders its "Access Denied" fallback during the
+  // initial mount window where userDetails is still null.
+  if (isLoading || isFetchingDetails || !userDetails) {
     return (
       <ProcurementLayout>
         <div className="flex items-center justify-center h-96">

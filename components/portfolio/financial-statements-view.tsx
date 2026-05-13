@@ -14,6 +14,7 @@ import { format } from "date-fns"
 import { FinancialReportUploadModal } from "./financial-report-upload-modal"
 import { FinancialReportType } from "@/lib/api/application-portal-api"
 import { FinancialStatementsSkeleton } from "./financial-statements-skeleton"
+import { getFilePreviewUrl } from "@/lib/utils/file-preview"
 import { GradientBorderButton } from "@/components/ui/gradient-border-button"
 import { useRolePermissions } from "@/lib/hooks/useRolePermissions"
 import {
@@ -161,7 +162,7 @@ export function FinancialStatementsView() {
                       </div>
                       <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
                         <Button asChild size="sm" className="bg-white/90 hover:bg-white text-gray-900 rounded-full">
-                          <a href={report.reportUrl} target="_blank" rel="noopener noreferrer"><Eye className="w-4 h-4 mr-1" /> Preview</a>
+                          <a href={getFilePreviewUrl(report.reportUrl, report.title)} target="_blank" rel="noopener noreferrer"><Eye className="w-4 h-4 mr-1" /> Preview</a>
                         </Button>
                       </div>
                     </div>

@@ -40,6 +40,7 @@ interface KYCDocument {
   id: string
   documentType: string
   fileName: string
+  fileUrl: string
   fileSize: number
   mimeType: string
   isVerified: boolean
@@ -211,20 +212,19 @@ export function VendorApprovalDrawer({ vendor, open, onOpenChange, onApprovalCha
     }
   }
 
-  const handleDownloadDoc = async (docId: string, fileName: string) => {
-    try {
-      const blob = await procurementApiV2.downloadStaffKYCDoc(docId)
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = fileName
-      document.body.appendChild(a)
-      a.click()
-      window.URL.revokeObjectURL(url)
-      document.body.removeChild(a)
-    } catch (error) {
-      toast.error('Failed to download document')
+  const handleDownloadDoc = (fileUrl: string, fileName: string) => {
+    if (!fileUrl) {
+      toast.error('Document URL is missing')
+      return
     }
+    const a = document.createElement('a')
+    a.href = fileUrl
+    a.download = fileName
+    a.target = '_blank'
+    a.rel = 'noopener noreferrer'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
   }
 
   return (
@@ -432,7 +432,7 @@ export function VendorApprovalDrawer({ vendor, open, onOpenChange, onApprovalCha
                               )}
                             </div>
                             <Button
-                              onClick={() => handleDownloadDoc(doc.id, doc.fileName)}
+                              onClick={() => handleDownloadDoc(doc.fileUrl, doc.fileName)}
                               size="sm"
                               variant="outline"
                               className="gap-1"

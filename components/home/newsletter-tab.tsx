@@ -20,8 +20,20 @@ import { newslettersApi, type Newsletter, type NewsletterRecipientUser } from "@
 import { useAppSelector } from "@/lib/store"
 import { Pencil, Trash2, Users, Plus, X, Search, Loader2, Mail } from "lucide-react"
 import { NewsletterForm, type NewsletterFormValues } from "./newsletter-form"
+import { useRolePermissions } from "@/lib/hooks/useRolePermissions"
 
 type ActiveTab = "newsletters" | "recipients"
+
+// Roles permitted to manage the newsletter recipients list (toggle members in/out).
+// Permissions for this feature are hard-coded in the frontend, so add a role here
+// to grant it the recipients-management switch.
+const NEWSLETTER_MANAGER_ROLES = new Set<string>([
+  "CFO",
+  "CEO",
+  "BOARD_CHAIR",
+  "HR_MGR",
+  "IT_MGR",
+])
 
 export function NewsletterTab() {
   const [showCreateForm, setShowCreateForm] = useState(false)
@@ -30,6 +42,9 @@ export function NewsletterTab() {
   const [editing, setEditing] = useState<Newsletter | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const { user } = useAppSelector((s) => s.auth)
+  const { roleCode } = useRolePermissions()
+  const isAdmin = (user?.role || "").toString().toLowerCase() === "admin"
+  const canManageRecipients = isAdmin || (!!roleCode && NEWSLETTER_MANAGER_ROLES.has(roleCode))
 
   // Recipients state
   const [activeTab, setActiveTab] = useState<ActiveTab>("newsletters")
@@ -231,20 +246,22 @@ export function NewsletterTab() {
             <CiMail className="w-4 h-4" />
             Newsletters
           </button>
-          <button
-            onClick={() => setActiveTab("recipients")}
-            className={`relative flex items-center gap-2 py-3 px-1 text-sm font-normal transition-colors cursor-pointer ${
-              activeTab === "recipients"
-                ? "text-blue-600 border-b-2 border-blue-600"
-                : "text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            <Users className="w-4 h-4" />
-            Manage Recipients
-            <Badge variant="secondary" className="ml-1 text-xs bg-blue-100 text-blue-700">
-              {activeRecipientCount}
-            </Badge>
-          </button>
+          {canManageRecipients && (
+            <button
+              onClick={() => setActiveTab("recipients")}
+              className={`relative flex items-center gap-2 py-3 px-1 text-sm font-normal transition-colors cursor-pointer ${
+                activeTab === "recipients"
+                  ? "text-blue-600 border-b-2 border-blue-600"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              Manage Recipients
+              <Badge variant="secondary" className="ml-1 text-xs bg-blue-100 text-blue-700">
+                {activeRecipientCount}
+              </Badge>
+            </button>
+          )}
         </nav>
       </div>
 
@@ -351,7 +368,7 @@ export function NewsletterTab() {
       )}
 
       {/* Recipients Tab */}
-      {activeTab === "recipients" && (
+      {activeTab === "recipients" && canManageRecipients && (
         <div className="space-y-6">
           {/* Recipients Header */}
           <div className="flex items-center justify-between">

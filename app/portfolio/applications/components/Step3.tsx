@@ -10,6 +10,7 @@ import { toast } from "sonner"
 import DocumentUploadModal from "./DocumentUploadModal"
 import { useAppDispatch } from "@/lib/store"
 import { addDocument, updateDocument, removeDocument as removeDocumentAction } from "@/lib/store/slices/applicationSlice"
+import { getFilePreviewUrl, isOfficeDocument } from "@/lib/utils/file-preview"
 
 interface Step3Props {
   formData: any
@@ -475,10 +476,16 @@ const Step3 = ({ formData, updateField, errors }: Step3Props) => {
                     </div>
                   </div>
                 ) : selectedDocument.fileName.toLowerCase().match(/\.(jpg|jpeg|png|gif)$/) ? (
-                  <img 
-                    src={selectedDocument.fileUrl} 
+                  <img
+                    src={selectedDocument.fileUrl}
                     alt={selectedDocument.fileName}
                     className="w-full h-96 object-contain"
+                  />
+                ) : isOfficeDocument(selectedDocument.fileName) ? (
+                  <iframe
+                    src={getFilePreviewUrl(selectedDocument.fileUrl, selectedDocument.fileName)}
+                    title={selectedDocument.fileName}
+                    className="w-full h-96 border-0"
                   />
                 ) : (
                   <div className="h-96 bg-gray-100 flex items-center justify-center">
@@ -488,7 +495,7 @@ const Step3 = ({ formData, updateField, errors }: Step3Props) => {
                       <p className="text-sm text-gray-500 mt-2">
                         Click to download and view the document
                       </p>
-                      <Button 
+                      <Button
                         className="mt-4"
                         onClick={() => window.open(selectedDocument.fileUrl, '_blank')}
                       >

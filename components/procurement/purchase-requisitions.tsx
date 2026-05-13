@@ -13,7 +13,6 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import {
-  fetchRequisitions,
   fetchMyRequisitions,
   fetchPendingApprovalRequisitions,
   fetchInvesteeRequisitions,
@@ -30,7 +29,7 @@ import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 
 type TabConfig = {
-  id: 'all' | 'my' | 'pending' | 'investee'
+  id: 'all' | 'pending' | 'investee'
   label: string
   icon: any
   gradient: string
@@ -39,15 +38,9 @@ type TabConfig = {
 const mainTabs: TabConfig[] = [
   {
     id: 'all',
-    label: 'My Sent requisitions',
+    label: 'My Sent Requisitions',
     icon: FileText,
     gradient: 'from-blue-500 to-blue-600'
-  },
-  {
-    id: 'my',
-    label: 'My Requisitions',
-    icon: CiUser,
-    gradient: 'from-green-500 to-green-600'
   },
   {
     id: 'pending',
@@ -88,7 +81,7 @@ export function PurchaseRequisitions() {
   const [isCreateRFQModalOpen, setIsCreateRFQModalOpen] = useState(false)
   const [selectedRequisitionForRFQ, setSelectedRequisitionForRFQ] = useState<string | null>(null)
   const [isInvesteeMode, setIsInvesteeMode] = useState(false)
-  const [activeTab, setActiveTab] = useState<'all' | 'my' | 'pending' | 'investee'>('all')
+  const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'investee'>('all')
 
   // Filter states
   const [searchTerm, setSearchTerm] = useState('')
@@ -113,16 +106,16 @@ export function PurchaseRequisitions() {
       if (statusFilter !== 'all') filters.status = statusFilter
       if (priorityFilter !== 'all') filters.priority = priorityFilter
 
-      await dispatch(fetchRequisitions(filters)).unwrap()
+      // Everyone needs their "My Sent" list
       await dispatch(fetchMyRequisitions()).unwrap()
-      await dispatch(fetchPendingApprovalRequisitions()).unwrap()
 
-      if (activeTab === 'investee') {
-        await dispatch(fetchInvesteeRequisitions()).unwrap()
-      }
-
+      // Only privileged roles fetch pending-approval + investee data
       if (permissions.canApprovePurchaseRequisition) {
+        await dispatch(fetchPendingApprovalRequisitions()).unwrap()
         await dispatch(fetchSlaBreachedRequisitions()).unwrap()
+        if (activeTab === 'investee') {
+          await dispatch(fetchInvesteeRequisitions()).unwrap()
+        }
       }
     } catch (error: any) {
       toast.error("Error loading requisitions", { description: error.message })
@@ -130,17 +123,15 @@ export function PurchaseRequisitions() {
   }
 
   const getCurrentData = () => {
-    if (activeTab === 'my') return myRequisitions
     if (activeTab === 'pending') return pendingApprovalRequisitions
     if (activeTab === 'investee') return investeeRequisitions
-    return requisitions
+    return myRequisitions
   }
 
   const getCurrentCount = () => {
-    if (activeTab === 'my') return myRequisitionsCount
     if (activeTab === 'pending') return pendingApprovalCount
     if (activeTab === 'investee') return investeeRequisitionsCount
-    return requisitionsCount
+    return myRequisitionsCount
   }
 
   const getPaginationData = () => {
@@ -371,11 +362,11 @@ export function PurchaseRequisitions() {
             {mainTabs.map((tab) => {
               const Icon = tab.icon
               const isActive = activeTab === tab.id
-              let count = requisitionsCount
-              if (tab.id === 'my') count = myRequisitionsCount
-              else if (tab.id === 'pending') count = pendingApprovalCount
+              let count = myRequisitionsCount
+              if (tab.id === 'pending') count = pendingApprovalCount
               else if (tab.id === 'investee') count = investeeRequisitionsCount
-              const showTab = tab.id !== 'investee' || permissions.canApprovePurchaseRequisition
+              // 'all' (My Sent) is always visible. 'pending' and 'investee' require approval permission.
+              const showTab = tab.id === 'all' || permissions.canApprovePurchaseRequisition
 
               if (!showTab) return null
 
@@ -383,7 +374,7 @@ export function PurchaseRequisitions() {
                 <button
                   key={tab.id}
                   onClick={() => {
-                    setActiveTab(tab.id as 'all' | 'my' | 'pending' | 'investee')
+                    setActiveTab(tab.id as 'all' | 'pending' | 'investee')
                     setCurrentPage(1)
                   }}
                   className={cn(

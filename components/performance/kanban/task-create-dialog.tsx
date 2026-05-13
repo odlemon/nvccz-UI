@@ -412,7 +412,7 @@ export function TaskCreateDialog({ open, onOpenChange }: Props) {
           <Button variant="outline" onClick={() => onOpenChange(false)} className="rounded-full">
             Cancel
           </Button>
-          <Button 
+          <Button
             onClick={handleCreate} 
             disabled={creating || !title.trim()}
             variant="gradient-create"
