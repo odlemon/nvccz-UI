@@ -28,6 +28,7 @@ export default function VendorInvoiceSubmissionPage() {
   const quotationNumber = searchParams.get('quotationNumber')
   const vendorEmail = searchParams.get('vendorEmail') ? decodeURIComponent(searchParams.get('vendorEmail')!) : ''
   const rfqNumber = searchParams.get('rfqNumber')
+  const token = searchParams.get('token')
 
   const [submitted, setSubmitted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -132,6 +133,7 @@ export default function VendorInvoiceSubmissionPage() {
         quotationNumber,
         rfqNumber,
         vendorEmail,
+        vendorPortalToken: token, // Added vendorPortalToken
         invoiceNumber,
         invoiceDate: invoiceDate?.toISOString(),
         dueDate: dueDate?.toISOString(),
@@ -364,13 +366,8 @@ export default function VendorInvoiceSubmissionPage() {
               </div>
 
               <div className="text-center pt-4">
-                <Button
-                  onClick={() => window.close()}
-                  className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-8 py-6 text-lg rounded-full"
-                >
-                  Close
-                </Button>
-                <p className="text-xs text-gray-500 mt-4">You can now safely close this window.</p>
+                <p className="text-sm font-medium text-gray-600 mb-2">Submission Complete</p>
+                <p className="text-xs text-gray-500">You may now safely close this browser tab.</p>
               </div>
             </CardContent>
           </Card>
@@ -380,288 +377,269 @@ export default function VendorInvoiceSubmissionPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 py-8 px-4">
-      <div className="max-w-5xl mx-auto">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="flex justify-center mb-6">
-            <div className="w-20 h-20 bg-white rounded-full shadow-lg border-4 border-blue-100 flex items-center justify-center overflow-hidden">
-              {!logoError ? (
-                <Image
-                  src={getOrgLogo()}
-                  alt={getOrgName()}
-                  width={80}
-                  height={80}
-                  className="rounded-full"
-                  onError={() => setLogoError(true)}
-                  priority
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-100 to-blue-200">
-                  <span className="text-sm font-bold text-blue-700">{getOrgName().substring(0, 2).toUpperCase()}</span>
+    <div className="min-h-screen bg-gray-50/50 py-8 px-4">
+      <div className="max-w-4xl mx-auto">
+        {/* Header - Logo Only */}
+        <div className="flex justify-center mb-10">
+          <div className="relative w-48 h-12">
+            {!logoError ? (
+              <Image
+                src={getOrgLogo()}
+                alt={getOrgName()}
+                fill
+                className="object-contain"
+                priority
+                onError={() => setLogoError(true)}
+              />
+            ) : (
+              <div className="flex items-center gap-2">
+                <div className="w-10 h-10 rounded bg-blue-600 flex items-center justify-center text-white font-bold">
+                  {getOrgName().substring(0, 1)}
                 </div>
-              )}
-            </div>
+                <span className="text-xl font-bold text-gray-900">{getOrgName()}</span>
+              </div>
+            )}
           </div>
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Submit Invoice to {getOrgName()}</h1>
-          <p className="text-lg text-gray-600">Quotation: <Badge variant="outline" className="text-base font-mono">{quotationNumber}</Badge></p>
+        </div>
+
+        <div className="text-center mb-10">
+          <h1 className="text-3xl font-normal text-gray-900 mb-2">Submit Invoice</h1>
+          <p className="text-gray-600">
+            For Quotation: <Badge variant="outline" className="font-mono text-blue-600 border-blue-200">{quotationNumber}</Badge>
+          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Invoice Details */}
-          <Card className="shadow-lg border-t-4 border-t-blue-500">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+          {/* Invoice Basic Information */}
+          <Card className="border-l-4 border-l-blue-500 shadow-none border-y border-r border-gray-200">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-base font-normal flex items-center gap-2">
                 <FileText className="w-5 h-5 text-blue-600" />
-                Invoice Information
+                Invoice Details
               </CardTitle>
-              <CardDescription>Provide invoice details and dates</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <Label htmlFor="invoiceNumber" className="flex items-center gap-2 mb-2">
-                    <FileText className="w-4 h-4" />
-                    Invoice Number <span className="text-red-500">*</span>
-                  </Label>
-                  <Input
-                    id="invoiceNumber"
-                    value={invoiceNumber}
-                    onChange={(e) => setInvoiceNumber(e.target.value)}
-                    placeholder="e.g., INV-001"
-                    required
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>Invoice Number <span className="text-red-500">*</span></Label>
+                  <Input 
+                    value={invoiceNumber} 
+                    onChange={e => setInvoiceNumber(e.target.value)} 
+                    placeholder="INV-001" 
+                    required 
+                    className="rounded-full h-11"
                   />
                 </div>
-                <div>
-                  <Label htmlFor="invoiceDate" className="flex items-center gap-2 mb-2">
-                    <Calendar className="w-4 h-4" />
-                    Invoice Date <span className="text-red-500">*</span>
-                  </Label>
-                  <DatePicker
-                    value={invoiceDate}
-                    onChange={setInvoiceDate}
-                    placeholder="Select invoice date"
-                  />
+                <div className="space-y-2">
+                  <Label>Invoice Date <span className="text-red-500">*</span></Label>
+                  <DatePicker value={invoiceDate} onChange={setInvoiceDate} className="rounded-full h-11" />
                 </div>
-                <div>
-                  <Label htmlFor="dueDate" className="flex items-center gap-2 mb-2">
-                    <Calendar className="w-4 h-4" />
-                    Due Date <span className="text-red-500">*</span>
-                  </Label>
-                  <DatePicker
-                    value={dueDate}
-                    onChange={setDueDate}
-                    placeholder="Select due date"
-                  />
+                <div className="space-y-2">
+                  <Label>Due Date <span className="text-red-500">*</span></Label>
+                  <DatePicker value={dueDate} onChange={setDueDate} allowFutureDates={true} className="rounded-full h-11" />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="paymentTerms" className="mb-2 block">Payment Terms</Label>
-                  <Input
-                    id="paymentTerms"
-                    value={paymentTerms}
-                    onChange={(e) => setPaymentTerms(e.target.value)}
-                    placeholder="e.g., NET 30"
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Payment Terms</Label>
+                  <Input 
+                    value={paymentTerms} 
+                    onChange={e => setPaymentTerms(e.target.value)} 
+                    placeholder="e.g., Net 30"
+                    className="rounded-full h-11"
                   />
                 </div>
-                <div>
-                  <Label htmlFor="taxPercentage" className="mb-2 block">Vat Percentage (%)</Label>
-                  <Input
-                    id="taxPercentage"
-                    type="number"
-                    step="0.01"
-                    value={taxPercentage}
-                    onChange={(e) => setTaxPercentage(e.target.value)}
-                    placeholder="0"
-                  />
+                <div className="space-y-2">
+                  <Label>Currency</Label>
+                  <div className="flex gap-2">
+                    <select
+                      value={currencyCode}
+                      onChange={(e) => setCurrencyCode(e.target.value)}
+                      className="flex h-11 w-full rounded-full border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    >
+                      <option value="USD">USD - US Dollar</option>
+                      <option value="ZWL">ZWL - Zimbabwe Dollar</option>
+                      <option value="ZAR">ZAR - SA Rand</option>
+                      <option value="GBP">GBP - British Pound</option>
+                      <option value="EUR">EUR - Euro</option>
+                    </select>
+                  </div>
                 </div>
-              </div>
-
-              <div>
-                <Label htmlFor="bankDetails" className="mb-2 block">Bank Details / Payment Instructions</Label>
-                <Textarea
-                  id="bankDetails"
-                  value={bankDetails}
-                  onChange={(e) => setBankDetails(e.target.value)}
-                  placeholder="Account number, bank name, SWIFT code, etc."
-                  rows={3}
-                />
               </div>
             </CardContent>
           </Card>
 
           {/* Items */}
-          <Card className="shadow-lg border-t-4 border-t-green-500">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <Package className="w-5 h-5 text-green-600" />
-                    Invoice Items
-                  </CardTitle>
-                  <CardDescription>List items on this invoice</CardDescription>
-                </div>
-                <Button type="button" onClick={addItem} variant="outline" size="sm" className="rounded-full">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Item
-                </Button>
-              </div>
+          <Card className="border-l-4 border-l-green-500 shadow-none border-y border-r border-gray-200">
+            <CardHeader className="pb-4 flex flex-row items-center justify-between">
+              <CardTitle className="text-base font-normal flex items-center gap-2">
+                <Package className="w-5 h-5 text-green-600" />
+                Line Items
+              </CardTitle>
+              <Button type="button" onClick={addItem} variant="outline" size="sm" className="rounded-full h-9 px-4 border-green-200 text-green-700 hover:bg-green-50">
+                <Plus className="w-4 h-4 mr-2" /> Add Item
+              </Button>
             </CardHeader>
             <CardContent className="space-y-6">
               {items.map((item, index) => (
-                <div key={index} className="p-4 border-2 border-dashed border-gray-300 rounded-lg space-y-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <Badge variant="secondary">Item #{index + 1}</Badge>
+                <div key={index} className="p-4 border rounded-3xl space-y-4 relative bg-gray-50/30 border-gray-100">
+                  <div className="flex justify-between items-center">
+                    <Badge variant="secondary" className="bg-gray-100 text-gray-600 hover:bg-gray-100 rounded-full">Item #{index + 1}</Badge>
                     {items.length > 1 && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeItem(index)}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50 rounded-full"
-                      >
+                      <Button type="button" variant="ghost" size="sm" onClick={() => removeItem(index)} className="text-red-500 hover:bg-red-50 h-8 w-8 p-0 rounded-full">
                         <Trash2 className="w-4 h-4" />
                       </Button>
                     )}
                   </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label className="mb-2 block">Item Name <span className="text-red-500">*</span></Label>
-                      <Input
-                        value={item.itemName}
-                        onChange={(e) => updateItem(index, 'itemName', e.target.value)}
-                        placeholder="e.g., Office Desk"
-                        required
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Item Name <span className="text-red-500">*</span></Label>
+                      <Input 
+                        value={item.itemName} 
+                        onChange={e => updateItem(index, 'itemName', e.target.value)} 
+                        required 
+                        className="rounded-full h-11"
+                        placeholder="Description of goods/services"
                       />
                     </div>
-                    <div>
-                      <Label className="mb-2 block">Unit</Label>
-                      <Input
-                        value={item.unit}
-                        onChange={(e) => updateItem(index, 'unit', e.target.value)}
-                        placeholder="e.g., pieces"
+                    <div className="space-y-2">
+                      <Label>Unit</Label>
+                      <Input 
+                        value={item.unit} 
+                        onChange={e => updateItem(index, 'unit', e.target.value)} 
+                        className="rounded-full h-11"
+                        placeholder="e.g., Each, Hours"
                       />
                     </div>
                   </div>
-
-                  <div>
-                    <Label className="mb-2 block">Description</Label>
-                    <Textarea
-                      value={item.description}
-                      onChange={(e) => updateItem(index, 'description', e.target.value)}
-                      placeholder="Item description"
+                  <div className="space-y-2">
+                    <Label>Detailed Description</Label>
+                    <Textarea 
+                      value={item.description} 
+                      onChange={e => updateItem(index, 'description', e.target.value)} 
+                      className="rounded-2xl resize-none"
                       rows={2}
+                      placeholder="Additional details about this item..."
                     />
                   </div>
-
-                  <div className="grid grid-cols-4 gap-4">
-                    <div>
-                      <Label className="mb-2 block">Quantity <span className="text-red-500">*</span></Label>
-                      <Input
-                        type="number"
-                        value={item.quantity}
-                        onChange={(e) => updateItem(index, 'quantity', parseInt(e.target.value) || 1)}
-                        min="1"
-                        required
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label>Quantity <span className="text-red-500">*</span></Label>
+                      <Input 
+                        type="number" 
+                        value={item.quantity} 
+                        onChange={e => updateItem(index, 'quantity', parseInt(e.target.value) || 1)} 
+                        required 
+                        className="rounded-full h-11"
                       />
                     </div>
-                    <div>
-                      <Label className="mb-2 block">Unit Price <span className="text-red-500">*</span></Label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={item.unitPrice}
-                        onChange={(e) => updateItem(index, 'unitPrice', e.target.value)}
-                        placeholder="0.00"
-                        required
+                    <div className="space-y-2">
+                      <Label>Unit Price ({currencyCode}) <span className="text-red-500">*</span></Label>
+                      <Input 
+                        type="number" 
+                        step="0.01" 
+                        value={item.unitPrice} 
+                        onChange={e => updateItem(index, 'unitPrice', e.target.value)} 
+                        required 
+                        className="rounded-full h-11"
                       />
                     </div>
-                    <div className="col-span-2">
-                      <Label className="mb-2 block">Item Total</Label>
-                      <Input
-                        value={calculateItemTotal(item)}
-                        disabled
-                        className="bg-gray-50 font-semibold"
-                      />
+                    <div className="space-y-2 md:col-span-1 col-span-2">
+                      <Label>Line Total</Label>
+                      <div className="h-11 flex items-center px-4 bg-gray-100/50 rounded-full font-medium text-gray-700">
+                        {currencyCode} {calculateItemTotal(item)}
+                      </div>
                     </div>
                   </div>
                 </div>
               ))}
 
-              {/* Totals Summary */}
-              <div className="space-y-3 p-4 bg-gray-50 rounded-lg border-2 border-gray-200">
-                <div className="flex justify-between items-center text-gray-700">
+              <div className="flex flex-col items-end space-y-3 p-6 bg-gray-50 rounded-3xl border border-gray-100">
+                <div className="flex justify-between w-full max-w-xs text-sm text-gray-600">
                   <span>Subtotal:</span>
-                  <span className="font-medium">{calculateSubtotal()}</span>
+                  <span className="font-medium">{currencyCode} {calculateSubtotal()}</span>
                 </div>
-                {parseFloat(taxPercentage) > 0 && (
-                  <div className="flex justify-between items-center text-gray-700">
-                    <span>Vat ({taxPercentage}%):</span>
-                    <span className="font-medium">{calculateTax()}</span>
+                <div className="flex justify-between w-full max-w-xs items-center text-sm text-gray-600">
+                  <span className="flex items-center gap-1">VAT Percentage:</span>
+                  <div className="w-24">
+                    <div className="relative">
+                      <Input 
+                        type="number" 
+                        value={taxPercentage} 
+                        onChange={e => setTaxPercentage(e.target.value)}
+                        className="h-9 text-right rounded-full pr-7"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">%</span>
+                    </div>
                   </div>
-                )}
-                <div className="border-t-2 border-gray-300 pt-2 flex justify-between items-center">
+                </div>
+                <div className="flex justify-between w-full max-w-xs text-sm text-gray-600">
+                  <span>VAT Amount:</span>
+                  <span className="font-medium text-blue-600">+{currencyCode} {calculateTax()}</span>
+                </div>
+                <div className="pt-3 mt-1 border-t w-full max-w-xs flex justify-between items-center">
                   <span className="font-semibold text-gray-900">Total Amount:</span>
-                  <select
-                    value={currencyCode}
-                    onChange={(e) => setCurrencyCode(e.target.value)}
-                    className="px-2 py-1 border border-gray-300 rounded-md font-medium text-sm mr-2"
-                  >
-                    <option value="USD">USD</option>
-                    <option value="ZWL">ZWL</option>
-                    <option value="ZAR">ZAR</option>
-                    <option value="GBP">GBP</option>
-                    <option value="EUR">EUR</option>
-                  </select>
-                  <span className="text-2xl font-bold text-green-600">{calculateTotal()}</span>
+                  <div className="text-right">
+                    <span className="text-2xl font-bold text-gray-900">{currencyCode} {calculateTotal()}</span>
+                  </div>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Additional Notes */}
-          <Card className="shadow-lg border-t-4 border-t-purple-500">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="w-5 h-5 text-purple-600" />
-                Additional Notes
+          {/* Payment & Notes */}
+          <Card className="border-l-4 border-l-purple-500 shadow-none border-y border-r border-gray-200">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-base font-normal flex items-center gap-2">
+                <Building2 className="w-5 h-5 text-purple-600" />
+                Payment & Additional Info
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <Textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Any additional information or notes"
-                rows={4}
-              />
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>Bank Details / Payment Instructions</Label>
+                <Textarea 
+                  value={bankDetails} 
+                  onChange={e => setBankDetails(e.target.value)} 
+                  placeholder="Beneficiary Name, Bank, Account Number, Branch Code, SWIFT/BIC..." 
+                  rows={3} 
+                  className="rounded-2xl"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Additional Notes</Label>
+                <Textarea 
+                  value={notes} 
+                  onChange={e => setNotes(e.target.value)} 
+                  placeholder="Any other information for our accounts department..." 
+                  rows={2} 
+                  className="rounded-2xl"
+                />
+              </div>
             </CardContent>
           </Card>
 
-          {/* Submit Button */}
-          <div className="flex justify-center pt-4">
-            <Button
-              type="submit"
-              disabled={submitting}
-              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-12 py-6 text-lg rounded-full shadow-lg hover:shadow-xl transition-all duration-200"
-            >
-              {submitting ? (
-                <>
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3" />
-                  Submitting Invoice...
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="w-5 h-5 mr-2" />
-                  Submit Invoice
-                </>
-              )}
-            </Button>
-          </div>
+          <Button 
+            type="submit" 
+            disabled={submitting} 
+            className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white py-7 rounded-full text-lg font-normal transition-all shadow-md hover:shadow-lg"
+          >
+            {submitting ? (
+              <div className="flex items-center gap-3">
+                <Loader2 className="animate-spin w-5 h-5" />
+                <span>Processing Submission...</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5" />
+                <span>Submit Final Invoice</span>
+              </div>
+            )}
+          </Button>
         </form>
       </div>
     </div>
   )
+}
 }

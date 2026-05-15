@@ -112,6 +112,8 @@ export function middleware(request: NextRequest) {
     '/vendor-portal',         // vendor portal incl. /kyc/[token], /rfq/[rfqNumber], /register
     '/public-tenders',        // public tender browsing
     '/applications/form',     // public application form
+    '/vendor-quotations',     // vendor quotation submission routes
+    '/[token]'
   ]
   if (passThroughRoutes.some((route) => pathname.startsWith(route))) {
     return NextResponse.next()

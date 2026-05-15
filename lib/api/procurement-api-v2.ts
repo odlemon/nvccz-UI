@@ -94,23 +94,29 @@ export interface RequisitionFilters {
 
 // RFQ Types
 export interface RFQ {
+  id?: string
   rfqNumber: string
+  requisitionId?: string
   title: string
   description: string
-  items: RFQItem[]
-  status: 'DRAFT' | 'SENT' | 'CLOSED' | 'CANCELLED'
-  vendors: Array<{
+  items?: RFQItem[]
+  itemsSnapshot?: { items: RFQItem[] }
+  status: 'DRAFT' | 'OPEN' | 'SENT' | 'CLOSED' | 'CANCELLED'
+  visibility?: 'INVITED_ONLY' | 'PUBLIC'
+  vendors?: Array<{
     id: string
     name: string
     email: string
   }>
   createdAt: string
-  createdById: string
+  updatedAt?: string
+  createdById?: string
   rfqDeadline?: string
+  closingAt?: string
   deliveryAddress?: string
   specialRequirements?: string
   expectedDeliveryDate?: string
-  createdBy: {
+  createdBy?: {
     id: string
     firstName: string
     lastName: string
@@ -120,9 +126,11 @@ export interface RFQ {
 
 export interface RFQItem {
   itemName: string
-  description?: string
+  description?: string | null
   quantity: number
   unit: string
+  unitPrice?: number | string | null
+  lineTotal?: number | string | null
   specifications?: any
 }
 
@@ -152,29 +160,33 @@ export interface Quotation {
   quotationNumber: string
   rfqNumber: string
   requisitionId: string
+  procurementRfqId?: string
+  vendorId?: string
   vendorName: string
   vendorEmail: string
   companyName: string
-  taxEIN?: string
-  contactPerson?: string
-  phoneNumber?: string
-  address?: string
+  taxEIN?: string | null
+  contactPerson?: string | null
+  phoneNumber?: string | null
+  address?: string | null
   status: 'SUBMITTED' | 'UNDER_REVIEW' | 'ACCEPTED' | 'REJECTED'
   validUntil: string
-  subtotal: string
-  taxAmount: string
-  totalAmount: string
+  subtotal: string | number
+  taxAmount: string | number
+  totalAmount: string | number
   currencyCode: string
-  paymentTerms?: string
-  deliveryTerms?: string
-  deliveryTime?: string
-  notes?: string
+  paymentTerms?: string | null
+  deliveryTerms?: string | null
+  deliveryTime?: string | null
+  notes?: string | null
   attachments?: any
-  reviewedById?: string
-  reviewedAt?: string
-  reviewNotes?: string
-  rejectionReason?: string
-  invoiceId?: string
+  technicalScoreJson?: any
+  reviewedById?: string | null
+  reviewedAt?: string | null
+  reviewNotes?: string | null
+  rejectionReason?: string | null
+  rejectionContentFingerprint?: string | null
+  invoiceId?: string | null
   submittedAt: string
   updatedAt: string
   items: QuotationItem[]
@@ -183,7 +195,7 @@ export interface Quotation {
     firstName: string
     lastName: string
     email: string
-  }
+  } | null
   invoice?: any
 }
 
@@ -191,17 +203,26 @@ export interface QuotationItem {
   id: string
   quotationId: string
   itemName: string
-  description: string
-  quantity: string
+  description?: string | null
+  quantity: string | number
   unit: string
-  unitPrice: string
-  totalPrice: string
+  unitPrice: string | number
+  totalPrice: string | number
   specifications?: any
-  brand?: string
-  model?: string
-  warranty?: string
+  brand?: string | null
+  model?: string | null
+  warranty?: string | null
   createdAt: string
   updatedAt: string
+}
+
+// Response shape for getQuotationsByRFQ — includes the RFQ snapshot alongside quotations
+export interface QuotationsByRFQResponse {
+  success: boolean
+  message?: string
+  data?: Quotation[]
+  rfq?: RFQ
+  count?: number
 }
 
 export interface SubmitQuotationRequest {
@@ -812,9 +833,10 @@ class ProcurementApiServiceV2 {
   /**
    * Get quotations for a specific RFQ
    * Required Role: PROC_MGR, PROC_OFF, or BUYER
+   * Response includes both `data` (quotations) and `rfq` (the RFQ with itemsSnapshot)
    */
-  async getQuotationsByRFQ(rfqNumber: string): Promise<ProcurementResponse<Quotation[]>> {
-    return apiClient.get<ProcurementResponse<Quotation[]>>(`/vendor-quotations/rfq/${rfqNumber}`)
+  async getQuotationsByRFQ(rfqNumber: string): Promise<QuotationsByRFQResponse> {
+    return apiClient.get<QuotationsByRFQResponse>(`/vendor-quotations/rfq/${rfqNumber}`)
   }
 
   /**

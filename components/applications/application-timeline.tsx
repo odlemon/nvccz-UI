@@ -968,6 +968,12 @@ export function ApplicationTimeline({
                                     </span>
                                   </div>
                                 )}
+                                {(latestApplication as any)?.screeningRejectionReason && (
+                                  <div className="mt-2 p-2 bg-red-50 border border-red-100 rounded-md">
+                                    <span className="text-xs font-semibold text-red-700 block mb-1">Rejection Reason:</span>
+                                    <p className="text-xs text-red-600">{(latestApplication as any).screeningRejectionReason}</p>
+                                  </div>
+                                )}
                                 <p className="text-xs text-muted-foreground mt-2">
                                   Assign an analyst to begin screening. Score &ge; 50 advances to Active DD; below 50 rejects at screening.
                                 </p>

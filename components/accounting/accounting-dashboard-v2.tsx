@@ -132,12 +132,11 @@ export function AccountingDashboardV2() {
     // No derived "growth" or "net margin" series are added — those weren't
     // part of the source payload and produced misleading lines.
     const chartData = dashboardData?.monthlyData || []
-    // The asset distribution / list uses the high-level summary breakdown (which now includes
-    // "other assets" categories like recoverable VAT, fixed-asset register overlap, short-term
-    // investments). Fall back to detailed if summary is unavailable.
+    // Assets list and distribution grid render the detailed account-level breakdown
+    // (per individual GL account). Falls back to summary if detailed is unavailable.
     const assetsSummaryData = dashboardData?.assets?.summary || []
     const assetsDetailedData = dashboardData?.assets?.detailed || []
-    const assetsGridData = assetsSummaryData.length > 0 ? assetsSummaryData : assetsDetailedData
+    const assetsGridData = assetsDetailedData.length > 0 ? assetsDetailedData : assetsSummaryData
     const liabilitiesEquityData = dashboardData?.liabilitiesEquity?.summary || []
     const expensesChartData = dashboardData?.expenses || []
 

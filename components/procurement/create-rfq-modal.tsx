@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
+import { DatePicker } from "@/components/ui/date-picker"
 import { FileText, DollarSign, Plus, Trash2, Building2, Calendar, Users } from "lucide-react"
 import { toast } from "sonner"
 import { useProcurementPermissions } from "@/lib/hooks/useProcurementPermissions"
@@ -348,22 +349,25 @@ export function CreateRFQModal({ isOpen, onClose, onSuccess, preSelectedRequisit
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="rfqDeadline">RFQ Deadline *</Label>
-                    <Input
-                      id="rfqDeadline"
-                      type="date"
-                      value={formData.rfqDeadline}
-                      onChange={(e) => setFormData(prev => ({ ...prev, rfqDeadline: e.target.value }))}
+                    <DatePicker
+                      value={formData.rfqDeadline ? new Date(formData.rfqDeadline) : undefined}
+                      onChange={(date) => setFormData(prev => ({
+                        ...prev,
+                        rfqDeadline: date ? date.toISOString().split('T')[0] : ''
+                      }))}
+                      placeholder="Select deadline"
                       className="rounded-lg"
-                      required
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="expectedDeliveryDate">Expected Delivery Date</Label>
-                    <Input
-                      id="expectedDeliveryDate"
-                      type="date"
-                      value={formData.expectedDeliveryDate}
-                      onChange={(e) => setFormData(prev => ({ ...prev, expectedDeliveryDate: e.target.value }))}
+                    <DatePicker
+                      value={formData.expectedDeliveryDate ? new Date(formData.expectedDeliveryDate) : undefined}
+                      onChange={(date) => setFormData(prev => ({
+                        ...prev,
+                        expectedDeliveryDate: date ? date.toISOString().split('T')[0] : ''
+                      }))}
+                      placeholder="Select delivery date"
                       className="rounded-lg"
                     />
                   </div>
