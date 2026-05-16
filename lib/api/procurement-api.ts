@@ -18,23 +18,62 @@ export interface ProcurementItem {
 
 export interface PurchaseOrder {
   id: string
-  purchaseOrderNumber: string
-  requisitionId?: string
+  poNumber: string
+  requisitionId?: string | null
+  quotationId?: string | null
   vendorId: string
-  status: 'DRAFT' | 'SENT' | 'ACKNOWLEDGED' | 'PARTIALLY_RECEIVED' | 'RECEIVED' | 'CANCELLED'
+  status: 'DRAFT' | 'SENT' | 'ACKNOWLEDGED' | 'PARTIALLY_RECEIVED' | 'RECEIVED' | 'BILLED' | 'PAID' | 'CANCELLED'
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'
+  subtotal?: string
+  taxAmount?: string
   totalAmount: string
   currencyId: string
+  orderDate?: string
   expectedDeliveryDate: string
-  shippingAddress: string
-  paymentTerms: string
-  deliveryTerms: string
+  actualDeliveryDate?: string | null
+  shippingAddress?: string | null
+  paymentTerms?: string | null
+  deliveryTerms?: string | null
+  sentAt?: string | null
+  approvedAt?: string | null
+  rejectionReason?: string | null
   createdAt: string
   updatedAt: string
   vendor: {
     id: string
     name: string
+    email?: string
+    phone?: string | null
   }
+  currency?: {
+    id: string
+    code: string
+    name: string
+    symbol: string
+  }
+  requisition?: {
+    id: string
+    requisitionNumber: string
+    title?: string
+  } | null
+  quotation?: {
+    id: string
+    quotationNumber: string
+    status?: string
+    rfqNumber?: string
+  } | null
+  createdBy?: {
+    id: string
+    firstName: string
+    lastName: string
+    email: string
+  }
+  approvedBy?: {
+    id: string
+    firstName: string
+    lastName: string
+    email: string
+  } | null
   items: ProcurementItem[]
   approvalRequest?: ApprovalRequest
 }
@@ -80,7 +119,7 @@ export interface ProcurementInvoice {
   }
   purchaseOrder?: {
     id: string
-    purchaseOrderNumber: string
+    poNumber: string
   } | null
   currency: {
     id: string
@@ -118,7 +157,7 @@ export interface GoodsReceivedNote {
   updatedAt: string
   purchaseOrder: {
     id: string
-    purchaseOrderNumber: string
+    poNumber: string
   }
   items: GRNItem[]
   approvalRequest?: ApprovalRequest

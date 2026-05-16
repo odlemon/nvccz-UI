@@ -244,7 +244,7 @@ export function CreateGRNModal({ isOpen, onClose, onSuccess, isInvestee, initial
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[75vw] !max-w-[75vw] sm:!max-w-[75vw] max-h-[92vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-2xl font-semibold flex items-center gap-2">
             <Package className="w-6 h-6" />
@@ -259,7 +259,7 @@ export function CreateGRNModal({ isOpen, onClose, onSuccess, isInvestee, initial
               <CardTitle className="text-lg">Receipt Information</CardTitle>
             </CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
+              <div className="space-y-1.5">
                 <Label htmlFor="purchaseOrderId">Purchase Order *</Label>
                 <Select
                   value={formData.purchaseOrderId}
@@ -273,8 +273,13 @@ export function CreateGRNModal({ isOpen, onClose, onSuccess, isInvestee, initial
                     {purchaseOrders.map(po => (
                       <SelectItem key={po.id} value={po.id}>
                         <div className="flex items-center gap-2">
-                          <FileText className="w-4 h-4" />
-                          {po.poNumber} - {po.vendorName}
+                          <FileText className="w-4 h-4 shrink-0" />
+                          <span className="truncate">
+                            {po.poNumber}
+                            {(po.vendor?.name || po.vendorName) && (
+                              <span className="text-gray-500"> — {po.vendor?.name || po.vendorName}</span>
+                            )}
+                          </span>
                         </div>
                       </SelectItem>
                     ))}
@@ -282,7 +287,7 @@ export function CreateGRNModal({ isOpen, onClose, onSuccess, isInvestee, initial
                 </Select>
               </div>
 
-              <div>
+              <div className="space-y-1.5">
                 <Label htmlFor="receivedDate">Received Date *</Label>
                 <Input
                   id="receivedDate"
@@ -293,7 +298,7 @@ export function CreateGRNModal({ isOpen, onClose, onSuccess, isInvestee, initial
                 />
               </div>
 
-              <div>
+              <div className="space-y-1.5">
                 <Label htmlFor="tolerancePercentage">Over-Delivery Tolerance (%)</Label>
                 <Input
                   id="tolerancePercentage"
@@ -338,95 +343,124 @@ export function CreateGRNModal({ isOpen, onClose, onSuccess, isInvestee, initial
                 items.map((item, index) => {
                   const sumMismatch = item.quantityAccepted + item.quantityRejected !== item.quantityReceived
                   return (
-                    <div key={item.purchaseOrderItemId || index} className="border rounded-lg p-4 space-y-4">
-                      <div className="flex items-center justify-between">
-                        <h4 className="font-medium flex items-center gap-2">
-                          <Package className="w-4 h-4" />
-                          {item.itemName}
-                          {item.unit && <span className="text-xs text-gray-500">({item.unit})</span>}
-                        </h4>
-                        <Badge className={qualityStatusColor(item.qualityStatus)}>
-                          {item.qualityStatus}
-                        </Badge>
-                      </div>
-
-                      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                        <div>
-                          <Label>Ordered</Label>
-                          <div className="flex items-center h-10 px-3 border rounded-md bg-gray-50">
-                            <span className="font-medium">{item.poQuantity}</span>
+                    <div
+                      key={item.purchaseOrderItemId || index}
+                      className="border rounded-xl bg-gray-50/40 overflow-hidden"
+                    >
+                      {/* Item header */}
+                      <div className="flex items-center justify-between gap-3 px-5 py-3 bg-white border-b">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+                            <Package className="w-4 h-4 text-blue-600" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-semibold text-gray-900 truncate">{item.itemName}</p>
+                            <p className="text-xs text-gray-500">
+                              Ordered: <span className="font-medium text-gray-700">{item.poQuantity}</span>
+                              {item.unit && <span className="ml-1">{item.unit}</span>}
+                            </p>
                           </div>
                         </div>
-                        <div>
-                          <Label>Received *</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            value={item.quantityReceived}
-                            onChange={(e) => {
-                              const received = parseInt(e.target.value) || 0
-                              updateItem(index, {
-                                quantityReceived: received,
-                                quantityAccepted: received,
-                                quantityRejected: 0,
-                              })
-                            }}
-                          />
-                        </div>
-                        <div>
-                          <Label>Accepted</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            max={item.quantityReceived}
-                            value={item.quantityAccepted}
-                            onChange={(e) => {
-                              const accepted = parseInt(e.target.value) || 0
-                              const rejected = Math.max(0, item.quantityReceived - accepted)
-                              updateItem(index, { quantityAccepted: accepted, quantityRejected: rejected })
-                            }}
-                          />
-                        </div>
-                        <div>
-                          <Label>Rejected</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            max={item.quantityReceived}
-                            value={item.quantityRejected}
-                            onChange={(e) => {
-                              const rejected = parseInt(e.target.value) || 0
-                              const accepted = Math.max(0, item.quantityReceived - rejected)
-                              updateItem(index, { quantityRejected: rejected, quantityAccepted: accepted })
-                            }}
-                          />
-                        </div>
-                        <div>
-                          <Label>Quality Status</Label>
-                          <Select
-                            value={item.qualityStatus}
-                            onValueChange={(value: QualityStatus) =>
-                              updateItem(index, { qualityStatus: value })
-                            }
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="PASSED">Passed</SelectItem>
-                              <SelectItem value="PARTIAL">Partial</SelectItem>
-                              <SelectItem value="FAILED">Failed</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
+                        <Badge className={qualityStatusColor(item.qualityStatus)}>{item.qualityStatus}</Badge>
                       </div>
 
-                      {sumMismatch && (
-                        <p className="text-xs text-red-600 flex items-center gap-1">
-                          <AlertCircle className="w-3 h-3" />
-                          Accepted + rejected ({item.quantityAccepted + item.quantityRejected}) does not match received ({item.quantityReceived})
-                        </p>
-                      )}
+                      {/* Quantities row */}
+                      <div className="px-5 py-4 space-y-4">
+                        <div>
+                          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                            Quantities
+                          </p>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            <div className="space-y-1.5">
+                              <Label className="text-xs text-gray-500">Ordered</Label>
+                              <div className="flex items-center h-10 px-3 border rounded-md bg-gray-100 text-gray-700">
+                                <span className="font-medium">{item.poQuantity}</span>
+                              </div>
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label className="text-xs text-gray-500">Received *</Label>
+                              <Input
+                                type="number"
+                                min="0"
+                                value={item.quantityReceived}
+                                onChange={(e) => {
+                                  const received = parseInt(e.target.value) || 0
+                                  updateItem(index, {
+                                    quantityReceived: received,
+                                    quantityAccepted: received,
+                                    quantityRejected: 0,
+                                  })
+                                }}
+                                className="bg-white"
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label className="text-xs text-gray-500">Accepted</Label>
+                              <Input
+                                type="number"
+                                min="0"
+                                max={item.quantityReceived}
+                                value={item.quantityAccepted}
+                                onChange={(e) => {
+                                  const accepted = parseInt(e.target.value) || 0
+                                  const rejected = Math.max(0, item.quantityReceived - accepted)
+                                  updateItem(index, { quantityAccepted: accepted, quantityRejected: rejected })
+                                }}
+                                className="bg-white"
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label className="text-xs text-gray-500">Rejected</Label>
+                              <Input
+                                type="number"
+                                min="0"
+                                max={item.quantityReceived}
+                                value={item.quantityRejected}
+                                onChange={(e) => {
+                                  const rejected = parseInt(e.target.value) || 0
+                                  const accepted = Math.max(0, item.quantityReceived - rejected)
+                                  updateItem(index, { quantityRejected: rejected, quantityAccepted: accepted })
+                                }}
+                                className="bg-white"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Quality Status row */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-gray-200">
+                          <div className="space-y-1.5">
+                            <Label className="text-xs text-gray-500">Quality Status</Label>
+                            <Select
+                              value={item.qualityStatus}
+                              onValueChange={(value: QualityStatus) =>
+                                updateItem(index, { qualityStatus: value })
+                              }
+                            >
+                              <SelectTrigger className="bg-white">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="PASSED">Passed</SelectItem>
+                                <SelectItem value="PARTIAL">Partial</SelectItem>
+                                <SelectItem value="FAILED">Failed</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <p className="text-[11px] text-gray-500">
+                              Auto-derived from quantities — override if needed.
+                            </p>
+                          </div>
+                        </div>
+
+                        {sumMismatch && (
+                          <div className="flex items-start gap-2 p-2.5 bg-red-50 border border-red-200 rounded-md">
+                            <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                            <p className="text-xs text-red-700">
+                              Accepted + Rejected ({item.quantityAccepted + item.quantityRejected}) does not match Received ({item.quantityReceived})
+                            </p>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )
                 })

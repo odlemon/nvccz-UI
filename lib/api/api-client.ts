@@ -1,6 +1,34 @@
 // API Client with Authentication Interceptor
 import { getAuthToken, clearAuthCookies } from '@/lib/utils/cookies'
 
+// Public route prefixes — pages that are reachable without authentication.
+// When an API call fails with 401 on one of these pages we must NOT redirect
+// to /login (the visitor is an unauthenticated vendor / external user — bouncing
+// them to /login would just lose their context). Mirrors middleware passThroughRoutes.
+const PUBLIC_ROUTE_PREFIXES = [
+  '/login',
+  '/register',
+  '/forgot-password',
+  '/reset-password',
+  '/verify-email',
+  '/permissions-matrix',
+  '/events/rsvp',
+  '/events/public',
+  '/vendor/quotation/submit',
+  '/vendor/invoice/submit',
+  '/vendor-quote',
+  '/vendor-portal',
+  '/public-tenders',
+  '/applications/form',
+  '/vendor-quotations',
+]
+
+const isOnPublicRoute = (): boolean => {
+  if (typeof window === 'undefined') return false
+  const path = window.location.pathname
+  return PUBLIC_ROUTE_PREFIXES.some((prefix) => path.startsWith(prefix))
+}
+
 // API Response interface
 interface ApiResponse<T = any> {
   success: boolean
@@ -49,40 +77,34 @@ class ApiClient {
   private async handleResponse<T>(response: Response, options?: RequestInit & { responseType?: string }): Promise<T> {
     // Handle unauthorized responses - check both status and response body
     if (response.status === 401) {
+      const onPublic = isOnPublicRoute()
+      let errorData: any
       try {
-        const errorData = await response.json()
-        
-        // Clear authentication data
-        clearAuthCookies()
-        if (typeof window !== 'undefined' && localStorage) {
-          localStorage.removeItem('token')
-          localStorage.removeItem('user')
-        }
-
-        // Redirect to login
-        if (typeof window !== 'undefined') {
-          window.location.href = '/login'
-        }
-
-        throw new ApiError(
-          errorData.message || 'Unauthorized - Please login again',
-          401,
-          errorData
-        )
-      } catch (parseError) {
-        // If JSON parsing fails, still handle as unauthorized
-        clearAuthCookies()
-        if (typeof window !== 'undefined' && localStorage) {
-          localStorage.removeItem('token')
-          localStorage.removeItem('user')
-        }
-        
-        if (typeof window !== 'undefined') {
-          window.location.href = '/login'
-        }
-
-        throw new ApiError('Unauthorized - Please login again', 401)
+        errorData = await response.json()
+      } catch {
+        errorData = { message: 'Unauthorized' }
       }
+
+      // Only clear session and redirect when the visitor is *inside* the
+      // authenticated app. On public pages (vendor submission forms, public
+      // tenders, etc.) a 401 just means the called endpoint requires auth;
+      // we must not bounce the vendor to /login.
+      if (!onPublic) {
+        clearAuthCookies()
+        if (typeof window !== 'undefined' && localStorage) {
+          localStorage.removeItem('token')
+          localStorage.removeItem('user')
+        }
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login'
+        }
+      }
+
+      throw new ApiError(
+        errorData.message || 'Unauthorized - Please login again',
+        401,
+        errorData
+      )
     }
 
     // Handle other HTTP errors
@@ -94,14 +116,13 @@ class ApiClient {
         errorData = { message: `HTTP error! status: ${response.status}` }
       }
 
-      // Check if error message indicates unauthorized
-      if (errorData.message?.toLowerCase().includes('unauthorized')) {
+      // Check if error message indicates unauthorized — same public-route guard.
+      if (errorData.message?.toLowerCase().includes('unauthorized') && !isOnPublicRoute()) {
         clearAuthCookies()
         if (typeof window !== 'undefined' && localStorage) {
           localStorage.removeItem('token')
           localStorage.removeItem('user')
         }
-        
         if (typeof window !== 'undefined') {
           window.location.href = '/login'
         }

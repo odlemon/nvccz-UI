@@ -1,14 +1,14 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useAppDispatch } from "@/lib/store"
 import { sendPurchaseOrder, convertPOToBill } from "@/lib/store/slices/procurementV2Slice"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { PurchaseOrder } from "@/lib/api/procurement-api-v2"
+import { PurchaseOrder } from "@/lib/api/procurement-api"
 import { procurementApiV2 } from "@/lib/api/procurement-api-v2"
 import { PurchaseOrderTimeline } from "./purchase-order-timeline"
 import { Loader2, DollarSign, Calendar, MapPin, Send, Download, RotateCcw, Trash2, Package, FileText, Clock } from "lucide-react"
@@ -22,18 +22,70 @@ interface PODrawerContentProps {
   onCreateGRN?: (poId: string) => void
 }
 
-export function PODrawerContent({ po, onSuccess, onCreateGRN }: PODrawerContentProps) {
+export function PODrawerContent({ po: initialPo, onSuccess, onCreateGRN }: PODrawerContentProps) {
   const dispatch = useAppDispatch()
   const { permissions } = useProcurementPermissions()
+  const [po, setPo] = useState<PurchaseOrder>(initialPo)
+  const [loadingPO, setLoadingPO] = useState(false)
   const [sendingPO, setSendingPO] = useState(false)
   const [convertingBill, setConvertingBill] = useState(false)
   const [grnLoading, setGrnLoading] = useState(false)
+  const [poRefreshCounter, setPoRefreshCounter] = useState(0)
+
+  const refreshPO = async () => {
+    if (!po.id) return
+    try {
+      const response = await procurementApiV2.getPurchaseOrderById(po.id)
+      if (response.success && response.data) {
+        setPo(response.data as any)
+        setPoRefreshCounter((c) => c + 1)
+      }
+    } catch (_e) {
+      // silent — caller already toasts
+    }
+  }
+
+  // Fetch the latest single PO from the API on open / id change so the drawer
+  // always shows fresh, fully-populated data (nested vendor / currency / items / requisition / quotation).
+  useEffect(() => {
+    let cancelled = false
+    const fetchSinglePO = async () => {
+      if (!initialPo?.id) return
+      setLoadingPO(true)
+      try {
+        const response = await procurementApiV2.getPurchaseOrderById(initialPo.id)
+        if (cancelled) return
+        if (response.success && response.data) {
+          setPo(response.data as any)
+        }
+      } catch (error: any) {
+        if (!cancelled) {
+          toast.error('Failed to load purchase order', {
+            description: typeof error === 'string' ? error : error?.message,
+          })
+        }
+      } finally {
+        if (!cancelled) setLoadingPO(false)
+      }
+    }
+    setPo(initialPo)
+    fetchSinglePO()
+    return () => { cancelled = true }
+  }, [initialPo?.id])
+
+  const currencyCode = po.currency?.code || 'USD'
+  const currencySymbol = po.currency?.symbol || ''
+  const formatAmount = (raw: string | number | null | undefined) => {
+    const n = typeof raw === 'number' ? raw : parseFloat((raw as string) || '0')
+    return `${currencySymbol || currencyCode + ' '}${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  }
 
   const handleSendPO = async () => {
     setSendingPO(true)
     try {
       await dispatch(sendPurchaseOrder(po.id)).unwrap()
       toast.success('PO sent to vendor successfully')
+      await refreshPO()
       onSuccess?.()
     } catch (error: any) {
       const description = typeof error === 'string' ? error : error?.message || 'Failed to send PO'
@@ -64,6 +116,7 @@ export function PODrawerContent({ po, onSuccess, onCreateGRN }: PODrawerContentP
     try {
       await dispatch(convertPOToBill(po.id)).unwrap()
       toast.success('PO converted to bill successfully')
+      await refreshPO()
       onSuccess?.()
     } catch (error: any) {
       const description = typeof error === 'string' ? error : error?.message || 'Failed to convert to bill'
@@ -102,38 +155,122 @@ export function PODrawerContent({ po, onSuccess, onCreateGRN }: PODrawerContentP
     }
   }
 
+  if (loadingPO && !po.items?.length) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+        <span className="ml-3 text-sm text-gray-500">Loading purchase order...</span>
+      </div>
+    )
+  }
+
+  const tabTriggerCls =
+    "flex items-center gap-2 px-0 pb-3 bg-transparent shadow-none rounded-none border-b-2 border-transparent transition-all " +
+    "data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600"
+
   return (
-    <Tabs defaultValue="details" className="w-full">
-      <TabsList className="flex items-center justify-start gap-8 bg-transparent border-b rounded-none h-12 w-full px-0 mb-6">
-        <TabsTrigger
-          value="details"
-          className="flex items-center gap-2 px-0 pb-3 data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 rounded-none border-b-2 border-transparent transition-all"
+    <div className="w-full space-y-4">
+      {/* Top-right action row */}
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        {po.status === 'DRAFT' && permissions.canCreatePurchaseOrder && (
+          <Button
+            onClick={handleSendPO}
+            disabled={sendingPO}
+            variant="gradient-info"
+            className="gap-2 rounded-full h-9 px-4 shadow-sm"
+          >
+            {sendingPO ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Sending...
+              </>
+            ) : (
+              <>
+                <Send className="w-4 h-4" />
+                Send to Vendor
+              </>
+            )}
+          </Button>
+        )}
+
+        {(po.status === 'SENT' || po.status === 'PARTIALLY_RECEIVED') && permissions.canCreateGRN && (
+          <Button
+            onClick={() => onCreateGRN?.(po.id)}
+            variant="gradient-create"
+            className="gap-2 rounded-full h-9 px-4 shadow-sm"
+          >
+            <Package className="w-4 h-4" />
+            Create GRN
+          </Button>
+        )}
+
+        {po.status === 'RECEIVED' && permissions.canCreatePurchaseOrder && (
+          <Button
+            onClick={handleConvertToBill}
+            disabled={convertingBill}
+            variant="gradient-create"
+            className="gap-2 rounded-full h-9 px-4 shadow-sm"
+          >
+            {convertingBill ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Converting...
+              </>
+            ) : (
+              <>
+                <DollarSign className="w-4 h-4" />
+                Convert to Bill
+              </>
+            )}
+          </Button>
+        )}
+
+        {po.status === 'RECEIVED' && permissions.canCreatePurchaseOrder && (
+          <Button
+            onClick={handleGRNReturn}
+            disabled={grnLoading}
+            variant="gradient-danger"
+            className="gap-2 rounded-full h-9 px-4 shadow-sm"
+          >
+            {grnLoading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Processing...
+              </>
+            ) : (
+              <>
+                <RotateCcw className="w-4 h-4" />
+                Return to Vendor
+              </>
+            )}
+          </Button>
+        )}
+
+        <Button
+          onClick={handleDownloadPDF}
+          variant="gradient-info"
+          className="gap-2 rounded-full h-9 px-4 shadow-sm"
         >
-          <FileText className="w-5 h-5" />
-          <span className="font-medium">Details</span>
-        </TabsTrigger>
-        <TabsTrigger
-          value="lines"
-          className="flex items-center gap-2 px-0 pb-3 data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 rounded-none border-b-2 border-transparent transition-all"
-        >
-          <Package className="w-5 h-5" />
-          <span className="font-medium">Line Items</span>
-        </TabsTrigger>
-        <TabsTrigger
-          value="timeline"
-          className="flex items-center gap-2 px-0 pb-3 data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 rounded-none border-b-2 border-transparent transition-all"
-        >
-          <Clock className="w-5 h-5" />
-          <span className="font-medium">Timeline</span>
-        </TabsTrigger>
-        <TabsTrigger
-          value="actions"
-          className="flex items-center gap-2 px-0 pb-3 data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 rounded-none border-b-2 border-transparent transition-all"
-        >
-          <Send className="w-5 h-5" />
-          <span className="font-medium">Actions</span>
-        </TabsTrigger>
-      </TabsList>
+          <Download className="w-4 h-4" />
+          Export PDF
+        </Button>
+      </div>
+
+      <Tabs defaultValue="details" className="w-full">
+        <TabsList className="flex items-center justify-start gap-8 bg-transparent border-b rounded-none h-12 w-full px-0 mb-6">
+          <TabsTrigger value="details" className={tabTriggerCls}>
+            <FileText className="w-5 h-5" />
+            <span className="font-medium">Details</span>
+          </TabsTrigger>
+          <TabsTrigger value="lines" className={tabTriggerCls}>
+            <Package className="w-5 h-5" />
+            <span className="font-medium">Line Items</span>
+          </TabsTrigger>
+          <TabsTrigger value="timeline" className={tabTriggerCls}>
+            <Clock className="w-5 h-5" />
+            <span className="font-medium">Timeline</span>
+          </TabsTrigger>
+        </TabsList>
 
       {/* Details Tab */}
       <TabsContent value="details" className="space-y-4">
@@ -155,10 +292,29 @@ export function PODrawerContent({ po, onSuccess, onCreateGRN }: PODrawerContentP
               <div className="col-span-2">
                 <label className="text-sm font-medium text-gray-500">Vendor</label>
                 <div className="mt-1 space-y-1">
-                  <p className="font-medium text-gray-900">{po.vendorName || 'Unknown Vendor'}</p>
-                  {po.vendorEmail && <p className="text-sm text-gray-600">{po.vendorEmail}</p>}
+                  <p className="font-medium text-gray-900">{po.vendor?.name || 'Unknown Vendor'}</p>
+                  {po.vendor?.email && <p className="text-sm text-gray-600">{po.vendor.email}</p>}
+                  {po.vendor?.phone && <p className="text-sm text-gray-600">{po.vendor.phone}</p>}
                 </div>
               </div>
+              {po.requisition && (
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Requisition</label>
+                  <p className="mt-1 text-gray-700 font-mono text-sm">{po.requisition.requisitionNumber}</p>
+                  {po.requisition.title && (
+                    <p className="text-xs text-gray-500">{po.requisition.title}</p>
+                  )}
+                </div>
+              )}
+              {po.quotation && (
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Quotation</label>
+                  <p className="mt-1 text-gray-700 font-mono text-sm">{po.quotation.quotationNumber}</p>
+                  {po.quotation.rfqNumber && (
+                    <p className="text-xs text-gray-500">RFQ: {po.quotation.rfqNumber}</p>
+                  )}
+                </div>
+              )}
               <div>
                 <label className="text-sm font-medium text-gray-500 flex items-center gap-2">
                   <Calendar className="w-4 h-4" />
@@ -189,18 +345,46 @@ export function PODrawerContent({ po, onSuccess, onCreateGRN }: PODrawerContentP
               <div className="col-span-2">
                 <label className="text-sm font-medium text-gray-500 flex items-center gap-2">
                   <MapPin className="w-4 h-4" />
-                  Delivery Address
+                  Shipping Address
                 </label>
-                <p className="mt-1 text-gray-700">{po.deliveryAddress || '-'}</p>
+                <p className="mt-1 text-gray-700">{po.shippingAddress || '-'}</p>
               </div>
+              {(po.paymentTerms || po.deliveryTerms) && (
+                <>
+                  {po.paymentTerms && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">Payment Terms</label>
+                      <p className="mt-1 text-gray-700">{po.paymentTerms}</p>
+                    </div>
+                  )}
+                  {po.deliveryTerms && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">Delivery Terms</label>
+                      <p className="mt-1 text-gray-700">{po.deliveryTerms}</p>
+                    </div>
+                  )}
+                </>
+              )}
               <div className="col-span-2">
                 <label className="text-sm font-medium text-gray-500 flex items-center gap-2">
                   <DollarSign className="w-4 h-4" />
                   Total Amount
                 </label>
-                <div className="mt-1 flex items-baseline gap-2">
-                  <p className="text-2xl font-bold text-gray-900">
-                    {po.currencyCode || 'USD'} {parseFloat(po.totalAmount || '0').toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                <div className="mt-1 space-y-1">
+                  {po.subtotal && (
+                    <div className="flex justify-between text-sm text-gray-600 max-w-xs">
+                      <span>Subtotal</span>
+                      <span>{formatAmount(po.subtotal)}</span>
+                    </div>
+                  )}
+                  {po.taxAmount && (
+                    <div className="flex justify-between text-sm text-gray-600 max-w-xs">
+                      <span>Tax</span>
+                      <span>{formatAmount(po.taxAmount)}</span>
+                    </div>
+                  )}
+                  <p className="text-2xl font-bold text-gray-900 pt-1">
+                    {currencyCode} {parseFloat(po.totalAmount || '0').toLocaleString('en-US', { minimumFractionDigits: 2 })}
                   </p>
                 </div>
               </div>
@@ -224,7 +408,7 @@ export function PODrawerContent({ po, onSuccess, onCreateGRN }: PODrawerContentP
                       <TableHead>Unit</TableHead>
                       <TableHead className="text-right">Unit Price</TableHead>
                       <TableHead className="text-right">Subtotal</TableHead>
-                      {po.status === 'DRAFT' && permissions.canUpdatePO && <TableHead className="w-[50px]">Action</TableHead>}
+                      {po.status === 'DRAFT' && permissions.canUpdatePurchaseOrder && <TableHead className="w-[50px]">Action</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -240,12 +424,12 @@ export function PODrawerContent({ po, onSuccess, onCreateGRN }: PODrawerContentP
                         <TableCell className="text-center font-medium">{item.quantity}</TableCell>
                         <TableCell>{item.unit}</TableCell>
                         <TableCell className="text-right">
-                          {po.currencyCode || 'USD'} {parseFloat(item.unitPrice || '0').toLocaleString()}
+                          {currencyCode} {parseFloat(String(item.unitPrice ?? '0')).toLocaleString()}
                         </TableCell>
                         <TableCell className="text-right font-medium">
-                          {po.currencyCode || 'USD'} {(parseFloat(item.unitPrice || '0') * parseFloat(item.quantity || '0')).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                          {currencyCode} {(parseFloat(String(item.unitPrice ?? '0')) * parseFloat(String(item.quantity ?? '0'))).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                         </TableCell>
-                        {po.status === 'DRAFT' && permissions.canUpdatePO && (
+                        {po.status === 'DRAFT' && permissions.canUpdatePurchaseOrder && (
                           <TableCell>
                             <Button
                               variant="ghost"
@@ -273,108 +457,9 @@ export function PODrawerContent({ po, onSuccess, onCreateGRN }: PODrawerContentP
 
       {/* Timeline Tab */}
       <TabsContent value="timeline" className="space-y-4">
-        <PurchaseOrderTimeline poId={po.id} />
+        <PurchaseOrderTimeline poId={po.id} refreshTrigger={poRefreshCounter} />
       </TabsContent>
-
-      {/* Actions Tab */}
-      <TabsContent value="actions" className="space-y-4">
-        <Card>
-          <CardContent className="pt-6 space-y-3">
-            {po.status === 'DRAFT' && permissions.canCreatePO && (
-              <Button
-                onClick={handleSendPO}
-                disabled={sendingPO}
-                variant="gradient-info"
-                className="w-full gap-2 rounded-full h-10 px-6 shadow-sm"
-              >
-                {sendingPO ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Sending...
-                  </>
-                ) : (
-                  <>
-                    <Send className="w-4 h-4" />
-                    Send PO to Vendor
-                  </>
-                )}
-              </Button>
-            )}
-
-            <Button
-              onClick={handleDownloadPDF}
-              variant="outline"
-              className="w-full gap-2 rounded-full h-10 px-6"
-            >
-              <Download className="w-4 h-4" />
-              Download PDF
-            </Button>
-
-            {(po.status === 'SENT' || po.status === 'PARTIALLY_RECEIVED') && permissions.canCreateGRN && (
-              <Button
-                onClick={() => onCreateGRN?.(po.id)}
-                variant="gradient-create"
-                className="w-full gap-2 rounded-full h-10 px-6 shadow-sm"
-              >
-                <Package className="w-4 h-4" />
-                Create GRN
-              </Button>
-            )}
-
-            {po.status === 'RECEIVED' && permissions.canCreatePO && (
-              <Button
-                onClick={handleConvertToBill}
-                disabled={convertingBill}
-                variant="outline"
-                className="w-full gap-2 rounded-full h-10 px-6"
-              >
-                {convertingBill ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Converting...
-                  </>
-                ) : (
-                  <>
-                    <DollarSign className="w-4 h-4" />
-                    Convert to Bill
-                  </>
-                )}
-              </Button>
-            )}
-
-            {po.status === 'RECEIVED' && permissions.canCreatePO && (
-              <Button
-                onClick={handleGRNReturn}
-                disabled={grnLoading}
-                variant="outline"
-                className="w-full gap-2 text-red-600 border-red-300 hover:bg-red-50 rounded-full h-10 px-6"
-              >
-                {grnLoading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    <RotateCcw className="w-4 h-4" />
-                    Return to Vendor
-                  </>
-                )}
-              </Button>
-            )}
-
-            {Object.values({ sendingPO, convertingBill, grnLoading }).every(v => !v) && (
-              <div className="text-sm text-gray-500 text-center pt-4">
-                {po.status === 'DRAFT' && 'Send this PO to the vendor'}
-                {po.status === 'SENT' && 'Awaiting vendor acknowledgment and goods delivery'}
-                {po.status === 'RECEIVED' && 'Convert to bill or return to vendor'}
-                {po.status === 'PAID' && 'This PO is fully paid'}
-                {po.status === 'CANCELLED' && 'This PO has been cancelled'}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </TabsContent>
-    </Tabs>
+      </Tabs>
+    </div>
   )
 }

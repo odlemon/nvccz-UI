@@ -124,7 +124,7 @@ export function InvoiceDrawerContent({ invoice, onUpdate, onProcessPayment, onCl
             </div>
             {invoice.purchaseOrder && (
               <p className="text-sm text-gray-600">
-                PO: {invoice.purchaseOrder.purchaseOrderNumber}
+                PO: {invoice.purchaseOrder.poNumber}
               </p>
             )}
           </div>

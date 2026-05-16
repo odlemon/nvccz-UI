@@ -511,8 +511,8 @@ export const getRFQClarifications = createAsyncThunk('procurementV2/getRFQClarif
 
 export const postRFQClarification = createAsyncThunk(
   'procurementV2/postRFQClarification',
-  async ({ rfqId, clarificationId, answer }: { rfqId: string; clarificationId?: string; answer: string }) => {
-    const response = await procurementApiV2.postRFQClarification(rfqId, { clarificationId, answer })
+  async ({ rfqId, body, attachmentUrl }: { rfqId: string; body: string; attachmentUrl?: string }) => {
+    const response = await procurementApiV2.postRFQClarification(rfqId, { body, attachmentUrl })
     return response.data
   }
 )

@@ -81,7 +81,7 @@ export function PurchaseOrders() {
   }
 
   const handleDelete = async (order: PurchaseOrder) => {
-    if (!confirm(`Are you sure you want to delete purchase order ${order.purchaseOrderNumber}?`)) {
+    if (!confirm(`Are you sure you want to delete purchase order ${order.poNumber}?`)) {
       return
     }
 
@@ -200,7 +200,7 @@ export function PurchaseOrders() {
 
   const columns: Column<PurchaseOrder>[] = [
     {
-      key: 'purchaseOrderNumber',
+      key: 'poNumber',
       label: 'PO Number',
       sortable: true,
       render: (value, row) => (
@@ -213,11 +213,15 @@ export function PurchaseOrders() {
     {
       key: 'vendor',
       label: 'Vendor',
-      sortable: true,
       render: (value) => (
         <div className="flex items-center gap-2">
-          <Building className="w-4 h-4 text-gray-600" />
-          <span>{value?.name || 'N/A'}</span>
+          <Building className="w-4 h-4 text-gray-600 shrink-0" />
+          <div className="min-w-0">
+            <p className="font-medium truncate">{value?.name || 'N/A'}</p>
+            {value?.email && (
+              <p className="text-xs text-gray-500 truncate">{value.email}</p>
+            )}
+          </div>
         </div>
       )
     },
@@ -337,46 +341,24 @@ export function PurchaseOrders() {
       {/* Status Tabs */}
       <Tabs value={selectedTab} onValueChange={setSelectedTab} className="w-full">
         <TabsList className="flex items-center justify-start gap-8 bg-transparent border-b rounded-none h-12 w-full px-0">
-          <TabsTrigger 
-            value="all" 
-            className="flex items-center gap-2 px-0 pb-3 data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 rounded-none border-b-2 border-transparent transition-all"
-          >
-            <div className="flex items-center gap-2">
-              <FileText className="w-5 h-5" />
-              <span className="font-medium">All Orders</span>
-            </div>
-            <Badge variant="secondary" className="ml-1 bg-gray-100 text-gray-600 border-none">{getTabCount('all')}</Badge>
-          </TabsTrigger>
-          <TabsTrigger 
-            value="sent" 
-            className="flex items-center gap-2 px-0 pb-3 data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 rounded-none border-b-2 border-transparent transition-all"
-          >
-            <div className="flex items-center gap-2">
-              <Send className="w-5 h-5" />
-              <span className="font-medium">Sent</span>
-            </div>
-            <Badge variant="secondary" className="ml-1 bg-gray-100 text-gray-600 border-none">{getTabCount('sent')}</Badge>
-          </TabsTrigger>
-          <TabsTrigger 
-            value="received" 
-            className="flex items-center gap-2 px-0 pb-3 data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 rounded-none border-b-2 border-transparent transition-all"
-          >
-            <div className="flex items-center gap-2">
-              <Truck className="w-5 h-5" />
-              <span className="font-medium">Received</span>
-            </div>
-            <Badge variant="secondary" className="ml-1 bg-gray-100 text-gray-600 border-none">{getTabCount('received')}</Badge>
-          </TabsTrigger>
-          <TabsTrigger 
-            value="paid" 
-            className="flex items-center gap-2 px-0 pb-3 data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 rounded-none border-b-2 border-transparent transition-all"
-          >
-            <div className="flex items-center gap-2">
-              <CiDollar className="w-5 h-5" />
-              <span className="font-medium">Paid</span>
-            </div>
-            <Badge variant="secondary" className="ml-1 bg-gray-100 text-gray-600 border-none">{getTabCount('paid')}</Badge>
-          </TabsTrigger>
+          {([
+            { value: 'all', icon: FileText, label: 'All Orders', count: getTabCount('all') },
+            { value: 'sent', icon: Send, label: 'Sent', count: getTabCount('sent') },
+            { value: 'received', icon: Truck, label: 'Received', count: getTabCount('received') },
+            { value: 'paid', icon: CiDollar, label: 'Paid', count: getTabCount('paid') },
+          ] as const).map(({ value, icon: Icon, label, count }) => (
+            <TabsTrigger
+              key={value}
+              value={value}
+              className="flex items-center gap-2 px-0 pb-3 bg-transparent shadow-none rounded-none border-b-2 border-transparent transition-all data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600"
+            >
+              <div className="flex items-center gap-2">
+                <Icon className="w-5 h-5" />
+                <span className="font-medium">{label}</span>
+              </div>
+              <Badge variant="secondary" className="ml-1 bg-gray-100 text-gray-600 border-none">{count}</Badge>
+            </TabsTrigger>
+          ))}
         </TabsList>
 
         <TabsContent value={selectedTab} className="space-y-6">
@@ -404,7 +386,7 @@ export function PurchaseOrders() {
       <ProcurementDrawer
         open={isDrawerOpen}
         onOpenChange={setIsDrawerOpen}
-        title={`Purchase Order: ${viewingOrder?.purchaseOrderNumber || ''}`}
+        title={`Purchase Order: ${viewingOrder?.poNumber || ''}`}
         description="View purchase order details and manage status"
         size="xl"
       >
@@ -453,7 +435,7 @@ export function PurchaseOrders() {
         open={isApprovalDialogOpen}
         onOpenChange={setIsApprovalDialogOpen}
         title="Send Purchase Order for Approval"
-        description={`Are you sure you want to send purchase order ${selectedOrderForApproval?.purchaseOrderNumber} for approval?`}
+        description={`Are you sure you want to send purchase order ${selectedOrderForApproval?.poNumber} for approval?`}
         loading={approvalLoading}
         onConfirm={async () => {
           if (!selectedOrderForApproval) return

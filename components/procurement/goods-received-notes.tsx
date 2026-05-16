@@ -27,6 +27,7 @@ export function GoodsReceivedNotes() {
   const [approvalLoading, setApprovalLoading] = useState(false)
   const [selectedGRNForApproval, setSelectedGRNForApproval] = useState<GoodsReceivedNote | null>(null)
   const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false)
+  const [rejectionReason, setRejectionReason] = useState('')
 
   const [filters, setFilters] = useState({
     status: 'all',
@@ -575,21 +576,28 @@ export function GoodsReceivedNotes() {
       {/* Approval Dialog */}
       <ApprovalDialog
         open={isApprovalDialogOpen}
-        onOpenChange={setIsApprovalDialogOpen}
+        onOpenChange={(o) => { setIsApprovalDialogOpen(o); if (!o) setSelectedGRNForApproval(null) }}
         title="Approve Goods Received Note"
         description={`Are you sure you want to approve GRN ${selectedGRNForApproval?.grnNumber}?`}
         loading={approvalLoading}
+        confirmLabel="Approve"
         onConfirm={async () => {
           if (!selectedGRNForApproval) return
           setApprovalLoading(true)
           try {
-            // TODO: Replace with actual API call
-            await new Promise(resolve => setTimeout(resolve, 1000))
-            toast.success('GRN approved successfully')
+            const response = await procurementApiV2.approveGRN(selectedGRNForApproval.id)
+            if (!response.success) {
+              throw new Error(response.message || 'Failed to approve GRN')
+            }
+            toast.success(`GRN ${selectedGRNForApproval.grnNumber} approved`)
             setIsApprovalDialogOpen(false)
+            setIsDrawerOpen(false)
+            setSelectedGRNForApproval(null)
             loadGoodsReceivedNotes()
-          } catch (error) {
-            toast.error('Failed to approve GRN')
+          } catch (error: any) {
+            toast.error('Failed to approve GRN', {
+              description: typeof error === 'string' ? error : error?.message,
+            })
           } finally {
             setApprovalLoading(false)
           }
@@ -599,21 +607,47 @@ export function GoodsReceivedNotes() {
       {/* Reject Dialog */}
       <ApprovalDialog
         open={isRejectDialogOpen}
-        onOpenChange={setIsRejectDialogOpen}
+        onOpenChange={(o) => {
+          setIsRejectDialogOpen(o)
+          if (!o) {
+            setSelectedGRNForApproval(null)
+            setRejectionReason('')
+          }
+        }}
         title="Reject Goods Received Note"
-        description={`Are you sure you want to reject GRN ${selectedGRNForApproval?.grnNumber}?`}
+        description={`Provide a reason for rejecting GRN ${selectedGRNForApproval?.grnNumber}. The vendor will be notified.`}
         loading={approvalLoading}
+        confirmLabel="Reject"
+        confirmVariant="gradient-danger"
+        reasonValue={rejectionReason}
+        onReasonChange={setRejectionReason}
+        reasonLabel="Rejection reason"
+        reasonPlaceholder="Explain why this GRN is being rejected..."
+        reasonRequired
         onConfirm={async () => {
           if (!selectedGRNForApproval) return
+          if (!rejectionReason.trim()) {
+            toast.error('Rejection reason is required')
+            return
+          }
           setApprovalLoading(true)
           try {
-            // TODO: Replace with actual API call
-            await new Promise(resolve => setTimeout(resolve, 1000))
-            toast.success('GRN rejected successfully')
+            const response = await procurementApiV2.rejectGRN(selectedGRNForApproval.id, {
+              rejectionReason: rejectionReason.trim(),
+            })
+            if (!response.success) {
+              throw new Error(response.message || 'Failed to reject GRN')
+            }
+            toast.success(`GRN ${selectedGRNForApproval.grnNumber} rejected`)
             setIsRejectDialogOpen(false)
+            setIsDrawerOpen(false)
+            setSelectedGRNForApproval(null)
+            setRejectionReason('')
             loadGoodsReceivedNotes()
-          } catch (error) {
-            toast.error('Failed to reject GRN')
+          } catch (error: any) {
+            toast.error('Failed to reject GRN', {
+              description: typeof error === 'string' ? error : error?.message,
+            })
           } finally {
             setApprovalLoading(false)
           }

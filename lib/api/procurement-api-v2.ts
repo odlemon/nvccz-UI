@@ -526,37 +526,86 @@ export interface InvoicePayment {
 }
 
 // RFQ Comparison & Clarifications
-export interface ComparisonMatrix {
-  rfqId: string
+export interface ComparisonScores {
+  rawTotal: number
+  normalizedTotalReporting: number
+  reportingCurrencyCode: string | null
+  fxRateUsed: number
+  vendorRating: number | null
+  technicalScore: number
+  technicalScoreJson: any | null
+  priceScore: number
+  compositeScore: number
+  priceWeight: number
+  technicalWeight: number
+}
+
+export interface ComparisonHighlight {
+  quotationNumber: string
   rfqNumber: string
-  items: Array<{
-    id: string
-    itemName: string
-    quantity: number
-    unit: string
+  vendorName: string
+  vendorEmail: string
+  currencyCode: string
+  status: string
+  subtotal: number
+  taxAmount: number
+  totalAmount: number
+  paymentTerms?: string | null
+  deliveryTerms?: string | null
+  deliveryTime?: string | null
+  normalizedTotalReporting: number
+  reportingCurrencyCode: string | null
+  vendorRating: number | null
+  technicalScore: number
+  compositeScore: number
+}
+
+export interface ComparisonMatrix {
+  rfq?: RFQ & {
+    priceWeight?: number
+    technicalWeight?: number
+    reportingCurrency?: string | null
+    awardedQuotationId?: string | null
+    awardRationale?: string | null
+  }
+  quotationCount?: number
+  reportingCurrencyId?: string | null
+  rows?: Array<{
+    quotation: Quotation
+    comparison: ComparisonScores
   }>
-  vendors: Array<{
-    id: string
-    quotationId: string
-    vendorName: string
-    vendorEmail: string
-    validUntil: string
-    currencyCode: string
-    itemPrices: Record<string, string>
-    totalPrice: string
-  }>
+  highlights?: {
+    lowestNormalizedCost: ComparisonHighlight | null
+    highestVendorRating: ComparisonHighlight | null
+    highestCompositeScore: ComparisonHighlight | null
+  }
+  // Sealed-bid state — kept optional for backwards compatibility.
+  sealed?: boolean
+  message?: string
+  closingAt?: string
 }
 
 export interface RFQClarification {
   id: string
-  rfqId: string
-  vendorId: string
-  vendorName: string
-  question: string
-  askedAt: string
-  answer?: string
-  answeredAt?: string
-  answeredBy?: string
+  procurementRfqId: string
+  authorType: 'STAFF' | 'VENDOR'
+  vendorId?: string | null
+  userId?: string | null
+  body: string
+  attachmentUrl?: string | null
+  createdAt: string
+  emailsSent?: number
+  vendor?: {
+    id: string
+    name?: string
+    email?: string
+  } | null
+  user?: {
+    id: string
+    firstName?: string
+    lastName?: string
+    email?: string
+  } | null
 }
 
 // Vendor Registration & KYC
@@ -916,15 +965,15 @@ class ProcurementApiServiceV2 {
   }
 
   /**
-   * Post a clarification to an RFQ (staff reply to vendor question or new clarification to all)
-   * If clarificationId is provided, replies to that specific question. Otherwise posts to all vendors.
+   * Post a clarification message on the RFQ thread (chat-style).
+   * All staff posts are sent to invited vendors via email.
    * Required Role: PROC_MGR, PROC_OFF, or BUYER
    */
-  async postRFQClarification(rfqId: string, data: { clarificationId?: string; answer: string }): Promise<ProcurementResponse<RFQClarification>> {
-    const endpoint = data.clarificationId
-      ? `/procurement/rfqs/${rfqId}/clarifications/${data.clarificationId}/reply`
-      : `/procurement/rfqs/${rfqId}/clarifications`
-    return apiClient.post<ProcurementResponse<RFQClarification>>(endpoint, { answer: data.answer })
+  async postRFQClarification(rfqId: string, data: { body: string; attachmentUrl?: string }): Promise<ProcurementResponse<RFQClarification>> {
+    return apiClient.post<ProcurementResponse<RFQClarification>>(
+      `/procurement/rfqs/${rfqId}/clarifications`,
+      data
+    )
   }
 
   /**
@@ -992,10 +1041,7 @@ class ProcurementApiServiceV2 {
    * Returns: Blob (PDF file)
    */
   async downloadPOPDF(id: string): Promise<Blob> {
-    const response = await fetch(`/api/procurement/purchase-orders/${id}/pdf`, {
-      headers: { 'Authorization': `Bearer ${document.cookie}` }
-    })
-    return response.blob()
+    return apiClient.get<Blob>(`/procurement/purchase-orders/${id}/pdf`, { responseType: 'blob' })
   }
 
   /**
@@ -1052,6 +1098,22 @@ class ProcurementApiServiceV2 {
    */
   async createGRN(data: any): Promise<ProcurementResponse<GoodsReceivedNote>> {
     return apiClient.post<ProcurementResponse<GoodsReceivedNote>>('/procurement/goods-received-notes', data)
+  }
+
+  /**
+   * Approve a GRN
+   * Required Role: PROC_MGR or PROC_OFF
+   */
+  async approveGRN(id: string, data?: { approvalNotes?: string }): Promise<ProcurementResponse<GoodsReceivedNote>> {
+    return apiClient.put<ProcurementResponse<GoodsReceivedNote>>(`/procurement/goods-received-notes/${id}/approve`, data ?? {})
+  }
+
+  /**
+   * Reject a GRN
+   * Required Role: PROC_MGR or PROC_OFF
+   */
+  async rejectGRN(id: string, data: { rejectionReason: string }): Promise<ProcurementResponse<GoodsReceivedNote>> {
+    return apiClient.put<ProcurementResponse<GoodsReceivedNote>>(`/procurement/goods-received-notes/${id}/reject`, data)
   }
 
   // ---- Applicant / Investee GRN endpoints (portfolio-scoped) ------------------

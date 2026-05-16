@@ -22,12 +22,12 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
   ChevronDown, ChevronUp, Building2, Mail, Phone, MapPin, Package, DollarSign,
   Calendar, Clock, Globe, Copy, Check, BarChart2, FileText, User, Hash, Truck,
-  StickyNote, Eye, EyeOff
+  StickyNote, Eye, EyeOff, Trophy, CheckCircle2, Loader2
 } from "lucide-react"
 import { format } from "date-fns"
 import { toast } from "sonner"
 import { useAppDispatch } from "@/lib/store"
-import { extendRFQDeadline } from "@/lib/store/slices/procurementV2Slice"
+import { extendRFQDeadline, awardRFQ } from "@/lib/store/slices/procurementV2Slice"
 
 interface RFQDrawerContentProps {
   rfq: RFQ
@@ -54,8 +54,8 @@ export function RFQDrawerContent({ rfq: rfqProp }: RFQDrawerContentProps) {
   const [extendDeadlineOpen, setExtendDeadlineOpen] = useState(false)
   const [newDeadline, setNewDeadline] = useState('')
   const [extendingDeadline, setExtendingDeadline] = useState(false)
-  const [matrixOpen, setMatrixOpen] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [awardingQuotationId, setAwardingQuotationId] = useState<string | null>(null)
 
   useEffect(() => {
     setRfq(rfqProp)
@@ -121,6 +121,22 @@ export function RFQDrawerContent({ rfq: rfqProp }: RFQDrawerContentProps) {
     }
   }
 
+  const handleAward = async (quotationId: string, vendorName: string) => {
+    if (!rfq.id) return
+    setAwardingQuotationId(quotationId)
+    try {
+      await dispatch(awardRFQ({ rfqId: rfq.id, quotationId })).unwrap()
+      toast.success(`RFQ awarded to ${vendorName}`)
+      // Refresh quotations and rfq so awarded status + reject reasons flow in.
+      await loadQuotations()
+    } catch (error: any) {
+      const description = typeof error === 'string' ? error : error?.message || 'Failed to award RFQ'
+      toast.error('Award failed', { description })
+    } finally {
+      setAwardingQuotationId(null)
+    }
+  }
+
   const handleCopyPublicLink = async () => {
     const publicLink = `${typeof window !== 'undefined' ? window.location.origin : ''}/public-tenders/${rfq.rfqNumber}`
     try {
@@ -160,9 +176,11 @@ export function RFQDrawerContent({ rfq: rfqProp }: RFQDrawerContentProps) {
 
   const isOpen = rfq.status === 'OPEN' || rfq.status === 'SENT'
 
+  const showComparisonTab = !!rfq.id && quotations.length > 0
+
   return (
     <Tabs defaultValue="details" className="w-full">
-      <TabsList className="grid w-full grid-cols-4">
+      <TabsList className={`grid w-full ${showComparisonTab ? 'grid-cols-5' : 'grid-cols-4'}`}>
         <TabsTrigger value="details">Details</TabsTrigger>
         <TabsTrigger value="items">
           Items
@@ -172,6 +190,12 @@ export function RFQDrawerContent({ rfq: rfqProp }: RFQDrawerContentProps) {
           Quotations
           <Badge variant="secondary" className="ml-2">{quotations.length}</Badge>
         </TabsTrigger>
+        {showComparisonTab && (
+          <TabsTrigger value="comparison" className="gap-1.5">
+            <BarChart2 className="w-4 h-4" />
+            Comparison
+          </TabsTrigger>
+        )}
         <TabsTrigger value="clarifications">Clarifications</TabsTrigger>
       </TabsList>
 
@@ -393,11 +417,6 @@ export function RFQDrawerContent({ rfq: rfqProp }: RFQDrawerContentProps) {
 
       {/* Quotations Tab */}
       <TabsContent value="quotations" className="space-y-4">
-        {quotations.length > 0 && (rfq.status === 'OPEN' || rfq.status === 'SENT' || rfq.status === 'CLOSED') && (
-          <Button onClick={() => setMatrixOpen(true)} variant="gradient-info" className="gap-2 rounded-full h-10 px-6 shadow-sm">
-            <BarChart2 className="w-4 h-4" /> View Comparison Matrix
-          </Button>
-        )}
         <Card>
           <CardContent className="pt-6">
             {loadingQuotations ? (
@@ -443,6 +462,41 @@ export function RFQDrawerContent({ rfq: rfqProp }: RFQDrawerContentProps) {
                               <p className="text-xs text-gray-500">Total</p>
                               <p className="font-bold text-green-700">{formatCurrency(quotation.totalAmount, quotation.currencyCode)}</p>
                             </div>
+                            {(() => {
+                              const awardedId = (rfq as any).awardedQuotationId as string | undefined | null
+                              const isAwarded = awardedId === quotation.id
+                              const isRejected = quotation.status === 'REJECTED'
+                              if (isAwarded) {
+                                return (
+                                  <Badge className="bg-emerald-100 text-emerald-800 gap-1 px-2 py-1">
+                                    <Trophy className="w-3 h-3" /> Awarded
+                                  </Badge>
+                                )
+                              }
+                              if (!awardedId && !isRejected && rfq.id) {
+                                const busy = awardingQuotationId === quotation.id
+                                return (
+                                  <Button
+                                    size="sm"
+                                    variant="gradient-create"
+                                    className="rounded-full h-8 px-3 text-xs shadow-sm"
+                                    onClick={() => handleAward(quotation.id, quotation.companyName || quotation.vendorName)}
+                                    disabled={!!awardingQuotationId}
+                                  >
+                                    {busy ? (
+                                      <>
+                                        <Loader2 className="w-3 h-3 mr-1 animate-spin" /> Awarding...
+                                      </>
+                                    ) : (
+                                      <>
+                                        <CheckCircle2 className="w-3 h-3 mr-1" /> Award
+                                      </>
+                                    )}
+                                  </Button>
+                                )
+                              }
+                              return null
+                            })()}
                             <CollapsibleTrigger asChild>
                               <Button variant="ghost" size="sm" onClick={() => toggleQuotation(quotation.id)} className="rounded-full h-9">
                                 {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
@@ -602,10 +656,14 @@ export function RFQDrawerContent({ rfq: rfqProp }: RFQDrawerContentProps) {
             )}
           </CardContent>
         </Card>
-        {rfq.id && (
-          <RFQComparisonMatrix rfqId={rfq.id} isOpen={matrixOpen} onClose={() => setMatrixOpen(false)} />
-        )}
       </TabsContent>
+
+      {/* Comparison Tab */}
+      {showComparisonTab && (
+        <TabsContent value="comparison" className="space-y-4">
+          <RFQComparisonMatrix rfqId={rfq.id!} />
+        </TabsContent>
+      )}
 
       {/* Clarifications Tab */}
       <TabsContent value="clarifications" className="space-y-4">

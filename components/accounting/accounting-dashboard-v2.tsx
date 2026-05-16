@@ -30,6 +30,7 @@ import {
     YAxis,
     CartesianGrid,
     Tooltip,
+    Legend,
     ResponsiveContainer,
     ComposedChart,
     Area,
@@ -129,9 +130,17 @@ export function AccountingDashboardV2() {
 
     // Charts plot only the KPIs the API actually returns:
     //   month, revenue, cogs, grossProfit, grossProfitPercent, netProfit.
-    // No derived "growth" or "net margin" series are added — those weren't
-    // part of the source payload and produced misleading lines.
-    const chartData = dashboardData?.monthlyData || []
+    // Net Profit % is derived (netProfit / revenue * 100) so the Net Profit chart
+    // can render a percentage line on its right Y axis to mirror the design.
+    const chartData = useMemo(() => {
+        const rows = dashboardData?.monthlyData || []
+        return rows.map((row: any) => {
+            const revenue = Number(row?.revenue) || 0
+            const netProfit = Number(row?.netProfit) || 0
+            const netProfitPercent = revenue !== 0 ? (netProfit / revenue) * 100 : 0
+            return { ...row, netProfitPercent }
+        })
+    }, [dashboardData?.monthlyData])
     // Assets list and distribution grid render the detailed account-level breakdown
     // (per individual GL account). Falls back to summary if detailed is unavailable.
     const assetsSummaryData = dashboardData?.assets?.summary || []
@@ -397,57 +406,89 @@ export function AccountingDashboardV2() {
                     {/* Operating Profit Chart */}
                     <Card className="bg-white border-none rounded-xl shadow-none overflow-hidden">
                         <CardHeader className="p-5 pb-2">
-                            <div className="flex items-center justify-between">
-                                <CardTitle className="text-lg font-semibold text-foreground">Operating Profit</CardTitle>
-                                <div className="flex items-center gap-4 text-[10px] text-muted-foreground font-bold uppercase tracking-wider">
-                                    <div className="flex items-center gap-1.5">
-                                        <div className="w-2.5 h-2.5 rounded-full bg-[#fbbf24]"></div>
-                                        <span>Profit</span>
-                                    </div>
-                                    <div className="flex items-center gap-1.5">
-                                        <div className="w-2.5 h-2.5 rounded-full bg-[#ef4444]"></div>
-                                        <span>COGS</span>
-                                    </div>
-                                    <div className="flex items-center gap-1.5">
-                                        <div className="w-2.5 h-2.5 rounded-full bg-[#10b981]"></div>
-                                        <span>Margin %</span>
-                                    </div>
-                                </div>
-                            </div>
+                            <CardTitle className="text-lg font-semibold text-foreground">Operating Profit</CardTitle>
                         </CardHeader>
                         <CardContent className="p-5 pt-2">
                             {chartData.length > 0 ? (
                             <ResponsiveContainer width="100%" height={300}>
-                                <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                                    <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} dy={10} />
-                                    <YAxis
-                                        yAxisId="left"
-                                        tick={{ fontSize: 11, fill: '#94a3b8' }}
+                                <ComposedChart
+                                    data={chartData}
+                                    margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                                    barGap={0}
+                                >
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                                    <XAxis
+                                        dataKey="month"
                                         axisLine={false}
                                         tickLine={false}
+                                        tick={{ fill: '#6b7280', fontSize: 12 }}
+                                    />
+                                    <YAxis
+                                        yAxisId="left"
+                                        axisLine={false}
+                                        tickLine={false}
+                                        tick={{ fill: '#6b7280', fontSize: 12 }}
                                         tickFormatter={(v) => `${currencySymbol}${(v / 1000000).toFixed(1)}M`}
                                     />
                                     <YAxis
                                         yAxisId="right"
                                         orientation="right"
-                                        tick={{ fontSize: 11, fill: '#94a3b8' }}
                                         axisLine={false}
                                         tickLine={false}
+                                        tick={{ fill: '#6b7280', fontSize: 12 }}
                                         tickFormatter={(v) => `${v}%`}
                                     />
                                     <Tooltip
-                                        contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                        formatter={(value: any, name: any) => {
+                                        contentStyle={{
+                                            backgroundColor: 'white',
+                                            border: '1px solid #e5e7eb',
+                                            borderRadius: '8px',
+                                            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                                        }}
+                                        formatter={(value: number, name: string) => {
                                             const num = Number(value) || 0
-                                            if (name === 'grossProfitPercent') return [`${num}%`, 'Gross margin']
-                                            const label = name === 'grossProfit' ? 'Gross profit' : name === 'cogs' ? 'COGS' : String(name)
-                                            return [formatCurrency(num), label]
+                                            if (name === 'grossProfitPercent') return [`${num.toFixed(2)}%`, 'Gross Profit (%)']
+                                            return [formatCurrency(num), name === 'revenue' ? 'Revenue' : 'COGS']
                                         }}
                                     />
-                                    <Bar yAxisId="left" dataKey="grossProfit" fill="#fbbf24" barSize={12} />
-                                    <Bar yAxisId="left" dataKey="cogs" fill="#ef4444" barSize={12} />
-                                    <Bar yAxisId="right" dataKey="grossProfitPercent" fill="#10b981" barSize={8} />
+                                    <Legend
+                                        verticalAlign="top"
+                                        align="right"
+                                        iconType="circle"
+                                        iconSize={10}
+                                        wrapperStyle={{ paddingBottom: 20 }}
+                                        formatter={(value) => {
+                                            const labels: Record<string, string> = {
+                                                revenue: 'Revenue',
+                                                cogs: 'COGS',
+                                                grossProfitPercent: 'Gross Profit (%)',
+                                            }
+                                            return <span className="text-sm text-gray-600">{labels[value] || value}</span>
+                                        }}
+                                    />
+                                    <Bar
+                                        yAxisId="left"
+                                        dataKey="revenue"
+                                        fill="#1e40af"
+                                        radius={[2, 2, 0, 0]}
+                                        barSize={10}
+                                    />
+                                    <Bar
+                                        yAxisId="left"
+                                        dataKey="cogs"
+                                        fill="#0d9488"
+                                        radius={[2, 2, 0, 0]}
+                                        barSize={10}
+                                    />
+                                    <Line
+                                        yAxisId="right"
+                                        type="monotone"
+                                        dataKey="grossProfitPercent"
+                                        stroke="#eab308"
+                                        strokeWidth={2}
+                                        dot={{ fill: '#eab308', strokeWidth: 2, r: 4 }}
+                                        activeDot={{ r: 6 }}
+                                    />
                                 </ComposedChart>
                             </ResponsiveContainer>
                             ) : (
@@ -465,42 +506,89 @@ export function AccountingDashboardV2() {
                     {/* Net Profit Chart */}
                     <Card className="bg-white border-none rounded-xl shadow-none overflow-hidden">
                         <CardHeader className="p-5 pb-2">
-                            <div className="flex items-center justify-between">
-                                <CardTitle className="text-lg font-semibold text-foreground">Net Profit</CardTitle>
-                                <div className="flex items-center gap-4 text-[10px] text-muted-foreground font-bold uppercase tracking-wider">
-                                    <div className="flex items-center gap-1.5">
-                                        <div className="w-2 h-2 rounded-full bg-[#065f46]"></div>
-                                        <span>Net Profit</span>
-                                    </div>
-                                    <div className="flex items-center gap-1.5">
-                                        <div className="w-2 h-2 rounded-full bg-[#10b981]"></div>
-                                        <span>Gross Profit</span>
-                                    </div>
-                                </div>
-                            </div>
+                            <CardTitle className="text-lg font-semibold text-foreground">Net Profit</CardTitle>
                         </CardHeader>
                         <CardContent className="p-5 pt-2">
                             {chartData.length > 0 ? (
                             <ResponsiveContainer width="100%" height={300}>
-                                <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                                    <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} dy={10} />
-                                    <YAxis
-                                        tick={{ fontSize: 11, fill: '#94a3b8' }}
+                                <ComposedChart
+                                    data={chartData}
+                                    margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                                    barGap={0}
+                                >
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                                    <XAxis
+                                        dataKey="month"
                                         axisLine={false}
                                         tickLine={false}
-                                        tickFormatter={(v) => `${currencySymbol}${(v / 1000).toFixed(0)}k`}
+                                        tick={{ fill: '#6b7280', fontSize: 12 }}
+                                    />
+                                    <YAxis
+                                        yAxisId="left"
+                                        axisLine={false}
+                                        tickLine={false}
+                                        tick={{ fill: '#6b7280', fontSize: 12 }}
+                                        tickFormatter={(v) => `${currencySymbol}${(v / 1000000).toFixed(1)}M`}
+                                    />
+                                    <YAxis
+                                        yAxisId="right"
+                                        orientation="right"
+                                        axisLine={false}
+                                        tickLine={false}
+                                        tick={{ fill: '#6b7280', fontSize: 12 }}
+                                        tickFormatter={(v) => `${Number(v).toFixed(0)}%`}
                                     />
                                     <Tooltip
-                                        contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                        formatter={(value: any, name: any) => {
+                                        contentStyle={{
+                                            backgroundColor: 'white',
+                                            border: '1px solid #e5e7eb',
+                                            borderRadius: '8px',
+                                            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                                        }}
+                                        formatter={(value: number, name: string) => {
                                             const num = Number(value) || 0
-                                            const label = name === "netProfit" ? "Net Profit" : name === "grossProfit" ? "Gross Profit" : String(name)
-                                            return [formatCurrency(num), label]
+                                            if (name === 'netProfitPercent') return [`${num.toFixed(2)}%`, 'Net Margin (%)']
+                                            return [formatCurrency(num), name === 'revenue' ? 'Revenue' : 'COGS']
                                         }}
                                     />
-                                    <Bar dataKey="netProfit" fill="#065f46" barSize={10} />
-                                    <Bar dataKey="grossProfit" fill="#10b981" barSize={10} />
+                                    <Legend
+                                        verticalAlign="top"
+                                        align="right"
+                                        iconType="circle"
+                                        iconSize={10}
+                                        wrapperStyle={{ paddingBottom: 20 }}
+                                        formatter={(value) => {
+                                            const labels: Record<string, string> = {
+                                                revenue: 'Revenue',
+                                                cogs: 'COGS',
+                                                netProfitPercent: 'Net Margin (%)',
+                                            }
+                                            return <span className="text-sm text-gray-600">{labels[value] || value}</span>
+                                        }}
+                                    />
+                                    <Bar
+                                        yAxisId="left"
+                                        dataKey="revenue"
+                                        fill="#1e40af"
+                                        radius={[2, 2, 0, 0]}
+                                        barSize={10}
+                                    />
+                                    <Bar
+                                        yAxisId="left"
+                                        dataKey="cogs"
+                                        fill="#0d9488"
+                                        radius={[2, 2, 0, 0]}
+                                        barSize={10}
+                                    />
+                                    <Line
+                                        yAxisId="right"
+                                        type="monotone"
+                                        dataKey="netProfitPercent"
+                                        stroke="#eab308"
+                                        strokeWidth={2}
+                                        dot={{ fill: '#eab308', strokeWidth: 2, r: 4 }}
+                                        activeDot={{ r: 6 }}
+                                    />
                                 </ComposedChart>
                             </ResponsiveContainer>
                             ) : (
@@ -564,7 +652,7 @@ export function AccountingDashboardV2() {
                         </CardHeader>
                         <CardContent className="p-5">
                             {assetsGridData.length > 0 ? (
-                                <div className="flex flex-col h-[450px] overflow-hidden rounded-md">
+                                <div className="flex flex-col min-h-[450px] overflow-hidden rounded-md" style={{ height: `${Math.max(450, Math.ceil(assetsGridData.length / 2) * 90)}px` }}>
                                     {(() => {
                                         const rowWidthPatterns = [
                                             ['55%', '45%'],
@@ -615,7 +703,7 @@ export function AccountingDashboardV2() {
                                     })()}
                                 </div>
                             ) : (
-                                <div className="flex flex-col items-center justify-center h-[450px] text-center">
+                                <div className="flex flex-col items-center justify-center min-h-[450px] text-center">
                                     <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
                                         <ArrowUpRight className="w-8 h-8 text-gray-400" />
                                     </div>

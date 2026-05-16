@@ -160,21 +160,31 @@ export function ReviewForm({ reviewId }: Props) {
   
   const validateAll = (): { valid: boolean; error?: string } => {
     for (const [_, pf] of Object.entries(pillarFeedback)) {
-      if (!pf.rating || pf.rating < 1 || pf.rating > 5) {
-        return { valid: false, error: "All ratings must be between 1 and 6" }
+      const pillarLabel = pf.pillarName || 'pillar'
+      if (!pf.rating || pf.rating < 1 || pf.rating > 6) {
+        return { valid: false, error: `${pillarLabel}: rating must be between 1 and 6` }
       }
       if (!Number.isInteger(pf.rating)) {
-        return { valid: false, error: "Ratings must be integers" }
+        return { valid: false, error: `${pillarLabel}: rating must be an integer` }
       }
       if ((pf.feedback || "").trim().length < MIN_FEEDBACK_LENGTH) {
         return {
           valid: false,
-          error: `Evaluations must be at least ${MIN_FEEDBACK_LENGTH} characters`,
+          error: `${pillarLabel}: evaluation must be at least ${MIN_FEEDBACK_LENGTH} characters`,
         }
       }
     }
     return { valid: true }
   }
+
+  // Stages where the next step is finalize, not advance — the backend rejects
+  // submitStage at this point with "No further stage to advance to from here."
+  const FINAL_REVIEW_STAGES = new Set([
+    'manager',
+    'MANAGER_REVIEW',
+    'final',
+    'FINAL_REVIEW',
+  ])
 
   const handleSubmit = async () => {
     const v = validateAll()
@@ -190,17 +200,48 @@ export function ReviewForm({ reviewId }: Props) {
         feedback: pf.feedback.trim(),
       })
     )
+
+    const stage = currentReview.currentStage
+    const isFinalStage = FINAL_REVIEW_STAGES.has(stage)
+
     try {
+      // At the final reviewable stage, attempt to save feedback (best-effort)
+      // then finalize. The backend may either accept submitStage as a save-only,
+      // or reject with "no further stage" — both paths still finalize.
+      if (isFinalStage) {
+        try {
+          await dispatch(
+            submitReviewStage({ id: reviewId, stage, pillarFeedback: payload })
+          ).unwrap()
+        } catch (e: any) {
+          if (!/no further stage|use .*\/finalize/i.test(e?.message || '')) {
+            throw e
+          }
+        }
+        await dispatch(finalizeReview(reviewId)).unwrap()
+        toast.success('Review finalized')
+        return
+      }
+
       await dispatch(
-        submitReviewStage({
-          id: reviewId,
-          stage: currentReview.currentStage,
-          pillarFeedback: payload,
-        })
+        submitReviewStage({ id: reviewId, stage, pillarFeedback: payload })
       ).unwrap()
-      toast.success("Stage submitted successfully")
+      toast.success('Stage submitted successfully')
     } catch (e: any) {
-      toast.error(e?.message || "Submit failed")
+      // Safety net: if the backend signals "no further stage / use /finalize"
+      // even for a stage we didn't classify as final, fall back to finalize.
+      const msg = e?.message || ''
+      if (/no further stage|use .*\/finalize/i.test(msg)) {
+        try {
+          await dispatch(finalizeReview(reviewId)).unwrap()
+          toast.success('Review finalized')
+          return
+        } catch (e2: any) {
+          toast.error(e2?.message || 'Finalize failed')
+          return
+        }
+      }
+      toast.error(msg || 'Submit failed')
     }
   }
 
@@ -297,11 +338,11 @@ export function ReviewForm({ reviewId }: Props) {
              </div>
              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
                 <span className="text-xs font-medium text-gray-400 uppercase tracking-tight">Cycle</span>
-                <span className="text-sm font-medium text-gray-700">{currentReview.reviewPeriod || "Annual 2026"}</span>
+                <span className="text-sm font-medium text-gray-700">{(currentReview as any).reviewPeriod || "Annual 2026"}</span>
              </div>
              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
                 <span className="text-xs font-medium text-gray-400 uppercase tracking-tight">Type</span>
-                <span className="text-sm font-medium text-gray-700">{currentReview.reviewType || "ANNUAL"}</span>
+                <span className="text-sm font-medium text-gray-700">{(currentReview as any).reviewType || "ANNUAL"}</span>
              </div>
              <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-gray-400 uppercase tracking-tight">Rating Scale</span>

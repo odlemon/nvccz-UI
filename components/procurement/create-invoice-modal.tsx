@@ -278,7 +278,7 @@ export function CreateInvoiceModal({ isOpen, onClose, onSuccess }: CreateInvoice
                       <SelectItem key={po.id} value={po.id}>
                         <div className="flex items-center gap-2">
                           <FileText className="w-4 h-4" />
-                          {po.purchaseOrderNumber} - {po.vendor?.name}
+                          {po.poNumber} - {po.vendor?.name}
                         </div>
                       </SelectItem>
                     ))}

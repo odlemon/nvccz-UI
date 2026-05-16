@@ -265,7 +265,7 @@ export default function ProcurementInvoicePDF({
             {invoice.purchaseOrder && (
               <>
                 <Text style={styles.infoLabel}>Purchase Order</Text>
-                <Text style={styles.infoValue}>{invoice.purchaseOrder.purchaseOrderNumber}</Text>
+                <Text style={styles.infoValue}>{invoice.purchaseOrder.poNumber}</Text>
               </>
             )}
           </View>
