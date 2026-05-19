@@ -6,18 +6,19 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
-import { 
-  Plus, 
-  Calendar, 
-  Clock, 
-  FileText, 
-  Edit, 
-  Trash2, 
+import {
+  Plus,
+  Calendar,
+  Clock,
+  FileText,
+  Edit,
+  Trash2,
   Settings2,
   CheckCircle2,
   XCircle,
   MoreVertical,
-  Settings
+  Settings,
+  Eye,
 } from "lucide-react"
 import {
   fetchScheduleConfigs,
@@ -26,6 +27,7 @@ import {
 } from "@/lib/store/slices/portfolioReportingSlice"
 import { ReportingScheduleConfig } from "@/lib/api/portfolio-reporting-api"
 import { ScheduleConfigModal } from "./schedule-config-modal"
+import { SchedulePreviewDrawer } from "./schedule-preview-drawer"
 import { toast } from "sonner"
 import {
   DropdownMenu,
@@ -60,6 +62,8 @@ export function ScheduleConfigurations() {
   const { configs, loading } = useAppSelector(state => state.portfolioReporting)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedConfig, setSelectedConfig] = useState<ReportingScheduleConfig | null>(null)
+  const [previewConfig, setPreviewConfig] = useState<ReportingScheduleConfig | null>(null)
+  const [previewOpen, setPreviewOpen] = useState(false)
 
   const canManage = canPerformAction('full', 'create') // Using full access for simplicity
 
@@ -131,7 +135,10 @@ export function ScheduleConfigurations() {
                       <MoreVertical className="w-4 h-4" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-40">
+                  <DropdownMenuContent align="end" className="w-44">
+                    <DropdownMenuItem onClick={() => { setPreviewConfig(config); setPreviewOpen(true) }}>
+                      <Eye className="w-4 h-4 mr-2" /> Preview
+                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => handleEdit(config)}>
                       <Edit className="w-4 h-4 mr-2" /> Edit
                     </DropdownMenuItem>
@@ -220,10 +227,16 @@ export function ScheduleConfigurations() {
         )}
       </div>
 
-      <ScheduleConfigModal 
+      <ScheduleConfigModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         config={selectedConfig}
+      />
+
+      <SchedulePreviewDrawer
+        isOpen={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        config={previewConfig}
       />
     </div>
   )

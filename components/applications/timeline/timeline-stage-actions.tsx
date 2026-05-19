@@ -111,8 +111,8 @@ export function TimelineStageActions({
   const canApproveDisbursement = hasSpecificAction('application-portal', APPLICATION_PORTAL_ACTIONS.APPROVE_DISBURSEMENT)
   const canUpdateChecklist = hasSpecificAction('application-portal', APPLICATION_PORTAL_ACTIONS.UPDATE_CHECKLIST)
 
-  // Special handling for BOARD_APPROVED - show TERM_SHEET actions
-  if (application.currentStage === "BOARD_APPROVED" && stageId === "TERM_SHEET") {
+  // When due diligence is complete, show Term Sheet creation as the next step
+  if (application.currentStage === "DUE_DILIGENCE_COMPLETED" && stageId === "TERM_SHEET_GROUP") {
     return (
       <div className="flex gap-2">
         {canCreateTermSheet ? (
@@ -130,8 +130,8 @@ export function TimelineStageActions({
     )
   }
 
-  // Special handling for DUE_DILIGENCE_COMPLETED - show UNDER_BOARD_REVIEW actions
-  if (application.currentStage === "DUE_DILIGENCE_COMPLETED" && stageId === "UNDER_BOARD_REVIEW") {
+  // Once term sheet is signed, show Board Review initiation (with investment memo upload)
+  if (application.currentStage === "TERM_SHEET_SIGNED" && stageId === "BOARD_GROUP") {
     return (
       <div className="flex gap-2">
         {canInitiateBoardReview ? (

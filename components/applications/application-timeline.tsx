@@ -54,6 +54,8 @@ import { DueDiligenceSection } from "./timeline/due-diligence-section"
 import { BoardReviewSection } from "./timeline/board-review-section"
 import { TermSheetSection } from "./timeline/term-sheet-section"
 import { FundDisbursementSection } from "./timeline/fund-disbursement-section"
+import { ValuationsSection } from "./timeline/valuations-section"
+import { ExitSection } from "./timeline/exit-section"
 import { TimelineStageActions } from "./timeline/timeline-stage-actions"
 import { applicationsApi, type ExtendedApplication } from '@/lib/api/applications-api'
 import { toast } from "sonner"
@@ -137,21 +139,21 @@ const stages = [
     completedColor: "bg-green-500"
   },
   {
-    id: "BOARD_GROUP",
-    statusCodes: ["UNDER_BOARD_REVIEW", "BOARD_APPROVED", "BOARD_CONDITIONAL", "BOARD_REJECTED"],
-    title: "Board Review & IC Decision",
-    description: "Investment Memorandum submitted; IC members cast votes; quorum determines outcome.",
-    icon: Users,
-    color: "bg-purple-500",
-    completedColor: "bg-green-500"
-  },
-  {
     id: "TERM_SHEET_GROUP",
     statusCodes: ["TERM_SHEET_NEGOTIATION", "TERM_SHEET", "TERM_SHEET_SIGNED"],
     title: "Term Sheet",
     description: "Negotiating the term sheet before finalizing the deal; term sheet generated, finalized, and signed by applicant.",
     icon: FileText,
     color: "bg-indigo-500",
+    completedColor: "bg-green-500"
+  },
+  {
+    id: "BOARD_GROUP",
+    statusCodes: ["UNDER_BOARD_REVIEW", "BOARD_APPROVED", "BOARD_CONDITIONAL", "BOARD_REJECTED"],
+    title: "Board Review & IC Decision",
+    description: "Investment Memorandum submitted; IC members cast votes; quorum determines outcome.",
+    icon: Users,
+    color: "bg-purple-500",
     completedColor: "bg-green-500"
   },
   {
@@ -212,8 +214,8 @@ export function ApplicationTimeline({
     const stageOrder = [
       'SHORTLISTED', 'SCREENING_PENDING', 'SCREENING',
       'ACTIVE_DD', 'UNDER_DUE_DILIGENCE', 'DUE_DILIGENCE_COMPLETED',
-      'UNDER_BOARD_REVIEW', 'BOARD_APPROVED', 'BOARD_CONDITIONAL', 'BOARD_REJECTED',
       'TERM_SHEET_NEGOTIATION', 'TERM_SHEET', 'TERM_SHEET_SIGNED',
+      'UNDER_BOARD_REVIEW', 'BOARD_APPROVED', 'BOARD_CONDITIONAL', 'BOARD_REJECTED',
       'INVESTMENT_IMPLEMENTATION', 'DISBURSED', 'FUNDED'
     ]
     const currentIdx = stageOrder.indexOf(cs)
@@ -230,12 +232,12 @@ export function ApplicationTimeline({
       case "DUE_DILIGENCE_GROUP":
         return (latestApplication as any)?.dueDiligenceReview?.status === 'COMPLETED' ||
           currentIdx > stageOrder.indexOf('DUE_DILIGENCE_COMPLETED')
-      case "BOARD_GROUP":
-        return (latestApplication as any)?.boardReview?.status === 'COMPLETED' ||
-          ['BOARD_APPROVED', 'BOARD_CONDITIONAL', 'BOARD_REJECTED', 'TERM_SHEET_NEGOTIATION', 'TERM_SHEET', 'TERM_SHEET_SIGNED', 'INVESTMENT_IMPLEMENTATION', 'DISBURSED', 'FUNDED'].includes(cs)
       case "TERM_SHEET_GROUP":
         return (latestApplication as any)?.termSheet?.status === 'SIGNED' ||
-          ['INVESTMENT_IMPLEMENTATION', 'DISBURSED', 'FUNDED'].includes(cs)
+          ['UNDER_BOARD_REVIEW', 'BOARD_APPROVED', 'BOARD_CONDITIONAL', 'BOARD_REJECTED', 'INVESTMENT_IMPLEMENTATION', 'DISBURSED', 'FUNDED'].includes(cs)
+      case "BOARD_GROUP":
+        return (latestApplication as any)?.boardReview?.status === 'COMPLETED' ||
+          ['BOARD_APPROVED', 'BOARD_CONDITIONAL', 'BOARD_REJECTED', 'INVESTMENT_IMPLEMENTATION', 'DISBURSED', 'FUNDED'].includes(cs)
       case "INVESTMENT_GROUP":
         return cs !== 'INVESTMENT_IMPLEMENTATION' &&
           (!!(latestApplication as any)?.investmentImplementation || ['DISBURSED', 'FUNDED'].includes(cs))
@@ -1120,7 +1122,7 @@ export function ApplicationTimeline({
                       )}
 
                       {stage.id === "INVESTMENT_GROUP" && showAccordion && (
-                        <Accordion type="single" collapsible className="w-full">
+                        <Accordion type="multiple" className="w-full space-y-2">
                           <AccordionItem value="fund-disbursement-data">
                             <AccordionTrigger className="text-left hover:bg-emerald-50 transition-colors duration-200 cursor-pointer">
                               <div className="flex items-center gap-3">
@@ -1152,6 +1154,43 @@ export function ApplicationTimeline({
                               />
                             </AccordionContent>
                           </AccordionItem>
+
+                          {(implementationData?.id || application.investmentImplementation?.id) && (
+                            <AccordionItem value="valuations-data">
+                              <AccordionTrigger className="text-left hover:bg-blue-50 transition-colors duration-200 cursor-pointer">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-100 to-indigo-200 flex items-center justify-center">
+                                    <MessageSquare className="w-4 h-4 text-blue-500" />
+                                  </div>
+                                  <span>Valuation History</span>
+                                </div>
+                              </AccordionTrigger>
+                              <AccordionContent>
+                                <ValuationsSection
+                                  implementationId={implementationData?.id ?? application.investmentImplementation?.id ?? ""}
+                                />
+                              </AccordionContent>
+                            </AccordionItem>
+                          )}
+
+                          {(implementationData?.id || application.investmentImplementation?.id) && (
+                            <AccordionItem value="exit-data">
+                              <AccordionTrigger className="text-left hover:bg-rose-50 transition-colors duration-200 cursor-pointer">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-6 h-6 rounded-full bg-gradient-to-br from-rose-100 to-pink-200 flex items-center justify-center">
+                                    <X className="w-4 h-4 text-rose-500" />
+                                  </div>
+                                  <span>Exit Management</span>
+                                </div>
+                              </AccordionTrigger>
+                              <AccordionContent>
+                                <ExitSection
+                                  implementationId={implementationData?.id ?? application.investmentImplementation?.id ?? ""}
+                                  onExitRecorded={refreshSelectedApplication}
+                                />
+                              </AccordionContent>
+                            </AccordionItem>
+                          )}
                         </Accordion>
                       )}
 
