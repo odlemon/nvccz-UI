@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useForm, Controller } from "react-hook-form"
 import { yupResolver } from "@hookform/resolvers/yup"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { 
+import {
   Command,
   CommandEmpty,
   CommandGroup,
@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/command"
 import { employeeFormSchema, EmployeeFormData } from "@/lib/validations/payroll"
 import { Employee } from "@/lib/api/payroll-api"
-import { User, Building2, CreditCard, DollarSign, AlertCircle, Loader2 } from "lucide-react"
+import { User, Building2, DollarSign, AlertCircle, Loader2, ImageIcon, X, Camera } from "lucide-react"
 import { useAppDispatch, useAppSelector } from "@/lib/store"
 import { usersApi } from "@/lib/api/users-api"
 import { setUsers, setUsersError, setUsersLoading } from "@/lib/store/slices/usersSlice"
@@ -29,7 +29,7 @@ import { setCurrencies, setCurrenciesError, setCurrenciesLoading } from "@/lib/s
 interface EmployeeFormProps {
   isOpen: boolean
   onClose: () => void
-  onSubmit: (data: EmployeeFormData) => void
+  onSubmit: (data: EmployeeFormData, picture?: File) => void
   editingEmployee?: Employee | null
   loading?: boolean
 }
@@ -45,6 +45,9 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, editingEmployee, loadi
   const { currencies, currenciesLoading } = useAppSelector(state => state.accounting)
   const [isUserOpen, setIsUserOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [picture, setPicture] = useState<File | null>(null)
+  const [picturePreview, setPicturePreview] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const {
     control,
     handleSubmit,
@@ -81,7 +84,7 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, editingEmployee, loadi
   // Reset form when editingEmployee changes
   useEffect(() => {
     if (editingEmployee) {
-      const formData = {
+      reset({
         userId: editingEmployee.userId,
         bankName: editingEmployee.bankName,
         branchCode: editingEmployee.branchCode,
@@ -92,8 +95,9 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, editingEmployee, loadi
         nextOfKin: editingEmployee.nextOfKin,
         address: editingEmployee.address,
         pictureUrl: editingEmployee.pictureUrl
-      }
-      reset(formData)
+      })
+      setPicturePreview(editingEmployee.pictureUrl || null)
+      setPicture(null)
     } else {
       reset({
         userId: '',
@@ -107,6 +111,8 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, editingEmployee, loadi
         address: '',
         pictureUrl: ''
       })
+      setPicturePreview(null)
+      setPicture(null)
     }
   }, [editingEmployee, reset])
 
@@ -148,12 +154,27 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, editingEmployee, loadi
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setPicture(file)
+    setPicturePreview(URL.createObjectURL(file))
+  }
+
+  const handleRemovePicture = () => {
+    setPicture(null)
+    setPicturePreview(null)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
   const handleFormSubmit = async (data: EmployeeFormData) => {
     setIsSubmitting(true)
     try {
-      await onSubmit(data)
+      await onSubmit(data, picture ?? undefined)
       if (!editingEmployee) {
         reset()
+        setPicture(null)
+        setPicturePreview(null)
       }
     } catch (e) {
       // no-op, parent should toast
@@ -166,6 +187,8 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, editingEmployee, loadi
     onClose()
     if (!editingEmployee) {
       reset()
+      setPicture(null)
+      setPicturePreview(null)
     }
   }
 
@@ -470,23 +493,65 @@ export function EmployeeForm({ isOpen, onClose, onSubmit, editingEmployee, loadi
               </div>
 
               <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="pictureUrl">Picture URL</Label>
-                <Controller
-                  name="pictureUrl"
-                  control={control}
-                  render={({ field }) => (
-                    <Input
-                      {...field}
-                      placeholder="e.g., http://example.com/picture.jpg"
-                      className="rounded-full"
-                    />
-                  )}
+                <Label>Employee Photo</Label>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
+                  onChange={handleFileChange}
+                  className="hidden"
                 />
-                {errors.pictureUrl && (
-                  <p className="text-sm text-red-600 flex items-center gap-1">
-                    <AlertCircle className="w-4 h-4" />
-                    {errors.pictureUrl.message}
-                  </p>
+                {picturePreview ? (
+                  <div className="flex items-center gap-4 p-3 border rounded-xl bg-gray-50">
+                    <div className="relative shrink-0">
+                      <img
+                        src={picturePreview}
+                        alt="Employee photo preview"
+                        className="w-20 h-20 rounded-full object-cover border-2 border-white shadow-sm"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleRemovePicture}
+                        className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center text-white transition-colors"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-700 truncate">
+                        {picture ? picture.name : 'Current photo'}
+                      </p>
+                      {picture && (
+                        <p className="text-xs text-gray-500">
+                          {(picture.size / 1024).toFixed(1)} KB
+                        </p>
+                      )}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="rounded-full mt-2 h-8"
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        <Camera className="w-3 h-3 mr-1.5" />
+                        Change Photo
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-full border-2 border-dashed border-gray-200 rounded-xl p-6 flex flex-col items-center gap-2 hover:border-blue-400 hover:bg-blue-50/30 transition-colors group"
+                  >
+                    <div className="w-12 h-12 rounded-full bg-gray-100 group-hover:bg-blue-100 flex items-center justify-center transition-colors">
+                      <ImageIcon className="w-6 h-6 text-gray-400 group-hover:text-blue-500 transition-colors" />
+                    </div>
+                    <p className="text-sm text-gray-600 group-hover:text-blue-600 transition-colors">
+                      Click to upload employee photo
+                    </p>
+                    <p className="text-xs text-gray-400">PNG, JPG, WEBP, GIF · Max 5MB</p>
+                  </button>
                 )}
               </div>
             </div>

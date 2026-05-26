@@ -86,30 +86,32 @@ export function PerformanceDashboardV2() {
     
     // Extract summary cards data
     const summaryCards = dashboardData?.summaryCards || {}
+    const fmtChange = (pct: number | undefined, fallback = "+0%") =>
+        pct !== undefined ? `${pct > 0 ? '+' : ''}${pct.toFixed(1)}%` : fallback
     const statsData = {
         pendingTasks: {
             value: summaryCards?.pendingTasks?.value || 0,
-            change: summaryCards?.pendingTasks?.changePercent ? `${summaryCards.pendingTasks.changePercent > 0 ? '+' : ''}${summaryCards.pendingTasks.changePercent}%` : "+0%",
-            progress: summaryCards?.pendingTasks?.progress ? summaryCards.pendingTasks.progress * 100 : 0,
-            total: summaryCards?.pendingTasks?.total ?? 0
+            change: fmtChange(summaryCards?.pendingTasks?.changePercent),
+            progress: summaryCards?.pendingTasks?.progressPercent || 0,
+            ratioText: summaryCards?.pendingTasks?.ratioText || "0/0",
         },
         inProgress: {
             value: summaryCards?.inProgress?.value || 0,
-            change: summaryCards?.inProgress?.changePercent ? `${summaryCards.inProgress.changePercent > 0 ? '+' : ''}${summaryCards.inProgress.changePercent}%` : "+0%",
-            progress: summaryCards?.inProgress?.progress ? summaryCards.inProgress.progress * 100 : 0,
-            total: summaryCards?.inProgress?.total ?? 0
+            change: fmtChange(summaryCards?.inProgress?.changePercent),
+            progress: summaryCards?.inProgress?.progressPercent || 0,
+            ratioText: summaryCards?.inProgress?.ratioText || "0/0",
         },
         completed: {
             value: summaryCards?.completed?.value || 0,
-            change: summaryCards?.completed?.changePercent ? `${summaryCards.completed.changePercent > 0 ? '+' : ''}${summaryCards.completed.changePercent}%` : "-0%",
-            progress: summaryCards?.completed?.progress ? summaryCards.completed.progress * 100 : 0,
-            total: summaryCards?.completed?.total ?? 0
+            change: fmtChange(summaryCards?.completed?.changePercent, "-0%"),
+            progress: summaryCards?.completed?.progressPercent || 0,
+            ratioText: summaryCards?.completed?.ratioText || "0/0",
         },
-        completionRate: { 
-            value: `${summaryCards?.completionRate?.value || 0}%`, 
-            change: summaryCards?.completionRate?.changePercent ? `${summaryCards.completionRate.changePercent > 0 ? '+' : ''}${summaryCards.completionRate.changePercent}%` : "+0%", 
-            progress: summaryCards?.completionRate?.value || 0, 
-            total: 100 
+        completionRate: {
+            value: `${(summaryCards?.completionRate?.value || 0).toFixed(1)}%`,
+            change: fmtChange(summaryCards?.completionRate?.changePercent),
+            progress: summaryCards?.completionRate?.value || 0,
+            ratioText: `${(summaryCards?.completionRate?.value || 0).toFixed(1)}%`,
         },
     }
 
@@ -165,7 +167,9 @@ export function PerformanceDashboardV2() {
     const budgetData = {
         totalBudget: budgetTracker.totalBudget || 0,
         totalSpend: budgetTracker.totalSpend || 0,
-        remaining: budgetTracker.remaining || 0
+        remaining: budgetTracker.remaining || 0,
+        overBudget: budgetTracker.overBudget || false,
+        lineItems: (budgetTracker.lineItems || []) as { name: string; budgeted: number; actual: number }[],
     }
 
     // Extract employee of the month
@@ -276,7 +280,7 @@ export function PerformanceDashboardV2() {
                             <div className="space-y-2">
                                 <div className="flex justify-between text-xs text-muted-foreground">
                                     <span>Pending Tasks</span>
-                                    <span>{statsData.pendingTasks.progress}/{statsData.pendingTasks.total}</span>
+                                    <span>{statsData.pendingTasks.ratioText}</span>
                                 </div>
                                 <div className="flex gap-0.5">
                                     {Array.from({ length: 50 }).map((_, i) => (
@@ -309,8 +313,8 @@ export function PerformanceDashboardV2() {
                             </div>
                             <div className="space-y-2">
                                 <div className="flex justify-between text-xs text-muted-foreground">
-                                    <span>In progress</span>
-                                    <span>{statsData.inProgress.progress}/{statsData.inProgress.total}</span>
+                                    <span>In Progress</span>
+                                    <span>{statsData.inProgress.ratioText}</span>
                                 </div>
                                 <div className="flex gap-0.5">
                                     {Array.from({ length: 50 }).map((_, i) => (
@@ -344,7 +348,7 @@ export function PerformanceDashboardV2() {
                             <div className="space-y-2">
                                 <div className="flex justify-between text-xs text-muted-foreground">
                                     <span>Completed</span>
-                                    <span>{statsData.completed.progress}/{statsData.completed.total}</span>
+                                    <span>{statsData.completed.ratioText}</span>
                                 </div>
                                 <div className="flex gap-0.5">
                                     {Array.from({ length: 50 }).map((_, i) => (
@@ -378,7 +382,7 @@ export function PerformanceDashboardV2() {
                             <div className="space-y-2">
                                 <div className="flex justify-between text-xs text-muted-foreground">
                                     <span>Completion Rate</span>
-                                    <span>{statsData.completionRate.progress}%</span>
+                                    <span>{statsData.completionRate.ratioText}</span>
                                 </div>
                                 <div className="flex gap-0.5">
                                     {Array.from({ length: 50 }).map((_, i) => (
@@ -405,7 +409,6 @@ export function PerformanceDashboardV2() {
                                 </div>
                                 <div className="flex items-center gap-3">
                                     <div className="flex items-center gap-2">
-                                        <div className="w-3 h-3 rounded-full bg-[#4c1d95]"></div>
                                         <span className="text-sm text-muted-foreground">Task Completed Rate</span>
                                     </div>
                                     <Button variant="ghost" size="icon" className="w-8 h-8 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
@@ -643,7 +646,6 @@ export function PerformanceDashboardV2() {
                                 {/* Gauge Chart */}
                                 <div className="relative w-52 h-28 mb-4">
                                     <svg viewBox="0 0 200 100" className="w-full h-full">
-                                        {/* Background arc */}
                                         <path
                                             d="M 20 90 A 80 80 0 0 1 180 90"
                                             fill="none"
@@ -651,11 +653,10 @@ export function PerformanceDashboardV2() {
                                             strokeWidth="20"
                                             strokeLinecap="round"
                                         />
-                                        {/* Progress arc */}
                                         <path
                                             d="M 20 90 A 80 80 0 0 1 180 90"
                                             fill="none"
-                                            stroke="url(#gaugeGradient)"
+                                            stroke={budgetData.overBudget ? "url(#gaugeGradientOver)" : "url(#gaugeGradient)"}
                                             strokeWidth="20"
                                             strokeLinecap="round"
                                             strokeDasharray={`${Math.min(100, budgetPercentage) / 100 * 251.2} 251.2`}
@@ -666,8 +667,11 @@ export function PerformanceDashboardV2() {
                                                 <stop offset="50%" stopColor="#7c3aed" />
                                                 <stop offset="100%" stopColor="#4c1d95" />
                                             </linearGradient>
+                                            <linearGradient id="gaugeGradientOver" x1="0%" y1="0%" x2="100%" y2="0%">
+                                                <stop offset="0%" stopColor="#fca5a5" />
+                                                <stop offset="100%" stopColor="#dc2626" />
+                                            </linearGradient>
                                         </defs>
-                                        {/* Tick marks */}
                                         {[0, 25, 50, 75, 100].map((tick) => {
                                             const angle = (tick / 100) * 180 - 180
                                             const radians = (angle * Math.PI) / 180
@@ -675,61 +679,82 @@ export function PerformanceDashboardV2() {
                                             const y1 = 90 + 60 * Math.sin(radians)
                                             const x2 = 100 + 70 * Math.cos(radians)
                                             const y2 = 90 + 70 * Math.sin(radians)
-                                            return (
-                                                <line
-                                                    key={tick}
-                                                    x1={x1}
-                                                    y1={y1}
-                                                    x2={x2}
-                                                    y2={y2}
-                                                    stroke="#666"
-                                                    strokeWidth="2"
-                                                />
-                                            )
+                                            return <line key={tick} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#666" strokeWidth="2" />
                                         })}
-                                        {/* Needle */}
                                         <line
-                                            x1="100"
-                                            y1="90"
+                                            x1="100" y1="90"
                                             x2={100 + 55 * Math.cos(((Math.min(180, gaugeAngle) - 180) * Math.PI) / 180)}
                                             y2={90 + 55 * Math.sin(((Math.min(180, gaugeAngle) - 180) * Math.PI) / 180)}
-                                            stroke="#4c1d95"
+                                            stroke={budgetData.overBudget ? "#dc2626" : "#4c1d95"}
                                             strokeWidth="3"
                                             strokeLinecap="round"
                                         />
-                                        <circle cx="100" cy="90" r="6" fill="#4c1d95" />
+                                        <circle cx="100" cy="90" r="6" fill={budgetData.overBudget ? "#dc2626" : "#4c1d95"} />
                                     </svg>
-                                    {/* Labels */}
                                     {(() => {
-                                        const formatAmt = (val: number) => val >= 1000 ? `${(val / 1000).toFixed(0)}k` : val.toString();
-                                        const total = budgetData.totalBudget;
+                                        const fmt = (v: number) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v.toString()
+                                        const t = budgetData.totalBudget
                                         return (
                                             <>
                                                 <span className="absolute -left-6 bottom-0 text-[10px] font-bold text-muted-foreground">0</span>
-                                                <span className="absolute -left-8 top-4 text-[10px] font-bold text-muted-foreground">{formatAmt(total * 0.25)}</span>
-                                                <span className="absolute left-1/2 -translate-x-1/2 -top-6 text-[10px] font-bold text-muted-foreground">{formatAmt(total * 0.5)}</span>
-                                                <span className="absolute -right-8 top-4 text-[10px] font-bold text-muted-foreground">{formatAmt(total * 0.75)}</span>
-                                                <span className="absolute -right-6 bottom-0 text-[10px] font-bold text-muted-foreground">{formatAmt(total)}</span>
+                                                <span className="absolute -left-8 top-4 text-[10px] font-bold text-muted-foreground">{fmt(t * 0.25)}</span>
+                                                <span className="absolute left-1/2 -translate-x-1/2 -top-6 text-[10px] font-bold text-muted-foreground">{fmt(t * 0.5)}</span>
+                                                <span className="absolute -right-8 top-4 text-[10px] font-bold text-muted-foreground">{fmt(t * 0.75)}</span>
+                                                <span className="absolute -right-6 bottom-0 text-[10px] font-bold text-muted-foreground">{fmt(t)}</span>
                                             </>
-                                        );
+                                        )
                                     })()}
                                 </div>
 
-                                {/* Stats */}
-                                <div className="grid grid-cols-3 gap-4 w-full text-center">
+                                {/* KPI row */}
+                                <div className="grid grid-cols-3 gap-4 w-full text-center mb-4">
                                     <div>
                                         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Budget</p>
                                         <p className="text-xl font-semibold text-foreground tracking-tight">${budgetData.totalBudget.toLocaleString()}</p>
                                     </div>
                                     <div>
-                                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Total Spend</p>
-                                        <p className="text-xl font-semibold text-foreground tracking-tight">${budgetData.totalSpend.toLocaleString()}</p>
+                                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Spend</p>
+                                        <p className={`text-xl font-semibold tracking-tight ${budgetData.overBudget ? "text-red-600" : "text-foreground"}`}>
+                                            ${budgetData.totalSpend.toLocaleString()}
+                                        </p>
                                     </div>
                                     <div>
                                         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Remaining</p>
-                                        <p className="text-xl font-semibold text-foreground tracking-tight">${budgetData.remaining.toLocaleString()}</p>
+                                        <p className={`text-xl font-semibold tracking-tight ${budgetData.remaining < 0 ? "text-red-600" : "text-emerald-600"}`}>
+                                            ${budgetData.remaining.toLocaleString()}
+                                        </p>
                                     </div>
                                 </div>
+
+                                {/* Line items */}
+                                {budgetData.lineItems.length > 0 && (
+                                    <div className="w-full">
+                                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2">Line Items</p>
+                                        <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
+                                            {budgetData.lineItems.map((item, idx) => {
+                                                const pct = item.budgeted > 0 ? Math.min(100, (item.actual / item.budgeted) * 100) : (item.actual > 0 ? 100 : 0)
+                                                const over = item.actual > item.budgeted && item.budgeted > 0
+                                                return (
+                                                    <div key={idx} className="space-y-1">
+                                                        <div className="flex justify-between items-center">
+                                                            <p className="text-xs text-foreground font-medium truncate flex-1 mr-2">{item.name}</p>
+                                                            <div className="flex gap-2 flex-shrink-0 text-[10px]">
+                                                                <span className="text-muted-foreground">B: ${item.budgeted.toLocaleString()}</span>
+                                                                <span className={over ? "text-red-600 font-semibold" : "text-foreground"}>A: ${item.actual.toLocaleString()}</span>
+                                                            </div>
+                                                        </div>
+                                                        <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                                            <div
+                                                                className={`h-full rounded-full transition-all ${over ? "bg-red-500" : "bg-[#7c3aed]"}`}
+                                                                style={{ width: `${pct}%` }}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                )
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </CardContent>
                     </Card>

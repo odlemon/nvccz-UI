@@ -55,6 +55,16 @@ import {
   X,
   FileText,
   Printer,
+  Award,
+  Target,
+  DollarSign,
+  Search,
+  ChevronDown,
+  Download,
+  Filter,
+  Settings2,
+  ArrowRight,
+  Clock,
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -206,6 +216,12 @@ export function PerformanceContractsManagement() {
   const [PDFDownloadLink, setPDFDownloadLink] = useState<any>(null)
   const [activeAddress, setActiveAddress] = useState<CompanyAddress | null>(null)
 
+  const [contractDrawerTab, setContractDrawerTab] = useState<'overview' | 'kpis'>('overview')
+  const drawerContractMeta = useMemo(
+    () => CONTRACT_TYPES.find(c => c.type === selectedContract?.contractType) ?? null,
+    [selectedContract?.contractType]
+  )
+
   useEffect(() => {
     setIsClient(true)
     import("@react-pdf/renderer")
@@ -256,7 +272,7 @@ export function PerformanceContractsManagement() {
   const loadUsers = async () => {
     setUsersLoading(true)
     try {
-      const res = await applicationsApi.getInvestmentUsers()
+      const res: any = await applicationsApi.getInvestmentUsers()
       setUsers(res.data || [])
     } catch (e: any) {
       toast.error("Failed to load users", { description: e?.message })
@@ -268,7 +284,7 @@ export function PerformanceContractsManagement() {
   const loadContractEmployees = async (periodLabel: string) => {
     setContractEmployeesLoading(true)
     try {
-      const res = await scorecardApiService.getEmployeesForGeneration(periodLabel)
+      const res: any = await scorecardApiService.getEmployeesForGeneration(periodLabel)
       const mapped = (res.data?.employees || []).map((emp) => ({
         id: emp.id,
         firstName: emp.firstName || "",
@@ -302,7 +318,7 @@ export function PerformanceContractsManagement() {
   const loadContracts = async (year: number) => {
     setContractsLoading(true)
     try {
-      const res = await performanceBscApiService.fetchPerformanceContracts({
+      const res: any = await performanceBscApiService.fetchPerformanceContracts({
         periodYear: year,
         periodLabel: String(year),
         contractType: filters.contractType || undefined,
@@ -631,7 +647,7 @@ export function PerformanceContractsManagement() {
                     return (
                       <div
                         key={contract.id}
-                        onClick={() => { setSelectedContract(contract); setIsDrawerOpen(true) }}
+                        onClick={() => { setSelectedContract(contract); setIsDrawerOpen(true); setContractDrawerTab('overview') }}
                         className="flex items-center justify-between px-5 py-3 text-sm hover:bg-muted/30 transition-colors cursor-pointer"
                       >
                         <div className="flex items-center gap-3 flex-1">
@@ -991,21 +1007,23 @@ export function PerformanceContractsManagement() {
 
       {/* Contract Detail Drawer */}
       <Sheet open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
-        <SheetContent className="sm:max-w-2xl overflow-y-auto p-5">
+        <SheetContent className="sm:max-w-2xl overflow-y-auto">
           {selectedContract && (
             <>
               <SheetHeader>
-                <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center justify-between">
                   <SheetTitle className="flex items-center gap-3 truncate">
-                    <FileText className="w-6 h-6 text-blue-600 shrink-0" />
-                    <span className="truncate">
-                      {selectedContract.title || `${selectedContract.contractType} Contract`}
-                    </span>
+                    {drawerContractMeta && (
+                      <div className={`w-8 h-8 rounded-full ${drawerContractMeta.iconBg} flex items-center justify-center shrink-0`}>
+                        <drawerContractMeta.icon className={`w-4 h-4 ${drawerContractMeta.iconColor}`} />
+                      </div>
+                    )}
+                    <span className="truncate">{selectedContract.title || "Performance Contract"}</span>
                   </SheetTitle>
-                  <div className="flex items-center gap-2 mr-8 shrink-0">
+                  <div className="flex items-center gap-2 mr-8">
                     <Button
                       onClick={handleGoToScorecard}
-                      className="rounded-full h-10 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white"
+                      className="rounded-full h-10 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg hover:shadow-xl transition-all duration-200"
                     >
                       <Eye className="w-4 h-4 mr-2" />
                       Scorecard
@@ -1018,16 +1036,13 @@ export function PerformanceContractsManagement() {
                             activeAddress={activeAddress}
                           />
                         }
-                        fileName={`${(selectedContract.contractType || "contract")
-                          .toString()
-                          .toLowerCase()}-contract-${selectedContract.periodLabel || ""}-${new Date()
-                          .toISOString()
-                          .split("T")[0]}.pdf`}
+                        fileName={`${(selectedContract.contractType || "contract").toLowerCase()}-pc-${selectedContract.periodLabel}.pdf`}
                       >
                         {({ loading: pdfLoading }: any) => (
                           <Button
                             disabled={pdfLoading}
-                            className="rounded-full h-10 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white"
+                            variant="outline"
+                            className="rounded-full h-10"
                           >
                             <Printer className={`w-4 h-4 mr-2 ${pdfLoading ? "animate-spin" : ""}`} />
                             {pdfLoading ? "Preparing..." : "Export PDF"}
@@ -1047,160 +1062,329 @@ export function PerformanceContractsManagement() {
                 </div>
               </SheetHeader>
 
-              {/* Header meta row */}
-              <div className="mt-3 flex items-center gap-3 flex-wrap">
-                <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 border-none px-3 py-1 text-[10px] uppercase tracking-widest font-bold">
-                  {selectedContract.contractType} Contract
-                </Badge>
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <Calendar className="w-4 h-4" />
-                  <span>{selectedContract.periodLabel}</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <Building2 className="w-4 h-4" />
-                  <span>{selectedContract.departmentName || "N/A"}</span>
-                </div>
+              {/* Tab Navigation */}
+              <div className="mt-4 border-b">
+                <nav className="flex -mb-px space-x-6">
+                  {([
+                    { id: 'overview' as const, label: 'Overview', Icon: FileText },
+                    { id: 'kpis' as const, label: 'KPIs & Goals', Icon: Target, count: selectedContract.contractKpis?.metricsCount ?? 0 },
+                  ] as const).map((tab) => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setContractDrawerTab(tab.id)}
+                      className={cn(
+                        "flex items-center gap-2 py-3 px-1 text-sm font-medium transition-colors",
+                        contractDrawerTab === tab.id
+                          ? "border-b-2 border-blue-600 text-blue-600"
+                          : "border-b-2 border-transparent text-gray-500 hover:text-gray-700",
+                      )}
+                    >
+                      <tab.Icon className="h-4 w-4" />
+                      {tab.label}
+                      {'count' in tab && (
+                        <span className="ml-1 bg-blue-100 text-blue-700 text-xs font-bold px-2 py-0.5 rounded-full">
+                          {(tab as any).count}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </nav>
               </div>
 
-              <div className="mt-6 space-y-8">
-                {/* Status Section */}
-                <section className="space-y-4">
-                  <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">Lifecycle Status</h4>
-                  <div className="flex flex-wrap gap-3">
-                    <Badge variant={selectedContract.status === "ACTIVE" ? "default" : "secondary"} className="px-4 py-1.5 rounded-xl text-xs font-semibold shadow-none border-2">
-                      {selectedContract.status}
-                    </Badge>
-                    <Badge variant="outline" className="px-4 py-1.5 rounded-xl text-xs font-semibold shadow-none border-2 border-gray-100 text-gray-500">
-                      VERSION 1.0
-                    </Badge>
-                  </div>
-                </section>
+              {/* Tab Content */}
+              <div className="mt-6 space-y-4">
 
-                {/* Primary Actors */}
-                <section className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-gray-50">
-                   <div className="space-y-4">
-                      <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">Subject Participant</h4>
-                      <div className="flex items-center gap-3 p-4 bg-gray-50/50 rounded-2xl border-2 border-gray-100">
-                         <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
-                            <User className="w-5 h-5" />
-                         </div>
-                         <div>
-                            <p className="text-sm font-semibold text-gray-900">{selectedContract.subjectUser?.firstName || "N/A"} {selectedContract.subjectUser?.lastName || ""}</p>
-                            <p className="text-[10px] text-gray-400 font-medium uppercase mt-0.5">{selectedContract.subjectUser?.email || "No Participant Assigned"}</p>
-                         </div>
-                      </div>
-                   </div>
-                   <div className="space-y-4">
-                      <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">Created By</h4>
-                      <div className="flex items-center gap-3 p-4 bg-gray-50/50 rounded-2xl border-2 border-gray-100">
-                         <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600">
-                            <User className="w-5 h-5" />
-                         </div>
-                         <div>
-                            <p className="text-sm font-semibold text-gray-900">{selectedContract.createdBy?.firstName || "System"} {selectedContract.createdBy?.lastName || ""}</p>
-                            <p className="text-[10px] text-gray-400 font-medium uppercase mt-0.5">{selectedContract.createdBy?.email || "Automated Setup"}</p>
-                         </div>
-                      </div>
-                   </div>
-                </section>
+                {/* ── Overview Tab ── */}
+                {contractDrawerTab === 'overview' && (
+                  <>
+                    {/* Status + Period */}
+                    <Card className={cn("border-l-4", selectedContract.status === 'ACTIVE' ? "border-l-green-500" : "border-l-yellow-500")}>
+                      <CardContent className="pt-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="flex items-center gap-3">
+                            <div className={cn("w-10 h-10 rounded-full flex items-center justify-center", selectedContract.status === 'ACTIVE' ? "bg-green-100" : "bg-yellow-100")}>
+                              <CheckCircle2 className={cn("w-5 h-5", selectedContract.status === 'ACTIVE' ? "text-green-600" : "text-yellow-600")} />
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground">Status</p>
+                              <p className="font-semibold">{selectedContract.status}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                              <Calendar className="w-5 h-5 text-blue-600" />
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground">Period</p>
+                              <p className="font-semibold">{selectedContract.periodLabel}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
 
-                {/* Period & Department */}
-                <section className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-gray-50">
-                   <div className="space-y-4">
-                      <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">Reporting Period</h4>
-                      <div className="flex items-center gap-3 p-4 bg-gray-50/50 rounded-2xl border-2 border-gray-100">
-                         <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center text-amber-600">
-                            <Calendar className="w-5 h-5" />
-                         </div>
-                         <div>
-                            <p className="text-sm font-semibold text-gray-900">{selectedContract.periodLabel}</p>
-                            <p className="text-[10px] text-gray-400 font-medium uppercase mt-0.5">
-                               {selectedContract.periodStart ? new Date(selectedContract.periodStart).toLocaleDateString() : "N/A"} - {selectedContract.periodEnd ? new Date(selectedContract.periodEnd).toLocaleDateString() : "N/A"}
+                    {/* Contract Details */}
+                    <Card className="border-l-4 border-l-purple-500">
+                      <CardContent className="pt-4">
+                        <div className="flex items-center gap-2 mb-3">
+                          <FileText className="w-5 h-5 text-purple-500" />
+                          <h3 className="text-base font-semibold">Contract Details</h3>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <p className="text-xs text-muted-foreground">Type</p>
+                            <Badge className={cn("mt-1 border-0", drawerContractMeta ? `${drawerContractMeta.iconBg} ${drawerContractMeta.iconColor}` : "")}>
+                              {selectedContract.contractType}
+                            </Badge>
+                          </div>
+                          {selectedContract.departmentName && (
+                            <div>
+                              <p className="text-xs text-muted-foreground">Department</p>
+                              <p className="font-medium mt-1">{selectedContract.departmentName}</p>
+                            </div>
+                          )}
+                          <div>
+                            <p className="text-xs text-muted-foreground">Start Date</p>
+                            <p className="font-medium">{new Date(selectedContract.periodStart).toLocaleDateString()}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">End Date</p>
+                            <p className="font-medium">{new Date(selectedContract.periodEnd).toLocaleDateString()}</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Parties */}
+                    <Card className="border-l-4 border-l-blue-500">
+                      <CardContent className="pt-4">
+                        <div className="flex items-center gap-2 mb-4">
+                          <Users className="w-5 h-5 text-blue-500" />
+                          <h3 className="text-base font-semibold">Parties to Contract</h3>
+                        </div>
+                        <div className="space-y-3">
+                          <div className="p-3 bg-gray-50 rounded-lg">
+                            <p className="text-xs text-muted-foreground mb-2">Subject (Obligor)</p>
+                            <div className="flex items-center gap-3">
+                              <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-sm">
+                                {selectedContract.subjectUser?.firstName?.[0] ?? selectedContract.departmentName?.[0] ?? 'S'}
+                              </div>
+                              <div>
+                                <p className="font-medium text-sm">
+                                  {selectedContract.subjectUser
+                                    ? `${selectedContract.subjectUser.firstName} ${selectedContract.subjectUser.lastName}`
+                                    : selectedContract.departmentName ?? 'General Entity'}
+                                </p>
+                                {selectedContract.subjectUser?.email && (
+                                  <p className="text-xs text-muted-foreground">{selectedContract.subjectUser.email}</p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="p-3 bg-gray-50 rounded-lg">
+                              <p className="text-xs text-muted-foreground mb-2">Reviewer</p>
+                              {selectedContract.reviewer ? (
+                                <div className="flex items-center gap-2">
+                                  <div className="w-7 h-7 rounded-full bg-purple-100 flex items-center justify-center text-purple-700 font-bold text-xs">
+                                    {selectedContract.reviewer.firstName?.[0]}
+                                  </div>
+                                  <p className="text-sm font-medium truncate">{selectedContract.reviewer.firstName} {selectedContract.reviewer.lastName}</p>
+                                </div>
+                              ) : (
+                                <p className="text-sm text-muted-foreground italic">Unassigned</p>
+                              )}
+                            </div>
+                            <div className="p-3 bg-gray-50 rounded-lg">
+                              <p className="text-xs text-muted-foreground mb-2">Approver</p>
+                              {selectedContract.approver ? (
+                                <div className="flex items-center gap-2">
+                                  <div className="w-7 h-7 rounded-full bg-amber-100 flex items-center justify-center text-amber-700 font-bold text-xs">
+                                    {selectedContract.approver.firstName?.[0]}
+                                  </div>
+                                  <p className="text-sm font-medium truncate">{selectedContract.approver.firstName} {selectedContract.approver.lastName}</p>
+                                </div>
+                              ) : (
+                                <p className="text-sm text-muted-foreground italic">Unassigned</p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Financial Provisions */}
+                    <Card className="border-l-4 border-l-emerald-500">
+                      <CardContent className="pt-4">
+                        <div className="flex items-center gap-2 mb-4">
+                          <DollarSign className="w-5 h-5 text-emerald-500" />
+                          <h3 className="text-base font-semibold">Financial Provisions</h3>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="p-3 bg-emerald-50 rounded-lg">
+                            <p className="text-xs text-muted-foreground">Allocated Budget</p>
+                            <p className="text-xl font-bold text-emerald-700 mt-1">
+                              {selectedContract.allocatedBudget ? `$${Number(selectedContract.allocatedBudget).toLocaleString()}` : 'N/A'}
                             </p>
-                         </div>
-                      </div>
-                   </div>
-                   <div className="space-y-4">
-                      <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">Departmental Unit</h4>
-                      <div className="flex items-center gap-3 p-4 bg-gray-50/50 rounded-2xl border-2 border-gray-100">
-                         <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center text-purple-600">
-                            <Building2 className="w-5 h-5" />
-                         </div>
-                         <div>
-                            <p className="text-sm font-semibold text-gray-900">{selectedContract.departmentName || "N/A"}</p>
-                            <p className="text-[10px] text-gray-400 font-medium uppercase mt-0.5">Primary Org Unit</p>
-                         </div>
-                      </div>
-                   </div>
-                </section>
+                          </div>
+                          <div className="p-3 bg-red-50 rounded-lg">
+                            <p className="text-xs text-muted-foreground">Expended Funds</p>
+                            <p className="text-xl font-bold text-red-600 mt-1">
+                              {selectedContract.actualSpend ? `$${Number(selectedContract.actualSpend).toLocaleString()}` : 'N/A'}
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
 
-                {/* Workflow Roles */}
-                <section className="space-y-4 pt-4 border-t border-gray-50">
-                   <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">Workflow Approval Chain</h4>
-                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="p-4 bg-white border-2 border-gray-100 rounded-2xl space-y-2">
-                         <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Reviewer</span>
-                            <Badge variant="outline" className={cn("text-[9px] font-bold uppercase", selectedContract.reviewer ? "border-emerald-200 text-emerald-600" : "border-gray-200 text-gray-400")}>
-                               {selectedContract.reviewer ? "Assigned" : "Pending"}
-                            </Badge>
-                         </div>
-                         <p className="text-sm font-semibold text-gray-800">
-                            {selectedContract.reviewer ? `${selectedContract.reviewer.firstName} ${selectedContract.reviewer.lastName}` : "No Reviewer Assigned"}
-                         </p>
-                      </div>
-                      <div className="p-4 bg-white border-2 border-gray-100 rounded-2xl space-y-2">
-                         <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Approver</span>
-                            <Badge variant="outline" className={cn("text-[9px] font-bold uppercase", selectedContract.approver ? "border-emerald-200 text-emerald-600" : "border-gray-200 text-gray-400")}>
-                               {selectedContract.approver ? "Assigned" : "Pending"}
-                            </Badge>
-                         </div>
-                         <p className="text-sm font-semibold text-gray-800">
-                            {selectedContract.approver ? `${selectedContract.approver.firstName} ${selectedContract.approver.lastName}` : "No Approver Assigned"}
-                         </p>
-                      </div>
-                   </div>
-                </section>
+                    {/* Metadata footer */}
+                    <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t gap-2 flex-wrap">
+                      <span>ID: {selectedContract.id?.slice(0, 8)}...</span>
+                      <span>Created {new Date(selectedContract.createdAt || Date.now()).toLocaleDateString()}</span>
+                      {selectedContract.createdBy && (
+                        <span>By {selectedContract.createdBy.firstName} {selectedContract.createdBy.lastName}</span>
+                      )}
+                    </div>
+                  </>
+                )}
 
-                {/* Financials & Metadata */}
-                <section className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-gray-50">
-                   <div className="space-y-4">
-                      <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">Budget Allocation</h4>
-                      <div className="p-4 bg-gray-50/50 rounded-2xl border-2 border-gray-100 flex items-center justify-between">
-                         <div>
-                            <p className="text-xs font-bold text-gray-900">${(selectedContract.allocatedBudget || 0).toLocaleString()}</p>
-                            <p className="text-[10px] text-gray-400 uppercase mt-0.5">Allocated</p>
-                         </div>
-                         <div className="text-right">
-                            <p className="text-xs font-bold text-red-600">${(selectedContract.actualSpend || 0).toLocaleString()}</p>
-                            <p className="text-[10px] text-gray-400 uppercase mt-0.5">Actual Spend</p>
-                         </div>
-                      </div>
-                   </div>
-                   <div className="space-y-4">
-                      <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">System Metadata</h4>
-                      <div className="p-4 bg-gray-50/50 rounded-2xl border-2 border-gray-100">
-                         <p className="text-sm font-semibold text-gray-900 capitalize">{selectedContract.metadata?.source?.replace(/_/g, ' ') || "Manual Entry"}</p>
-                         <p className="text-[10px] text-gray-400 font-medium uppercase mt-0.5">Source Origin</p>
-                      </div>
-                   </div>
-                </section>
+                {/* ── KPIs & Goals Tab ── */}
+                {contractDrawerTab === 'kpis' && (
+                  <>
+                    {/* Scorecard status */}
+                    {selectedContract.contractKpis?.hasGeneratedScorecard && selectedContract.contractKpis?.scorecard && (
+                      <Card className="border-l-4 border-l-amber-500">
+                        <CardContent className="pt-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
+                                <Award className="w-5 h-5 text-amber-600" />
+                              </div>
+                              <div>
+                                <p className="font-semibold text-sm">Scorecard Generated</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {selectedContract.contractKpis.scorecard.scorecardType} · {selectedContract.contractKpis.scorecard.periodLabel}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <Badge className={cn(
+                                "border-0",
+                                selectedContract.contractKpis.scorecard.status === 'PUBLISHED'
+                                  ? "bg-green-100 text-green-700"
+                                  : "bg-amber-100 text-amber-700"
+                              )}>
+                                {selectedContract.contractKpis.scorecard.status}
+                              </Badge>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Score: {selectedContract.contractKpis.scorecard.finalScore}
+                              </p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
 
-                {/* KPI Overview (Placeholder) */}
-                <section className="space-y-4 pt-4 border-t border-gray-50">
-                   <div className="flex items-center justify-between">
-                      <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">Contract KPIs</h4>
-                      <Badge className="bg-blue-50 text-blue-600 border-none rounded-full px-3 py-1 text-[10px] font-bold">12 METRICS</Badge>
-                   </div>
-                   <div className="bg-gray-50 rounded-2xl p-8 border-2 border-dashed border-gray-200 flex flex-col items-center justify-center text-center">
-                      <div className="w-12 h-12 rounded-full bg-white border-2 border-gray-100 flex items-center justify-center mb-3">
-                         <RefreshCw className="w-6 h-6 text-gray-300" />
+                    {/* Goal cards */}
+                    {(selectedContract.contractKpis?.goals?.length ?? 0) > 0 ? (
+                      <div className="space-y-4">
+                        {selectedContract.contractKpis.goals.map((goal: any) => {
+                          const prog = Math.min(goal.progressPercentage || 0, 100)
+                          const fmtVal = (v: number) => {
+                            const sym = goal.kpi?.unitSymbol || ''
+                            const n = Number(v || 0).toLocaleString()
+                            if (!sym) return `${n}${goal.targetUnit ? ` ${goal.targetUnit}` : ''}`
+                            return (goal.kpi?.unitCategory?.toLowerCase() === 'percentage') ? `${n}${sym}` : `${sym}${n}`
+                          }
+                          return (
+                            <Card key={goal.id} className={cn(
+                              "border-l-4 hover:shadow-md transition-shadow",
+                              prog >= 100 ? "border-l-green-500" : prog >= 50 ? "border-l-blue-500" : "border-l-amber-500"
+                            )}>
+                              <CardContent className="pt-4">
+                                <div className="flex items-start justify-between mb-3">
+                                  <div className="flex-1 min-w-0 pr-4">
+                                    <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
+                                      {goal.scorecardPillar && (
+                                        <Badge className="bg-indigo-100 text-indigo-700 text-xs border-0">{goal.scorecardPillar}</Badge>
+                                      )}
+                                      <Badge className={cn(
+                                        "text-xs border-0",
+                                        goal.stage === 'completed' ? "bg-green-100 text-green-700" :
+                                        goal.stage === 'in_progress' ? "bg-blue-100 text-blue-700" :
+                                        "bg-gray-100 text-gray-700"
+                                      )}>
+                                        {goal.stage?.replace(/_/g, ' ')}
+                                      </Badge>
+                                      {goal.isReverseKpi && (
+                                        <Badge className="bg-orange-100 text-orange-700 text-xs border-0">Reverse KPI</Badge>
+                                      )}
+                                    </div>
+                                    <p className="font-semibold text-sm leading-snug">{goal.title}</p>
+                                    {goal.kpi && (
+                                      <p className="text-xs text-muted-foreground mt-0.5">{goal.kpi.name} · {goal.kpi.unitSymbol}</p>
+                                    )}
+                                  </div>
+                                  <div className="text-right shrink-0">
+                                    <p className="text-2xl font-bold">{(goal.progressPercentage || 0).toFixed(0)}%</p>
+                                    <p className="text-xs text-muted-foreground">Achievement</p>
+                                  </div>
+                                </div>
+
+                                <div className="w-full bg-gray-100 rounded-full h-2 mb-3">
+                                  <div
+                                    className={cn(
+                                      "h-2 rounded-full transition-all duration-500",
+                                      prog >= 100 ? "bg-green-500" : prog >= 50 ? "bg-blue-500" : "bg-amber-500"
+                                    )}
+                                    style={{ width: `${prog}%` }}
+                                  />
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div className="p-2 bg-gray-50 rounded-lg text-center">
+                                    <p className="text-xs text-muted-foreground">Current</p>
+                                    <p className="font-semibold text-sm">{fmtVal(goal.currentValue)}</p>
+                                  </div>
+                                  <div className="p-2 bg-gray-50 rounded-lg text-center">
+                                    <p className="text-xs text-muted-foreground">Target</p>
+                                    <p className="font-semibold text-sm">{fmtVal(goal.targetValue)}</p>
+                                  </div>
+                                </div>
+
+                                {goal.scorecardWeight != null && (
+                                  <div className="mt-3 flex items-center gap-2">
+                                    <span className="text-xs text-muted-foreground">Scorecard Weight</span>
+                                    <Badge variant="outline" className="text-xs">{goal.scorecardWeight}%</Badge>
+                                  </div>
+                                )}
+                              </CardContent>
+                            </Card>
+                          )
+                        })}
                       </div>
-                      <p className="text-sm font-medium text-gray-500">Scorecard details are being processed.</p>
-                      <p className="text-xs text-gray-400 mt-1 max-w-[240px]">Navigate to individual scorecards to view detailed KPI breakdown.</p>
-                   </div>
-                </section>
+                    ) : (
+                      <Card>
+                        <CardContent className="py-12">
+                          <div className="text-center">
+                            <Target className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                            <h3 className="text-base font-semibold text-gray-600 mb-2">No KPIs Linked</h3>
+                            <p className="text-sm text-muted-foreground max-w-xs mx-auto">
+                              {selectedContract.contractKpis?.summary || "This contract has no performance goals linked yet."}
+                            </p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {selectedContract.contractKpis?.summary && (
+                      <div className="p-4 bg-blue-50 rounded-lg border border-blue-100">
+                        <p className="text-sm text-blue-700 leading-relaxed">{selectedContract.contractKpis.summary}</p>
+                      </div>
+                    )}
+                  </>
+                )}
+
               </div>
             </>
           )}

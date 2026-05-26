@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { CiTrophy, CiCalendar, CiUser } from "react-icons/ci"
 import { TrendingUp } from "lucide-react"
 import { DashboardSkeleton } from "@/components/ui/skeleton-loader"
+import { InvestmentRecipientGuard } from "@/components/user-application-portal/investment-recipient-guard"
 
 export default function ValuationsPage() {
   const dispatch = useAppDispatch()
@@ -41,6 +42,7 @@ export default function ValuationsPage() {
 
   return (
     <ApplicationPortalLayout>
+      <InvestmentRecipientGuard>
       <div className="p-6 space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -148,6 +150,7 @@ export default function ValuationsPage() {
           </div>
         )}
       </div>
+      </InvestmentRecipientGuard>
     </ApplicationPortalLayout>
   )
 }

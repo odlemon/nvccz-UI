@@ -314,9 +314,17 @@ export function EmployeeDrawer({ isOpen, onClose, employee, onEdit, onTerminated
           <div className="border border-gray-200 rounded-lg p-4">
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-4">
-                <div className={`w-16 h-16 rounded-full flex items-center justify-center text-white text-xl font-medium ${getInitialsGradient(`${employee.user.firstName} ${employee.user.lastName}`)}`}>
-                  {getInitials(employee.user.firstName, employee.user.lastName)}
-                </div>
+                {(employee.picture || employee.pictureUrl) ? (
+                  <img
+                    src={(employee.picture || employee.pictureUrl)!}
+                    alt={`${employee.user.firstName} ${employee.user.lastName}`}
+                    className="w-16 h-16 rounded-full object-cover border-2 border-gray-200 shadow-sm"
+                  />
+                ) : (
+                  <div className={`w-16 h-16 rounded-full flex items-center justify-center text-white text-xl font-medium ${getInitialsGradient(`${employee.user.firstName} ${employee.user.lastName}`)}`}>
+                    {getInitials(employee.user.firstName, employee.user.lastName)}
+                  </div>
+                )}
                 <div className="space-y-2">
                   <h2 className="text-xl font-semibold text-gray-900">
                     {employee.user.firstName} {employee.user.lastName}

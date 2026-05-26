@@ -462,6 +462,7 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'payments': 'read',
         }
       },
+      { moduleId: 'performance-management', access: 'write' },
     ]
   },
 
@@ -499,6 +500,7 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'purchase-requisitions': 'write',
         }
       },
+      { moduleId: 'performance-management', access: 'write' },
     ]
   },
 
@@ -532,6 +534,7 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'purchase-requisitions': 'write',
         }
       },
+      { moduleId: 'performance-management', access: 'write' },
     ]
   },
 
@@ -561,6 +564,7 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'purchase-requisitions': 'write',
         }
       },
+      { moduleId: 'performance-management', access: 'read' },
     ]
   },
 
@@ -780,6 +784,7 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
       { moduleId: 'homepage', access: 'full' },
       { moduleId: 'procurement', access: 'write' },
       { moduleId: 'events-management', access: 'write' },
+      { moduleId: 'performance-management', access: 'write' },
     ]
   },
 
@@ -821,6 +826,7 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'purchase-requisitions': 'write',
         }
       },
+      { moduleId: 'performance-management', access: 'read' },
     ]
   },
 
@@ -991,6 +997,7 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'my-approvals': 'full',
         }
       },
+      { moduleId: 'performance-management', access: 'write' },
     ]
   },
 
@@ -1037,6 +1044,7 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'my-approvals': 'read',
         }
       },
+      { moduleId: 'performance-management', access: 'write' },
     ]
   },
 
@@ -1054,6 +1062,7 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'goods-received-notes': 'write',
         }
       },
+      { moduleId: 'performance-management', access: 'write' },
     ]
   },
 
@@ -1067,6 +1076,7 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
         moduleId: 'procurement',
         access: 'read',
       },
+      { moduleId: 'performance-management', access: 'read' },
     ]
   },
 
@@ -1282,6 +1292,7 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'purchase-requisitions': 'write',
         }
       },
+      { moduleId: 'performance-management', access: 'write' },
     ]
   },
 
@@ -1302,6 +1313,7 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'purchase-requisitions': 'write',
         }
       },
+      { moduleId: 'performance-management', access: 'read' },
     ]
   },
 
@@ -1358,6 +1370,7 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'purchase-requisitions': 'write',
         }
       },
+      { moduleId: 'performance-management', access: 'write' },
     ]
   },
 
@@ -1426,6 +1439,7 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'purchase-requisitions': 'write',
         }
       },
+      { moduleId: 'performance-management', access: 'read' },
     ]
   },
 
@@ -1493,6 +1507,7 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'purchase-requisitions': 'write',
         }
       },
+      { moduleId: 'performance-management', access: 'write' },
     ]
   },
 
@@ -1590,6 +1605,7 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'purchase-requisitions': 'write',
         }
       },
+      { moduleId: 'performance-management', access: 'read' },
     ]
   },
 
@@ -1790,6 +1806,7 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'purchase-requisitions': 'write',
         }
       },
+      { moduleId: 'performance-management', access: 'write' },
     ]
   },
 
@@ -1810,6 +1827,7 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'purchase-requisitions': 'write',
         }
       },
+      { moduleId: 'performance-management', access: 'read' },
     ]
   },
 

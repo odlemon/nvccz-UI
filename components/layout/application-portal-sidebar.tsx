@@ -8,27 +8,23 @@ import { getModuleById } from "@/lib/config/modules"
 import { useAppDispatch, useAppSelector } from "@/lib/store"
 import { fetchDashboard } from "@/lib/store/slices/applicationPortalSlice"
 
-// Sub-modules that are always visible regardless of application stage.
+// Sub-modules that are always visible regardless of investment status.
 const ALWAYS_VISIBLE: ReadonlySet<string> = new Set([
   "application-dashboard",
   "application-details",
   "term-sheets",
 ])
 
-// Sub-modules unlocked once the application has been disbursed AND the
-// portfolio company is approved (the post-disbursement experience).
-const POST_DISBURSEMENT_GATED: ReadonlySet<string> = new Set([
+// Sub-modules unlocked once the company has received investment
+// (dashboard.hasReceivedInvestment === true).
+const INVESTMENT_GATED: ReadonlySet<string> = new Set([
+  "portfolio-company",
   "investment-details",
   "drawdown",
   "grn",
   "valuations",
   "reports",
   "application-portal-settings",
-])
-
-// Sub-modules unlocked as soon as a portfolio company exists and is APPROVED.
-const PORTFOLIO_COMPANY_GATED: ReadonlySet<string> = new Set([
-  "portfolio-company",
 ])
 
 export function ApplicationPortalSidebar() {
@@ -50,28 +46,21 @@ export function ApplicationPortalSidebar() {
 
   const isPathActive = (path: string) => pathname === path
 
-  const isDisbursedAndApproved = useMemo(() => {
-    const stage = (dashboard as any)?.application?.currentStage
-    const status = (dashboard as any)?.portfolioCompany?.status
-    return stage === "DISBURSED" && status === "APPROVED"
-  }, [dashboard])
-
-  const hasActivePortfolioCompany = useMemo(() => {
-    const status = (dashboard as any)?.portfolioCompany?.status
-    return status === "APPROVED"
+  const hasReceivedInvestment = useMemo(() => {
+    return Boolean(
+      (dashboard as any)?.hasReceivedInvestment ||
+      (dashboard as any)?.summary?.hasReceivedInvestment
+    )
   }, [dashboard])
 
   const visibleSubModules = useMemo(() => {
     if (!module) return []
     return module.subModules.filter((sub) => {
       if (ALWAYS_VISIBLE.has(sub.id)) return true
-      if (PORTFOLIO_COMPANY_GATED.has(sub.id)) return hasActivePortfolioCompany
-      if (POST_DISBURSEMENT_GATED.has(sub.id)) return isDisbursedAndApproved
-      // Anything new that hasn't been classified defaults to visible so we
-      // don't accidentally hide it before it's been triaged.
+      if (INVESTMENT_GATED.has(sub.id)) return hasReceivedInvestment
       return true
     })
-  }, [module, hasActivePortfolioCompany, isDisbursedAndApproved])
+  }, [module, hasReceivedInvestment])
 
   if (!module) {
     return null

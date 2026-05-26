@@ -291,13 +291,16 @@ export interface DashboardPortfolioCompany {
 export interface DashboardSummary {
   hasApplication: boolean
   hasPortfolioCompany: boolean
+  hasReceivedInvestment: boolean
   applicationStage: string
   companyStatus: string
+  applicationProgress: number
   requestedAmount: number
   approvedAmount: number
 }
 
 export interface Dashboard {
+  hasReceivedInvestment: boolean
   application: DashboardApplication | null
   portfolioCompany: DashboardPortfolioCompany | null
   recentActivities: any[]

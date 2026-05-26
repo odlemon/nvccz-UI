@@ -13,6 +13,7 @@ import { ContactInfoCard } from "@/components/portfolio/contact-info-card"
 import { AdditionalInfoCard } from "@/components/portfolio/additional-info-card"
 import { CompanyEditForm } from "@/components/portfolio/company-edit-form"
 import { PortfolioSkeleton } from "@/components/portfolio/portfolio-skeleton"
+import { InvestmentRecipientGuard } from "@/components/user-application-portal/investment-recipient-guard"
 
 export default function PortfolioCompanyPage() {
   const dispatch = useAppDispatch()
@@ -70,21 +71,24 @@ export default function PortfolioCompanyPage() {
   if (!company) {
     return (
       <ApplicationPortalLayout>
-        <div className="p-6 space-y-6">
-          <div className="flex items-center justify-center h-64">
-            <div className="text-center">
-              <div className="text-gray-400 text-6xl mb-4">🏢</div>
-              <h3 className="text-lg font-semibold text-gray-600 mb-2">No Company Found</h3>
-              <p className="text-muted-foreground">Your company profile will appear here once registered.</p>
+        <InvestmentRecipientGuard>
+          <div className="p-6 space-y-6">
+            <div className="flex items-center justify-center h-64">
+              <div className="text-center">
+                <div className="text-gray-400 text-6xl mb-4">🏢</div>
+                <h3 className="text-lg font-semibold text-gray-600 mb-2">No Company Found</h3>
+                <p className="text-muted-foreground">Your company profile will appear here once registered.</p>
+              </div>
             </div>
           </div>
-        </div>
+        </InvestmentRecipientGuard>
       </ApplicationPortalLayout>
     )
   }
 
   return (
     <ApplicationPortalLayout>
+      <InvestmentRecipientGuard>
       <div className="p-6 space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -141,6 +145,7 @@ export default function PortfolioCompanyPage() {
           </div>
         )}
       </div>
+      </InvestmentRecipientGuard>
     </ApplicationPortalLayout>
   )
 }

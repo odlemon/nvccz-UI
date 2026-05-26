@@ -2,96 +2,181 @@ import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer"
 import { PerformancePdfLetterhead } from "./pdf-letterhead"
 
 const COLORS = {
-  primary: "#2563eb",
+  primary: "#1e40af", // Formal Darker Blue
   slate900: "#0f172a",
   slate700: "#334155",
   slate500: "#64748b",
   slate300: "#cbd5e1",
   slate100: "#f1f5f9",
-  emerald: "#10b981",
-  amber: "#f59e0b",
-  red: "#ef4444",
+  emerald: "#059669",
+  amber: "#d97706",
+  red: "#dc2626",
   white: "#ffffff",
 }
 
 const styles = StyleSheet.create({
   page: {
-    paddingTop: 36,
-    paddingBottom: 44,
-    paddingHorizontal: 32,
+    paddingTop: 40,
+    paddingBottom: 60,
+    paddingHorizontal: 40,
     fontFamily: "Helvetica",
     fontSize: 9,
     color: COLORS.slate700,
+    lineHeight: 1.5,
   },
-  // Status pill row directly under the letterhead
-  pillRow: { flexDirection: "row", gap: 6, marginBottom: 14, flexWrap: "wrap" },
-  pill: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-    fontSize: 8,
+  
+  // Contract Title Section
+  contractTitleContainer: {
+    marginTop: 20,
+    marginBottom: 30,
+    textAlign: "center",
+    borderBottomWidth: 2,
+    borderBottomColor: COLORS.slate900,
+    paddingBottom: 15,
+  },
+  contractTitle: {
+    fontSize: 16,
     fontWeight: "bold",
-    letterSpacing: 0.5,
+    color: COLORS.slate900,
+    textTransform: "uppercase",
+    letterSpacing: 1.5,
   },
-  pillPrimary: { backgroundColor: "#dbeafe", color: "#1e40af" },
-  pillStatus: { backgroundColor: "#dcfce7", color: "#166534" },
-  pillStatusInactive: { backgroundColor: "#f1f5f9", color: COLORS.slate700 },
+  contractSubtitle: {
+    fontSize: 10,
+    color: COLORS.slate500,
+    marginTop: 5,
+    fontWeight: "bold",
+  },
 
-  // Section
-  section: { marginBottom: 14 },
-  sectionTitle: {
+  // Recitals / Intro
+  recital: {
+    marginBottom: 20,
+    fontStyle: "italic",
+    fontSize: 10,
+    color: COLORS.slate900,
+    borderLeftWidth: 3,
+    borderLeftColor: COLORS.slate300,
+    paddingLeft: 10,
+  },
+
+  // Section Styling
+  section: { 
+    marginBottom: 25,
+  },
+  sectionHeading: {
     fontSize: 11,
     fontWeight: "bold",
     color: COLORS.slate900,
-    marginBottom: 8,
-    paddingBottom: 4,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.slate300,
+    backgroundColor: COLORS.slate100,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginBottom: 10,
+    textTransform: "uppercase",
   },
 
-  // Two-column field grid
-  grid: { flexDirection: "row", flexWrap: "wrap", marginHorizontal: -4 },
-  gridCell: { width: "50%", paddingHorizontal: 4, marginBottom: 8 },
-  cellBox: {
+  // Tables
+  table: {
+    width: "100%",
     borderWidth: 1,
-    borderColor: COLORS.slate300,
-    borderRadius: 4,
-    backgroundColor: COLORS.slate100,
-    padding: 8,
+    borderColor: COLORS.slate200,
+    borderRadius: 2,
   },
-  cellLabel: {
+  tableHeader: {
+    flexDirection: "row",
+    backgroundColor: COLORS.slate50,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.slate200,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+  },
+  tableRow: {
+    flexDirection: "row",
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.slate100,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+  },
+  tableCell: {
+    flex: 1,
+  },
+  tableCellLabel: {
+    fontWeight: "bold",
+    fontSize: 8,
+    color: COLORS.slate500,
+    textTransform: "uppercase",
+  },
+  tableCellText: {
+    fontSize: 9,
+    fontWeight: "bold",
+    color: COLORS.slate900,
+  },
+
+  // KPI Table Specifics
+  kpiRow: {
+    flexDirection: "row",
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.slate100,
+    paddingVertical: 10,
+  },
+  kpiColMain: { flex: 4, paddingRight: 10 },
+  kpiColValue: { flex: 1.5, textAlign: "right", paddingRight: 5 },
+  kpiColUnit: { flex: 1, textAlign: "right" },
+  
+  kpiTitle: { fontSize: 9, fontWeight: "bold", color: COLORS.slate900 },
+  kpiSubtitle: { fontSize: 7, color: COLORS.slate500, marginTop: 2 },
+
+  // Legal Clauses
+  clause: {
+    marginBottom: 12,
+  },
+  clauseTitle: {
+    fontWeight: "bold",
+    color: COLORS.slate900,
+    marginRight: 5,
+  },
+
+  // Signatures
+  signatureGrid: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 40,
+    gap: 30,
+  },
+  signatureBox: {
+    flex: 1,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.slate900,
+    paddingTop: 10,
+  },
+  signatureName: {
+    fontSize: 9,
+    fontWeight: "bold",
+    color: COLORS.slate900,
+  },
+  signatureLabel: {
     fontSize: 7,
     color: COLORS.slate500,
     textTransform: "uppercase",
-    letterSpacing: 0.6,
-    marginBottom: 3,
+    marginTop: 2,
   },
-  cellValue: { fontSize: 10, color: COLORS.slate900, fontWeight: "bold" },
-  cellMeta: { fontSize: 8, color: COLORS.slate500, marginTop: 2 },
-
-  // Inline label/value row (for compact lists)
-  inlineRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingVertical: 4,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.slate100,
+  signatureDate: {
+    fontSize: 7,
+    color: COLORS.slate400,
+    marginTop: 6,
   },
-  inlineLabel: { fontSize: 9, color: COLORS.slate500 },
-  inlineValue: { fontSize: 9, color: COLORS.slate900, fontWeight: "bold" },
 
   footer: {
     position: "absolute",
-    bottom: 20,
-    left: 32,
-    right: 32,
+    bottom: 30,
+    left: 40,
+    right: 40,
     borderTopWidth: 1,
-    borderTopColor: COLORS.slate300,
-    paddingTop: 6,
+    borderTopColor: COLORS.slate200,
+    paddingTop: 8,
     flexDirection: "row",
     justifyContent: "space-between",
     fontSize: 7,
-    color: COLORS.slate500,
+    color: COLORS.slate400,
   },
 })
 
@@ -100,154 +185,161 @@ interface PerformanceContractPDFProps {
   activeAddress?: any
 }
 
-const fmtDate = (d?: string) => (d ? new Date(d).toLocaleDateString() : "—")
-
 const fullName = (u?: { firstName?: string; lastName?: string }) =>
   u ? `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() : ""
 
 export default function PerformanceContractPDF({
-  contract,
+  contract: c,
   activeAddress,
 }: PerformanceContractPDFProps) {
-  const c = contract || {}
-  const subjectName = fullName(c.subjectUser) || "No participant assigned"
-  const subjectEmail = c.subjectUser?.email || "—"
-  const createdByName = fullName(c.createdBy) || "System"
-  const createdByEmail = c.createdBy?.email || "—"
-  const reviewerName = fullName(c.reviewer) || "Not assigned"
-  const approverName = fullName(c.approver) || "Not assigned"
-  const allocated = Number(c.allocatedBudget ?? 0).toLocaleString()
-  const actual = Number(c.actualSpend ?? 0).toLocaleString()
-  const source = String(c.metadata?.source ?? "manual_entry").replace(/_/g, " ")
-
-  const isActive = String(c.status || "").toUpperCase() === "ACTIVE"
+  const subjectName = fullName(c.subjectUser) || c.departmentName || "Official Subject"
+  const subjectRole = c.contractType === 'CEO' ? 'Chief Executive Officer' : 
+                   c.contractType === 'BOARD' ? 'Member of the Board' : 
+                   c.contractType === 'DEPARTMENT' ? 'Department Head' : 'Employee'
+  
+  const reviewerName = fullName(c.reviewer) || "Official Reviewer"
+  const approverName = fullName(c.approver) || "Approving Authority"
+  const goals = c.contractKpis?.goals || []
 
   return (
     <Document>
       <Page size="A4" style={styles.page} wrap>
         <PerformancePdfLetterhead
-          title={c.title || `${c.contractType || ""} Performance Contract`.trim()}
-          subtitle={subjectName ? `Subject: ${subjectName}` : "Performance Contract"}
+          title="Official Performance Agreement"
+          subtitle={c.periodLabel ? `Reporting Cycle: ${c.periodLabel}` : "Executive Agreement"}
           periodLabel={c.periodLabel}
           activeAddress={activeAddress}
         />
 
-        {/* Status pills row */}
-        <View style={styles.pillRow}>
-          <Text style={[styles.pill, styles.pillPrimary]}>
-            {String(c.contractType || "").toUpperCase()} CONTRACT
+        <View style={styles.contractTitleContainer}>
+          <Text style={styles.contractTitle}>
+            {c.contractType} PERFORMANCE CONTRACT
           </Text>
-          <Text style={[styles.pill, isActive ? styles.pillStatus : styles.pillStatusInactive]}>
-            {String(c.status || "—").toUpperCase()}
+          <Text style={styles.contractSubtitle}>
+            CONTRACT REF: PC-{c.id?.slice(0, 8).toUpperCase() || "NEW"}
           </Text>
-          {c.periodLabel && (
-            <Text style={[styles.pill, styles.pillStatusInactive]}>
-              PERIOD · {c.periodLabel}
-            </Text>
+        </View>
+
+        <Text style={styles.recital}>
+          THIS AGREEMENT is entered into for the performance cycle of {c.periodLabel}, 
+          outlining the strategic objectives, key performance indicators (KPIs), and budget 
+          allocations agreed upon between the Management and the Subject Participant.
+        </Text>
+
+        {/* 1.0 PARTIES */}
+        <View style={styles.section}>
+          <Text style={styles.sectionHeading}>1.0 Parties to the Agreement</Text>
+          <View style={styles.table}>
+            <View style={styles.tableRow}>
+              <View style={styles.tableCell}>
+                <Text style={styles.tableCellLabel}>Subject Participant</Text>
+                <Text style={styles.tableCellText}>{subjectName}</Text>
+              </View>
+              <View style={styles.tableCell}>
+                <Text style={styles.tableCellLabel}>Designation</Text>
+                <Text style={styles.tableCellText}>{subjectRole}</Text>
+              </View>
+            </View>
+            <View style={[styles.tableRow, { borderBottomWidth: 0 }]}>
+              <View style={styles.tableCell}>
+                <Text style={styles.tableCellLabel}>Department / Unit</Text>
+                <Text style={styles.tableCellText}>{c.departmentName || "Corporate Executive"}</Text>
+              </View>
+              <View style={styles.tableCell}>
+                <Text style={styles.tableCellLabel}>Agreement Status</Text>
+                <Text style={[styles.tableCellText, { color: c.status === 'ACTIVE' ? COLORS.emerald : COLORS.amber }]}>
+                  {c.status || "PENDING"}
+                </Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* 2.0 SCOPE OF WORK */}
+        <View style={styles.section} wrap={false}>
+          <Text style={styles.sectionHeading}>2.0 Strategic Deliverables & Performance Metrics</Text>
+          <Text style={{ fontSize: 8, marginBottom: 8, color: COLORS.slate500 }}>
+            The following Key Performance Indicators have been established and agreed upon for this period.
+          </Text>
+          
+          <View style={{ borderTopWidth: 1, borderTopColor: COLORS.slate900, marginBottom: 5 }} />
+          <View style={{ flexDirection: "row", paddingVertical: 4 }}>
+             <Text style={[styles.tableCellLabel, { flex: 4 }]}>Deliverable / KPI Description</Text>
+             <Text style={[styles.tableCellLabel, { flex: 1.5, textAlign: "right" }]}>Target</Text>
+             <Text style={[styles.tableCellLabel, { flex: 1, textAlign: "right" }]}>Unit</Text>
+          </View>
+          <View style={{ borderTopWidth: 1, borderTopColor: COLORS.slate300, marginBottom: 5 }} />
+
+          {goals.length > 0 ? (
+            goals.map((goal: any, idx: number) => (
+              <View key={goal.id} style={styles.kpiRow} wrap={false}>
+                <View style={styles.kpiColMain}>
+                  <Text style={styles.kpiTitle}>{idx + 1}. {goal.title}</Text>
+                  <Text style={styles.kpiSubtitle}>Pillar: {goal.scorecardPillar || "Strategic"} | Stage: {goal.stage?.replace(/_/g, ' ') || 'Active'}</Text>
+                </View>
+                <View style={styles.kpiColValue}>
+                  <Text style={styles.tableCellText}>{goal.targetValue || "0"}</Text>
+                </View>
+                <View style={styles.kpiColUnit}>
+                  <Text style={[styles.tableCellText, { fontSize: 8, color: COLORS.slate500 }]}>{goal.targetUnit || "Units"}</Text>
+                </View>
+              </View>
+            ))
+          ) : (
+             <Text style={{ textAlign: "center", paddingVertical: 20, color: COLORS.slate400, fontSize: 8 }}>
+                No specific KPIs have been defined for this contract.
+             </Text>
           )}
         </View>
 
-        {/* Parties */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Parties</Text>
-          <View style={styles.grid}>
-            <View style={styles.gridCell}>
-              <View style={styles.cellBox}>
-                <Text style={styles.cellLabel}>Subject Participant</Text>
-                <Text style={styles.cellValue}>{subjectName}</Text>
-                <Text style={styles.cellMeta}>{subjectEmail}</Text>
-              </View>
-            </View>
-            <View style={styles.gridCell}>
-              <View style={styles.cellBox}>
-                <Text style={styles.cellLabel}>Created By</Text>
-                <Text style={styles.cellValue}>{createdByName}</Text>
-                <Text style={styles.cellMeta}>{createdByEmail}</Text>
-              </View>
-            </View>
-            <View style={styles.gridCell}>
-              <View style={styles.cellBox}>
-                <Text style={styles.cellLabel}>Reviewer</Text>
-                <Text style={styles.cellValue}>{reviewerName}</Text>
-              </View>
-            </View>
-            <View style={styles.gridCell}>
-              <View style={styles.cellBox}>
-                <Text style={styles.cellLabel}>Approver</Text>
-                <Text style={styles.cellValue}>{approverName}</Text>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        {/* Period & Department */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Period &amp; Department</Text>
-          <View style={styles.grid}>
-            <View style={styles.gridCell}>
-              <View style={styles.cellBox}>
-                <Text style={styles.cellLabel}>Reporting Period</Text>
-                <Text style={styles.cellValue}>{c.periodLabel || "—"}</Text>
-                <Text style={styles.cellMeta}>
-                  {fmtDate(c.periodStart)} — {fmtDate(c.periodEnd)}
+        {/* 3.0 FINANCIAL ALLOCATION */}
+        <View style={styles.section} wrap={false}>
+          <Text style={styles.sectionHeading}>3.0 Financial Budget Allocation</Text>
+          <View style={styles.table}>
+            <View style={[styles.tableRow, { borderBottomWidth: 0 }]}>
+              <View style={styles.tableCell}>
+                <Text style={styles.tableCellLabel}>Total Allocated Budget (USD)</Text>
+                <Text style={[styles.tableCellText, { fontSize: 12, color: COLORS.primary }]}>
+                  ${Number(c.allocatedBudget || 0).toLocaleString()}
                 </Text>
               </View>
-            </View>
-            <View style={styles.gridCell}>
-              <View style={styles.cellBox}>
-                <Text style={styles.cellLabel}>Department</Text>
-                <Text style={styles.cellValue}>{c.departmentName || "—"}</Text>
-                <Text style={styles.cellMeta}>Primary org unit</Text>
+              <View style={styles.tableCell}>
+                <Text style={styles.tableCellLabel}>Allocated Date</Text>
+                <Text style={styles.tableCellText}>{new Date(c.createdAt || Date.now()).toLocaleDateString()}</Text>
               </View>
             </View>
           </View>
         </View>
 
-        {/* Financials */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Financials</Text>
-          <View style={styles.grid}>
-            <View style={styles.gridCell}>
-              <View style={styles.cellBox}>
-                <Text style={styles.cellLabel}>Allocated Budget</Text>
-                <Text style={[styles.cellValue, { color: COLORS.slate900 }]}>
-                  ${allocated}
-                </Text>
-              </View>
+        {/* 4.0 SIGNATORIES */}
+        <View style={styles.section} wrap={false}>
+          <Text style={styles.sectionHeading}>4.0 Agreement Signatories</Text>
+          <Text style={{ fontSize: 8, color: COLORS.slate500, marginBottom: 10 }}>
+            By signing below, the parties agree to strictly adhere to the performance metrics and financial 
+            provisions outlined in this document.
+          </Text>
+
+          <View style={styles.signatureGrid}>
+            <View style={styles.signatureBox}>
+              <Text style={styles.signatureName}>{subjectName}</Text>
+              <Text style={styles.signatureLabel}>Subject Participant (Obligor)</Text>
+              <Text style={styles.signatureDate}>Date: ________________________</Text>
             </View>
-            <View style={styles.gridCell}>
-              <View style={styles.cellBox}>
-                <Text style={styles.cellLabel}>Actual Spend</Text>
-                <Text style={[styles.cellValue, { color: COLORS.red }]}>
-                  ${actual}
-                </Text>
-              </View>
+            <View style={styles.signatureBox}>
+              <Text style={styles.signatureName}>{reviewerName}</Text>
+              <Text style={styles.signatureLabel}>Official Reviewer</Text>
+              <Text style={styles.signatureDate}>Date: ________________________</Text>
+            </View>
+            <View style={styles.signatureBox}>
+              <Text style={styles.signatureName}>{approverName}</Text>
+              <Text style={styles.signatureLabel}>Approving Authority</Text>
+              <Text style={styles.signatureDate}>Date: ________________________</Text>
             </View>
           </View>
         </View>
 
-        {/* Metadata */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Metadata</Text>
-          <View style={styles.inlineRow}>
-            <Text style={styles.inlineLabel}>Source</Text>
-            <Text style={[styles.inlineValue, { textTransform: "capitalize" }]}>
-              {source}
-            </Text>
-          </View>
-          <View style={styles.inlineRow}>
-            <Text style={styles.inlineLabel}>Contract ID</Text>
-            <Text style={styles.inlineValue}>{c.id || "—"}</Text>
-          </View>
-          <View style={styles.inlineRow}>
-            <Text style={styles.inlineLabel}>Generated</Text>
-            <Text style={styles.inlineValue}>{new Date().toLocaleString()}</Text>
-          </View>
-        </View>
-
-        {/* Fixed footer */}
         <View style={styles.footer} fixed>
-          <Text> Generated {new Date().toLocaleString()}</Text>
+          <Text>Performance Contract Ref: {c.id || "N/A"}</Text>
           <Text render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} />
         </View>
       </Page>

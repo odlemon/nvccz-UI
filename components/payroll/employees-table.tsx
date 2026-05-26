@@ -104,13 +104,13 @@ export function EmployeesTable({ title, description }: EmployeesTableProps) {
     }
   };
 
-  const handleFormSubmit = async (data: any) => {
+  const handleFormSubmit = async (data: any, picture?: File) => {
     try {
       if (editingEmployee) {
         await employeesApi.update(editingEmployee.id, data);
         toast.success("Employee updated successfully");
       } else {
-        await employeesApi.create(data);
+        await employeesApi.create(data, picture);
         toast.success("Employee created successfully");
       }
       setIsFormOpen(false);
@@ -203,23 +203,34 @@ export function EmployeesTable({ title, description }: EmployeesTableProps) {
       key: "user" as keyof Employee,
       label: "Name",
       sortable: true,
-      render: (value: any) => (
-        <div className="flex items-center gap-3">
-          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-medium ${getInitialsGradient(`${value.firstName} ${value.lastName}`)}`}>
-            {getInitials(value.firstName, value.lastName)}
-          </div>
-          <div>
-            <div className="font-medium text-gray-900">
-              {value.firstName} {value.lastName}
+      render: (value: any, row: Employee) => {
+        const photoUrl = row.picture || row.pictureUrl
+        return (
+          <div className="flex items-center gap-3">
+            {photoUrl ? (
+              <img
+                src={photoUrl}
+                alt={`${value.firstName} ${value.lastName}`}
+                className="w-10 h-10 rounded-full object-cover border border-gray-200 shrink-0"
+              />
+            ) : (
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-medium shrink-0 ${getInitialsGradient(`${value.firstName} ${value.lastName}`)}`}>
+                {getInitials(value.firstName, value.lastName)}
+              </div>
+            )}
+            <div>
+              <div className="font-medium text-gray-900">
+                {value.firstName} {value.lastName}
+              </div>
+              <CopyText
+                text={value.email}
+                successMessage="Email copied to clipboard!"
+                className="mt-1"
+              />
             </div>
-            <CopyText 
-              text={value.email}
-              successMessage="Email copied to clipboard!"
-              className="mt-1"
-            />
           </div>
-        </div>
-      ),
+        )
+      },
     },
     {
       key: "employeeNumber" as keyof Employee,

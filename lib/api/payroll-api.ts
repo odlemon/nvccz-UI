@@ -97,6 +97,7 @@ export interface Employee {
   nextOfKin: string
   address: string
   pictureUrl: string | null
+  picture: string | null
   isActive: boolean
   createdAt: string
   updatedAt: string
@@ -463,19 +464,34 @@ export const employeesApi = {
     return apiClient.get<ApiResponse<Employee[]>>('/payroll/employees')
   },
 
-  create: async (data: {
-    userId: string
-    bankName: string
-    branchCode: string
-    accountNumber: string
-    basicSalary: number
-    currencyId: string
-    idNumber: string
-    nextOfKin: string
-    address: string
-    pictureUrl?: string | null
-  }): Promise<ApiResponse<Employee>> => {
-    return apiClient.post<ApiResponse<Employee>>('/payroll/employees', data)
+  create: async (
+    data: {
+      userId: string
+      bankName: string
+      branchCode: string
+      accountNumber: string
+      basicSalary: number
+      currencyId: string
+      idNumber: string
+      nextOfKin: string
+      address: string
+      pictureUrl?: string | null
+    },
+    picture?: File
+  ): Promise<ApiResponse<Employee>> => {
+    const fd = new FormData()
+    fd.append('userId', data.userId)
+    fd.append('bankName', data.bankName)
+    fd.append('branchCode', data.branchCode)
+    fd.append('accountNumber', data.accountNumber)
+    fd.append('basicSalary', String(data.basicSalary))
+    fd.append('currencyId', data.currencyId)
+    fd.append('idNumber', data.idNumber)
+    fd.append('nextOfKin', data.nextOfKin)
+    fd.append('address', data.address)
+    if (data.pictureUrl) fd.append('pictureUrl', data.pictureUrl)
+    if (picture) fd.append('picture', picture)
+    return apiClient.post<ApiResponse<Employee>>('/payroll/employees', fd)
   },
 
   update: async (id: string, data: {

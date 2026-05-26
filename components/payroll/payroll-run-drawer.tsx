@@ -388,9 +388,7 @@ export function PayrollRunDrawer({ isOpen, onClose, payrollRun, onEdit, onProces
                             Before deductions
                           </p>
                         </div>
-                        <div className="w-8 h-8 rounded-full flex items-center justify-center bg-white/20">
-                          <DollarSign className="h-4 w-4 text-white" />
-                        </div>
+                        
                       </div>
                     </div>
                   </div>
@@ -407,9 +405,7 @@ export function PayrollRunDrawer({ isOpen, onClose, payrollRun, onEdit, onProces
                             Taxes & other deductions
                           </p>
                         </div>
-                        <div className="w-8 h-8 rounded-full flex items-center justify-center gradient-primary">
-                          <DollarSign className="h-4 w-4 text-white" />
-                        </div>
+                       
                       </div>
                     </div>
                   </div>
@@ -426,9 +422,7 @@ export function PayrollRunDrawer({ isOpen, onClose, payrollRun, onEdit, onProces
                             Amount to be paid
                           </p>
                         </div>
-                        <div className="w-8 h-8 rounded-full flex items-center justify-center bg-white/20">
-                          <DollarSign className="h-4 w-4 text-white" />
-                        </div>
+                       
                       </div>
                     </div>
                   </div>

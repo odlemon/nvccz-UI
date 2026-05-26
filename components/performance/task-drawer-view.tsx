@@ -71,6 +71,17 @@ const ActivityListSkeleton = () => (
   </div>
 )
 
+function formatTaskValue(task: any): string {
+  const unitSymbol = task?.valueDisplay?.unitSymbol ?? task?.kpi?.unitSymbol ?? ''
+  const unitPosition = task?.kpi?.unitPosition ?? 'prefix'
+  const unitCategory = task?.kpi?.unitCategory ?? ''
+  const raw = unitCategory === 'Currency' || (!task?.percentValueAchieved && task?.monetaryValueAchieved)
+    ? parseFloat(task?.monetaryValueAchieved ?? 0)
+    : parseFloat(task?.percentValueAchieved ?? 0)
+  const formatted = raw.toLocaleString()
+  return unitPosition === 'prefix' ? `${unitSymbol}${formatted}` : `${formatted}${unitSymbol}`
+}
+
 export function TaskDrawerView({ task, onClose }: TaskDrawerViewProps) {
   const dispatch = useAppDispatch()
   const { activities, activitiesLoading, activitiesError } = useAppSelector((state) => state.tasks)
@@ -123,8 +134,6 @@ export function TaskDrawerView({ task, onClose }: TaskDrawerViewProps) {
               <Activity className="w-4 h-4 mr-2" />
               Log Activity
             </Button>
-
-
             {/* <Button 
               onClick={() => setCreateActivityModalOpen(true)}
               className="rounded-full h-10 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white"
@@ -144,9 +153,7 @@ export function TaskDrawerView({ task, onClose }: TaskDrawerViewProps) {
             </Button>
           </div>
         </div>
-
       </SheetHeader>
-
       {/* Tab Navigation */}
       <div className="mt-4 border-b">
         <nav className="flex -mb-px space-x-6">
@@ -167,7 +174,6 @@ export function TaskDrawerView({ task, onClose }: TaskDrawerViewProps) {
           ))}
         </nav>
       </div>
-
       {/* Tab Content */}
       <div className="mt-6 space-y-6">
         {activeDrawerTab === "details" && (
@@ -324,7 +330,7 @@ export function TaskDrawerView({ task, onClose }: TaskDrawerViewProps) {
                     </CardContent>
                   </Card>
                   
-                  {task?.monetaryValueAchieved && parseFloat(task.monetaryValueAchieved) > 0 && (
+                  {task?.valueDisplay?.showValue && (
                     <Card className="border-l-4 border-l-blue-500">
                       <CardContent className="pt-4">
                         <div className="flex items-center gap-3">
@@ -334,7 +340,7 @@ export function TaskDrawerView({ task, onClose }: TaskDrawerViewProps) {
                           <div>
                             <p className="text-xs text-gray-600">Value Achieved</p>
                             <p className="text-xl font-semibold text-blue-600">
-                              ${parseFloat(task.monetaryValueAchieved).toLocaleString()}
+                              {formatTaskValue(task)}
                             </p>
                           </div>
                         </div>

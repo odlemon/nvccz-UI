@@ -141,14 +141,10 @@ export function AccountingDashboardV2() {
             return { ...row, netProfitPercent }
         })
     }, [dashboardData?.monthlyData])
-    // Assets list and distribution grid render the detailed account-level breakdown
-    // (per individual GL account). Falls back to summary if detailed is unavailable.
+    // Assets list (Left) and distribution grid (Right) now use specific data sources per request.
     const assetsSummaryData = dashboardData?.assets?.summary || []
     const assetsDetailedData = dashboardData?.assets?.detailed || []
-    const assetsGridData = assetsDetailedData.length > 0 ? assetsDetailedData : assetsSummaryData
-    const liabilitiesEquityData = dashboardData?.liabilitiesEquity?.summary || []
-    const expensesChartData = dashboardData?.expenses || []
-
+    
     const formatCurrency = (value: number) => {
         if (value >= 1000000) {
             return `${currencySymbol}${(value / 1000000).toFixed(1)}M`
@@ -160,6 +156,13 @@ export function AccountingDashboardV2() {
         return `${currencySymbol}${value.toLocaleString()}`
     }
 
+    // Calculate total assets for display - prioritize API's total field
+    const totalAssets = dashboardData?.assets?.total || 0
+    const totalAssetsLabel = formatCurrency(totalAssets)
+
+    const liabilitiesEquityData = dashboardData?.liabilitiesEquity?.summary || []
+    const expensesChartData = dashboardData?.expenses || []
+
     const getMetricAmountClass = (formattedAmount: string) => {
         const length = formattedAmount.length
         if (length >= 17) return "text-lg sm:text-xl"
@@ -167,10 +170,6 @@ export function AccountingDashboardV2() {
         if (length >= 13) return "text-2xl sm:text-3xl"
         return "text-3xl sm:text-4xl"
     }
-
-    // Calculate total assets for display
-    const totalAssets = dashboardData?.assets?.total || assetsGridData.reduce((sum: number, asset: any) => sum + (asset.amount || 0), 0)
-    const totalAssetsLabel = formatCurrency(totalAssets)
 
     // Calculate total liabilities & equity
     const totalLiabilitiesEquity = dashboardData?.liabilitiesEquity?.total || liabilitiesEquityData.reduce((sum: number, item: any) => sum + (item.amount || 0), 0)
@@ -607,17 +606,17 @@ export function AccountingDashboardV2() {
                 {/* Bottom Row - Assets and Expenses */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {/* Assets List */}
-                    <Card className="bg-white border-none rounded-xl shadow-none overflow-hidden">
-                        <CardHeader className="p-5 pb-2">
+                    <Card className="bg-white border-none rounded-xl shadow-none overflow-hidden flex flex-col h-[500px]">
+                        <CardHeader className="p-5 pb-2 shrink-0">
                             <div className="flex items-center justify-between">
                                 <CardTitle className="text-lg font-semibold text-foreground">Assets</CardTitle>
                                 <span className="text-sm font-medium text-muted-foreground bg-gray-50 px-3 py-1 rounded-full">{totalAssetsLabel} Total</span>
                             </div>
                         </CardHeader>
-                        <CardContent className="p-5">
-                            <div className="space-y-6">
-                                {assetsGridData.length > 0 ? (
-                                    assetsGridData.slice(0, 8).map((asset: any, index: number) => (
+                        <CardContent className="p-5 pt-0 overflow-y-auto custom-scrollbar">
+                            <div className="space-y-6 py-4">
+                                {assetsDetailedData.length > 0 ? (
+                                    assetsDetailedData.map((asset: any, index: number) => (
                                         <div key={index} className="flex items-center gap-4">
                                             <div className="w-1.5 h-10 rounded-full" style={{ backgroundColor: ASSET_GRID_COLORS[index % ASSET_GRID_COLORS.length] }}></div>
                                             <div className="flex-1">
@@ -643,16 +642,16 @@ export function AccountingDashboardV2() {
                     </Card>
 
                     {/* Assets Treemap / Distribution Grid */}
-                    <Card className="bg-white border-none rounded-xl shadow-none overflow-hidden">
-                        <CardHeader className="p-5 pb-2">
+                    <Card className="bg-white border-none rounded-xl shadow-none overflow-hidden flex flex-col h-[500px]">
+                        <CardHeader className="p-5 pb-2 shrink-0">
                             <div className="flex items-center justify-between">
                                 <CardTitle className="text-lg font-semibold text-foreground">Asset Distribution</CardTitle>
                                 <span className="text-sm font-medium text-muted-foreground bg-gray-50 px-3 py-1 rounded-full">{totalAssetsLabel}</span>
                             </div>
                         </CardHeader>
-                        <CardContent className="p-5">
-                            {assetsGridData.length > 0 ? (
-                                <div className="flex flex-col min-h-[450px] overflow-hidden rounded-md" style={{ height: `${Math.max(450, Math.ceil(assetsGridData.length / 2) * 90)}px` }}>
+                        <CardContent className="p-5 pt-0 overflow-y-auto custom-scrollbar">
+                            {assetsSummaryData.length > 0 ? (
+                                <div className="flex flex-col rounded-md overflow-hidden my-4">
                                     {(() => {
                                         const rowWidthPatterns = [
                                             ['55%', '45%'],
@@ -661,14 +660,14 @@ export function AccountingDashboardV2() {
                                             ['48%', '52%'],
                                             ['52%', '48%'],
                                         ]
-                                        const rowCount = Math.ceil(assetsGridData.length / 2)
+                                        const rowCount = Math.ceil(assetsSummaryData.length / 2)
                                         return Array.from({ length: rowCount }).map((_, rowIdx) => {
-                                            const left = assetsGridData[rowIdx * 2]
-                                            const right = assetsGridData[rowIdx * 2 + 1]
+                                            const left = assetsSummaryData[rowIdx * 2]
+                                            const right = assetsSummaryData[rowIdx * 2 + 1]
                                             const widths = rowWidthPatterns[rowIdx % rowWidthPatterns.length]
                                             const isLast = rowIdx === rowCount - 1
                                             return (
-                                                <div key={rowIdx} className={`flex flex-1 ${!isLast ? 'border-b border-white/20' : ''}`}>
+                                                <div key={rowIdx} className={`flex h-[110px] ${!isLast ? 'border-b border-white/20' : ''}`}>
                                                     {[left, right].map((item: any, colIdx: number) => {
                                                         if (!item) return null
                                                         const dataIdx = rowIdx * 2 + colIdx
@@ -703,7 +702,7 @@ export function AccountingDashboardV2() {
                                     })()}
                                 </div>
                             ) : (
-                                <div className="flex flex-col items-center justify-center min-h-[450px] text-center">
+                                <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
                                     <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
                                         <ArrowUpRight className="w-8 h-8 text-gray-400" />
                                     </div>

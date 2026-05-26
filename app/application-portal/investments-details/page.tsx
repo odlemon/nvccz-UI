@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Building2, TrendingUp, DollarSign, FileText, Eye, PieChart, BarChart3 } from "lucide-react"
 import { InvestmentSkeleton } from "@/components/investments/investment-skeleton"
+import { InvestmentRecipientGuard } from "@/components/user-application-portal/investment-recipient-guard"
 
 export default function InvestmentDetailsPage() {
   const router = useRouter()
@@ -46,6 +47,7 @@ export default function InvestmentDetailsPage() {
 
   return (
     <ApplicationPortalLayout>
+      <InvestmentRecipientGuard>
       <div className="p-6 space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -305,6 +307,7 @@ export default function InvestmentDetailsPage() {
           </Card>
         )}
       </div>
+      </InvestmentRecipientGuard>
     </ApplicationPortalLayout>
   )
 }
