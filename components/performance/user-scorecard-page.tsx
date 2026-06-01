@@ -11,9 +11,12 @@ import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { CiUser, CiViewBoard, CiCircleCheck, CiTrophy, CiFileOn } from "react-icons/ci"
 import { TbTarget } from "react-icons/tb"
-import { Calendar, RefreshCw } from "lucide-react"
+import { Calendar, RefreshCw, ClipboardList } from "lucide-react"
 import { toast } from "sonner"
 import { usePerformancePermissions } from "@/lib/hooks/usePerformancePermissions"
+import { useRolePermissions } from "@/lib/hooks/useRolePermissions"
+import { PERFORMANCE_ACTIONS } from "@/lib/config/performance-permissions"
+import { EmployeeQualitativeModal } from "./employee-qualitative-modal"
 import {
   PieChart,
   Pie,
@@ -61,6 +64,9 @@ export function UserScorecardsPage() {
   const [employees, setEmployees] = useState<Array<{ id: string; name: string }>>([])
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("self")
   const [activeAddress, setActiveAddress] = useState<CompanyAddress | null>(null)
+  const [isQualModalOpen, setIsQualModalOpen] = useState(false)
+  const { hasSpecificAction } = useRolePermissions()
+  const canEditQualitative = hasSpecificAction(PERFORMANCE_ACTIONS.CONDUCT_PERFORMANCE_REVIEW)
 
   const canSelectEmployee =
     permissions.canViewUserScorecards ||
@@ -253,6 +259,17 @@ export function UserScorecardsPage() {
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
             Refresh
           </Button>
+          {canEditQualitative && userScorecard?.employee?.id && (
+            <Button
+              size="sm"
+              variant="gradient"
+              className="rounded-full gap-1.5"
+              onClick={() => setIsQualModalOpen(true)}
+            >
+              <ClipboardList className="w-3.5 h-3.5" />
+              Add Evaluation
+            </Button>
+          )}
           {isClient && userScorecard && PDFComponents && (
             <PDFComponents.PDFDownloadLink
               document={<PDFComponents.UserScorecardPDF data={userScorecard} activeAddress={activeAddress} />}
@@ -631,9 +648,67 @@ export function UserScorecardsPage() {
                   </CardContent>
                 </Card>
               )}
+
+              {(() => {
+                const attrs = userScorecard?.document?.qualitativeSections?.personalAttributes
+                if (!attrs || attrs.length === 0) return null
+                const cols = attrs[0]?.columns?.map((c: any) => c.label) ?? []
+                return (
+                  <Card className="bg-white rounded-2xl">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center">
+                          <ClipboardList className="w-5 h-5 text-white" />
+                        </div>
+                        Employee Leadership Evaluation
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b bg-gray-50">
+                              <th className="text-left px-3 py-2 font-semibold text-gray-700 w-[35%]">Attribute</th>
+                              {cols.map((col: string) => (
+                                <th key={col} className="px-3 py-2 font-semibold text-gray-700 text-center whitespace-nowrap">{col}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {attrs.map((attr: any, idx: number) => (
+                              <tr key={idx} className="border-b last:border-0">
+                                <td className="px-3 py-2 font-medium text-gray-800">{attr.attribute}</td>
+                                {attr.columns.map((col: any) => (
+                                  <td key={col.label} className="px-3 py-2 text-center">
+                                    {col.selected ? (
+                                      <span className="inline-flex w-6 h-6 rounded-full bg-blue-600 items-center justify-center text-white text-xs">●</span>
+                                    ) : (
+                                      <span className="inline-flex w-6 h-6 rounded-full border-2 border-gray-300 items-center justify-center text-gray-300 text-xs">○</span>
+                                    )}
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )
+              })()}
           </>
         )}
       </div>
+
+      <EmployeeQualitativeModal
+        isOpen={isQualModalOpen}
+        onClose={() => setIsQualModalOpen(false)}
+        employeeId={userScorecard?.employee?.id || ""}
+        employeeName={userScorecard?.employee?.name || employee?.name || "Employee"}
+        periodLabel={periodLabel}
+        existingAttributes={userScorecard?.document?.qualitativeSections?.personalAttributes}
+        onSaved={handleRefresh}
+      />
     </div>
   )
 }

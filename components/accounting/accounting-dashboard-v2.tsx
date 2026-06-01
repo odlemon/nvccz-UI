@@ -58,6 +58,10 @@ export function AccountingDashboardV2() {
     const [selectedCurrency, setSelectedCurrency] = useState("")
     const [financialYear, setFinancialYear] = useState("2026")
     const [selectedMonths, setSelectedMonths] = useState("all")
+    const [assetsPage, setAssetsPage] = useState(1)
+    const [expensesPage, setExpensesPage] = useState(1)
+    const ITEMS_PER_PAGE = 5
+    const EXPENSES_PER_PAGE = 8
 
     // Fetch currencies on mount
     useEffect(() => {
@@ -606,50 +610,81 @@ export function AccountingDashboardV2() {
                 {/* Bottom Row - Assets and Expenses */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {/* Assets List */}
-                    <Card className="bg-white border-none rounded-xl shadow-none overflow-hidden flex flex-col h-[500px]">
+                    <Card className="bg-white border-none rounded-xl shadow-none overflow-hidden flex flex-col">
                         <CardHeader className="p-5 pb-2 shrink-0">
                             <div className="flex items-center justify-between">
                                 <CardTitle className="text-lg font-semibold text-foreground">Assets</CardTitle>
                                 <span className="text-sm font-medium text-muted-foreground bg-gray-50 px-3 py-1 rounded-full">{totalAssetsLabel} Total</span>
                             </div>
                         </CardHeader>
-                        <CardContent className="p-5 pt-0 overflow-y-auto custom-scrollbar">
-                            <div className="space-y-6 py-4">
-                                {assetsDetailedData.length > 0 ? (
-                                    assetsDetailedData.map((asset: any, index: number) => (
-                                        <div key={index} className="flex items-center gap-4">
-                                            <div className="w-1.5 h-10 rounded-full" style={{ backgroundColor: ASSET_GRID_COLORS[index % ASSET_GRID_COLORS.length] }}></div>
-                                            <div className="flex-1">
-                                                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{asset.category}</p>
-                                                <p className="text-xl font-normal text-foreground mt-1 tracking-tight">{currencySymbol}{(asset.amount ?? 0).toLocaleString()}</p>
-                                                {typeof asset.percent === 'number' && (
-                                                    <p className="text-[11px] font-medium text-muted-foreground/70 mt-0.5">{asset.percent.toFixed(1)}% of total</p>
-                                                )}
+                        <CardContent className="p-5 pt-0 flex flex-col flex-1">
+                            {assetsDetailedData.length > 0 ? (
+                                <>
+                                    <div className="space-y-6 py-4 flex-1">
+                                        {assetsDetailedData.slice((assetsPage - 1) * ITEMS_PER_PAGE, assetsPage * ITEMS_PER_PAGE).map((asset: any, index: number) => {
+                                            const globalIndex = (assetsPage - 1) * ITEMS_PER_PAGE + index
+                                            return (
+                                                <div key={globalIndex} className="flex items-center gap-4">
+                                                    <div className="w-1.5 h-10 rounded-full" style={{ backgroundColor: ASSET_GRID_COLORS[globalIndex % ASSET_GRID_COLORS.length] }}></div>
+                                                    <div className="flex-1">
+                                                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{asset.category}</p>
+                                                        <p className="text-xl font-normal text-foreground mt-1 tracking-tight">{currencySymbol}{(asset.amount ?? 0).toLocaleString()}</p>
+                                                        {typeof asset.percent === 'number' && (
+                                                            <p className="text-[11px] font-medium text-muted-foreground/70 mt-0.5">{asset.percent.toFixed(1)}% of total</p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                    {assetsDetailedData.length > ITEMS_PER_PAGE && (
+                                        <div className="flex items-center justify-between pt-4 border-t mt-2">
+                                            <span className="text-xs text-muted-foreground">
+                                                {(assetsPage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(assetsPage * ITEMS_PER_PAGE, assetsDetailedData.length)} of {assetsDetailedData.length}
+                                            </span>
+                                            <div className="flex items-center gap-1">
+                                                <button
+                                                    onClick={() => setAssetsPage(p => Math.max(1, p - 1))}
+                                                    disabled={assetsPage === 1}
+                                                    className="h-7 w-7 rounded-full flex items-center justify-center text-xs border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                                >‹</button>
+                                                {Array.from({ length: Math.ceil(assetsDetailedData.length / ITEMS_PER_PAGE) }, (_, i) => i + 1).map(page => (
+                                                    <button
+                                                        key={page}
+                                                        onClick={() => setAssetsPage(page)}
+                                                        className={`h-7 w-7 rounded-full flex items-center justify-center text-xs transition-colors ${assetsPage === page ? 'bg-primary text-white' : 'border border-gray-200 hover:bg-gray-50'}`}
+                                                    >{page}</button>
+                                                ))}
+                                                <button
+                                                    onClick={() => setAssetsPage(p => Math.min(Math.ceil(assetsDetailedData.length / ITEMS_PER_PAGE), p + 1))}
+                                                    disabled={assetsPage === Math.ceil(assetsDetailedData.length / ITEMS_PER_PAGE)}
+                                                    className="h-7 w-7 rounded-full flex items-center justify-center text-xs border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                                >›</button>
                                             </div>
                                         </div>
-                                    ))
-                                ) : (
-                                    <div className="flex flex-col items-center justify-center py-12 text-center">
-                                        <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
-                                            <ArrowUpRight className="w-8 h-8 text-gray-400" />
-                                        </div>
-                                        <p className="text-sm font-medium text-muted-foreground">No asset data available</p>
-                                        <p className="text-xs text-muted-foreground mt-1">Asset information will appear here when available</p>
+                                    )}
+                                </>
+                            ) : (
+                                <div className="flex flex-col items-center justify-center py-12 text-center">
+                                    <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+                                        <ArrowUpRight className="w-8 h-8 text-gray-400" />
                                     </div>
-                                )}
-                            </div>
+                                    <p className="text-sm font-medium text-muted-foreground">No asset data available</p>
+                                    <p className="text-xs text-muted-foreground mt-1">Asset information will appear here when available</p>
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
 
                     {/* Assets Treemap / Distribution Grid */}
-                    <Card className="bg-white border-none rounded-xl shadow-none overflow-hidden flex flex-col h-[500px]">
+                    <Card className="bg-white border-none rounded-xl shadow-none overflow-hidden flex flex-col">
                         <CardHeader className="p-5 pb-2 shrink-0">
                             <div className="flex items-center justify-between">
                                 <CardTitle className="text-lg font-semibold text-foreground">Asset Distribution</CardTitle>
                                 <span className="text-sm font-medium text-muted-foreground bg-gray-50 px-3 py-1 rounded-full">{totalAssetsLabel}</span>
                             </div>
                         </CardHeader>
-                        <CardContent className="p-5 pt-0 overflow-y-auto custom-scrollbar">
+                        <CardContent className="p-5 pt-0">
                             {assetsSummaryData.length > 0 ? (
                                 <div className="flex flex-col rounded-md overflow-hidden my-4">
                                     {(() => {
@@ -714,40 +749,68 @@ export function AccountingDashboardV2() {
                     </Card>
 
                     {/* Expenses */}
-                    <Card className="bg-white border-none rounded-xl shadow-none overflow-hidden">
-                        <CardHeader className="p-5 pb-2">
+                    <Card className="bg-white border-none rounded-xl shadow-none overflow-hidden flex flex-col">
+                        <CardHeader className="p-5 pb-2 shrink-0">
                             <div className="flex items-center justify-between">
                                 <CardTitle className="text-lg font-semibold text-foreground">Expenses</CardTitle>
                                 <span className="text-sm font-medium text-muted-foreground bg-gray-50 px-3 py-1 rounded-full">{totalExpensesLabel} Total</span>
                             </div>
                         </CardHeader>
-                        <CardContent className="p-5">
-                            <div className="space-y-4">
-                                {expensesChartData.length > 0 ? (
-                                    expensesChartData.map((expense: any, index: number) => (
-                                        <div key={index} className="space-y-1.5">
-                                            <div className="flex items-center justify-between text-xs font-medium px-1">
-                                                <span className="text-muted-foreground uppercase tracking-wider">{expense.category}</span>
-                                                <span className="text-foreground">{currencySymbol}{(expense.amount || 0).toLocaleString()}</span>
+                        <CardContent className="p-5 flex flex-col flex-1">
+                            {expensesChartData.length > 0 ? (
+                                <>
+                                    <div className="space-y-4 flex-1">
+                                        {expensesChartData.slice((expensesPage - 1) * EXPENSES_PER_PAGE, expensesPage * EXPENSES_PER_PAGE).map((expense: any, index: number) => (
+                                            <div key={index} className="space-y-1.5">
+                                                <div className="flex items-center justify-between text-xs font-medium px-1">
+                                                    <span className="text-muted-foreground uppercase tracking-wider">{expense.category}</span>
+                                                    <span className="text-foreground">{currencySymbol}{(expense.amount || 0).toLocaleString()}</span>
+                                                </div>
+                                                <div className="h-4 w-full bg-gray-50 rounded-full overflow-hidden">
+                                                    <div
+                                                        className="h-full bg-emerald-400 rounded-full transition-all duration-500"
+                                                        style={{ width: `${expensesChartData.length > 0 ? ((expense.amount || 0) / Math.max(...expensesChartData.map((e: any) => e.amount || 0))) * 100 : 0}%` }}
+                                                    />
+                                                </div>
                                             </div>
-                                            <div className="h-4 w-full bg-gray-50 rounded-full overflow-hidden">
-                                                <div
-                                                    className="h-full bg-emerald-400 rounded-full transition-all duration-500"
-                                                    style={{ width: `${expensesChartData.length > 0 ? ((expense.amount || 0) / Math.max(...expensesChartData.map((e: any) => e.amount || 0))) * 100 : 0}%` }}
-                                                />
-                                            </div>
-                                        </div>
-                                    ))
-                                ) : (
-                                    <div className="flex flex-col items-center justify-center py-12 text-center">
-                                        <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
-                                            <ArrowUpRight className="w-8 h-8 text-gray-400" />
-                                        </div>
-                                        <p className="text-sm font-medium text-muted-foreground">No expense data available</p>
-                                        <p className="text-xs text-muted-foreground mt-1">Expense breakdown will appear here when available</p>
+                                        ))}
                                     </div>
-                                )}
-                            </div>
+                                    {expensesChartData.length > EXPENSES_PER_PAGE && (
+                                        <div className="flex items-center justify-between pt-4 border-t mt-4">
+                                            <span className="text-xs text-muted-foreground">
+                                                {(expensesPage - 1) * EXPENSES_PER_PAGE + 1}–{Math.min(expensesPage * EXPENSES_PER_PAGE, expensesChartData.length)} of {expensesChartData.length}
+                                            </span>
+                                            <div className="flex items-center gap-1">
+                                                <button
+                                                    onClick={() => setExpensesPage(p => Math.max(1, p - 1))}
+                                                    disabled={expensesPage === 1}
+                                                    className="h-7 w-7 rounded-full flex items-center justify-center text-xs border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                                >‹</button>
+                                                {Array.from({ length: Math.ceil(expensesChartData.length / EXPENSES_PER_PAGE) }, (_, i) => i + 1).map(page => (
+                                                    <button
+                                                        key={page}
+                                                        onClick={() => setExpensesPage(page)}
+                                                        className={`h-7 w-7 rounded-full flex items-center justify-center text-xs transition-colors ${expensesPage === page ? 'bg-primary text-white' : 'border border-gray-200 hover:bg-gray-50'}`}
+                                                    >{page}</button>
+                                                ))}
+                                                <button
+                                                    onClick={() => setExpensesPage(p => Math.min(Math.ceil(expensesChartData.length / EXPENSES_PER_PAGE), p + 1))}
+                                                    disabled={expensesPage === Math.ceil(expensesChartData.length / EXPENSES_PER_PAGE)}
+                                                    className="h-7 w-7 rounded-full flex items-center justify-center text-xs border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                                >›</button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </>
+                            ) : (
+                                <div className="flex flex-col items-center justify-center py-12 text-center">
+                                    <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+                                        <ArrowUpRight className="w-8 h-8 text-gray-400" />
+                                    </div>
+                                    <p className="text-sm font-medium text-muted-foreground">No expense data available</p>
+                                    <p className="text-xs text-muted-foreground mt-1">Expense breakdown will appear here when available</p>
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
                 </div>

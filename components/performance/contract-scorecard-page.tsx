@@ -16,8 +16,11 @@ import {
 } from "@/components/ui/select"
 import { toast } from "sonner"
 import { CiFileOn } from "react-icons/ci"
-import { RefreshCw, Plus, Sparkles } from "lucide-react"
+import { RefreshCw, Plus, Sparkles, ClipboardList } from "lucide-react"
 import ContractScorecardPDF from "./contract-scorecard-pdf-document"
+import { ContractQualitativeModal } from "./contract-qualitative-modal"
+import { useRolePermissions } from "@/lib/hooks/useRolePermissions"
+import { PERFORMANCE_ACTIONS } from "@/lib/config/performance-permissions"
 import {
   BalancedScorecardView,
   HeatMapLegend,
@@ -40,6 +43,9 @@ export function ContractScorecardPage({ type }: ContractScorecardPageProps) {
   const [periodLabel, setPeriodLabel] = useState("2026")
   const [isClient, setIsClient] = useState(false)
   const [PDFDownloadLink, setPDFDownloadLink] = useState<any>(null)
+  const [isQualModalOpen, setIsQualModalOpen] = useState(false)
+  const { hasSpecificAction } = useRolePermissions()
+  const canEditQualitative = hasSpecificAction(PERFORMANCE_ACTIONS.CONDUCT_PERFORMANCE_REVIEW)
   const [activeAddress, setActiveAddress] = useState<CompanyAddress | null>(null)
 
   useEffect(() => {
@@ -271,6 +277,17 @@ export function ContractScorecardPage({ type }: ContractScorecardPageProps) {
             <Sparkles className={`w-3.5 h-3.5 ${generating ? "animate-spin" : ""}`} />
             {generating ? "Generating..." : "Generate"}
           </Button>
+          {canEditQualitative && data && (
+            <Button
+              size="sm"
+              variant="gradient"
+              className="rounded-full gap-1.5"
+              onClick={() => setIsQualModalOpen(true)}
+            >
+              <ClipboardList className="w-3.5 h-3.5" />
+              Add Evaluation
+            </Button>
+          )}
           {isClient && data && PDFDownloadLink && (
             <PDFDownloadLink
               document={<ContractScorecardPDF data={data} type={type} activeAddress={activeAddress} />}
@@ -298,18 +315,19 @@ export function ContractScorecardPage({ type }: ContractScorecardPageProps) {
         <Card><CardContent className="p-6">No {type} scorecard found for this period.</CardContent></Card>
       ) : (
         <>
-          <div className="grid gap-4 md:grid-cols-3">
-            <Card className="rounded-2xl gradient-primary text-white">
+          <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-5">
+            <Card className="rounded-2xl gradient-primary text-white md:col-span-1">
               <CardContent className="pt-6">
                 <p className="text-sm text-white/80">Final Score</p>
                 <p className="text-4xl">{String(scoreValue)}</p>
-                <p className="text-xs text-white/80 mt-2">{data.contract?.title || `${type} Contract`}</p>
+                {performanceLabel && <Badge className="mt-2 bg-white/20 text-white border-white/30">{performanceLabel}</Badge>}
               </CardContent>
             </Card>
             <Card>
               <CardContent className="pt-6">
                 <p className="text-sm text-muted-foreground">Period</p>
                 <p className="text-2xl">{data.contract?.periodLabel || periodLabel}</p>
+                <p className="text-xs text-muted-foreground mt-1">{data.contract?.title || `${type} Contract`}</p>
               </CardContent>
             </Card>
             <Card>
@@ -319,6 +337,22 @@ export function ContractScorecardPage({ type }: ContractScorecardPageProps) {
                 <p className="text-xs text-muted-foreground">{subjectTitle || "N/A"}</p>
               </CardContent>
             </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-sm text-muted-foreground">Reviewer</p>
+                <p className="text-lg font-medium">
+                  {data.contract?.reviewer?.name ?? data.contract?.reviewerName ?? "—"}
+                </p>
+              </CardContent>
+            </Card>
+            {data.scores?.budgetScore != null && (
+              <Card>
+                <CardContent className="pt-6">
+                  <p className="text-sm text-muted-foreground">Budget Score</p>
+                  <p className="text-2xl font-medium">{data.scores.budgetScore}</p>
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           {warnings.length > 0 && (
@@ -328,6 +362,13 @@ export function ContractScorecardPage({ type }: ContractScorecardPageProps) {
                 {warnings.map((warning: string, idx: number) => <p key={idx} className="text-sm text-amber-800">{warning}</p>)}
               </CardContent>
             </Card>
+          )}
+
+          {data?.lifecycle && (
+            <div className="rounded-xl border-l-4 border-l-blue-500 bg-blue-50 px-4 py-3 flex items-center gap-3">
+              <Badge className="bg-blue-100 text-blue-700 border-0">{data.lifecycle.phase}</Badge>
+              <p className="text-sm text-blue-800">{data.lifecycle.bannerMessage}</p>
+            </div>
           )}
 
           {/* Balanced Scorecard — perspectives as colored bands, indicators as rows,
@@ -388,8 +429,65 @@ export function ContractScorecardPage({ type }: ContractScorecardPageProps) {
               </CardContent>
             </Card>
           )}
+
+          {(() => {
+            const attrs = data?.document?.qualitativeSections?.personalAttributes
+            if (!attrs || attrs.length === 0) return null
+            const cols = attrs[0]?.columns?.map((c: any) => c.label) ?? []
+            return (
+              <Card className="bg-white rounded-2xl">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center">
+                      <ClipboardList className="w-5 h-5 text-white" />
+                    </div>
+                    {type} Leadership Evaluation
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b bg-gray-50">
+                          <th className="text-left px-3 py-2 font-semibold text-gray-700 w-[35%]">Attribute</th>
+                          {cols.map((col: string) => (
+                            <th key={col} className="px-3 py-2 font-semibold text-gray-700 text-center whitespace-nowrap">{col}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {attrs.map((attr: any, idx: number) => (
+                          <tr key={idx} className="border-b last:border-0">
+                            <td className="px-3 py-2 font-medium text-gray-800">{attr.attribute}</td>
+                            {attr.columns.map((col: any) => (
+                              <td key={col.label} className="px-3 py-2 text-center">
+                                {col.selected ? (
+                                  <span className="inline-flex w-6 h-6 rounded-full bg-blue-600 items-center justify-center text-white text-xs">●</span>
+                                ) : (
+                                  <span className="inline-flex w-6 h-6 rounded-full border-2 border-gray-300 items-center justify-center text-gray-300 text-xs">○</span>
+                                )}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })()}
         </>
       )}
+
+      <ContractQualitativeModal
+        isOpen={isQualModalOpen}
+        onClose={() => setIsQualModalOpen(false)}
+        type={type}
+        periodLabel={periodLabel}
+        existingAttributes={data?.document?.qualitativeSections?.personalAttributes}
+        onSaved={() => void loadData()}
+      />
     </div>
   )
 }

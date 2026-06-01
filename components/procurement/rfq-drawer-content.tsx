@@ -292,32 +292,7 @@ export function RFQDrawerContent({ rfq: rfqProp }: RFQDrawerContentProps) {
                   <p className="mt-1 text-gray-700">{rfq.specialRequirements}</p>
                 </div>
               )}
-              {rfq.status !== 'DRAFT' && (
-                <div className="col-span-2">
-                  <label className="text-sm font-medium text-gray-500 flex items-center gap-2">
-                    <Globe className="w-4 h-4" />
-                    Public Tender URL
-                  </label>
-                  <div className="mt-2 flex items-center gap-2 p-2 bg-gray-50 rounded">
-                    <code className="text-xs flex-1 truncate text-blue-600">
-                      {typeof window !== 'undefined' ? window.location.origin : ''}/public-tenders/{rfq.rfqNumber}
-                    </code>
-                    <Button size="sm" variant="ghost" onClick={handleCopyPublicLink} className="gap-1 rounded-full h-8 px-3">
-                      {copied ? (
-                        <>
-                          <Check className="w-4 h-4 text-green-600" />
-                          <span className="text-xs text-green-600">Copied</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-4 h-4" />
-                          <span className="text-xs">Copy</span>
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              )}
+             
             </div>
           </CardContent>
         </Card>

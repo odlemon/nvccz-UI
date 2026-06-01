@@ -152,9 +152,16 @@ export function GoalViewDrawer({ goal, isOpen, onClose, onEdit, onDelete, onBrea
   }
 
   // Helper function to format currency
-  const formatCurrency = (value: any, prefix: string = '$'): string => {
+  const formatCurrency = (value: any, unitSymbol: string = '$'): string => {
     const numValue = parseNumericValue(value)
-    return `${prefix}${numValue.toLocaleString()}`
+    const formatted = numValue.toLocaleString()
+    if (!unitSymbol) return formatted
+    // % is always a suffix: 100%
+    if (unitSymbol === '%') return `${formatted}%`
+    // Alphabetic units (hours, reports, days, USD, ZiG…) go after with a space: 100 hours
+    if (/^[a-zA-Z]/.test(unitSymbol)) return `${formatted} ${unitSymbol}`
+    // Symbol characters ($, £, €, ¥…) go before: $100
+    return `${unitSymbol}${formatted}`
   }
 
   // Helper function to format percentage

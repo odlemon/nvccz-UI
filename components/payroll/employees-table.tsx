@@ -107,7 +107,7 @@ export function EmployeesTable({ title, description }: EmployeesTableProps) {
   const handleFormSubmit = async (data: any, picture?: File) => {
     try {
       if (editingEmployee) {
-        await employeesApi.update(editingEmployee.id, data);
+        await employeesApi.update(editingEmployee.id, data, picture);
         toast.success("Employee updated successfully");
       } else {
         await employeesApi.create(data, picture);

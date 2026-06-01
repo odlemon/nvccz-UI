@@ -68,6 +68,13 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   warningText: { fontSize: 8, color: "#92400e" },
+  qualTable: { borderWidth: 1, borderColor: COLORS.slate300, borderRadius: 4 },
+  qualHeaderRow: { flexDirection: 'row' as const, backgroundColor: COLORS.slate100, borderBottomWidth: 1, borderBottomColor: COLORS.slate300 },
+  qualRow: { flexDirection: 'row' as const, borderBottomWidth: 1, borderBottomColor: COLORS.slate300 },
+  qualRowLast: { flexDirection: 'row' as const },
+  qualCellAttr: { flex: 2.5, padding: 5, fontSize: 8, color: COLORS.slate700 },
+  qualCellCol: { flex: 1, padding: 5, fontSize: 8, textAlign: 'center' as const, color: COLORS.slate500 },
+  qualSelected: { color: COLORS.primary, fontWeight: 'bold' as const },
   footer: {
     position: "absolute",
     bottom: 20,
@@ -275,6 +282,35 @@ export default function UserScorecardPDF({ data, activeAddress }: UserScorecardP
             />
           </View>
         )}
+
+        {(() => {
+          const attrs: any[] = data?.document?.qualitativeSections?.personalAttributes ?? []
+          if (attrs.length === 0) return null
+          const colLabels: string[] = attrs[0]?.columns?.map((c: any) => c.label) ?? []
+          return (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Employee Leadership Evaluation</Text>
+              <View style={styles.qualTable}>
+                <View style={styles.qualHeaderRow}>
+                  <Text style={[styles.qualCellAttr, { fontWeight: 'bold', color: COLORS.slate900 }]}>Attribute</Text>
+                  {colLabels.map((col: string) => (
+                    <Text key={col} style={[styles.qualCellCol, { fontWeight: 'bold', color: COLORS.slate900 }]}>{col}</Text>
+                  ))}
+                </View>
+                {attrs.map((attr: any, idx: number) => (
+                  <View key={idx} style={idx === attrs.length - 1 ? styles.qualRowLast : styles.qualRow}>
+                    <Text style={styles.qualCellAttr}>{attr.attribute}</Text>
+                    {attr.columns.map((col: any) => (
+                      <Text key={col.label} style={[styles.qualCellCol, col.selected ? styles.qualSelected : {}]}>
+                        {col.selected ? '●' : '○'}
+                      </Text>
+                    ))}
+                  </View>
+                ))}
+              </View>
+            </View>
+          )
+        })()}
 
         {warnings.length > 0 && (
           <View style={styles.section}>

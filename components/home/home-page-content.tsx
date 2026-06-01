@@ -107,19 +107,19 @@ export function HomePageContent() {
             </motion.div>
           </div>
 
-          <div className="flex-1 p-6 ml-[25%]">
+          <div className="flex-1 p-6 ml-[25%] min-w-0 overflow-x-hidden">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.2 }}
               className="space-y-6"
             >
-              <div className="flex gap-6">
-                <div className="w-[60%]">
+              <div className="flex flex-col xl:flex-row gap-6">
+                <div className="w-full xl:w-[60%] min-w-0">
                   <GreetWidget />
                 </div>
-                
-                <div className="w-[40%]">
+
+                <div className="w-full xl:w-[40%] min-w-0 overflow-hidden">
                   <TradingViewWidget />
                 </div>
               </div>
@@ -130,7 +130,7 @@ export function HomePageContent() {
               </div> */}
 
               {/* TradingView Full Width Chart */}
-              <div className="w-full">
+              <div className="w-full min-w-0 overflow-hidden">
                 <TradingViewSymbolOverview />
               </div>
 

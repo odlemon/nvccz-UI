@@ -1,5 +1,8 @@
 import { apiClient } from "./api-client"
 
+export interface QualitativeAttributeColumn { label: string; selected: boolean }
+export interface QualitativeAttribute { attribute: string; columns: QualitativeAttributeColumn[] }
+
 export interface ScorecardIndicator {
   id?: string
   section?: string
@@ -44,6 +47,7 @@ export interface ScorecardContract {
   stretchScoringEnabled?: boolean
   reviewerId?: string | null
   reviewerName?: string | null
+  reviewer?: { id: string; name: string } | null
 }
 
 export interface ScorecardDocumentHeader {
@@ -93,7 +97,8 @@ export interface ScorecardDocument {
     label?: string
     content?: string | null
   }
-  qualitativeSections?: Record<string, unknown>
+  qualitativeSections?: { personalAttributes: QualitativeAttribute[]; trainingAndDevelopment?: any }
+  rollupTable?: Array<{ employeeName: string; finalScore: number; rollupWeight: number; weightedContribution: number }>
   signatureBlock?: Record<string, unknown>
   subtotals?: {
     finalScore?: number
@@ -150,6 +155,9 @@ export interface ScorecardGoal {
   isReverseKpi?: boolean
   excludedFromScoring?: boolean
   missingValue?: boolean
+  childContributions?: Array<{ employeeId: string; employeeName: string; progressPct: number; contributionWeight: number }>
+  selectedSource?: string
+  rollupWeight?: number
 }
 
 export interface DepartmentScorecard {
@@ -163,7 +171,11 @@ export interface DepartmentScorecard {
     name: string
     managerId?: string | null
     managerName?: string | null
+    headOfDepartmentName?: string | null
+    headOfDepartmentTitle?: string | null
   }
+  lifecycle?: { phase: string; bannerMessage: string }
+  appraiser?: { id: string; name: string; title: string }
   contract?: ScorecardContract | null
   warnings: string[]
   goals: ScorecardGoal[]
@@ -226,6 +238,7 @@ export interface ContractScorecard {
     canView: boolean
     canGenerate: boolean
   }
+  lifecycle?: { phase: string; bannerMessage: string }
   ceo?: {
     id: string
     name: string
@@ -434,5 +447,44 @@ export const scorecardApiService = {
     const queryParams = new URLSearchParams()
     queryParams.append("periodLabel", periodLabel)
     return apiClient.get(`/performance/scorecards/employees-for-generation?${queryParams.toString()}`)
+  },
+
+  async saveDepartmentQualitativeEvaluation(
+    departmentName: string,
+    payload: {
+      periodLabel: string
+      qualitativeEvaluation: { personalAttributes: QualitativeAttribute[] }
+    }
+  ): Promise<ApiResponse<any>> {
+    const encoded = encodeURIComponent(departmentName)
+    return apiClient.put(`/performance/scorecards/department/${encoded}/qualitative-evaluation`, payload)
+  },
+
+  async saveCeoQualitativeEvaluation(
+    payload: {
+      periodLabel: string
+      qualitativeEvaluation: { personalAttributes: QualitativeAttribute[] }
+    }
+  ): Promise<ApiResponse<any>> {
+    return apiClient.put(`/performance/scorecards/ceo/qualitative-evaluation`, payload)
+  },
+
+  async saveBoardQualitativeEvaluation(
+    payload: {
+      periodLabel: string
+      qualitativeEvaluation: { personalAttributes: QualitativeAttribute[] }
+    }
+  ): Promise<ApiResponse<any>> {
+    return apiClient.put(`/performance/scorecards/board/qualitative-evaluation`, payload)
+  },
+
+  async saveEmployeeQualitativeEvaluation(
+    employeeId: string,
+    payload: {
+      periodLabel: string
+      qualitativeEvaluation: { personalAttributes: QualitativeAttribute[] }
+    }
+  ): Promise<ApiResponse<any>> {
+    return apiClient.put(`/performance/scorecards/employee/${encodeURIComponent(employeeId)}/qualitative-evaluation`, payload)
   },
 }

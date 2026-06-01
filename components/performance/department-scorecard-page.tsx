@@ -10,10 +10,13 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { CiViewBoard, CiUser, CiTrophy, CiFileOn } from "react-icons/ci"
-import { Calendar, RefreshCw } from "lucide-react"
+import { Calendar, RefreshCw, ClipboardList } from "lucide-react"
 import { TbTarget } from "react-icons/tb"
 import { toast } from "sonner"
 import DepartmentScorecardPDF from "./department-scorecard-pdf-document"
+import { useRolePermissions } from "@/lib/hooks/useRolePermissions"
+import { PERFORMANCE_ACTIONS } from "@/lib/config/performance-permissions"
+import { DepartmentQualitativeModal } from "./department-qualitative-modal"
 
 const DepartmentScorecardSkeleton = () => (
   <div className="space-y-6 animate-pulse">
@@ -57,6 +60,10 @@ export function DepartmentScorecardsPage() {
   const [isClient, setIsClient] = useState(false)
   const [PDFDownloadLink, setPDFDownloadLink] = useState<any>(null)
   const [activeAddress, setActiveAddress] = useState<CompanyAddress | null>(null)
+  const [isQualModalOpen, setIsQualModalOpen] = useState(false)
+
+  const { hasSpecificAction } = useRolePermissions()
+  const canEditQualitative = hasSpecificAction(PERFORMANCE_ACTIONS.CONDUCT_PERFORMANCE_REVIEW)
 
   useEffect(() => {
     setIsClient(true)
@@ -169,6 +176,17 @@ export function DepartmentScorecardsPage() {
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
             Refresh
           </Button>
+          {canEditQualitative && departmentScorecard && (
+            <Button
+              size="sm"
+              variant="gradient"
+              className="rounded-full gap-1.5"
+              onClick={() => setIsQualModalOpen(true)}
+            >
+              <ClipboardList className="w-3.5 h-3.5" />
+              Add Evaluation
+            </Button>
+          )}
           {isClient && departmentScorecard && PDFDownloadLink && (
             <PDFDownloadLink
               document={<DepartmentScorecardPDF data={departmentScorecard} activeAddress={activeAddress} />}
@@ -264,6 +282,38 @@ export function DepartmentScorecardsPage() {
             </Card>
           )}
 
+          {departmentScorecard?.lifecycle && (
+            <div className="rounded-xl border-l-4 border-l-blue-500 bg-blue-50 px-4 py-3 flex items-center gap-3">
+              <Badge className="bg-blue-100 text-blue-700 border-0">{departmentScorecard.lifecycle.phase}</Badge>
+              <p className="text-sm text-blue-800">{departmentScorecard.lifecycle.bannerMessage}</p>
+            </div>
+          )}
+
+          {(departmentInfo?.headOfDepartmentName || departmentScorecard?.appraiser || departmentScorecard?.contract?.reviewer) && (
+            <div className="grid gap-4 md:grid-cols-3">
+              <Card className="border-l-4 border-l-purple-500">
+                <CardContent className="pt-4">
+                  <p className="text-xs text-muted-foreground">Head of Department</p>
+                  <p className="font-semibold mt-1">{departmentInfo?.headOfDepartmentName || "—"}</p>
+                  <p className="text-xs text-muted-foreground">{departmentInfo?.headOfDepartmentTitle || ""}</p>
+                </CardContent>
+              </Card>
+              <Card className="border-l-4 border-l-blue-500">
+                <CardContent className="pt-4">
+                  <p className="text-xs text-muted-foreground">Appraiser</p>
+                  <p className="font-semibold mt-1">{departmentScorecard?.appraiser?.name || "—"}</p>
+                  <p className="text-xs text-muted-foreground">{departmentScorecard?.appraiser?.title || ""}</p>
+                </CardContent>
+              </Card>
+              <Card className="border-l-4 border-l-green-500">
+                <CardContent className="pt-4">
+                  <p className="text-xs text-muted-foreground">Contract Reviewer</p>
+                  <p className="font-semibold mt-1">{departmentScorecard?.contract?.reviewer?.name || "—"}</p>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
           <div className="grid gap-6 lg:grid-cols-2">
             <Card className="bg-white rounded-2xl">
               <CardHeader>
@@ -285,7 +335,12 @@ export function DepartmentScorecardsPage() {
                           <p className="font-semibold text-sm leading-tight">{goal.goalName ?? goal.title ?? "Untitled Goal"}</p>
                           <p className="text-xs text-muted-foreground mt-1">{goal.kpiOrMeasure || "KPI"}</p>
                         </div>
-                        <Badge className={statusColor(goal.status)}>{String(goal.status || "N/A")}</Badge>
+                        <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                          {goal.selectedSource && (
+                            <Badge className="bg-gray-100 text-gray-700 text-xs border-0">{goal.selectedSource}</Badge>
+                          )}
+                          <Badge className={statusColor(goal.status)}>{String(goal.status || "N/A")}</Badge>
+                        </div>
                       </div>
                       <div className="grid grid-cols-2 gap-4 text-xs text-muted-foreground">
                         <p>Target: {goal.targetValue ?? "N/A"}</p>
@@ -302,6 +357,19 @@ export function DepartmentScorecardsPage() {
                           <div className={`h-full ${progress >= 80 ? "bg-emerald-500" : progress >= 60 ? "bg-blue-500" : progress >= 40 ? "bg-amber-500" : "bg-red-500"}`} style={{ width: `${Math.min(progress, 100)}%` }} />
                         </div>
                       </div>
+                      {goal.childContributions && goal.childContributions.length > 0 && (
+                        <div className="mt-2 pt-2 border-t border-dashed">
+                          <p className="text-xs font-medium text-muted-foreground mb-1">Employee Contributions</p>
+                          <div className="space-y-1">
+                            {goal.childContributions.map((c: any, ci: number) => (
+                              <div key={ci} className="flex items-center justify-between text-xs text-muted-foreground">
+                                <span>{c.employeeName}</span>
+                                <span>{c.progressPct}% · weight {c.contributionWeight}%</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )
                 })}
@@ -336,6 +404,100 @@ export function DepartmentScorecardsPage() {
               </CardContent>
             </Card>
           </div>
+
+          {rollupSummary.length > 0 && (
+            <Card className="bg-white rounded-2xl">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center">
+                    <CiUser className="w-5 h-5 text-white" />
+                  </div>
+                  Employee Roll-up Summary
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b bg-gray-50">
+                        <th className="text-left px-3 py-2 font-semibold text-gray-700">Employee</th>
+                        <th className="text-right px-3 py-2 font-semibold text-gray-700">Final Score</th>
+                        <th className="text-right px-3 py-2 font-semibold text-gray-700">Roll-up Weight</th>
+                        <th className="text-right px-3 py-2 font-semibold text-gray-700">Weighted Contribution</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rollupSummary.map((row: any, idx: number) => (
+                        <tr key={idx} className="border-b last:border-0 hover:bg-gray-50">
+                          <td className="px-3 py-2 font-medium">{row.employeeName}</td>
+                          <td className="px-3 py-2 text-right">{row.finalScore ?? "—"}</td>
+                          <td className="px-3 py-2 text-right">{row.rollupWeight ?? "—"}%</td>
+                          <td className="px-3 py-2 text-right">{row.weightedContribution ?? "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {(() => {
+            const attrs = departmentScorecard?.document?.qualitativeSections?.personalAttributes
+            if (!attrs || attrs.length === 0) return null
+            const cols = attrs[0]?.columns?.map((c: any) => c.label) ?? []
+            return (
+              <Card className="bg-white rounded-2xl">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center">
+                      <ClipboardList className="w-5 h-5 text-white" />
+                    </div>
+                    HOD Leadership Evaluation
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b bg-gray-50">
+                          <th className="text-left px-3 py-2 font-semibold text-gray-700 w-[35%]">Attribute</th>
+                          {cols.map((col: string) => (
+                            <th key={col} className="px-3 py-2 font-semibold text-gray-700 text-center whitespace-nowrap">{col}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {attrs.map((attr: any, idx: number) => (
+                          <tr key={idx} className="border-b last:border-0">
+                            <td className="px-3 py-2 font-medium text-gray-800">{attr.attribute}</td>
+                            {attr.columns.map((col: any) => (
+                              <td key={col.label} className="px-3 py-2 text-center">
+                                {col.selected ? (
+                                  <span className="inline-flex w-6 h-6 rounded-full bg-blue-600 items-center justify-center text-white text-xs">●</span>
+                                ) : (
+                                  <span className="inline-flex w-6 h-6 rounded-full border-2 border-gray-300 items-center justify-center text-gray-300 text-xs">○</span>
+                                )}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })()}
+
+          <DepartmentQualitativeModal
+            isOpen={isQualModalOpen}
+            onClose={() => setIsQualModalOpen(false)}
+            departmentName={selectedDepartment}
+            periodLabel={periodLabel}
+            existingAttributes={departmentScorecard?.document?.qualitativeSections?.personalAttributes}
+            onSaved={handleRefresh}
+          />
         </>
       )}
     </div>

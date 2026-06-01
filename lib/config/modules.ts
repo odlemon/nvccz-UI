@@ -165,7 +165,7 @@ export const MODULE_CONFIG: ModuleConfig[] = [
         icon: IoStatsChartOutline,
         items: [
           { id: "org-bsc", name: "Org BSC", path: "/performance/org-bsc", icon: CiGrid41, description: "Organisational BSC dashboard" },
-          { id: "department-scorecards", name: "Department Performance Scorecard", path: "/performance/department-scorecards", icon: CiViewBoard, description: "Department performance scorecards" },
+          { id: "department-scorecards", name: "Department Scorecards", path: "/performance/department-scorecards", icon: CiViewBoard, description: "Department performance scorecards" },
           { id: "board-scorecards", name: "Board Scorecards", path: "/performance/board-scorecards", icon: IoStatsChartOutline, description: "Board contract scorecards" },
           { id: "ceo-scorecards", name: "CEO Scorecards", path: "/performance/ceo-scorecards", icon: CiTrophy, description: "CEO contract scorecards" },
           { id: "user-scorecards", name: "Employee Scorecards", path: "/performance/user-scorecards", icon: CiViewTable, description: "User performance scorecards" },

@@ -72,6 +72,21 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   warningText: { fontSize: 8, color: "#92400e" },
+  ratingsTable: { borderWidth: 1, borderColor: COLORS.slate300, borderRadius: 4, marginTop: 4 },
+  ratingsRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: COLORS.slate300, paddingVertical: 4, paddingHorizontal: 6 },
+  ratingsRowLast: { flexDirection: 'row', paddingVertical: 4, paddingHorizontal: 6 },
+  ratingsRowBold: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: COLORS.slate300, paddingVertical: 4, paddingHorizontal: 6, backgroundColor: COLORS.slate100 },
+  ratingsCellSection: { width: '12%', fontSize: 8, color: COLORS.slate500 },
+  ratingsCellHeading: { flex: 1, fontSize: 8, color: COLORS.slate700 },
+  ratingsCellScore: { width: '12%', fontSize: 8, textAlign: 'right' as const, fontWeight: 'bold', color: COLORS.slate900 },
+  ratingsCellLabel: { width: '28%', fontSize: 8, textAlign: 'right' as const, color: COLORS.slate600 },
+  qualTable: { borderWidth: 1, borderColor: COLORS.slate300, borderRadius: 4 },
+  qualHeaderRow: { flexDirection: 'row' as const, backgroundColor: COLORS.slate100, borderBottomWidth: 1, borderBottomColor: COLORS.slate300 },
+  qualRow: { flexDirection: 'row' as const, borderBottomWidth: 1, borderBottomColor: COLORS.slate300 },
+  qualRowLast: { flexDirection: 'row' as const },
+  qualCellAttr: { flex: 2.5, padding: 5, fontSize: 8, color: COLORS.slate700 },
+  qualCellCol: { flex: 1, padding: 5, fontSize: 8, textAlign: 'center' as const, color: COLORS.slate500 },
+  qualSelected: { color: COLORS.primary, fontWeight: 'bold' as const },
   footer: {
     position: "absolute",
     bottom: 20,
@@ -246,6 +261,12 @@ export default function ContractScorecardPDF({ data, type, activeAddress }: Cont
             </Text>
           </View>
           <View style={styles.summaryCard}>
+            <Text style={styles.summaryLabel}>Contract Party</Text>
+            <Text style={styles.summaryValue}>
+              {subjectName ? `${subjectName}${subjectTitle ? ` — ${subjectTitle}` : ''}` : '—'}
+            </Text>
+          </View>
+          <View style={styles.summaryCard}>
             <Text style={styles.summaryLabel}>Sections</Text>
             <Text style={styles.summaryValue}>{sections.length}</Text>
           </View>
@@ -276,10 +297,10 @@ export default function ContractScorecardPDF({ data, type, activeAddress }: Cont
             <Text style={styles.rowLabel}>Title</Text>
             <Text style={styles.rowValue}>{subjectTitle || "N/A"}</Text>
           </View>
-          {data?.contract?.reviewer && (
+          {(data?.contract?.reviewer?.name ?? data?.contract?.reviewerName) && (
             <View style={styles.row}>
               <Text style={styles.rowLabel}>Reviewer</Text>
-              <Text style={styles.rowValue}>{data.contract.reviewer}</Text>
+              <Text style={styles.rowValue}>{data.contract.reviewer?.name ?? data.contract.reviewerName}</Text>
             </View>
           )}
           {data?.contract?.approver && (
@@ -302,6 +323,62 @@ export default function ContractScorecardPDF({ data, type, activeAddress }: Cont
             <HeatMapLegend />
           </View>
         )}
+
+        {/* Agreed Ratings Summary */}
+        {(() => {
+          const ratings: any[] = data?.document?.agreedRatingsSummary ?? data?.agreedRatingsSummary ?? []
+          if (ratings.length === 0) return null
+          return (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Agreed Ratings Summary</Text>
+              <View style={styles.ratingsTable}>
+                {ratings.map((item: any, idx: number) => {
+                  const isTotal = item.section === 'TOTAL'
+                  const isLast = idx === ratings.length - 1
+                  const rowStyle = isTotal ? styles.ratingsRowBold : (isLast ? styles.ratingsRowLast : styles.ratingsRow)
+                  return (
+                    <View key={idx} style={rowStyle}>
+                      <Text style={styles.ratingsCellSection}>{item.section}</Text>
+                      <Text style={[styles.ratingsCellHeading, isTotal ? { fontWeight: 'bold' } : {}]}>{item.heading}</Text>
+                      <Text style={[styles.ratingsCellScore, isTotal ? { color: COLORS.primary } : {}]}>{item.sectionScore}</Text>
+                      <Text style={styles.ratingsCellLabel}>{item.label}</Text>
+                    </View>
+                  )
+                })}
+              </View>
+            </View>
+          )
+        })()}
+
+        {/* Qualitative Evaluation */}
+        {(() => {
+          const attrs: any[] = data?.document?.qualitativeSections?.personalAttributes ?? []
+          if (attrs.length === 0) return null
+          const colLabels: string[] = attrs[0]?.columns?.map((c: any) => c.label) ?? []
+          return (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>{type} Leadership Evaluation</Text>
+              <View style={styles.qualTable}>
+                <View style={styles.qualHeaderRow}>
+                  <Text style={[styles.qualCellAttr, { fontWeight: 'bold', color: COLORS.slate900 }]}>Attribute</Text>
+                  {colLabels.map((col: string) => (
+                    <Text key={col} style={[styles.qualCellCol, { fontWeight: 'bold', color: COLORS.slate900 }]}>{col}</Text>
+                  ))}
+                </View>
+                {attrs.map((attr: any, idx: number) => (
+                  <View key={idx} style={idx === attrs.length - 1 ? styles.qualRowLast : styles.qualRow}>
+                    <Text style={styles.qualCellAttr}>{attr.attribute}</Text>
+                    {attr.columns.map((col: any) => (
+                      <Text key={col.label} style={[styles.qualCellCol, col.selected ? styles.qualSelected : {}]}>
+                        {col.selected ? '●' : '○'}
+                      </Text>
+                    ))}
+                  </View>
+                ))}
+              </View>
+            </View>
+          )
+        })()}
 
         {/* Warnings */}
         {warnings.length > 0 && (

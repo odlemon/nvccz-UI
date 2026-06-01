@@ -494,18 +494,33 @@ export const employeesApi = {
     return apiClient.post<ApiResponse<Employee>>('/payroll/employees', fd)
   },
 
-  update: async (id: string, data: {
-    bankName?: string
-    branchCode?: string
-    accountNumber?: string
-    basicSalary?: number
-    idNumber?: string
-    nextOfKin?: string
-    address?: string
-    pictureUrl?: string | null
-    isActive?: boolean
-  }): Promise<ApiResponse<Employee>> => {
-    return apiClient.put<ApiResponse<Employee>>(`/payroll/employees/${id}`, data)
+  update: async (
+    id: string,
+    data: {
+      bankName?: string
+      branchCode?: string
+      accountNumber?: string
+      basicSalary?: number
+      idNumber?: string
+      nextOfKin?: string
+      address?: string
+      pictureUrl?: string | null
+      isActive?: boolean
+    },
+    picture?: File
+  ): Promise<ApiResponse<Employee>> => {
+    const fd = new FormData()
+    if (data.bankName != null) fd.append('bankName', data.bankName)
+    if (data.branchCode != null) fd.append('branchCode', data.branchCode)
+    if (data.accountNumber != null) fd.append('accountNumber', data.accountNumber)
+    if (data.basicSalary != null) fd.append('basicSalary', String(data.basicSalary))
+    if (data.idNumber != null) fd.append('idNumber', data.idNumber)
+    if (data.nextOfKin != null) fd.append('nextOfKin', data.nextOfKin)
+    if (data.address != null) fd.append('address', data.address)
+    if (data.pictureUrl != null) fd.append('pictureUrl', data.pictureUrl)
+    if (data.isActive != null) fd.append('isActive', String(data.isActive))
+    if (picture) fd.append('picture', picture)
+    return apiClient.put<ApiResponse<Employee>>(`/payroll/employees/${id}`, fd)
   },
 
   delete: async (id: string): Promise<ApiResponse<void>> => {

@@ -74,6 +74,14 @@ const styles = StyleSheet.create({
     fontSize: 7,
     color: COLORS.slate500,
   },
+
+  qualTable: { borderWidth: 1, borderColor: COLORS.slate300, borderRadius: 4 },
+  qualHeaderRow: { flexDirection: "row", backgroundColor: COLORS.slate100, borderBottomWidth: 1, borderBottomColor: COLORS.slate300 },
+  qualRow: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: COLORS.slate300 },
+  qualRowLast: { flexDirection: "row" },
+  qualCellAttr: { flex: 2.5, padding: 5, fontSize: 8, color: COLORS.slate700 },
+  qualCellCol: { flex: 1, padding: 5, fontSize: 8, textAlign: "center" as const, color: COLORS.slate500 },
+  qualSelected: { color: COLORS.primary, fontWeight: "bold" },
 })
 
 interface DepartmentScorecardPDFProps {
@@ -209,6 +217,18 @@ export default function DepartmentScorecardPDF({ data, activeAddress }: Departme
             <Text style={styles.summaryLabel}>Roll-up Records</Text>
             <Text style={styles.summaryValue}>{rollup.length}</Text>
           </View>
+          {data?.department?.headOfDepartmentName && (
+            <View style={styles.summaryCard}>
+              <Text style={styles.summaryLabel}>Head of Dept</Text>
+              <Text style={styles.summaryValue}>{data.department.headOfDepartmentName}</Text>
+            </View>
+          )}
+          {data?.appraiser?.name && (
+            <View style={styles.summaryCard}>
+              <Text style={styles.summaryLabel}>Appraiser</Text>
+              <Text style={styles.summaryValue}>{data.appraiser.name}</Text>
+            </View>
+          )}
         </View>
 
         {/* Balanced Scorecard table */}
@@ -269,6 +289,66 @@ export default function DepartmentScorecardPDF({ data, activeAddress }: Departme
             />
           </View>
         )}
+
+        {/* Employee Roll-up */}
+        {(() => {
+          const rollupRows: any[] = data?.document?.rollupTable ?? data?.rollupSummary ?? data?.employeeRollupSummary ?? []
+          if (rollupRows.length === 0) return null
+          return (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Employee Roll-up Summary</Text>
+              <BalancedScorecardTable
+                perspectives={[{ id: 'rollup', name: 'Employee Roll-up', color: COLORS.primary }]}
+                rows={rollupRows.map((row: any) => ({
+                  perspectiveId: 'rollup',
+                  heat: 'neutral' as any,
+                  values: {
+                    employee: row.employeeName ?? '—',
+                    score: String(row.finalScore ?? '—'),
+                    weight: row.rollupWeight != null ? `${row.rollupWeight}%` : '—',
+                    contribution: String(row.weightedContribution ?? '—'),
+                  },
+                }))}
+                columns={[
+                  { key: 'employee', label: 'Employee', flex: 3, bold: true },
+                  { key: 'score', label: 'Final Score', flex: 1, align: 'right' as const },
+                  { key: 'weight', label: 'Roll-up Weight', flex: 1, align: 'right' as const },
+                  { key: 'contribution', label: 'Weighted Contribution', flex: 1.2, align: 'right' as const },
+                ]}
+              />
+            </View>
+          )
+        })()}
+
+        {/* HOD Leadership Evaluation */}
+        {(() => {
+          const attrs: any[] = data?.document?.qualitativeSections?.personalAttributes ?? []
+          if (attrs.length === 0) return null
+          const colLabels: string[] = attrs[0]?.columns?.map((c: any) => c.label) ?? []
+          return (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>HOD Leadership Evaluation</Text>
+              <View style={styles.qualTable}>
+                <View style={styles.qualHeaderRow}>
+                  <Text style={[styles.qualCellAttr, { fontWeight: 'bold', color: COLORS.slate900 }]}>Attribute</Text>
+                  {colLabels.map((col: string) => (
+                    <Text key={col} style={[styles.qualCellCol, { fontWeight: 'bold', color: COLORS.slate900 }]}>{col}</Text>
+                  ))}
+                </View>
+                {attrs.map((attr: any, idx: number) => (
+                  <View key={idx} style={idx === attrs.length - 1 ? styles.qualRowLast : styles.qualRow}>
+                    <Text style={styles.qualCellAttr}>{attr.attribute}</Text>
+                    {attr.columns.map((col: any) => (
+                      <Text key={col.label} style={[styles.qualCellCol, col.selected ? styles.qualSelected : {}]}>
+                        {col.selected ? '●' : '○'}
+                      </Text>
+                    ))}
+                  </View>
+                ))}
+              </View>
+            </View>
+          )
+        })()}
 
         {/* Warnings */}
         {warnings.length > 0 && (
