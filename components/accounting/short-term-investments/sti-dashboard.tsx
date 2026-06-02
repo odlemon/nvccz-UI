@@ -33,6 +33,8 @@ import {
   Bar,
   LineChart,
   Line,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -56,6 +58,7 @@ export function STIDashboard() {
   const [asOfDate, setAsOfDate] = useState<Date>(new Date())
   const asOf = format(asOfDate, "yyyy-MM-dd")
   const [broker, setBroker] = useState("")
+  const [yieldPeriod, setYieldPeriod] = useState<'1D' | '5D' | '1M' | '3M' | '6M' | 'YTD' | '1Y'>('1M')
 
   useEffect(() => {
     dispatch(fetchSTIDashboard({
@@ -91,15 +94,74 @@ export function STIDashboard() {
     ]
   }, [dashboard])
 
-  // Daily yield data for bar chart
+  // Daily yield data — raw daily points for the loaded month
   const dailyYieldData = useMemo(() => {
     if (!dashboard?.dailyYieldInMonth) return []
     return dashboard.dailyYieldInMonth.map((d) => ({
       day: format(new Date(d.accrualDate), "d"),
+      label: format(new Date(d.accrualDate), "MMM d"),
       fullDate: format(new Date(d.accrualDate), "MMMM d, yyyy"),
+      isoDate: format(new Date(d.accrualDate), "yyyy-MM-dd"),
+      isoMonth: format(new Date(d.accrualDate), "yyyy-MM"),
       amount: d.amountSum,
     }))
   }, [dashboard])
+
+  // Build the correct series for the selected period.
+  // Short periods (1D/5D/1M): daily granularity, slice from the loaded month.
+  // Long periods (3M/6M/YTD/1Y): monthly granularity — aggregate current-month
+  // daily data into its month bucket, zero-fill all other months in the range.
+  const filteredYieldData = useMemo(() => {
+    const anchor = asOfDate || new Date()
+    const anchorMonth = format(anchor, "yyyy-MM")
+
+    if (yieldPeriod === '1D' || yieldPeriod === '5D' || yieldPeriod === '1M') {
+      const cutoffs: Record<string, number> = { '1D': 1, '5D': 5, '1M': 31 }
+      const days = cutoffs[yieldPeriod] ?? 31
+      return dailyYieldData.slice(-days)
+    }
+
+    // Monthly series
+    let monthCount: number
+    if (yieldPeriod === 'YTD') {
+      monthCount = anchor.getMonth() + 1   // Jan=1 … Dec=12
+    } else if (yieldPeriod === '3M') {
+      monthCount = 3
+    } else if (yieldPeriod === '6M') {
+      monthCount = 6
+    } else {
+      monthCount = 12  // 1Y
+    }
+
+    // Sum all daily amounts that belong to the loaded month
+    const monthTotals: Record<string, number> = {}
+    for (const d of dailyYieldData) {
+      monthTotals[d.isoMonth] = (monthTotals[d.isoMonth] ?? 0) + d.amount
+    }
+
+    // Build the range backwards from anchor month
+    const series = []
+    for (let i = monthCount - 1; i >= 0; i--) {
+      const date = new Date(anchor.getFullYear(), anchor.getMonth() - i, 1)
+      const iso = format(date, "yyyy-MM")
+      series.push({
+        label: format(date, "MMM"),
+        fullDate: format(date, "MMMM yyyy"),
+        day: format(date, "MMM"),
+        isoMonth: iso,
+        amount: monthTotals[iso] ?? 0,
+      })
+    }
+    return series
+  }, [dailyYieldData, yieldPeriod, asOfDate])
+
+  // Determine if yield trend is positive (for chart colour)
+  const yieldTrendPositive = useMemo(() => {
+    if (filteredYieldData.length < 2) return true
+    const first = filteredYieldData[0].amount
+    const last = filteredYieldData[filteredYieldData.length - 1].amount
+    return last >= first
+  }, [filteredYieldData])
 
   // Active alerts count
   const pendingAlerts = dashboard?.alerts?.filter((a) => a.type === "PENDING_APPROVAL")?.length || 0
@@ -221,38 +283,88 @@ export function STIDashboard() {
           <CardContent className="p-6 pt-4">
             <div className="h-[240px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={dailyYieldData}>
+                <AreaChart data={filteredYieldData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="yieldGradientPos" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#4f77ff" stopOpacity={0.18} />
+                      <stop offset="95%" stopColor="#4f77ff" stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="yieldGradientNeg" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#ef4444" stopOpacity={0.18} />
+                      <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                   <XAxis
-                    dataKey="day"
+                    dataKey="label"
                     tick={{ fontSize: 10, fill: "#94a3b8" }}
                     axisLine={false}
                     tickLine={false}
+                    interval={['3M','6M','YTD','1Y'].includes(yieldPeriod) ? 0 : "preserveStartEnd"}
                   />
                   <YAxis
                     tick={{ fontSize: 10, fill: "#94a3b8" }}
                     axisLine={false}
                     tickLine={false}
-                    tickFormatter={(v) => `$${v.toFixed(0)}`}
+                    tickFormatter={(v) => `$${Number(v).toLocaleString(undefined, { notation: 'compact', maximumFractionDigits: 1 })}`}
+                    width={56}
                   />
                   <Tooltip
-                    formatter={(value: number) => [`$${formatNumber(value)}`, "Interest"]}
+                    formatter={(value: number) => [`$${formatNumber(value)}`, "Yield"]}
                     labelFormatter={(label) => {
-                      const found = dailyYieldData.find((item) => item.day === String(label))
-                      return found ? ` (${found.fullDate})` : `n/a`
+                      const found = filteredYieldData.find((item) => item.label === String(label))
+                      return found ? found.fullDate : String(label)
                     }}
-                    contentStyle={{ borderRadius: 12, border: "1px solid #e2e8f0", fontSize: 12 }}
+                    contentStyle={{ borderRadius: 8, border: "1px solid #e2e8f0", fontSize: 12, padding: '6px 12px' }}
+                    cursor={{ stroke: '#94a3b8', strokeWidth: 1, strokeDasharray: '4 2' }}
                   />
-                  <Bar dataKey="amount" radius={[4, 4, 0, 0]}>
-                    {dailyYieldData.map((entry, index) => (
-                      <Cell
-                        key={`cell-${index}`}
-                        fill={entry.amount > 0 ? "#4f77ff" : entry.amount < 0 ? "#ef4444" : "#e2e8f0"}
-                      />
-                    ))}
-                  </Bar>
-                </BarChart>
+                  <Area
+                    type="monotone"
+                    dataKey="amount"
+                    stroke={yieldTrendPositive ? "#4f77ff" : "#ef4444"}
+                    strokeWidth={2}
+                    fill={yieldTrendPositive ? "url(#yieldGradientPos)" : "url(#yieldGradientNeg)"}
+                    dot={false}
+                    activeDot={{ r: 4, strokeWidth: 0, fill: yieldTrendPositive ? "#4f77ff" : "#ef4444" }}
+                  />
+                </AreaChart>
               </ResponsiveContainer>
+            </div>
+            {filteredYieldData.length > 0 && (
+              <div className="flex items-center gap-4 mt-2 pt-2 border-t">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] text-muted-foreground">Open</span>
+                  <span className="text-[11px] font-semibold">${formatNumber(filteredYieldData[0]?.amount ?? 0)}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] text-muted-foreground">Close</span>
+                  <span className="text-[11px] font-semibold">${formatNumber(filteredYieldData[filteredYieldData.length - 1]?.amount ?? 0)}</span>
+                </div>
+                <div className="flex items-center gap-1.5 ml-auto">
+                  <span className={`text-[11px] font-semibold ${yieldTrendPositive ? 'text-blue-600' : 'text-red-500'}`}>
+                    {yieldTrendPositive ? '▲' : '▼'}{' '}
+                    {filteredYieldData.length > 1
+                      ? Math.abs(((filteredYieldData[filteredYieldData.length-1].amount - filteredYieldData[0].amount) / Math.max(Math.abs(filteredYieldData[0].amount), 1)) * 100).toFixed(2)
+                      : '0.00'}%
+                  </span>
+                </div>
+              </div>
+            )}
+            {/* TradingView-style period filter — bottom */}
+            <div className="flex items-center justify-between mt-3 pt-3 border-t gap-1">
+              {(['1D','5D','1M','3M','6M','YTD','1Y'] as const).map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setYieldPeriod(p)}
+                  className={`flex-1 py-1.5 text-[12px] font-semibold rounded-md transition-colors ${
+                    yieldPeriod === p
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-gray-100'
+                  }`}
+                >
+                  {p}
+                </button>
+              ))}
             </div>
           </CardContent>
         </Card>
