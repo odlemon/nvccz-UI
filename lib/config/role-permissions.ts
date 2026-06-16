@@ -285,6 +285,16 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
         access: 'read',
       },
       {
+        moduleId: 'forecasting',
+        access: 'full',
+        subModules: {
+          'forecasting-dashboard': 'full',
+          'scenarios': 'full',
+          'forecasting-audit': 'full',
+          'forecasting-settings': 'full',
+        }
+      },
+      {
         moduleId: 'admin-management',
         access: 'read',
       },
@@ -389,6 +399,7 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'user-scorecard': 'full',
         }
       },
+      { moduleId: 'forecasting', access: 'write', subModules: { 'forecasting-dashboard': 'full', 'scenarios': 'write', 'forecasting-audit': 'read', 'forecasting-settings': 'write' } },
     ]
   },
 
@@ -463,6 +474,7 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
         }
       },
       { moduleId: 'performance-management', access: 'write' },
+      { moduleId: 'forecasting', access: 'write', subModules: { 'forecasting-dashboard': 'full', 'scenarios': 'write', 'forecasting-audit': 'read', 'forecasting-settings': 'write' } },
     ]
   },
 
@@ -501,6 +513,7 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
         }
       },
       { moduleId: 'performance-management', access: 'write' },
+      { moduleId: 'forecasting', access: 'write', subModules: { 'forecasting-dashboard': 'full', 'scenarios': 'write', 'forecasting-audit': 'read', 'forecasting-settings': 'write' } },
     ]
   },
 
@@ -1743,6 +1756,16 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
         }
       },
       {
+        moduleId: 'forecasting',
+        access: 'full',
+        subModules: {
+          'forecasting-dashboard': 'full',
+          'scenarios': 'full',
+          'forecasting-audit': 'full',
+          'forecasting-settings': 'full',
+        }
+      },
+      {
         moduleId: 'admin-management',
         access: 'full',
       },
@@ -1950,6 +1973,16 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
         }
       },
       { moduleId: 'events-management', access: 'read' },
+      {
+        moduleId: 'forecasting',
+        access: 'full',
+        subModules: {
+          'forecasting-dashboard': 'full',
+          'scenarios': 'full',
+          'forecasting-audit': 'full',
+          'forecasting-settings': 'full',
+        }
+      },
       { moduleId: 'admin-management', access: 'full' },
     ]
   },

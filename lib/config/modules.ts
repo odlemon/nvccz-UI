@@ -358,6 +358,22 @@ export const MODULE_CONFIG: ModuleConfig[] = [
     ],
   },
 
+  // forecasting
+  {
+    id: "forecasting",
+    name: "Forecasting",
+    description: "Multi-dimensional scenario forecasting engine",
+    icon: TrendingUp,
+    color: "oklch(0.52 0.16 240)",
+    path: "/forecasting",
+    subModules: [
+      { id: "forecasting-dashboard", name: "Dashboard",   path: "/forecasting",          icon: CiGrid41,       description: "Forecasting overview and scenario counts" },
+      { id: "scenarios",            name: "Scenarios",   path: "/forecasting/scenarios", icon: CiFileOn,       description: "Manage forecast scenarios" },
+      { id: "forecasting-audit",    name: "Audit Trail", path: "/forecasting/audit",     icon: CiViewTimeline, description: "Scenario audit log" },
+      { id: "forecasting-settings", name: "Settings",    path: "/forecasting/settings",  icon: CiSettings,     description: "Entity management and GL sync" },
+    ],
+  },
+
   // application-portal
   {
     id: "application-portal",
