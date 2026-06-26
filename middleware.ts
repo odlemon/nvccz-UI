@@ -85,6 +85,13 @@ const routePermissions: Record<string, { module: string; subModule?: string }> =
 
   // Events Management routes
   '/events': { module: 'events-management' },
+  '/events/my-events': { module: 'events-management', subModule: 'my-events' },
+
+  // Forecasting routes
+  '/forecasting': { module: 'forecasting', subModule: 'forecasting-dashboard' },
+  '/forecasting/scenarios': { module: 'forecasting', subModule: 'scenarios' },
+  '/forecasting/audit': { module: 'forecasting', subModule: 'forecasting-audit' },
+  '/forecasting/settings': { module: 'forecasting', subModule: 'forecasting-settings' },
 
   // Admin Management routes
   '/admin': { module: 'admin-management' },

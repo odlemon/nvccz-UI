@@ -1,16 +1,18 @@
 "use client"
 
+import { useMemo } from "react"
 import { usePathname } from "next/navigation"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { getModuleById } from "@/lib/config/modules"
+import { useRolePermissions } from "@/lib/hooks/useRolePermissions"
 
 export function EventsSidebar() {
   const pathname = usePathname()
+  const { hasSubModuleAccess, isLoading } = useRolePermissions()
 
   const module = getModuleById("events-management")
 
-  // Fix: Only highlight dashboard on exact match, others on startsWith
   const isPathActive = (path: string, isDashboard: boolean) => {
     const base = path.split("?")[0]
     if (isDashboard) {
@@ -19,6 +21,14 @@ export function EventsSidebar() {
     return pathname.startsWith(base + "/") || pathname === base
   }
 
+  const accessibleSubModules = useMemo(() => {
+    if (!module) return []
+    if (isLoading) return module.subModules
+    return module.subModules.filter((subModule) =>
+      hasSubModuleAccess("events-management", subModule.id)
+    )
+  }, [module, hasSubModuleAccess, isLoading])
+
   if (!module) {
     return null
   }
@@ -26,9 +36,8 @@ export function EventsSidebar() {
   return (
     <aside className="w-64 bg-white border-r border-border h-[calc(100vh-5rem)] overflow-y-auto sticky top-20 z-10">
       <div className="p-4 space-y-4">
-        {/* Module Header */}
         <div className="flex items-center gap-3 p-3 rounded-lg bg-gradient-to-r from-purple-50 to-purple-100">
-          <div 
+          <div
             className="w-10 h-10 rounded-lg flex items-center justify-center"
             style={{ backgroundColor: module.color }}
           >
@@ -39,11 +48,9 @@ export function EventsSidebar() {
           </div>
         </div>
 
-        {/* Navigation Items */}
         <div className="space-y-1">
-          {module.subModules.map((subModule, idx) => {
+          {accessibleSubModules.map((subModule, idx) => {
             const Icon = subModule.icon
-            // Assume dashboard is always the first subModule (adjust if needed)
             const isDashboard = idx === 0 || subModule.id === "dashboard"
             const active = isPathActive(subModule.path, isDashboard)
             return (
@@ -62,6 +69,12 @@ export function EventsSidebar() {
             )
           })}
         </div>
+
+        {!isLoading && accessibleSubModules.length === 0 && (
+          <div className="p-4 text-center text-sm text-muted-foreground">
+            No accessible features
+          </div>
+        )}
       </div>
     </aside>
   )

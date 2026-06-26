@@ -282,7 +282,11 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
       },
       {
         moduleId: 'events-management',
-        access: 'read',
+        access: 'full',
+        subModules: {
+          'events-dashboard': 'full',
+          'my-events': 'full',
+        },
       },
       {
         moduleId: 'forecasting',
