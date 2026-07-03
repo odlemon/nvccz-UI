@@ -4,37 +4,23 @@ import { useEffect, useMemo, useState } from "react"
 import { useAppDispatch, useAppSelector } from "@/lib/store"
 import { setPriceDrawerOpen, fetchSecurityPriceHistory } from "@/lib/store/slices/investmentsSlice"
 import { priceChange } from "@/lib/api/investments-api"
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
-import { Badge } from "@/components/ui/badge"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
-import { TrendingUp, TrendingDown, Minus, ChevronLeft, ChevronRight, LineChart } from "lucide-react"
+import { ChevronLeft, ChevronRight, LineChart, ShieldCheck, Radio, TrendingUp } from "lucide-react"
+import { Delta, ValidationBadge, SourceBadge, ExchangeTag } from "./status-pills"
 
 const PAGE_SIZE = 15
 
-function ValidationPill({ status }: { status: string }) {
-  const map: Record<string, string> = {
-    APPROVED: "bg-emerald-100 text-emerald-700",
-    PENDING_REVIEW: "bg-amber-100 text-amber-700",
-    REJECTED: "bg-red-100 text-red-700",
-  }
+function Mini({ icon: Icon, label, children }: { icon: any; label: string; children: React.ReactNode }) {
   return (
-    <span className={cn("inline-flex text-[10px] font-medium px-1.5 py-0.5 rounded-full", map[status] ?? "bg-gray-100 text-gray-600")}>
-      {status.replace("_", " ")}
-    </span>
-  )
-}
-
-function SourcePill({ status }: { status: string }) {
-  return status === "FALLBACK" ? (
-    <span className="inline-flex text-[10px] font-medium px-1.5 py-0.5 rounded-full border border-dashed border-slate-300 text-slate-500">
-      FALLBACK
-    </span>
-  ) : (
-    <span className="inline-flex text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700">
-      OK
-    </span>
+    <div className="rounded-lg border border-border bg-background p-2">
+      <div className="mb-1 flex items-center justify-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+        <Icon className="h-3 w-3" /> {label}
+      </div>
+      {children}
+    </div>
   )
 }
 
@@ -68,138 +54,123 @@ export function SecurityPriceDrawer() {
 
   return (
     <Sheet open onOpenChange={() => dispatch(setPriceDrawerOpen(false))}>
-      <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">
-            <span className="font-mono">{priceDrawerTarget.symbol}</span>
-            <Badge variant="outline">{priceDrawerTarget.exchangeCode}</Badge>
-          </SheetTitle>
+      <SheetContent className="flex w-full flex-col gap-0 p-0 sm:max-w-xl overflow-y-auto">
+        <SheetHeader className="space-y-0 border-b border-border p-5">
+          <div className="flex items-center gap-2">
+            <SheetTitle className="font-mono text-base">{priceDrawerTarget.symbol}</SheetTitle>
+            <ExchangeTag exchange={priceDrawerTarget.exchangeCode} />
+          </div>
+          <SheetDescription className="mt-1 text-xs">
+            {priceDrawerTarget.name} · {priceDrawerTarget.listingCurrencyCode}
+          </SheetDescription>
         </SheetHeader>
 
-        <div className="mt-1 mb-4">
-          <p className="text-sm text-muted-foreground">{priceDrawerTarget.name}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">{priceDrawerTarget.listingCurrencyCode}</p>
-        </div>
-
-        {/* Summary strip */}
-        {priceHistoryLoading ? (
-          <Skeleton className="h-16 w-full rounded-xl mb-4" />
-        ) : latest ? (
-          <div className="flex items-center justify-between bg-gray-50/60 border border-gray-100 rounded-xl px-4 py-3 mb-4">
-            <div>
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Latest Price</p>
-              <p className="font-mono text-2xl font-semibold text-gray-900">{summary.price?.toFixed(4)}</p>
-            </div>
-            <div className="flex items-center gap-1.5">
-              {summary.direction === "UP" && <TrendingUp className="w-4 h-4 text-[#10B981]" />}
-              {summary.direction === "DOWN" && <TrendingDown className="w-4 h-4 text-[#EF4444]" />}
-              {summary.direction === "FLAT" && <Minus className="w-4 h-4 text-[#6B7280]" />}
-              <span className={cn("font-mono text-sm", summary.direction === "UP" ? "text-[#10B981]" : summary.direction === "DOWN" ? "text-[#EF4444]" : "text-[#6B7280]")}>
-                {summary.pct != null ? `${summary.pct >= 0 ? "+" : ""}${summary.pct.toFixed(2)}%` : "—"}
-              </span>
-            </div>
-            <div className="flex flex-col items-end gap-1">
-              <ValidationPill status={latest.validationStatus} />
-              <SourcePill status={latest.sourceStatus} />
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center py-8 text-center mb-4">
-            <LineChart className="w-8 h-8 text-gray-200 mb-2" />
-            <p className="text-xs text-muted-foreground">No price ticks recorded yet</p>
-          </div>
-        )}
-
-        {/* Rich datatable */}
-        <div className="border border-gray-100 rounded-xl overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-gray-100 bg-gray-50/60">
-                  {["Priced At", "Type", "Price", "Prev Close", "Dev %", "Validation", "Freq", "FX Rate", "Source"].map((h) => (
-                    <th key={h} className="text-left px-3 py-2 font-semibold text-gray-400 uppercase tracking-wide whitespace-nowrap">
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {priceHistoryLoading ? (
-                  Array.from({ length: 5 }).map((_, i) => (
-                    <tr key={i}>
-                      <td colSpan={9} className="px-3 py-2"><Skeleton className="h-4 w-full" /></td>
-                    </tr>
-                  ))
-                ) : paginated.length === 0 ? (
-                  <tr>
-                    <td colSpan={9} className="text-center py-8 text-muted-foreground">No price history</td>
-                  </tr>
-                ) : (
-                  paginated.map((tick) => {
-                    const c = priceChange(tick)
-                    return (
-                      <tr key={tick.id} className="hover:bg-blue-50/20">
-                        <td className="px-3 py-2 font-mono text-gray-600 whitespace-nowrap">
-                          {new Date(tick.pricedAt).toLocaleString()}
-                        </td>
-                        <td className="px-3 py-2 text-gray-700">{tick.priceType}</td>
-                        <td className="px-3 py-2 font-mono font-semibold text-gray-900">{Number(tick.price).toFixed(4)}</td>
-                        <td className="px-3 py-2 font-mono text-gray-600">
-                          {tick.previousClose != null ? Number(tick.previousClose).toFixed(4) : "—"}
-                        </td>
-                        <td className="px-3 py-2 font-mono">
-                          {tick.deviationPct != null ? (
-                            <span className={cn(Number(tick.deviationPct) > 15 ? "text-amber-600 font-semibold" : "text-gray-600")}>
-                              {Number(tick.deviationPct).toFixed(2)}%
-                            </span>
-                          ) : "—"}
-                        </td>
-                        <td className="px-3 py-2"><ValidationPill status={tick.validationStatus} /></td>
-                        <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{tick.tickFrequency}</td>
-                        <td className="px-3 py-2 font-mono text-gray-600">{Number(tick.fxRateUsed).toFixed(2)}</td>
-                        <td className="px-3 py-2"><SourcePill status={tick.sourceStatus} /></td>
-                      </tr>
-                    )
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between px-3 py-2 border-t border-gray-100 bg-gray-50/40">
-              <p className="text-[11px] text-muted-foreground">
-                Page {safePage} of {totalPages} · {priceHistory.length} ticks
-              </p>
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="outline" size="sm" className="h-6 w-6 p-0 rounded-full bg-white"
-                  disabled={safePage <= 1}
-                  onClick={() => setPage((p) => p - 1)}
-                >
-                  <ChevronLeft className="w-3 h-3" />
-                </Button>
-                {pageNumbers.map((n) => (
-                  <Button
-                    key={n}
-                    variant={safePage === n ? "default" : "outline"}
-                    size="sm"
-                    className={cn("h-6 w-6 p-0 rounded-full text-[11px]", safePage === n ? "gradient-primary text-white" : "bg-white")}
-                    onClick={() => setPage(n)}
-                  >
-                    {n}
-                  </Button>
-                ))}
-                <Button
-                  variant="outline" size="sm" className="h-6 w-6 p-0 rounded-full bg-white"
-                  disabled={safePage >= totalPages}
-                  onClick={() => setPage((p) => p + 1)}
-                >
-                  <ChevronRight className="w-3 h-3" />
-                </Button>
+        <div className="flex-1 space-y-6 overflow-y-auto p-5">
+          {/* Price snapshot */}
+          {priceHistoryLoading ? (
+            <Skeleton className="h-24 w-full rounded-xl" />
+          ) : latest ? (
+            <section className="rounded-xl border border-border bg-card p-4">
+              <div className="flex items-end justify-between">
+                <div>
+                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Latest price</p>
+                  <p className="mt-0.5 font-mono text-2xl font-semibold text-foreground">
+                    {summary.price?.toFixed(4)}
+                    <span className="ml-1 text-sm text-muted-foreground">{priceDrawerTarget.listingCurrencyCode}</span>
+                  </p>
+                </div>
+                <Delta value={summary.pct} direction={summary.direction} className="text-sm" />
               </div>
+              <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                <Mini icon={ShieldCheck} label="Validation">
+                  <ValidationBadge status={latest.validationStatus} />
+                </Mini>
+                <Mini icon={Radio} label="Source">
+                  <SourceBadge status={latest.sourceStatus} />
+                </Mini>
+                <Mini icon={TrendingUp} label="Feed">
+                  <span className="text-xs font-medium text-foreground">{latest.tickFrequency?.replace("_", " ")}</span>
+                </Mini>
+              </div>
+            </section>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-8 text-center rounded-lg border border-dashed border-border">
+              <LineChart className="w-8 h-8 text-muted-foreground/30 mb-2" />
+              <p className="text-xs text-muted-foreground">No price ticks recorded yet</p>
             </div>
           )}
+
+          {/* Rich datatable */}
+          <div className="rounded-xl border border-border overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-border bg-muted/40">
+                    {["Priced At", "Type", "Price", "Prev Close", "Dev %", "Validation", "Freq", "FX Rate", "Source"].map((h) => (
+                      <th key={h} className="text-left px-3 py-2 font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {priceHistoryLoading ? (
+                    Array.from({ length: 5 }).map((_, i) => (
+                      <tr key={i}><td colSpan={9} className="px-3 py-2"><Skeleton className="h-4 w-full" /></td></tr>
+                    ))
+                  ) : paginated.length === 0 ? (
+                    <tr><td colSpan={9} className="text-center py-8 text-muted-foreground">No price history</td></tr>
+                  ) : (
+                    paginated.map((tick) => {
+                      const c = priceChange(tick)
+                      return (
+                        <tr key={tick.id} className="border-b border-border/60 last:border-0 hover:bg-muted/40">
+                          <td className="px-3 py-2 font-mono text-muted-foreground whitespace-nowrap">{new Date(tick.pricedAt).toLocaleString()}</td>
+                          <td className="px-3 py-2 text-foreground">{tick.priceType}</td>
+                          <td className="px-3 py-2 font-mono font-semibold text-foreground">{Number(tick.price).toFixed(4)}</td>
+                          <td className="px-3 py-2 font-mono text-muted-foreground">{tick.previousClose != null ? Number(tick.previousClose).toFixed(4) : "—"}</td>
+                          <td className="px-3 py-2 font-mono">
+                            {tick.deviationPct != null ? (
+                              <span className={cn(Number(tick.deviationPct) > 15 ? "text-warn-foreground font-semibold" : "text-muted-foreground")}>
+                                {Number(tick.deviationPct).toFixed(2)}%
+                              </span>
+                            ) : "—"}
+                          </td>
+                          <td className="px-3 py-2"><ValidationBadge status={tick.validationStatus} /></td>
+                          <td className="px-3 py-2 text-muted-foreground whitespace-nowrap">{tick.tickFrequency}</td>
+                          <td className="px-3 py-2 font-mono text-muted-foreground">{Number(tick.fxRateUsed).toFixed(2)}</td>
+                          <td className="px-3 py-2"><SourceBadge status={tick.sourceStatus} /></td>
+                        </tr>
+                      )
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between px-3 py-2 border-t border-border bg-muted/20">
+                <p className="text-[11px] text-muted-foreground">Page {safePage} of {totalPages} · {priceHistory.length} ticks</p>
+                <div className="flex items-center gap-1">
+                  <Button variant="outline" size="sm" className="h-6 w-6 p-0 rounded-full bg-card" disabled={safePage <= 1} onClick={() => setPage((p) => p - 1)}>
+                    <ChevronLeft className="w-3 h-3" />
+                  </Button>
+                  {pageNumbers.map((n) => (
+                    <Button
+                      key={n} variant={safePage === n ? "default" : "outline"} size="sm"
+                      className={cn("h-6 w-6 p-0 rounded-full text-[11px]", safePage === n ? "bg-primary text-primary-foreground" : "bg-card")}
+                      onClick={() => setPage(n)}
+                    >
+                      {n}
+                    </Button>
+                  ))}
+                  <Button variant="outline" size="sm" className="h-6 w-6 p-0 rounded-full bg-card" disabled={safePage >= totalPages} onClick={() => setPage((p) => p + 1)}>
+                    <ChevronRight className="w-3 h-3" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </SheetContent>
     </Sheet>

@@ -15,12 +15,12 @@ import { TerminalKpiCards } from "./terminal-kpi-cards"
 import { TerminalPriceChart } from "./terminal-price-chart"
 import { HoldingsAllocationChart } from "./holdings-allocation-chart"
 import { TerminalAlertsFeed } from "./terminal-alerts-feed"
-import { TerminalQuickActions } from "./terminal-quick-actions"
+import { OrderTicketPanel } from "./order-ticket-panel"
+import { PageHeader } from "./page-header"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Dot, RefreshCw, Zap } from "lucide-react"
+import { Dot, RefreshCw, Plus } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Delta } from "./status-pills"
 
 export function UnifiedTerminal() {
   const dispatch = useAppDispatch()
@@ -63,88 +63,89 @@ export function UnifiedTerminal() {
   }, [dispatch, selectedFundId])
 
   return (
-    <div className="p-6 space-y-6 bg-gray-50/30 min-h-screen">
-      {/* ── Header ──────────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3 flex-wrap">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Market Terminal</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">Real-time watchlist, holdings, and trade routing</p>
-          </div>
-        </div>
+    <div className="min-h-screen space-y-5 p-4 md:p-6">
+      <PageHeader
+        title="Market Terminal"
+        subtitle="Real-time watchlist, holdings, and trade routing"
+        actions={
+          <>
+            {fundsLoading ? (
+              <Skeleton className="h-9 w-48" />
+            ) : (
+              <Select value={selectedFundId ?? ""} onValueChange={(v) => dispatch(setSelectedFundId(v))}>
+                <SelectTrigger className="w-48 h-9 text-sm bg-card border-border">
+                  <SelectValue placeholder="Select fund…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {funds.map((f) => (
+                    <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
 
-        <div className="flex items-center gap-2 flex-wrap">
-          {fundsLoading ? (
-            <Skeleton className="h-9 w-48" />
-          ) : (
-            <Select value={selectedFundId ?? ""} onValueChange={(v) => dispatch(setSelectedFundId(v))}>
-              <SelectTrigger className="w-48 h-9 text-sm bg-white">
-                <SelectValue placeholder="Select fund…" />
-              </SelectTrigger>
-              <SelectContent>
-                {funds.map((f) => (
-                  <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
+            {selectedFund && (
+              <>
+                <span className="inline-flex items-center rounded-lg border border-border bg-card px-3 py-2 font-mono text-xs font-medium text-foreground">
+                  {selectedFund.base_currency}
+                </span>
+                <span className="font-mono text-sm font-semibold whitespace-nowrap text-foreground">
+                  NAV {selectedFund.base_currency} {selectedFund.nav?.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                </span>
+                {pnl?.unrealized && (
+                  <span className="inline-flex items-center gap-1 rounded-lg bg-muted px-3 py-2 font-mono text-xs font-medium text-muted-foreground">
+                    <Dot className="w-2 h-2 text-warn" />
+                    ZiG {pnl.unrealized.fxRateUsed.toFixed(4)}
+                  </span>
+                )}
+              </>
+            )}
 
-          {selectedFund && (
-            <>
-              <Badge variant="outline" className="font-mono text-xs h-9 px-3">
-                {selectedFund.base_currency}
-              </Badge>
-              <span className="font-mono text-sm font-semibold whitespace-nowrap">
-                NAV {selectedFund.base_currency} {selectedFund.nav?.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-              </span>
-              {pnl?.unrealized && (
-                <Badge variant="secondary" className="font-mono text-xs gap-1">
-                  <Dot className="w-2 h-2 text-amber-500" />
-                  ZiG {pnl.unrealized.fxRateUsed.toFixed(4)}
-                </Badge>
-              )}
-            </>
-          )}
+            <button
+              onClick={refreshAll}
+              className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium text-foreground hover:bg-muted"
+            >
+              <RefreshCw className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => dispatch(setExecuteTradeModalOpen(true))}
+              className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
+            >
+              <Plus className="h-4 w-4" /> New Trade
+            </button>
+          </>
+        }
+      />
 
-          <Button variant="outline" size="sm" className="rounded-full h-9 bg-white" onClick={refreshAll}>
-            <RefreshCw className="w-3.5 h-3.5" />
-          </Button>
-          <Button
-            size="sm" className="rounded-full h-9 gradient-primary text-white shadow"
-            onClick={() => dispatch(setExecuteTradeModalOpen(true))}
-          >
-            <Zap className="w-3.5 h-3.5 mr-1.5" /> Execute Trade
-          </Button>
-        </div>
-      </div>
-
-      {/* ── KPI cards ───────────────────────────────────────────────────────── */}
       <TerminalKpiCards />
 
-      {/* ── Charts row ──────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-        <TerminalPriceChart />
+      {/* Chart + allocation */}
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
+        <div className="xl:col-span-2">
+          <TerminalPriceChart />
+        </div>
         <HoldingsAllocationChart />
       </div>
 
-      {/* ── Alerts + Quick Actions row ──────────────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <TerminalAlertsFeed />
-        <TerminalQuickActions />
-      </div>
-
-      {/* ── Operational panels: Watchlist / Holdings ───────────────────────── */}
-      <div className="rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="flex h-[460px]">
-          <div className="flex-1 min-w-0 border-r border-slate-800">
+      {/* Watchlist + order ticket + feed */}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
+        <div className="lg:col-span-5">
+          <div className="h-[520px]">
             <WatchlistPane />
           </div>
-          <div className="flex-1 min-w-0">
-            <HoldingsPane />
+        </div>
+        <div className="lg:col-span-4">
+          <OrderTicketPanel />
+        </div>
+        <div className="lg:col-span-3">
+          <div className="h-[520px]">
+            <TerminalAlertsFeed />
           </div>
         </div>
-        <RoutingBar />
       </div>
+
+      <HoldingsPane />
+      <RoutingBar />
 
       {executeTradeModalOpen && <ExecuteTradeModal />}
       {priceDrawerOpen && <SecurityPriceDrawer />}

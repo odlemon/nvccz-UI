@@ -1,14 +1,9 @@
 "use client"
 
-import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
-import {
-  TrendingUp, TrendingDown, Minus,
-  CheckCircle2, Clock, XCircle, RotateCcw,
-} from "lucide-react"
 import type { Trade, RoutingHop } from "@/lib/api/investments-api"
 
-// ─── Delta — colored +/- value/percentage pill ─────────────────────────────
+// ─── Delta — colored +/- percentage, gain/loss toned ───────────────────────
 interface DeltaProps {
   value: number | null | undefined
   direction?: "UP" | "DOWN" | "FLAT"
@@ -17,55 +12,53 @@ interface DeltaProps {
   className?: string
 }
 
-export function Delta({ value, direction, suffix = "%", showIcon = false, className }: DeltaProps) {
+export function Delta({ value, direction, suffix = "%", className }: DeltaProps) {
   if (value == null) {
-    return <span className={cn("font-mono text-[#6B7280]", className)}>—</span>
+    return <span className={cn("font-mono tabular-nums text-muted-foreground", className)}>—</span>
   }
   const dir = direction ?? (value > 0 ? "UP" : value < 0 ? "DOWN" : "FLAT")
-  const color = dir === "UP" ? "text-[#10B981]" : dir === "DOWN" ? "text-[#EF4444]" : "text-[#6B7280]"
+  const tone = dir === "UP" ? "text-gain" : dir === "DOWN" ? "text-loss" : "text-muted-foreground"
   return (
-    <span className={cn("inline-flex items-center gap-1 font-mono", color, className)}>
-      {showIcon && <DirectionDot direction={dir} />}
-      {value >= 0 ? "+" : ""}{value.toFixed(2)}{suffix}
+    <span className={cn("font-mono tabular-nums", tone, className)}>
+      {value > 0 ? "+" : ""}{value.toFixed(2)}{suffix}
     </span>
   )
 }
 
-// ─── DirectionDot — small up/down/flat icon ────────────────────────────────
+// ─── DirectionDot — small up/down/flat dot ─────────────────────────────────
 export function DirectionDot({ direction, className }: { direction?: "UP" | "DOWN" | "FLAT"; className?: string }) {
-  if (direction === "UP") return <TrendingUp className={cn("w-3.5 h-3.5 text-[#10B981]", className)} />
-  if (direction === "DOWN") return <TrendingDown className={cn("w-3.5 h-3.5 text-[#EF4444]", className)} />
-  return <Minus className={cn("w-3.5 h-3.5 text-[#6B7280]", className)} />
+  const map: Record<string, string> = { UP: "bg-gain", DOWN: "bg-loss", FLAT: "bg-muted-foreground" }
+  return <span className={cn("inline-block size-1.5 rounded-full", map[direction ?? "FLAT"], className)} aria-hidden />
 }
 
 // ─── TradeStatusBadge ───────────────────────────────────────────────────────
-const TRADE_STATUS_MAP: Record<Trade["status"], { label: string; className: string; icon: React.ReactNode }> = {
-  DRAFT:             { label: "Draft",     className: "bg-slate-100 text-slate-600",     icon: <Clock className="w-3 h-3" /> },
-  EXECUTED:          { label: "Executed",  className: "bg-blue-100 text-blue-700",       icon: <CheckCircle2 className="w-3 h-3" /> },
-  ROUTING:           { label: "Routing",   className: "bg-amber-100 text-amber-700",     icon: <RotateCcw className="w-3 h-3" /> },
-  SETTLED:           { label: "Settled",   className: "bg-emerald-100 text-emerald-700", icon: <CheckCircle2 className="w-3 h-3" /> },
-  SETTLEMENT_FAILED: { label: "Failed",    className: "bg-red-100 text-red-700",         icon: <XCircle className="w-3 h-3" /> },
-  CANCELLED:         { label: "Cancelled", className: "bg-slate-100 text-slate-500",     icon: <XCircle className="w-3 h-3" /> },
+const TRADE_TONES: Record<Trade["status"], string> = {
+  DRAFT: "bg-muted text-muted-foreground ring-border",
+  EXECUTED: "bg-accent text-accent-foreground ring-primary/20",
+  ROUTING: "bg-warn-muted text-warn-foreground ring-warn/30",
+  SETTLED: "bg-gain-muted text-gain-foreground ring-gain/30",
+  SETTLEMENT_FAILED: "bg-loss-muted text-loss-foreground ring-loss/30",
+  CANCELLED: "bg-muted text-muted-foreground ring-border",
 }
 
 export function TradeStatusBadge({ status, className }: { status: Trade["status"]; className?: string }) {
-  const s = TRADE_STATUS_MAP[status] ?? TRADE_STATUS_MAP.DRAFT
   return (
-    <Badge className={cn("gap-1 text-xs font-medium border-0", s.className, className)}>
-      {s.icon}{s.label}
-    </Badge>
+    <span className={cn("inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset", TRADE_TONES[status] ?? TRADE_TONES.DRAFT, className)}>
+      <span className="size-1.5 rounded-full bg-current opacity-70" aria-hidden />
+      {status.replace(/_/g, " ")}
+    </span>
   )
 }
 
 // ─── RoutingStatusBadge ─────────────────────────────────────────────────────
-const ROUTING_STATUS_MAP: Record<RoutingHop["status"], string> = {
-  STAGED:     "bg-slate-100 text-slate-600 border-slate-300",
-  DISPATCHED: "bg-blue-100 text-blue-700 border-blue-300",
-  CONFIRMED:  "bg-emerald-100 text-emerald-700 border-emerald-300",
-  RETRYING:   "bg-amber-100 text-amber-700 border-amber-300",
-  FAILED:     "bg-red-100 text-red-700 border-red-300",
+const ROUTING_TONES: Record<RoutingHop["status"], string> = {
+  STAGED: "bg-muted text-muted-foreground ring-border",
+  DISPATCHED: "bg-accent text-accent-foreground ring-primary/20",
+  CONFIRMED: "bg-gain-muted text-gain-foreground ring-gain/30",
+  RETRYING: "bg-warn-muted text-warn-foreground ring-warn/30",
+  FAILED: "bg-loss-muted text-loss-foreground ring-loss/30",
 }
-const SKIPPED_CLASS = "border-dashed border-slate-300 text-slate-400 bg-transparent"
+const SKIPPED_TONE = "bg-transparent text-muted-foreground ring-border ring-dashed"
 
 interface RoutingStatusBadgeProps {
   status: RoutingHop["status"]
@@ -75,27 +68,26 @@ interface RoutingStatusBadgeProps {
 }
 
 export function RoutingStatusBadge({ status, skipped, attemptCount, className }: RoutingStatusBadgeProps) {
-  const badgeCls = skipped ? SKIPPED_CLASS : (ROUTING_STATUS_MAP[status] ?? ROUTING_STATUS_MAP.STAGED)
   const label = skipped
-    ? "SKIPPED (INTERNAL)"
-    : `${status.replace("_", " ")}${status === "RETRYING" && attemptCount != null ? ` (${attemptCount}/5)` : ""}`
+    ? "SKIPPED"
+    : `${status.replace(/_/g, " ")}${status === "RETRYING" && attemptCount != null ? ` (${attemptCount}/5)` : ""}`
   return (
-    <Badge className={cn("text-[10px] font-mono border", badgeCls, className)}>
+    <span className={cn("inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset", skipped ? SKIPPED_TONE : (ROUTING_TONES[status] ?? ROUTING_TONES.STAGED), className)}>
       {label}
-    </Badge>
+    </span>
   )
 }
 
 // ─── ValidationBadge — PriceTick.validationStatus / ValidationQueueItem ────
-const VALIDATION_MAP: Record<string, string> = {
-  APPROVED: "bg-emerald-100 text-emerald-700",
-  PENDING_REVIEW: "bg-amber-100 text-amber-700",
-  REJECTED: "bg-red-100 text-red-700",
+const VALIDATION_TONES: Record<string, string> = {
+  APPROVED: "bg-gain-muted text-gain-foreground ring-gain/30",
+  PENDING_REVIEW: "bg-warn-muted text-warn-foreground ring-warn/30",
+  REJECTED: "bg-loss-muted text-loss-foreground ring-loss/30",
 }
 
 export function ValidationBadge({ status, className }: { status: string; className?: string }) {
   return (
-    <span className={cn("inline-flex text-[10px] font-medium px-1.5 py-0.5 rounded-full", VALIDATION_MAP[status] ?? "bg-gray-100 text-gray-600", className)}>
+    <span className={cn("inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset", VALIDATION_TONES[status] ?? "bg-muted text-muted-foreground ring-border", className)}>
       {status.replace(/_/g, " ")}
     </span>
   )
@@ -104,37 +96,35 @@ export function ValidationBadge({ status, className }: { status: string; classNa
 // ─── SourceBadge — PriceTick.sourceStatus / IngestBatch.source_status (OK|FALLBACK) ──
 export function SourceBadge({ status, className }: { status: "OK" | "FALLBACK" | string; className?: string }) {
   return status === "FALLBACK" ? (
-    <span className={cn("inline-flex text-[10px] font-medium px-1.5 py-0.5 rounded-full border border-dashed border-slate-300 text-slate-500", className)}>
+    <span className={cn("inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset bg-warn-muted text-warn-foreground ring-warn/30", className)}>
       FALLBACK
     </span>
   ) : (
-    <span className={cn("inline-flex text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700", className)}>
+    <span className={cn("inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset bg-accent text-accent-foreground ring-primary/20", className)}>
       OK
     </span>
   )
 }
 
 // ─── ExchangeTag ────────────────────────────────────────────────────────────
-const INTL_EXCHANGES = ["NYSE", "NASDAQ", "LSE", "VFEX"]
-
 export function ExchangeTag({ exchange, className }: { exchange: string; className?: string }) {
-  const intl = INTL_EXCHANGES.includes(exchange)
   return (
-    <Badge
-      variant="outline"
-      className={cn("text-[10px] px-1 py-0 font-mono", intl ? "border-blue-400 text-blue-500" : "border-slate-400 text-slate-500", className)}
-    >
+    <span className={cn("inline-flex items-center rounded border border-border bg-muted/60 px-1.5 py-0.5 font-mono text-[10px] font-medium uppercase tracking-wide text-muted-foreground", className)}>
       {exchange}
-    </Badge>
+    </span>
   )
 }
 
 // ─── SideBadge — BUY/SELL ───────────────────────────────────────────────────
 export function SideBadge({ side, className }: { side: "BUY" | "SELL"; className?: string }) {
   return (
-    <Badge className={cn("gap-1 text-xs border-0", side === "BUY" ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700", className)}>
-      {side === "BUY" ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+    <span className={cn(
+      "inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset",
+      side === "BUY" ? "bg-gain-muted text-gain-foreground ring-gain/30" : "bg-loss-muted text-loss-foreground ring-loss/30",
+      className
+    )}>
+      <span className="size-1.5 rounded-full bg-current opacity-70" aria-hidden />
       {side}
-    </Badge>
+    </span>
   )
 }

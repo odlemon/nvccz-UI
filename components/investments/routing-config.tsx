@@ -5,19 +5,16 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
-import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
 import { Info, Network } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { PageHeader } from "./page-header"
 
 export function RoutingConfig() {
   return (
-    <div className="space-y-6 max-w-2xl">
-      <div>
-        <h1 className="text-xl font-semibold">Routing Configuration</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">Configure broker, custodian, and settlement routing behaviour</p>
-      </div>
+    <div className="space-y-6 max-w-3xl">
+      <PageHeader title="Routing Configuration" subtitle="Configure broker, custodian, and settlement routing behaviour" />
 
       {/* Broker Gateway */}
       <Card>
@@ -141,7 +138,9 @@ export function RoutingConfig() {
       <Separator />
 
       <div className="flex justify-end">
-        <Button className="gradient-primary text-white">Save Configuration</Button>
+        <button className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90">
+          Save Configuration
+        </button>
       </div>
     </div>
   )

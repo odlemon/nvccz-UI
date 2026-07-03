@@ -38,6 +38,22 @@
   --sidebar-accent-foreground: oklch(0.205 0 0); /* Dark text */
   --sidebar-border: oklch(0.922 0 0); /* Light border */
   --sidebar-ring: oklch(0.60 0.18 252 / 0.3); /* Blue focus ring */
+
+  /* Investments terminal — finance semantic tokens (scoped additions, cloned from reference dashboard) */
+  --gain: oklch(0.65 0.16 158);
+  --gain-foreground: oklch(0.44 0.12 158);
+  --gain-muted: oklch(0.95 0.05 158);
+  --loss: oklch(0.6 0.21 22);
+  --loss-foreground: oklch(0.52 0.2 22);
+  --loss-muted: oklch(0.95 0.04 22);
+  --warn: oklch(0.75 0.15 75);
+  --warn-foreground: oklch(0.55 0.13 68);
+  --warn-muted: oklch(0.96 0.05 85);
+  --flat: oklch(0.6 0.02 260);
+  --panel: oklch(0.16 0.03 262);
+  --panel-foreground: oklch(0.97 0.01 255);
+  --panel-muted: oklch(0.66 0.03 258);
+  --panel-border: oklch(0.30 0.035 262);
 }
 
 .dark {
@@ -115,6 +131,22 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Investments terminal semantic tokens */
+  --color-gain: var(--gain);
+  --color-gain-foreground: var(--gain-foreground);
+  --color-gain-muted: var(--gain-muted);
+  --color-loss: var(--loss);
+  --color-loss-foreground: var(--loss-foreground);
+  --color-loss-muted: var(--loss-muted);
+  --color-warn: var(--warn);
+  --color-warn-foreground: var(--warn-foreground);
+  --color-warn-muted: var(--warn-muted);
+  --color-flat: var(--flat);
+  --color-panel: var(--panel);
+  --color-panel-foreground: var(--panel-foreground);
+  --color-panel-muted: var(--panel-muted);
+  --color-panel-border: var(--panel-border);
 }
 
 @layer base {
