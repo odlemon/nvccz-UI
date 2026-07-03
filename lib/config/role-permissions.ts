@@ -117,6 +117,12 @@ export const APPLICATION_PORTAL_ACTIONS = {
   COMPLETE_BOARD_REVIEW: 'complete-board-review',
   CAST_VOTE: 'cast-vote',
 
+  // Investment Memo Editing Actions
+  DRAFT_INVESTMENT_MEMO: 'draft-investment-memo',
+  SUBMIT_INVESTMENT_MEMO: 'submit-investment-memo',
+  APPROVE_INVESTMENT_MEMO: 'approve-investment-memo',
+  REJECT_INVESTMENT_MEMO: 'reject-investment-memo',
+
   // Term Sheet Actions
   CREATE_TERM_SHEET: 'create-term-sheet',
   UPDATE_TERM_SHEET: 'update-term-sheet',
@@ -141,6 +147,24 @@ export const PORTFOLIO_ACTIONS = {
   ACCEPT_REPORT: 'accept-report',
   REJECT_REPORT: 'reject-report',
   MANAGE_REPORTING_SCHEDULE: 'manage-reporting-schedule',
+} as const;
+
+export const FUND_REPORTING_ACTIONS = {
+  MANAGE_TEMPLATES: 'manage-fund-report-templates',
+  MANAGE_SCHEDULES: 'manage-fund-report-schedules',
+  MANAGE_DISTRIBUTION_LISTS: 'manage-fund-report-distribution-lists',
+  TRIGGER_RUN: 'trigger-fund-report-run',
+  VIEW_RUN_DETAIL: 'view-fund-report-run-detail',
+  VIEW_DELIVERY_MONITORING: 'view-fund-report-delivery-monitoring',
+  VIEW_AUDIT_TRAIL: 'view-fund-report-audit-trail',
+} as const;
+
+export const LP_MANAGEMENT_ACTIONS = {
+  INVITE_LP_MEMBER: 'invite-lp-member',
+  REVOKE_LP_MEMBER: 'revoke-lp-member',
+  PUBLISH_LP_DOCUMENT: 'publish-lp-document',
+  MANAGE_MFA_POLICY: 'manage-lp-mfa-policy',
+  LINK_CLIENT_TO_USER: 'link-client-to-user',
 } as const;
 
 /**
@@ -295,6 +319,25 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
         }
       },
       {
+        moduleId: 'investments',
+        access: 'full',
+        subModules: {
+          'investments-terminal': 'full',
+          'investments-trades': 'full',
+          'investments-market-data': 'full',
+          'investments-securities': 'full',
+          'investments-routing': 'full',
+        }
+      },
+      {
+        moduleId: 'street-rates',
+        access: 'full',
+        subModules: {
+          'street-rates-dashboard': 'full',
+          'street-rates-config': 'full',
+        }
+      },
+      {
         moduleId: 'admin-management',
         access: 'read',
       },
@@ -400,6 +443,8 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
         }
       },
       { moduleId: 'forecasting', access: 'write', subModules: { 'forecasting-dashboard': 'full', 'scenarios': 'write', 'forecasting-audit': 'read', 'forecasting-settings': 'write' } },
+      { moduleId: 'investments', access: 'write', subModules: { 'investments-terminal': 'full', 'investments-trades': 'write', 'investments-market-data': 'read', 'investments-securities': 'read', 'investments-routing': 'none' } },
+      { moduleId: 'street-rates', access: 'read', subModules: { 'street-rates-dashboard': 'read', 'street-rates-config': 'none' } },
     ]
   },
 
@@ -475,6 +520,8 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
       },
       { moduleId: 'performance-management', access: 'write' },
       { moduleId: 'forecasting', access: 'write', subModules: { 'forecasting-dashboard': 'full', 'scenarios': 'write', 'forecasting-audit': 'read', 'forecasting-settings': 'write' } },
+      { moduleId: 'investments', access: 'write', subModules: { 'investments-terminal': 'full', 'investments-trades': 'write', 'investments-market-data': 'read', 'investments-securities': 'read', 'investments-routing': 'none' } },
+      { moduleId: 'street-rates', access: 'read', subModules: { 'street-rates-dashboard': 'read', 'street-rates-config': 'none' } },
     ]
   },
 
@@ -514,6 +561,8 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
       },
       { moduleId: 'performance-management', access: 'write' },
       { moduleId: 'forecasting', access: 'write', subModules: { 'forecasting-dashboard': 'full', 'scenarios': 'write', 'forecasting-audit': 'read', 'forecasting-settings': 'write' } },
+      { moduleId: 'investments', access: 'write', subModules: { 'investments-terminal': 'full', 'investments-trades': 'write', 'investments-market-data': 'read', 'investments-securities': 'read', 'investments-routing': 'none' } },
+      { moduleId: 'street-rates', access: 'read', subModules: { 'street-rates-dashboard': 'read', 'street-rates-config': 'none' } },
     ]
   },
 
@@ -1671,7 +1720,8 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
       {
         moduleId: 'portfolio-management',
         access: 'full',
-        actions: Object.values(PORTFOLIO_ACTIONS)
+        actions: [...Object.values(PORTFOLIO_ACTIONS), ...Object.values(FUND_REPORTING_ACTIONS), ...Object.values(LP_MANAGEMENT_ACTIONS)],
+        subModules: { 'fund-performance-reporting': 'full', 'lp-management': 'full' }
       },
       {
         moduleId: 'application-portal',
@@ -1763,6 +1813,25 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'scenarios': 'full',
           'forecasting-audit': 'full',
           'forecasting-settings': 'full',
+        }
+      },
+      {
+        moduleId: 'investments',
+        access: 'full',
+        subModules: {
+          'investments-terminal': 'full',
+          'investments-trades': 'full',
+          'investments-market-data': 'full',
+          'investments-securities': 'full',
+          'investments-routing': 'full',
+        }
+      },
+      {
+        moduleId: 'street-rates',
+        access: 'full',
+        subModules: {
+          'street-rates-dashboard': 'full',
+          'street-rates-config': 'full',
         }
       },
       {
@@ -1983,6 +2052,25 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'forecasting-settings': 'full',
         }
       },
+      {
+        moduleId: 'investments',
+        access: 'full',
+        subModules: {
+          'investments-terminal': 'full',
+          'investments-trades': 'full',
+          'investments-market-data': 'full',
+          'investments-securities': 'full',
+          'investments-routing': 'full',
+        }
+      },
+      {
+        moduleId: 'street-rates',
+        access: 'full',
+        subModules: {
+          'street-rates-dashboard': 'full',
+          'street-rates-config': 'full',
+        }
+      },
       { moduleId: 'admin-management', access: 'full' },
     ]
   },
@@ -1996,12 +2084,14 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
       {
         moduleId: 'portfolio-management',
         access: 'full',
-        actions: Object.values(PORTFOLIO_ACTIONS),
+        actions: [...Object.values(PORTFOLIO_ACTIONS), ...Object.values(FUND_REPORTING_ACTIONS), ...Object.values(LP_MANAGEMENT_ACTIONS)],
         subModules: {
           'Dashboard': 'full',
           'funds': 'full',
           'companies': 'full',
           'reporting-schedule-configs': 'full',
+          'fund-performance-reporting': 'full',
+          'lp-management': 'full',
         }
       },
       {
@@ -2077,6 +2167,14 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'task-management': 'full',
           'department-scorecard': 'full',
           'user-scorecard': 'full',
+        }
+      },
+      {
+        moduleId: 'street-rates',
+        access: 'full',
+        subModules: {
+          'street-rates-dashboard': 'full',
+          'street-rates-config': 'full',
         }
       },
       { moduleId: 'admin-management', access: 'read' },
@@ -2164,12 +2262,14 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
       {
         moduleId: 'portfolio-management',
         access: 'full',
-        actions: Object.values(PORTFOLIO_ACTIONS),
+        actions: [...Object.values(PORTFOLIO_ACTIONS), ...Object.values(FUND_REPORTING_ACTIONS), ...Object.values(LP_MANAGEMENT_ACTIONS)],
         subModules: {
           'Dashboard': 'full',
           'funds': 'full',
           'companies': 'full',
           'reporting-schedule-configs': 'full',
+          'fund-performance-reporting': 'full',
+          'lp-management': 'full',
         }
       },
       {
@@ -2180,6 +2280,8 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           APPLICATION_PORTAL_ACTIONS.CREATE_DD_TASK,
           APPLICATION_PORTAL_ACTIONS.CREATE_TERM_SHEET,
           APPLICATION_PORTAL_ACTIONS.UPDATE_TERM_SHEET,
+          APPLICATION_PORTAL_ACTIONS.DRAFT_INVESTMENT_MEMO,
+          APPLICATION_PORTAL_ACTIONS.SUBMIT_INVESTMENT_MEMO,
           APPLICATION_PORTAL_ACTIONS.FINALIZE_TERM_SHEET,
           APPLICATION_PORTAL_ACTIONS.INITIATE_FUND_DISBURSEMENT,
           APPLICATION_PORTAL_ACTIONS.CREATE_DISBURSEMENT,
@@ -2232,12 +2334,19 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
       {
         moduleId: 'portfolio-management',
         access: 'full',
-        actions: Object.values(PORTFOLIO_ACTIONS),
+        // MFA policy is a security-posture decision withheld from this role — CIO/FUND_MGR/SYSADMIN only.
+        actions: [
+          ...Object.values(PORTFOLIO_ACTIONS),
+          ...Object.values(FUND_REPORTING_ACTIONS),
+          ...Object.values(LP_MANAGEMENT_ACTIONS).filter((a) => a !== LP_MANAGEMENT_ACTIONS.MANAGE_MFA_POLICY),
+        ],
         subModules: {
           'Dashboard': 'full',
           'funds': 'full',
           'companies': 'full',
           'reporting-schedule-configs': 'full',
+          'fund-performance-reporting': 'full',
+          'lp-management': 'full',
         }
       },
       {
@@ -2250,6 +2359,8 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           APPLICATION_PORTAL_ACTIONS.APPROVE_DD_ACTIVITY,
           APPLICATION_PORTAL_ACTIONS.CREATE_TERM_SHEET,
           APPLICATION_PORTAL_ACTIONS.UPDATE_TERM_SHEET,
+          APPLICATION_PORTAL_ACTIONS.DRAFT_INVESTMENT_MEMO,
+          APPLICATION_PORTAL_ACTIONS.SUBMIT_INVESTMENT_MEMO,
           APPLICATION_PORTAL_ACTIONS.FINALIZE_TERM_SHEET,
           APPLICATION_PORTAL_ACTIONS.INITIATE_FUND_DISBURSEMENT,
           APPLICATION_PORTAL_ACTIONS.CREATE_DISBURSEMENT,
@@ -2311,6 +2422,8 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           APPLICATION_PORTAL_ACTIONS.COMPLETE_DUE_DILIGENCE,
           APPLICATION_PORTAL_ACTIONS.CREATE_TERM_SHEET,
           APPLICATION_PORTAL_ACTIONS.UPDATE_TERM_SHEET,
+          APPLICATION_PORTAL_ACTIONS.DRAFT_INVESTMENT_MEMO,
+          APPLICATION_PORTAL_ACTIONS.SUBMIT_INVESTMENT_MEMO,
         ]
       },
       {
@@ -2404,6 +2517,17 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'funds': 'read',
           'applications-dashboard': 'read',
           'applications-all': 'read',
+        }
+      },
+      {
+        moduleId: 'lp-portal',
+        access: 'full',
+        subModules: {
+          'lp-dashboard': 'read',
+          'lp-ledger': 'read',
+          'lp-vault': 'read',
+          'lp-reports': 'read',
+          'lp-colleagues': 'full',
         }
       },
     ]

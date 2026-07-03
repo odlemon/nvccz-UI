@@ -44,7 +44,8 @@ import {
   fetchLatestApplicationById,
   investorSignTermSheet,
   fetchInvestmentImplementationByApp,
-  fetchDisbursementSummaryByApp
+  fetchDisbursementSummaryByApp,
+  fetchMemoHeader
 } from '@/lib/store/slices/applicationSlice'
 import { fundDisbursementApi } from '@/lib/api/fund-disbursement-api'
 import { FundDisbursementForm } from "./fund-disbursement-form"
@@ -57,6 +58,7 @@ import { FundDisbursementSection } from "./timeline/fund-disbursement-section"
 import { ValuationsSection } from "./timeline/valuations-section"
 import { ExitSection } from "./timeline/exit-section"
 import { TimelineStageActions } from "./timeline/timeline-stage-actions"
+import { InvestmentMemoEditor } from "@/components/portfolio/memo/investment-memo-editor"
 import { applicationsApi, type ExtendedApplication } from '@/lib/api/applications-api'
 import { toast } from "sonner"
 
@@ -280,6 +282,7 @@ export function ApplicationTimeline({
     dispatch(fetchTermSheetByApplication(application.id));
     dispatch(fetchFundDisbursementByApplication(application.id));
     dispatch(fetchVoteSummaryByApplication(application.id));
+    dispatch(fetchMemoHeader(application.id));
 
     // Fetch investment implementation data if available
     if (application?.investmentImplementation?.portfolioCompanyId) {
@@ -379,6 +382,7 @@ export function ApplicationTimeline({
     dispatch(fetchTermSheetByApplication(application.id))
     dispatch(fetchFundDisbursementByApplication(application.id))
     dispatch(fetchVoteSummaryByApplication(application.id))
+    dispatch(fetchMemoHeader(application.id))
 
     // Fetch investment implementation data if available
     if (application.investmentImplementation?.portfolioCompanyId && application.investmentImplementation?.id) {
@@ -470,6 +474,7 @@ export function ApplicationTimeline({
   // Use latestApplication for all subcomponent payloads
   const dueDiligenceData = dueDiligenceByApp[application.id] || (latestApplication as any)?.dueDiligenceReview || null;
   const voteSummary = useAppSelector((s) => s.application.voteSummaryByApp[application.id] || null);
+  const memoHeader = useAppSelector((s) => (s.application as any).investmentMemoByApp[application.id] || null);
   const hasRbzDocument = Boolean(
     (latestApplication as any)?.rbzDocumentUrl ||
       (latestApplication as any)?.documents?.some(
@@ -1068,7 +1073,20 @@ export function ApplicationTimeline({
                       )}
 
                       {stage.id === "BOARD_GROUP" && showAccordion && (
-                        <Accordion type="single" collapsible className="w-full">
+                        <Accordion type="multiple" defaultValue={["board-review-data"]} className="w-full space-y-2">
+                          <AccordionItem value="investment-memo">
+                            <AccordionTrigger className="text-left hover:bg-purple-50 transition-colors duration-200 cursor-pointer">
+                              <div className="flex items-center gap-3">
+                                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-100 to-violet-200 flex items-center justify-center">
+                                  <FileText className="w-4 h-4 text-purple-500" />
+                                </div>
+                                <span>Investment Memo</span>
+                              </div>
+                            </AccordionTrigger>
+                            <AccordionContent>
+                              <InvestmentMemoEditor applicationId={application.id} />
+                            </AccordionContent>
+                          </AccordionItem>
                           <AccordionItem value="board-review-data">
                             <AccordionTrigger className="text-left hover:bg-purple-50 transition-colors duration-200 cursor-pointer">
                               <div className="flex items-center gap-3">
@@ -1206,6 +1224,7 @@ export function ApplicationTimeline({
                           activityApprovalLoading={activityApprovalLoading}
                           boardReviewData={boardReviewData}
                           voteSummary={voteSummary}
+                          memoHeader={memoHeader}
                           implementationData={implementationData}
                           implementationLoading={implementationLoading}
                           onInitiateDueDiligence={handleInitiateDueDiligence}

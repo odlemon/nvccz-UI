@@ -39,6 +39,11 @@ import performanceReviewsReducer from './slices/performanceReviewsSlice'
 import notificationsReducer from './slices/notificationsSlice'
 import portfolioReportingReducer from './slices/portfolioReportingSlice'
 import forecastingReducer from './slices/forecastingSlice'
+import investmentsReducer from './slices/investmentsSlice'
+import streetRatesReducer from './slices/streetRatesSlice'
+import fundPerformanceReportingReducer from './slices/fundPerformanceReportingSlice'
+import lpPortalAdminReducer from './slices/lpPortalAdminSlice'
+import lpPortalReducer from './slices/lpPortalSlice'
 
 export const store = configureStore({
   reducer: {
@@ -80,6 +85,11 @@ export const store = configureStore({
     notifications: notificationsReducer,
     portfolioReporting: portfolioReportingReducer,
     forecasting: forecastingReducer,
+    investments: investmentsReducer,
+    streetRates: streetRatesReducer,
+    fundPerformanceReporting: fundPerformanceReportingReducer,
+    lpPortalAdmin: lpPortalAdminReducer,
+    lpPortal: lpPortalReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

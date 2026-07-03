@@ -17,6 +17,7 @@ import DepartmentScorecardPDF from "./department-scorecard-pdf-document"
 import { useRolePermissions } from "@/lib/hooks/useRolePermissions"
 import { PERFORMANCE_ACTIONS } from "@/lib/config/performance-permissions"
 import { DepartmentQualitativeModal } from "./department-qualitative-modal"
+import { ScorecardEditDrawer } from "./scorecard-edit-drawer"
 
 const DepartmentScorecardSkeleton = () => (
   <div className="space-y-6 animate-pulse">
@@ -61,6 +62,7 @@ export function DepartmentScorecardsPage() {
   const [PDFDownloadLink, setPDFDownloadLink] = useState<any>(null)
   const [activeAddress, setActiveAddress] = useState<CompanyAddress | null>(null)
   const [isQualModalOpen, setIsQualModalOpen] = useState(false)
+  const [isEditDrawerOpen, setIsEditDrawerOpen] = useState(false)
 
   const { hasSpecificAction } = useRolePermissions()
   const canEditQualitative = hasSpecificAction(PERFORMANCE_ACTIONS.CONDUCT_PERFORMANCE_REVIEW)
@@ -185,6 +187,17 @@ export function DepartmentScorecardsPage() {
             >
               <ClipboardList className="w-3.5 h-3.5" />
               Add Evaluation
+            </Button>
+          )}
+          {canEditQualitative && departmentScorecard && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="rounded-full gap-1.5"
+              onClick={() => setIsEditDrawerOpen(true)}
+            >
+              <ClipboardList className="w-3.5 h-3.5" />
+              Edit Qualitative
             </Button>
           )}
           {isClient && departmentScorecard && PDFDownloadLink && (
@@ -496,6 +509,14 @@ export function DepartmentScorecardsPage() {
             departmentName={selectedDepartment}
             periodLabel={periodLabel}
             existingAttributes={departmentScorecard?.document?.qualitativeSections?.personalAttributes}
+            onSaved={handleRefresh}
+          />
+          <ScorecardEditDrawer
+            open={isEditDrawerOpen}
+            onClose={() => setIsEditDrawerOpen(false)}
+            type="DEPARTMENT"
+            subjectId={selectedDepartment}
+            periodLabel={periodLabel}
             onSaved={handleRefresh}
           />
         </>
