@@ -9,6 +9,7 @@ import { Switch } from "@/components/ui/switch"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { User, Bell, Shield, CreditCard, Save, Upload, Key, Trash2 } from "lucide-react"
+import { MfaSettingsCard } from "@/components/account/mfa-settings-card"
 
 export default function AccountSettingsPage() {
   const [activeTab, setActiveTab] = useState("profile")
@@ -228,20 +229,7 @@ export default function AccountSettingsPage() {
               </div>
 
               {/* Two-Factor Authentication */}
-              <div className="border-t pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-medium">Two-Factor Authentication</h4>
-                    <p className="text-sm text-gray-600">Add an extra layer of security to your account</p>
-                  </div>
-                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                    Enabled
-                  </Badge>
-                </div>
-                <Button variant="outline" className="mt-3 bg-transparent">
-                  Manage 2FA
-                </Button>
-              </div>
+              <MfaSettingsCard />
 
               {/* Active Sessions */}
               <div className="border-t pt-6">

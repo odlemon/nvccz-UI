@@ -487,4 +487,73 @@ export const scorecardApiService = {
   ): Promise<ApiResponse<any>> {
     return apiClient.put(`/performance/scorecards/employee/${encodeURIComponent(employeeId)}/qualitative-evaluation`, payload)
   },
+
+  // ── Phase 2 — Persisted scorecard GET + qualitative edit PUT ─────────────────
+
+  async getPersistedEmployeeScorecard(employeeId: string, params?: { periodLabel?: string }): Promise<ApiResponse<any>> {
+    const q = params?.periodLabel ? `?periodLabel=${encodeURIComponent(params.periodLabel)}` : ""
+    return apiClient.get(`/performance/scorecards/employee/${encodeURIComponent(employeeId)}/persisted${q}`)
+  },
+
+  async getPersistedDepartmentScorecard(department: string, params?: { periodLabel?: string }): Promise<ApiResponse<any>> {
+    const q = params?.periodLabel ? `?periodLabel=${encodeURIComponent(params.periodLabel)}` : ""
+    return apiClient.get(`/performance/scorecards/department/${encodeURIComponent(department)}/persisted${q}`)
+  },
+
+  async getPersistedCeoScorecard(params?: { periodLabel?: string }): Promise<ApiResponse<any>> {
+    const q = params?.periodLabel ? `?periodLabel=${encodeURIComponent(params.periodLabel)}` : ""
+    return apiClient.get(`/performance/scorecards/ceo/persisted${q}`)
+  },
+
+  async getPersistedBoardScorecard(params?: { periodLabel?: string }): Promise<ApiResponse<any>> {
+    const q = params?.periodLabel ? `?periodLabel=${encodeURIComponent(params.periodLabel)}` : ""
+    return apiClient.get(`/performance/scorecards/board/persisted${q}`)
+  },
+
+  async editEmployeeScorecard(employeeId: string, payload: QualitativeEditPayload): Promise<ApiResponse<any>> {
+    return apiClient.put(`/performance/scorecards/employee/${encodeURIComponent(employeeId)}/edit`, payload)
+  },
+
+  async editDepartmentScorecard(department: string, payload: QualitativeEditPayload): Promise<ApiResponse<any>> {
+    return apiClient.put(`/performance/scorecards/department/${encodeURIComponent(department)}/edit`, payload)
+  },
+
+  async editCeoScorecard(payload: QualitativeEditPayload): Promise<ApiResponse<any>> {
+    return apiClient.put(`/performance/scorecards/ceo/edit`, payload)
+  },
+
+  async editBoardScorecard(payload: QualitativeEditPayload): Promise<ApiResponse<any>> {
+    return apiClient.put(`/performance/scorecards/board/edit`, payload)
+  },
+}
+
+// ── Phase 2 types ─────────────────────────────────────────────────────────────
+
+export interface TrainingEntry {
+  programme: string
+  provider: string
+  duration: string
+  status: string
+}
+
+export interface Intervention {
+  area: string
+  action: string
+  targetDate: string
+}
+
+export interface TrainingAndDevelopment {
+  completedTraining: TrainingEntry[]
+  plannedTraining: TrainingEntry[]
+  interventions: Intervention[]
+}
+
+export interface QualitativeEditPayload {
+  editReason: string
+  periodLabel: string
+  department?: string
+  qualitativeEvaluation: {
+    personalAttributes: QualitativeAttribute[]
+    trainingAndDevelopment?: TrainingAndDevelopment
+  }
 }

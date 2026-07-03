@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Topbar } from "@/components/layout/topbar";
-import { QuickActions } from "./quick-actions";
 import { ExchangeRatesTicker } from "./exchange-rates-ticker";
 import { GreetWidget } from "./greet-widget";
 import { ZimbabweStockAllocation } from "./zimbabwe-stock-allocation";
@@ -19,6 +18,7 @@ import { DashboardTab } from "./dashboard-tab";
 import { FinancialDataProvider } from "@/components/providers/financial-data-provider";
 import TradingViewSymbolOverview from "./trading-view-symbol-overview";
 import { TradingViewWidget } from "./trading-view";
+import { StreetRateHomeWidget } from "@/components/street-rates/street-rate-home-widget";
 
 export function HomePageContent() {
   const [activeTab, setActiveTab] = useState<TabType>("news");
@@ -96,52 +96,44 @@ export function HomePageContent() {
           <ExchangeRatesTicker />
         </div>
 
-        <div className="flex">
-          <div className="w-1/4 fixed left-0 top-40 h-[calc(100vh-10rem)] bg-white border-r border-gray-200 p-6 overflow-y-auto">
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.5 }}
-            >
-              <QuickActions />
-            </motion.div>
-          </div>
-
-          <div className="flex-1 p-6 ml-[25%] min-w-0 overflow-x-hidden">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.2 }}
-              className="space-y-6"
-            >
-              <div className="flex flex-col xl:flex-row gap-6">
-                <div className="w-full xl:w-[60%] min-w-0">
-                  <GreetWidget />
-                </div>
-
-                <div className="w-full xl:w-[40%] min-w-0 overflow-hidden">
-                  <TradingViewWidget />
-                </div>
+        <div className="p-6 min-w-0 overflow-x-hidden">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="space-y-6"
+          >
+            <div className="flex flex-col xl:flex-row gap-6">
+              <div className="w-full xl:w-[45%] min-w-0">
+                <GreetWidget />
               </div>
 
-              {/* Market Overview */}
-              {/* <div className="w-full">
-                <ZimbabweStockExchange />
-              </div> */}
-
-              {/* TradingView Full Width Chart */}
-              <div className="w-full min-w-0 overflow-hidden">
-                <TradingViewSymbolOverview />
+              <div className="w-full xl:w-[30%] min-w-0 overflow-hidden">
+                <TradingViewWidget />
               </div>
 
-              {/* Sticky Tab Section - Sticks below ticker */}
-              <div className="bg-white sticky top-40 z-10">
-                <TabView activeTab={activeTab} onTabChange={setActiveTab}>
-                  {renderTabContent()}
-                </TabView>
+              <div className="w-full xl:w-[25%] min-w-0">
+                <StreetRateHomeWidget />
               </div>
-            </motion.div>
-          </div>
+            </div>
+
+            {/* Market Overview */}
+            {/* <div className="w-full">
+              <ZimbabweStockExchange />
+            </div> */}
+
+            {/* TradingView Full Width Chart */}
+            <div className="w-full min-w-0 overflow-hidden">
+              <TradingViewSymbolOverview />
+            </div>
+
+            {/* Sticky Tab Section - Sticks below ticker */}
+            <div className="bg-white sticky top-40 z-10">
+              <TabView activeTab={activeTab} onTabChange={setActiveTab}>
+                {renderTabContent()}
+              </TabView>
+            </div>
+          </motion.div>
         </div>
       </div>
     </FinancialDataProvider>

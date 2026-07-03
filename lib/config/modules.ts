@@ -40,7 +40,10 @@ import {
   Settings,
   TrendingUp,
   DollarSign,
-  FileText
+  FileText,
+  CandlestickChart,
+  Monitor,
+  ArrowLeftRight
 } from "lucide-react"
 import { IconType } from "react-icons"
 import { IoPeopleOutline, IoReceiptOutline, IoStatsChartOutline } from "react-icons/io5"
@@ -97,7 +100,9 @@ export const MODULE_CONFIG: ModuleConfig[] = [
       { id: "funds", name: "Funds", path: "/portfolio/funds", icon: CiDollar, description: "Manage funds and investments" },
       { id: "capital-calls", name: "Capital Calls", path: "/portfolio/funds/capital-calls", icon: CiCoins1, description: "Fund investment capital calls" },
       { id: "companies", name: "Companies", path: "/portfolio/companies", icon: CiShop, description: "Manage companies" },
-      { id: "reporting-schedule-configs", name: "Reporting Schedules", path: "/portfolio/reporting-schedules", icon: CiCalendar, description: "Manage reporting schedule configurations" }
+      { id: "reporting-schedule-configs", name: "Reporting Schedules", path: "/portfolio/reporting-schedules", icon: CiCalendar, description: "Manage reporting schedule configurations" },
+      { id: "fund-performance-reporting", name: "Fund Performance Reporting", path: "/portfolio/fund-performance-reporting", icon: CiFileOn, description: "GP operations console for LP report templates, schedules, distribution runs and delivery monitoring" },
+      { id: "lp-management", name: "LP Management", path: "/portfolio/lp-management", icon: CiUser, description: "Manage LP portal access, vault document publishing and MFA policy" }
 
     ],
     // Grouped navigation per requirements
@@ -358,6 +363,37 @@ export const MODULE_CONFIG: ModuleConfig[] = [
     ],
   },
 
+  // investments
+  {
+    id: "investments",
+    name: "Investments",
+    description: "Stock price collector and multi-module transaction router",
+    icon: CandlestickChart,
+    color: "oklch(0.50 0.16 160)",
+    path: "/investments",
+    subModules: [
+      { id: "investments-terminal",    name: "Market Terminal", path: "/investments/terminal",                   icon: Monitor,        description: "Unified watchlist, holdings, and routing dashboard" },
+      { id: "investments-trades",      name: "Trade Blotter",   path: "/investments/trades",                     icon: CiFileOn,       description: "Trade executions and routing status" },
+      { id: "investments-market-data", name: "Market Data",     path: "/investments/market-data/validation",     icon: CiViewTimeline, description: "Validation queue and ingest batches" },
+      { id: "investments-securities",  name: "Securities",      path: "/investments/securities",                 icon: CiGrid41,       description: "Securities master registry" },
+      { id: "investments-routing",     name: "Routing Config",  path: "/investments/routing-config",             icon: CiSettings,     description: "Broker, custodian, and signing key configuration" },
+    ],
+  },
+
+  // street-rates
+  {
+    id: "street-rates",
+    name: "Street Rates",
+    description: "Street vs official USD/ZWG exchange rate intelligence",
+    icon: ArrowLeftRight,
+    color: "oklch(0.72 0.16 80)",
+    path: "/street-rates",
+    subModules: [
+      { id: "street-rates-dashboard", name: "Dashboard",      path: "/street-rates",        icon: ArrowLeftRight, description: "Live street vs official rate dashboard" },
+      { id: "street-rates-config",    name: "Configuration",  path: "/street-rates/config", icon: CiSettings,     description: "Display config, manual overrides, and ingest control" },
+    ],
+  },
+
   // forecasting
   {
     id: "forecasting",
@@ -453,6 +489,23 @@ export const MODULE_CONFIG: ModuleConfig[] = [
         icon: CiSettings,
         description: "Company letterhead and portal settings",
       },
+    ],
+  },
+
+  // lp-portal
+  {
+    id: "lp-portal",
+    name: "LP Portal",
+    path: "/lp-portal",
+    icon: Landmark,
+    description: "Limited Partner self-service fund dashboard and document vault",
+    color: "oklch(0.60 0.14 220)",
+    subModules: [
+      { id: "lp-dashboard", name: "Dashboard", path: "/lp-portal", icon: BarChart3, description: "Fund overview, NAV/IRR metrics, and FX rates" },
+      { id: "lp-ledger", name: "Capital Account", path: "/lp-portal/ledger", icon: DollarSign, description: "Capital calls, distributions, and fees ledger" },
+      { id: "lp-vault", name: "Document Vault", path: "/lp-portal/vault", icon: FileText, description: "Tax, audit, and performance report documents" },
+      { id: "lp-reports", name: "Performance Reports", path: "/lp-portal/reports", icon: CiFileOn, description: "Historical performance report deliveries" },
+      { id: "lp-colleagues", name: "Colleagues", path: "/lp-portal/colleagues", icon: Users, description: "Manage colleague access to your LP account" },
     ],
   },
 

@@ -126,4 +126,31 @@ export const authApiService = {
   },
 }
 
+// ── MFA (TOTP) — enrollment happens post-login from Account Settings; the
+// login-flow verify step is deferred until a real /auth/login MFA-pending
+// response sample is available (see plan gaps). ──
+export interface MfaEnrollResponse {
+  success: boolean
+  data: { qrCodeDataUrl: string; manualEntryKey: string }
+}
+
+export interface MfaConfirmEnrollmentResponse {
+  success: boolean
+  data: { backupCodes: string[] }
+}
+
+export const mfaApiService = {
+  async enroll(): Promise<MfaEnrollResponse> {
+    return apiClient.post('/auth/mfa/enroll', {})
+  },
+
+  async confirmEnrollment(token: string): Promise<MfaConfirmEnrollmentResponse> {
+    return apiClient.post('/auth/mfa/confirm-enrollment', { token })
+  },
+
+  async verify(mfaPendingToken: string, token: string): Promise<LoginResponse> {
+    return apiClient.post('/auth/mfa/verify', { mfaPendingToken, token })
+  },
+}
+
 export default authApiService

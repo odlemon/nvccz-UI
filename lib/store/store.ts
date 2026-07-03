@@ -14,6 +14,7 @@ import fundsReducer from './slices/fundsSlice'
 import reconciliationReducer from './slices/reconciliationSlice'
 import shortTermInvestmentsReducer from './slices/shortTermInvestmentsSlice'
 import forecastingReducer from './slices/forecastingSlice'
+import investmentsReducer from './slices/investmentsSlice'
 
 export const store = configureStore({
   reducer: {
@@ -32,6 +33,7 @@ export const store = configureStore({
     funds: fundsReducer,
     shortTermInvestments: shortTermInvestmentsReducer,
     forecasting: forecastingReducer,
+    investments: investmentsReducer,
   },
   // ...existing middleware...
 })

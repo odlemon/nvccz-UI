@@ -46,7 +46,7 @@ export interface ForecastDriver {
   scenario_id?: string
   target_account_range_start: number
   target_account_range_end: number
-  driver_type: "LINEAR_TREND" | "EXPONENTIAL" | "CAGR_DRIVEN" | "CUSTOM_FORMULA"
+  driver_type: "CAGR_DRIVEN" | "HEADCOUNT_GROWTH" | "INFLATION_MULTIPLIER" | "FX_SCALAR" | "LINEAR_REGRESSION" | "MANUAL_OVERRIDE"
   formula_expression?: string
   parameters: Record<string, any>
   updated_at?: string
@@ -337,8 +337,10 @@ class ForecastingApiService {
     return apiClient.post("/v1/forecasting/compute", data)
   }
 
-  async validateFormula(expression: string): Promise<ForecastingResponse<{ valid: boolean; error?: string }>> {
-    return apiClient.post("/v1/forecasting/compute/validate", { expression })
+  async validateFormula(
+    payload: { expression: string; driver_type?: ForecastDriver["driver_type"]; parameters?: Record<string, any> }
+  ): Promise<ForecastingResponse<{ valid: boolean; error?: string; parsed_ast?: any }>> {
+    return apiClient.post("/v1/forecasting/compute/validate", payload)
   }
 
   async getComputeJob(computeJobId: string): Promise<ForecastingResponse<ComputeJob>> {
