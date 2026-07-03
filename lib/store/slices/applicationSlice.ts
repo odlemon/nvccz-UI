@@ -1,6 +1,7 @@
 import { createSlice, PayloadAction, createAsyncThunk } from '@reduxjs/toolkit'
 import { applicationsApi, ApplicationCreateRequest, Application } from '@/lib/api/applications-api'
 import { boardReviewApi } from '@/lib/api/board-review-api'
+import { investmentMemoApi, type MemoSections } from '@/lib/api/investment-memo-api'
 
 export interface Document {
   documentType: 'BUSINESS_PLAN' | 'PROOF_OF_CONCEPT' | 'MARKET_RESEARCH' | 'PROJECTED_CASH_FLOWS' | 'HISTORICAL_FINANCIALS'
@@ -64,6 +65,22 @@ export interface ApplicationFormData {
   disbursementSummaryByApp: Record<string, any>
   disbursementSummaryLoadingByApp: Record<string, boolean>
   agreedToNDA: boolean
+
+  // Investment Memo Editing
+  investmentMemoByApp: Record<string, any>
+  investmentMemoLoadingByApp: Record<string, boolean>
+  memoVersionsByApp: Record<string, any[]>
+  memoVersionsLoadingByApp: Record<string, boolean>
+  memoVersionDetailById: Record<string, any>
+  memoVersionDetailLoadingById: Record<string, boolean>
+  memoApprovalHistoryByApp: Record<string, any[]>
+  memoApprovalHistoryLoadingByApp: Record<string, boolean>
+  memoSaving: boolean
+  memoValidating: boolean
+  memoSubmitting: boolean
+  memoApproving: boolean
+  memoRejecting: boolean
+  memoError?: string
 }
 
 export const fetchLatestApplicationById = createAsyncThunk(
@@ -119,7 +136,22 @@ const initialState: ApplicationFormData = {
   investmentImplementationLoadingByApp: {},
   disbursementSummaryByApp: {},
   disbursementSummaryLoadingByApp: {},
-  agreedToNDA: false
+  agreedToNDA: false,
+
+  investmentMemoByApp: {},
+  investmentMemoLoadingByApp: {},
+  memoVersionsByApp: {},
+  memoVersionsLoadingByApp: {},
+  memoVersionDetailById: {},
+  memoVersionDetailLoadingById: {},
+  memoApprovalHistoryByApp: {},
+  memoApprovalHistoryLoadingByApp: {},
+  memoSaving: false,
+  memoValidating: false,
+  memoSubmitting: false,
+  memoApproving: false,
+  memoRejecting: false,
+  memoError: undefined,
 }
 
 // Async thunk for submitting application
@@ -377,6 +409,142 @@ export const castVote = createAsyncThunk(
       return response
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to cast vote')
+    }
+  }
+)
+
+// ─── Investment Memo Editing ────────────────────────────────────────────────
+export const fetchMemoHeader = createAsyncThunk(
+  'application/fetchMemoHeader',
+  async (applicationId: string, { rejectWithValue }) => {
+    try {
+      const response = await investmentMemoApi.getHeader(applicationId)
+      return { applicationId, data: response.data }
+    } catch (error: any) {
+      return rejectWithValue({ applicationId, message: error.message || 'Failed to fetch investment memo' })
+    }
+  }
+)
+
+export const fetchMemoVersions = createAsyncThunk(
+  'application/fetchMemoVersions',
+  async (applicationId: string, { rejectWithValue }) => {
+    try {
+      const response = await investmentMemoApi.getVersions(applicationId)
+      return { applicationId, data: response.data ?? [] }
+    } catch (error: any) {
+      return rejectWithValue({ applicationId, message: error.message || 'Failed to fetch memo versions' })
+    }
+  }
+)
+
+export const fetchMemoVersionDetail = createAsyncThunk(
+  'application/fetchMemoVersionDetail',
+  async ({ applicationId, versionId }: { applicationId: string; versionId: string }, { rejectWithValue }) => {
+    try {
+      const response = await investmentMemoApi.getVersion(applicationId, versionId)
+      return { versionId, data: response.data }
+    } catch (error: any) {
+      return rejectWithValue({ versionId, message: error.message || 'Failed to fetch memo version' })
+    }
+  }
+)
+
+export const createMemoVersion = createAsyncThunk(
+  'application/createMemoVersion',
+  async ({ applicationId, changeSummary }: { applicationId: string; changeSummary?: string }, { rejectWithValue }) => {
+    try {
+      const response = await investmentMemoApi.createVersion(applicationId, changeSummary)
+      return { applicationId, data: response.data }
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to create new memo version')
+    }
+  }
+)
+
+export const saveMemoVersion = createAsyncThunk(
+  'application/saveMemoVersion',
+  async (
+    { applicationId, versionId, data, validate }: { applicationId: string; versionId: string; data: { sections: Partial<MemoSections>; changeSummary?: string }; validate: boolean },
+    { rejectWithValue }
+  ) => {
+    try {
+      const response = await investmentMemoApi.saveVersion(applicationId, versionId, data, validate)
+      return { versionId, data: response.data }
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to save memo version')
+    }
+  }
+)
+
+export const validateMemoVersion = createAsyncThunk(
+  'application/validateMemoVersion',
+  async ({ applicationId, versionId }: { applicationId: string; versionId: string }, { rejectWithValue }) => {
+    try {
+      const response = await investmentMemoApi.validateVersion(applicationId, versionId)
+      return response.data
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to validate memo version')
+    }
+  }
+)
+
+export const submitMemoVersion = createAsyncThunk(
+  'application/submitMemoVersion',
+  async ({ applicationId, versionId }: { applicationId: string; versionId: string }, { rejectWithValue }) => {
+    try {
+      const response = await investmentMemoApi.submitVersion(applicationId, versionId)
+      return { applicationId, data: response.data }
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to submit memo for approval')
+    }
+  }
+)
+
+export const approveMemoVersion = createAsyncThunk(
+  'application/approveMemoVersion',
+  async ({ applicationId, versionId, comment }: { applicationId: string; versionId: string; comment: string }, { rejectWithValue }) => {
+    try {
+      const response = await investmentMemoApi.approveVersion(applicationId, versionId, comment)
+      return { applicationId, data: response.data }
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to approve memo')
+    }
+  }
+)
+
+export const rejectMemoVersion = createAsyncThunk(
+  'application/rejectMemoVersion',
+  async ({ applicationId, versionId, comment }: { applicationId: string; versionId: string; comment: string }, { rejectWithValue }) => {
+    try {
+      const response = await investmentMemoApi.rejectVersion(applicationId, versionId, comment)
+      return { applicationId, data: response.data }
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to reject memo')
+    }
+  }
+)
+
+export const uploadMemoAttachment = createAsyncThunk(
+  'application/uploadMemoAttachment',
+  async ({ applicationId, versionId, file }: { applicationId: string; versionId: string; file: File }, { rejectWithValue }) => {
+    try {
+      const response = await investmentMemoApi.uploadAttachment(applicationId, versionId, file)
+      return { versionId, data: response.data }
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to upload attachment')
+    }
+  }
+)
+
+export const fetchMemoApprovalHistory = createAsyncThunk(
+  'application/fetchMemoApprovalHistory',
+  async (applicationId: string, { rejectWithValue }) => {
+    try {
+      const response = await investmentMemoApi.getApprovalHistory(applicationId)
+      return { applicationId, data: response.data ?? [] }
+    } catch (error: any) {
+      return rejectWithValue({ applicationId, message: error.message || 'Failed to fetch approval history' })
     }
   }
 )
@@ -683,6 +851,130 @@ const applicationSlice = createSlice({
       .addCase(castVote.rejected, (state, action) => {
         state.isSubmitting = false
         state.submitError = action.payload as string
+      })
+
+      // Investment Memo Editing
+      .addCase(fetchMemoHeader.pending, (state, action) => {
+        state.investmentMemoLoadingByApp[action.meta.arg] = true
+      })
+      .addCase(fetchMemoHeader.fulfilled, (state, action) => {
+        const { applicationId, data } = action.payload as any
+        state.investmentMemoLoadingByApp[applicationId] = false
+        state.investmentMemoByApp[applicationId] = data
+      })
+      .addCase(fetchMemoHeader.rejected, (state, action) => {
+        const { applicationId, message } = (action.payload as any) || {}
+        if (applicationId) state.investmentMemoLoadingByApp[applicationId] = false
+        state.memoError = message
+      })
+
+      .addCase(fetchMemoVersions.pending, (state, action) => {
+        state.memoVersionsLoadingByApp[action.meta.arg] = true
+      })
+      .addCase(fetchMemoVersions.fulfilled, (state, action) => {
+        const { applicationId, data } = action.payload as any
+        state.memoVersionsLoadingByApp[applicationId] = false
+        state.memoVersionsByApp[applicationId] = data
+      })
+      .addCase(fetchMemoVersions.rejected, (state, action) => {
+        const { applicationId, message } = (action.payload as any) || {}
+        if (applicationId) state.memoVersionsLoadingByApp[applicationId] = false
+        state.memoError = message
+      })
+
+      .addCase(fetchMemoVersionDetail.pending, (state, action) => {
+        state.memoVersionDetailLoadingById[action.meta.arg.versionId] = true
+      })
+      .addCase(fetchMemoVersionDetail.fulfilled, (state, action) => {
+        const { versionId, data } = action.payload as any
+        state.memoVersionDetailLoadingById[versionId] = false
+        state.memoVersionDetailById[versionId] = data
+      })
+      .addCase(fetchMemoVersionDetail.rejected, (state, action) => {
+        const { versionId, message } = (action.payload as any) || {}
+        if (versionId) state.memoVersionDetailLoadingById[versionId] = false
+        state.memoError = message
+      })
+
+      .addCase(createMemoVersion.pending, (state) => { state.memoSaving = true })
+      .addCase(createMemoVersion.fulfilled, (state, action) => {
+        state.memoSaving = false
+        const { data } = action.payload as any
+        if (data?.id) state.memoVersionDetailById[data.id] = data
+      })
+      .addCase(createMemoVersion.rejected, (state, action) => {
+        state.memoSaving = false
+        state.memoError = action.payload as string
+      })
+
+      .addCase(saveMemoVersion.pending, (state) => { state.memoSaving = true })
+      .addCase(saveMemoVersion.fulfilled, (state, action) => {
+        state.memoSaving = false
+        const { versionId, data } = action.payload as any
+        state.memoVersionDetailById[versionId] = data
+      })
+      .addCase(saveMemoVersion.rejected, (state, action) => {
+        state.memoSaving = false
+        state.memoError = action.payload as string
+      })
+
+      .addCase(validateMemoVersion.pending, (state) => { state.memoValidating = true })
+      .addCase(validateMemoVersion.fulfilled, (state) => { state.memoValidating = false })
+      .addCase(validateMemoVersion.rejected, (state, action) => {
+        state.memoValidating = false
+        state.memoError = action.payload as string
+      })
+
+      .addCase(submitMemoVersion.pending, (state) => { state.memoSubmitting = true })
+      .addCase(submitMemoVersion.fulfilled, (state, action) => {
+        state.memoSubmitting = false
+        const { applicationId, data } = action.payload as any
+        state.investmentMemoByApp[applicationId] = data
+      })
+      .addCase(submitMemoVersion.rejected, (state, action) => {
+        state.memoSubmitting = false
+        state.memoError = action.payload as string
+      })
+
+      .addCase(approveMemoVersion.pending, (state) => { state.memoApproving = true })
+      .addCase(approveMemoVersion.fulfilled, (state, action) => {
+        state.memoApproving = false
+        const { applicationId, data } = action.payload as any
+        state.investmentMemoByApp[applicationId] = data
+      })
+      .addCase(approveMemoVersion.rejected, (state, action) => {
+        state.memoApproving = false
+        state.memoError = action.payload as string
+      })
+
+      .addCase(rejectMemoVersion.pending, (state) => { state.memoRejecting = true })
+      .addCase(rejectMemoVersion.fulfilled, (state, action) => {
+        state.memoRejecting = false
+        const { applicationId, data } = action.payload as any
+        state.investmentMemoByApp[applicationId] = data
+      })
+      .addCase(rejectMemoVersion.rejected, (state, action) => {
+        state.memoRejecting = false
+        state.memoError = action.payload as string
+      })
+
+      .addCase(uploadMemoAttachment.fulfilled, (state, action) => {
+        const { versionId, data } = action.payload as any
+        state.memoVersionDetailById[versionId] = data
+      })
+
+      .addCase(fetchMemoApprovalHistory.pending, (state, action) => {
+        state.memoApprovalHistoryLoadingByApp[action.meta.arg] = true
+      })
+      .addCase(fetchMemoApprovalHistory.fulfilled, (state, action) => {
+        const { applicationId, data } = action.payload as any
+        state.memoApprovalHistoryLoadingByApp[applicationId] = false
+        state.memoApprovalHistoryByApp[applicationId] = data
+      })
+      .addCase(fetchMemoApprovalHistory.rejected, (state, action) => {
+        const { applicationId, message } = (action.payload as any) || {}
+        if (applicationId) state.memoApprovalHistoryLoadingByApp[applicationId] = false
+        state.memoError = message
       })
   }
 })

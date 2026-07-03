@@ -19,6 +19,7 @@ import { CiFileOn } from "react-icons/ci"
 import { RefreshCw, Plus, Sparkles, ClipboardList } from "lucide-react"
 import ContractScorecardPDF from "./contract-scorecard-pdf-document"
 import { ContractQualitativeModal } from "./contract-qualitative-modal"
+import { ScorecardEditDrawer } from "./scorecard-edit-drawer"
 import { useRolePermissions } from "@/lib/hooks/useRolePermissions"
 import { PERFORMANCE_ACTIONS } from "@/lib/config/performance-permissions"
 import {
@@ -44,6 +45,7 @@ export function ContractScorecardPage({ type }: ContractScorecardPageProps) {
   const [isClient, setIsClient] = useState(false)
   const [PDFDownloadLink, setPDFDownloadLink] = useState<any>(null)
   const [isQualModalOpen, setIsQualModalOpen] = useState(false)
+  const [isEditDrawerOpen, setIsEditDrawerOpen] = useState(false)
   const { hasSpecificAction } = useRolePermissions()
   const canEditQualitative = hasSpecificAction(PERFORMANCE_ACTIONS.CONDUCT_PERFORMANCE_REVIEW)
   const [activeAddress, setActiveAddress] = useState<CompanyAddress | null>(null)
@@ -288,6 +290,17 @@ export function ContractScorecardPage({ type }: ContractScorecardPageProps) {
               Add Evaluation
             </Button>
           )}
+          {canEditQualitative && data && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="rounded-full gap-1.5"
+              onClick={() => setIsEditDrawerOpen(true)}
+            >
+              <ClipboardList className="w-3.5 h-3.5" />
+              Edit Qualitative
+            </Button>
+          )}
           {isClient && data && PDFDownloadLink && (
             <PDFDownloadLink
               document={<ContractScorecardPDF data={data} type={type} activeAddress={activeAddress} />}
@@ -486,6 +499,13 @@ export function ContractScorecardPage({ type }: ContractScorecardPageProps) {
         type={type}
         periodLabel={periodLabel}
         existingAttributes={data?.document?.qualitativeSections?.personalAttributes}
+        onSaved={() => void loadData()}
+      />
+      <ScorecardEditDrawer
+        open={isEditDrawerOpen}
+        onClose={() => setIsEditDrawerOpen(false)}
+        type={type}
+        periodLabel={periodLabel}
         onSaved={() => void loadData()}
       />
     </div>

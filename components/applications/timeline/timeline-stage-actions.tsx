@@ -17,6 +17,7 @@ interface TimelineStageActionsProps {
   activityApprovalLoading?: boolean
   boardReviewData?: BoardReviewData | null
   voteSummary?: VoteSummaryData | null
+  memoHeader?: any
   termSheetData?: any
   termSheetDataLoding?: boolean
   implementationData?: InvestmentImplementationData | null
@@ -56,6 +57,7 @@ export function TimelineStageActions({
   termSheetData,
   termSheetDataLoding,
   voteSummary,
+  memoHeader,
   implementationData,
   implementationLoading,
   onInitiateDueDiligence,
@@ -412,7 +414,8 @@ export function TimelineStageActions({
       }
 
       const isVotingComplete = voteSummary?.isVotingComplete === true
-      const canVote = voteSummary?.boardStatus === 'IN_PROGRESS' && !voteSummary.userVote
+      const memoApproved = memoHeader?.workflowStatus === 'APPROVED'
+      const canVote = voteSummary?.boardStatus === 'IN_PROGRESS' && !voteSummary.userVote && memoApproved
 
       // If board review exists, show other actions
       return (
@@ -450,7 +453,16 @@ export function TimelineStageActions({
             )}
           </div>
 
-          {voteSummary?.boardStatus === 'IN_PROGRESS' && !isVotingComplete && !canVote && (
+          {voteSummary?.boardStatus === 'IN_PROGRESS' && !isVotingComplete && !memoApproved && (
+            <div className="flex justify-center">
+              <p className="text-sm text-amber-600 italic py-2 flex items-center gap-2">
+                <FileText className="w-4 h-4" />
+                Call to Vote is locked until the CIO approves the Investment Memo.
+              </p>
+            </div>
+          )}
+
+          {voteSummary?.boardStatus === 'IN_PROGRESS' && !isVotingComplete && memoApproved && !canVote && (
             <div className="flex justify-center">
               <p className="text-sm text-gray-500 italic py-2">Voting in progress... You have already voted.</p>
             </div>

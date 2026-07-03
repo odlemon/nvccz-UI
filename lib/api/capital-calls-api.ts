@@ -250,6 +250,8 @@ export interface ClientRecord {
   address: string | null
   taxId: string | null
   status: string
+  /** null means the client has not yet been linked to a portal User account — prerequisite for LP Portal access */
+  userId?: string | null
   createdAt: string
   updatedAt: string
   investmentCommitments?: Array<{
@@ -267,6 +269,18 @@ export interface ClientRecord {
   }>
 }
 
+// GET /clients uses a distinct wrapper shape (data.clients + sibling pagination
+// fields) rather than the usual `data` = array-directly convention.
+export interface ClientsListResponse {
+  success: boolean
+  data: {
+    clients: ClientRecord[]
+    total: number
+    page: number
+    totalPages: number
+  }
+}
+
 export const clientsApi = {
   /** 0a. Create LP (client) + optional fund commitment */
   create: async (
@@ -281,5 +295,22 @@ export const clientsApi = {
     body: Partial<ClientCreateRequest>
   ): Promise<{ success: boolean; message: string; data: ClientRecord }> => {
     return apiClient.put(`/clients/${id}`, body)
+  },
+
+  /** List/search clients — used by LP Management's client pickers */
+  list: async (params?: { page?: number; search?: string }): Promise<ClientsListResponse> => {
+    const q = new URLSearchParams()
+    if (params?.page) q.append('page', String(params.page))
+    if (params?.search) q.append('search', params.search)
+    const qs = q.toString()
+    return apiClient.get(`/clients${qs ? `?${qs}` : ''}`)
+  },
+
+  /** Links a Client to a User account — prerequisite for LP portal access */
+  linkUser: async (
+    id: string,
+    userId: string
+  ): Promise<{ success: boolean; message: string; data: ClientRecord }> => {
+    return apiClient.put(`/clients/${id}/link-user`, { userId })
   },
 }

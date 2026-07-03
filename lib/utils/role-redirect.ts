@@ -22,6 +22,7 @@ export const getRoleBasedRedirect = (
   // Role-based redirect mapping
   const roleRedirects: Record<string, string> = {
     'applicant': '/application-portal',
+    'limited_partner': '/lp-portal',
     'admin': '/',
     'investment_manager': '/',
     'board_member': '/',
