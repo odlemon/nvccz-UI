@@ -14,9 +14,17 @@ import { cn } from "@/lib/utils"
 import { Check, ChevronsUpDown, AlertTriangle, TrendingUp, TrendingDown } from "lucide-react"
 import { toast } from "sonner"
 import { priceChange } from "@/lib/api/investments-api"
+import { RoutingPipeline, type PipelineHop } from "./routing-pipeline"
 
 type Side = "BUY" | "SELL"
 type Step = "form" | "confirm"
+
+const PREVIEW_HOPS: PipelineHop[] = [
+  { target: "BROKER", status: "STAGED" },
+  { target: "CUSTODIAN", status: "STAGED", skipped: true },
+  { target: "CORE_BANKING", status: "STAGED" },
+  { target: "ACCOUNTING_GL", status: "STAGED" },
+]
 
 export function ExecuteTradeModal() {
   const dispatch = useAppDispatch()
@@ -262,17 +270,7 @@ export function ExecuteTradeModal() {
 
             <div>
               <p className="text-xs font-medium text-slate-500 mb-2">Routing Preview</p>
-              <div className="flex items-center gap-1.5 text-[10px]">
-                {["Broker Gateway", "Custodian Network", "Core Banking", "Acct Register"].map((label, i) => (
-                  <div key={label} className="flex items-center gap-1.5">
-                    <div className={cn("px-2 py-1 rounded border text-center", i === 1 ? "border-dashed border-slate-300 text-slate-400" : "border-slate-200 bg-slate-50 text-slate-600")}>
-                      {label}
-                      {i === 1 && <div className="text-[9px] text-slate-400">SKIPPED</div>}
-                    </div>
-                    {i < 3 && <span className="text-slate-300">→</span>}
-                  </div>
-                ))}
-              </div>
+              <RoutingPipeline mode="compact" hops={PREVIEW_HOPS} />
             </div>
           </div>
         )}
