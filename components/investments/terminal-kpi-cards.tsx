@@ -1,49 +1,58 @@
 "use client"
 
-import type { ReactNode } from "react"
 import { format } from "date-fns"
 import { useMemo } from "react"
 import { useAppDispatch, useAppSelector } from "@/lib/store"
 import { setPnlPeriod, fetchFundPnL } from "@/lib/store/slices/investmentsSlice"
 import { effectiveHoldingValue, holdingCostBasis } from "@/lib/api/investments-api"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Wallet, TrendingUp, TrendingDown, Layers, Clock, ShieldAlert, ShieldCheck } from "lucide-react"
+import { ArrowDownRight, ArrowUpRight, Wallet, TrendingUp, Coins, Layers, type LucideIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-function KpiCard({
-  title, value, subtitle, icon: Icon, gradient, loading, action,
-}: {
-  title: string; value: string | number; subtitle: string
-  icon: any; gradient: boolean; loading: boolean; action?: ReactNode
-}) {
+interface Kpi {
+  label: string
+  value: string
+  sub: string
+  delta?: number
+  icon: LucideIcon
+  loading: boolean
+  action?: React.ReactNode
+}
+
+function KpiCard({ k }: { k: Kpi }) {
+  const positive = (k.delta ?? 0) >= 0
   return (
-    <Card className={cn("border shadow-sm hover:shadow-md transition-all duration-200", gradient ? "gradient-primary" : "bg-white border-gray-200")}>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-4 px-4">
-        <CardTitle className={cn("text-xs font-medium uppercase tracking-wide", gradient ? "text-white/80" : "text-gray-500")}>
-          {title}
-        </CardTitle>
+    <div className="group relative overflow-hidden rounded-2xl border border-border bg-card p-5 transition-shadow hover:shadow-sm">
+      <div className="flex items-start justify-between">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-accent-foreground">
+          <k.icon className="h-5 w-5" />
+        </div>
         <div className="flex items-center gap-1.5">
-          {action}
-          <div className={cn("w-8 h-8 rounded-full flex items-center justify-center", gradient ? "bg-white/20" : "gradient-primary")}>
-            <Icon className="h-3.5 w-3.5 text-white" />
-          </div>
+          {k.action}
+          {k.delta !== undefined && (
+            <span
+              className={cn(
+                "inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-xs font-semibold",
+                positive ? "bg-gain-muted text-gain-foreground" : "bg-loss-muted text-loss-foreground",
+              )}
+            >
+              {positive ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+              {Math.abs(k.delta).toFixed(2)}%
+            </span>
+          )}
         </div>
-      </CardHeader>
-      <CardContent className="px-4 pb-4">
-        {loading ? (
-          <Skeleton className={cn("h-8 w-20 mt-1", gradient && "bg-white/20")} />
+      </div>
+      <p className="mt-4 text-xs font-medium uppercase tracking-wide text-muted-foreground">{k.label}</p>
+      <div className="mt-1 flex items-end justify-between gap-2">
+        {k.loading ? (
+          <Skeleton className="h-8 w-24" />
         ) : (
-          <div className={cn("text-2xl font-bold", gradient ? "text-white" : "text-gray-900")}>
-            {value}
-          </div>
+          <p className="font-mono text-2xl font-semibold tracking-tight text-foreground">{k.value}</p>
         )}
-        <div className={cn("flex items-center gap-1 mt-1", gradient ? "text-white/60" : "text-gray-400")}>
-          <span className="text-xs">{subtitle}</span>
-        </div>
-      </CardContent>
-    </Card>
+      </div>
+      <p className="mt-1 text-xs text-muted-foreground">{k.sub}</p>
+    </div>
   )
 }
 
@@ -56,7 +65,7 @@ export function TerminalKpiCards() {
   const dispatch = useAppDispatch()
   const {
     funds, selectedFundId, pnl, pnlLoading, pnlPeriod,
-    holdings, holdingsLoading, trades, validationQueue,
+    holdings, holdingsLoading,
   } = useAppSelector((s) => s.investments)
 
   const fund = funds.find((f) => f.id === selectedFundId)
@@ -72,9 +81,7 @@ export function TerminalKpiCards() {
 
   const unrealizedUsd = pnl?.unrealized?.usd ?? 0
   const realizedUsd = pnl?.realized?.usd ?? 0
-  const unrealizedPositive = unrealizedUsd >= 0
-  const realizedPositive = realizedUsd >= 0
-  const unrealizedPct = totalCostBasis > 0 ? (unrealizedUsd / totalCostBasis) * 100 : null
+  const unrealizedPct = totalCostBasis > 0 ? (unrealizedUsd / totalCostBasis) * 100 : undefined
 
   const lastValuationAt = holdings.reduce<string | null>((latest, h) => {
     if (!h.lastValuationAt) return latest
@@ -82,94 +89,53 @@ export function TerminalKpiCards() {
     return latest
   }, null) ?? fund?.nav_updated_at ?? null
 
-  const hopIssues = trades.filter((t) => (t.routingHops ?? []).some((h) => h.status === "FAILED" || h.status === "RETRYING")).length
-  const pendingReview = validationQueue.length
-  const totalAlerts = hopIssues + pendingReview
+  const kpis: Kpi[] = [
+    {
+      label: "Total Market Value",
+      value: fmtMoney(totalMarketValue, baseCurrency),
+      sub: lastValuationAt ? `Last valued ${format(new Date(lastValuationAt), "MMM d, HH:mm")}` : "Current portfolio value",
+      icon: Wallet,
+      loading: holdingsLoading,
+    },
+    {
+      label: "Unrealized P&L",
+      value: fmtMoney(unrealizedUsd, baseCurrency),
+      sub: unrealizedPct != null ? `${unrealizedPct >= 0 ? "+" : ""}${unrealizedPct.toFixed(2)}% of cost basis` : "No valuation yet",
+      delta: unrealizedPct,
+      icon: TrendingUp,
+      loading: pnlLoading,
+    },
+    {
+      label: "Realized P&L",
+      value: fmtMoney(realizedUsd, baseCurrency),
+      sub: `${pnlPeriod} performance`,
+      icon: Coins,
+      loading: pnlLoading,
+      action: (
+        <Select value={pnlPeriod} onValueChange={(v) => handlePeriodChange(v as "MTD" | "QTD" | "YTD")}>
+          <SelectTrigger className="h-6 w-14 text-[10px] bg-muted border-border px-1.5">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="MTD">MTD</SelectItem>
+            <SelectItem value="QTD">QTD</SelectItem>
+            <SelectItem value="YTD">YTD</SelectItem>
+          </SelectContent>
+        </Select>
+      ),
+    },
+    {
+      label: "Open Positions",
+      value: String(holdings.length),
+      sub: "Securities held",
+      icon: Layers,
+      loading: holdingsLoading,
+    },
+  ]
 
   return (
-    <div className="space-y-3">
-      {/* Primary KPI cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard
-          title="Total Market Value"
-          value={fmtMoney(totalMarketValue, baseCurrency)}
-          subtitle="Current portfolio value"
-          icon={Wallet}
-          gradient
-          loading={holdingsLoading}
-        />
-        <KpiCard
-          title="Unrealized P&L"
-          value={fmtMoney(unrealizedUsd, baseCurrency)}
-          subtitle={unrealizedPct != null ? `${unrealizedPositive ? "+" : ""}${unrealizedPct.toFixed(2)}%` : "No valuation yet"}
-          icon={unrealizedPositive ? TrendingUp : TrendingDown}
-          gradient={false}
-          loading={pnlLoading}
-        />
-        <KpiCard
-          title="Realized P&L"
-          value={fmtMoney(realizedUsd, baseCurrency)}
-          subtitle={`${pnlPeriod} performance`}
-          icon={realizedPositive ? TrendingUp : TrendingDown}
-          gradient
-          loading={pnlLoading}
-          action={
-            <Select value={pnlPeriod} onValueChange={(v) => handlePeriodChange(v as "MTD" | "QTD" | "YTD")}>
-              <SelectTrigger className="h-6 w-16 text-[10px] bg-white/20 border-white/30 text-white px-1.5">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="MTD">MTD</SelectItem>
-                <SelectItem value="QTD">QTD</SelectItem>
-                <SelectItem value="YTD">YTD</SelectItem>
-              </SelectContent>
-            </Select>
-          }
-        />
-        <KpiCard
-          title="Open Positions"
-          value={holdings.length}
-          subtitle="Securities held"
-          icon={Layers}
-          gradient={false}
-          loading={holdingsLoading}
-        />
-      </div>
-
-      {/* Secondary metric strip */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        {[
-          {
-            label: "NAV",
-            value: fund?.nav != null ? fmtMoney(fund.nav, baseCurrency) : "—",
-            icon: Wallet, color: "text-blue-600", bg: "bg-blue-50",
-          },
-          {
-            label: "Last Valuation",
-            value: lastValuationAt ? format(new Date(lastValuationAt), "MMM d, HH:mm") : "—",
-            icon: Clock, color: "text-blue-600", bg: "bg-blue-50",
-          },
-          {
-            label: "Routing Alerts",
-            value: totalAlerts > 0 ? `${totalAlerts} pending` : "All clear",
-            icon: totalAlerts > 0 ? ShieldAlert : ShieldCheck,
-            color: totalAlerts > 0 ? "text-red-600" : "text-emerald-600",
-            bg: totalAlerts > 0 ? "bg-red-50" : "bg-emerald-50",
-          },
-        ].map((item) => (
-          <Card key={item.label} className="bg-white border border-gray-200 shadow-sm">
-            <CardContent className="flex items-center gap-3 p-4">
-              <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center shrink-0", item.bg)}>
-                <item.icon className={cn("w-4 h-4", item.color)} />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs text-muted-foreground">{item.label}</p>
-                <p className={cn("text-sm font-bold mt-0.5 truncate", item.color)}>{item.value}</p>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {kpis.map((k) => <KpiCard key={k.label} k={k} />)}
     </div>
   )
 }

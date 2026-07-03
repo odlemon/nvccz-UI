@@ -1,15 +1,25 @@
 "use client"
 
-import React, { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
+import { cn } from "@/lib/utils"
 import { useAppDispatch, useAppSelector } from "@/lib/store"
 import { fetchValidationQueue, approveValidationTick, rejectValidationTick } from "@/lib/store/slices/investmentsSlice"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
-import { cn } from "@/lib/utils"
-import { CheckCircle2, XCircle, AlertTriangle } from "lucide-react"
+import { Check } from "lucide-react"
 import { toast } from "sonner"
+import { PageHeader } from "./page-header"
+import { ValidationItemCard } from "./validation-item-card"
+
+function Stat({ label, value, tone }: { label: string; value: string; tone?: "warn" | "gain" | "loss" }) {
+  return (
+    <div className="rounded-xl border border-border bg-card p-4">
+      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className={cn("mt-1 font-mono text-lg font-semibold", tone === "loss" ? "text-loss" : tone === "gain" ? "text-gain" : tone === "warn" ? "text-warn-foreground" : "text-foreground")}>
+        {value}
+      </p>
+    </div>
+  )
+}
 
 export function ValidationQueue() {
   const dispatch = useAppDispatch()
@@ -20,6 +30,15 @@ export function ValidationQueue() {
   useEffect(() => {
     dispatch(fetchValidationQueue())
   }, [dispatch])
+
+  const stats = useMemo(() => {
+    const highDeviation = validationQueue.filter((v) => Math.abs(v.deviation_percent) > 15).length
+    const exchanges = new Set(validationQueue.map((v) => v.exchange).filter(Boolean)).size
+    const avgDeviation = validationQueue.length
+      ? validationQueue.reduce((sum, v) => sum + Math.abs(v.deviation_percent), 0) / validationQueue.length
+      : 0
+    return { total: validationQueue.length, highDeviation, exchanges, avgDeviation }
+  }, [validationQueue])
 
   const handleApprove = async (tickId: string) => {
     try {
@@ -43,137 +62,48 @@ export function ValidationQueue() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold">Validation Queue</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Price outliers pending manual review</p>
-        </div>
-        <Badge variant="secondary" className="font-mono">
-          {validationQueue.length} pending
-        </Badge>
+    <div className="space-y-5">
+      <PageHeader title="Validation Queue" subtitle="Manual review of price ticks flagged for exceeding deviation thresholds" />
+
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <Stat label="Pending review" value={String(stats.total)} tone={stats.total ? "warn" : "gain"} />
+        <Stat label="High deviation (>15%)" value={String(stats.highDeviation)} tone={stats.highDeviation ? "warn" : undefined} />
+        <Stat label="Exchanges affected" value={String(stats.exchanges)} />
+        <Stat label="Avg deviation" value={`${stats.avgDeviation.toFixed(2)}%`} />
       </div>
 
       {validationLoading ? (
-        <div className="space-y-2">
-          {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-40 w-full rounded-2xl" />)}
+        </div>
+      ) : validationQueue.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-border bg-card py-16 text-center">
+          <Check className="mx-auto h-8 w-8 text-gain" />
+          <p className="mt-3 text-sm font-medium text-foreground">Queue is clear</p>
+          <p className="text-xs text-muted-foreground">All flagged ticks have been reviewed.</p>
         </div>
       ) : (
-        <div className="rounded-lg border overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/50 border-b">
-              <tr>
-                <th className="text-left px-4 py-2.5 font-medium text-xs text-muted-foreground">Ticker</th>
-                <th className="text-left px-4 py-2.5 font-medium text-xs text-muted-foreground">Exchange</th>
-                <th className="text-left px-4 py-2.5 font-medium text-xs text-muted-foreground">Date</th>
-                <th className="text-right px-4 py-2.5 font-medium text-xs text-muted-foreground">Proposed</th>
-                <th className="text-right px-4 py-2.5 font-medium text-xs text-muted-foreground">Prev Close</th>
-                <th className="text-right px-4 py-2.5 font-medium text-xs text-muted-foreground">Deviation</th>
-                <th className="px-4 py-2.5" />
-              </tr>
-            </thead>
-            <tbody>
-              {validationQueue.map((item) => {
-                const isHighDeviation = Math.abs(item.deviation_percent) > 15
-                const isRejecting = rejectingId === item.tick_id
-
-                return (
-                  <React.Fragment key={item.tick_id}>
-                    <tr className="border-b last:border-0">
-                      <td className="px-4 py-2.5">
-                        <span className="font-mono font-medium">{item.ticker}</span>
-                      </td>
-                      <td className="px-4 py-2.5">
-                        <Badge variant="outline" className="text-xs">{item.exchange}</Badge>
-                      </td>
-                      <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">
-                        {new Date(item.price_date).toLocaleDateString()}
-                      </td>
-                      <td className="px-4 py-2.5 text-right font-mono text-xs">
-                        {item.proposed_price.toFixed(4)}
-                      </td>
-                      <td className="px-4 py-2.5 text-right font-mono text-xs text-muted-foreground">
-                        {item.previous_close.toFixed(4)}
-                      </td>
-                      <td className="px-4 py-2.5 text-right">
-                        <div className={cn("flex items-center justify-end gap-1 font-mono text-xs", isHighDeviation ? "text-amber-600" : "text-muted-foreground")}>
-                          {isHighDeviation && <AlertTriangle className="w-3 h-3" />}
-                          {item.deviation_percent >= 0 ? "+" : ""}{item.deviation_percent.toFixed(2)}%
-                        </div>
-                      </td>
-                      <td className="px-4 py-2.5">
-                        <div className="flex items-center justify-end gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-6 text-xs text-emerald-600 border-emerald-200 hover:bg-emerald-50"
-                            onClick={() => handleApprove(item.tick_id)}
-                          >
-                            <CheckCircle2 className="w-3 h-3 mr-1" /> Approve
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-6 text-xs text-red-600 border-red-200 hover:bg-red-50"
-                            onClick={() => {
-                              if (isRejecting) {
-                                setRejectingId(null)
-                                setRejectReason("")
-                              } else {
-                                setRejectingId(item.tick_id)
-                                setRejectReason("")
-                              }
-                            }}
-                          >
-                            <XCircle className="w-3 h-3 mr-1" /> Reject
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                    {isRejecting && (
-                      <tr className="border-b bg-red-50/50">
-                        <td colSpan={7} className="px-4 py-2">
-                          <div className="flex items-center gap-2">
-                            <Input
-                              placeholder="Rejection reason (required)…"
-                              value={rejectReason}
-                              onChange={(e) => setRejectReason(e.target.value)}
-                              className="h-7 text-xs"
-                              autoFocus
-                            />
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              className="h-7 text-xs shrink-0"
-                              disabled={!rejectReason.trim()}
-                              onClick={() => handleRejectSubmit(item.tick_id)}
-                            >
-                              Confirm Reject
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-7 text-xs"
-                              onClick={() => { setRejectingId(null); setRejectReason("") }}
-                            >
-                              Cancel
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                  </React.Fragment>
-                )
-              })}
-              {validationQueue.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="text-center py-10 text-sm text-muted-foreground">
-                    No items pending review
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {validationQueue.map((item) => (
+            <ValidationItemCard
+              key={item.tick_id}
+              item={item}
+              isRejecting={rejectingId === item.tick_id}
+              rejectReason={rejectReason}
+              onApprove={() => handleApprove(item.tick_id)}
+              onRejectToggle={() => {
+                if (rejectingId === item.tick_id) {
+                  setRejectingId(null)
+                  setRejectReason("")
+                } else {
+                  setRejectingId(item.tick_id)
+                  setRejectReason("")
+                }
+              }}
+              onRejectReasonChange={setRejectReason}
+              onRejectSubmit={() => handleRejectSubmit(item.tick_id)}
+            />
+          ))}
         </div>
       )}
     </div>
