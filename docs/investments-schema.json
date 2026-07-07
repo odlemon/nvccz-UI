@@ -1,0 +1,150 @@
+{
+  "$description": "Canonical data contract for the Arcus Investment Operations module (Phase 1: Dashboard, Portfolios, Orders). Handed to the backend team so new endpoints can be built to match what the frontend already renders. Every entity is returned wrapped in the existing InvestmentsResponse<T> envelope used across lib/api/investments-api.ts.",
+  "responseEnvelope": {
+    "name": "InvestmentsResponse<T>",
+    "fields": {
+      "success": "boolean",
+      "message": "string | undefined",
+      "data": "T | undefined",
+      "error": "string | undefined",
+      "timestamp": "string (ISO 8601) | undefined"
+    }
+  },
+  "sourceLegend": {
+    "REAL": "Backed today by an existing endpoint/table (see investments-api.ts). No new backend work needed.",
+    "DERIVED": "Computed client-side from REAL data (e.g. aggregation, grouping). No new backend work needed, but listed here so backend knows the frontend is producing this value and can optionally move the computation server-side later.",
+    "MOCK": "No backend support exists yet. The frontend currently renders this from a local mock dataset (see lib/mock/*.ts). Needs a real endpoint before Phase 2."
+  },
+  "entities": {
+    "Portfolio": {
+      "description": "Superset of the existing Fund entity — adds the portfolio grouping/hierarchy concepts introduced by the new Portfolios module (Folder Setup, Setup).",
+      "existingRealType": "Fund (lib/api/investments-api.ts)",
+      "fields": [
+        { "name": "id", "type": "string", "source": "REAL" },
+        { "name": "name", "type": "string", "source": "REAL" },
+        { "name": "base_currency", "type": "string", "source": "REAL" },
+        { "name": "nav", "type": "number | null", "source": "REAL" },
+        { "name": "nav_updated_at", "type": "string (ISO 8601) | null", "source": "REAL" },
+        { "name": "manager_user_id", "type": "string | null", "source": "REAL" },
+        { "name": "folderId", "type": "string | null", "source": "MOCK", "note": "Portfolio Folder Setup grouping — needs a portfolio_folders table + FK on funds." },
+        { "name": "cashBalance", "type": "number | null", "source": "MOCK", "note": "No cash-balance field exists on Fund today; needed for a Trading cash-positions view." },
+        { "name": "mandateRuleIds", "type": "string[]", "source": "MOCK", "note": "Links to MandateRule entities applied to this portfolio." }
+      ]
+    },
+    "PortfolioFolder": {
+      "description": "Net-new grouping/hierarchy concept for organizing portfolios (Portfolios > Folder Setup).",
+      "source": "MOCK",
+      "fields": [
+        { "name": "id", "type": "string", "source": "MOCK" },
+        { "name": "name", "type": "string", "source": "MOCK" },
+        { "name": "parentFolderId", "type": "string | null", "source": "MOCK" },
+        { "name": "portfolioIds", "type": "string[]", "source": "MOCK" }
+      ]
+    },
+    "Instrument": {
+      "description": "Superset of the existing Security entity — adds SRD-required reference-data fields not currently tracked.",
+      "existingRealType": "Security (lib/api/investments-api.ts)",
+      "fields": [
+        { "name": "id", "type": "string", "source": "REAL" },
+        { "name": "symbol", "type": "string", "source": "REAL" },
+        { "name": "isin", "type": "string | null", "source": "REAL" },
+        { "name": "exchangeCode", "type": "string", "source": "REAL" },
+        { "name": "name", "type": "string", "source": "REAL" },
+        { "name": "listingCurrencyCode", "type": "string", "source": "REAL" },
+        { "name": "isActive", "type": "boolean", "source": "REAL" },
+        { "name": "country", "type": "string | null", "source": "MOCK", "note": "Needed for country-exposure charts on the Dashboard and Positions screen." },
+        { "name": "sector", "type": "string | null", "source": "MOCK", "note": "Needed for sector-exposure charts and Positions screen." },
+        { "name": "assetClass", "type": "string | null", "source": "MOCK" }
+      ]
+    },
+    "PriceTick": {
+      "description": "Unchanged real entity, listed for completeness — the reference UI's Prices screen expects bid/ask/volume fields this API does not have.",
+      "existingRealType": "PriceTick (lib/api/investments-api.ts)",
+      "fields": [
+        { "name": "id", "type": "string", "source": "REAL" },
+        { "name": "securityId", "type": "string", "source": "REAL" },
+        { "name": "price", "type": "string (decimal)", "source": "REAL" },
+        { "name": "previousClose", "type": "string (decimal) | null", "source": "REAL" },
+        { "name": "validationStatus", "type": "'APPROVED' | 'PENDING_REVIEW' | 'REJECTED'", "source": "REAL" },
+        { "name": "sourceStatus", "type": "'OK' | 'FALLBACK'", "source": "REAL" },
+        { "name": "bid", "type": "string (decimal) | null", "source": "MOCK", "note": "No bid/ask on PriceTick today." },
+        { "name": "ask", "type": "string (decimal) | null", "source": "MOCK" },
+        { "name": "volume", "type": "number | null", "source": "MOCK" }
+      ]
+    },
+    "Position": {
+      "description": "Superset of the existing Holding entity — adds P&L-bearing fields the Positions screen needs but the API doesn't provide. The frontend shows a muted \"—\" placeholder for these rather than fabricating numbers.",
+      "existingRealType": "Holding (lib/api/investments-api.ts)",
+      "fields": [
+        { "name": "id", "type": "string", "source": "REAL" },
+        { "name": "fundId", "type": "string", "source": "REAL" },
+        { "name": "securityId", "type": "string", "source": "REAL" },
+        { "name": "quantity", "type": "number", "source": "REAL" },
+        { "name": "wac", "type": "number", "source": "REAL" },
+        { "name": "wacCurrencyCode", "type": "string", "source": "REAL" },
+        { "name": "currentPrice", "type": "number | null", "source": "REAL" },
+        { "name": "marketValue", "type": "number | null", "source": "REAL" },
+        { "name": "unrealizedPnl", "type": "number | null", "source": "REAL" },
+        { "name": "currencyExposure", "type": "{ currencyCode: string, marketValue: number }[]", "source": "DERIVED", "note": "Computed client-side by grouping holdings by security.listingCurrencyCode — shown on the Dashboard." },
+        { "name": "country", "type": "string | null", "source": "MOCK", "note": "Shown as \"—\" until Instrument.country exists." },
+        { "name": "sector", "type": "string | null", "source": "MOCK" },
+        { "name": "realizedPnl", "type": "number | null", "source": "MOCK", "note": "No realized-P&L-per-position field exists; only fund-level realized P&L (PortfolioPnL.realized) is real." },
+        { "name": "openDate", "type": "string (ISO 8601) | null", "source": "MOCK" },
+        { "name": "weightPct", "type": "number | null", "source": "MOCK", "note": "Position as % of portfolio NAV — derivable server-side once cost basis is authoritative; currently not exposed." }
+      ]
+    },
+    "Order": {
+      "description": "Richer superset of the existing Trade entity, aligned to the SRD's aspirational order lifecycle. Two lifecycle states (COMPLIANCE_REVIEW, PARTIALLY_EXECUTED) are unreachable this phase since no real workflow produces them yet — see lifecycleMapping below.",
+      "existingRealType": "Trade (lib/api/investments-api.ts)",
+      "fields": [
+        { "name": "id", "type": "string", "source": "REAL" },
+        { "name": "tradeRef", "type": "string", "source": "REAL" },
+        { "name": "fundId", "type": "string", "source": "REAL" },
+        { "name": "securityId", "type": "string", "source": "REAL" },
+        { "name": "side", "type": "'BUY' | 'SELL'", "source": "REAL" },
+        { "name": "quantity", "type": "string (decimal)", "source": "REAL" },
+        { "name": "executionPrice", "type": "string (decimal)", "source": "REAL" },
+        { "name": "status", "type": "'DRAFT' | 'EXECUTED' | 'ROUTING' | 'SETTLED' | 'SETTLEMENT_FAILED' | 'CANCELLED'", "source": "REAL" },
+        { "name": "routingHops", "type": "RoutingHop[]", "source": "REAL" },
+        { "name": "settlementStatus", "type": "string", "source": "DERIVED", "note": "Computed client-side (lib/utils/order-status.ts) from the CUSTODIAN routing hop." },
+        { "name": "accountingStatus", "type": "string", "source": "DERIVED", "note": "Computed client-side from the ACCOUNTING_GL routing hop." },
+        { "name": "confirmationStatus", "type": "string", "source": "DERIVED", "note": "Computed client-side from the BROKER routing hop." },
+        { "name": "lifecycleStatus", "type": "'DRAFT' | 'SUBMITTED' | 'COMPLIANCE_REVIEW' | 'APPROVED' | 'SENT_TO_BROKER' | 'PARTIALLY_EXECUTED' | 'EXECUTED' | 'PENDING_SETTLEMENT' | 'SETTLED' | 'CANCELLED' | 'REJECTED' | 'FAILED' | 'ARCHIVED'", "source": "MOCK", "note": "SRD's full order lifecycle. Only a subset maps onto real Trade.status today; COMPLIANCE_REVIEW and PARTIALLY_EXECUTED are unreachable until a compliance workflow and partial-fill support exist." },
+        { "name": "complianceCheckIds", "type": "string[]", "source": "MOCK" }
+      ],
+      "lifecycleMapping": {
+        "DRAFT": "DRAFT",
+        "EXECUTED": "EXECUTED",
+        "ROUTING": "SENT_TO_BROKER",
+        "SETTLED": "SETTLED",
+        "SETTLEMENT_FAILED": "FAILED",
+        "CANCELLED": "CANCELLED",
+        "unreachableThisPhase": ["SUBMITTED", "COMPLIANCE_REVIEW", "APPROVED", "PARTIALLY_EXECUTED", "PENDING_SETTLEMENT", "REJECTED", "ARCHIVED"]
+      }
+    },
+    "ComplianceCheck": {
+      "description": "Net-new entity for pre/post-trade compliance rule evaluation (Orders > Compliance). No real backend support exists.",
+      "source": "MOCK",
+      "fields": [
+        { "name": "id", "type": "string", "source": "MOCK" },
+        { "name": "orderId", "type": "string | null", "source": "MOCK" },
+        { "name": "mandateRuleId", "type": "string", "source": "MOCK" },
+        { "name": "result", "type": "'PASS' | 'BREACH' | 'WARNING'", "source": "MOCK" },
+        { "name": "message", "type": "string", "source": "MOCK" },
+        { "name": "checkedAt", "type": "string (ISO 8601)", "source": "MOCK" }
+      ]
+    },
+    "MandateRule": {
+      "description": "Net-new entity for portfolio investment-mandate constraints (e.g. concentration limits, restricted securities) evaluated by ComplianceCheck. No real backend support exists.",
+      "source": "MOCK",
+      "fields": [
+        { "name": "id", "type": "string", "source": "MOCK" },
+        { "name": "portfolioId", "type": "string", "source": "MOCK" },
+        { "name": "name", "type": "string", "source": "MOCK" },
+        { "name": "ruleType", "type": "'MAX_POSITION_WEIGHT' | 'RESTRICTED_SECURITY' | 'MAX_SECTOR_EXPOSURE' | 'MAX_COUNTRY_EXPOSURE' | 'MIN_LIQUIDITY'", "source": "MOCK" },
+        { "name": "threshold", "type": "number | null", "source": "MOCK" },
+        { "name": "isActive", "type": "boolean", "source": "MOCK" }
+      ]
+    }
+  }
+}

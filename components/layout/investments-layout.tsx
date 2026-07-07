@@ -4,7 +4,8 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { usePathname } from "next/navigation"
 import { SharedTopbar } from "./shared-topbar"
-import { InvestmentsSidebar } from "./investments-sidebar"
+import { TerminalSidebar } from "@/components/investments/terminal/sidebar"
+import { InvestmentsThemeProvider } from "@/components/investments/terminal/theme-provider"
 import { MODULE_CONFIG, getModuleByPath } from "@/lib/config/modules"
 
 interface InvestmentsLayoutProps {
@@ -29,10 +30,14 @@ export function InvestmentsLayout({ children }: InvestmentsLayoutProps) {
   return (
     <div className="min-h-screen bg-background">
       <SharedTopbar onModuleSelect={handleModuleSelect} currentModule={currentModule} />
-      <div className="flex">
-        <InvestmentsSidebar />
-        <main className="flex-1 overflow-auto">{children}</main>
-      </div>
+      <InvestmentsThemeProvider>
+        <div className="h-[calc(100vh-5rem)] flex overflow-hidden p-2 gap-2 bg-background">
+          <TerminalSidebar />
+          <main className="flex-1 flex flex-col overflow-hidden min-w-0 rounded-2xl border border-border bg-card">
+            <div className="flex-1 overflow-y-auto">{children}</div>
+          </main>
+        </div>
+      </InvestmentsThemeProvider>
     </div>
   )
 }

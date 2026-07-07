@@ -58,7 +58,7 @@ export function OrderTicketPanel() {
   const dispatch = useAppDispatch()
   const { securities, latestPrices, selectedFundId, funds, executing, ingestRunning, valuationRunning } = useAppSelector((s) => s.investments)
   const { hasSubModuleAccess } = useRolePermissions()
-  const isAdmin = hasSubModuleAccess("investments", "investments-market-data")
+  const isAdmin = hasSubModuleAccess("investments", "investments-portfolios-prices")
 
   const watchlist = useMemo(() => securities.filter((s) => s.isActive), [securities])
   const [securityId, setSecurityId] = useState(() => watchlist[0]?.id ?? "")

@@ -4,27 +4,26 @@ import { useEffect } from "react"
 import { useAppDispatch, useAppSelector } from "@/lib/store"
 import {
   fetchFunds, fetchFundHoldings, fetchFundPnL, fetchSecurities, fetchLatestPrices,
-  fetchTrades, fetchValidationQueue, setSelectedFundId, setExecuteTradeModalOpen,
+  fetchTrades, fetchValidationQueue, setSelectedFundId, setPnlPeriod,
 } from "@/lib/store/slices/investmentsSlice"
 import { WatchlistPane } from "./watchlist-pane"
 import { HoldingsPane } from "./holdings-pane"
 import { RoutingBar } from "./routing-bar"
-import { ExecuteTradeModal } from "./execute-trade-modal"
 import { SecurityPriceDrawer } from "./security-price-drawer"
 import { TerminalKpiCards } from "./terminal-kpi-cards"
 import { TerminalPriceChart } from "./terminal-price-chart"
 import { HoldingsAllocationChart } from "./holdings-allocation-chart"
+import { CurrencyExposureChart } from "./currency-exposure-chart"
 import { TerminalAlertsFeed } from "./terminal-alerts-feed"
-import { OrderTicketPanel } from "./order-ticket-panel"
-import { PageHeader } from "./page-header"
+import { TerminalTopbar } from "@/components/investments/terminal/topbar"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Dot, RefreshCw, Plus } from "lucide-react"
+import { Dot, RefreshCw } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Delta } from "./status-pills"
+import { Button } from "@/components/ui/button"
 
 export function UnifiedTerminal() {
   const dispatch = useAppDispatch()
-  const { funds, fundsLoading, selectedFundId, pnl, executeTradeModalOpen, priceDrawerOpen } = useAppSelector((s) => s.investments)
+  const { funds, fundsLoading, selectedFundId, pnl, pnlPeriod, priceDrawerOpen } = useAppSelector((s) => s.investments)
 
   const selectedFund = funds.find((f) => f.id === selectedFundId)
 
@@ -38,6 +37,12 @@ export function UnifiedTerminal() {
       dispatch(fetchFundHoldings(selectedFundId))
       dispatch(fetchFundPnL({ fundId: selectedFundId }))
     }
+  }
+
+  const handlePeriodChange = (p: string) => {
+    const period = p as "MTD" | "QTD" | "YTD"
+    dispatch(setPnlPeriod(period))
+    if (selectedFundId) dispatch(fetchFundPnL({ fundId: selectedFundId, period }))
   }
 
   useEffect(() => {
@@ -63,17 +68,20 @@ export function UnifiedTerminal() {
   }, [dispatch, selectedFundId])
 
   return (
-    <div className="min-h-screen space-y-5 p-4 md:p-6">
-      <PageHeader
-        title="Market Terminal"
-        subtitle="Real-time watchlist, holdings, and trade routing"
+    <div className="space-y-5">
+      <TerminalTopbar
+        title="Dashboard"
+        subtitle="Investment operations overview"
+        showPeriod
+        period={pnlPeriod}
+        onPeriodChange={handlePeriodChange}
         actions={
           <>
             {fundsLoading ? (
-              <Skeleton className="h-9 w-48" />
+              <Skeleton className="h-8 w-40" />
             ) : (
               <Select value={selectedFundId ?? ""} onValueChange={(v) => dispatch(setSelectedFundId(v))}>
-                <SelectTrigger className="w-48 h-9 text-sm bg-card border-border">
+                <SelectTrigger className="h-8 w-40 text-xs bg-muted/50 border-border">
                   <SelectValue placeholder="Select fund…" />
                 </SelectTrigger>
                 <SelectContent>
@@ -86,14 +94,14 @@ export function UnifiedTerminal() {
 
             {selectedFund && (
               <>
-                <span className="inline-flex items-center rounded-lg border border-border bg-card px-3 py-2 font-mono text-xs font-medium text-foreground">
+                <span className="inline-flex items-center rounded-full border border-border bg-muted/50 px-2.5 py-1 font-mono text-[11px] font-medium text-foreground">
                   {selectedFund.base_currency}
                 </span>
-                <span className="font-mono text-sm font-semibold whitespace-nowrap text-foreground">
+                <span className="hidden font-mono text-xs font-semibold whitespace-nowrap text-foreground sm:inline">
                   NAV {selectedFund.base_currency} {selectedFund.nav?.toLocaleString("en-US", { minimumFractionDigits: 2 })}
                 </span>
                 {pnl?.unrealized && (
-                  <span className="inline-flex items-center gap-1 rounded-lg bg-muted px-3 py-2 font-mono text-xs font-medium text-muted-foreground">
+                  <span className="hidden items-center gap-1 rounded-full bg-muted/50 px-2.5 py-1 font-mono text-[11px] font-medium text-muted-foreground sm:inline-flex">
                     <Dot className="w-2 h-2 text-warn" />
                     ZiG {pnl.unrealized.fxRateUsed.toFixed(4)}
                   </span>
@@ -101,18 +109,9 @@ export function UnifiedTerminal() {
               </>
             )}
 
-            <button
-              onClick={refreshAll}
-              className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium text-foreground hover:bg-muted"
-            >
+            <Button variant="ghost" size="icon" className="size-8 rounded-full text-muted-foreground" onClick={refreshAll}>
               <RefreshCw className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => dispatch(setExecuteTradeModalOpen(true))}
-              className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
-            >
-              <Plus className="h-4 w-4" /> New Trade
-            </button>
+            </Button>
           </>
         }
       />
@@ -127,27 +126,26 @@ export function UnifiedTerminal() {
         <HoldingsAllocationChart />
       </div>
 
-      {/* Watchlist + order ticket + feed */}
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
-        <div className="lg:col-span-5">
-          <div className="h-[520px]">
-            <WatchlistPane />
-          </div>
+      {/* Currency exposure — real data, derived from holdings */}
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
+        <div className="xl:col-span-1">
+          <CurrencyExposureChart />
         </div>
-        <div className="lg:col-span-4">
-          <OrderTicketPanel />
-        </div>
-        <div className="lg:col-span-3">
-          <div className="h-[520px]">
+        <div className="xl:col-span-2">
+          <div className="h-[280px]">
             <TerminalAlertsFeed />
           </div>
         </div>
       </div>
 
+      {/* Watchlist */}
+      <div className="h-[520px]">
+        <WatchlistPane />
+      </div>
+
       <HoldingsPane />
       <RoutingBar />
 
-      {executeTradeModalOpen && <ExecuteTradeModal />}
       {priceDrawerOpen && <SecurityPriceDrawer />}
     </div>
   )

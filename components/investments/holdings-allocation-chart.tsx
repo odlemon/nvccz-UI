@@ -6,6 +6,7 @@ import { effectiveHoldingValue } from "@/lib/api/investments-api"
 import { Skeleton } from "@/components/ui/skeleton"
 import { PieChart as PieChartIcon } from "lucide-react"
 import { ResponsiveContainer, PieChart, Pie, Cell } from "recharts"
+import { TerminalCard } from "@/components/investments/terminal/card"
 
 const COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)", "var(--flat)"]
 
@@ -25,12 +26,9 @@ export function HoldingsAllocationChart() {
   const total = data.reduce((s, d) => s + d.value, 0)
 
   return (
-    <div className="rounded-2xl border border-border bg-card p-5">
-      <h2 className="text-sm font-semibold text-foreground">Allocation by Security</h2>
-      <p className="text-xs text-muted-foreground">Market value distribution</p>
-
+    <TerminalCard header={{ title: "Allocation by Security", subtitle: "Market value distribution" }} bodyClassName="p-4">
       {holdingsLoading ? (
-        <div className="mt-3 flex items-center gap-4">
+        <div className="flex items-center gap-4">
           <Skeleton className="h-32 w-32 rounded-full shrink-0" />
           <div className="flex-1 space-y-2">
             {[1, 2, 3].map((i) => <Skeleton key={i} className="h-4 w-full rounded" />)}
@@ -42,7 +40,7 @@ export function HoldingsAllocationChart() {
           <p className="text-xs text-muted-foreground">No holdings to allocate yet</p>
         </div>
       ) : (
-        <div className="mt-3 flex items-center gap-4">
+        <div className="flex items-center gap-4">
           <div className="relative h-32 w-32 shrink-0">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
@@ -82,6 +80,6 @@ export function HoldingsAllocationChart() {
           </ul>
         </div>
       )}
-    </div>
+    </TerminalCard>
   )
 }

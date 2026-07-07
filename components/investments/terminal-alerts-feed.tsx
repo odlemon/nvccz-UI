@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { useAppSelector } from "@/lib/store"
 import { AlertTriangle, CheckCircle2, Info, XCircle, type LucideIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { TerminalCard } from "@/components/investments/terminal/card"
 
 const TARGET_LABELS: Record<string, string> = {
   BROKER: "Broker Gateway",
@@ -67,15 +68,18 @@ export function TerminalAlertsFeed() {
   const actionCount = rows.filter((r) => r.severity === "error" || r.severity === "warn").length
 
   return (
-    <div className="flex h-full flex-col rounded-2xl border border-border bg-card">
-      <div className="flex items-center justify-between border-b border-border px-5 py-4">
-        <h2 className="text-sm font-semibold text-foreground">Operations Feed</h2>
-        {rows.length > 0 && (
+    <TerminalCard
+      className="h-full"
+      bodyClassName="flex min-h-0 flex-1 flex-col"
+      header={{
+        title: "Operations Feed",
+        actions: rows.length > 0 ? (
           <span className="rounded-full bg-loss-muted px-2 py-0.5 text-[11px] font-medium text-loss-foreground">
             {actionCount} action
           </span>
-        )}
-      </div>
+        ) : undefined,
+      }}
+    >
       {rows.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center text-center">
           <CheckCircle2 className="w-8 h-8 text-gain/40 mb-2" />
@@ -86,7 +90,7 @@ export function TerminalAlertsFeed() {
           {rows.map((a) => {
             const c = CONFIG[a.severity]
             return (
-              <li key={a.id} className="flex gap-3 px-5 py-3 hover:bg-muted/40 cursor-pointer" onClick={() => router.push("/investments/trades")}>
+              <li key={a.id} className="flex gap-3 px-5 py-3 hover:bg-muted/40 cursor-pointer" onClick={() => router.push("/investments/orders/blotter")}>
                 <span className={cn("mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg", c.wrap)}>
                   <c.icon className={cn("h-4 w-4", c.icon_c)} />
                 </span>
@@ -106,6 +110,6 @@ export function TerminalAlertsFeed() {
           })}
         </ul>
       )}
-    </div>
+    </TerminalCard>
   )
 }

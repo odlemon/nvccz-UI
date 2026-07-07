@@ -1,0 +1,741 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.5);
+  --radius-md: calc(var(--radius) * 1);
+  --radius-lg: calc(var(--radius) * 1.5);
+  --radius-xl: calc(var(--radius) * 2);
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Courier New', monospace;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Investments Terminal Theme — Scoped to .investments-terminal
+   Dark theme by default, light theme via .light class
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.investments-terminal {
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* ── Dark Theme (Default) ──────────────────────────────────────── */
+.investments-terminal.dark {
+  color-scheme: dark;
+
+  /* Base */
+  --background: #111318;
+  --foreground: #e2e8f0;
+  --card: #1a1d24;
+  --card-foreground: #e2e8f0;
+  --popover: #1a1d24;
+  --popover-foreground: #e2e8f0;
+  --primary: #3b82f6;
+  --primary-foreground: #ffffff;
+  --secondary: #1e2330;
+  --secondary-foreground: #94a3b8;
+  --muted: #1e2330;
+  --muted-foreground: #64748b;
+  --accent: #1e3a5f;
+  --accent-foreground: #93c5fd;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --border: rgba(255,255,255,0.06);
+  --input: rgba(255,255,255,0.07);
+  --ring: #3b82f6;
+  --radius: 0.5rem;
+
+  /* Charts */
+  --chart-1: #3b82f6;
+  --chart-2: #8b5cf6;
+  --chart-3: #06b6d4;
+  --chart-4: #10b981;
+  --chart-5: #f59e0b;
+
+  /* Sidebar */
+  --sidebar: #0e1117;
+  --sidebar-foreground: #94a3b8;
+  --sidebar-primary: #3b82f6;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #1e2330;
+  --sidebar-accent-foreground: #e2e8f0;
+  --sidebar-border: rgba(255,255,255,0.05);
+  --sidebar-ring: #3b82f6;
+}
+
+/* ── Light Theme ───────────────────────────────────────────────── */
+.investments-terminal.light {
+  color-scheme: light;
+
+  /* Base */
+  --background: #f4f6fa;
+  --foreground: #1a2233;
+  --card: #ffffff;
+  --card-foreground: #1a2233;
+  --popover: #ffffff;
+  --popover-foreground: #1a2233;
+  --primary: #2563eb;
+  --primary-foreground: #ffffff;
+  --secondary: #eef1f6;
+  --secondary-foreground: #47536b;
+  --muted: #eef1f6;
+  --muted-foreground: #64748b;
+  --accent: #dbeafe;
+  --accent-foreground: #1e3a8a;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --border: rgba(15, 23, 42, 0.08);
+  --input: rgba(15, 23, 42, 0.10);
+  --ring: #2563eb;
+  --radius: 0.5rem;
+
+  /* Charts */
+  --chart-1: #2563eb;
+  --chart-2: #7c3aed;
+  --chart-3: #0891b2;
+  --chart-4: #059669;
+  --chart-5: #d97706;
+
+  /* Sidebar */
+  --sidebar: #ffffff;
+  --sidebar-foreground: #47536b;
+  --sidebar-primary: #2563eb;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #eef1f6;
+  --sidebar-accent-foreground: #1a2233;
+  --sidebar-border: rgba(15, 23, 42, 0.06);
+  --sidebar-ring: #2563eb;
+}
+
+@layer base {
+  .investments-terminal * {
+    @apply border-border outline-ring/50;
+  }
+  
+  .investments-terminal {
+    @apply bg-background text-foreground;
+  }
+
+  /* Thin scrollbars for both themes */
+  .investments-terminal.dark ::-webkit-scrollbar { width: 4px; height: 4px; }
+  .investments-terminal.dark ::-webkit-scrollbar-track { background: transparent; }
+  .investments-terminal.dark ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
+  .investments-terminal.dark ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.15); }
+
+  .investments-terminal.light ::-webkit-scrollbar { width: 4px; height: 4px; }
+  .investments-terminal.light ::-webkit-scrollbar-track { background: transparent; }
+  .investments-terminal.light ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 2px; }
+  .investments-terminal.light ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.2); }
+}
+
+/* ── Arcus Table ─────────────────────────────────────────────── */
+.arcus-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.arcus-table th {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  padding: 9px 16px;
+  text-align: left;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  white-space: nowrap;
+  background: #14161e;
+}
+.arcus-table td {
+  padding: 10px 16px;
+  font-size: 12.5px;
+  color: #cbd5e1;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  white-space: nowrap;
+}
+.arcus-table tr:hover td {
+  background: rgba(59,130,246,0.05);
+}
+
+/* ── Arcus Card ──────────────────────────────────────────────── */
+.arcus-card {
+  background: #1a1d24;
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 16px;
+  overflow: hidden;
+}
+.arcus-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+/* ── Badges ──────────────────────────────────────────────────── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 9px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.badge-green  { background: rgba(16,185,129,0.15); color: #10b981; }
+.badge-red    { background: rgba(239,68,68,0.15);  color: #ef4444; }
+.badge-yellow { background: rgba(245,158,11,0.15); color: #f59e0b; }
+.badge-blue   { background: rgba(59,130,246,0.15); color: #60a5fa; }
+.badge-gray   { background: rgba(100,116,139,0.15); color: #94a3b8; }
+
+/* ── Pill tabs (Orderbook/New/Pending…) ──────────────────────── */
+.pill-tabs {
+  display: flex;
+  gap: 0;
+}
+.pill-tab {
+  padding: 5px 16px;
+  font-size: 12px;
+  color: #64748b;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color .15s, border-color .15s;
+  white-space: nowrap;
+}
+.pill-tab:hover { color: #94a3b8; }
+.pill-tab.active {
+  color: #3b82f6;
+  border-bottom-color: #3b82f6;
+}
+
+/* ── Category filter pills (Equity/Fund/Cash…) ───────────────── */
+.cat-pill {
+  padding: 5px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+  white-space: nowrap;
+  background: #1e2330;
+  color: #94a3b8;
+}
+.cat-pill:hover { background: #252b3b; color: #cbd5e1; }
+.cat-pill.active { background: #3b82f6; color: #fff; }
+
+/* ── Pagination ──────────────────────────────────────────────── */
+.pg-btn {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 500;
+  color: #64748b;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.pg-btn:hover { background: #1e2330; color: #94a3b8; }
+.pg-btn.active { background: #3b82f6; color: #fff; }
+
+/* ── Action buttons ──────────────────────────────────────────── */
+.btn-white {
+  background: #fff;
+  color: #0f172a;
+  border-radius: 20px;
+  padding: 5px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .15s;
+}
+.btn-white:hover { background: #f1f5f9; }
+
+.btn-outline {
+  background: transparent;
+  color: #94a3b8;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 20px;
+  padding: 5px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .15s, color .15s;
+}
+.btn-outline:hover { background: #1e2330; color: #cbd5e1; }
+
+.btn-blue {
+  background: #3b82f6;
+  color: #fff;
+  border-radius: 20px;
+  padding: 5px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .15s;
+}
+.btn-blue:hover { background: #2563eb; }
+
+/* ── Sort dropdown pill ──────────────────────────────────────── */
+.sort-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #1e2330;
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 20px;
+  padding: 4px 12px;
+  font-size: 12px;
+  color: #94a3b8;
+  cursor: pointer;
+}
+
+/* ── Portfolio folder tabs ───────────────────────────────────── */
+.folder-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 16px;
+  border-radius: 22px;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .15s, color .15s, border-color .15s;
+  border: 1px solid rgba(255,255,255,0.1);
+  color: #94a3b8;
+  background: #1a1d24;
+}
+.folder-tab:hover { background: #232733; color: #cbd5e1; border-color: rgba(255,255,255,0.15); }
+.folder-tab.active {
+  background: #3b82f6;
+  color: #fff;
+  border-color: #3b82f6;
+  font-weight: 600;
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Component Styles — Tables, Cards, Buttons, Badges
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Arcus Table (Dark) ────────────────────────────────────────── */
+.investments-terminal.dark .arcus-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.investments-terminal.dark .arcus-table th {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  padding: 9px 16px;
+  text-align: left;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  white-space: nowrap;
+  background: #14161e;
+}
+.investments-terminal.dark .arcus-table td {
+  padding: 10px 16px;
+  font-size: 12.5px;
+  color: #cbd5e1;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  white-space: nowrap;
+}
+.investments-terminal.dark .arcus-table tr:hover td {
+  background: rgba(59,130,246,0.05);
+}
+
+/* ── Arcus Table (Light) ───────────────────────────────────────── */
+.investments-terminal.light .arcus-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.investments-terminal.light .arcus-table th {
+  color: #475569;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  padding: 9px 16px;
+  text-align: left;
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+  white-space: nowrap;
+  background: #f8fafc;
+}
+.investments-terminal.light .arcus-table td {
+  padding: 10px 16px;
+  font-size: 12.5px;
+  color: #1e293b;
+  font-weight: 500;
+  border-bottom: 1px solid rgba(0,0,0,0.05);
+  white-space: nowrap;
+}
+.investments-terminal.light .arcus-table tr:hover td {
+  background: rgba(37,99,235,0.05);
+}
+
+/* ── Arcus Card (Dark) ─────────────────────────────────────────── */
+.investments-terminal.dark .arcus-card {
+  background: #1a1d24;
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 16px;
+  overflow: hidden;
+}
+.investments-terminal.dark .arcus-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+/* ── Arcus Card (Light) ────────────────────────────────────────── */
+.investments-terminal.light .arcus-card {
+  background: #ffffff;
+  border: 1px solid rgba(0,0,0,0.08);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+.investments-terminal.light .arcus-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px 12px;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+}
+
+/* ── Badges ────────────────────────────────────────────────────── */
+.investments-terminal .badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 9px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.investments-terminal .badge-green  { background: rgba(16,185,129,0.15); color: #10b981; }
+.investments-terminal .badge-red    { background: rgba(239,68,68,0.15);  color: #ef4444; }
+.investments-terminal .badge-yellow { background: rgba(245,158,11,0.15); color: #f59e0b; }
+.investments-terminal .badge-blue   { background: rgba(59,130,246,0.15); color: #60a5fa; }
+.investments-terminal .badge-gray   { background: rgba(100,116,139,0.15); color: #94a3b8; }
+
+/* ── Pill Tabs ─────────────────────────────────────────────────── */
+.investments-terminal .pill-tabs {
+  display: flex;
+  gap: 0;
+}
+.investments-terminal.dark .pill-tab {
+  padding: 5px 16px;
+  font-size: 12px;
+  color: #64748b;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color .15s, border-color .15s;
+  white-space: nowrap;
+}
+.investments-terminal.dark .pill-tab:hover { color: #94a3b8; }
+.investments-terminal.dark .pill-tab.active {
+  color: #3b82f6;
+  border-bottom-color: #3b82f6;
+}
+
+.investments-terminal.light .pill-tab {
+  padding: 5px 16px;
+  font-size: 12px;
+  color: #64748b;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color .15s, border-color .15s;
+  white-space: nowrap;
+}
+.investments-terminal.light .pill-tab:hover { color: #475569; }
+.investments-terminal.light .pill-tab.active {
+  color: #2563eb;
+  border-bottom-color: #2563eb;
+}
+
+/* ── Category Pills (Dark) ─────────────────────────────────────── */
+.investments-terminal.dark .cat-pill {
+  padding: 5px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+  white-space: nowrap;
+  background: #1e2330;
+  color: #94a3b8;
+}
+.investments-terminal.dark .cat-pill:hover { background: #252b3b; color: #cbd5e1; }
+.investments-terminal.dark .cat-pill.active { background: #3b82f6; color: #fff; }
+
+/* ── Category Pills (Light) ────────────────────────────────────── */
+.investments-terminal.light .cat-pill {
+  padding: 5px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+  white-space: nowrap;
+  background: #eef1f6;
+  color: #64748b;
+}
+.investments-terminal.light .cat-pill:hover { background: #dde4ee; color: #475569; }
+.investments-terminal.light .cat-pill.active { background: #2563eb; color: #fff; }
+
+/* ── Pagination ────────────────────────────────────────────────── */
+.investments-terminal.dark .pg-btn {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 500;
+  color: #64748b;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.investments-terminal.dark .pg-btn:hover { background: #1e2330; color: #94a3b8; }
+.investments-terminal.dark .pg-btn.active { background: #3b82f6; color: #fff; }
+
+.investments-terminal.light .pg-btn {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 500;
+  color: #64748b;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.investments-terminal.light .pg-btn:hover { background: #eef1f6; color: #475569; }
+.investments-terminal.light .pg-btn.active { background: #2563eb; color: #fff; }
+
+/* ── Buttons (Dark) ────────────────────────────────────────────── */
+.investments-terminal.dark .btn-white {
+  background: #fff;
+  color: #0f172a;
+  border-radius: 20px;
+  padding: 5px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .15s;
+}
+.investments-terminal.dark .btn-white:hover { background: #f1f5f9; }
+
+.investments-terminal.dark .btn-outline {
+  background: transparent;
+  color: #94a3b8;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 20px;
+  padding: 5px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .15s, color .15s;
+}
+.investments-terminal.dark .btn-outline:hover { background: #1e2330; color: #cbd5e1; }
+
+.investments-terminal.dark .btn-blue {
+  background: #3b82f6;
+  color: #fff;
+  border-radius: 20px;
+  padding: 5px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .15s;
+}
+.investments-terminal.dark .btn-blue:hover { background: #2563eb; }
+
+/* ── Buttons (Light) ───────────────────────────────────────────── */
+.investments-terminal.light .btn-white {
+  background: #ffffff;
+  color: #0f172a;
+  border: 1px solid rgba(0,0,0,0.1);
+  border-radius: 20px;
+  padding: 5px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .15s, border-color .15s;
+}
+.investments-terminal.light .btn-white:hover { background: #f8fafc; border-color: rgba(0,0,0,0.15); }
+
+.investments-terminal.light .btn-outline {
+  background: transparent;
+  color: #64748b;
+  border: 1px solid rgba(0,0,0,0.15);
+  border-radius: 20px;
+  padding: 5px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .15s, color .15s;
+}
+.investments-terminal.light .btn-outline:hover { background: #f8fafc; color: #475569; }
+
+.investments-terminal.light .btn-blue {
+  background: #2563eb;
+  color: #fff;
+  border-radius: 20px;
+  padding: 5px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .15s;
+}
+.investments-terminal.light .btn-blue:hover { background: #1d4ed8; }
+
+/* ── Sort Pill (Dark) ──────────────────────────────────────────── */
+.investments-terminal.dark .sort-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #1e2330;
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 20px;
+  padding: 4px 12px;
+  font-size: 12px;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: background .15s;
+}
+.investments-terminal.dark .sort-pill:hover { background: #252b3b; }
+
+/* ── Sort Pill (Light) ─────────────────────────────────────────── */
+.investments-terminal.light .sort-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #eef1f6;
+  border: 1px solid rgba(0,0,0,0.08);
+  border-radius: 20px;
+  padding: 4px 12px;
+  font-size: 12px;
+  color: #64748b;
+  cursor: pointer;
+  transition: background .15s;
+}
+.investments-terminal.light .sort-pill:hover { background: #dde4ee; }
+
+/* ── Folder Tabs (Dark) ────────────────────────────────────────── */
+.investments-terminal.dark .folder-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 16px;
+  border-radius: 22px;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .15s, color .15s, border-color .15s;
+  border: 1px solid rgba(255,255,255,0.1);
+  color: #94a3b8;
+  background: #1a1d24;
+}
+.investments-terminal.dark .folder-tab:hover { background: #232733; color: #cbd5e1; border-color: rgba(255,255,255,0.15); }
+.investments-terminal.dark .folder-tab.active {
+  background: #3b82f6;
+  color: #fff;
+  border-color: #3b82f6;
+  font-weight: 600;
+}
+
+/* ── Folder Tabs (Light) ───────────────────────────────────────── */
+.investments-terminal.light .folder-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 16px;
+  border-radius: 22px;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .15s, color .15s, border-color .15s;
+  border: 1px solid rgba(0,0,0,0.12);
+  color: #64748b;
+  background: #ffffff;
+}
+.investments-terminal.light .folder-tab:hover { background: #f8fafc; color: #475569; border-color: rgba(0,0,0,0.18); }
+.investments-terminal.light .folder-tab.active {
+  background: #2563eb;
+  color: #fff;
+  border-color: #2563eb;
+  font-weight: 600;
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Sidebar Navigation Hover Effects
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.investments-terminal.dark aside a:hover,
+.investments-terminal.dark aside button:hover {
+  background: rgba(59,130,246,0.08) !important;
+  color: #94a3b8 !important;
+}
+
+.investments-terminal.light aside a:hover,
+.investments-terminal.light aside button:hover {
+  background: rgba(37,99,235,0.06) !important;
+  color: #475569 !important;
+}

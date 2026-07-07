@@ -171,7 +171,7 @@ export function ExecuteTradeModal() {
               </Popover>
 
               {isPendingReview && (
-                <div className="flex items-center gap-1.5 text-xs text-amber-600 bg-amber-50 px-2 py-1.5 rounded">
+                <div className="flex items-center gap-1.5 text-xs text-warn-foreground bg-warn-muted px-2 py-1.5 rounded">
                   <AlertTriangle className="w-3.5 h-3.5" />
                   Price tick pending review — execution blocked until approved
                 </div>
@@ -181,11 +181,11 @@ export function ExecuteTradeModal() {
             {/* BUY/SELL toggle */}
             <div className="space-y-1.5">
               <Label className="text-xs">Side</Label>
-              <div className="flex rounded-md overflow-hidden border">
+              <div className="flex rounded-md overflow-hidden border border-border">
                 <button
                   type="button"
                   className={cn("flex-1 h-9 text-sm font-medium transition-colors flex items-center justify-center gap-1.5",
-                    side === "BUY" ? "bg-emerald-600 text-white" : "bg-white text-slate-600 hover:bg-slate-50")}
+                    side === "BUY" ? "bg-gain text-white" : "bg-background text-muted-foreground hover:bg-muted")}
                   onClick={() => setSide("BUY")}
                 >
                   <TrendingUp className="w-3.5 h-3.5" /> BUY
@@ -193,7 +193,7 @@ export function ExecuteTradeModal() {
                 <button
                   type="button"
                   className={cn("flex-1 h-9 text-sm font-medium transition-colors flex items-center justify-center gap-1.5",
-                    side === "SELL" ? "bg-red-600 text-white" : "bg-white text-slate-600 hover:bg-slate-50")}
+                    side === "SELL" ? "bg-loss text-white" : "bg-background text-muted-foreground hover:bg-muted")}
                   onClick={() => setSide("SELL")}
                 >
                   <TrendingDown className="w-3.5 h-3.5" /> SELL
@@ -236,40 +236,40 @@ export function ExecuteTradeModal() {
             </div>
 
             {grossAmount > 0 && (
-              <div className="bg-slate-50 rounded px-3 py-2 text-xs flex justify-between">
-                <span className="text-slate-500">Gross Amount</span>
-                <span className="font-mono font-semibold">{grossAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+              <div className="bg-muted rounded px-3 py-2 text-xs flex justify-between">
+                <span className="text-muted-foreground">Gross Amount</span>
+                <span className="font-mono font-semibold text-foreground">{grossAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
               </div>
             )}
           </div>
         ) : (
           /* Confirm step — quad-target preview */
           <div className="space-y-4 py-2">
-            <div className="bg-slate-50 rounded-lg p-3 space-y-2 text-sm">
+            <div className="bg-muted rounded-lg p-3 space-y-2 text-sm">
               <div className="flex justify-between">
-                <span className="text-slate-500">Security</span>
-                <span className="font-mono font-medium">{selectedSecurity?.symbol} — {selectedSecurity?.exchangeCode}</span>
+                <span className="text-muted-foreground">Security</span>
+                <span className="font-mono font-medium text-foreground">{selectedSecurity?.symbol} — {selectedSecurity?.exchangeCode}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-500">Side</span>
-                <Badge className={cn("font-mono", side === "BUY" ? "bg-emerald-600" : "bg-red-600")}>{side}</Badge>
+                <span className="text-muted-foreground">Side</span>
+                <Badge className={cn("font-mono text-white", side === "BUY" ? "bg-gain" : "bg-loss")}>{side}</Badge>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-500">Quantity</span>
-                <span className="font-mono">{Number(quantity).toLocaleString()}</span>
+                <span className="text-muted-foreground">Quantity</span>
+                <span className="font-mono text-foreground">{Number(quantity).toLocaleString()}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-500">Price</span>
-                <span className="font-mono">{Number(executionPrice).toFixed(4)}</span>
+                <span className="text-muted-foreground">Price</span>
+                <span className="font-mono text-foreground">{Number(executionPrice).toFixed(4)}</span>
               </div>
               <div className="flex justify-between font-semibold">
-                <span className="text-slate-600">Gross Total</span>
-                <span className="font-mono">{grossAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                <span className="text-foreground">Gross Total</span>
+                <span className="font-mono text-foreground">{grossAmount.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
               </div>
             </div>
 
             <div>
-              <p className="text-xs font-medium text-slate-500 mb-2">Routing Preview</p>
+              <p className="text-xs font-medium text-muted-foreground mb-2">Routing Preview</p>
               <RoutingPipeline mode="compact" hops={PREVIEW_HOPS} />
             </div>
           </div>
@@ -280,7 +280,7 @@ export function ExecuteTradeModal() {
             {step === "confirm" ? "Back" : "Cancel"}
           </Button>
           <Button
-            className={cn("gradient-primary text-white", side === "SELL" && step === "confirm" && "from-red-600 to-red-700")}
+            className={cn("text-white", side === "SELL" && step === "confirm" ? "bg-loss hover:bg-loss/90" : "bg-primary hover:bg-primary/90")}
             onClick={handleSubmit}
             disabled={!canSubmit || executing}
           >

@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton"
 import { LineChart as LineChartIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { TerminalCard } from "@/components/investments/terminal/card"
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as ReTooltip,
 } from "recharts"
@@ -57,36 +58,35 @@ export function TerminalPriceChart() {
   const change = priceChange(latest)
 
   return (
-    <div className="rounded-2xl border border-border bg-card p-5">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-sm font-medium text-muted-foreground">
-            {focusSecurity ? `${focusSecurity.symbol} — Price History` : "Market Chart"}
-          </p>
-          {latest && (
-            <div className="mt-1 flex items-baseline gap-3">
-              <span className="font-mono text-3xl font-semibold tracking-tight text-foreground">
-                {change.price?.toFixed(4)}
-              </span>
-              <span className={cn("font-mono text-sm font-semibold", change.direction === "UP" ? "text-gain" : change.direction === "DOWN" ? "text-loss" : "text-muted-foreground")}>
-                {change.pct != null ? `${change.pct >= 0 ? "+" : ""}${change.pct.toFixed(2)}%` : "—"}
-              </span>
-            </div>
-          )}
-        </div>
-        <Select value={dashboardFocusSecurityId ?? ""} onValueChange={(v) => dispatch(setDashboardFocusSecurityId(v))}>
-          <SelectTrigger className="h-9 w-36 text-xs bg-muted/50 border-border">
-            <SelectValue placeholder="Select security…" />
-          </SelectTrigger>
-          <SelectContent>
-            {watchlist.map((s) => (
-              <SelectItem key={s.id} value={s.id}>{s.symbol}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="mt-4 h-64 w-full">
+    <TerminalCard
+      header={{
+        title: focusSecurity ? `${focusSecurity.symbol} — Price History` : "Market Chart",
+        subtitle: latest ? (
+          <span className="flex items-baseline gap-2">
+            <span className="font-mono text-lg font-semibold tracking-tight text-foreground">
+              {change.price?.toFixed(4)}
+            </span>
+            <span className={cn("font-mono text-xs font-semibold", change.direction === "UP" ? "text-gain" : change.direction === "DOWN" ? "text-loss" : "text-muted-foreground")}>
+              {change.pct != null ? `${change.pct >= 0 ? "+" : ""}${change.pct.toFixed(2)}%` : "—"}
+            </span>
+          </span>
+        ) : undefined,
+        actions: (
+          <Select value={dashboardFocusSecurityId ?? ""} onValueChange={(v) => dispatch(setDashboardFocusSecurityId(v))}>
+            <SelectTrigger className="h-8 w-32 text-xs bg-muted/50 border-border">
+              <SelectValue placeholder="Select security…" />
+            </SelectTrigger>
+            <SelectContent>
+              {watchlist.map((s) => (
+                <SelectItem key={s.id} value={s.id}>{s.symbol}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ),
+      }}
+      bodyClassName="p-4"
+    >
+      <div className="h-64 w-full">
         {priceHistoryLoading ? (
           <Skeleton className="h-full w-full rounded-lg" />
         ) : chartData.length === 0 ? (
@@ -122,6 +122,6 @@ export function TerminalPriceChart() {
           </ResponsiveContainer>
         )}
       </div>
-    </div>
+    </TerminalCard>
   )
 }

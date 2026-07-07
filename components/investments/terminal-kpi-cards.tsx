@@ -2,13 +2,10 @@
 
 import { format } from "date-fns"
 import { useMemo } from "react"
-import { useAppDispatch, useAppSelector } from "@/lib/store"
-import { setPnlPeriod, fetchFundPnL } from "@/lib/store/slices/investmentsSlice"
+import { useAppSelector } from "@/lib/store"
 import { effectiveHoldingValue, holdingCostBasis } from "@/lib/api/investments-api"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowDownRight, ArrowUpRight, Wallet, TrendingUp, Coins, Layers, type LucideIcon } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { Wallet, TrendingUp, Coins, Layers, type LucideIcon } from "lucide-react"
+import { TerminalStatCard } from "@/components/investments/terminal/stat-card"
 
 interface Kpi {
   label: string
@@ -17,43 +14,6 @@ interface Kpi {
   delta?: number
   icon: LucideIcon
   loading: boolean
-  action?: React.ReactNode
-}
-
-function KpiCard({ k }: { k: Kpi }) {
-  const positive = (k.delta ?? 0) >= 0
-  return (
-    <div className="group relative overflow-hidden rounded-2xl border border-border bg-card p-5 transition-shadow hover:shadow-sm">
-      <div className="flex items-start justify-between">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-accent-foreground">
-          <k.icon className="h-5 w-5" />
-        </div>
-        <div className="flex items-center gap-1.5">
-          {k.action}
-          {k.delta !== undefined && (
-            <span
-              className={cn(
-                "inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-xs font-semibold",
-                positive ? "bg-gain-muted text-gain-foreground" : "bg-loss-muted text-loss-foreground",
-              )}
-            >
-              {positive ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-              {Math.abs(k.delta).toFixed(2)}%
-            </span>
-          )}
-        </div>
-      </div>
-      <p className="mt-4 text-xs font-medium uppercase tracking-wide text-muted-foreground">{k.label}</p>
-      <div className="mt-1 flex items-end justify-between gap-2">
-        {k.loading ? (
-          <Skeleton className="h-8 w-24" />
-        ) : (
-          <p className="font-mono text-2xl font-semibold tracking-tight text-foreground">{k.value}</p>
-        )}
-      </div>
-      <p className="mt-1 text-xs text-muted-foreground">{k.sub}</p>
-    </div>
-  )
 }
 
 function fmtMoney(n: number | null | undefined, currency = "USD"): string {
@@ -62,7 +22,6 @@ function fmtMoney(n: number | null | undefined, currency = "USD"): string {
 }
 
 export function TerminalKpiCards() {
-  const dispatch = useAppDispatch()
   const {
     funds, selectedFundId, pnl, pnlLoading, pnlPeriod,
     holdings, holdingsLoading,
@@ -70,11 +29,6 @@ export function TerminalKpiCards() {
 
   const fund = funds.find((f) => f.id === selectedFundId)
   const baseCurrency = fund?.base_currency ?? "USD"
-
-  const handlePeriodChange = (p: "MTD" | "QTD" | "YTD") => {
-    dispatch(setPnlPeriod(p))
-    if (selectedFundId) dispatch(fetchFundPnL({ fundId: selectedFundId, period: p }))
-  }
 
   const totalMarketValue = useMemo(() => holdings.reduce((sum, h) => sum + effectiveHoldingValue(h), 0), [holdings])
   const totalCostBasis = useMemo(() => holdings.reduce((sum, h) => sum + holdingCostBasis(h), 0), [holdings])
@@ -111,18 +65,6 @@ export function TerminalKpiCards() {
       sub: `${pnlPeriod} performance`,
       icon: Coins,
       loading: pnlLoading,
-      action: (
-        <Select value={pnlPeriod} onValueChange={(v) => handlePeriodChange(v as "MTD" | "QTD" | "YTD")}>
-          <SelectTrigger className="h-6 w-14 text-[10px] bg-muted border-border px-1.5">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="MTD">MTD</SelectItem>
-            <SelectItem value="QTD">QTD</SelectItem>
-            <SelectItem value="YTD">YTD</SelectItem>
-          </SelectContent>
-        </Select>
-      ),
     },
     {
       label: "Open Positions",
@@ -135,7 +77,20 @@ export function TerminalKpiCards() {
 
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      {kpis.map((k) => <KpiCard key={k.label} k={k} />)}
+      {kpis.map((k) => (
+        <TerminalStatCard
+          key={k.label}
+          label={
+            <span className="inline-flex items-center gap-1.5">
+              <k.icon className="size-3.5" />
+              {k.label}
+            </span>
+          }
+          value={k.loading ? "…" : k.value}
+          subValue={k.sub}
+          change={k.delta}
+        />
+      ))}
     </div>
   )
 }

@@ -1,25 +1,13 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { cn } from "@/lib/utils"
 import { useAppDispatch, useAppSelector } from "@/lib/store"
 import { fetchValidationQueue, approveValidationTick, rejectValidationTick } from "@/lib/store/slices/investmentsSlice"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Check } from "lucide-react"
 import { toast } from "sonner"
-import { PageHeader } from "./page-header"
 import { ValidationItemCard } from "./validation-item-card"
-
-function Stat({ label, value, tone }: { label: string; value: string; tone?: "warn" | "gain" | "loss" }) {
-  return (
-    <div className="rounded-xl border border-border bg-card p-4">
-      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className={cn("mt-1 font-mono text-lg font-semibold", tone === "loss" ? "text-loss" : tone === "gain" ? "text-gain" : tone === "warn" ? "text-warn-foreground" : "text-foreground")}>
-        {value}
-      </p>
-    </div>
-  )
-}
+import { TerminalStatCard } from "@/components/investments/terminal/stat-card"
 
 export function ValidationQueue() {
   const dispatch = useAppDispatch()
@@ -63,13 +51,11 @@ export function ValidationQueue() {
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Validation Queue" subtitle="Manual review of price ticks flagged for exceeding deviation thresholds" />
-
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <Stat label="Pending review" value={String(stats.total)} tone={stats.total ? "warn" : "gain"} />
-        <Stat label="High deviation (>15%)" value={String(stats.highDeviation)} tone={stats.highDeviation ? "warn" : undefined} />
-        <Stat label="Exchanges affected" value={String(stats.exchanges)} />
-        <Stat label="Avg deviation" value={`${stats.avgDeviation.toFixed(2)}%`} />
+        <TerminalStatCard label="Pending review" value={String(stats.total)} subValue={stats.total ? "Needs attention" : "Queue clear"} />
+        <TerminalStatCard label="High deviation (>15%)" value={String(stats.highDeviation)} subValue={stats.highDeviation ? "Review closely" : "None flagged"} />
+        <TerminalStatCard label="Exchanges affected" value={String(stats.exchanges)} />
+        <TerminalStatCard label="Avg deviation" value={`${stats.avgDeviation.toFixed(2)}%`} />
       </div>
 
       {validationLoading ? (

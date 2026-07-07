@@ -188,3 +188,145 @@
     overflow: hidden;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Investments terminal theme — scoped to .investments-terminal, does NOT
+   touch the app-wide :root/.dark blocks above. Toggled dark/light via a
+   second class (.dark or .light) applied alongside .investments-terminal by
+   InvestmentsThemeProvider. Re-themes every shared component that already
+   consumes these variable names (bg-background, bg-gain, border-border, …)
+   with zero blast radius on other modules.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.investments-terminal {
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.investments-terminal.dark {
+  color-scheme: dark;
+  --background: #111318;
+  --foreground: #e2e8f0;
+  --card: #1a1d24;
+  --card-foreground: #e2e8f0;
+  --popover: #1a1d24;
+  --popover-foreground: #e2e8f0;
+  --primary: #3b82f6;
+  --primary-foreground: #ffffff;
+  --secondary: #1e2330;
+  --secondary-foreground: #94a3b8;
+  --muted: #1e2330;
+  --muted-foreground: #64748b;
+  --accent: #1e3a5f;
+  --accent-foreground: #93c5fd;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --border: rgba(255, 255, 255, 0.06);
+  --input: rgba(255, 255, 255, 0.07);
+  --ring: #3b82f6;
+  --radius: 0.5rem;
+  --chart-1: #3b82f6;
+  --chart-2: #8b5cf6;
+  --chart-3: #06b6d4;
+  --chart-4: #10b981;
+  --chart-5: #f59e0b;
+  --sidebar: #0e1117;
+  --sidebar-foreground: #94a3b8;
+  --sidebar-primary: #3b82f6;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #1e2330;
+  --sidebar-accent-foreground: #e2e8f0;
+  --sidebar-border: rgba(255, 255, 255, 0.05);
+  --sidebar-ring: #3b82f6;
+
+  --gain: #10b981;
+  --gain-foreground: #10b981;
+  --gain-muted: rgba(16, 185, 129, 0.15);
+  --loss: #ef4444;
+  --loss-foreground: #ef4444;
+  --loss-muted: rgba(239, 68, 68, 0.15);
+  --warn: #f59e0b;
+  --warn-foreground: #f59e0b;
+  --warn-muted: rgba(245, 158, 11, 0.15);
+  --flat: #64748b;
+  --panel: #1a1d24;
+  --panel-foreground: #e2e8f0;
+  --panel-muted: #64748b;
+  --panel-border: rgba(255, 255, 255, 0.08);
+}
+
+.investments-terminal.light {
+  color-scheme: light;
+  --background: #f4f6fa;
+  --foreground: #1a2233;
+  --card: #ffffff;
+  --card-foreground: #1a2233;
+  --popover: #ffffff;
+  --popover-foreground: #1a2233;
+  --primary: #2563eb;
+  --primary-foreground: #ffffff;
+  --secondary: #eef1f6;
+  --secondary-foreground: #47536b;
+  --muted: #eef1f6;
+  --muted-foreground: #64748b;
+  --accent: #dbeafe;
+  --accent-foreground: #1e3a8a;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --border: rgba(15, 23, 42, 0.08);
+  --input: rgba(15, 23, 42, 0.10);
+  --ring: #2563eb;
+  --radius: 0.5rem;
+  --chart-1: #2563eb;
+  --chart-2: #7c3aed;
+  --chart-3: #0891b2;
+  --chart-4: #059669;
+  --chart-5: #d97706;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #47536b;
+  --sidebar-primary: #2563eb;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #eef1f6;
+  --sidebar-accent-foreground: #1a2233;
+  --sidebar-border: rgba(15, 23, 42, 0.06);
+  --sidebar-ring: #2563eb;
+
+  --gain: #059669;
+  --gain-foreground: #047857;
+  --gain-muted: rgba(5, 150, 105, 0.10);
+  --loss: #dc2626;
+  --loss-foreground: #b91c1c;
+  --loss-muted: rgba(220, 38, 38, 0.10);
+  --warn: #d97706;
+  --warn-foreground: #b45309;
+  --warn-muted: rgba(217, 119, 6, 0.10);
+  --flat: #64748b;
+  --panel: #ffffff;
+  --panel-foreground: #1a2233;
+  --panel-muted: #64748b;
+  --panel-border: rgba(15, 23, 42, 0.08);
+}
+
+.investments-terminal .terminal-table th {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 9px 16px;
+  color: var(--muted-foreground);
+}
+.investments-terminal .terminal-table td {
+  font-size: 12.5px;
+  padding: 10px 16px;
+  color: var(--foreground);
+}
+.investments-terminal .terminal-table tr:hover td {
+  background: color-mix(in srgb, var(--primary) 5%, transparent);
+}
+.investments-terminal ::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+.investments-terminal ::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 2px;
+}

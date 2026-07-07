@@ -43,7 +43,11 @@ import {
   FileText,
   CandlestickChart,
   Monitor,
-  ArrowLeftRight
+  ArrowLeftRight,
+  Briefcase,
+  ClipboardList,
+  Scale,
+  LayoutDashboard
 } from "lucide-react"
 import { IconType } from "react-icons"
 import { IoPeopleOutline, IoReceiptOutline, IoStatsChartOutline } from "react-icons/io5"
@@ -363,20 +367,111 @@ export const MODULE_CONFIG: ModuleConfig[] = [
     ],
   },
 
-  // investments
+  // investments — Arcus Investment Operations terminal (9-module IA)
   {
     id: "investments",
     name: "Investments",
-    description: "Stock price collector and multi-module transaction router",
+    description: "Institutional investment operations, portfolio, and order management terminal",
     icon: CandlestickChart,
     color: "oklch(0.50 0.16 160)",
-    path: "/investments",
+    path: "/investments-v2",
     subModules: [
-      { id: "investments-terminal",    name: "Market Terminal", path: "/investments/terminal",                   icon: Monitor,        description: "Unified watchlist, holdings, and routing dashboard" },
-      { id: "investments-trades",      name: "Trade Blotter",   path: "/investments/trades",                     icon: CiFileOn,       description: "Trade executions and routing status" },
-      { id: "investments-market-data", name: "Market Data",     path: "/investments/market-data/validation",     icon: CiViewTimeline, description: "Validation queue and ingest batches" },
-      { id: "investments-securities",  name: "Securities",      path: "/investments/securities",                 icon: CiGrid41,       description: "Securities master registry" },
-      { id: "investments-routing",     name: "Routing Config",  path: "/investments/routing-config",             icon: CiSettings,     description: "Broker, custodian, and signing key configuration" },
+      { id: "investments-dashboard", name: "Dashboard", path: "/investments-v2", icon: LayoutDashboard, description: "Investment operations overview" },
+    ],
+    groups: [
+      {
+        id: "investments-portfolios",
+        title: "Portfolios",
+        icon: Briefcase,
+        path: "/investments-v2/portfolios",
+        items: [
+          { id: "investments-portfolios-overview",     name: "Overview",      path: "/investments-v2/portfolios",              icon: CiGrid41,   description: "Portfolio overview" },
+          { id: "investments-portfolios-instruments",  name: "Instruments",   path: "/investments-v2/portfolios/instruments",  icon: CiGrid41,   description: "Securities master registry" },
+          { id: "investments-portfolios-prices",       name: "Prices",        path: "/investments-v2/portfolios/prices",       icon: CiViewTimeline, description: "Live prices, validation, ingest" },
+          { id: "investments-portfolios-positions",    name: "Positions",     path: "/investments-v2/portfolios/positions",    icon: CiViewList, description: "Portfolio positions" },
+          { id: "investments-portfolios-transactions", name: "Transactions",  path: "/investments-v2/portfolios/transactions", icon: CiFileOn,   description: "Portfolio transactions" },
+          { id: "investments-portfolios-folder-setup", name: "Folder Setup",  path: "/investments-v2/portfolios/folder-setup", icon: CiSettings, description: "Portfolio folder configuration" },
+          { id: "investments-portfolios-setup",        name: "Setup",         path: "/investments-v2/portfolios/setup",        icon: CiSettings, description: "Portfolio-level configuration" },
+        ],
+      },
+      {
+        id: "investments-orders",
+        title: "Orders",
+        icon: ClipboardList,
+        path: "/investments-v2/orders",
+        items: [
+          { id: "investments-orders-blotter",    name: "Trade Blotter", path: "/investments-v2/orders/blotter",    icon: CiFileOn,       description: "Trade executions and routing status" },
+          { id: "investments-orders-orderbook",  name: "Orderbook",     path: "/investments-v2/orders/orderbook",  icon: CiViewList,     description: "Order book" },
+          { id: "investments-orders-trading",    name: "Trading",       path: "/investments-v2/orders/trading",    icon: Monitor,        description: "Trading workspace" },
+          { id: "investments-orders-compliance", name: "Compliance",    path: "/investments-v2/orders/compliance", icon: CiCircleCheck,  description: "Pre/post-trade compliance" },
+          { id: "investments-orders-simulation", name: "Simulation",    path: "/investments-v2/orders/simulation", icon: CiViewTimeline, description: "Order simulation" },
+          { id: "investments-orders-models",     name: "Models",        path: "/investments-v2/orders/models",     icon: CiGrid41,       description: "Trading models" },
+          { id: "investments-orders-setup",      name: "Setup",         path: "/investments-v2/orders/setup",      icon: CiSettings,     description: "Broker, custodian, and signing key configuration" },
+        ],
+      },
+      // Deferred to a later phase — nav preview only, single "coming soon" placeholder page per group.
+      {
+        id: "investments-reconciliation",
+        title: "Reconciliation",
+        icon: Scale,
+        path: "/investments-v2/reconciliation",
+        items: [
+          { id: "investments-reconciliation-cash",      name: "Cash Reconciliation",     path: "/investments-v2/reconciliation", icon: CiGrid41, description: "Cash reconciliation" },
+          { id: "investments-reconciliation-holdings",  name: "Holdings Reconciliation", path: "/investments-v2/reconciliation", icon: CiGrid41, description: "Holdings reconciliation" },
+          { id: "investments-reconciliation-trades",    name: "Trade Reconciliation",    path: "/investments-v2/reconciliation", icon: CiGrid41, description: "Trade reconciliation" },
+          { id: "investments-reconciliation-exceptions",name: "Exceptions",              path: "/investments-v2/reconciliation", icon: CiGrid41, description: "Reconciliation exceptions" },
+        ],
+      },
+      {
+        id: "investments-valuation",
+        title: "Valuation",
+        icon: TrendingUp,
+        path: "/investments-v2/valuation",
+        items: [
+          { id: "investments-valuation-nav",   name: "NAV Runs",         path: "/investments-v2/valuation", icon: CiGrid41, description: "NAV calculation runs" },
+          { id: "investments-valuation-pnl",   name: "P&L Runs",         path: "/investments-v2/valuation", icon: CiGrid41, description: "P&L calculation runs" },
+          { id: "investments-valuation-price", name: "Price Validation", path: "/investments-v2/valuation", icon: CiGrid41, description: "Price validation runs" },
+          { id: "investments-valuation-fx",    name: "FX Conversion",    path: "/investments-v2/valuation", icon: CiGrid41, description: "FX conversion runs" },
+        ],
+      },
+      {
+        id: "investments-reporting",
+        title: "Reporting",
+        icon: BarChart3,
+        path: "/investments-v2/reporting",
+        items: [
+          { id: "investments-reporting-portfolio", name: "Portfolio Reports", path: "/investments-v2/reporting", icon: CiGrid41, description: "Portfolio reports" },
+          { id: "investments-reporting-pnl",       name: "P&L Reports",       path: "/investments-v2/reporting", icon: CiGrid41, description: "P&L reports" },
+          { id: "investments-reporting-trade",     name: "Trade Reports",     path: "/investments-v2/reporting", icon: CiGrid41, description: "Trade reports" },
+        ],
+      },
+      {
+        id: "investments-documentation",
+        title: "Documentation",
+        icon: FileText,
+        path: "/investments-v2/documentation",
+        items: [
+          { id: "investments-documentation-register", name: "Document Register", path: "/investments-v2/documentation", icon: CiGrid41, description: "Document register" },
+          { id: "investments-documentation-upload",   name: "Upload",            path: "/investments-v2/documentation", icon: CiGrid41, description: "Upload documents" },
+        ],
+      },
+      {
+        id: "investments-accounting",
+        title: "Accounting",
+        icon: Calculator,
+        path: "/investments-v2/accounting",
+        items: [
+          { id: "investments-accounting-events",   name: "Events",   path: "/investments-v2/accounting", icon: CiGrid41, description: "Accounting events" },
+          { id: "investments-accounting-journals", name: "Journals", path: "/investments-v2/accounting", icon: CiGrid41, description: "GL journals" },
+        ],
+      },
+      {
+        id: "investments-setup",
+        title: "Setup",
+        icon: Settings,
+        path: "/investments-v2/setup",
+        items: [],
+      },
     ],
   },
 
