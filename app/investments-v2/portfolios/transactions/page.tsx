@@ -1,12 +1,11 @@
 'use client'
 
-import { useState } from 'react'
-import { Topbar } from '@/components/arcus/topbar'
+import { useEffect, useMemo, useState } from 'react'
+import { PageHeader } from '@/components/investments-v2/page-header'
+import { PortfoliosSubNav } from '@/components/investments-v2/portfolios-subnav'
 import { StatusBadge } from '@/components/arcus/status-badge'
 import { cn } from '@/lib/utils'
 import { Filter, Download, Search } from 'lucide-react'
-
-const instrumentTabs = ['Overview', 'Instruments', 'Prices', 'Positions', 'Transactions']
 
 const txnTypes = ['All', 'Buy', 'Sell', 'Dividend', 'Coupon', 'FX', 'Fee', 'Subscription', 'Redemption']
 
@@ -23,126 +22,197 @@ const transactions = [
 ]
 
 const typeColors: Record<string, string> = {
-  Buy: 'text-[#10B981]',
-  Sell: 'text-[#EF4444]',
-  Dividend: 'text-[#60A5FA]',
-  Coupon: 'text-[#60A5FA]',
-  FX: 'text-[#F59E0B]',
-  Fee: 'text-[#EF4444]',
-  Subscription: 'text-[#10B981]',
-  Redemption: 'text-[#EF4444]',
+  Buy: '#10b981',
+  Sell: '#ef4444',
+  Dividend: '#3b82f6',
+  Coupon: '#3b82f6',
+  FX: '#f59e0b',
+  Fee: '#ef4444',
+  Subscription: '#10b981',
+  Redemption: '#ef4444',
 }
+
+const PAGE_SIZE = 12
 
 export default function TransactionsPage() {
   const [typeFilter, setTypeFilter] = useState('All')
   const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
 
-  const filtered = transactions.filter(t => {
-    const matchType = typeFilter === 'All' || t.type === typeFilter
-    const matchSearch = !search || t.ticker.toLowerCase().includes(search.toLowerCase()) || t.id.toLowerCase().includes(search.toLowerCase()) || t.name.toLowerCase().includes(search.toLowerCase())
-    return matchType && matchSearch
-  })
+  const filtered = useMemo(() => {
+    return transactions.filter((t) => {
+      const matchType = typeFilter === 'All' || t.type === typeFilter
+      const matchSearch =
+        !search ||
+        t.ticker.toLowerCase().includes(search.toLowerCase()) ||
+        t.id.toLowerCase().includes(search.toLowerCase()) ||
+        t.name.toLowerCase().includes(search.toLowerCase())
+      return matchType && matchSearch
+    })
+  }, [typeFilter, search])
+
+  useEffect(() => {
+    setPage(1)
+  }, [typeFilter, search])
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const pageRows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <Topbar title="Portfolio Management" subtitle="Transactions" showPeriod />
+      <PageHeader title="Transactions" />
+      <PortfoliosSubNav />
 
-      <div className="flex items-center gap-4 px-4 pt-3 pb-0 border-b border-white/[0.06] flex-shrink-0 overflow-x-auto">
-        {instrumentTabs.map(t => (
-          <a key={t}
-            href={t === 'Overview' ? '/portfolios' : t === 'Instruments' ? '/portfolios/instruments' : t === 'Prices' ? '/portfolios/prices' : t === 'Positions' ? '/portfolios/positions' : '#'}
-            className={cn('text-xs pb-2 border-b-2 whitespace-nowrap transition-colors',
-              t === 'Transactions' ? 'border-[#2563EB] text-[#60A5FA]' : 'border-transparent text-[#6B7A95] hover:text-[#A8B4C8]')}>
-            {t}
-          </a>
-        ))}
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1 flex-wrap">
-            {txnTypes.map(t => (
-              <button key={t} onClick={() => setTypeFilter(t)}
-                className={cn('px-3 py-1 rounded text-xs font-medium transition-colors',
-                  typeFilter === t ? 'bg-[#1E3A5F] text-[#60A5FA]' : 'text-[#6B7A95] hover:bg-[#111C30] hover:text-[#A8B4C8]')}>
+      <div className="flex-1 overflow-y-auto px-5 pb-5 pt-4 space-y-4">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {txnTypes.map((t) => (
+              <button key={t} onClick={() => setTypeFilter(t)} className={cn('cat-pill', typeFilter === t && 'active')}>
                 {t}
               </button>
             ))}
           </div>
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5 bg-[#111C30] border border-white/[0.06] rounded px-2.5 py-1.5">
-              <Search className="w-3 h-3 text-[#4B5A72]" />
-              <input value={search} onChange={e => setSearch(e.target.value)}
+            <div
+              className="flex items-center gap-1.5 rounded px-2.5 py-1.5"
+              style={{ background: 'var(--muted)', border: '1px solid var(--border)' }}
+            >
+              <Search className="w-3.5 h-3.5" style={{ color: 'var(--muted-foreground)' }} />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search..."
-                className="bg-transparent text-[#A8B4C8] text-xs outline-none w-32 placeholder:text-[#4B5A72]" />
+                className="bg-transparent text-xs outline-none w-32"
+                style={{ color: 'var(--foreground)' }}
+              />
             </div>
-            <button className="flex items-center gap-1.5 text-[#6B7A95] hover:text-[#A8B4C8] text-xs px-2 py-1.5 bg-[#111C30] border border-white/[0.06] rounded">
+            <button
+              className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded"
+              style={{ color: 'var(--muted-foreground)', background: 'var(--muted)', border: '1px solid var(--border)' }}
+            >
               <Filter className="w-3 h-3" /> Filter
             </button>
-            <button className="flex items-center gap-1.5 text-[#6B7A95] hover:text-[#A8B4C8] text-xs px-2 py-1.5 bg-[#111C30] border border-white/[0.06] rounded">
+            <button
+              className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded"
+              style={{ color: 'var(--muted-foreground)', background: 'var(--muted)', border: '1px solid var(--border)' }}
+            >
               <Download className="w-3 h-3" /> Export
             </button>
           </div>
         </div>
 
-        <div className="bg-[#0D1526] border border-white/[0.06] rounded-md overflow-hidden">
+        <div className="arcus-card">
+          <div className="arcus-card-header">
+            <span className="text-[13px] font-semibold" style={{ color: 'var(--foreground)' }}>
+              Transactions
+            </span>
+          </div>
           <div className="overflow-x-auto">
-            <table className="arcus-table">
-              <thead>
-                <tr>
-                  <th>Txn ID</th>
-                  <th>Portfolio</th>
-                  <th>Ticker</th>
-                  <th>Description</th>
-                  <th>Type</th>
-                  <th className="text-right">Qty</th>
-                  <th className="text-right">Price</th>
-                  <th className="text-right">Gross</th>
-                  <th className="text-right">Fees</th>
-                  <th className="text-right">Net Amount</th>
-                  <th>CCY</th>
-                  <th>Trade Date</th>
-                  <th>Val Date</th>
-                  <th>Broker</th>
-                  <th>Settlement</th>
-                  <th>Posted</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map(txn => (
-                  <tr key={txn.id} className="cursor-pointer">
-                    <td className="text-[#60A5FA] font-mono text-[11px]">{txn.id}</td>
-                    <td className="text-[#A8B4C8]">{txn.portfolio}</td>
-                    <td className="text-[#C8D3E8] font-mono font-semibold">{txn.ticker}</td>
-                    <td className="text-[#A8B4C8]">{txn.name}</td>
-                    <td>
-                      <span className={cn('text-xs font-semibold', typeColors[txn.type] ?? 'text-[#A8B4C8]')}>
-                        {txn.type}
-                      </span>
-                    </td>
-                    <td className="text-right font-mono">{txn.qty.toLocaleString()}</td>
-                    <td className="text-right font-mono">{txn.price.toFixed(2)}</td>
-                    <td className="text-right font-mono">{txn.gross.toLocaleString()}</td>
-                    <td className="text-right font-mono text-[#F59E0B]">{txn.fee || '—'}</td>
-                    <td className="text-right font-mono font-medium text-[#E8EDF5]">{txn.net.toLocaleString()}</td>
-                    <td className="text-[#A8B4C8] font-mono">{txn.currency}</td>
-                    <td className="text-[#6B7A95]">{txn.tradeDate}</td>
-                    <td className="text-[#6B7A95]">{txn.valDate}</td>
-                    <td className="text-[#A8B4C8]">{txn.broker}</td>
-                    <td><StatusBadge status={txn.settlStatus} /></td>
-                    <td>
-                      <span className={cn('text-[10px] font-medium', txn.posted ? 'text-[#10B981]' : 'text-[#F59E0B]')}>
-                        {txn.posted ? 'Posted' : 'Pending'}
-                      </span>
-                    </td>
+            {pageRows.length === 0 ? (
+              <div className="py-10 text-center text-[12px]" style={{ color: 'var(--muted-foreground)' }}>
+                No transactions found{search ? ` matching "${search}"` : ''}.
+              </div>
+            ) : (
+              <table className="arcus-table">
+                <thead>
+                  <tr>
+                    <th>Txn ID</th>
+                    <th>Portfolio</th>
+                    <th>Ticker</th>
+                    <th>Description</th>
+                    <th>Type</th>
+                    <th className="text-right">Qty</th>
+                    <th className="text-right">Price</th>
+                    <th className="text-right">Gross</th>
+                    <th className="text-right">Fees</th>
+                    <th className="text-right">Net Amount</th>
+                    <th>CCY</th>
+                    <th>Trade Date</th>
+                    <th>Val Date</th>
+                    <th>Broker</th>
+                    <th>Settlement</th>
+                    <th>Posted</th>
                   </tr>
+                </thead>
+                <tbody>
+                  {pageRows.map((txn) => (
+                    <tr key={txn.id} className="cursor-pointer">
+                      <td className="font-mono text-[11px]" style={{ color: '#3b82f6' }}>
+                        {txn.id}
+                      </td>
+                      <td style={{ color: 'var(--muted-foreground)' }}>{txn.portfolio}</td>
+                      <td className="font-mono font-semibold" style={{ color: 'var(--foreground)' }}>
+                        {txn.ticker}
+                      </td>
+                      <td style={{ color: 'var(--muted-foreground)' }}>{txn.name}</td>
+                      <td>
+                        <span className="text-xs font-semibold" style={{ color: typeColors[txn.type] ?? 'var(--muted-foreground)' }}>
+                          {txn.type}
+                        </span>
+                      </td>
+                      <td className="text-right font-mono" style={{ color: 'var(--foreground)' }}>
+                        {txn.qty.toLocaleString()}
+                      </td>
+                      <td className="text-right font-mono" style={{ color: 'var(--foreground)' }}>
+                        {txn.price.toFixed(2)}
+                      </td>
+                      <td className="text-right font-mono" style={{ color: 'var(--foreground)' }}>
+                        {txn.gross.toLocaleString()}
+                      </td>
+                      <td className="text-right font-mono" style={{ color: '#f59e0b' }}>
+                        {txn.fee || '—'}
+                      </td>
+                      <td className="text-right font-mono font-medium" style={{ color: 'var(--foreground)' }}>
+                        {txn.net.toLocaleString()}
+                      </td>
+                      <td className="font-mono" style={{ color: 'var(--muted-foreground)' }}>
+                        {txn.currency}
+                      </td>
+                      <td style={{ color: 'var(--muted-foreground)' }}>{txn.tradeDate}</td>
+                      <td style={{ color: 'var(--muted-foreground)' }}>{txn.valDate}</td>
+                      <td style={{ color: 'var(--muted-foreground)' }}>{txn.broker}</td>
+                      <td>
+                        <StatusBadge status={txn.settlStatus} />
+                      </td>
+                      <td>
+                        <span
+                          className="text-[10px] font-medium"
+                          style={{ color: txn.posted ? '#10b981' : '#f59e0b' }}
+                        >
+                          {txn.posted ? 'Posted' : 'Pending'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-4 py-2.5" style={{ borderTop: '1px solid var(--border)' }}>
+              <span className="text-[11px]" style={{ color: 'var(--muted-foreground)' }}>
+                Showing {pageRows.length} out of {filtered.length} results
+              </span>
+              <div className="flex items-center gap-1">
+                <button className="pg-btn" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}>
+                  ‹
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                  <button key={p} onClick={() => setPage(p)} className={cn('pg-btn', page === p && 'active')}>
+                    {p}
+                  </button>
                 ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="flex items-center justify-between px-4 py-2 border-t border-white/[0.06]">
-            <div className="text-[10px] text-[#6B7A95]">Showing {filtered.length} of {transactions.length} transactions</div>
-          </div>
+                <button
+                  className="pg-btn"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page >= totalPages}
+                >
+                  ›
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

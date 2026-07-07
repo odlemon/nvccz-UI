@@ -1,170 +1,375 @@
 'use client'
 
-import { useState } from 'react'
-import { Topbar } from '@/components/arcus/topbar'
+import { Fragment, useEffect, useMemo, useState } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
+import { PageHeader } from '@/components/investments-v2/page-header'
+import { PortfoliosSubNav } from '@/components/investments-v2/portfolios-subnav'
+import { SecurityFormDialog } from '@/components/investments-v2/security-form-dialog'
 import { StatusBadge } from '@/components/arcus/status-badge'
 import { cn } from '@/lib/utils'
-import { Upload, RefreshCw, AlertTriangle, CheckCircle2, Search, Download } from 'lucide-react'
+import { RefreshCw, Search, Plus, ChevronDown, ChevronRight, Loader2 } from 'lucide-react'
+import { useAppDispatch, useAppSelector } from '@/lib/store'
+import { fetchSecurities, fetchLatestPrices, fetchSecurityPriceHistory } from '@/lib/store/slices/investmentsSlice'
+import { priceChange, type Security } from '@/lib/api/investments-api'
+import { useRolePermissions } from '@/lib/hooks/useRolePermissions'
 
-const instrumentTabs = ['Overview', 'Instruments', 'Prices', 'Positions', 'Transactions']
+const EXCHANGES = ['All', 'ZSE', 'VFEX', 'SECZIM', 'NASDAQ', 'NYSE'] as const
+const PAGE_SIZE = 12
 
-const priceData = [
-  { ticker: 'NVDA', name: 'NVIDIA Corp', source: 'Bloomberg', currency: 'USD', prevClose: 125.10, currentPrice: 127.42, change: 2.32, changePct: 1.85, bid: 127.40, ask: 127.44, volume: 42812000, timestamp: '07 Jul 16:00', status: 'active' },
-  { ticker: 'MSFT', name: 'Microsoft Corp', source: 'Bloomberg', currency: 'USD', prevClose: 429.82, currentPrice: 432.18, change: 2.36, changePct: 0.55, bid: 432.15, ask: 432.20, volume: 18240000, timestamp: '07 Jul 16:00', status: 'active' },
-  { ticker: 'AAPL', name: 'Apple Inc', source: 'Bloomberg', currency: 'USD', prevClose: 194.20, currentPrice: 196.42, change: 2.22, changePct: 1.14, bid: 196.40, ask: 196.45, volume: 54810000, timestamp: '07 Jul 16:00', status: 'active' },
-  { ticker: 'GOOGL', name: 'Alphabet Inc', source: 'Bloomberg', currency: 'USD', prevClose: 176.10, currentPrice: 174.29, change: -1.81, changePct: -1.03, bid: 174.28, ask: 174.31, volume: 21420000, timestamp: '07 Jul 16:00', status: 'active' },
-  { ticker: 'BHP', name: 'BHP Group', source: 'Bloomberg', currency: 'AUD', prevClose: 44.80, currentPrice: 44.28, change: -0.52, changePct: -1.16, bid: 44.27, ask: 44.29, volume: 8420000, timestamp: '07 Jul 16:00', status: 'active' },
-  { ticker: 'TSM', name: 'TSMC ADR', source: 'Bloomberg', currency: 'USD', prevClose: 180.20, currentPrice: 182.50, change: 2.30, changePct: 1.28, bid: 182.48, ask: 182.52, volume: 12820000, timestamp: '07 Jul 16:00', status: 'active' },
-  { ticker: 'META', name: 'Meta Platforms', source: 'Bloomberg', currency: 'USD', prevClose: 558.40, currentPrice: 562.38, change: 3.98, changePct: 0.71, bid: 562.35, ask: 562.42, volume: 9240000, timestamp: '07 Jul 16:00', status: 'active' },
-  { ticker: 'BABA', name: 'Alibaba Group', source: 'Bloomberg', currency: 'USD', prevClose: 84.20, currentPrice: 82.14, change: -2.06, changePct: -2.45, bid: 82.10, ask: 82.18, volume: 0, timestamp: '04 Jul 16:00', status: 'stale' },
-  { ticker: 'CBZH', name: 'CBZ Holdings', source: 'ZSE', currency: 'ZiG', prevClose: 1.80, currentPrice: 1.84, change: 0.04, changePct: 2.22, bid: 1.82, ask: 1.86, volume: 1284200, timestamp: '07 Jul 15:30', status: 'active' },
-  { ticker: 'ECONET', name: 'Econet Wireless', source: 'VFEX', currency: 'USD', prevClose: 0.40, currentPrice: 0.42, change: 0.02, changePct: 5.00, bid: 0.41, ask: 0.43, volume: 421800, timestamp: '07 Jul 15:30', status: 'active' },
-  { ticker: 'UST10Y', name: 'US Treasury 10Y', source: 'Bloomberg', currency: 'USD', prevClose: 98.18, currentPrice: 98.42, change: 0.24, changePct: 0.24, bid: 98.41, ask: 98.43, volume: 0, timestamp: '07 Jul 17:00', status: 'active' },
-  { ticker: 'GOLD', name: 'iShares Gold ETF', source: 'Bloomberg', currency: 'USD', prevClose: 184.20, currentPrice: 186.40, change: 2.20, changePct: 1.19, bid: 186.38, ask: 186.42, volume: 2840000, timestamp: '07 Jul 16:00', status: 'active' },
-]
-
-const sources = ['All', 'Bloomberg', 'ZSE', 'VFEX', 'Manual']
+function Spinner() {
+  return <Loader2 className="w-4 h-4 animate-spin" style={{ color: 'var(--muted-foreground)' }} />
+}
 
 export default function PricesPage() {
+  const dispatch = useAppDispatch()
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const focusedSecurityId = searchParams.get('securityId')
+
+  const { securities, securitiesLoading, latestPrices, pricesLoading, priceHistoryCache, priceHistoryLoadingIds } =
+    useAppSelector((s) => s.investments)
+  const { hasSubModuleAccess } = useRolePermissions()
+  const isAdmin = hasSubModuleAccess('investments', 'investments-portfolios-prices')
+
+  const [exchange, setExchange] = useState<(typeof EXCHANGES)[number]>('All')
   const [search, setSearch] = useState('')
-  const [sourceFilter, setSourceFilter] = useState('All')
-  const [refreshing, setRefreshing] = useState(false)
+  const [page, setPage] = useState(1)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [dialogOpen, setDialogOpen] = useState(false)
 
-  const filtered = priceData.filter(p => {
-    const matchSource = sourceFilter === 'All' || p.source === sourceFilter
-    const matchSearch = !search || p.ticker.toLowerCase().includes(search.toLowerCase()) || p.name.toLowerCase().includes(search.toLowerCase())
-    return matchSource && matchSearch
-  })
+  useEffect(() => {
+    dispatch(fetchSecurities())
+    dispatch(fetchLatestPrices())
+  }, [dispatch])
 
-  const staleCount = priceData.filter(p => p.status === 'stale').length
+  // Auto-expand the security passed via ?securityId= (e.g. linked from Instruments)
+  useEffect(() => {
+    if (focusedSecurityId) {
+      setExpandedId(focusedSecurityId)
+      dispatch(fetchSecurityPriceHistory(focusedSecurityId))
+    }
+  }, [dispatch, focusedSecurityId])
 
-  const handleRefresh = () => {
-    setRefreshing(true)
-    setTimeout(() => setRefreshing(false), 2000)
+  useEffect(() => {
+    setPage(1)
+  }, [exchange, search])
+
+  const toggleExpand = (sec: Security) => {
+    if (expandedId === sec.id) {
+      setExpandedId(null)
+      if (focusedSecurityId) router.push('/investments-v2/portfolios/prices')
+      return
+    }
+    setExpandedId(sec.id)
+    if (!priceHistoryCache[sec.id]) dispatch(fetchSecurityPriceHistory(sec.id))
   }
+
+  const rows = useMemo(() => {
+    return securities
+      .filter((s) => exchange === 'All' || s.exchangeCode === exchange)
+      .map((sec) => {
+        const tick = latestPrices[sec.symbol] ?? latestPrices[sec.id]
+        const change = priceChange(tick)
+        return { security: sec, tick, change }
+      })
+  }, [securities, latestPrices, exchange])
+
+  const filteredRows = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return rows
+    return rows.filter(
+      (r) => r.security.symbol.toLowerCase().includes(q) || r.security.name.toLowerCase().includes(q)
+    )
+  }, [rows, search])
+
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE))
+  const pageRows = filteredRows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
+  const pricedCount = rows.filter((r) => r.tick).length
+  const liveCount = rows.filter((r) => r.tick?.tickFrequency === 'LIVE').length
+  const staleCount = rows.filter((r) => {
+    if (!r.tick) return false
+    const ageMs = Date.now() - new Date(r.tick.pricedAt).getTime()
+    return ageMs > 1000 * 60 * 60 * 24 * 2 // >2 days old
+  }).length
+  const lastBatchAt = rows.reduce<string | null>((latest, r) => {
+    if (!r.tick) return latest
+    if (!latest || new Date(r.tick.pricedAt) > new Date(latest)) return r.tick.pricedAt
+    return latest
+  }, null)
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <Topbar title="Portfolio Management" subtitle="Prices" showPeriod={false} />
+      <PageHeader
+        title="Prices"
+        actions={
+          isAdmin ? (
+            <button
+              onClick={() => setDialogOpen(true)}
+              className="flex items-center gap-1.5 text-white text-xs font-medium px-3 py-1.5 rounded-full"
+              style={{ background: '#2563eb' }}
+            >
+              <Plus className="w-3.5 h-3.5" /> New Security
+            </button>
+          ) : undefined
+        }
+      />
+      <PortfoliosSubNav />
 
-      <div className="flex items-center gap-4 px-4 pt-3 pb-0 border-b border-white/[0.06] flex-shrink-0 overflow-x-auto">
-        {instrumentTabs.map(t => (
-          <a key={t}
-            href={t === 'Overview' ? '/portfolios' : t === 'Instruments' ? '/portfolios/instruments' : t === 'Positions' ? '/portfolios/positions' : t === 'Transactions' ? '/portfolios/transactions' : '#'}
-            className={cn('text-xs pb-2 border-b-2 whitespace-nowrap transition-colors',
-              t === 'Prices' ? 'border-[#2563EB] text-[#60A5FA]' : 'border-transparent text-[#6B7A95] hover:text-[#A8B4C8]')}>
-            {t}
-          </a>
-        ))}
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      <div className="flex-1 overflow-y-auto px-5 pb-5 pt-4 space-y-4">
         {/* Status strip */}
         <div className="grid grid-cols-4 gap-3">
           {[
-            { label: 'Total Instruments Priced', value: priceData.length, color: 'text-[#E8EDF5]' },
-            { label: 'Live / Updated Today', value: priceData.filter(p => p.status === 'active').length, color: 'text-[#10B981]' },
-            { label: 'Stale Prices', value: staleCount, color: staleCount > 0 ? 'text-[#F59E0B]' : 'text-[#10B981]' },
-            { label: 'Last Batch Pull', value: '10:14:58', color: 'text-[#60A5FA]' },
-          ].map(s => (
-            <div key={s.label} className="bg-[#0D1526] border border-white/[0.06] rounded-md px-4 py-2.5">
-              <div className="text-[10px] text-[#6B7A95] uppercase tracking-wider mb-0.5">{s.label}</div>
-              <div className={cn('text-lg font-semibold font-mono', s.color)}>{s.value}</div>
+            { label: 'Total Instruments Priced', value: pricedCount, color: 'var(--foreground)' },
+            { label: 'Live Ticks', value: liveCount, color: '#10b981' },
+            { label: 'Stale (>2 days)', value: staleCount, color: staleCount > 0 ? '#f59e0b' : '#10b981' },
+            {
+              label: 'Last Batch',
+              value: lastBatchAt ? new Date(lastBatchAt).toLocaleString() : '—',
+              color: '#3b82f6',
+            },
+          ].map((s) => (
+            <div key={s.label} className="arcus-card px-4 py-2.5">
+              <div className="text-[10px] uppercase tracking-wider mb-0.5" style={{ color: 'var(--muted-foreground)' }}>
+                {s.label}
+              </div>
+              <div className="text-lg font-semibold font-mono" style={{ color: s.color }}>
+                {s.value}
+              </div>
             </div>
           ))}
         </div>
 
-        {staleCount > 0 && (
-          <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/20 rounded-md px-4 py-2.5">
-            <AlertTriangle className="w-4 h-4 text-[#F59E0B] flex-shrink-0" />
-            <span className="text-xs text-[#F59E0B]">
-              <span className="font-semibold">{staleCount} stale price{staleCount > 1 ? 's' : ''}</span> detected — prices may be outdated by more than 2 business days. Manual override or re-fetch required.
-            </span>
-          </div>
-        )}
-
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5">
-            {sources.map(s => (
-              <button key={s} onClick={() => setSourceFilter(s)}
-                className={cn('px-3 py-1 rounded text-xs font-medium transition-colors',
-                  sourceFilter === s ? 'bg-[#1E3A5F] text-[#60A5FA]' : 'text-[#6B7A95] hover:bg-[#111C30] hover:text-[#A8B4C8]')}>
-                {s}
+        {/* Exchange filter + search + refresh */}
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {EXCHANGES.map((ex) => (
+              <button key={ex} onClick={() => setExchange(ex)} className={cn('cat-pill', exchange === ex && 'active')}>
+                {ex}
               </button>
             ))}
           </div>
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5 bg-[#111C30] border border-white/[0.06] rounded px-2.5 py-1.5">
-              <Search className="w-3 h-3 text-[#4B5A72]" />
-              <input value={search} onChange={e => setSearch(e.target.value)}
-                placeholder="Search..."
-                className="bg-transparent text-[#A8B4C8] text-xs outline-none w-32 placeholder:text-[#4B5A72]" />
+            <div
+              className="flex items-center gap-1.5 rounded px-2.5 py-1.5"
+              style={{ background: 'var(--muted)', border: '1px solid var(--border)' }}
+            >
+              <Search className="w-3.5 h-3.5" style={{ color: 'var(--muted-foreground)' }} />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Filter by symbol or name..."
+                className="bg-transparent text-xs outline-none w-44"
+                style={{ color: 'var(--foreground)' }}
+              />
             </div>
-            <button className="flex items-center gap-1.5 text-[#6B7A95] hover:text-[#A8B4C8] text-xs px-2.5 py-1.5 bg-[#111C30] border border-white/[0.06] rounded">
-              <Upload className="w-3 h-3" /> Upload CSV
-            </button>
-            <button onClick={handleRefresh} className="flex items-center gap-1.5 bg-[#2563EB] text-white text-xs font-medium px-3 py-1.5 rounded hover:bg-[#1D4ED8]">
-              <RefreshCw className={cn('w-3 h-3', refreshing && 'animate-spin')} />
-              {refreshing ? 'Fetching...' : 'Refresh Prices'}
+            <button
+              onClick={() => dispatch(fetchLatestPrices())}
+              disabled={pricesLoading}
+              className="flex items-center gap-1.5 text-white text-xs font-medium px-3 py-1.5 rounded"
+              style={{ background: '#2563eb' }}
+            >
+              <RefreshCw className={cn('w-3 h-3', pricesLoading && 'animate-spin')} />
+              {pricesLoading ? 'Fetching...' : 'Refresh Prices'}
             </button>
           </div>
         </div>
 
-        <div className="bg-[#0D1526] border border-white/[0.06] rounded-md overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="arcus-table">
-              <thead>
-                <tr>
-                  <th>Ticker</th>
-                  <th>Name</th>
-                  <th>Source</th>
-                  <th>CCY</th>
-                  <th className="text-right">Prev Close</th>
-                  <th className="text-right">Current Price</th>
-                  <th className="text-right">Change</th>
-                  <th className="text-right">Change %</th>
-                  <th className="text-right">Bid</th>
-                  <th className="text-right">Ask</th>
-                  <th className="text-right">Volume</th>
-                  <th>Timestamp</th>
-                  <th>Status</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map(p => (
-                  <tr key={p.ticker} className={cn('cursor-pointer', p.status === 'stale' && 'bg-amber-500/[0.03]')}>
-                    <td className="text-[#60A5FA] font-mono font-semibold">{p.ticker}</td>
-                    <td className="text-[#A8B4C8]">{p.name}</td>
-                    <td className="text-[#6B7A95]">{p.source}</td>
-                    <td className="text-[#A8B4C8] font-mono">{p.currency}</td>
-                    <td className="text-right font-mono text-[#6B7A95]">{p.prevClose.toFixed(2)}</td>
-                    <td className="text-right font-mono font-semibold text-[#E8EDF5]">{p.currentPrice.toFixed(2)}</td>
-                    <td className={cn('text-right font-mono', p.change >= 0 ? 'text-[#10B981]' : 'text-[#EF4444]')}>
-                      {p.change >= 0 ? '+' : ''}{p.change.toFixed(2)}
-                    </td>
-                    <td className={cn('text-right font-mono', p.changePct >= 0 ? 'text-[#10B981]' : 'text-[#EF4444]')}>
-                      {p.changePct >= 0 ? '+' : ''}{p.changePct.toFixed(2)}%
-                    </td>
-                    <td className="text-right font-mono text-[#6B7A95]">{p.bid.toFixed(2)}</td>
-                    <td className="text-right font-mono text-[#6B7A95]">{p.ask.toFixed(2)}</td>
-                    <td className="text-right font-mono text-[#6B7A95]">
-                      {p.volume > 0 ? (p.volume / 1000000).toFixed(2) + 'M' : '—'}
-                    </td>
-                    <td className={cn('font-mono text-xs', p.status === 'stale' ? 'text-[#F59E0B]' : 'text-[#6B7A95]')}>{p.timestamp}</td>
-                    <td><StatusBadge status={p.status} /></td>
-                    <td>
-                      {p.status === 'stale' && (
-                        <button className="text-[10px] text-[#F59E0B] hover:underline">Override</button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        {/* Latest prices — collapsible accordion table */}
+        <div className="arcus-card">
+          <div className="arcus-card-header">
+            <span className="text-[13px] font-semibold" style={{ color: 'var(--foreground)' }}>
+              Latest Market Prices
+            </span>
+            {(securitiesLoading || pricesLoading) && <Spinner />}
           </div>
+          <div className="overflow-x-auto">
+            {securitiesLoading && securities.length === 0 ? (
+              <div className="flex items-center justify-center py-10">
+                <Spinner />
+              </div>
+            ) : pageRows.length === 0 ? (
+              <div className="py-10 text-center text-[12px]" style={{ color: 'var(--muted-foreground)' }}>
+                No securities found{search ? ` matching "${search}"` : ''}.
+              </div>
+            ) : (
+              <table className="arcus-table">
+                <thead>
+                  <tr>
+                    <th />
+                    <th>Ticker</th>
+                    <th>Name / Exchange</th>
+                    <th>CCY</th>
+                    <th className="text-right">Prev Close</th>
+                    <th className="text-right">Current Price</th>
+                    <th className="text-right">Change</th>
+                    <th className="text-right">Change %</th>
+                    <th>Validation</th>
+                    <th>Source</th>
+                    <th>Priced At</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pageRows.map(({ security: sec, tick, change }) => {
+                    const isExpanded = expandedId === sec.id
+                    const history = priceHistoryCache[sec.id] ?? []
+                    const historyLoading = !!priceHistoryLoadingIds[sec.id]
+                    return (
+                      <Fragment key={sec.id}>
+                        <tr
+                          className={cn('cursor-pointer', isExpanded && 'bg-[#3b82f614]')}
+                          onClick={() => toggleExpand(sec)}
+                        >
+                          <td className="w-6">
+                            {isExpanded ? (
+                              <ChevronDown className="w-3.5 h-3.5" style={{ color: 'var(--muted-foreground)' }} />
+                            ) : (
+                              <ChevronRight className="w-3.5 h-3.5" style={{ color: 'var(--muted-foreground)' }} />
+                            )}
+                          </td>
+                          <td className="font-mono font-semibold" style={{ color: '#3b82f6' }}>
+                            {sec.symbol}
+                          </td>
+                          <td>
+                            <div className="flex flex-col leading-tight">
+                              <span style={{ color: 'var(--foreground)' }}>{sec.name}</span>
+                              <span className="text-[10px]" style={{ color: 'var(--muted-foreground)' }}>
+                                {sec.exchangeCode}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="font-mono" style={{ color: 'var(--muted-foreground)' }}>
+                            {sec.listingCurrencyCode}
+                          </td>
+                          <td className="text-right font-mono" style={{ color: 'var(--muted-foreground)' }}>
+                            {change.prevClose != null ? change.prevClose.toFixed(4) : '—'}
+                          </td>
+                          <td className="text-right font-mono font-semibold" style={{ color: 'var(--foreground)' }}>
+                            {change.price != null ? change.price.toFixed(4) : '—'}
+                          </td>
+                          <td
+                            className="text-right font-mono"
+                            style={{
+                              color: change.abs == null ? 'var(--muted-foreground)' : change.abs >= 0 ? '#10b981' : '#ef4444',
+                            }}
+                          >
+                            {change.abs != null ? `${change.abs >= 0 ? '+' : ''}${change.abs.toFixed(4)}` : '—'}
+                          </td>
+                          <td
+                            className="text-right font-mono"
+                            style={{
+                              color: change.pct == null ? 'var(--muted-foreground)' : change.pct >= 0 ? '#10b981' : '#ef4444',
+                            }}
+                          >
+                            {change.pct != null ? `${change.pct >= 0 ? '+' : ''}${change.pct.toFixed(2)}%` : '—'}
+                          </td>
+                          <td>{tick ? <StatusBadge status={tick.validationStatus} /> : '—'}</td>
+                          <td>{tick ? <StatusBadge status={tick.sourceStatus === 'OK' ? 'active' : 'stale'} /> : '—'}</td>
+                          <td className="font-mono text-[11px]" style={{ color: 'var(--muted-foreground)' }}>
+                            {tick ? new Date(tick.pricedAt).toLocaleString() : '—'}
+                          </td>
+                        </tr>
+                        {isExpanded && (
+                          <tr key={`${sec.id}-history`}>
+                            <td colSpan={11} className="p-0">
+                              <div
+                                className="px-6 py-3"
+                                style={{ background: 'rgba(59,130,246,0.04)', borderTop: '1px solid var(--border)' }}
+                              >
+                                {historyLoading ? (
+                                  <div className="flex items-center justify-center py-4">
+                                    <Spinner />
+                                  </div>
+                                ) : history.length === 0 ? (
+                                  <div className="py-3 text-center text-[11px]" style={{ color: 'var(--muted-foreground)' }}>
+                                    No price history available for {sec.symbol}.
+                                  </div>
+                                ) : (
+                                  <table className="arcus-table">
+                                    <thead>
+                                      <tr>
+                                        <th>Priced At</th>
+                                        <th>Price Type</th>
+                                        <th className="text-right">Price</th>
+                                        <th className="text-right">Prev Close</th>
+                                        <th className="text-right">Deviation %</th>
+                                        <th>Frequency</th>
+                                        <th>Validation</th>
+                                        <th>Source</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {history.map((h) => (
+                                        <tr key={h.id}>
+                                          <td className="font-mono text-[11px]" style={{ color: 'var(--foreground)' }}>
+                                            {new Date(h.pricedAt).toLocaleString()}
+                                          </td>
+                                          <td style={{ color: 'var(--muted-foreground)' }}>{h.priceType}</td>
+                                          <td className="text-right font-mono font-semibold" style={{ color: 'var(--foreground)' }}>
+                                            {Number(h.price).toFixed(4)}
+                                          </td>
+                                          <td className="text-right font-mono" style={{ color: 'var(--muted-foreground)' }}>
+                                            {h.previousClose != null ? Number(h.previousClose).toFixed(4) : '—'}
+                                          </td>
+                                          <td className="text-right font-mono" style={{ color: 'var(--muted-foreground)' }}>
+                                            {h.deviationPct != null ? `${Number(h.deviationPct).toFixed(2)}%` : '—'}
+                                          </td>
+                                          <td style={{ color: 'var(--muted-foreground)' }}>{h.tickFrequency}</td>
+                                          <td>
+                                            <StatusBadge status={h.validationStatus} />
+                                          </td>
+                                          <td>
+                                            <StatusBadge status={h.sourceStatus === 'OK' ? 'active' : 'stale'} />
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    )
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          {/* Pagination */}
+          {filteredRows.length > PAGE_SIZE && (
+            <div
+              className="flex items-center justify-between px-4 py-2.5"
+              style={{ borderTop: '1px solid var(--border)' }}
+            >
+              <span className="text-[11px]" style={{ color: 'var(--muted-foreground)' }}>
+                Showing {pageRows.length} out of {filteredRows.length} results
+              </span>
+              <div className="flex items-center gap-1">
+                <button className="pg-btn" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}>
+                  ‹
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                  <button key={p} onClick={() => setPage(p)} className={cn('pg-btn', page === p && 'active')}>
+                    {p}
+                  </button>
+                ))}
+                <button
+                  className="pg-btn"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page >= totalPages}
+                >
+                  ›
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
+
+      <SecurityFormDialog open={dialogOpen} onOpenChange={setDialogOpen} editTarget={null} onSaved={() => dispatch(fetchSecurities())} />
     </div>
   )
 }

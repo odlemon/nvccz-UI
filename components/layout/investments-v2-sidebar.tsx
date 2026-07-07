@@ -145,7 +145,7 @@ export function InvestmentsV2Sidebar() {
     return `${user.firstName || ''} ${user.lastName || ''}`.trim()
   }
 
-  const sidebarStyles = theme === 'dark' 
+  const sidebarStyles = theme === 'dark'
     ? { background: '#1a1d24', borderRight: '1px solid rgba(255,255,255,0.06)' }
     : { background: '#ffffff', borderRight: '1px solid rgba(0,0,0,0.08)' }
 
@@ -179,15 +179,7 @@ export function InvestmentsV2Sidebar() {
   return (
     <aside className="w-[210px] flex-shrink-0 flex flex-col overflow-hidden" style={sidebarStyles}>
       {/* Logo */}
-      <div className="px-5 py-4 flex items-center gap-2.5 flex-shrink-0" style={{ borderBottom: `1px solid ${userCardBorder}` }}>
-        <div className="w-7 h-7 rounded-md flex items-center justify-center" style={logoBoxStyles}>
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <path d="M2 7L5.5 3.5L9 7L12 4.5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M2 10.5L5.5 7L9 10.5L12 8" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.6"/>
-          </svg>
-        </div>
-        <span className="font-bold text-sm tracking-wide" style={{ color: theme === 'dark' ? '#e2e8f0' : '#1a2233' }}>ARCUS</span>
-      </div>
+
 
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-0.5">
@@ -253,11 +245,11 @@ export function InvestmentsV2Sidebar() {
             {/* Avatar */}
             <div className="relative">
               <div className="w-9 h-9 rounded-full overflow-hidden border-2" style={{ borderColor: theme === 'dark' ? '#3b82f6' : '#2563eb' }}>
-                <div 
-                  className="w-full h-full flex items-center justify-center text-sm font-bold" 
-                  style={{ 
-                    background: theme === 'dark' ? '#3b82f6' : '#2563eb', 
-                    color: '#ffffff' 
+                <div
+                  className="w-full h-full flex items-center justify-center text-sm font-bold"
+                  style={{
+                    background: theme === 'dark' ? '#3b82f6' : '#2563eb',
+                    color: '#ffffff'
                   }}
                 >
                   {getUserInitials()}
@@ -273,7 +265,7 @@ export function InvestmentsV2Sidebar() {
               </div>
             </div>
           </div>
-          <button 
+          <button
             onClick={handleLogout}
             disabled={isLoggingOut}
             className="w-full text-[12px] py-1.5 font-semibold rounded-full transition-colors disabled:opacity-50"

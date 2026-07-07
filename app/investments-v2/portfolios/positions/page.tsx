@@ -1,11 +1,10 @@
 'use client'
 
-import { useState } from 'react'
-import { Topbar } from '@/components/arcus/topbar'
+import { useEffect, useMemo, useState } from 'react'
+import { PageHeader } from '@/components/investments-v2/page-header'
+import { PortfoliosSubNav } from '@/components/investments-v2/portfolios-subnav'
 import { cn } from '@/lib/utils'
 import { Filter, Download, ChevronDown, ChevronUp } from 'lucide-react'
-
-const instrumentTabs = ['Overview', 'Instruments', 'Prices', 'Positions', 'Transactions']
 
 const portfolioTabs = [
   { id: 'all', label: 'All Portfolios' },
@@ -29,22 +28,39 @@ const positions = [
 ]
 
 type SortKey = 'ticker' | 'mktValue' | 'unrealPnl' | 'unrealPnlPct' | 'weight'
+const PAGE_SIZE = 12
+
+const portfolioLabel = (id: string) =>
+  ({ 'equity-world': 'Equity World', 'multi-asset': 'Multi Asset', 'fixed-income': 'Fixed Income', 'asia-select': 'Asia Select' }[id] ?? id)
 
 export default function PositionsPage() {
   const [activePortfolio, setActivePortfolio] = useState('all')
   const [sortKey, setSortKey] = useState<SortKey>('mktValue')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+  const [page, setPage] = useState(1)
 
-  const filtered = positions.filter(p => activePortfolio === 'all' || p.portfolio === activePortfolio)
-  const sorted = [...filtered].sort((a, b) => {
-    const dir = sortDir === 'asc' ? 1 : -1
-    if (sortKey === 'ticker') return dir * a.ticker.localeCompare(b.ticker)
-    return dir * (a[sortKey] - b[sortKey])
-  })
+  const filtered = positions.filter((p) => activePortfolio === 'all' || p.portfolio === activePortfolio)
+  const sorted = useMemo(() => {
+    return [...filtered].sort((a, b) => {
+      const dir = sortDir === 'asc' ? 1 : -1
+      if (sortKey === 'ticker') return dir * a.ticker.localeCompare(b.ticker)
+      return dir * (a[sortKey] - b[sortKey])
+    })
+  }, [filtered, sortKey, sortDir])
+
+  useEffect(() => {
+    setPage(1)
+  }, [activePortfolio])
+
+  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE))
+  const pageRows = sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   const handleSort = (key: SortKey) => {
-    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
-    else { setSortKey(key); setSortDir('desc') }
+    if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    else {
+      setSortKey(key)
+      setSortDir('desc')
+    }
   }
 
   const totalMktValue = filtered.reduce((s, p) => s + p.mktValue, 0)
@@ -52,62 +68,77 @@ export default function PositionsPage() {
 
   const SortIcon = ({ col }: { col: SortKey }) => {
     if (sortKey !== col) return <ChevronDown className="w-2.5 h-2.5 opacity-30" />
-    return sortDir === 'desc' ? <ChevronDown className="w-2.5 h-2.5 text-[#60A5FA]" /> : <ChevronUp className="w-2.5 h-2.5 text-[#60A5FA]" />
+    return sortDir === 'desc' ? (
+      <ChevronDown className="w-2.5 h-2.5" style={{ color: '#3b82f6' }} />
+    ) : (
+      <ChevronUp className="w-2.5 h-2.5" style={{ color: '#3b82f6' }} />
+    )
   }
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <Topbar title="Portfolio Management" subtitle="Positions" showPeriod={false} />
+      <PageHeader title="Positions" />
+      <PortfoliosSubNav />
 
-      <div className="flex items-center gap-4 px-4 pt-3 pb-0 border-b border-white/[0.06] flex-shrink-0 overflow-x-auto">
-        {instrumentTabs.map(t => (
-          <a key={t}
-            href={t === 'Overview' ? '/portfolios' : t === 'Instruments' ? '/portfolios/instruments' : t === 'Prices' ? '/portfolios/prices' : t === 'Transactions' ? '/portfolios/transactions' : '#'}
-            className={cn('text-xs pb-2 border-b-2 whitespace-nowrap transition-colors',
-              t === 'Positions' ? 'border-[#2563EB] text-[#60A5FA]' : 'border-transparent text-[#6B7A95] hover:text-[#A8B4C8]')}>
-            {t}
-          </a>
-        ))}
-      </div>
+      <div className="flex-1 overflow-y-auto px-5 pb-5 pt-4 space-y-4">
+        {/* Portfolio filter pills */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {portfolioTabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActivePortfolio(tab.id)}
+              className={cn('cat-pill', activePortfolio === tab.id && 'active')}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
 
-      {/* Portfolio filter tabs */}
-      <div className="flex items-center gap-1 px-4 py-2 border-b border-white/[0.06] bg-[#070B14] flex-shrink-0 overflow-x-auto">
-        {portfolioTabs.map(tab => (
-          <button key={tab.id} onClick={() => setActivePortfolio(tab.id)}
-            className={cn('px-3 py-1 rounded text-xs font-medium transition-colors whitespace-nowrap',
-              activePortfolio === tab.id ? 'bg-[#1E3A5F] text-[#60A5FA]' : 'text-[#6B7A95] hover:bg-[#111C30] hover:text-[#A8B4C8]')}>
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
-        {/* Summary strip */}
-        <div className="grid grid-cols-4 gap-px bg-white/[0.03] rounded-md overflow-hidden">
+        {/* Stat strip */}
+        <div className="grid grid-cols-4 gap-3">
           {[
-            { label: 'Total Market Value', value: `$${(totalMktValue / 1000000).toFixed(2)}M`, sub: 'USD' },
-            { label: 'Total Unrealised P&L', value: `${totalUnrealPnl >= 0 ? '+' : ''}$${(totalUnrealPnl / 1000).toFixed(0)}k`, green: totalUnrealPnl >= 0 },
-            { label: 'Open Positions', value: filtered.length, sub: 'instruments' },
-            { label: 'Val Date', value: '07 Jul 2026', sub: 'Last recalc: 10:15' },
-          ].map(s => (
-            <div key={s.label} className="bg-[#0D1526] px-4 py-2.5">
-              <div className="text-[10px] text-[#6B7A95] uppercase tracking-wider mb-0.5">{s.label}</div>
-              <div className={cn('text-sm font-semibold font-mono', 'green' in s ? (s.green ? 'text-[#10B981]' : 'text-[#EF4444]') : 'text-[#E8EDF5]')}>{s.value}</div>
-              {'sub' in s && s.sub && <div className="text-[10px] text-[#4B5A72]">{s.sub}</div>}
+            { label: 'Total Market Value', value: `$${(totalMktValue / 1000000).toFixed(2)}M`, color: 'var(--foreground)' },
+            {
+              label: 'Total Unrealised P&L',
+              value: `${totalUnrealPnl >= 0 ? '+' : ''}$${(totalUnrealPnl / 1000).toFixed(0)}k`,
+              color: totalUnrealPnl >= 0 ? '#10b981' : '#ef4444',
+            },
+            { label: 'Open Positions', value: filtered.length, color: 'var(--foreground)' },
+            { label: 'Val Date', value: '07 Jul 2026', color: '#3b82f6' },
+          ].map((s) => (
+            <div key={s.label} className="arcus-card px-4 py-2.5">
+              <div className="text-[10px] uppercase tracking-wider mb-0.5" style={{ color: 'var(--muted-foreground)' }}>
+                {s.label}
+              </div>
+              <div className="text-lg font-semibold font-mono" style={{ color: s.color }}>
+                {s.value}
+              </div>
             </div>
           ))}
         </div>
 
         <div className="flex items-center justify-end gap-2">
-          <button className="flex items-center gap-1.5 text-[#6B7A95] hover:text-[#A8B4C8] text-xs px-2 py-1.5 bg-[#111C30] border border-white/[0.06] rounded">
+          <button
+            className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded"
+            style={{ color: 'var(--muted-foreground)', background: 'var(--muted)', border: '1px solid var(--border)' }}
+          >
             <Filter className="w-3 h-3" /> Filter
           </button>
-          <button className="flex items-center gap-1.5 text-[#6B7A95] hover:text-[#A8B4C8] text-xs px-2 py-1.5 bg-[#111C30] border border-white/[0.06] rounded">
+          <button
+            className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded"
+            style={{ color: 'var(--muted-foreground)', background: 'var(--muted)', border: '1px solid var(--border)' }}
+          >
             <Download className="w-3 h-3" /> Export
           </button>
         </div>
 
-        <div className="bg-[#0D1526] border border-white/[0.06] rounded-md overflow-hidden">
+        {/* Positions table card */}
+        <div className="arcus-card">
+          <div className="arcus-card-header">
+            <span className="text-[13px] font-semibold" style={{ color: 'var(--foreground)' }}>
+              Portfolio Positions
+            </span>
+          </div>
           <div className="overflow-x-auto">
             <table className="arcus-table">
               <thead>
@@ -129,7 +160,6 @@ export default function PositionsPage() {
                       Mkt Value <SortIcon col="mktValue" />
                     </button>
                   </th>
-                  <th className="text-right">Book Cost</th>
                   <th className="text-right">
                     <button className="flex items-center gap-1 ml-auto" onClick={() => handleSort('unrealPnl')}>
                       Unrealised P&L <SortIcon col="unrealPnl" />
@@ -140,7 +170,6 @@ export default function PositionsPage() {
                       P&L % <SortIcon col="unrealPnlPct" />
                     </button>
                   </th>
-                  <th className="text-right">Realised P&L</th>
                   <th className="text-right">
                     <button className="flex items-center gap-1 ml-auto" onClick={() => handleSort('weight')}>
                       Weight <SortIcon col="weight" />
@@ -150,48 +179,96 @@ export default function PositionsPage() {
                 </tr>
               </thead>
               <tbody>
-                {sorted.map(pos => (
+                {pageRows.map((pos) => (
                   <tr key={pos.ticker + pos.portfolio} className="cursor-pointer">
-                    <td className="text-[#60A5FA] font-mono font-semibold">{pos.ticker}</td>
-                    <td className="text-[#A8B4C8]">{pos.name}</td>
+                    <td className="font-mono font-semibold" style={{ color: '#3b82f6' }}>
+                      {pos.ticker}
+                    </td>
+                    <td style={{ color: 'var(--foreground)' }}>{pos.name}</td>
                     <td>
-                      <span className="bg-[#1E3A5F] text-[#60A5FA] text-[10px] font-bold px-2 py-0.5 rounded font-mono">{pos.type}</span>
+                      <span
+                        className="text-[10px] font-bold px-2 py-0.5 rounded font-mono"
+                        style={{ background: 'rgba(59,130,246,0.12)', color: '#3b82f6' }}
+                      >
+                        {pos.type}
+                      </span>
                     </td>
-                    <td className="text-[#6B7A95] capitalize">{pos.portfolio.replace('-', ' ').replace('equity world', 'Equity World').replace('multi asset', 'Multi Asset').replace('fixed income', 'Fixed Income').replace('asia select', 'Asia Select')}</td>
-                    <td className="text-[#A8B4C8] font-mono">{pos.currency}</td>
-                    <td className="text-right font-mono">{pos.quantity.toLocaleString()}</td>
-                    <td className="text-right font-mono text-[#6B7A95]">{pos.avgCost.toFixed(2)}</td>
-                    <td className="text-right font-mono">{pos.mktPrice.toFixed(2)}</td>
-                    <td className="text-right font-mono">{pos.mktValue.toLocaleString()}</td>
-                    <td className="text-right font-mono text-[#6B7A95]">{pos.bookCost.toLocaleString()}</td>
-                    <td className={cn('text-right font-mono', pos.unrealPnl >= 0 ? 'text-[#10B981]' : 'text-[#EF4444]')}>
-                      {pos.unrealPnl >= 0 ? '+' : ''}{pos.unrealPnl.toLocaleString()}
+                    <td style={{ color: 'var(--muted-foreground)' }}>{portfolioLabel(pos.portfolio)}</td>
+                    <td className="font-mono" style={{ color: 'var(--muted-foreground)' }}>
+                      {pos.currency}
                     </td>
-                    <td className={cn('text-right font-mono', pos.unrealPnlPct >= 0 ? 'text-[#10B981]' : 'text-[#EF4444]')}>
-                      {pos.unrealPnlPct >= 0 ? '+' : ''}{pos.unrealPnlPct.toFixed(2)}%
+                    <td className="text-right font-mono" style={{ color: 'var(--foreground)' }}>
+                      {pos.quantity.toLocaleString()}
                     </td>
-                    <td className={cn('text-right font-mono', pos.realPnl >= 0 ? 'text-[#10B981]' : 'text-[#EF4444]')}>
-                      {pos.realPnl === 0 ? '—' : (pos.realPnl >= 0 ? '+' : '') + pos.realPnl.toLocaleString()}
+                    <td className="text-right font-mono" style={{ color: 'var(--muted-foreground)' }}>
+                      {pos.avgCost.toFixed(2)}
                     </td>
-                    <td className="text-right font-mono">{pos.weight}%</td>
-                    <td className="text-[#6B7A95]">{pos.openDate}</td>
+                    <td className="text-right font-mono" style={{ color: 'var(--foreground)' }}>
+                      {pos.mktPrice.toFixed(2)}
+                    </td>
+                    <td className="text-right font-mono" style={{ color: 'var(--foreground)' }}>
+                      {pos.mktValue.toLocaleString()}
+                    </td>
+                    <td className="text-right font-mono" style={{ color: pos.unrealPnl >= 0 ? '#10b981' : '#ef4444' }}>
+                      {pos.unrealPnl >= 0 ? '+' : ''}
+                      {pos.unrealPnl.toLocaleString()}
+                    </td>
+                    <td className="text-right font-mono" style={{ color: pos.unrealPnlPct >= 0 ? '#10b981' : '#ef4444' }}>
+                      {pos.unrealPnlPct >= 0 ? '+' : ''}
+                      {pos.unrealPnlPct.toFixed(2)}%
+                    </td>
+                    <td className="text-right font-mono" style={{ color: 'var(--foreground)' }}>
+                      {pos.weight}%
+                    </td>
+                    <td style={{ color: 'var(--muted-foreground)' }}>{pos.openDate}</td>
                   </tr>
                 ))}
               </tbody>
-              {/* Totals row */}
               <tfoot>
-                <tr className="bg-[#111C30] border-t border-white/[0.06]">
-                  <td colSpan={8} className="text-[11px] text-[#6B7A95] font-medium px-3 py-2">Total ({sorted.length} positions)</td>
-                  <td className="text-right font-mono font-semibold text-[#E8EDF5] px-3 py-2">{totalMktValue.toLocaleString()}</td>
-                  <td className="px-3 py-2"></td>
-                  <td className={cn('text-right font-mono font-semibold px-3 py-2', totalUnrealPnl >= 0 ? 'text-[#10B981]' : 'text-[#EF4444]')}>
-                    {totalUnrealPnl >= 0 ? '+' : ''}{totalUnrealPnl.toLocaleString()}
+                <tr style={{ background: 'var(--muted)', borderTop: '1px solid var(--border)' }}>
+                  <td colSpan={8} className="text-[11px] font-medium px-3 py-2" style={{ color: 'var(--muted-foreground)' }}>
+                    Total ({sorted.length} positions)
                   </td>
-                  <td colSpan={4} className="px-3 py-2"></td>
+                  <td className="text-right font-mono font-semibold px-3 py-2" style={{ color: 'var(--foreground)' }}>
+                    {totalMktValue.toLocaleString()}
+                  </td>
+                  <td
+                    className="text-right font-mono font-semibold px-3 py-2"
+                    style={{ color: totalUnrealPnl >= 0 ? '#10b981' : '#ef4444' }}
+                  >
+                    {totalUnrealPnl >= 0 ? '+' : ''}
+                    {totalUnrealPnl.toLocaleString()}
+                  </td>
+                  <td colSpan={3} className="px-3 py-2" />
                 </tr>
               </tfoot>
             </table>
           </div>
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-4 py-2.5" style={{ borderTop: '1px solid var(--border)' }}>
+              <span className="text-[11px]" style={{ color: 'var(--muted-foreground)' }}>
+                Showing {pageRows.length} out of {sorted.length} results
+              </span>
+              <div className="flex items-center gap-1">
+                <button className="pg-btn" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}>
+                  ‹
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                  <button key={p} onClick={() => setPage(p)} className={cn('pg-btn', page === p && 'active')}>
+                    {p}
+                  </button>
+                ))}
+                <button
+                  className="pg-btn"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page >= totalPages}
+                >
+                  ›
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

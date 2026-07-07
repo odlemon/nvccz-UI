@@ -1,21 +1,11 @@
 'use client'
 
-import { Topbar } from '@/components/arcus/topbar'
+import { PageHeader } from '@/components/investments-v2/page-header'
+import { PortfoliosSubNav } from '@/components/investments-v2/portfolios-subnav'
 import { cn } from '@/lib/utils'
 import { Pencil, Plus } from 'lucide-react'
-import Link from 'next/link'
 
 const setupTabs = ['Setup', 'Broker/Counterparties', 'Commissions', 'Countries', 'Currencies', 'Instrument Types', 'Issuer', 'Markets']
-
-const portfolioSubNav = [
-  { label: 'Overview',     href: '/portfolios' },
-  { label: 'Instruments',  href: '/portfolios/instruments' },
-  { label: 'Prices',       href: '/portfolios/prices' },
-  { label: 'Positions',    href: '/portfolios/positions' },
-  { label: 'Transactions', href: '/portfolios/transactions' },
-  { label: 'Folder Setup', href: '#' },
-  { label: 'Setup',        href: '/portfolios/setup' },
-]
 
 const priceApiRows = [
   { label: 'Heartbeat', value: '23 April 21, 22:09' },
@@ -72,22 +62,8 @@ const iconRows = [
 export default function PortfolioSetupPage() {
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <Topbar title="Portfolios" />
-
-      {/* Portfolio sub-nav */}
-      <div className="flex items-center gap-0 px-5 flex-shrink-0 overflow-x-auto" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-        {portfolioSubNav.map((t) => (
-          <Link key={t.label} href={t.href}
-            className={cn(
-              'px-4 py-3 text-[12.5px] font-medium whitespace-nowrap transition-colors border-b-2',
-              t.label === 'Setup'
-                ? 'text-[#3b82f6] border-[#3b82f6]'
-                : 'text-[#64748b] border-transparent hover:text-[#94a3b8]'
-            )}>
-            {t.label}
-          </Link>
-        ))}
-      </div>
+      <PageHeader title="Setup" />
+      <PortfoliosSubNav />
 
       {/* Setup top-level tabs */}
       <div className="flex items-center gap-0 px-5 pt-3 pb-0 flex-shrink-0 overflow-x-auto">
