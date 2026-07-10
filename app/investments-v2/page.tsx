@@ -1,18 +1,19 @@
 'use client'
 
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { BarChart, Bar, Cell, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts'
-import { Lock, ChevronDown, Loader2 } from 'lucide-react'
+import { ChevronDown, Loader2, RefreshCw } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '@/lib/store'
 import {
-  fetchFunds,
-  fetchFundHoldings,
-  fetchFundPnL,
-  setSelectedFundId,
-  setPnlPeriod,
-} from '@/lib/store/slices/investmentsSlice'
-import { effectiveHoldingValue } from '@/lib/api/investments-api'
+  fetchDashboardSummary,
+  fetchDashboardAllocation,
+  fetchDashboardCurrencyExposure,
+  fetchDashboardFunds,
+  recalculateDashboard,
+  setOpsSelectedFundId,
+} from '@/lib/store/slices/investmentOpsSlice'
 import { PageHeader } from '@/components/investments-v2/page-header'
+import { cn } from '@/lib/utils'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function fmt(n: number) {
@@ -26,6 +27,17 @@ function fmtDec(n: number) {
 const PERIOD_OPTIONS: Array<'MTD' | 'QTD' | 'YTD'> = ['MTD', 'QTD', 'YTD']
 
 const DOT_COLORS = ['#f59e0b', '#3b82f6', '#6366f1', '#10b981', '#e879f9', '#f97316']
+
+const ALLOCATION_COLORS: Record<string, string> = {
+  equities: '#8b5cf6',
+  cash: '#3b82f6',
+  bonds: '#6366f1',
+  funds: '#4338ca',
+  commodities: '#e879f9',
+  crypto: '#f97316',
+  alternatives: '#10b981',
+  other: '#64748b',
+}
 
 // ── Concentric rings SVG ──────────────────────────────────────────────────────
 interface Ring { r: number; pct: number; color: string; width: number }
@@ -112,111 +124,72 @@ function FundPill({ funds, selectedId, onChange }: {
 export default function DashboardPage() {
   const dispatch = useAppDispatch()
   const {
-    funds, fundsLoading,
+    dashboardFunds, dashboardFundsLoading,
     selectedFundId,
-    holdings, holdingsLoading,
-    pnl, pnlLoading,
-    pnlPeriod,
-  } = useAppSelector(s => s.investments)
+    dashboardSummary, dashboardSummaryLoading,
+    dashboardAllocation, dashboardAllocationLoading,
+    dashboardCurrencyExposure, dashboardCurrencyExposureLoading,
+    recalculating,
+  } = useAppSelector(s => s.investmentOps)
+
+  const [period, setPeriod] = useState<'MTD' | 'QTD' | 'YTD'>('MTD')
 
   // Initial load
   useEffect(() => {
-    dispatch(fetchFunds())
+    dispatch(fetchDashboardFunds())
   }, [dispatch])
 
-  // Load holdings + PnL when fund or period changes
+  useEffect(() => {
+    dispatch(fetchDashboardSummary({ period }))
+  }, [dispatch, period])
+
+  // Load allocation + currency exposure when fund changes
   useEffect(() => {
     if (!selectedFundId) return
-    dispatch(fetchFundHoldings(selectedFundId))
-    dispatch(fetchFundPnL({ fundId: selectedFundId, period: pnlPeriod }))
-  }, [dispatch, selectedFundId, pnlPeriod])
+    dispatch(fetchDashboardAllocation(selectedFundId))
+    dispatch(fetchDashboardCurrencyExposure(selectedFundId))
+  }, [dispatch, selectedFundId])
+
+  const handleRecalculate = async () => {
+    if (!selectedFundId) return
+    await dispatch(recalculateDashboard(selectedFundId))
+    dispatch(fetchDashboardSummary({ period }))
+    dispatch(fetchDashboardAllocation(selectedFundId))
+    dispatch(fetchDashboardCurrencyExposure(selectedFundId))
+  }
 
   // ── Derived data ────────────────────────────────────────────────────────────
 
-  // Portfolios table: group holdings by asset_class
-  const portfolioRows = useMemo(() => {
-    if (!holdings.length) return []
-    const groups: Record<string, { nav: number; pnl: number; count: number }> = {}
-    for (const h of holdings) {
-      const key = h.security?.exchangeCode ?? 'Unknown'
-      if (!groups[key]) groups[key] = { nav: 0, pnl: 0, count: 0 }
-      groups[key].nav += effectiveHoldingValue(h)
-      groups[key].pnl += h.unrealizedPnl ?? 0
-      groups[key].count++
-    }
-    return Object.entries(groups).map(([name, g], i) => ({
-      name,
-      nav: g.nav,
-      pnl: g.pnl,
-      pnlPct: g.nav > 0 ? (g.pnl / g.nav) * 100 : 0,
-      count: g.count,
-      dot: DOT_COLORS[i % DOT_COLORS.length],
-    }))
-  }, [holdings])
+  const portfolioRows = dashboardSummary?.portfolios ?? []
 
-  // Currency exposure: group by currency
   const currencyBars = useMemo(() => {
-    if (!holdings.length) return []
-    const totals: Record<string, number> = {}
-    let grand = 0
-    for (const h of holdings) {
-      const cur = h.wacCurrencyCode ?? 'USD'
-      const val = effectiveHoldingValue(h)
-      totals[cur] = (totals[cur] ?? 0) + val
-      grand += val
-    }
-    const entries = Object.entries(totals)
-      .map(([name, val]) => ({ name, value: grand > 0 ? (val / grand) * 100 : 0 }))
+    if (!dashboardCurrencyExposure.length) return []
+    const grand = dashboardCurrencyExposure.reduce((s, e) => s + e.value, 0)
+    const entries = dashboardCurrencyExposure
+      .map(e => ({ name: e.currency, value: grand > 0 ? (e.value / grand) * 100 : 0 }))
       .sort((a, b) => b.value - a.value)
-    const top4 = entries.slice(0, 4)
-    const otherVal = entries.slice(4).reduce((s, e) => s + e.value, 0)
-    if (otherVal > 0) top4.push({ name: 'Others', value: otherVal })
-    const maxVal = Math.max(...top4.map(e => e.value))
-    return top4.map(e => ({ ...e, highlight: e.value === maxVal }))
-  }, [holdings])
+    const maxVal = Math.max(...entries.map(e => e.value))
+    return entries.map(e => ({ ...e, highlight: e.value === maxVal }))
+  }, [dashboardCurrencyExposure])
 
-  // Asset allocation (concentric rings) by security type
-  const assetAllocationRings = useMemo(() => {
-    if (!holdings.length) return []
-    const totals: Record<string, number> = {}
-    let grand = 0
-    for (const h of holdings) {
-      const key = h.security?.exchangeCode ?? 'Other'
-      const val = effectiveHoldingValue(h)
-      totals[key] = (totals[key] ?? 0) + val
-      grand += val
-    }
-    const colors = ['#8b5cf6', '#3b82f6', '#6366f1', '#4338ca', '#e879f9']
-    const radii = [68, 53, 38, 23, 12]
-    return Object.entries(totals)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([label, val], i) => ({
-        label,
-        pct: grand > 0 ? Math.round((val / grand) * 100) : 0,
-        color: colors[i],
+  const allocationRings = useMemo(() => {
+    if (!dashboardAllocation) return []
+    const radii = [68, 53, 38, 23, 12, 8, 4]
+    return Object.entries(dashboardAllocation)
+      .filter(([, bucket]) => bucket.value > 0)
+      .sort((a, b) => b[1].value - a[1].value)
+      .slice(0, radii.length)
+      .map(([label, bucket], i) => ({
+        label: label.charAt(0).toUpperCase() + label.slice(1),
+        pct: Math.round(bucket.pct),
+        color: ALLOCATION_COLORS[label] ?? DOT_COLORS[i % DOT_COLORS.length],
         r: radii[i],
         width: 10,
       }))
-  }, [holdings])
-
-  // Allocation by Security (if we have per-security data)
-  const securityRows = useMemo(() => {
-    return holdings
-      .filter(h => h.security)
-      .map((h, i) => ({
-        name: h.security!.name ?? h.security!.symbol,
-        symbol: h.security!.symbol,
-        value: effectiveHoldingValue(h),
-        pnl: h.unrealizedPnl ?? 0,
-        dot: DOT_COLORS[i % DOT_COLORS.length],
-      }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 10)
-  }, [holdings])
+  }, [dashboardAllocation])
 
   const topCurrency = currencyBars[0]
-  const selectedFund = funds.find(f => f.id === selectedFundId)
+  const selectedFundRow = portfolioRows.find(p => p.fundId === selectedFundId)
 
   return (
     <div className="flex flex-col h-full w-full">
@@ -225,16 +198,16 @@ export default function DashboardPage() {
       <div className="flex-1 overflow-y-auto p-5 space-y-4">
 
         {/* Fund selector row */}
-        {funds.length > 0 && (
+        {dashboardFunds.length > 0 && (
           <div className="flex items-center gap-3">
             <span className="text-[12px]" style={{ color: 'var(--muted-foreground)' }}>Fund:</span>
-            <FundPill funds={funds} selectedId={selectedFundId} onChange={id => dispatch(setSelectedFundId(id))} />
-            {selectedFund && (
+            <FundPill funds={dashboardFunds} selectedId={selectedFundId} onChange={id => dispatch(setOpsSelectedFundId(id))} />
+            {selectedFundRow && (
               <span className="text-[12px]" style={{ color: 'var(--muted-foreground)' }}>
-                Base currency: <span style={{ color: 'var(--foreground)' }}>{selectedFund.base_currency}</span>
+                Base currency: <span style={{ color: 'var(--foreground)' }}>{selectedFundRow.baseCurrency}</span>
               </span>
             )}
-            {(holdingsLoading || fundsLoading) && <Spinner />}
+            {(dashboardSummaryLoading || dashboardFundsLoading) && <Spinner />}
           </div>
         )}
 
@@ -246,39 +219,51 @@ export default function DashboardPage() {
             <div className="arcus-card-header">
               <span className="text-[13px] font-semibold" style={{ color: 'var(--foreground)' }}>Portfolios</span>
               <div className="flex items-center gap-2">
-                <PeriodPill value={pnlPeriod} onChange={v => dispatch(setPnlPeriod(v))} />
-                <button className="btn-white text-[12px] py-1 px-4">Recalculate</button>
+                <PeriodPill value={period} onChange={setPeriod} />
+                <button onClick={handleRecalculate} disabled={recalculating} className="btn-white text-[12px] py-1 px-4 flex items-center gap-1.5 disabled:opacity-60">
+                  <RefreshCw className={cn('w-3 h-3', recalculating && 'animate-spin')} />
+                  Recalculate
+                </button>
               </div>
             </div>
             <div className="overflow-x-auto">
-              {holdingsLoading ? (
+              {dashboardSummaryLoading ? (
                 <div className="flex items-center justify-center py-8"><Spinner /></div>
               ) : portfolioRows.length === 0 ? (
                 <div className="py-8 text-center text-[12px]" style={{ color: 'var(--muted-foreground)' }}>
-                  {fundsLoading ? 'Loading funds…' : 'No holdings data available'}
+                  No portfolio data available
                 </div>
               ) : (
                 <table className="arcus-table">
                   <thead>
                     <tr>
-                      <th>Asset Class</th>
-                      <th>Market Value</th>
-                      <th>Positions</th>
-                      <th>Unrealized P&amp;L</th>
+                      <th>Fund</th>
+                      <th>NAV</th>
+                      <th>P&amp;L</th>
                       <th>In %</th>
+                      <th>Status</th>
+                      <th>Last Recalc</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {portfolioRows.map((row) => (
-                      <tr key={row.name}>
-                        <td className="font-medium" style={{ color: 'var(--foreground)' }}>{row.name}</td>
-                        <td>
-                          <span className="inline-flex items-center gap-1.5 font-mono text-[12px]" style={{ color: 'var(--foreground)' }}>
-                            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: row.dot }} />
-                            {fmt(row.nav)}
+                    {portfolioRows.map((row, i) => (
+                      <tr
+                        key={row.fundId}
+                        className="cursor-pointer"
+                        onClick={() => dispatch(setOpsSelectedFundId(row.fundId))}
+                        style={row.fundId === selectedFundId ? { background: 'rgba(59,130,246,0.08)' } : undefined}
+                      >
+                        <td className="font-medium" style={{ color: 'var(--foreground)' }}>
+                          <span className="inline-flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: DOT_COLORS[i % DOT_COLORS.length] }} />
+                            {row.name}
                           </span>
                         </td>
-                        <td style={{ color: 'var(--muted-foreground)' }}>{row.count}</td>
+                        <td>
+                          <span className="font-mono text-[12px]" style={{ color: 'var(--foreground)' }}>
+                            {fmt(row.nav)} {row.baseCurrency}
+                          </span>
+                        </td>
                         <td>
                           <span className="inline-flex items-center gap-1.5 font-mono text-[12px]"
                             style={{ color: row.pnl >= 0 ? '#10b981' : '#f43f5e' }}>
@@ -287,6 +272,19 @@ export default function DashboardPage() {
                         </td>
                         <td className="font-mono" style={{ color: 'var(--muted-foreground)' }}>
                           {row.pnlPct.toFixed(2)}%
+                        </td>
+                        <td>
+                          <span
+                            className="text-[10px] font-semibold px-2 py-0.5 rounded-full uppercase"
+                            style={row.status === 'OK'
+                              ? { background: 'rgba(16,185,129,0.12)', color: '#10b981' }
+                              : { background: 'rgba(245,158,11,0.12)', color: '#f59e0b' }}
+                          >
+                            {row.status}
+                          </span>
+                        </td>
+                        <td className="text-[11px]" style={{ color: 'var(--muted-foreground)' }}>
+                          {row.lastRecalculation ? new Date(row.lastRecalculation).toLocaleString() : '—'}
                         </td>
                       </tr>
                     ))}
@@ -300,13 +298,12 @@ export default function DashboardPage() {
           <div className="rounded-2xl p-4 flex flex-col" style={{ background: 'linear-gradient(145deg, #2d1f6e 0%, #3730a3 50%, #1e1b4b 100%)' }}>
             <div className="flex items-center justify-between mb-3">
               <span className="text-white text-[13px] font-semibold">Asset Allocation</span>
-              <PeriodPill value={pnlPeriod} onChange={v => dispatch(setPnlPeriod(v))} />
             </div>
             <div className="flex items-center justify-center my-2">
-              {holdingsLoading ? (
+              {dashboardAllocationLoading ? (
                 <div className="w-[160px] h-[160px] flex items-center justify-center"><Spinner /></div>
-              ) : assetAllocationRings.length > 0 ? (
-                <ConcentricRings rings={assetAllocationRings} />
+              ) : allocationRings.length > 0 ? (
+                <ConcentricRings rings={allocationRings} />
               ) : (
                 <div className="w-[160px] h-[160px] flex items-center justify-center text-[11px]" style={{ color: '#c4b5fd' }}>
                   No data
@@ -314,7 +311,7 @@ export default function DashboardPage() {
               )}
             </div>
             <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 mt-2">
-              {assetAllocationRings.map(r => (
+              {allocationRings.map(r => (
                 <div key={r.label} className="flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: r.color }} />
                   <span className="text-[11px]" style={{ color: '#c4b5fd' }}>{r.label} ({r.pct}%)</span>
@@ -331,14 +328,13 @@ export default function DashboardPage() {
           <div className="arcus-card">
             <div className="arcus-card-header">
               <span className="text-[13px] font-semibold" style={{ color: 'var(--foreground)' }}>Currency Exposure</span>
-              <PeriodPill value={pnlPeriod} onChange={v => dispatch(setPnlPeriod(v))} />
             </div>
             <div className="p-4">
-              {holdingsLoading ? (
+              {dashboardCurrencyExposureLoading ? (
                 <div className="flex items-center justify-center h-[200px]"><Spinner /></div>
               ) : currencyBars.length === 0 ? (
                 <div className="flex items-center justify-center h-[200px] text-[12px]" style={{ color: 'var(--muted-foreground)' }}>
-                  No holdings data
+                  No exposure data
                 </div>
               ) : (
                 <>
@@ -372,15 +368,11 @@ export default function DashboardPage() {
           <div className="arcus-card">
             <div className="arcus-card-header">
               <span className="text-[13px] font-semibold" style={{ color: 'var(--foreground)' }}>Funds</span>
-              <div className="flex items-center gap-2">
-                <PeriodPill value={pnlPeriod} onChange={v => dispatch(setPnlPeriod(v))} />
-                <button className="btn-white text-[12px] py-1 px-4">New Valuation</button>
-              </div>
             </div>
             <div className="overflow-x-auto">
-              {fundsLoading ? (
+              {dashboardFundsLoading ? (
                 <div className="flex items-center justify-center py-8"><Spinner /></div>
-              ) : funds.length === 0 ? (
+              ) : dashboardFunds.length === 0 ? (
                 <div className="py-8 text-center text-[12px]" style={{ color: 'var(--muted-foreground)' }}>No funds available</div>
               ) : (
                 <table className="arcus-table">
@@ -389,16 +381,16 @@ export default function DashboardPage() {
                       <th>Fund Name</th>
                       <th>NAV</th>
                       <th>Currency</th>
-                      <th>Updated</th>
-                      <th>Action</th>
+                      <th>Status</th>
+                      <th>Last Snapshot</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {funds.map((fund, i) => (
+                    {dashboardFunds.map((fund, i) => (
                       <tr
                         key={fund.id}
                         className="cursor-pointer"
-                        onClick={() => dispatch(setSelectedFundId(fund.id))}
+                        onClick={() => dispatch(setOpsSelectedFundId(fund.id))}
                         style={fund.id === selectedFundId ? { background: 'rgba(59,130,246,0.08)' } : undefined}
                       >
                         <td style={{ color: 'var(--foreground)' }} className="font-medium">
@@ -408,16 +400,21 @@ export default function DashboardPage() {
                           </span>
                         </td>
                         <td className="font-mono text-[12px]" style={{ color: 'var(--foreground)' }}>
-                          {fund.nav != null ? fmt(fund.nav) : '—'}
+                          {fund.latestSnapshot ? fmt(Number(fund.latestSnapshot.navBaseCurrency)) : '—'}
                         </td>
-                        <td style={{ color: 'var(--muted-foreground)' }}>{fund.base_currency}</td>
-                        <td style={{ color: 'var(--muted-foreground)' }}>
-                          {fund.nav_updated_at ? new Date(fund.nav_updated_at).toLocaleDateString() : '—'}
-                        </td>
+                        <td style={{ color: 'var(--muted-foreground)' }}>{fund.baseCurrencyCode}</td>
                         <td>
-                          <button className="w-6 h-6 flex items-center justify-center rounded opacity-50 hover:opacity-100 transition-opacity">
-                            <Lock className="w-3.5 h-3.5" style={{ color: 'var(--muted-foreground)' }} />
-                          </button>
+                          <span
+                            className="text-[10px] font-semibold px-2 py-0.5 rounded-full uppercase"
+                            style={fund.latestSnapshot?.status === 'OK'
+                              ? { background: 'rgba(16,185,129,0.12)', color: '#10b981' }
+                              : { background: 'rgba(100,116,139,0.15)', color: '#64748b' }}
+                          >
+                            {fund.latestSnapshot?.status ?? 'STALE'}
+                          </span>
+                        </td>
+                        <td style={{ color: 'var(--muted-foreground)' }}>
+                          {fund.latestSnapshot ? new Date(fund.latestSnapshot.asOf).toLocaleDateString() : '—'}
                         </td>
                       </tr>
                     ))}
@@ -428,65 +425,24 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* ── Row 3: Allocation by Security (only if holdings have security data) ── */}
-        {securityRows.length > 0 && (
-          <div className="arcus-card">
-            <div className="arcus-card-header">
-              <span className="text-[13px] font-semibold" style={{ color: 'var(--foreground)' }}>Allocation by Security</span>
-              <PeriodPill value={pnlPeriod} onChange={v => dispatch(setPnlPeriod(v))} />
-            </div>
-            <div className="overflow-x-auto">
-              <table className="arcus-table">
-                <thead>
-                  <tr>
-                    <th>Security</th>
-                    <th>Symbol</th>
-                    <th>Market Value</th>
-                    <th>Unrealized P&amp;L</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {securityRows.map((row, i) => (
-                    <tr key={row.symbol ?? i}>
-                      <td style={{ color: 'var(--foreground)' }} className="font-medium">
-                        <span className="inline-flex items-center gap-1.5">
-                          <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: row.dot }} />
-                          {row.name}
-                        </span>
-                      </td>
-                      <td className="font-mono text-[11px]" style={{ color: 'var(--muted-foreground)' }}>{row.symbol}</td>
-                      <td className="font-mono text-[12px]" style={{ color: 'var(--foreground)' }}>{fmt(row.value)}</td>
-                      <td className="font-mono text-[12px]" style={{ color: row.pnl >= 0 ? '#10b981' : '#f43f5e' }}>
-                        {row.pnl >= 0 ? '+' : ''}{fmtDec(row.pnl)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
         {/* PnL summary strip */}
-        {pnl && (
+        {selectedFundRow && (
           <div className="grid grid-cols-2 gap-4">
             <div className="arcus-card p-4">
-              <div className="text-[11px] mb-1" style={{ color: 'var(--muted-foreground)' }}>Unrealized P&amp;L ({pnlPeriod})</div>
+              <div className="text-[11px] mb-1" style={{ color: 'var(--muted-foreground)' }}>P&amp;L ({period})</div>
               <div className="text-[20px] font-mono font-semibold"
-                style={{ color: (pnl.unrealized?.usd ?? 0) >= 0 ? '#10b981' : '#f43f5e' }}>
-                {(pnl.unrealized?.usd ?? 0) >= 0 ? '+' : ''}{fmtDec(pnl.unrealized?.usd ?? 0)}
+                style={{ color: selectedFundRow.pnl >= 0 ? '#10b981' : '#f43f5e' }}>
+                {selectedFundRow.pnl >= 0 ? '+' : ''}{fmtDec(selectedFundRow.pnl)}
               </div>
-              {pnl.unrealized && (
-                <div className="text-[11px] mt-1" style={{ color: 'var(--muted-foreground)' }}>
-                  FX rate {pnl.unrealized.fxRateUsed?.toFixed(4)} ({pnl.unrealized.fxRateSource})
-                </div>
-              )}
+              <div className="text-[11px] mt-1" style={{ color: 'var(--muted-foreground)' }}>
+                {selectedFundRow.pnlPct.toFixed(2)}% of NAV
+              </div>
             </div>
             <div className="arcus-card p-4">
-              <div className="text-[11px] mb-1" style={{ color: 'var(--muted-foreground)' }}>Realized P&amp;L (All-time)</div>
+              <div className="text-[11px] mb-1" style={{ color: 'var(--muted-foreground)' }}>Realized P&amp;L ({period})</div>
               <div className="text-[20px] font-mono font-semibold"
-                style={{ color: (pnl.realized?.usd ?? 0) >= 0 ? '#10b981' : '#f43f5e' }}>
-                {(pnl.realized?.usd ?? 0) >= 0 ? '+' : ''}{fmtDec(pnl.realized?.usd ?? 0)}
+                style={{ color: selectedFundRow.periodRealizedPnl >= 0 ? '#10b981' : '#f43f5e' }}>
+                {selectedFundRow.periodRealizedPnl >= 0 ? '+' : ''}{fmtDec(selectedFundRow.periodRealizedPnl)}
               </div>
             </div>
           </div>

@@ -2,13 +2,22 @@
 
 import { useEffect, useState, useMemo } from 'react'
 import { PageHeader } from '@/components/investments-v2/page-header'
+import { PortfoliosSubNav } from '@/components/investments-v2/portfolios-subnav'
 import { cn } from '@/lib/utils'
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Cell, PieChart, Pie } from 'recharts'
-import { Folder, FolderOpen, ChevronDown, ChevronUp, Loader2 } from 'lucide-react'
+import { Folder, FolderOpen, ChevronDown, ChevronUp, Loader2, RefreshCw } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '@/lib/store'
-import { fetchFunds, fetchFundHoldings, fetchFundPnL, setSelectedFundId } from '@/lib/store/slices/investmentsSlice'
-import { effectiveHoldingValue } from '@/lib/api/investments-api'
-import { fetchOrderbook, type MockOrder } from '@/lib/mock/orders-mock-data'
+import {
+  fetchPortfolios,
+  fetchPortfolioOverview,
+  fetchPortfolioHoldings,
+  fetchPortfolioTransactions,
+  fetchPortfolioExposure,
+  fetchDashboardCurrencyExposure,
+  recalculatePortfolio,
+  setOpsSelectedFundId,
+} from '@/lib/store/slices/investmentOpsSlice'
+import { effectiveHoldingValue, type Holding } from '@/lib/api/investments-api'
 
 const DOT_COLORS = ['#f59e0b', '#3b82f6', '#6366f1', '#10b981', '#e879f9', '#f97316']
 
@@ -45,7 +54,7 @@ function CountryRings({ rings }: { rings: Ring[] }) {
 // ── Collapsible accordion row for holdings ────────────────────────
 function HoldingsAccordion({ label, holdings, total, pct, dot }: {
   label: string
-  holdings: any[]
+  holdings: Holding[]
   total: number
   pct: string
   dot: string
@@ -104,32 +113,45 @@ function HoldingsAccordion({ label, holdings, total, pct, dot }: {
 
 export default function PortfoliosPage() {
   const dispatch = useAppDispatch()
-  const { funds, fundsLoading, selectedFundId, holdings, holdingsLoading, pnl } = useAppSelector(s => s.investments)
-  const [orders, setOrders] = useState<MockOrder[] | null>(null)
+  const {
+    portfolios, portfoliosLoading,
+    selectedFundId,
+    portfolioOverview, portfolioOverviewLoading,
+    portfolioHoldings, portfolioHoldingsLoading,
+    portfolioTransactions, portfolioTransactionsLoading,
+    portfolioExposure,
+    dashboardCurrencyExposure,
+    portfolioRecalculating,
+  } = useAppSelector(s => s.investmentOps)
   const [activePage, setActivePage] = useState(1)
 
   useEffect(() => {
-    dispatch(fetchFunds())
+    dispatch(fetchPortfolios())
   }, [dispatch])
 
   useEffect(() => {
     if (!selectedFundId) return
-    dispatch(fetchFundHoldings(selectedFundId))
-    dispatch(fetchFundPnL({ fundId: selectedFundId }))
+    dispatch(fetchPortfolioOverview(selectedFundId))
+    dispatch(fetchPortfolioHoldings(selectedFundId))
+    dispatch(fetchPortfolioTransactions(selectedFundId))
+    dispatch(fetchPortfolioExposure(selectedFundId))
+    dispatch(fetchDashboardCurrencyExposure(selectedFundId))
   }, [dispatch, selectedFundId])
 
-  useEffect(() => {
-    dispatch(fetchOrderbook()).unwrap().then(setOrders)
-  }, [dispatch])
+  const handleRecalculate = async () => {
+    if (!selectedFundId) return
+    await dispatch(recalculatePortfolio(selectedFundId))
+    dispatch(fetchPortfolioOverview(selectedFundId))
+    dispatch(fetchPortfolioHoldings(selectedFundId))
+    dispatch(fetchPortfolioExposure(selectedFundId))
+  }
 
-  const selectedFund = funds.find(f => f.id === selectedFundId)
-
-  // Group holdings by exchange
+  // Group holdings by exchange (unchanged logic, real data source now)
   const groupedHoldings = useMemo(() => {
-    if (!holdings.length) return []
-    const groups: Record<string, any[]> = {}
+    if (!portfolioHoldings.length) return []
+    const groups: Record<string, Holding[]> = {}
     let grandTotal = 0
-    for (const h of holdings) {
+    for (const h of portfolioHoldings) {
       const key = h.security?.exchangeCode ?? 'Cash'
       if (!groups[key]) groups[key] = []
       groups[key].push(h)
@@ -145,36 +167,23 @@ export default function PortfoliosPage() {
         dot: DOT_COLORS[i % DOT_COLORS.length],
       }
     })
-  }, [holdings])
+  }, [portfolioHoldings])
 
-  // Country distribution (mock — based on exchange)
+  // Country/exchange rings — now real, from getPortfolioExposure().byExchange
   const countryRings = useMemo(() => {
-    const totals: Record<string, number> = {}
-    let grand = 0
-    for (const h of holdings) {
-      const key = h.security?.exchangeCode ?? 'Other'
-      const val = effectiveHoldingValue(h)
-      totals[key] = (totals[key] ?? 0) + val
-      grand += val
-    }
+    if (!portfolioExposure?.byExchange.length) return []
     const colors = ['#3b82f6', '#6366f1', '#8b5cf6', '#0ea5e9']
     const radii = [68, 53, 38, 23]
-    return Object.entries(totals)
-      .sort((a, b) => b[1] - a[1])
+    return portfolioExposure.byExchange
       .slice(0, 4)
-      .map(([label, val], i) => ({
-        label,
-        pct: grand > 0 ? Math.round((val / grand) * 100) : 0,
-        color: colors[i],
-        r: radii[i],
-      }))
-  }, [holdings])
+      .map((e, i) => ({ label: e.key, pct: Math.round(e.pct), color: colors[i], r: radii[i] }))
+  }, [portfolioExposure])
 
-  // Sector bars (mock — use exchange as sector proxy)
+  // Sector bars — still a client-derived proxy (no sector-exposure endpoint provided yet)
   const sectorBars = useMemo(() => {
     const totals: Record<string, number> = {}
     let grand = 0
-    for (const h of holdings) {
+    for (const h of portfolioHoldings) {
       const key = h.security?.exchangeCode ?? 'Other'
       const val = effectiveHoldingValue(h)
       totals[key] = (totals[key] ?? 0) + val
@@ -186,47 +195,36 @@ export default function PortfoliosPage() {
       .slice(0, 8)
     const maxVal = Math.max(...bars.map(b => b.value))
     return bars.map(b => ({ ...b, highlight: b.value === maxVal }))
-  }, [holdings])
+  }, [portfolioHoldings])
 
-  // Currency pie
+  // Currency pie — real, from getDashboardCurrencyExposure(fundId)
   const currencyPie = useMemo(() => {
-    const totals: Record<string, number> = {}
-    let grand = 0
-    for (const h of holdings) {
-      const cur = h.wacCurrencyCode ?? 'USD'
-      const val = effectiveHoldingValue(h)
-      totals[cur] = (totals[cur] ?? 0) + val
-      grand += val
-    }
+    if (!dashboardCurrencyExposure.length) return []
+    const grand = dashboardCurrencyExposure.reduce((s, e) => s + e.value, 0)
     const colors = ['#3b82f6', '#8b5cf6', '#6366f1', '#0ea5e9']
-    return Object.entries(totals)
-      .sort((a, b) => b[1] - a[1])
+    return dashboardCurrencyExposure
+      .slice()
+      .sort((a, b) => b.value - a.value)
       .slice(0, 4)
-      .map(([name, val], i) => ({
-        name,
-        value: grand > 0 ? Math.round((val / grand) * 100) : 0,
-        color: colors[i],
-      }))
-  }, [holdings])
-
-  const totalNav = holdings.reduce((s, h) => s + effectiveHoldingValue(h), 0)
-  const totalPnl = holdings.reduce((s, h) => s + (h.unrealizedPnl ?? 0), 0)
+      .map((e, i) => ({ name: e.currency, value: grand > 0 ? Math.round((e.value / grand) * 100) : 0, color: colors[i] }))
+  }, [dashboardCurrencyExposure])
 
   return (
     <div className="flex flex-col h-full w-full">
       <PageHeader title="Portfolios" />
+      <PortfoliosSubNav />
 
       {/* ── Fund folder tabs ── */}
       <div className="flex items-center gap-2.5 px-5 pt-4 pb-4 flex-shrink-0 overflow-x-auto">
-        {fundsLoading ? (
+        {portfoliosLoading ? (
           <Spinner />
-        ) : funds.length === 0 ? (
+        ) : portfolios.length === 0 ? (
           <span className="text-[12px]" style={{ color: 'var(--muted-foreground)' }}>No funds available</span>
         ) : (
-          funds.map((fund) => (
+          portfolios.map((fund) => (
             <button
               key={fund.id}
-              onClick={() => dispatch(setSelectedFundId(fund.id))}
+              onClick={() => dispatch(setOpsSelectedFundId(fund.id))}
               className={cn('folder-tab', selectedFundId === fund.id && 'active')}
             >
               {selectedFundId === fund.id
@@ -240,9 +238,9 @@ export default function PortfoliosPage() {
 
       <div className="flex-1 overflow-y-auto px-5 pb-5 space-y-3">
 
-        {!selectedFund ? (
+        {!portfolioOverview ? (
           <div className="py-8 text-center text-[12px]" style={{ color: 'var(--muted-foreground)' }}>
-            Select a fund to view holdings
+            {portfolioOverviewLoading ? 'Loading…' : 'Select a fund to view holdings'}
           </div>
         ) : (
           <>
@@ -251,25 +249,31 @@ export default function PortfoliosPage() {
               <div className="arcus-card-header">
                 <div className="flex items-center gap-2 flex-wrap">
                   <Folder className="w-4 h-4" style={{ color: 'var(--muted-foreground)' }} />
-                  <span className="text-[13px] font-semibold" style={{ color: 'var(--foreground)' }}>{selectedFund.name}</span>
+                  <span className="text-[13px] font-semibold" style={{ color: 'var(--foreground)' }}>{portfolioOverview.name}</span>
                   <span className="text-[11px] ml-2" style={{ color: 'var(--muted-foreground)' }}>
                     NAV <span className="font-mono" style={{ color: '#3b82f6' }}>
-                      {holdingsLoading ? '...' : `${fmt(totalNav)} ${selectedFund.base_currency}`}
+                      {fmt(portfolioOverview.nav)} {portfolioOverview.baseCurrency}
                     </span>
                   </span>
                   <span className="text-[11px]" style={{ color: 'var(--muted-foreground)' }}>
-                    P&L <span className="font-mono" style={{ color: totalPnl >= 0 ? '#10b981' : '#f43f5e' }}>
-                      {holdingsLoading ? '...' : `${totalPnl >= 0 ? '+' : ''}${fmt(totalPnl)} ${selectedFund.base_currency}`}
+                    P&L <span className="font-mono" style={{ color: portfolioOverview.pnl >= 0 ? '#10b981' : '#f43f5e' }}>
+                      {portfolioOverview.pnl >= 0 ? '+' : ''}{fmt(portfolioOverview.pnl)} {portfolioOverview.baseCurrency}
                     </span>
                   </span>
-                  {holdingsLoading && <Spinner />}
+                  <span className="text-[11px]" style={{ color: 'var(--muted-foreground)' }}>
+                    Manager <span style={{ color: 'var(--foreground)' }}>{portfolioOverview.portfolioManager}</span>
+                  </span>
+                  {portfolioHoldingsLoading && <Spinner />}
                 </div>
-                <button className="btn-white text-[12px] py-1 px-4">Recalculate</button>
+                <button onClick={handleRecalculate} disabled={portfolioRecalculating} className="btn-white text-[12px] py-1 px-4 flex items-center gap-1.5 disabled:opacity-60">
+                  <RefreshCw className={cn('w-3 h-3', portfolioRecalculating && 'animate-spin')} />
+                  Recalculate
+                </button>
               </div>
 
               {/* Composition table with collapsible accordions */}
               <div className="overflow-x-auto">
-                {holdingsLoading ? (
+                {portfolioHoldingsLoading ? (
                   <div className="flex items-center justify-center py-8"><Spinner /></div>
                 ) : groupedHoldings.length === 0 ? (
                   <div className="py-8 text-center text-[12px]" style={{ color: 'var(--muted-foreground)' }}>
@@ -305,9 +309,9 @@ export default function PortfoliosPage() {
               </div>
 
               {/* ── 3 inline charts ── */}
-              {!holdingsLoading && holdings.length > 0 && (
+              {!portfolioHoldingsLoading && portfolioHoldings.length > 0 && (
                 <div className="grid grid-cols-3 gap-0" style={{ borderTop: '1px solid var(--border)' }}>
-                  {/* Country rings */}
+                  {/* Country/exchange rings — real */}
                   <div className="flex gap-4 p-4 items-center" style={{ borderRight: '1px solid var(--border)' }}>
                     {countryRings.length > 0 ? (
                       <>
@@ -328,7 +332,7 @@ export default function PortfoliosPage() {
                     )}
                   </div>
 
-                  {/* Sector bars */}
+                  {/* Sector bars — still derived (no sector-exposure endpoint yet) */}
                   <div className="p-4 flex flex-col" style={{ borderRight: '1px solid var(--border)' }}>
                     {sectorBars.length > 0 ? (
                       <>
@@ -364,7 +368,7 @@ export default function PortfoliosPage() {
                     )}
                   </div>
 
-                  {/* Currency pie */}
+                  {/* Currency pie — real */}
                   <div className="p-4 flex items-center gap-4">
                     {currencyPie.length > 0 ? (
                       <>
@@ -394,77 +398,64 @@ export default function PortfoliosPage() {
               )}
             </div>
 
-            {/* ── Orders section ── */}
+            {/* ── Recent Transactions ── */}
             <div className="arcus-card">
               <div className="arcus-card-header">
                 <span className="text-[13px] font-semibold" style={{ color: 'var(--foreground)' }}>
-                  Orders{orders ? `(${orders.length})` : ''}
+                  Recent Transactions{portfolioTransactions.length ? ` (${portfolioTransactions.length})` : ''}
                 </span>
-                <button className="btn-white text-[12px] py-1 px-4">New Position</button>
               </div>
               <div className="overflow-x-auto">
-                {!orders ? (
+                {portfolioTransactionsLoading ? (
                   <div className="flex items-center justify-center py-8"><Spinner /></div>
-                ) : orders.length === 0 ? (
-                  <div className="py-8 text-center text-[12px]" style={{ color: 'var(--muted-foreground)' }}>No orders available</div>
+                ) : portfolioTransactions.length === 0 ? (
+                  <div className="py-8 text-center text-[12px]" style={{ color: 'var(--muted-foreground)' }}>No transactions available</div>
                 ) : (
                   <table className="arcus-table">
                     <thead>
                       <tr>
-                        <th>Order Ref</th>
-                        <th>Security</th>
-                        <th>Side</th>
+                        <th>Trade Ref</th>
+                        <th>Symbol</th>
+                        <th>Type</th>
                         <th className="text-right">Quantity</th>
-                        <th className="text-right">Filled</th>
                         <th className="text-right">Price</th>
-                        <th>Venue</th>
                         <th>Status</th>
+                        <th>Trade Date</th>
+                        <th className="text-right">Realized P&amp;L</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {orders.slice(0, 10).map((order, i) => (
-                        <tr key={order.id}>
-                          <td className="font-mono text-[12px]" style={{ color: 'var(--foreground)' }}>{order.orderRef}</td>
-                          <td>
-                            <div className="flex flex-col">
-                              <span className="font-mono text-[12px] font-semibold" style={{ color: 'var(--foreground)' }}>
-                                {order.securitySymbol}
-                              </span>
-                              <span className="text-[10px]" style={{ color: 'var(--muted-foreground)' }}>
-                                {order.securityName}
-                              </span>
-                            </div>
-                          </td>
+                      {portfolioTransactions.slice((activePage - 1) * 10, activePage * 10).map((txn) => (
+                        <tr key={txn.id}>
+                          <td className="font-mono text-[12px]" style={{ color: 'var(--foreground)' }}>{txn.tradeRef}</td>
+                          <td className="font-mono text-[12px] font-semibold" style={{ color: 'var(--foreground)' }}>{txn.symbol}</td>
                           <td>
                             <span className={cn(
                               'text-[11px] px-2 py-0.5 rounded-full font-medium',
-                              order.side === 'BUY' ? 'bg-[#10b98114] text-[#10b981]' : 'bg-[#f43f5e14] text-[#f43f5e]'
+                              txn.type === 'PURCHASE' ? 'bg-[#10b98114] text-[#10b981]' : 'bg-[#f43f5e14] text-[#f43f5e]'
                             )}>
-                              {order.side}
+                              {txn.type === 'PURCHASE' ? 'BUY' : 'SELL'}
                             </span>
                           </td>
                           <td className="text-right font-mono" style={{ color: 'var(--foreground)' }}>
-                            {order.quantity.toLocaleString()}
-                          </td>
-                          <td className="text-right font-mono" style={{ color: 'var(--foreground)' }}>
-                            {order.filledQuantity.toLocaleString()}
-                            <span className="ml-1 text-[10px]" style={{ color: 'var(--muted-foreground)' }}>
-                              ({order.quantity ? Math.round((order.filledQuantity / order.quantity) * 100) : 0}%)
-                            </span>
+                            {txn.quantity.toLocaleString()}
                           </td>
                           <td className="text-right font-mono" style={{ color: 'var(--muted-foreground)' }}>
-                            {order.limitPrice != null ? order.limitPrice.toFixed(2) : order.avgFillPrice != null ? order.avgFillPrice.toFixed(2) : 'Market'}
+                            {txn.price.toFixed(4)}
                           </td>
-                          <td style={{ color: 'var(--muted-foreground)' }}>{order.venue}</td>
                           <td>
                             <span className={cn(
                               'text-[11px] px-2 py-0.5 rounded-full font-medium',
-                              order.status === 'FILLED' ? 'bg-[#10b98114] text-[#10b981]' :
-                              order.status === 'WORKING' || order.status === 'PARTIAL' ? 'bg-[#3b82f614] text-[#3b82f6]' :
+                              txn.status === 'SETTLED' ? 'bg-[#10b98114] text-[#10b981]' :
+                              txn.status === 'SETTLEMENT_FAILED' ? 'bg-[#f43f5e14] text-[#f43f5e]' :
                               'bg-[#64748b14] text-[#64748b]'
                             )}>
-                              {order.status}
+                              {txn.status}
                             </span>
+                          </td>
+                          <td style={{ color: 'var(--muted-foreground)' }}>{new Date(txn.tradeDate).toLocaleDateString()}</td>
+                          <td className="text-right font-mono" style={{ color: txn.realizedPnl != null && txn.realizedPnl >= 0 ? '#10b981' : txn.realizedPnl != null ? '#f43f5e' : 'var(--muted-foreground)' }}>
+                            {txn.realizedPnl != null ? fmt(txn.realizedPnl) : '—'}
                           </td>
                         </tr>
                       ))}
@@ -472,19 +463,19 @@ export default function PortfoliosPage() {
                   </table>
                 )}
               </div>
-              {orders && orders.length > 10 && (
+              {portfolioTransactions.length > 10 && (
                 <div className="flex items-center justify-between px-4 py-2.5" style={{ borderTop: '1px solid var(--border)' }}>
                   <span className="text-[11px]" style={{ color: 'var(--muted-foreground)' }}>
-                    Showing 10 out of {orders.length} results
+                    Showing {Math.min(10, portfolioTransactions.length - (activePage - 1) * 10)} out of {portfolioTransactions.length} results
                   </span>
                   <div className="flex items-center gap-1">
-                    <button className="pg-btn" onClick={() => setActivePage(Math.max(1, activePage - 1))}>‹</button>
-                    {[1,2,3,4].map(p => (
+                    <button className="pg-btn" onClick={() => setActivePage(p => Math.max(1, p - 1))}>‹</button>
+                    {Array.from({ length: Math.ceil(portfolioTransactions.length / 10) }, (_, i) => i + 1).map(p => (
                       <button key={p} onClick={() => setActivePage(p)} className={cn('pg-btn', activePage === p && 'active')}>
                         {p}
                       </button>
                     ))}
-                    <button className="pg-btn" onClick={() => setActivePage(Math.min(4, activePage + 1))}>›</button>
+                    <button className="pg-btn" onClick={() => setActivePage(p => Math.min(Math.ceil(portfolioTransactions.length / 10), p + 1))}>›</button>
                   </div>
                 </div>
               )}

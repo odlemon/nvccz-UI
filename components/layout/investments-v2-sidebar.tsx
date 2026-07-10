@@ -32,9 +32,8 @@ const navItems = [
       { label: 'Overview', href: '/investments-v2/portfolios' },
       { label: 'Instruments', href: '/investments-v2/portfolios/instruments' },
       { label: 'Prices', href: '/investments-v2/portfolios/prices' },
-      // { label: 'Positions', href: '/investments-v2/portfolios/positions' },
+      { label: 'Positions', href: '/investments-v2/portfolios/positions' },
       { label: 'Transactions', href: '/investments-v2/portfolios/transactions' },
-      // { label: 'Folder Setup', href: '/investments-v2/portfolios/folder-setup' },
       { label: 'Setup', href: '/investments-v2/portfolios/setup' },
     ],
   },
@@ -48,41 +47,23 @@ const navItems = [
       { label: 'Trading', href: '/investments-v2/orders/trading' },
       { label: 'Compliance', href: '/investments-v2/orders/compliance' },
       { label: 'Simulation', href: '/investments-v2/orders/simulation' },
-      // { label: 'Models', href: '/investments-v2/orders/models' },
-      // { label: 'Setup', href: '/investments-v2/orders/setup' },
+      { label: 'Models', href: '/investments-v2/orders/models' },
     ],
   },
   {
     label: 'Reconciliation',
     icon: Scale,
     href: '/investments-v2/reconciliation',
-    children: [
-      { label: 'Cash Recon', href: '/investments-v2/reconciliation/cash' },
-      { label: 'Holdings', href: '/investments-v2/reconciliation/holdings' },
-      { label: 'Trade Recon', href: '/investments-v2/reconciliation/trades' },
-      { label: 'Exceptions', href: '/investments-v2/reconciliation/exceptions' },
-    ],
   },
   {
     label: 'Valuation',
     icon: TrendingUp,
     href: '/investments-v2/valuation',
-    children: [
-      { label: 'NAV Runs', href: '/investments-v2/valuation/nav' },
-      { label: 'P&L Runs', href: '/investments-v2/valuation/pnl' },
-      { label: 'Price Validation', href: '/investments-v2/valuation/prices' },
-      { label: 'FX Conversion', href: '/investments-v2/valuation/fx' },
-    ],
   },
   {
     label: 'Reporting',
     icon: BarChart2,
     href: '/investments-v2/reporting',
-    children: [
-      { label: 'Portfolio Reports', href: '/investments-v2/reporting/portfolio' },
-      { label: 'P&L Reports', href: '/investments-v2/reporting/pnl' },
-      { label: 'Trade Reports', href: '/investments-v2/reporting/trades' },
-    ],
   }
 ]
 

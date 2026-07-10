@@ -1,20 +1,16 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { PageHeader } from '@/components/investments-v2/page-header'
 import { PortfoliosSubNav } from '@/components/investments-v2/portfolios-subnav'
-import { SecurityFormDialog } from '@/components/investments-v2/security-form-dialog'
 import { StatusBadge } from '@/components/arcus/status-badge'
 import { cn } from '@/lib/utils'
-import { Search, Loader2, Plus, Pencil } from 'lucide-react'
+import { Search, Loader2, ChevronDown } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '@/lib/store'
-import { fetchSecurities } from '@/lib/store/slices/investmentsSlice'
-import { useRolePermissions } from '@/lib/hooks/useRolePermissions'
-import type { Security } from '@/lib/api/investments-api'
+import { fetchInstrumentTypes, fetchInstruments } from '@/lib/store/slices/investmentOpsSlice'
 
 const EXCHANGES = ['All', 'ZSE', 'VFEX', 'SECZIM', 'NASDAQ', 'NYSE'] as const
-
 const PAGE_SIZE = 12
 
 function Spinner() {
@@ -24,73 +20,57 @@ function Spinner() {
 export default function InstrumentsPage() {
   const dispatch = useAppDispatch()
   const router = useRouter()
-  const { securities, securitiesLoading } = useAppSelector((s) => s.investments)
-  const { hasSubModuleAccess } = useRolePermissions()
-  const isAdmin = hasSubModuleAccess('investments', 'investments-portfolios-instruments')
+  const { instruments, instrumentsLoading, instrumentsTotal, instrumentTypes } = useAppSelector((s) => s.investmentOps)
 
   const [exchange, setExchange] = useState<(typeof EXCHANGES)[number]>('All')
+  const [type, setType] = useState<string>('All')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [editTarget, setEditTarget] = useState<Security | null>(null)
-
-  const openAdd = () => {
-    setEditTarget(null)
-    setDialogOpen(true)
-  }
-  const openEdit = (e: React.MouseEvent, sec: Security) => {
-    e.stopPropagation()
-    setEditTarget(sec)
-    setDialogOpen(true)
-  }
 
   useEffect(() => {
-    dispatch(fetchSecurities(exchange === 'All' ? undefined : { exchange }))
-  }, [dispatch, exchange])
+    dispatch(fetchInstrumentTypes())
+  }, [dispatch])
+
+  useEffect(() => {
+    dispatch(
+      fetchInstruments({
+        exchange: exchange === 'All' ? undefined : exchange,
+        type: type === 'All' ? undefined : type,
+        status: 'APPROVED',
+        page,
+        pageSize: PAGE_SIZE,
+      })
+    )
+  }, [dispatch, exchange, type, page])
 
   useEffect(() => {
     setPage(1)
-  }, [exchange, search])
+  }, [exchange, type])
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    if (!q) return securities
-    return securities.filter(
-      (s) => s.symbol.toLowerCase().includes(q) || s.name.toLowerCase().includes(q)
-    )
-  }, [securities, search])
+  const filtered = search.trim()
+    ? instruments.filter(
+        (i) =>
+          i.ticker.toLowerCase().includes(search.toLowerCase()) ||
+          i.fullName.toLowerCase().includes(search.toLowerCase()) ||
+          i.instrumentCode.toLowerCase().includes(search.toLowerCase())
+      )
+    : instruments
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
-  const pageRows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
-
-  const uniqueExchanges = useMemo(() => new Set(securities.map((s) => s.exchangeCode)).size, [securities])
-  const uniqueCurrencies = useMemo(() => new Set(securities.map((s) => s.listingCurrencyCode)).size, [securities])
-  const activeCount = useMemo(() => securities.filter((s) => s.isActive).length, [securities])
+  const totalPages = Math.max(1, Math.ceil(instrumentsTotal / PAGE_SIZE))
+  const uniqueExchanges = new Set(instruments.map((i) => i.exchangeCode)).size
+  const uniqueCurrencies = new Set(instruments.map((i) => i.listingCurrencyCode)).size
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <PageHeader
-        title="Instruments"
-        actions={
-          isAdmin ? (
-            <button
-              onClick={openAdd}
-              className="flex items-center gap-1.5 text-white text-xs font-medium px-3 py-1.5 rounded-full"
-              style={{ background: '#2563eb' }}
-            >
-              <Plus className="w-3.5 h-3.5" /> New Security
-            </button>
-          ) : undefined
-        }
-      />
+      <PageHeader title="Instruments" />
       <PortfoliosSubNav />
 
       <div className="flex-1 overflow-y-auto px-5 pb-5 pt-4 space-y-4">
         {/* Stat strip */}
         <div className="grid grid-cols-4 gap-3">
           {[
-            { label: 'Total Securities', value: securities.length },
-            { label: 'Active', value: activeCount },
+            { label: 'Total Instruments', value: instrumentsTotal },
+            { label: 'On This Page', value: instruments.length },
             { label: 'Exchanges Covered', value: uniqueExchanges },
             { label: 'Currencies Covered', value: uniqueCurrencies },
           ].map((s) => (
@@ -105,14 +85,32 @@ export default function InstrumentsPage() {
           ))}
         </div>
 
-        {/* Exchange filter + search */}
+        {/* Exchange + type filters + search */}
         <div className="flex items-center justify-between flex-wrap gap-2">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {EXCHANGES.map((ex) => (
-              <button key={ex} onClick={() => setExchange(ex)} className={cn('cat-pill', exchange === ex && 'active')}>
-                {ex}
-              </button>
-            ))}
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {EXCHANGES.map((ex) => (
+                <button key={ex} onClick={() => setExchange(ex)} className={cn('cat-pill', exchange === ex && 'active')}>
+                  {ex}
+                </button>
+              ))}
+            </div>
+            <div className="relative inline-flex">
+              <select
+                value={type}
+                onChange={(e) => setType(e.target.value)}
+                className="sort-pill text-[11px] appearance-none pr-5 cursor-pointer"
+                style={{ background: 'transparent' }}
+              >
+                <option value="All">All Types</option>
+                {instrumentTypes.map((t) => (
+                  <option key={t.id} value={t.typeCode}>
+                    {t.displayName}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3" />
+            </div>
           </div>
           <div
             className="flex items-center gap-1.5 rounded px-2.5 py-1.5"
@@ -122,7 +120,7 @@ export default function InstrumentsPage() {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search symbol or name..."
+              placeholder="Filter this page..."
               className="bg-transparent text-xs outline-none w-44"
               style={{ color: 'var(--foreground)' }}
             />
@@ -133,73 +131,70 @@ export default function InstrumentsPage() {
         <div className="arcus-card">
           <div className="arcus-card-header">
             <span className="text-[13px] font-semibold" style={{ color: 'var(--foreground)' }}>
-              Securities Master
+              Instrument Master
             </span>
-            {securitiesLoading && <Spinner />}
+            {instrumentsLoading && <Spinner />}
           </div>
           <div className="overflow-x-auto">
-            {securitiesLoading && securities.length === 0 ? (
+            {instrumentsLoading && instruments.length === 0 ? (
               <div className="flex items-center justify-center py-10">
                 <Spinner />
               </div>
-            ) : pageRows.length === 0 ? (
+            ) : filtered.length === 0 ? (
               <div className="py-10 text-center text-[12px]" style={{ color: 'var(--muted-foreground)' }}>
-                No securities found{search ? ` matching "${search}"` : ''}.
+                No instruments found{search ? ` matching "${search}"` : ''}.
               </div>
             ) : (
               <table className="arcus-table">
                 <thead>
                   <tr>
-                    <th>Symbol</th>
-                    <th>Name</th>
+                    <th>Code</th>
+                    <th>Ticker</th>
+                    <th>Full Name</th>
                     <th>Exchange</th>
+                    <th>Type</th>
+                    <th>Sector</th>
+                    <th>Industry</th>
                     <th>Currency</th>
-                    <th>ISIN</th>
+                    <th>Valuation Method</th>
                     <th>Status</th>
-                    <th>Listed</th>
                     <th />
                   </tr>
                 </thead>
                 <tbody>
-                  {pageRows.map((sec) => (
+                  {filtered.map((inst) => (
                     <tr
-                      key={sec.id}
-                      className="cursor-pointer"
-                      onClick={() => router.push(`/investments-v2/portfolios/prices?securityId=${sec.id}`)}
+                      key={inst.id}
+                      className={cn('cursor-pointer', !inst.listedEquitySecurityId && 'cursor-default')}
+                      onClick={() =>
+                        inst.listedEquitySecurityId &&
+                        router.push(`/investments-v2/portfolios/prices?securityId=${inst.listedEquitySecurityId}`)
+                      }
                     >
-                      <td className="font-mono font-semibold" style={{ color: '#3b82f6' }}>
-                        {sec.symbol}
-                      </td>
-                      <td style={{ color: 'var(--foreground)' }}>{sec.name}</td>
-                      <td style={{ color: 'var(--muted-foreground)' }}>{sec.exchangeCode}</td>
-                      <td className="font-mono" style={{ color: 'var(--muted-foreground)' }}>
-                        {sec.listingCurrencyCode}
-                      </td>
                       <td className="font-mono text-[11px]" style={{ color: 'var(--muted-foreground)' }}>
-                        {sec.isin ?? '—'}
+                        {inst.instrumentCode}
+                      </td>
+                      <td className="font-mono font-semibold" style={{ color: '#3b82f6' }}>
+                        {inst.ticker}
+                      </td>
+                      <td style={{ color: 'var(--foreground)' }}>{inst.fullName}</td>
+                      <td style={{ color: 'var(--muted-foreground)' }}>{inst.exchangeCode}</td>
+                      <td style={{ color: 'var(--muted-foreground)' }}>{inst.instrumentTypeCode}</td>
+                      <td style={{ color: 'var(--muted-foreground)' }}>{inst.sector ?? '—'}</td>
+                      <td style={{ color: 'var(--muted-foreground)' }}>{inst.industry ?? '—'}</td>
+                      <td className="font-mono" style={{ color: 'var(--muted-foreground)' }}>
+                        {inst.listingCurrencyCode}
+                      </td>
+                      <td style={{ color: 'var(--muted-foreground)' }}>{inst.valuationMethod}</td>
+                      <td>
+                        <StatusBadge status={inst.status.toLowerCase()} />
                       </td>
                       <td>
-                        <StatusBadge status={sec.isActive ? 'active' : 'inactive'} />
-                      </td>
-                      <td className="text-[11px]" style={{ color: 'var(--muted-foreground)' }}>
-                        {sec.createdAt ? new Date(sec.createdAt).toLocaleDateString() : '—'}
-                      </td>
-                      <td>
-                        <div className="flex items-center gap-2">
+                        {inst.listedEquitySecurityId && (
                           <span className="text-[10px] hover:underline" style={{ color: '#3b82f6' }}>
                             View Prices
                           </span>
-                          {isAdmin && (
-                            <button
-                              onClick={(e) => openEdit(e, sec)}
-                              className="opacity-60 hover:opacity-100"
-                              style={{ color: 'var(--muted-foreground)' }}
-                              title="Edit security"
-                            >
-                              <Pencil className="w-3 h-3" />
-                            </button>
-                          )}
-                        </div>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -208,14 +203,14 @@ export default function InstrumentsPage() {
             )}
           </div>
 
-          {/* Pagination */}
-          {filtered.length > PAGE_SIZE && (
+          {/* Server-side pagination */}
+          {totalPages > 1 && (
             <div
               className="flex items-center justify-between px-4 py-2.5"
               style={{ borderTop: '1px solid var(--border)' }}
             >
               <span className="text-[11px]" style={{ color: 'var(--muted-foreground)' }}>
-                Showing {pageRows.length} out of {filtered.length} results
+                Page {page} of {totalPages} · {instrumentsTotal} instruments
               </span>
               <div className="flex items-center gap-1">
                 <button className="pg-btn" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}>
@@ -238,13 +233,6 @@ export default function InstrumentsPage() {
           )}
         </div>
       </div>
-
-      <SecurityFormDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        editTarget={editTarget}
-        onSaved={() => dispatch(fetchSecurities(exchange === 'All' ? undefined : { exchange }))}
-      />
     </div>
   )
 }

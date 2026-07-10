@@ -1,23 +1,19 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { PageHeader } from '@/components/investments-v2/page-header'
 import { StatCard } from '@/components/arcus/stat-card'
 import { StatusBadge } from '@/components/arcus/status-badge'
 import { cn } from '@/lib/utils'
-import { RefreshCw, AlertTriangle, CheckCircle2 } from 'lucide-react'
+import { RefreshCw } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  BarChart, Bar
 } from 'recharts'
+import { useAppDispatch, useAppSelector } from '@/lib/store'
+import { fetchPortfolios, createValuationRun, fetchValuationExceptions } from '@/lib/store/slices/investmentOpsSlice'
+import { fetchSecurities } from '@/lib/store/slices/investmentsSlice'
 
-const valRuns = [
-  { id: 'VAL-1842', portfolio: 'Equity World', valDate: '07 Jul 2026', runTime: '10:15:22', nav: 142850200, grossAV: 148200000, netAV: 142850200, unrealPnl: 4820500, realPnl: 1240000, cashBal: 18200000, status: 'validated', method: 'Mark-to-Market', fxDate: '07 Jul 2026' },
-  { id: 'VAL-1841', portfolio: 'Multi Asset', valDate: '07 Jul 2026', runTime: '10:12:08', nav: 87320000, grossAV: 90100000, netAV: 87320000, unrealPnl: 1840200, realPnl: 480200, cashBal: 11200000, status: 'validated', method: 'Mark-to-Market', fxDate: '07 Jul 2026' },
-  { id: 'VAL-1840', portfolio: 'Fixed Income', valDate: '07 Jul 2026', runTime: '10:10:45', nav: 56100000, grossAV: 57200000, netAV: 56100000, unrealPnl: -210400, realPnl: 90000, cashBal: 6800000, status: 'validated', method: 'Amortised Cost', fxDate: '07 Jul 2026' },
-  { id: 'VAL-1839', portfolio: 'Asia Select', valDate: '07 Jul 2026', runTime: '09:55:14', nav: 33450000, grossAV: 34200000, netAV: 33450000, unrealPnl: 820700, realPnl: 220700, cashBal: 4200000, status: 'pending', method: 'Mark-to-Market', fxDate: '07 Jul 2026' },
-]
-
+// NAV trend chart stays a mock proxy — no history/trend endpoint has been provided yet.
 const navTrend = [
   { date: 'Jun 1', equity: 139.2, multiAsset: 85.4, fixedIncome: 56.8, asia: 32.1 },
   { date: 'Jun 15', equity: 140.8, multiAsset: 86.1, fixedIncome: 56.5, asia: 32.8 },
@@ -25,21 +21,36 @@ const navTrend = [
   { date: 'Jul 7', equity: 142.85, multiAsset: 87.32, fixedIncome: 56.10, asia: 33.45 },
 ]
 
-const exceptions = [
-  { id: 'VE-0041', portfolio: 'Asia Select', ticker: 'BABA', issue: 'Stale Price — Last price 3 days old', severity: 'high', status: 'pending' },
-  { id: 'VE-0040', portfolio: 'Fixed Income', ticker: 'HY-BOND', issue: 'Price deviation > 5% from previous close', severity: 'medium', status: 'investigating' },
-  { id: 'VE-0039', portfolio: 'Multi Asset', ticker: 'GOLD', issue: 'FX rate mismatch — source vs approved rate', severity: 'low', status: 'resolved' },
-]
+function runStatusBadge(status: string) {
+  if (status === 'COMPLETED') return 'validated'
+  if (status === 'COMPLETED_WITH_EXCEPTIONS') return 'warning'
+  return status.toLowerCase().replace(/_/g, ' ')
+}
 
 const tabs = ['NAV Runs', 'P&L Runs', 'Price Validation', 'FX Conversion', 'Exceptions']
 
 export default function ValuationPage() {
+  const dispatch = useAppDispatch()
+  const { portfolios, selectedFundId, valuationRuns, valuationRunning, valuationExceptions, valuationExceptionsLoading } =
+    useAppSelector((s) => s.investmentOps)
+  const { securities } = useAppSelector((s) => s.investments)
   const [activeTab, setActiveTab] = useState('NAV Runs')
-  const [running, setRunning] = useState(false)
+
+  useEffect(() => {
+    dispatch(fetchPortfolios())
+    dispatch(fetchSecurities())
+  }, [dispatch])
+
+  useEffect(() => {
+    dispatch(fetchValuationExceptions({ fundId: selectedFundId ?? undefined }))
+  }, [dispatch, selectedFundId])
+
+  const fundName = (fundId: string) => portfolios.find((f) => f.id === fundId)?.name ?? '—'
+  const ticker = (securityId: string | null) => (securityId ? securities.find((s) => s.id === securityId)?.symbol ?? '—' : '—')
 
   const handleRun = () => {
-    setRunning(true)
-    setTimeout(() => setRunning(false), 3000)
+    if (!selectedFundId) return
+    dispatch(createValuationRun({ fundId: selectedFundId, costBasisMethod: 'WAC' }))
   }
 
   return (
@@ -53,7 +64,9 @@ export default function ValuationPage() {
             className={cn('text-xs pb-2 border-b-2 whitespace-nowrap transition-colors',
               activeTab === t ? 'border-[#2563EB] text-[#60A5FA]' : 'border-transparent text-[#6B7A95] hover:text-[#A8B4C8]')}>
             {t}
-            {t === 'Exceptions' && <span className="ml-1.5 bg-[#EF4444] text-white text-[9px] rounded-full px-1.5">2</span>}
+            {t === 'Exceptions' && valuationExceptions.length > 0 && (
+              <span className="ml-1.5 bg-[#EF4444] text-white text-[9px] rounded-full px-1.5">{valuationExceptions.length}</span>
+            )}
           </button>
         ))}
       </div>
@@ -79,10 +92,11 @@ export default function ValuationPage() {
                 </div>
                 <button
                   onClick={handleRun}
-                  className="flex items-center gap-1.5 bg-[#2563EB] text-white text-xs font-medium px-3 py-1.5 rounded hover:bg-[#1D4ED8]"
+                  disabled={valuationRunning || !selectedFundId}
+                  className="flex items-center gap-1.5 bg-[#2563EB] text-white text-xs font-medium px-3 py-1.5 rounded hover:bg-[#1D4ED8] disabled:opacity-60"
                 >
-                  <RefreshCw className={cn('w-3 h-3', running && 'animate-spin')} />
-                  {running ? 'Running Valuation...' : 'Run All Valuations'}
+                  <RefreshCw className={cn('w-3 h-3', valuationRunning && 'animate-spin')} />
+                  {valuationRunning ? 'Running Valuation...' : 'Run Valuation'}
                 </button>
               </div>
               <ResponsiveContainer width="100%" height={180}>
@@ -111,10 +125,10 @@ export default function ValuationPage() {
               </ResponsiveContainer>
             </div>
 
-            {/* Valuation runs table */}
+            {/* Valuation runs table — session history only, no list-all-runs endpoint exists */}
             <div className="bg-[#0D1526] border border-white/[0.06] rounded-md overflow-hidden">
               <div className="px-4 py-2.5 border-b border-white/[0.06]">
-                <div className="text-xs font-semibold text-[#E8EDF5]">Valuation Runs — 07 Jul 2026</div>
+                <div className="text-xs font-semibold text-[#E8EDF5]">Valuation Runs</div>
               </div>
               <table className="arcus-table">
                 <thead>
@@ -122,34 +136,29 @@ export default function ValuationPage() {
                     <th>Run ID</th>
                     <th>Portfolio</th>
                     <th>Val Date</th>
-                    <th>Run Time</th>
                     <th className="text-right">NAV</th>
-                    <th className="text-right">Gross AV</th>
-                    <th className="text-right">Unrealised P&L</th>
-                    <th className="text-right">Realised P&L</th>
-                    <th className="text-right">Cash</th>
                     <th>Method</th>
                     <th>Status</th>
+                    <th className="text-right">Exceptions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {valRuns.map(r => (
+                  {valuationRuns.map(r => (
                     <tr key={r.id}>
                       <td className="text-[#60A5FA] font-mono text-[11px]">{r.id}</td>
-                      <td className="text-[#A8B4C8]">{r.portfolio}</td>
-                      <td className="text-[#6B7A95]">{r.valDate}</td>
-                      <td className="text-[#6B7A95] font-mono">{r.runTime}</td>
-                      <td className="text-right font-mono">{(r.nav / 1000000).toFixed(2)}M</td>
-                      <td className="text-right font-mono">{(r.grossAV / 1000000).toFixed(2)}M</td>
-                      <td className={cn('text-right font-mono', r.unrealPnl >= 0 ? 'text-[#10B981]' : 'text-[#EF4444]')}>
-                        {r.unrealPnl >= 0 ? '+' : ''}{(r.unrealPnl / 1000).toFixed(0)}k
-                      </td>
-                      <td className="text-right font-mono text-[#10B981]">+{(r.realPnl / 1000).toFixed(0)}k</td>
-                      <td className="text-right font-mono">{(r.cashBal / 1000000).toFixed(2)}M</td>
-                      <td className="text-[#6B7A95] text-xs">{r.method}</td>
-                      <td><StatusBadge status={r.status} /></td>
+                      <td className="text-[#A8B4C8]">{fundName(r.fundId)}</td>
+                      <td className="text-[#6B7A95]">{new Date(r.asOf).toLocaleString()}</td>
+                      <td className="text-right font-mono">{Number(r.navBaseCurrency).toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
+                      <td className="text-[#6B7A95] text-xs">{r.parametersJson.costBasisMethod}</td>
+                      <td><StatusBadge status={runStatusBadge(r.status)} /></td>
+                      <td className="text-right font-mono" style={{ color: r.exceptions.length > 0 ? '#F59E0B' : '#6B7A95' }}>{r.exceptions.length}</td>
                     </tr>
                   ))}
+                  {valuationRuns.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="text-center py-8 text-[12px]" style={{ color: '#64748b' }}>No valuation runs yet this session — click "Run Valuation" above.</td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -170,31 +179,24 @@ export default function ValuationPage() {
                   <th>Issue</th>
                   <th>Severity</th>
                   <th>Status</th>
-                  <th>Action</th>
                 </tr>
               </thead>
               <tbody>
-                {exceptions.map(e => (
+                {valuationExceptions.map(e => (
                   <tr key={e.id}>
                     <td className="text-[#60A5FA] font-mono text-[11px]">{e.id}</td>
-                    <td className="text-[#A8B4C8]">{e.portfolio}</td>
-                    <td className="text-[#C8D3E8] font-mono font-semibold">{e.ticker}</td>
-                    <td className="text-[#A8B4C8]">{e.issue}</td>
-                    <td>
-                      <span className={cn('text-[10px] font-medium',
-                        e.severity === 'high' ? 'text-[#EF4444]' :
-                        e.severity === 'medium' ? 'text-[#F59E0B]' : 'text-[#60A5FA]')}>
-                        {e.severity.toUpperCase()}
-                      </span>
-                    </td>
-                    <td><StatusBadge status={e.status} /></td>
-                    <td>
-                      {e.status !== 'resolved' && (
-                        <button className="text-[10px] text-[#60A5FA] hover:underline">Resolve</button>
-                      )}
-                    </td>
+                    <td className="text-[#A8B4C8]">{fundName(e.fundId)}</td>
+                    <td className="text-[#C8D3E8] font-mono font-semibold">{ticker(e.securityId)}</td>
+                    <td className="text-[#A8B4C8]">{e.exceptionType} — {e.message}</td>
+                    <td className="text-[10px] text-[#4B5A72]">—</td>
+                    <td><StatusBadge status={e.status.toLowerCase()} /></td>
                   </tr>
                 ))}
+                {valuationExceptions.length === 0 && !valuationExceptionsLoading && (
+                  <tr>
+                    <td colSpan={6} className="text-center py-8 text-[12px]" style={{ color: '#64748b' }}>No valuation exceptions.</td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>

@@ -9,6 +9,9 @@ export const ORDERS_SUBNAV = [
   { label: 'Orderbook', href: '/investments-v2/orders/orderbook' },
   { label: 'Trading', href: '/investments-v2/orders/trading' },
   { label: 'Compliance', href: '/investments-v2/orders/compliance' },
+  { label: 'Simulation', href: '/investments-v2/orders/simulation' },
+  { label: 'Models', href: '/investments-v2/orders/models' },
+  { label: 'Setup', href: '/investments-v2/setup' },
 ] as const
 
 export function OrdersSubNav() {
