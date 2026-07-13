@@ -1,7 +1,10 @@
 'use client'
 
+import { useMemo, useState } from 'react'
 import DashboardShell from '@/components/fpna/DashboardShell'
 import TopBar from '@/components/fpna/TopBar'
+import { useForecastingTheme } from '@/components/fpna/theme-provider'
+import { Button } from '@/components/ui/button'
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell, CartesianGrid, ReferenceLine
@@ -18,6 +21,12 @@ const revenueExpenseData = [
   { month: 'May\'25', revenue: 125.8, expense: 86.4 },
 ]
 
+const revenuePeriods = [
+  { label: 'Last 3 Months', months: 3 },
+  { label: 'Last 6 Months', months: 5 },
+  { label: 'Last 12 Months', months: 7 },
+]
+
 const cashRunwayData = [
   { month: 'May\'25', value: 38.4 },
   { month: 'Aug\'25', value: 34.2 },
@@ -26,9 +35,9 @@ const cashRunwayData = [
 ]
 
 const budgetWorkflowData = [
-  { name: 'Submitted', value: 72, color: '#2563eb' },
-  { name: 'In Review', value: 18, color: '#f59e0b' },
-  { name: 'Approved', value: 10, color: '#10b981' },
+  { name: 'Submitted', value: 72 },
+  { name: 'In Review', value: 18 },
+  { name: 'Approved', value: 10 },
 ]
 
 const kpiSparks = [
@@ -121,22 +130,69 @@ function statusBadge(s: string) {
 }
 
 export default function HomePage() {
+  const { theme } = useForecastingTheme()
+
+  // Revenue vs Expense period filter — slices the existing mock series.
+  const [revenuePeriodIdx, setRevenuePeriodIdx] = useState(revenuePeriods.length - 1)
+  const activePeriod = revenuePeriods[revenuePeriodIdx]
+  const filteredRevenueExpenseData = useMemo(
+    () => revenueExpenseData.slice(-activePeriod.months),
+    [activePeriod]
+  )
+  const cycleRevenuePeriod = () => setRevenuePeriodIdx((i) => (i + 1) % revenuePeriods.length)
+
+  // Cash Runway scenario toggle — reuses the existing scenarioRows mock data.
+  const cashRunwayScenarioRow = scenarioRows.find((r) => r.metric === 'Cash Runway')!
+  const cashRunwayScenarios = [
+    { key: 'base', label: 'Base Case', value: cashRunwayScenarioRow.base, delta: cashRunwayScenarioRow.baseD, positive: true },
+    { key: 'upside', label: 'Upside', value: cashRunwayScenarioRow.upside, delta: cashRunwayScenarioRow.upsideD, positive: true },
+    { key: 'downside', label: 'Downside', value: cashRunwayScenarioRow.downside, delta: cashRunwayScenarioRow.downsideD, positive: false },
+  ]
+  const [cashRunwayScenarioIdx, setCashRunwayScenarioIdx] = useState(0)
+  const activeCashRunwayScenario = cashRunwayScenarios[cashRunwayScenarioIdx]
+  const cycleCashRunwayScenario = () => setCashRunwayScenarioIdx((i) => (i + 1) % cashRunwayScenarios.length)
+
+  // Theme-conditional chart series colors.
+  const seriesColors = {
+    spark: theme === 'dark' ? '#3b82f6' : '#2563eb',
+    revenue: theme === 'dark' ? '#3b82f6' : '#2563eb',
+    expense: theme === 'dark' ? '#34d399' : '#10b981',
+    cashRunwayBar: theme === 'dark' ? '#3b82f6' : '#2563eb',
+    referenceLine: theme === 'dark' ? '#64748b' : '#94a3b8',
+    workflow: {
+      Submitted: theme === 'dark' ? '#3b82f6' : '#2563eb',
+      'In Review': theme === 'dark' ? '#fbbf24' : '#f59e0b',
+      Approved: theme === 'dark' ? '#34d399' : '#10b981',
+    } as Record<string, string>,
+  }
+
+  const chartGridStroke = 'var(--border)'
+  const chartAxisTick = { fontSize: 9, fill: 'var(--muted-foreground)' }
+  const chartTooltipStyle = {
+    fontSize: 11,
+    backgroundColor: 'var(--card)',
+    border: '1px solid var(--border)',
+    color: 'var(--foreground)',
+  }
+
   return (
     <DashboardShell>
       <TopBar title="FP&A Home" scenario="Base Case" version="Working" period="May 2025" />
-      <div className="flex-1 overflow-y-auto p-4" style={{ backgroundColor: '#f0f2f5' }}>
+      <div className="flex-1 overflow-y-auto p-4 bg-background">
 
         {/* KPI Row */}
         <div className="grid grid-cols-5 gap-3 mb-4">
           {kpis.map((k, i) => (
-            <div key={i} className="rounded-lg p-3 flex flex-col gap-1" style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0' }}>
+            <div key={i} className="rounded-lg p-3 flex flex-col gap-1 bg-card border border-border">
               <div className="flex items-center justify-between">
-                <span className="text-xs text-slate-500">{k.label}</span>
-                <MoreHorizontal size={12} className="text-slate-400 cursor-pointer" />
+                <span className="text-xs text-muted-foreground">{k.label}</span>
+                <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-muted-foreground">
+                  <MoreHorizontal size={12} />
+                </Button>
               </div>
               <div className="flex items-end justify-between">
-                <span className="text-lg font-bold text-slate-800">{k.value}</span>
-                <Spark data={kpiSparks[i]} color="#2563eb" />
+                <span className="text-lg font-bold text-foreground">{k.value}</span>
+                <Spark data={kpiSparks[i]} color={seriesColors.spark} />
               </div>
               <div className="flex items-center gap-1">
                 {k.positive
@@ -151,43 +207,43 @@ export default function HomePage() {
         {/* Row 2: Revenue Chart + Scenario + Workflow */}
         <div className="grid grid-cols-12 gap-3 mb-3">
           {/* Revenue vs Expense */}
-          <div className="col-span-5 rounded-lg p-3" style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0' }}>
+          <div className="col-span-5 rounded-lg p-3 bg-card border border-border">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-1">
-                <span className="text-xs font-semibold text-slate-700">Revenue vs Expense Trend</span>
-                <Info size={11} className="text-slate-400" />
+                <span className="text-xs font-semibold text-foreground">Revenue vs Expense Trend</span>
+                <Info size={11} className="text-muted-foreground" />
               </div>
-              <div className="flex items-center gap-1 px-2 py-0.5 rounded text-xs cursor-pointer" style={{ backgroundColor: '#f1f5f9', color: '#475569' }}>
-                Last 12 Months ▾
-              </div>
+              <Button variant="outline" size="pill" onClick={cycleRevenuePeriod}>
+                {activePeriod.label} &#9662;
+              </Button>
             </div>
             <div className="flex items-center gap-3 mb-1">
-              <div className="flex items-center gap-1"><span className="w-3 h-0.5 rounded inline-block" style={{ backgroundColor: '#2563eb' }}></span><span className="text-xs text-slate-500">Revenue</span></div>
-              <div className="flex items-center gap-1"><span className="w-3 h-0.5 rounded inline-block border-dashed border-t-2" style={{ borderColor: '#10b981' }}></span><span className="text-xs text-slate-500">Total Expenses</span></div>
+              <div className="flex items-center gap-1"><span className="w-3 h-0.5 rounded inline-block" style={{ backgroundColor: seriesColors.revenue }}></span><span className="text-xs text-muted-foreground">Revenue</span></div>
+              <div className="flex items-center gap-1"><span className="w-3 h-0.5 rounded inline-block border-dashed border-t-2" style={{ borderColor: seriesColors.expense }}></span><span className="text-xs text-muted-foreground">Total Expenses</span></div>
             </div>
             <div style={{ height: 130 }}>
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={revenueExpenseData} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                  <XAxis dataKey="month" tick={{ fontSize: 9 }} tickLine={false} axisLine={false} />
-                  <YAxis tick={{ fontSize: 9 }} tickLine={false} axisLine={false} tickFormatter={v => `${v}M`} width={32} />
-                  <Tooltip formatter={(v: number) => `$${v}M`} contentStyle={{ fontSize: 11 }} />
-                  <Line type="monotone" dataKey="revenue" stroke="#2563eb" strokeWidth={2} dot={false} />
-                  <Line type="monotone" dataKey="expense" stroke="#10b981" strokeWidth={2} dot={false} strokeDasharray="4 2" />
+                <LineChart data={filteredRevenueExpenseData} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={chartGridStroke} />
+                  <XAxis dataKey="month" tick={chartAxisTick} tickLine={false} axisLine={false} />
+                  <YAxis tick={chartAxisTick} tickLine={false} axisLine={false} tickFormatter={v => `${v}M`} width={32} />
+                  <Tooltip formatter={(v: number) => `$${v}M`} contentStyle={chartTooltipStyle} />
+                  <Line type="monotone" dataKey="revenue" stroke={seriesColors.revenue} strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="expense" stroke={seriesColors.expense} strokeWidth={2} dot={false} strokeDasharray="4 2" />
                 </LineChart>
               </ResponsiveContainer>
             </div>
           </div>
 
           {/* Scenario Comparison */}
-          <div className="col-span-4 rounded-lg p-3" style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0' }}>
+          <div className="col-span-4 rounded-lg p-3 bg-card border border-border">
             <div className="flex items-center gap-1 mb-2">
-              <span className="text-xs font-semibold text-slate-700">Scenario Comparison</span>
-              <Info size={11} className="text-slate-400" />
+              <span className="text-xs font-semibold text-foreground">Scenario Comparison</span>
+              <Info size={11} className="text-muted-foreground" />
             </div>
             <table className="w-full text-xs">
               <thead>
-                <tr style={{ color: '#94a3b8' }}>
+                <tr className="text-muted-foreground">
                   <th className="text-left font-medium pb-1.5">Scenario</th>
                   <th className="text-right font-medium pb-1.5"><span className="px-1.5 py-0.5 rounded text-xs font-semibold" style={{ backgroundColor: '#eff6ff', color: '#2563eb' }}>Base Case</span></th>
                   <th className="text-right font-medium pb-1.5"><span className="px-1.5 py-0.5 rounded text-xs font-semibold" style={{ backgroundColor: '#f0fdf4', color: '#16a34a' }}>Upside</span></th>
@@ -196,61 +252,61 @@ export default function HomePage() {
               </thead>
               <tbody>
                 {scenarioRows.map((r, i) => (
-                  <tr key={i} style={{ borderTop: '1px solid #f1f5f9' }}>
-                    <td className="py-1.5 font-medium text-slate-700">{r.metric}</td>
+                  <tr key={i} style={{ borderTop: '1px solid var(--border)' }}>
+                    <td className="py-1.5 font-medium text-foreground">{r.metric}</td>
                     <td className="py-1.5 text-right">
-                      <div className="font-semibold text-slate-800">{r.base}</div>
+                      <div className="font-semibold text-foreground">{r.base}</div>
                       <div style={{ color: '#16a34a', fontSize: 10 }}>{r.baseD}</div>
                     </td>
                     <td className="py-1.5 text-right">
-                      <div className="font-semibold text-slate-800">{r.upside}</div>
+                      <div className="font-semibold text-foreground">{r.upside}</div>
                       <div style={{ color: '#16a34a', fontSize: 10 }}>{r.upsideD}</div>
                     </td>
                     <td className="py-1.5 text-right">
-                      <div className="font-semibold text-slate-800">{r.downside}</div>
+                      <div className="font-semibold text-foreground">{r.downside}</div>
                       <div style={{ color: '#dc2626', fontSize: 10 }}>{r.downsideD}</div>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            <p className="text-xs mt-2" style={{ color: '#94a3b8' }}>All scenarios calculated for May 2025</p>
+            <p className="text-xs mt-2 text-muted-foreground">All scenarios calculated for May 2025</p>
           </div>
 
           {/* Budget Workflow Progress */}
-          <div className="col-span-3 rounded-lg p-3" style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0' }}>
+          <div className="col-span-3 rounded-lg p-3 bg-card border border-border">
             <div className="flex items-center gap-1 mb-2">
-              <span className="text-xs font-semibold text-slate-700">Budget Workflow Progress</span>
-              <Info size={11} className="text-slate-400" />
+              <span className="text-xs font-semibold text-foreground">Budget Workflow Progress</span>
+              <Info size={11} className="text-muted-foreground" />
             </div>
             <div className="flex items-center gap-3">
               <div style={{ position: 'relative', width: 80, height: 80 }}>
                 <ResponsiveContainer width={80} height={80}>
                   <PieChart>
                     <Pie data={budgetWorkflowData} cx={35} cy={35} innerRadius={24} outerRadius={36} dataKey="value" startAngle={90} endAngle={-270}>
-                      {budgetWorkflowData.map((d, i) => <Cell key={i} fill={d.color} />)}
+                      {budgetWorkflowData.map((d, i) => <Cell key={i} fill={seriesColors.workflow[d.name]} />)}
                     </Pie>
                   </PieChart>
                 </ResponsiveContainer>
                 <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', textAlign: 'center' }}>
-                  <div className="font-bold text-slate-800" style={{ fontSize: 14 }}>72%</div>
-                  <div style={{ fontSize: 8, color: '#94a3b8' }}>Complete</div>
+                  <div className="font-bold text-foreground" style={{ fontSize: 14 }}>72%</div>
+                  <div className="text-muted-foreground" style={{ fontSize: 8 }}>Complete</div>
                 </div>
               </div>
               <div className="flex flex-col gap-1.5">
                 {budgetWorkflowData.map((d, i) => (
                   <div key={i} className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: d.color }}></span>
-                      <span className="text-xs text-slate-600">{d.name}</span>
+                      <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: seriesColors.workflow[d.name] }}></span>
+                      <span className="text-xs text-muted-foreground">{d.name}</span>
                     </div>
-                    <span className="text-xs font-semibold text-slate-700">{d.value}%</span>
+                    <span className="text-xs font-semibold text-foreground">{d.value}%</span>
                   </div>
                 ))}
               </div>
             </div>
-            <p className="text-xs mt-2" style={{ color: '#94a3b8' }}>
-              Next: <span className="text-slate-600">Marketing budget in review</span>
+            <p className="text-xs mt-2 text-muted-foreground">
+              Next: <span className="text-foreground">Marketing budget in review</span>
             </p>
           </div>
         </div>
@@ -258,17 +314,17 @@ export default function HomePage() {
         {/* Row 3: Departments + Cash Runway + Recent Activity */}
         <div className="grid grid-cols-12 gap-3 mb-3">
           {/* Departments Over Budget */}
-          <div className="col-span-5 rounded-lg p-3" style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0' }}>
+          <div className="col-span-5 rounded-lg p-3 bg-card border border-border">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-1">
-                <span className="text-xs font-semibold text-slate-700">Departments Over Budget</span>
-                <Info size={11} className="text-slate-400" />
+                <span className="text-xs font-semibold text-foreground">Departments Over Budget</span>
+                <Info size={11} className="text-muted-foreground" />
               </div>
-              <span className="text-xs text-slate-400">May 2025</span>
+              <span className="text-xs text-muted-foreground">May 2025</span>
             </div>
             <table className="w-full text-xs">
               <thead>
-                <tr style={{ color: '#94a3b8', borderBottom: '1px solid #f1f5f9' }}>
+                <tr className="text-muted-foreground" style={{ borderBottom: '1px solid var(--border)' }}>
                   <th className="text-left font-medium pb-1.5">Department</th>
                   <th className="text-right font-medium pb-1.5">Budget</th>
                   <th className="text-right font-medium pb-1.5">Actual</th>
@@ -279,12 +335,12 @@ export default function HomePage() {
               </thead>
               <tbody>
                 {deptRows.map((r, i) => (
-                  <tr key={i} style={{ borderTop: '1px solid #f8fafc' }}>
-                    <td className="py-1.5 font-medium text-slate-700">{r.dept}</td>
-                    <td className="py-1.5 text-right text-slate-600">{r.budget}</td>
-                    <td className="py-1.5 text-right text-slate-600">{r.actual}</td>
+                  <tr key={i} style={{ borderTop: '1px solid var(--border)' }}>
+                    <td className="py-1.5 font-medium text-foreground">{r.dept}</td>
+                    <td className="py-1.5 text-right text-foreground">{r.budget}</td>
+                    <td className="py-1.5 text-right text-foreground">{r.actual}</td>
                     <td className="py-1.5 text-right font-semibold" style={{ color: '#dc2626' }}>{r.variance}</td>
-                    <td className="py-1.5 pl-2 text-slate-600">{r.owner}</td>
+                    <td className="py-1.5 pl-2 text-foreground">{r.owner}</td>
                     <td className="py-1.5 text-center">
                       <span className="px-2 py-0.5 rounded text-xs font-semibold" style={{ backgroundColor: '#fee2e2', color: '#991b1b' }}>Over Budget</span>
                     </td>
@@ -292,45 +348,49 @@ export default function HomePage() {
                 ))}
               </tbody>
             </table>
-            <button className="text-xs mt-2" style={{ color: '#2563eb' }}>View all departments</button>
+            <Button variant="outline" size="pill" className="mt-2">View all departments</Button>
           </div>
 
           {/* Cash Runway */}
-          <div className="col-span-4 rounded-lg p-3" style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0' }}>
+          <div className="col-span-4 rounded-lg p-3 bg-card border border-border">
             <div className="flex items-center justify-between mb-1">
               <div className="flex items-center gap-1">
-                <span className="text-xs font-semibold text-slate-700">Cash Runway</span>
-                <Info size={11} className="text-slate-400" />
+                <span className="text-xs font-semibold text-foreground">Cash Runway</span>
+                <Info size={11} className="text-muted-foreground" />
               </div>
-              <span className="text-xs px-2 py-0.5 rounded" style={{ backgroundColor: '#f1f5f9', color: '#475569' }}>Base Case ▾</span>
+              <Button variant="outline" size="pill" onClick={cycleCashRunwayScenario}>
+                {activeCashRunwayScenario.label} &#9662;
+              </Button>
             </div>
             <div className="flex items-baseline gap-2 mb-1">
-              <span className="text-2xl font-bold text-slate-800">14.2</span>
-              <span className="text-xs text-slate-500">months</span>
-              <span className="text-xs" style={{ color: '#16a34a' }}>▲ 1.1 mo vs Apr 2025</span>
+              <span className="text-2xl font-bold text-foreground">{activeCashRunwayScenario.value.split(' ')[0]}</span>
+              <span className="text-xs text-muted-foreground">months</span>
+              <span className="text-xs" style={{ color: activeCashRunwayScenario.positive ? '#16a34a' : '#dc2626' }}>
+                {activeCashRunwayScenario.positive ? '▲' : '▼'} {activeCashRunwayScenario.delta} vs Apr 2025
+              </span>
             </div>
             <div style={{ height: 100 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={cashRunwayData} margin={{ top: 0, right: 5, bottom: 0, left: -20 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                  <XAxis dataKey="month" tick={{ fontSize: 9 }} tickLine={false} axisLine={false} />
-                  <YAxis tick={{ fontSize: 9 }} tickLine={false} axisLine={false} tickFormatter={v => `$${v}M`} domain={[0, 50]} width={38} />
-                  <ReferenceLine y={20} stroke="#94a3b8" strokeDasharray="4 2" label={{ value: '12 Mo Target', position: 'insideTopRight', fontSize: 8, fill: '#94a3b8' }} />
-                  <Bar dataKey="value" fill="#2563eb" radius={[3, 3, 0, 0]} maxBarSize={40} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={chartGridStroke} vertical={false} />
+                  <XAxis dataKey="month" tick={chartAxisTick} tickLine={false} axisLine={false} />
+                  <YAxis tick={chartAxisTick} tickLine={false} axisLine={false} tickFormatter={v => `$${v}M`} domain={[0, 50]} width={38} />
+                  <ReferenceLine y={20} stroke={seriesColors.referenceLine} strokeDasharray="4 2" label={{ value: '12 Mo Target', position: 'insideTopRight', fontSize: 8, fill: seriesColors.referenceLine }} />
+                  <Bar dataKey="value" fill={seriesColors.cashRunwayBar} radius={[3, 3, 0, 0]} maxBarSize={40} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
-            <button className="text-xs mt-1" style={{ color: '#2563eb' }}>View cash flow</button>
+            <Button variant="outline" size="pill" className="mt-1">View cash flow</Button>
           </div>
 
           {/* Recent Activity */}
-          <div className="col-span-3 rounded-lg p-3" style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0' }}>
+          <div className="col-span-3 rounded-lg p-3 bg-card border border-border">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-1">
-                <span className="text-xs font-semibold text-slate-700">Recent Activity</span>
-                <Info size={11} className="text-slate-400" />
+                <span className="text-xs font-semibold text-foreground">Recent Activity</span>
+                <Info size={11} className="text-muted-foreground" />
               </div>
-              <button className="text-xs" style={{ color: '#2563eb' }}>View all</button>
+              <Button variant="outline" size="pill">View all</Button>
             </div>
             <div className="flex flex-col gap-2">
               {recentActivity.map((a, i) => (
@@ -339,8 +399,8 @@ export default function HomePage() {
                     {a.user[0]}
                   </div>
                   <div className="min-w-0">
-                    <p className="text-xs text-slate-700 leading-tight">{a.text}</p>
-                    <p className="text-xs mt-0.5" style={{ color: '#94a3b8' }}>{a.user} &middot; {a.time}</p>
+                    <p className="text-xs text-foreground leading-tight">{a.text}</p>
+                    <p className="text-xs mt-0.5 text-muted-foreground">{a.user} &middot; {a.time}</p>
                   </div>
                 </div>
               ))}
@@ -349,16 +409,16 @@ export default function HomePage() {
         </div>
 
         {/* Open Tasks */}
-        <div className="rounded-lg p-3" style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0' }}>
+        <div className="rounded-lg p-3 bg-card border border-border">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-1">
-              <span className="text-xs font-semibold text-slate-700">Open Tasks</span>
-              <Info size={11} className="text-slate-400" />
+              <span className="text-xs font-semibold text-foreground">Open Tasks</span>
+              <Info size={11} className="text-muted-foreground" />
             </div>
           </div>
           <table className="w-full text-xs">
             <thead>
-              <tr style={{ color: '#94a3b8', borderBottom: '1px solid #f1f5f9' }}>
+              <tr className="text-muted-foreground" style={{ borderBottom: '1px solid var(--border)' }}>
                 <th className="text-left font-medium pb-1.5">Task</th>
                 <th className="text-left font-medium pb-1.5">Module</th>
                 <th className="text-left font-medium pb-1.5">Owner</th>
@@ -369,21 +429,21 @@ export default function HomePage() {
             </thead>
             <tbody>
               {taskRows.map((r, i) => (
-                <tr key={i} style={{ borderTop: '1px solid #f8fafc' }}>
-                  <td className="py-1.5 text-slate-700 flex items-center gap-1.5">
-                    <CheckCircle2 size={12} className="text-slate-300" />
+                <tr key={i} style={{ borderTop: '1px solid var(--border)' }}>
+                  <td className="py-1.5 text-foreground flex items-center gap-1.5">
+                    <CheckCircle2 size={12} className="text-muted-foreground" />
                     {r.task}
                   </td>
-                  <td className="py-1.5 text-slate-500">{r.module}</td>
-                  <td className="py-1.5 text-slate-500">{r.owner}</td>
-                  <td className="py-1.5 text-slate-500">{r.due}</td>
+                  <td className="py-1.5 text-muted-foreground">{r.module}</td>
+                  <td className="py-1.5 text-muted-foreground">{r.owner}</td>
+                  <td className="py-1.5 text-muted-foreground">{r.due}</td>
                   <td className="py-1.5">{priorityBadge(r.priority)}</td>
                   <td className="py-1.5">{statusBadge(r.status)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-          <button className="text-xs mt-2" style={{ color: '#2563eb' }}>View all tasks</button>
+          <Button variant="outline" size="pill" className="mt-2">View all tasks</Button>
         </div>
 
       </div>

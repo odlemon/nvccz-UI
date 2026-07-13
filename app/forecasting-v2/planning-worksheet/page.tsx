@@ -2,6 +2,9 @@
 
 import DashboardShell from '@/components/fpna/DashboardShell'
 import TopBar from '@/components/fpna/TopBar'
+import { useThemeContainer } from '@/components/fpna/use-theme-container'
+import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useState } from 'react'
 import {
   Upload, Download, Copy, SplitSquareHorizontal, TrendingUp, MessageCircle,
@@ -117,30 +120,46 @@ function fmt(v: number | null, isPercent?: boolean) {
 export default function PlanningWorksheetPage() {
   const [selectedCell, setSelectedCell] = useState({ row: 'Revenue', col: 'Jun 2025' })
   const [showDrawer, setShowDrawer] = useState(true)
+  const [currency, setCurrency] = useState('USD')
+  const [displayMode, setDisplayMode] = useState('$ Amounts')
+  const [periodGranularity, setPeriodGranularity] = useState('Monthly')
+  const { ref: themeRef, container: themeContainer } = useThemeContainer()
 
   return (
     <DashboardShell>
       <TopBar title="Planning Worksheet" scenario="Base Case" version="FY2026 Working Forecast" period="Jun 2025" />
-      <div className="flex flex-1 overflow-hidden">
+      <div ref={themeRef} className="flex flex-1 overflow-hidden">
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Sub-header */}
-          <div className="px-4 pt-3 pb-2" style={{ backgroundColor: '#fff', borderBottom: '1px solid #e2e8f0' }}>
+          <div className="px-4 pt-3 pb-2 bg-card border-b" style={{ borderColor: 'var(--border)' }}>
             <div className="flex items-center justify-between mb-1">
-              <h1 className="text-sm font-bold text-slate-800">North Region Operating Forecast</h1>
-              <button className="flex items-center gap-1 px-2 py-1 rounded text-xs" style={{ backgroundColor: '#f1f5f9', color: '#475569' }}>
+              <h1 className="text-sm font-bold text-foreground">North Region Operating Forecast</h1>
+              <Button variant="outline" size="pill">
                 <Info size={11} /> Model Details
-              </button>
+              </Button>
             </div>
-            <div className="flex items-center gap-4 text-xs text-slate-500">
-              <div className="flex items-center gap-1"><span className="text-slate-400">Owner</span> <span className="font-medium text-slate-700">Jane Cooper</span></div>
-              <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-blue-500 inline-block"></span><span className="font-medium text-slate-700">In Progress</span></div>
-              <div className="flex items-center gap-1"><span className="text-slate-400">Currency</span> <span className="font-medium text-slate-700">USD</span></div>
-              <div className="flex items-center gap-1"><span className="text-slate-400">Last Updated</span> <span className="font-medium text-slate-700">May 28, 2025 10:32 AM</span></div>
+            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+              <div className="flex items-center gap-1"><span className="text-muted-foreground">Owner</span> <span className="font-medium text-foreground">Jane Cooper</span></div>
+              <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-primary inline-block"></span><span className="font-medium text-foreground">In Progress</span></div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-muted-foreground">Currency</span>
+                <Select value={currency} onValueChange={setCurrency}>
+                  <SelectTrigger className="h-6 rounded-full text-xs px-2 min-w-0" size="sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent container={themeContainer}>
+                    <SelectItem value="USD">USD</SelectItem>
+                    <SelectItem value="ZiG">ZiG</SelectItem>
+                    <SelectItem value="EUR">EUR</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center gap-1"><span className="text-muted-foreground">Last Updated</span> <span className="font-medium text-foreground">May 28, 2025 10:32 AM</span></div>
             </div>
           </div>
 
           {/* Toolbar */}
-          <div className="flex items-center gap-2 px-4 py-2 border-b" style={{ backgroundColor: '#fff', borderColor: '#e2e8f0' }}>
+          <div className="flex items-center gap-2 px-4 py-2 border-b bg-card" style={{ borderColor: 'var(--border)' }}>
             {[
               { icon: Upload, label: 'Import' },
               { icon: Download, label: 'Export' },
@@ -148,69 +167,82 @@ export default function PlanningWorksheetPage() {
               { icon: SplitSquareHorizontal, label: 'Spread' },
               { icon: TrendingUp, label: 'Apply Growth' },
             ].map(({ icon: Icon, label }) => (
-              <button key={label} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-medium border" style={{ borderColor: '#e2e8f0', color: '#475569', backgroundColor: '#fff' }}>
+              <Button key={label} variant="outline" size="pill">
                 <Icon size={11} />
                 {label}
-              </button>
+              </Button>
             ))}
-            <button className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold text-white" style={{ backgroundColor: '#2563eb' }}>
+            <Button variant="default" size="pill">
               Submit
-            </button>
-            <button className="flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-medium border ml-1" style={{ borderColor: '#e2e8f0', color: '#475569' }}>
+            </Button>
+            <Button variant="outline" size="pill" className="ml-1">
               <MessageCircle size={11} /> Add Comment
-            </button>
+            </Button>
             <div className="ml-auto flex items-center gap-2">
-              <select className="text-xs px-2 py-1.5 rounded border" style={{ borderColor: '#e2e8f0', color: '#475569' }}>
-                <option>$ Amounts</option>
-              </select>
-              <select className="text-xs px-2 py-1.5 rounded border" style={{ borderColor: '#e2e8f0', color: '#475569' }}>
-                <option>Monthly</option>
-              </select>
-              <Maximize2 size={13} className="text-slate-400 cursor-pointer" />
+              <Select value={displayMode} onValueChange={setDisplayMode}>
+                <SelectTrigger className="h-7 rounded-full text-xs" size="sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent container={themeContainer}>
+                  <SelectItem value="$ Amounts">$ Amounts</SelectItem>
+                  <SelectItem value="% of Revenue">% of Revenue</SelectItem>
+                  <SelectItem value="Per Unit">Per Unit</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={periodGranularity} onValueChange={setPeriodGranularity}>
+                <SelectTrigger className="h-7 rounded-full text-xs" size="sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent container={themeContainer}>
+                  <SelectItem value="Monthly">Monthly</SelectItem>
+                  <SelectItem value="Quarterly">Quarterly</SelectItem>
+                  <SelectItem value="Annual">Annual</SelectItem>
+                </SelectContent>
+              </Select>
+              <Maximize2 size={13} className="text-muted-foreground cursor-pointer" />
             </div>
           </div>
 
           {/* Table */}
           <div className="flex-1 overflow-auto">
             <table className="w-full text-xs border-collapse" style={{ minWidth: 1100 }}>
-              <thead style={{ backgroundColor: '#f8fafc', position: 'sticky', top: 0, zIndex: 1 }}>
+              <thead className="bg-muted" style={{ position: 'sticky', top: 0, zIndex: 1 }}>
                 <tr>
-                  <th className="text-left px-3 py-2 font-semibold text-slate-600 w-36 border-b border-r" style={{ borderColor: '#e2e8f0' }}>
+                  <th className="text-left px-3 py-2 font-semibold text-muted-foreground w-36 border-b border-r" style={{ borderColor: 'var(--border)' }}>
                     $ in thousands
                   </th>
                   {/* Actuals header */}
-                  <th colSpan={5} className="text-center py-1 font-semibold border-b border-r" style={{ borderColor: '#e2e8f0', color: '#475569', backgroundColor: '#f1f5f9' }}>
+                  <th colSpan={5} className="text-center py-1 font-semibold border-b border-r bg-muted text-muted-foreground" style={{ borderColor: 'var(--border)' }}>
                     ACTUALS
                   </th>
                   {/* Forecast header */}
-                  <th colSpan={7} className="text-center py-1 font-semibold border-b border-r" style={{ borderColor: '#e2e8f0', color: '#2563eb', backgroundColor: '#eff6ff' }}>
+                  <th colSpan={7} className="text-center py-1 font-semibold border-b border-r bg-accent text-accent-foreground" style={{ borderColor: 'var(--border)' }}>
                     FORECAST
                   </th>
                   {/* Quarters */}
                   {quarters.map(q => (
-                    <th key={q} className="text-center px-2 py-1 font-medium text-slate-500 border-b" style={{ borderColor: '#e2e8f0', fontSize: 10 }}>
+                    <th key={q} className="text-center px-2 py-1 font-medium text-muted-foreground border-b" style={{ borderColor: 'var(--border)', fontSize: 10 }}>
                       {q}
                     </th>
                   ))}
                 </tr>
-                <tr style={{ backgroundColor: '#f8fafc' }}>
-                  <th className="px-3 py-1.5 border-b border-r" style={{ borderColor: '#e2e8f0' }}></th>
+                <tr className="bg-muted">
+                  <th className="px-3 py-1.5 border-b border-r" style={{ borderColor: 'var(--border)' }}></th>
                   {actuals.map(a => (
-                    <th key={a} className="text-center px-2 py-1.5 font-medium border-b border-r" style={{ borderColor: '#e2e8f0', color: '#64748b', backgroundColor: '#f1f5f9', fontSize: 10, minWidth: 70 }}>
+                    <th key={a} className="text-center px-2 py-1.5 font-medium border-b border-r bg-muted text-muted-foreground" style={{ borderColor: 'var(--border)', fontSize: 10, minWidth: 70 }}>
                       {a}
                     </th>
                   ))}
                   {forecast.map((f, i) => (
-                    <th key={f} className="text-center px-2 py-1.5 font-medium border-b border-r" style={{
-                      borderColor: '#e2e8f0', color: i === 0 ? '#2563eb' : '#64748b',
-                      backgroundColor: i === 0 ? '#dbeafe' : '#eff6ff', fontSize: 10, minWidth: 70,
+                    <th key={f} className={`text-center px-2 py-1.5 font-medium border-b border-r ${i === 0 ? 'bg-accent text-accent-foreground' : 'bg-accent/30 text-muted-foreground'}`} style={{
+                      borderColor: 'var(--border)', fontSize: 10, minWidth: 70,
                       fontWeight: i === 0 ? 700 : 500
                     }}>
                       {f}
                     </th>
                   ))}
                   {quarters.map(q => (
-                    <th key={q} className="text-center px-2 py-1.5 font-medium border-b border-r" style={{ borderColor: '#e2e8f0', color: '#94a3b8', fontSize: 10, minWidth: 70 }}>
+                    <th key={q} className="text-center px-2 py-1.5 font-medium border-b border-r text-muted-foreground" style={{ borderColor: 'var(--border)', fontSize: 10, minWidth: 70 }}>
                       {q}
                     </th>
                   ))}
@@ -218,19 +250,17 @@ export default function PlanningWorksheetPage() {
               </thead>
               <tbody>
                 {rows.map((row, ri) => (
-                  <tr key={ri} style={{ borderBottom: '1px solid #f1f5f9' }}
-                    className="hover:bg-blue-50/30 transition-colors">
-                    <td className="px-3 py-1.5 border-r font-medium text-slate-700" style={{
-                      borderColor: '#e2e8f0',
+                  <tr key={ri} className="hover:bg-accent/20 transition-colors" style={{ borderBottom: '1px solid var(--border)' }}>
+                    <td className={`px-3 py-1.5 border-r font-medium text-foreground ${row.bold ? 'bg-muted' : ''}`} style={{
+                      borderColor: 'var(--border)',
                       paddingLeft: row.indent ? 20 : 12,
                       fontWeight: row.bold ? 600 : 400,
-                      backgroundColor: row.bold ? '#fafbfc' : undefined,
                     }}>
                       <div className="flex items-center gap-1">
-                        {row.bold && <ChevronRight size={10} className="text-slate-400" />}
+                        {row.bold && <ChevronRight size={10} className="text-muted-foreground" />}
                         {row.label}
                       </div>
-                      {row.bold && <div className="text-slate-400 font-normal" style={{ fontSize: 9 }}>$ in thousands</div>}
+                      {row.bold && <div className="text-muted-foreground font-normal" style={{ fontSize: 9 }}>$ in thousands</div>}
                     </td>
                     {row.actuals.map((v, ci) => {
                       const colName = actuals[ci]
@@ -238,11 +268,9 @@ export default function PlanningWorksheetPage() {
                       return (
                         <td key={ci}
                           onClick={() => setSelectedCell({ row: row.label, col: colName })}
-                          className="text-center px-2 py-1.5 cursor-pointer border-r"
+                          className={`text-center px-2 py-1.5 cursor-pointer border-r ${isSelected ? 'bg-accent' : 'bg-muted'} ${v !== null && v < 0 ? 'text-destructive' : 'text-foreground'}`}
                           style={{
-                            borderColor: '#e2e8f0',
-                            backgroundColor: isSelected ? '#dbeafe' : row.bold ? '#fafbfc' : undefined,
-                            color: v !== null && v < 0 ? '#dc2626' : '#1e293b',
+                            borderColor: 'var(--border)',
                             fontWeight: row.bold ? 600 : 400,
                           }}>
                           {fmt(v, row.isPercent)}
@@ -253,25 +281,28 @@ export default function PlanningWorksheetPage() {
                       const colName = forecast[ci]
                       const isSelected = selectedCell.row === row.label && selectedCell.col === colName
                       const isHighlight = row.highlightForecast && ci === 0
+                      const isCurrentCol = ci === 0
+                      const bgClass = isSelected || isHighlight
+                        ? 'bg-accent'
+                        : isCurrentCol
+                          ? 'bg-accent/30'
+                          : 'bg-card'
                       return (
                         <td key={ci}
                           onClick={() => setSelectedCell({ row: row.label, col: colName })}
-                          className="text-center px-2 py-1.5 cursor-pointer border-r"
+                          className={`text-center px-2 py-1.5 cursor-pointer border-r ${bgClass} ${v !== null && v < 0 ? 'text-destructive' : isHighlight ? 'text-accent-foreground' : 'text-foreground'}`}
                           style={{
-                            borderColor: '#e2e8f0',
-                            backgroundColor: isSelected ? '#dbeafe' : isHighlight ? '#dbeafe' : ci === 0 ? '#eff6ff' : row.bold ? '#fafbfc' : undefined,
-                            color: v !== null && v < 0 ? '#dc2626' : isHighlight ? '#1d4ed8' : '#1e293b',
+                            borderColor: 'var(--border)',
                             fontWeight: isHighlight ? 700 : row.bold ? 600 : 400,
-                            outline: isHighlight ? '1.5px solid #2563eb' : undefined,
+                            outline: isHighlight ? '1.5px solid var(--primary)' : undefined,
                           }}>
                           {fmt(v, row.isPercent)}
                         </td>
                       )
                     })}
                     {row.quarters.map((v, ci) => (
-                      <td key={ci} className="text-center px-2 py-1.5 border-r text-slate-500" style={{
-                        borderColor: '#e2e8f0', fontWeight: row.bold ? 600 : 400,
-                        backgroundColor: row.bold ? '#fafbfc' : undefined,
+                      <td key={ci} className="text-center px-2 py-1.5 border-r bg-muted text-muted-foreground" style={{
+                        borderColor: 'var(--border)', fontWeight: row.bold ? 600 : 400,
                       }}>
                         {fmt(v, row.isPercent)}
                       </td>
@@ -283,28 +314,34 @@ export default function PlanningWorksheetPage() {
           </div>
 
           {/* Validation Messages */}
-          <div className="border-t px-4 py-2" style={{ borderColor: '#e2e8f0', backgroundColor: '#fff' }}>
+          <div className="border-t px-4 py-2 bg-card" style={{ borderColor: 'var(--border)' }}>
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-1">
-                <span className="text-xs font-semibold text-slate-700">Validation Messages</span>
-                <span className="w-5 h-5 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{ backgroundColor: '#f59e0b', fontSize: 10 }}>3</span>
+                <span className="text-xs font-semibold text-foreground">Validation Messages</span>
+                <span className="w-5 h-5 rounded-full flex items-center justify-center text-white text-xs font-bold bg-amber-500" style={{ fontSize: 10 }}>3</span>
               </div>
-              <ChevronDown size={13} className="text-slate-400 cursor-pointer" />
+              <ChevronDown size={13} className="text-muted-foreground cursor-pointer" />
             </div>
             <table className="w-full text-xs">
               <tbody>
                 {validationMessages.map((m, i) => (
-                  <tr key={i} style={{ borderTop: i > 0 ? '1px solid #f1f5f9' : undefined }}>
+                  <tr key={i} style={{ borderTop: i > 0 ? '1px solid var(--border)' : undefined }}>
                     <td className="py-1.5 flex items-center gap-1.5">
                       {m.type === 'warning'
-                        ? <AlertTriangle size={12} style={{ color: '#d97706' }} />
-                        : <XCircle size={12} style={{ color: '#dc2626' }} />}
-                      <span className="font-medium text-slate-700">{m.item}</span>
+                        ? <AlertTriangle size={12} className="text-amber-600 dark:text-amber-400" />
+                        : <XCircle size={12} className="text-destructive" />}
+                      <span className="font-medium text-foreground">{m.item}</span>
                     </td>
-                    <td className="py-1.5 text-slate-500">{m.msg}</td>
-                    <td className="py-1.5 text-slate-400">{m.time}</td>
+                    <td className="py-1.5 text-muted-foreground">{m.msg}</td>
+                    <td className="py-1.5 text-muted-foreground/70">{m.time}</td>
                     <td className="py-1.5 text-right">
-                      <button className="text-xs" style={{ color: m.type === 'warning' ? '#d97706' : '#dc2626' }}>View</button>
+                      <Button
+                        variant="link"
+                        size="sm"
+                        className={`h-auto p-0 text-xs ${m.type === 'warning' ? 'text-amber-600 dark:text-amber-400' : 'text-destructive'}`}
+                      >
+                        View
+                      </Button>
                     </td>
                   </tr>
                 ))}
@@ -315,50 +352,52 @@ export default function PlanningWorksheetPage() {
 
         {/* Cell Details Drawer */}
         {showDrawer && (
-          <div className="w-56 shrink-0 border-l flex flex-col" style={{ borderColor: '#e2e8f0', backgroundColor: '#fff' }}>
-            <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: '#e2e8f0' }}>
-              <span className="text-xs font-semibold text-slate-700">Cell Details</span>
-              <X size={13} className="text-slate-400 cursor-pointer" onClick={() => setShowDrawer(false)} />
+          <div className="w-56 shrink-0 border-l flex flex-col bg-card" style={{ borderColor: 'var(--border)' }}>
+            <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: 'var(--border)' }}>
+              <span className="text-xs font-semibold text-foreground">Cell Details</span>
+              <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setShowDrawer(false)}>
+                <X size={13} className="text-muted-foreground" />
+              </Button>
             </div>
             <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-3">
               <div>
-                <p className="text-xs text-slate-400 mb-0.5">Selected Cell</p>
-                <p className="text-xs font-semibold text-slate-800">Revenue &middot; Jun 2025</p>
-                <p className="text-lg font-bold text-slate-800 mt-1">11,600</p>
-                <p className="text-xs text-slate-400">thousands</p>
+                <p className="text-xs text-muted-foreground mb-0.5">Selected Cell</p>
+                <p className="text-xs font-semibold text-foreground">Revenue &middot; Jun 2025</p>
+                <p className="text-lg font-bold text-foreground mt-1">11,600</p>
+                <p className="text-xs text-muted-foreground">thousands</p>
               </div>
               <div className="flex flex-col gap-1.5 text-xs">
                 {[
                   { label: 'Source Type', value: 'Manual Entry' },
                   { label: 'Formula', value: '—' },
                   { label: 'Owner', value: 'Jane Cooper' },
-                  { label: 'Validation', value: 'Valid', valueColor: '#16a34a' },
+                  { label: 'Validation', value: 'Valid', isValid: true },
                   { label: 'Last Updated', value: 'May 28, 2025 10:32 AM' },
-                ].map(({ label, value, valueColor }) => (
+                ].map(({ label, value, isValid }) => (
                   <div key={label} className="flex flex-col">
-                    <span className="text-slate-400">{label}</span>
-                    <span className="font-medium text-slate-700" style={valueColor ? { color: valueColor } : {}}>
+                    <span className="text-muted-foreground">{label}</span>
+                    <span className={`font-medium ${isValid ? 'text-green-600 dark:text-green-400' : 'text-foreground'}`}>
                       {value === 'Valid' ? '✓ ' : ''}{value}
                     </span>
                   </div>
                 ))}
                 <div className="flex items-center gap-1">
-                  <span className="text-slate-400">Comments</span>
-                  <span className="w-4 h-4 rounded-full flex items-center justify-center text-white" style={{ backgroundColor: '#2563eb', fontSize: 9 }}>2</span>
+                  <span className="text-muted-foreground">Comments</span>
+                  <span className="w-4 h-4 rounded-full flex items-center justify-center text-white bg-primary" style={{ fontSize: 9 }}>2</span>
                 </div>
               </div>
 
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-semibold text-slate-700">History</span>
-                  <button className="text-xs" style={{ color: '#2563eb' }}>View all</button>
+                  <span className="text-xs font-semibold text-foreground">History</span>
+                  <Button variant="link" size="sm" className="h-auto p-0 text-xs text-primary">View all</Button>
                 </div>
                 <div className="flex flex-col gap-2">
                   {historyItems.map((h, i) => (
-                    <div key={i} className="border-l-2 pl-2" style={{ borderColor: '#e2e8f0' }}>
-                      <p className="text-xs font-medium text-slate-700">{h.user}</p>
-                      <p className="text-slate-400" style={{ fontSize: 10 }}>{h.time}</p>
-                      <p className="text-xs font-semibold text-slate-800 mt-0.5">{h.value}</p>
+                    <div key={i} className="border-l-2 pl-2" style={{ borderColor: 'var(--border)' }}>
+                      <p className="text-xs font-medium text-foreground">{h.user}</p>
+                      <p className="text-muted-foreground" style={{ fontSize: 10 }}>{h.time}</p>
+                      <p className="text-xs font-semibold text-foreground mt-0.5">{h.value}</p>
                     </div>
                   ))}
                 </div>

@@ -47,7 +47,13 @@ import {
   Briefcase,
   ClipboardList,
   Scale,
-  LayoutDashboard
+  LayoutDashboard,
+  LineChart,
+  Layers,
+  FileSpreadsheet,
+  GitBranch,
+  ArrowUpDown,
+  Workflow
 } from "lucide-react"
 import { IconType } from "react-icons"
 import { IoPeopleOutline, IoReceiptOutline, IoStatsChartOutline } from "react-icons/io5"
@@ -472,6 +478,24 @@ export const MODULE_CONFIG: ModuleConfig[] = [
         path: "/investments-v2/setup",
         items: [],
       },
+    ],
+  },
+
+  // forecasting-v2 — Arcus FP&A Planning, Budgeting, Forecasting and Scenario Modelling
+  {
+    id: "forecasting",
+    name: "Forecasting",
+    description: "Planning, budgeting, rolling forecasts and scenario modelling",
+    icon: LineChart,
+    color: "oklch(0.55 0.18 264)",
+    path: "/forecasting-v2/home",
+    subModules: [
+      { id: "forecasting-home", name: "Home", path: "/forecasting-v2/home", icon: LayoutDashboard, description: "FP&A home dashboard" },
+      { id: "forecasting-model-builder", name: "Model Builder", path: "/forecasting-v2/model-builder", icon: Layers, description: "No-code planning model builder" },
+      { id: "forecasting-planning-worksheet", name: "Planning Worksheet", path: "/forecasting-v2/planning-worksheet", icon: FileSpreadsheet, description: "Spreadsheet-style planning grid" },
+      { id: "forecasting-scenario-comparison", name: "Scenario Comparison", path: "/forecasting-v2/scenario-comparison", icon: GitBranch, description: "Base/Upside/Downside scenario comparison" },
+      { id: "forecasting-variance", name: "Variance", path: "/forecasting-v2/variance", icon: ArrowUpDown, description: "Actual vs budget vs forecast variance analysis" },
+      { id: "forecasting-workflow", name: "Workflow", path: "/forecasting-v2/workflow", icon: Workflow, description: "Budget workflow and approvals" },
     ],
   },
 

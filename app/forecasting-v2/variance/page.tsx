@@ -2,12 +2,17 @@
 
 import DashboardShell from '@/components/fpna/DashboardShell'
 import TopBar from '@/components/fpna/TopBar'
+import { useForecastingTheme } from '@/components/fpna/theme-provider'
+import { useThemeContainer } from '@/components/fpna/use-theme-container'
+import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Textarea } from '@/components/ui/textarea'
 import { useState } from 'react'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   CartesianGrid, LineChart, Line, ReferenceLine, Cell
 } from 'recharts'
-import { Info, TrendingUp, TrendingDown, ArrowUp, ArrowDown, X, ChevronDown, MoreHorizontal } from 'lucide-react'
+import { Info, ArrowUp, ArrowDown, X, MoreHorizontal } from 'lucide-react'
 
 const kpis = [
   { label: 'Actual Revenue', value: '$125.8M', delta: '+4.2% vs Budget', positive: true, trend: [9, 10, 11, 12, 11, 13, 14] },
@@ -61,6 +66,8 @@ const commentaryRequests = [
   { dept: 'Marketing', area: 'Advertising', owner: 'Jane Cooper', variance: '$0.40M', due: 'May 28, 2025', status: 'Submitted' },
 ]
 
+const departmentOptions = Array.from(new Set(deptRows.map(r => r.dept)))
+
 function Spark({ data, color }: { data: number[], color: string }) {
   const pts = data.map((v, i) => ({ v, i }))
   return (
@@ -72,66 +79,125 @@ function Spark({ data, color }: { data: number[], color: string }) {
   )
 }
 
-function statusBadge(s: string) {
-  const map: Record<string, { bg: string; color: string }> = {
-    Overdue: { bg: '#fef2f2', color: '#dc2626' },
-    'In Progress': { bg: '#fffbeb', color: '#d97706' },
-    Submitted: { bg: '#f0fdf4', color: '#16a34a' },
+function statusBadge(s: string, theme: 'light' | 'dark') {
+  const map: Record<string, { bgLight: string; bgDark: string; colorLight: string; colorDark: string }> = {
+    Overdue: { bgLight: '#fef2f2', bgDark: 'rgba(239, 68, 68, 0.15)', colorLight: '#dc2626', colorDark: '#f87171' },
+    'In Progress': { bgLight: '#fffbeb', bgDark: 'rgba(217, 119, 6, 0.15)', colorLight: '#d97706', colorDark: '#fbbf24' },
+    Submitted: { bgLight: '#f0fdf4', bgDark: 'rgba(22, 163, 74, 0.15)', colorLight: '#16a34a', colorDark: '#4ade80' },
   }
-  const style = map[s] || { bg: '#f1f5f9', color: '#64748b' }
-  return <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ backgroundColor: style.bg, color: style.color }}>{s}</span>
+  const entry = map[s] || { bgLight: '#f1f5f9', bgDark: 'rgba(100, 116, 139, 0.15)', colorLight: '#64748b', colorDark: '#94a3b8' }
+  const bg = theme === 'dark' ? entry.bgDark : entry.bgLight
+  const color = theme === 'dark' ? entry.colorDark : entry.colorLight
+  return <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ backgroundColor: bg, color }}>{s}</span>
 }
 
 export default function VariancePage() {
+  const { theme } = useForecastingTheme()
+  const { ref: themeRef, container: themeContainer } = useThemeContainer()
+
   const [showDrawer, setShowDrawer] = useState(true)
   const [selectedDept, setSelectedDept] = useState('Product Development')
+  const [deptFilter, setDeptFilter] = useState('All Departments')
+  const [activeTab, setActiveTab] = useState<'Details' | 'History'>('Details')
+  const [commentText, setCommentText] = useState('')
+  const [comments, setComments] = useState<string[]>([])
+
+  // Semantic favourable/unfavourable colors — kept distinct from the theme
+  // vars (which cover chrome) since they encode meaning, but tuned per
+  // theme so they read correctly against light vs dark card backgrounds.
+  const favorableColor = theme === 'dark' ? '#4ade80' : '#16a34a'
+  const unfavorableColor = theme === 'dark' ? '#f87171' : '#dc2626'
+  const favorableBg = theme === 'dark' ? 'rgba(74, 222, 128, 0.15)' : '#dcfce7'
+  const unfavorableBg = theme === 'dark' ? 'rgba(248, 113, 113, 0.15)' : '#fee2e2'
+  const highlightBg = theme === 'dark' ? 'rgba(217, 119, 6, 0.12)' : '#fff7ed'
+  const seriesColors = {
+    budget: theme === 'dark' ? '#3b82f6' : '#2563eb',
+    forecast: theme === 'dark' ? '#94a3b8' : '#64748b',
+  }
+
+  const filteredDeptRows = deptFilter === 'All Departments'
+    ? deptRows
+    : deptRows.filter(r => r.dept === deptFilter)
+
+  const handleAddComment = () => {
+    if (!commentText.trim()) return
+    setComments(prev => [...prev, commentText.trim()])
+    setCommentText('')
+  }
 
   return (
     <DashboardShell>
       <TopBar title="Variance Analysis" scenario="Base Case" version="Working" period="May 2025" />
-      <div className="flex flex-1 overflow-hidden">
-        <div className="flex-1 overflow-y-auto p-4" style={{ backgroundColor: '#f0f2f5' }}>
+      <div ref={themeRef} className="flex flex-1 overflow-hidden">
+        <div className="flex-1 overflow-y-auto p-4 bg-background">
 
           {/* Header + Filters */}
           <div className="flex items-center gap-2 mb-3">
-            <h1 className="text-base font-bold text-slate-800">Variance Analysis</h1>
+            <h1 className="text-base font-bold text-foreground">Variance Analysis</h1>
           </div>
           <div className="flex items-center gap-2 mb-4">
-            {[
-              { label: 'Entity', value: 'All Entities (4)' },
-              { label: 'Department', value: 'All Departments' },
-              { label: 'Version', value: 'Working' },
-              { label: 'Period', value: 'May 2025' },
-              { label: 'View', value: 'Department View' },
-            ].map(f => (
-              <div key={f.label} className="flex items-center gap-1">
-                <label className="text-xs text-slate-400">{f.label}</label>
-                <select className="text-xs px-2 py-1 rounded border ml-1" style={{ borderColor: '#e2e8f0', color: '#475569' }}>
-                  <option>{f.value}</option>
-                </select>
-              </div>
-            ))}
-            <button className="ml-auto text-xs px-3 py-1.5 rounded border" style={{ borderColor: '#e2e8f0', color: '#475569', backgroundColor: '#fff' }}>
+            <div className="flex items-center gap-1">
+              <label className="text-xs text-muted-foreground">Entity</label>
+              <select className="text-xs px-2 py-1 rounded border ml-1 bg-card text-foreground border-border">
+                <option>All Entities (4)</option>
+              </select>
+            </div>
+
+            <div className="flex items-center gap-1">
+              <label className="text-xs text-muted-foreground">Department</label>
+              <Select value={deptFilter} onValueChange={setDeptFilter}>
+                <SelectTrigger className="w-auto min-w-[8rem] h-7 ml-1 text-xs" size="sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent container={themeContainer}>
+                  <SelectItem value="All Departments">All Departments</SelectItem>
+                  {departmentOptions.map(d => (
+                    <SelectItem key={d} value={d}>{d}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-center gap-1">
+              <label className="text-xs text-muted-foreground">Version</label>
+              <select className="text-xs px-2 py-1 rounded border ml-1 bg-card text-foreground border-border">
+                <option>Working</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-1">
+              <label className="text-xs text-muted-foreground">Period</label>
+              <select className="text-xs px-2 py-1 rounded border ml-1 bg-card text-foreground border-border">
+                <option>May 2025</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-1">
+              <label className="text-xs text-muted-foreground">View</label>
+              <select className="text-xs px-2 py-1 rounded border ml-1 bg-card text-foreground border-border">
+                <option>Department View</option>
+              </select>
+            </div>
+
+            <Button variant="outline" size="pill" className="ml-auto" onClick={() => setDeptFilter('All Departments')}>
               Reset Filters
-            </button>
+            </Button>
           </div>
 
           {/* KPI Row */}
           <div className="grid grid-cols-5 gap-3 mb-4">
             {kpis.map((k, i) => (
-              <div key={i} className="rounded-lg p-3" style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0' }}>
-                <p className="text-xs text-slate-400 mb-1">{k.label}</p>
+              <div key={i} className="rounded-lg p-3 bg-card border border-border">
+                <p className="text-xs text-muted-foreground mb-1">{k.label}</p>
                 <div className="flex items-end justify-between">
-                  <p className="text-lg font-bold text-slate-800">{k.value}</p>
-                  {k.trend && <Spark data={k.trend} color={k.positive ? '#2563eb' : '#dc2626'} />}
+                  <p className="text-lg font-bold text-foreground">{k.value}</p>
+                  {k.trend && <Spark data={k.trend} color={k.positive ? seriesColors.budget : unfavorableColor} />}
                   {k.isVariance && (
-                    <div className="w-7 h-7 rounded-full flex items-center justify-center" style={{ backgroundColor: k.positive ? '#dcfce7' : '#fee2e2' }}>
-                      {k.positive ? <ArrowUp size={14} style={{ color: '#16a34a' }} /> : <ArrowDown size={14} style={{ color: '#dc2626' }} />}
+                    <div className="w-7 h-7 rounded-full flex items-center justify-center" style={{ backgroundColor: k.positive ? favorableBg : unfavorableBg }}>
+                      {k.positive ? <ArrowUp size={14} style={{ color: favorableColor }} /> : <ArrowDown size={14} style={{ color: unfavorableColor }} />}
                     </div>
                   )}
                 </div>
                 {k.delta && (
-                  <p className="text-xs mt-1" style={{ color: k.positive ? '#16a34a' : '#dc2626' }}>
+                  <p className="text-xs mt-1" style={{ color: k.positive ? favorableColor : unfavorableColor }}>
                     {k.positive ? '▲' : '▼'} {k.delta}
                   </p>
                 )}
@@ -142,15 +208,15 @@ export default function VariancePage() {
           {/* Actual vs Budget + Variance Trend */}
           <div className="grid grid-cols-12 gap-3 mb-3">
             {/* Actual vs Budget Table */}
-            <div className="col-span-7 rounded-lg p-4" style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0' }}>
+            <div className="col-span-7 rounded-lg p-4 bg-card border border-border">
               <div className="flex items-center gap-1 mb-3">
-                <span className="text-xs font-semibold text-slate-700">Actual vs Budget vs Forecast</span>
-                <Info size={11} className="text-slate-400" />
-                <MoreHorizontal size={13} className="text-slate-400 cursor-pointer ml-auto" />
+                <span className="text-xs font-semibold text-foreground">Actual vs Budget vs Forecast</span>
+                <Info size={11} className="text-muted-foreground" />
+                <MoreHorizontal size={13} className="text-muted-foreground cursor-pointer ml-auto" />
               </div>
               <table className="w-full text-xs">
                 <thead>
-                  <tr style={{ borderBottom: '1px solid #e2e8f0', color: '#94a3b8' }}>
+                  <tr className="border-b border-border" style={{ color: 'var(--muted-foreground)' }}>
                     <th className="text-left font-medium pb-2">Department</th>
                     <th className="text-right font-medium pb-2">Actual<br /><span style={{ fontSize: 9 }}>May 2025</span></th>
                     <th className="text-right font-medium pb-2">Budget<br /><span style={{ fontSize: 9 }}>May 2025</span></th>
@@ -162,23 +228,23 @@ export default function VariancePage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {deptRows.map((r, i) => (
+                  {filteredDeptRows.map((r, i) => (
                     <tr key={i}
                       onClick={() => { setSelectedDept(r.dept); setShowDrawer(true) }}
                       className="cursor-pointer"
                       style={{
-                        borderBottom: '1px solid #f8fafc',
-                        backgroundColor: r.highlighted ? '#fff7ed' : undefined,
+                        borderBottom: '1px solid var(--muted)',
+                        backgroundColor: r.highlighted ? highlightBg : undefined,
                         fontWeight: i === 0 ? 600 : 400,
                       }}>
-                      <td className="py-1.5 text-slate-700" style={{ color: r.highlighted ? '#dc2626' : undefined }}>{r.dept}</td>
-                      <td className="py-1.5 text-right text-slate-700">{r.actual}</td>
-                      <td className="py-1.5 text-right text-slate-700">{r.budget}</td>
-                      <td className="py-1.5 text-right text-slate-700">{r.forecast}</td>
-                      <td className="py-1.5 text-right font-semibold" style={{ color: r.positive ? '#16a34a' : '#dc2626' }}>{r.varBudget}</td>
-                      <td className="py-1.5 text-right font-semibold" style={{ color: r.positive ? '#16a34a' : '#dc2626' }}>{r.varPct}</td>
-                      <td className="py-1.5 text-right text-slate-500">{r.varForecast}</td>
-                      <td className="py-1.5 text-center text-slate-400">{r.commentary}</td>
+                      <td className="py-1.5 text-foreground" style={{ color: r.highlighted ? unfavorableColor : undefined }}>{r.dept}</td>
+                      <td className="py-1.5 text-right text-foreground">{r.actual}</td>
+                      <td className="py-1.5 text-right text-foreground">{r.budget}</td>
+                      <td className="py-1.5 text-right text-foreground">{r.forecast}</td>
+                      <td className="py-1.5 text-right font-semibold" style={{ color: r.positive ? favorableColor : unfavorableColor }}>{r.varBudget}</td>
+                      <td className="py-1.5 text-right font-semibold" style={{ color: r.positive ? favorableColor : unfavorableColor }}>{r.varPct}</td>
+                      <td className="py-1.5 text-right text-muted-foreground">{r.varForecast}</td>
+                      <td className="py-1.5 text-center text-muted-foreground">{r.commentary}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -188,45 +254,51 @@ export default function VariancePage() {
             {/* Variance Trend + Dept Breakdown */}
             <div className="col-span-5 flex flex-col gap-3">
               {/* Trend */}
-              <div className="rounded-lg p-4" style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', flex: 1 }}>
+              <div className="rounded-lg p-4 bg-card border border-border" style={{ flex: 1 }}>
                 <div className="flex items-center gap-1 mb-2">
-                  <span className="text-xs font-semibold text-slate-700">Variance Trend (Total Company)</span>
-                  <Info size={11} className="text-slate-400" />
+                  <span className="text-xs font-semibold text-foreground">Variance Trend (Total Company)</span>
+                  <Info size={11} className="text-muted-foreground" />
                 </div>
                 <div className="flex items-center gap-3 mb-1">
-                  <div className="flex items-center gap-1"><span className="w-3 h-0.5 inline-block bg-blue-500"></span><span className="text-xs text-slate-400">Var to Budget ($M)</span></div>
-                  <div className="flex items-center gap-1"><span className="w-3 h-0.5 inline-block bg-slate-400 border-dashed border-t-2"></span><span className="text-xs text-slate-400">Var to Forecast ($M)</span></div>
+                  <div className="flex items-center gap-1">
+                    <span className="w-3 h-0.5 inline-block" style={{ backgroundColor: seriesColors.budget }}></span>
+                    <span className="text-xs text-muted-foreground">Var to Budget ($M)</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="w-3 h-0.5 inline-block border-dashed border-t-2" style={{ borderColor: seriesColors.forecast }}></span>
+                    <span className="text-xs text-muted-foreground">Var to Forecast ($M)</span>
+                  </div>
                 </div>
                 <div style={{ height: 100 }}>
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={trendData} margin={{ top: 5, right: 5, bottom: 0, left: -25 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                      <XAxis dataKey="month" tick={{ fontSize: 9 }} tickLine={false} axisLine={false} />
-                      <YAxis tick={{ fontSize: 9 }} tickLine={false} axisLine={false} />
-                      <Tooltip contentStyle={{ fontSize: 11 }} />
-                      <ReferenceLine y={0} stroke="#e2e8f0" />
-                      <Bar dataKey="varBudget" fill="#2563eb" radius={[2, 2, 0, 0]} maxBarSize={14} />
-                      <Bar dataKey="varForecast" fill="#94a3b8" radius={[2, 2, 0, 0]} maxBarSize={14} />
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                      <XAxis dataKey="month" tick={{ fontSize: 9, fill: 'var(--muted-foreground)' }} tickLine={false} axisLine={false} />
+                      <YAxis tick={{ fontSize: 9, fill: 'var(--muted-foreground)' }} tickLine={false} axisLine={false} />
+                      <Tooltip contentStyle={{ fontSize: 11, backgroundColor: 'var(--card)', border: '1px solid var(--border)', color: 'var(--foreground)' }} />
+                      <ReferenceLine y={0} stroke="var(--border)" />
+                      <Bar dataKey="varBudget" fill={seriesColors.budget} radius={[2, 2, 0, 0]} maxBarSize={14} />
+                      <Bar dataKey="varForecast" fill={seriesColors.forecast} radius={[2, 2, 0, 0]} maxBarSize={14} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
               </div>
 
               {/* Dept breakdown */}
-              <div className="rounded-lg p-4" style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', flex: 1 }}>
+              <div className="rounded-lg p-4 bg-card border border-border" style={{ flex: 1 }}>
                 <div className="flex items-center gap-1 mb-2">
-                  <span className="text-xs font-semibold text-slate-700">Variance Breakdown by Department (Var to Budget $M)</span>
+                  <span className="text-xs font-semibold text-foreground">Variance Breakdown by Department (Var to Budget $M)</span>
                 </div>
                 <div style={{ height: 130 }}>
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={deptVarianceData} layout="vertical" margin={{ top: 0, right: 30, bottom: 0, left: 80 }}>
-                      <XAxis type="number" tick={{ fontSize: 9 }} tickLine={false} axisLine={false} tickFormatter={v => `${v}M`} domain={[-1.5, 1.5]} />
-                      <YAxis type="category" dataKey="dept" tick={{ fontSize: 9 }} tickLine={false} axisLine={false} width={80} />
-                      <Tooltip contentStyle={{ fontSize: 11 }} formatter={(v: number) => `$${v}M`} />
-                      <ReferenceLine x={0} stroke="#e2e8f0" />
+                      <XAxis type="number" tick={{ fontSize: 9, fill: 'var(--muted-foreground)' }} tickLine={false} axisLine={false} tickFormatter={v => `${v}M`} domain={[-1.5, 1.5]} />
+                      <YAxis type="category" dataKey="dept" tick={{ fontSize: 9, fill: 'var(--muted-foreground)' }} tickLine={false} axisLine={false} width={80} />
+                      <Tooltip contentStyle={{ fontSize: 11, backgroundColor: 'var(--card)', border: '1px solid var(--border)', color: 'var(--foreground)' }} formatter={(v: number) => `$${v}M`} />
+                      <ReferenceLine x={0} stroke="var(--border)" />
                       <Bar dataKey="value" maxBarSize={12} radius={[0, 2, 2, 0]}>
                         {deptVarianceData.map((entry, i) => (
-                          <Cell key={i} fill={entry.value < 0 ? '#dc2626' : '#10b981'} />
+                          <Cell key={i} fill={entry.value < 0 ? unfavorableColor : favorableColor} />
                         ))}
                       </Bar>
                     </BarChart>
@@ -237,14 +309,14 @@ export default function VariancePage() {
           </div>
 
           {/* Commentary Requests */}
-          <div className="rounded-lg p-4" style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0' }}>
+          <div className="rounded-lg p-4 bg-card border border-border">
             <div className="flex items-center gap-1 mb-3">
-              <span className="text-xs font-semibold text-slate-700">Commentary Requests</span>
-              <Info size={11} className="text-slate-400" />
+              <span className="text-xs font-semibold text-foreground">Commentary Requests</span>
+              <Info size={11} className="text-muted-foreground" />
             </div>
             <table className="w-full text-xs">
               <thead>
-                <tr style={{ borderBottom: '1px solid #e2e8f0', color: '#94a3b8' }}>
+                <tr className="border-b border-border" style={{ color: 'var(--muted-foreground)' }}>
                   <th className="text-left font-medium pb-2">Department</th>
                   <th className="text-left font-medium pb-2">Variance Area</th>
                   <th className="text-left font-medium pb-2">Owner</th>
@@ -255,96 +327,135 @@ export default function VariancePage() {
               </thead>
               <tbody>
                 {commentaryRequests.map((r, i) => (
-                  <tr key={i} style={{ borderBottom: '1px solid #f8fafc' }}>
-                    <td className="py-1.5 text-slate-700">{r.dept}</td>
-                    <td className="py-1.5 text-slate-500">{r.area}</td>
-                    <td className="py-1.5 text-slate-500">{r.owner}</td>
-                    <td className="py-1.5 text-right font-semibold" style={{ color: r.variance.startsWith('$') && !r.variance.startsWith('$(') ? '#16a34a' : '#dc2626' }}>
+                  <tr key={i} style={{ borderBottom: '1px solid var(--muted)' }}>
+                    <td className="py-1.5 text-foreground">{r.dept}</td>
+                    <td className="py-1.5 text-muted-foreground">{r.area}</td>
+                    <td className="py-1.5 text-muted-foreground">{r.owner}</td>
+                    <td className="py-1.5 text-right font-semibold" style={{ color: r.variance.startsWith('$') && !r.variance.startsWith('$(') ? favorableColor : unfavorableColor }}>
                       {r.variance}
                     </td>
-                    <td className="py-1.5 text-slate-500 pl-4">{r.due}</td>
-                    <td className="py-1.5">{statusBadge(r.status)}</td>
+                    <td className="py-1.5 text-muted-foreground pl-4">{r.due}</td>
+                    <td className="py-1.5">{statusBadge(r.status, theme)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            <button className="text-xs mt-2" style={{ color: '#2563eb' }}>View all commentary requests</button>
+            <Button variant="link" size="pill" className="mt-2 px-0">
+              View all commentary requests
+            </Button>
           </div>
         </div>
 
         {/* Variance Detail Drawer */}
         {showDrawer && (
-          <div className="w-56 shrink-0 border-l flex flex-col" style={{ borderColor: '#e2e8f0', backgroundColor: '#fff' }}>
-            <div className="flex items-center justify-between px-3 py-2 border-b" style={{ borderColor: '#e2e8f0' }}>
-              <span className="text-xs font-semibold text-slate-700">Variance Detail</span>
-              <X size={13} className="text-slate-400 cursor-pointer" onClick={() => setShowDrawer(false)} />
+          <div className="w-56 shrink-0 border-l flex flex-col bg-card border-border">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-border">
+              <span className="text-xs font-semibold text-foreground">Variance Detail</span>
+              <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setShowDrawer(false)}>
+                <X size={13} className="text-muted-foreground" />
+              </Button>
             </div>
             <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-3">
               <div>
-                <p className="text-xs text-slate-400 mb-1">{selectedDept} — Headcount</p>
-                <p className="text-2xl font-bold" style={{ color: '#dc2626' }}>$(0.80M)</p>
-                <p className="text-xs" style={{ color: '#dc2626' }}>-7.4% vs Budget</p>
+                <p className="text-xs text-muted-foreground mb-1">{selectedDept} — Headcount</p>
+                <p className="text-2xl font-bold" style={{ color: unfavorableColor }}>$(0.80M)</p>
+                <p className="text-xs" style={{ color: unfavorableColor }}>-7.4% vs Budget</p>
               </div>
 
-              <div className="flex gap-1 border-b" style={{ borderColor: '#e2e8f0' }}>
-                {['Details', 'History'].map(t => (
-                  <button key={t} className="text-xs pb-1.5 px-1"
-                    style={{ color: t === 'Details' ? '#2563eb' : '#94a3b8', borderBottom: t === 'Details' ? '2px solid #2563eb' : '2px solid transparent', fontWeight: t === 'Details' ? 600 : 400 }}>
+              <div className="flex gap-1 border-b border-border">
+                {(['Details', 'History'] as const).map(t => (
+                  <Button
+                    key={t}
+                    variant="ghost"
+                    size="pill"
+                    onClick={() => setActiveTab(t)}
+                    className="h-auto rounded-none pb-1.5 px-1"
+                    style={{
+                      color: activeTab === t ? 'var(--primary)' : 'var(--muted-foreground)',
+                      borderBottom: activeTab === t ? '2px solid var(--primary)' : '2px solid transparent',
+                      fontWeight: activeTab === t ? 600 : 400,
+                    }}>
                     {t}
-                  </button>
+                  </Button>
                 ))}
               </div>
 
-              <div>
-                <p className="text-xs font-semibold text-slate-700 mb-1">Explanation</p>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  Lower headcount due to delayed hiring for Senior Engineers and Product Designers. Open roles are expected to be filled in Q3. Savings partially offset by contractor extensions.
-                </p>
-              </div>
-
-              <div>
-                <p className="text-xs font-semibold text-slate-700 mb-1">Corrective Action</p>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  Re-profile hiring plan into Q3 and Q4. Reallocate budget to contractor spend in the interim to maintain delivery.
-                </p>
-              </div>
-
-              <div>
-                <p className="text-xs font-semibold text-slate-700 mb-2">Supporting Details</p>
-                {[
-                  { label: 'Actual', value: '$15.00M', color: undefined },
-                  { label: 'Budget', value: '$15.00M', color: undefined },
-                  { label: 'Forecast', value: '$15.30M', color: undefined },
-                  { label: 'Var to Budget', value: '$(0.80M)', color: '#dc2626' },
-                  { label: 'Var %', value: '-7.4%', color: '#dc2626' },
-                  { label: 'Var to Forecast', value: '$(0.30M)', color: '#dc2626' },
-                ].map(({ label, value, color }) => (
-                  <div key={label} className="flex items-center justify-between py-0.5">
-                    <span className="text-xs text-slate-400">{label}</span>
-                    <span className="text-xs font-semibold" style={{ color: color || '#1e293b' }}>{value}</span>
+              {activeTab === 'Details' ? (
+                <>
+                  <div>
+                    <p className="text-xs font-semibold text-foreground mb-1">Explanation</p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Lower headcount due to delayed hiring for Senior Engineers and Product Designers. Open roles are expected to be filled in Q3. Savings partially offset by contractor extensions.
+                    </p>
                   </div>
-                ))}
-              </div>
+
+                  <div>
+                    <p className="text-xs font-semibold text-foreground mb-1">Corrective Action</p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Re-profile hiring plan into Q3 and Q4. Reallocate budget to contractor spend in the interim to maintain delivery.
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-xs font-semibold text-foreground mb-2">Supporting Details</p>
+                    {[
+                      { label: 'Actual', value: '$15.00M', color: undefined as string | undefined },
+                      { label: 'Budget', value: '$15.00M', color: undefined as string | undefined },
+                      { label: 'Forecast', value: '$15.30M', color: undefined as string | undefined },
+                      { label: 'Var to Budget', value: '$(0.80M)', color: unfavorableColor },
+                      { label: 'Var %', value: '-7.4%', color: unfavorableColor },
+                      { label: 'Var to Forecast', value: '$(0.30M)', color: unfavorableColor },
+                    ].map(({ label, value, color }) => (
+                      <div key={label} className="flex items-center justify-between py-0.5">
+                        <span className="text-xs text-muted-foreground">{label}</span>
+                        <span className="text-xs font-semibold" style={{ color: color || 'var(--foreground)' }}>{value}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div>
+                    {[
+                      { label: 'Owner', value: 'Devon Lane' },
+                      { label: 'Due Date', value: 'May 30, 2025' },
+                    ].map(({ label, value }) => (
+                      <div key={label} className="flex items-center justify-between py-0.5">
+                        <span className="text-xs text-muted-foreground">{label}</span>
+                        <span className="text-xs font-medium text-foreground">{value}</span>
+                      </div>
+                    ))}
+                    <div className="flex items-center justify-between py-0.5">
+                      <span className="text-xs text-muted-foreground">Status</span>
+                      {statusBadge('Overdue', theme)}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  No history entries yet for {selectedDept}.
+                </p>
+              )}
 
               <div>
-                {[
-                  { label: 'Owner', value: 'Devon Lane' },
-                  { label: 'Due Date', value: 'May 30, 2025' },
-                ].map(({ label, value }) => (
-                  <div key={label} className="flex items-center justify-between py-0.5">
-                    <span className="text-xs text-slate-400">{label}</span>
-                    <span className="text-xs font-medium text-slate-700">{value}</span>
+                <p className="text-xs font-semibold text-foreground mb-1">Add Comment</p>
+                <Textarea
+                  value={commentText}
+                  onChange={(e) => setCommentText(e.target.value)}
+                  placeholder="Add a comment..."
+                  className="text-xs rounded-lg bg-background border-border text-foreground min-h-[60px]"
+                />
+                <Button variant="outline" size="pill" className="w-full mt-2" onClick={handleAddComment}>
+                  Add Comment
+                </Button>
+                {comments.length > 0 && (
+                  <div className="mt-2 flex flex-col gap-1.5">
+                    {comments.map((c, i) => (
+                      <div key={i} className="text-xs rounded-md p-2 bg-muted text-foreground">
+                        {c}
+                      </div>
+                    ))}
                   </div>
-                ))}
-                <div className="flex items-center justify-between py-0.5">
-                  <span className="text-xs text-slate-400">Status</span>
-                  <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ backgroundColor: '#fef2f2', color: '#dc2626' }}>Overdue</span>
-                </div>
+                )}
               </div>
-
-              <button className="text-xs w-full text-center py-1.5 rounded border" style={{ borderColor: '#e2e8f0', color: '#475569' }}>
-                Add Comment
-              </button>
             </div>
           </div>
         )}

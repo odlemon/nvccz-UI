@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import DashboardShell from '@/components/fpna/DashboardShell'
 import TopBar from '@/components/fpna/TopBar'
 import {
@@ -7,24 +8,65 @@ import {
   Cell, LineChart, Line, ReferenceLine
 } from 'recharts'
 import { Info, Copy, TrendingUp, Download, MoreHorizontal, TrendingDown, Users } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { useForecastingTheme } from '@/components/fpna/theme-provider'
 
-const scenarioCards = [
+type CaseId = 'base' | 'upside' | 'downside'
+type Theme = 'light' | 'dark'
+
+// Base/Upside/Downside keep a consistent hue (blue/green/red) across both
+// themes — only brightness/saturation shifts for dark mode legibility.
+function caseColor(id: CaseId, theme: Theme) {
+  if (id === 'base') return theme === 'dark' ? '#3b82f6' : '#2563eb'
+  if (id === 'upside') return theme === 'dark' ? '#10b981' : '#16a34a'
+  return theme === 'dark' ? '#ef4444' : '#dc2626'
+}
+
+// Soft tint used for badges / card accents behind the case color.
+function caseTint(id: CaseId, theme: Theme) {
+  if (theme === 'dark') {
+    if (id === 'base') return 'rgba(59,130,246,0.16)'
+    if (id === 'upside') return 'rgba(16,185,129,0.16)'
+    return 'rgba(239,68,68,0.16)'
+  }
+  if (id === 'base') return '#eff6ff'
+  if (id === 'upside') return '#f0fdf4'
+  return '#fef2f2'
+}
+
+const neutralColor = (theme: Theme) => (theme === 'dark' ? '#64748b' : '#94a3b8')
+
+const scenarioCards: Array<{
+  id: CaseId
+  num: string
+  label: string
+  revenue: string
+  ebitda: string
+  margin: string
+  revDelta: string
+  ebitdaDelta: string
+  marginDelta: string
+  cash: string
+  runway: string
+  headcount: string
+  sparkData: number[]
+}> = [
   {
-    num: '1', label: 'Base Case', color: '#2563eb', bgColor: '#eff6ff',
+    id: 'base', num: '1', label: 'Base Case',
     revenue: '$125.8M', ebitda: '$23.6M', margin: '18.8%',
     revDelta: '+4.2%', ebitdaDelta: '+6.1%', marginDelta: '+29 bps',
     cash: '$38.4M', runway: '14.2 months', headcount: '532 FTEs',
     sparkData: [8, 9, 10, 11, 10, 12, 13, 12, 14, 15, 14, 16],
   },
   {
-    num: '2', label: 'Upside Case', color: '#16a34a', bgColor: '#f0fdf4',
+    id: 'upside', num: '2', label: 'Upside Case',
     revenue: '$138.3M', ebitda: '$29.1M', margin: '21.0%',
     revDelta: '+13.0%', ebitdaDelta: '+18.4%', marginDelta: '+210 bps',
     cash: '$53.2M', runway: '17.6 months', headcount: '548 FTEs',
     sparkData: [9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20],
   },
   {
-    num: '3', label: 'Downside Case', color: '#dc2626', bgColor: '#fff7ed',
+    id: 'downside', num: '3', label: 'Downside Case',
     revenue: '$113.2M', ebitda: '$17.2M', margin: '15.2%',
     revDelta: '-6.7%', ebitdaDelta: '-20.5%', marginDelta: '-120 bps',
     cash: '$25.1M', runway: '10.2 months', headcount: '516 FTEs',
@@ -51,16 +93,23 @@ const compTable = [
 // For positive bars: bottom = running total before bar, bar = delta
 // For negative bars: bottom = running total AFTER the drop (lower point), bar = abs(delta)
 // Budget 120 → +6.4 → +8.7 → +7.2 → +1.1 → -4.3 → -2.5 → Forecast 135.7 (shown as 125.8 label)
-const bridgeData = [
-  { name: 'Budget',          bottom: 0,     bar: 120,  fill: '#94a3b8' },
-  { name: 'Price / Mix',     bottom: 120,   bar: 6.4,  fill: '#10b981' },
-  { name: 'Volume',          bottom: 126.4, bar: 8.7,  fill: '#10b981' },
-  { name: 'New Business',    bottom: 135.1, bar: 7.2,  fill: '#10b981' },
-  { name: 'Other Income',    bottom: 142.3, bar: 1.1,  fill: '#10b981' },
-  { name: 'Churn/Attrition', bottom: 139.1, bar: 4.3,  fill: '#ef4444' },
-  { name: 'FX / Other',      bottom: 134.8, bar: 2.5,  fill: '#ef4444' },
-  { name: 'Forecast',        bottom: 0,     bar: 125.8, fill: '#2563eb' },
+const bridgeData: Array<{ name: string; bottom: number; bar: number; kind: 'neutral' | 'positive' | 'negative' | 'result' }> = [
+  { name: 'Budget',          bottom: 0,     bar: 120,   kind: 'neutral' },
+  { name: 'Price / Mix',     bottom: 120,   bar: 6.4,   kind: 'positive' },
+  { name: 'Volume',          bottom: 126.4, bar: 8.7,   kind: 'positive' },
+  { name: 'New Business',    bottom: 135.1, bar: 7.2,   kind: 'positive' },
+  { name: 'Other Income',    bottom: 142.3, bar: 1.1,   kind: 'positive' },
+  { name: 'Churn/Attrition', bottom: 139.1, bar: 4.3,   kind: 'negative' },
+  { name: 'FX / Other',      bottom: 134.8, bar: 2.5,   kind: 'negative' },
+  { name: 'Forecast',        bottom: 0,     bar: 125.8, kind: 'result' },
 ]
+
+function bridgeFill(kind: 'neutral' | 'positive' | 'negative' | 'result', theme: Theme) {
+  if (kind === 'neutral') return neutralColor(theme)
+  if (kind === 'positive') return caseColor('upside', theme)
+  if (kind === 'negative') return caseColor('downside', theme)
+  return caseColor('base', theme)
+}
 
 const sensitivityData = [
   { driver: 'Revenue Growth', range: '-5% to +5%', low: '$18.7M', mid: '$23.6M', high: '$28.5M' },
@@ -69,25 +118,25 @@ const sensitivityData = [
   { driver: 'Collection Days', range: '+10 to -10 days', low: '$21.2M', mid: '$23.6M', high: '$26.0M' },
 ]
 
-const cashRunwayComparison = [
-  { name: 'Base Case', value: 14.2, color: '#2563eb' },
-  { name: 'Upside Case', value: 17.6, color: '#10b981' },
-  { name: 'Downside Case', value: 10.2, color: '#dc2626' },
+const cashRunwayComparison: Array<{ id: CaseId; name: string; value: number }> = [
+  { id: 'base', name: 'Base Case', value: 14.2 },
+  { id: 'upside', name: 'Upside Case', value: 17.6 },
+  { id: 'downside', name: 'Downside Case', value: 10.2 },
 ]
 
-const notes = [
+const notes: Array<{ id: CaseId; label: string; text: string; icon: typeof TrendingUp }> = [
   {
-    label: 'Upside Scenario', color: '#16a34a',
+    id: 'upside', label: 'Upside Scenario',
     text: 'Strong revenue upside driven by new logo pipeline and pricing optimizations. Recommend investment in sales capacity to capture growth opportunity.',
     icon: TrendingUp,
   },
   {
-    label: 'Base Case', color: '#2563eb',
+    id: 'base', label: 'Base Case',
     text: 'Balanced plan with healthy margin and cash position. Continue operational discipline and monitor macro conditions.',
     icon: TrendingUp,
   },
   {
-    label: 'Downside Scenario', color: '#dc2626',
+    id: 'downside', label: 'Downside Scenario',
     text: 'Revenue pressure and higher costs impact profitability and runway. Recommend cost controls and prioritizing high ROI initiatives.',
     icon: TrendingDown,
   },
@@ -107,104 +156,164 @@ function Spark({ data, color }: { data: number[], color: string }) {
   )
 }
 
+const caseOrder: CaseId[] = ['base', 'upside', 'downside']
+
 export default function ScenarioComparisonPage() {
+  const { theme } = useForecastingTheme()
+  const [selectedCase, setSelectedCase] = useState<CaseId>('base')
+  const selectedScenario = scenarioCards.find((s) => s.id === selectedCase)!
+
+  const cycleCase = () => {
+    const idx = caseOrder.indexOf(selectedCase)
+    setSelectedCase(caseOrder[(idx + 1) % caseOrder.length])
+  }
+
   return (
     <DashboardShell>
       <TopBar title="Scenario Comparison" scenario="2025 Planning" version="Working" period="May 2025" entity="All Entities" />
-      <div className="flex-1 overflow-y-auto p-4" style={{ backgroundColor: '#f0f2f5' }}>
+      <div className="flex-1 overflow-y-auto p-4 bg-background">
 
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-1.5">
-            <h1 className="text-base font-bold text-slate-800">Scenario Comparison</h1>
-            <Info size={13} className="text-slate-400" />
+            <h1 className="text-base font-bold text-foreground">Scenario Comparison</h1>
+            <Info size={13} className="text-muted-foreground" />
           </div>
           <div className="flex items-center gap-2">
-            <button className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium border" style={{ borderColor: '#e2e8f0', color: '#475569', backgroundColor: '#fff' }}>
+            <Button variant="outline" size="pill">
               <Copy size={11} /> Duplicate Scenario
-            </button>
-            <button className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium border" style={{ borderColor: '#e2e8f0', color: '#475569', backgroundColor: '#fff' }}>
+            </Button>
+            <Button variant="outline" size="pill">
               <TrendingUp size={11} /> Promote to Forecast
-            </button>
-            <button className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium border" style={{ borderColor: '#e2e8f0', color: '#475569', backgroundColor: '#fff' }}>
+            </Button>
+            <Button variant="outline" size="pill">
               <Download size={11} /> Export Comparison
-            </button>
-            <MoreHorizontal size={16} className="text-slate-400 cursor-pointer" />
+            </Button>
+            <MoreHorizontal size={16} className="text-muted-foreground cursor-pointer" />
           </div>
         </div>
 
         {/* 3 Scenario Cards */}
         <div className="grid grid-cols-3 gap-4 mb-4">
-          {scenarioCards.map((s, i) => (
-            <div key={i} className="rounded-lg p-4" style={{ backgroundColor: '#fff', border: `1.5px solid ${s.color}20` }}>
-              <div className="flex items-center gap-2 mb-3">
-                <span className="w-5 h-5 rounded flex items-center justify-center text-white font-bold text-xs" style={{ backgroundColor: s.color }}>{s.num}</span>
-                <span className="text-sm font-bold text-slate-800">{s.label}</span>
-                <div className="ml-auto"><Spark data={s.sparkData} color={s.color} /></div>
-              </div>
-              <div className="grid grid-cols-3 gap-2 mb-3">
-                {[
-                  { label: 'Revenue', value: s.revenue, delta: s.revDelta },
-                  { label: 'EBITDA', value: s.ebitda, delta: s.ebitdaDelta },
-                  { label: 'Net Margin', value: s.margin, delta: s.marginDelta },
-                ].map((kpi, ki) => (
-                  <div key={ki}>
-                    <p className="text-xs text-slate-400">{kpi.label}</p>
-                    <p className="text-sm font-bold text-slate-800">{kpi.value}</p>
-                    <p className="text-xs" style={{ color: kpi.delta.startsWith('-') ? '#dc2626' : '#16a34a' }}>
-                      {kpi.delta.startsWith('-') ? '▼' : '▲'} {kpi.delta} vs Forecast
-                    </p>
+          {scenarioCards.map((s) => {
+            const color = caseColor(s.id, theme)
+            const isSelected = selectedCase === s.id
+            return (
+              <div
+                key={s.id}
+                onClick={() => setSelectedCase(s.id)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedCase(s.id) }}
+                className="rounded-lg p-4 bg-card cursor-pointer transition-shadow"
+                style={{
+                  border: `1.5px solid ${isSelected ? color : `${color}33`}`,
+                  boxShadow: isSelected ? `0 0 0 2px ${color}33` : 'none',
+                  backgroundColor: isSelected ? caseTint(s.id, theme) : 'var(--card)',
+                }}
+              >
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="w-5 h-5 rounded flex items-center justify-center text-white font-bold text-xs" style={{ backgroundColor: color }}>{s.num}</span>
+                  <span className="text-sm font-bold" style={{ color: isSelected ? color : 'var(--foreground)' }}>{s.label}</span>
+                  {isSelected && (
+                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded" style={{ color, backgroundColor: caseTint(s.id, theme) }}>Selected</span>
+                  )}
+                  <div className="ml-auto"><Spark data={s.sparkData} color={color} /></div>
+                </div>
+                <div className="grid grid-cols-3 gap-2 mb-3">
+                  {[
+                    { label: 'Revenue', value: s.revenue, delta: s.revDelta },
+                    { label: 'EBITDA', value: s.ebitda, delta: s.ebitdaDelta },
+                    { label: 'Net Margin', value: s.margin, delta: s.marginDelta },
+                  ].map((kpi, ki) => (
+                    <div key={ki}>
+                      <p className="text-xs text-muted-foreground">{kpi.label}</p>
+                      <p className="text-sm font-bold text-foreground">{kpi.value}</p>
+                      <p className="text-xs" style={{ color: kpi.delta.startsWith('-') ? caseColor('downside', theme) : caseColor('upside', theme) }}>
+                        {kpi.delta.startsWith('-') ? '▼' : '▲'} {kpi.delta} vs Forecast
+                      </p>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex items-center gap-4 pt-2 border-t border-border">
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <span className="text-muted-foreground">⬡</span> <span>Closing Cash</span>
+                    <span className="font-semibold text-foreground ml-1">{s.cash}</span>
                   </div>
-                ))}
-              </div>
-              <div className="flex items-center gap-4 pt-2" style={{ borderTop: '1px solid #f1f5f9' }}>
-                <div className="flex items-center gap-1 text-xs text-slate-500">
-                  <span className="text-slate-400">⬡</span> <span>Closing Cash</span>
-                  <span className="font-semibold text-slate-700 ml-1">{s.cash}</span>
-                </div>
-                <div className="flex items-center gap-1 text-xs text-slate-500">
-                  <span>Runway</span>
-                  <span className="font-semibold text-slate-700 ml-1">{s.runway}</span>
-                </div>
-                <div className="flex items-center gap-1 text-xs text-slate-500">
-                  <Users size={10} />
-                  <span className="font-semibold text-slate-700">{s.headcount}</span>
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <span>Runway</span>
+                    <span className="font-semibold text-foreground ml-1">{s.runway}</span>
+                  </div>
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <Users size={10} />
+                    <span className="font-semibold text-foreground">{s.headcount}</span>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
 
         {/* Middle row: Comparison Table + Bridge */}
         <div className="grid grid-cols-12 gap-4 mb-4">
           {/* Comparison Table */}
-          <div className="col-span-6 rounded-lg p-4" style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0' }}>
+          <div className="col-span-6 rounded-lg p-4 bg-card border border-border">
             <div className="flex items-center gap-1 mb-3">
-              <span className="text-xs font-semibold text-slate-700">Scenario Comparison Table</span>
-              <Info size={11} className="text-slate-400" />
+              <span className="text-xs font-semibold text-foreground">Scenario Comparison Table</span>
+              <Info size={11} className="text-muted-foreground" />
             </div>
             <table className="w-full text-xs">
               <thead>
-                <tr style={{ borderBottom: '1px solid #e2e8f0', color: '#94a3b8' }}>
+                <tr className="border-b border-border" style={{ color: neutralColor(theme) }}>
                   <th className="text-left font-medium pb-2 w-4">#</th>
                   <th className="text-left font-medium pb-2">Metric</th>
-                  <th className="text-right font-medium pb-2"><span className="px-1.5 py-0.5 rounded" style={{ backgroundColor: '#eff6ff', color: '#2563eb' }}>Base Case</span></th>
-                  <th className="text-right font-medium pb-2"><span className="px-1.5 py-0.5 rounded" style={{ backgroundColor: '#f0fdf4', color: '#16a34a' }}>Upside Case</span></th>
-                  <th className="text-right font-medium pb-2"><span className="px-1.5 py-0.5 rounded" style={{ backgroundColor: '#fef2f2', color: '#dc2626' }}>Downside Case</span></th>
-                  <th className="text-right font-medium pb-2 text-xs" style={{ color: '#16a34a' }}>Upside vs Base</th>
-                  <th className="text-right font-medium pb-2 text-xs" style={{ color: '#dc2626' }}>Downside vs Base</th>
+                  <th className="text-right font-medium pb-2">
+                    <span
+                      className="px-1.5 py-0.5 rounded"
+                      style={{
+                        backgroundColor: caseTint('base', theme),
+                        color: caseColor('base', theme),
+                        fontWeight: selectedCase === 'base' ? 700 : 500,
+                        outline: selectedCase === 'base' ? `1.5px solid ${caseColor('base', theme)}` : 'none',
+                      }}
+                    >Base Case</span>
+                  </th>
+                  <th className="text-right font-medium pb-2">
+                    <span
+                      className="px-1.5 py-0.5 rounded"
+                      style={{
+                        backgroundColor: caseTint('upside', theme),
+                        color: caseColor('upside', theme),
+                        fontWeight: selectedCase === 'upside' ? 700 : 500,
+                        outline: selectedCase === 'upside' ? `1.5px solid ${caseColor('upside', theme)}` : 'none',
+                      }}
+                    >Upside Case</span>
+                  </th>
+                  <th className="text-right font-medium pb-2">
+                    <span
+                      className="px-1.5 py-0.5 rounded"
+                      style={{
+                        backgroundColor: caseTint('downside', theme),
+                        color: caseColor('downside', theme),
+                        fontWeight: selectedCase === 'downside' ? 700 : 500,
+                        outline: selectedCase === 'downside' ? `1.5px solid ${caseColor('downside', theme)}` : 'none',
+                      }}
+                    >Downside Case</span>
+                  </th>
+                  <th className="text-right font-medium pb-2 text-xs" style={{ color: caseColor('upside', theme) }}>Upside vs Base</th>
+                  <th className="text-right font-medium pb-2 text-xs" style={{ color: caseColor('downside', theme) }}>Downside vs Base</th>
                 </tr>
               </thead>
               <tbody>
                 {compTable.map((r, i) => (
-                  <tr key={i} style={{ borderBottom: '1px solid #f8fafc' }}>
-                    <td className="py-1.5 text-slate-400">{i + 1}</td>
-                    <td className="py-1.5 text-slate-700">{r.metric}</td>
-                    <td className="py-1.5 text-right font-medium text-slate-800">{r.base}</td>
-                    <td className="py-1.5 text-right font-medium text-slate-800">{r.upside}</td>
-                    <td className="py-1.5 text-right font-medium text-slate-800">{r.downside}</td>
-                    <td className="py-1.5 text-right font-semibold" style={{ color: '#16a34a' }}>{r.uVb}</td>
-                    <td className="py-1.5 text-right font-semibold" style={{ color: '#dc2626' }}>{r.dVb}</td>
+                  <tr key={i} className="border-b border-border">
+                    <td className="py-1.5 text-muted-foreground">{i + 1}</td>
+                    <td className="py-1.5 text-foreground">{r.metric}</td>
+                    <td className="py-1.5 text-right font-medium text-foreground" style={{ fontWeight: selectedCase === 'base' ? 700 : 500 }}>{r.base}</td>
+                    <td className="py-1.5 text-right font-medium text-foreground" style={{ fontWeight: selectedCase === 'upside' ? 700 : 500 }}>{r.upside}</td>
+                    <td className="py-1.5 text-right font-medium text-foreground" style={{ fontWeight: selectedCase === 'downside' ? 700 : 500 }}>{r.downside}</td>
+                    <td className="py-1.5 text-right font-semibold" style={{ color: caseColor('upside', theme) }}>{r.uVb}</td>
+                    <td className="py-1.5 text-right font-semibold" style={{ color: caseColor('downside', theme) }}>{r.dVb}</td>
                   </tr>
                 ))}
               </tbody>
@@ -212,28 +321,31 @@ export default function ScenarioComparisonPage() {
           </div>
 
           {/* Budget to Forecast Bridge */}
-          <div className="col-span-6 rounded-lg p-4" style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0' }}>
+          <div className="col-span-6 rounded-lg p-4 bg-card border border-border">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-1">
-                <span className="text-xs font-semibold text-slate-700">Budget to Forecast Bridge (Revenue)</span>
-                <Info size={11} className="text-slate-400" />
+                <span className="text-xs font-semibold text-foreground">Budget to Forecast Bridge (Revenue)</span>
+                <Info size={11} className="text-muted-foreground" />
               </div>
-              <span className="text-xs px-2 py-0.5 rounded" style={{ backgroundColor: '#f1f5f9', color: '#475569' }}>Base Case ▾</span>
+              <Button variant="secondary" size="pill" onClick={cycleCase}>
+                {selectedScenario.label} ▾
+              </Button>
             </div>
             <div style={{ height: 220 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={bridgeData} margin={{ top: 10, right: 5, bottom: 0, left: -20 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                  <XAxis dataKey="name" tick={{ fontSize: 9 }} tickLine={false} axisLine={false} />
-                  <YAxis tick={{ fontSize: 9 }} tickLine={false} axisLine={false} domain={[80, 150]} tickFormatter={v => `${v}M`} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                  <XAxis dataKey="name" tick={{ fontSize: 9, fill: 'var(--muted-foreground)' }} tickLine={false} axisLine={false} />
+                  <YAxis tick={{ fontSize: 9, fill: 'var(--muted-foreground)' }} tickLine={false} axisLine={false} domain={[80, 150]} tickFormatter={v => `${v}M`} />
                   <Tooltip
                     content={({ active, payload }) => {
                       if (!active || !payload?.length) return null
                       const d = payload[0]?.payload as typeof bridgeData[0]
+                      const fill = bridgeFill(d.kind, theme)
                       return (
-                        <div className="rounded shadow-md border p-2" style={{ backgroundColor: '#fff', borderColor: '#e2e8f0', fontSize: 11 }}>
-                          <p className="font-semibold text-slate-700">{d.name}</p>
-                          <p style={{ color: d.fill }}>${d.bar}M</p>
+                        <div className="rounded shadow-md border p-2" style={{ backgroundColor: 'var(--card)', borderColor: 'var(--border)', fontSize: 11 }}>
+                          <p className="font-semibold text-foreground">{d.name}</p>
+                          <p style={{ color: fill }}>${d.bar}M</p>
                         </div>
                       )
                     }}
@@ -243,10 +355,10 @@ export default function ScenarioComparisonPage() {
                   {/* Visible colored bar on top of spacer */}
                   <Bar dataKey="bar" stackId="wf" maxBarSize={36} radius={[3, 3, 0, 0]} isAnimationActive={false}>
                     {bridgeData.map((entry, i) => (
-                      <Cell key={i} fill={entry.fill} />
+                      <Cell key={i} fill={bridgeFill(entry.kind, theme)} />
                     ))}
                   </Bar>
-                  <ReferenceLine y={125.8} stroke="#2563eb" strokeDasharray="3 3" />
+                  <ReferenceLine y={125.8} stroke={caseColor('base', theme)} strokeDasharray="3 3" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -256,19 +368,19 @@ export default function ScenarioComparisonPage() {
         {/* Bottom row: Sensitivity + Cash Runway + Notes */}
         <div className="grid grid-cols-12 gap-4">
           {/* Sensitivity */}
-          <div className="col-span-4 rounded-lg p-4" style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0' }}>
+          <div className="col-span-4 rounded-lg p-4 bg-card border border-border">
             <div className="flex items-center gap-1 mb-3">
-              <span className="text-xs font-semibold text-slate-700">Sensitivity Analysis</span>
-              <Info size={11} className="text-slate-400" />
+              <span className="text-xs font-semibold text-foreground">Sensitivity Analysis</span>
+              <Info size={11} className="text-muted-foreground" />
             </div>
             <table className="w-full text-xs">
               <thead>
-                <tr style={{ borderBottom: '1px solid #e2e8f0', color: '#94a3b8' }}>
+                <tr className="border-b border-border" style={{ color: neutralColor(theme) }}>
                   <th className="text-left font-medium pb-2">Driver</th>
                   <th className="text-left font-medium pb-2">Range</th>
                   <th className="text-center font-medium pb-2" colSpan={3}>Impact on EBITDA</th>
                 </tr>
-                <tr style={{ color: '#94a3b8' }}>
+                <tr style={{ color: neutralColor(theme) }}>
                   <th></th><th></th>
                   <th className="text-center pb-1 font-medium">Low</th>
                   <th className="text-center pb-1 font-medium">Mid (Base Case)</th>
@@ -277,61 +389,70 @@ export default function ScenarioComparisonPage() {
               </thead>
               <tbody>
                 {sensitivityData.map((r, i) => (
-                  <tr key={i} style={{ borderBottom: '1px solid #f8fafc' }}>
-                    <td className="py-1.5 text-slate-700">{r.driver}</td>
-                    <td className="py-1.5 text-slate-400 text-xs">{r.range}</td>
-                    <td className="py-1.5 text-center font-medium" style={{ color: '#dc2626' }}>{r.low}</td>
-                    <td className="py-1.5 text-center font-medium text-slate-700">{r.mid}</td>
-                    <td className="py-1.5 text-center font-medium" style={{ color: '#16a34a' }}>{r.high}</td>
+                  <tr key={i} className="border-b border-border">
+                    <td className="py-1.5 text-foreground">{r.driver}</td>
+                    <td className="py-1.5 text-muted-foreground text-xs">{r.range}</td>
+                    <td className="py-1.5 text-center font-medium" style={{ color: caseColor('downside', theme) }}>{r.low}</td>
+                    <td className="py-1.5 text-center font-medium text-foreground">{r.mid}</td>
+                    <td className="py-1.5 text-center font-medium" style={{ color: caseColor('upside', theme) }}>{r.high}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            <button className="text-xs mt-2" style={{ color: '#2563eb' }}>View full sensitivity model</button>
+            <Button variant="link" size="pill" className="mt-2 px-0 h-auto justify-start text-primary">View full sensitivity model</Button>
           </div>
 
           {/* Cash Runway Comparison */}
-          <div className="col-span-4 rounded-lg p-4" style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0' }}>
+          <div className="col-span-4 rounded-lg p-4 bg-card border border-border">
             <div className="flex items-center gap-1 mb-1">
-              <span className="text-xs font-semibold text-slate-700">Cash Runway Comparison</span>
-              <Info size={11} className="text-slate-400" />
+              <span className="text-xs font-semibold text-foreground">Cash Runway Comparison</span>
+              <Info size={11} className="text-muted-foreground" />
             </div>
             <div style={{ height: 180 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={cashRunwayComparison} margin={{ top: 20, right: 20, bottom: 0, left: -20 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                  <XAxis dataKey="name" tick={{ fontSize: 9 }} tickLine={false} axisLine={false} />
-                  <YAxis tick={{ fontSize: 9 }} tickLine={false} axisLine={false} domain={[0, 25]} />
-                  <Tooltip contentStyle={{ fontSize: 11 }} />
-                  <ReferenceLine y={12} stroke="#94a3b8" strokeDasharray="3 3" label={{ value: '12 Months Target', position: 'right', fontSize: 8 }} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                  <XAxis dataKey="name" tick={{ fontSize: 9, fill: 'var(--muted-foreground)' }} tickLine={false} axisLine={false} />
+                  <YAxis tick={{ fontSize: 9, fill: 'var(--muted-foreground)' }} tickLine={false} axisLine={false} domain={[0, 25]} />
+                  <Tooltip contentStyle={{ fontSize: 11, backgroundColor: 'var(--card)', borderColor: 'var(--border)', color: 'var(--foreground)' }} />
+                  <ReferenceLine y={12} stroke={neutralColor(theme)} strokeDasharray="3 3" label={{ value: '12 Months Target', position: 'right', fontSize: 8, fill: 'var(--muted-foreground)' }} />
                   <Bar dataKey="value" maxBarSize={48} radius={[3, 3, 0, 0]}>
                     {cashRunwayComparison.map((entry, i) => (
-                      <Cell key={i} fill={entry.color} />
+                      <Cell
+                        key={i}
+                        fill={caseColor(entry.id, theme)}
+                        fillOpacity={selectedCase === entry.id ? 1 : 0.45}
+                        cursor="pointer"
+                        onClick={() => setSelectedCase(entry.id)}
+                      />
                     ))}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
-            <button className="text-xs mt-1" style={{ color: '#2563eb' }}>View cash flow</button>
+            <Button variant="link" size="pill" className="mt-1 px-0 h-auto justify-start text-primary">View cash flow</Button>
           </div>
 
           {/* Notes & Recommendations */}
-          <div className="col-span-4 rounded-lg p-4" style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0' }}>
+          <div className="col-span-4 rounded-lg p-4 bg-card border border-border">
             <div className="flex items-center gap-1 mb-3">
-              <span className="text-xs font-semibold text-slate-700">Notes &amp; Recommendations</span>
-              <Info size={11} className="text-slate-400" />
+              <span className="text-xs font-semibold text-foreground">Notes &amp; Recommendations</span>
+              <Info size={11} className="text-muted-foreground" />
             </div>
             <div className="flex flex-col gap-3">
-              {notes.map((n, i) => (
-                <div key={i} className="flex items-start gap-2">
-                  <n.icon size={13} style={{ color: n.color, marginTop: 1, shrink: 0 }} />
-                  <div>
-                    <p className="text-xs font-semibold" style={{ color: n.color }}>{n.label}</p>
-                    <p className="text-xs text-slate-600 leading-relaxed mt-0.5">{n.text}</p>
+              {notes.map((n, i) => {
+                const color = caseColor(n.id, theme)
+                return (
+                  <div key={i} className="flex items-start gap-2">
+                    <n.icon size={13} className="shrink-0" style={{ color, marginTop: 1 }} />
+                    <div>
+                      <p className="text-xs font-semibold" style={{ color }}>{n.label}</p>
+                      <p className="text-xs text-muted-foreground leading-relaxed mt-0.5">{n.text}</p>
+                    </div>
                   </div>
-                </div>
-              ))}
-              <button className="text-xs" style={{ color: '#2563eb' }}>Add note</button>
+                )
+              })}
+              <Button variant="link" size="pill" className="px-0 h-auto justify-start text-primary self-start">Add note</Button>
             </div>
           </div>
         </div>
