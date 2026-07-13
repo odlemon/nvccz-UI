@@ -8,6 +8,33 @@ import type {
   FpaWorkflowStage,
 } from "@/lib/api/fpa-api"
 import { BUDGET_STATUS_LABEL } from "@/components/fpa/budget/budget-constants"
+import { looksLikeDbId } from "@/lib/fpa/humanize-dept-message"
+
+/** Resolve a human-readable department label when the API returns CUIDs as names. */
+export function humanDeptName(
+  departmentId?: string | null,
+  departmentName?: string | null,
+  owners?: FpaBudgetCycle["owners"],
+  deptById?: Map<string, string> | null,
+  taskTitle?: string | null,
+): string {
+  if (departmentName && !looksLikeDbId(departmentName)) return departmentName
+  if (departmentId) {
+    const fromOwner = owners?.find((o) => o.departmentId === departmentId)?.departmentName
+    if (fromOwner && !looksLikeDbId(fromOwner)) return fromOwner
+    const mapped = deptById?.get(departmentId)
+    if (mapped && !looksLikeDbId(mapped)) return mapped
+  }
+  if (departmentName && looksLikeDbId(departmentName)) {
+    const mapped = deptById?.get(departmentName)
+    if (mapped && !looksLikeDbId(mapped)) return mapped
+  }
+  if (taskTitle?.includes(" — ")) {
+    const part = taskTitle.split(" — ").pop()?.trim()
+    if (part && !looksLikeDbId(part)) return part
+  }
+  return "Department"
+}
 
 export type WorkflowTab = "All" | "My Tasks" | "Pending Review" | "Returned"
 
@@ -542,6 +569,10 @@ export function countReviewQueue(tasks: WorkflowTaskRow[]) {
 export function deptProgressRows(
   review: FpaReviewWorkspace | null,
   tasks: WorkflowTaskRow[],
+  opts?: {
+    owners?: FpaBudgetCycle["owners"]
+    deptById?: Map<string, string> | null
+  },
 ): Array<{
   departmentId: string
   departmentName: string
@@ -564,15 +595,19 @@ export function deptProgressRows(
     }
   >()
 
+  const resolveName = (departmentId: string, departmentName: string, taskTitle?: string) =>
+    humanDeptName(departmentId, departmentName, opts?.owners, opts?.deptById, taskTitle)
+
   const bump = (
     departmentId: string,
     departmentName: string,
     status: string,
+    taskTitle?: string,
   ) => {
     const key = departmentId || departmentName || "unknown"
     const row = map.get(key) || {
       departmentId: departmentId || key,
-      departmentName: departmentName || departmentId || "Department",
+      departmentName: resolveName(departmentId, departmentName, taskTitle),
       submitted: 0,
       inReview: 0,
       inProgress: 0,
@@ -593,7 +628,7 @@ export function deptProgressRows(
     }
   } else {
     for (const t of tasks) {
-      bump(t.departmentId || "", t.departmentName || "", t.status)
+      bump(t.departmentId || "", t.departmentName || "", t.status, t.title)
     }
   }
 

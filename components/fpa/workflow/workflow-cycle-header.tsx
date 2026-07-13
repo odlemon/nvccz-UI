@@ -23,7 +23,6 @@ export function WorkflowPlanningCycleCard({
   onCycleDetails,
   cyclePicker,
   boardPack,
-  cycleActions,
 }: {
   cycle: FpaBudgetCycle | null
   stages?: FpaWorkflowStage[] | null
@@ -37,8 +36,6 @@ export function WorkflowPlanningCycleCard({
     onOpen: () => void
     onGenerate: () => void
   } | null
-  /** Compact cycle review actions in the header (no separate Cycle actions card). */
-  cycleActions?: React.ReactNode
 }) {
   const active = workflowStepperIndex(cycle)
   const dates = stepperDateHints(cycle, stages)
@@ -59,7 +56,6 @@ export function WorkflowPlanningCycleCard({
             ) : null}
           </div>
           {cyclePicker}
-          {cycleActions}
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2 shrink-0">
           {boardPack?.canShow ? (

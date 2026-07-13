@@ -55,7 +55,7 @@ export function WorkflowDeptProgress({
           No department progress for this cycle yet.
         </p>
       ) : (
-        <ul className="space-y-3">
+        <ul className="fpa-thin-scroll space-y-3 max-h-44 overflow-y-auto pr-0.5">
           {rows.map((r) => {
             const total = Math.max(1, r.total)
             const w = (n: number) => `${(n / total) * 100}%`
@@ -184,7 +184,7 @@ export function WorkflowActivityFeed({
         </div>
       ) : null}
 
-      <div className="flex-1 space-y-3.5 overflow-y-auto min-h-0">
+      <div className="fpa-thin-scroll flex-1 space-y-3.5 overflow-y-auto min-h-0">
         {feed.length === 0 ? (
           <p className="text-[12px] text-[#94a3b8] leading-relaxed">
             No activity yet. Comments and approval history will appear here.

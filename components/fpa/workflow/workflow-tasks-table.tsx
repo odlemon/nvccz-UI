@@ -69,7 +69,7 @@ export function WorkflowTasksTable({
 
   return (
     <div className="flex flex-col min-h-0 flex-1">
-      <div className="overflow-auto flex-1 min-h-0 rounded-lg border border-[#e2e8f0]">
+      <div className="fpa-thin-scroll overflow-auto flex-1 min-h-0 rounded-lg border border-[#e2e8f0]">
         <table className="w-full border-collapse text-[11px] min-w-[820px]">
           <thead>
             <tr className="border-b border-[#e2e8f0] bg-[#f8fafc] text-[#64748b]">
@@ -111,7 +111,7 @@ export function WorkflowTasksTable({
                     </span>
                   </td>
                   <td className="px-2.5 py-2.5 text-[#475569]">
-                    {task.departmentName || task.departmentId || "—"}
+                    {task.departmentName || "—"}
                   </td>
                   <td className="px-2.5 py-2.5">
                     <PersonCell name={task.assigneeName} />

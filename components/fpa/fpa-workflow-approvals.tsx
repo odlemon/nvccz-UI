@@ -25,8 +25,8 @@ import { WorkflowTasksToolbar } from "@/components/fpa/workflow/workflow-tasks-t
 import {
   countReviewQueue,
   deptProgressRows,
-  getCycleActionControls,
   getTaskActionControls,
+  humanDeptName,
   isPendingReviewStatus,
   isReturnedStatus,
   mergeWorkflowTasks,
@@ -36,6 +36,7 @@ import {
   type WorkflowTaskRow,
 } from "@/components/fpa/workflow/workflow-utils"
 import { extractFpaExportId } from "@/lib/fpa/download-export"
+import { looksLikeDbId } from "@/lib/fpa/humanize-dept-message"
 import { errorMessage, logFpaGap } from "@/lib/fpa/fpa-api-gaps"
 import {
   fpaApi,
@@ -63,112 +64,6 @@ import { BUDGET_STATUS_LABEL } from "@/components/fpa/budget/budget-constants"
 
 const PAGE_SIZE = 12
 
-
-function CycleHeaderActions({
-  cycle,
-  busyKey,
-  comment,
-  onComment,
-  canReviewSubmissions,
-  canApproveBudget,
-  canReturnTask,
-  canLockVersion,
-  onFpaAccept,
-  onCfoApprove,
-  onReturn,
-  onLock,
-}: {
-  cycle: FpaBudgetCycle
-  busyKey: string | null
-  comment: string
-  onComment: (v: string) => void
-  canReviewSubmissions: boolean
-  canApproveBudget: boolean
-  canReturnTask: boolean
-  canLockVersion: boolean
-  onFpaAccept: () => void
-  onCfoApprove: () => void
-  onReturn: () => void
-  onLock: () => void
-}) {
-  const controls = getCycleActionControls({
-    cycleStatus: cycle.status,
-    canReviewSubmissions,
-    canApproveBudget,
-    canReturnTask,
-    canLockVersion,
-  })
-  const {
-    showFpaAccept,
-    showCfoApprove,
-    showReturn,
-    showLock,
-    commentEnabled,
-  } = controls
-  if (!showFpaAccept && !showCfoApprove && !showReturn && !showLock) return null
-  const busy = (k: string) => busyKey === k
-
-  return (
-    <div className="pt-2 space-y-2 max-w-xl">
-      {commentEnabled ? (
-        <input
-          value={comment}
-          onChange={(e) => onComment(e.target.value)}
-          disabled={!!busyKey}
-          placeholder={
-            showReturn
-              ? "Comment required to return (optional for accept/approve/lock)"
-              : "Optional comment"
-          }
-          className="h-8 w-full rounded-lg border border-[#e2e8f0] px-2.5 text-[11px] disabled:bg-[#f8fafc]"
-        />
-      ) : null}
-      <div className="flex flex-wrap gap-1.5">
-        {showFpaAccept ? (
-          <button
-            type="button"
-            disabled={!!busyKey}
-            onClick={onFpaAccept}
-            className="h-8 rounded-lg bg-[#2563eb] px-3 text-[11px] font-medium text-white disabled:opacity-50"
-          >
-            {busy("fpa-accept") ? "…" : "Accept for CFO"}
-          </button>
-        ) : null}
-        {showCfoApprove ? (
-          <button
-            type="button"
-            disabled={!!busyKey}
-            onClick={onCfoApprove}
-            className="h-8 rounded-lg bg-[#16a34a] px-3 text-[11px] font-medium text-white disabled:opacity-50"
-          >
-            {busy("cfo-approve") ? "…" : "Approve budget"}
-          </button>
-        ) : null}
-        {showReturn ? (
-          <button
-            type="button"
-            disabled={!!busyKey || !comment.trim()}
-            onClick={onReturn}
-            className="h-8 rounded-lg border border-[#dc2626] px-3 text-[11px] font-medium text-[#dc2626] disabled:opacity-50"
-          >
-            Return
-          </button>
-        ) : null}
-        {showLock ? (
-          <button
-            type="button"
-            disabled={!!busyKey}
-            onClick={onLock}
-            className="h-8 rounded-lg bg-[#0f172a] px-3 text-[11px] font-medium text-white disabled:opacity-50"
-          >
-            {busy("lock") ? "…" : "Lock"}
-          </button>
-        ) : null}
-      </div>
-    </div>
-  )
-}
-
 export function FpaWorkflowApprovals() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -191,7 +86,6 @@ export function FpaWorkflowApprovals() {
     canReturnTask,
     canAssignTasks,
     canReviewSubmissions,
-    canLockVersion,
     canExportBoardPack,
   } = useFpaPermissions()
 
@@ -224,7 +118,6 @@ export function FpaWorkflowApprovals() {
   const [drawerOpen, setDrawerOpen] = useState(Boolean(taskIdFromUrl))
   const [taskComment, setTaskComment] = useState("")
   const [reassignUserId, setReassignUserId] = useState("")
-  const [cycleComment, setCycleComment] = useState("")
   const [activityDraft, setActivityDraft] = useState("")
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [boardPackOpen, setBoardPackOpen] = useState(false)
@@ -420,8 +313,18 @@ export function FpaWorkflowApprovals() {
 
   const deptById = useMemo(() => {
     const m = new Map(departments.map((d) => [d.id, d.name]))
+    for (const o of cycle?.owners || []) {
+      if (o.departmentId && o.departmentName && !looksLikeDbId(o.departmentName)) {
+        m.set(o.departmentId, o.departmentName)
+      }
+    }
+    for (const t of cycleTasks) {
+      if (t.departmentId && t.departmentName && !looksLikeDbId(t.departmentName)) {
+        m.set(t.departmentId, t.departmentName)
+      }
+    }
     return m
-  }, [departments])
+  }, [departments, cycle?.owners, cycleTasks])
 
   const userById = useMemo(() => {
     const m = new Map(users.map((u) => [u.id, `${u.firstName} ${u.lastName}`.trim()]))
@@ -448,10 +351,13 @@ export function FpaWorkflowApprovals() {
         null
       return {
         ...t,
-        departmentName:
-          t.departmentName ||
-          (t.departmentId ? deptById.get(t.departmentId) : null) ||
+        departmentName: humanDeptName(
+          t.departmentId,
           t.departmentName,
+          cycle?.owners,
+          deptById,
+          t.title,
+        ),
         assigneeName:
           t.assigneeName ||
           (t.assigneeId ? userById.get(t.assigneeId) : null) ||
@@ -516,7 +422,10 @@ export function FpaWorkflowApprovals() {
   }, [tab, search, departmentFilter, statusFilter, priorityFilter, cycleId])
 
   const queue = countReviewQueue(allTasks)
-  const progressRows = deptProgressRows(review, allTasks)
+  const progressRows = deptProgressRows(review, allTasks, {
+    owners: cycle?.owners,
+    deptById,
+  })
   const selected = allTasks.find((t) => t.id === selectedId) || null
 
   const worksheetHref = useMemo(() => {
@@ -590,7 +499,6 @@ export function FpaWorkflowApprovals() {
       if (!res.success) throw new Error(res.message || `${label} failed`)
       if (res.data) setCycle(res.data)
       toast.success(label)
-      setCycleComment("")
       await loadCycleBoard(cycle.id)
       await dispatch(fetchMyFpaTasks())
     } catch (err) {
@@ -728,57 +636,6 @@ export function FpaWorkflowApprovals() {
                         }
                       : null
                   }
-                  cycleActions={
-                    cycle ? (
-                      <CycleHeaderActions
-                        cycle={cycle}
-                        busyKey={busyKey}
-                        comment={cycleComment}
-                        onComment={setCycleComment}
-                        canReviewSubmissions={canReviewSubmissions}
-                        canApproveBudget={canApproveBudget}
-                        canReturnTask={canReturnTask}
-                        canLockVersion={canLockVersion}
-                        onFpaAccept={() =>
-                          void runCycleAction("fpa-accept", "Accepted for CFO review", () =>
-                            fpaApi.fpaAcceptBudget(cycle.id, {
-                              comment: cycleComment.trim() || undefined,
-                            }),
-                          )
-                        }
-                        onCfoApprove={() =>
-                          void runCycleAction("cfo-approve", "Budget approved", () =>
-                            fpaApi.cfoApproveBudget(cycle.id, {
-                              comment: cycleComment.trim() || undefined,
-                            }),
-                          )
-                        }
-                        onReturn={() => {
-                          if (!cycleComment.trim()) {
-                            toast.error("Comment is required to return")
-                            return
-                          }
-                          const status = String(cycle.status || "").toUpperCase()
-                          void runCycleAction("return", "Returned for correction", () =>
-                            status === "PENDING_CFO_REVIEW"
-                              ? fpaApi.cfoReturnBudget(cycle.id, {
-                                  comment: cycleComment.trim(),
-                                })
-                              : fpaApi.fpaReturnBudget(cycle.id, {
-                                  comment: cycleComment.trim(),
-                                }),
-                          )
-                        }}
-                        onLock={() =>
-                          void runCycleAction("lock", "Budget locked", () =>
-                            fpaApi.lockBudgetCycle(cycle.id, {
-                              reason: cycleComment.trim() || undefined,
-                            }),
-                          )
-                        }
-                      />
-                    ) : null
-                  }
                 />
               </div>
               <div className="xl:col-span-3 min-w-0">
@@ -806,10 +663,10 @@ export function FpaWorkflowApprovals() {
               </div>
             ) : (
               <>
-                <div className="grid grid-cols-1 xl:grid-cols-12 gap-3 items-stretch">
-                  {/* Left ~50%: Workflow Tasks — stretch to match detail height */}
-                  <div className="xl:col-span-6 min-w-0 flex flex-col">
-                    <div className="rounded-xl border border-[#e2e8f0] bg-white p-4 flex flex-col gap-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)] min-h-[420px] h-full">
+                <div className="grid grid-cols-1 xl:grid-cols-12 gap-3 items-stretch min-h-[420px] xl:h-[calc(100vh-13rem)] xl:max-h-[calc(100vh-13rem)] xl:overflow-hidden">
+                  {/* Left ~50%: Workflow Tasks — shared row height; table scrolls inside */}
+                  <div className="xl:col-span-6 min-w-0 flex flex-col min-h-[420px] xl:min-h-0 xl:h-full overflow-hidden">
+                    <div className="rounded-xl border border-[#e2e8f0] bg-white p-4 flex flex-col gap-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)] flex-1 min-h-0 overflow-hidden">
                       <WorkflowTasksToolbar
                         tab={tab}
                         onTabChange={setTab}
@@ -838,8 +695,8 @@ export function FpaWorkflowApprovals() {
                     </div>
                   </div>
 
-                  {/* Middle ~25%: Progress + Activity — activity fills leftover height */}
-                  <div className="xl:col-span-3 min-w-0 flex flex-col gap-3 h-full min-h-0">
+                  {/* Middle ~25%: Progress + Activity — capped to same height, scroll inside */}
+                  <div className="xl:col-span-3 min-w-0 flex flex-col gap-3 min-h-[420px] xl:min-h-0 xl:h-full overflow-hidden">
                     <WorkflowDeptProgress
                       rows={progressRows}
                       onViewFull={() => setQueueModalOpen(true)}
@@ -885,8 +742,8 @@ export function FpaWorkflowApprovals() {
                     />
                   </div>
 
-                  {/* Right ~25%: Budget detail (defines row height when tallest) */}
-                  <div className="xl:col-span-3 min-w-0 flex flex-col h-full min-h-0">
+                  {/* Right ~25%: Task detail — same height; body scrolls */}
+                  <div className="xl:col-span-3 min-w-0 flex flex-col min-h-[420px] xl:min-h-0 xl:h-full overflow-hidden">
                     <WorkflowTaskDetailPanel
                       task={selected}
                       cycleStatus={cycle?.status}
