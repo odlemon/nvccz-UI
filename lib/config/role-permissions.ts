@@ -7,6 +7,8 @@
 
 import { PROCUREMENT_ACTIONS } from './procurement-permissions';
 import { PERFORMANCE_ACTIONS } from './performance-permissions';
+import { fpaModulePermission } from './fpa-permissions';
+import { fundraisingModulePermission } from './fundraising-permissions';
 
 export type RoleCode =
   // Finance Roles
@@ -312,16 +314,8 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'my-events': 'full',
         },
       },
-      {
-        moduleId: 'forecasting',
-        access: 'full',
-        subModules: {
-          'forecasting-dashboard': 'full',
-          'scenarios': 'full',
-          'forecasting-audit': 'full',
-          'forecasting-settings': 'full',
-        }
-      },
+      fpaModulePermission('CFO')!,
+      fundraisingModulePermission('CFO')!,
       {
         moduleId: 'investments',
         access: 'full',
@@ -446,7 +440,8 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'user-scorecard': 'full',
         }
       },
-      { moduleId: 'forecasting', access: 'write', subModules: { 'forecasting-dashboard': 'full', 'scenarios': 'write', 'forecasting-audit': 'read', 'forecasting-settings': 'write' } },
+      fpaModulePermission('FIN_MGR')!,
+      fundraisingModulePermission('FIN_MGR')!,
       { moduleId: 'investments', access: 'write', subModules: { 'investments-terminal': 'full', 'investments-trades': 'write', 'investments-market-data': 'read', 'investments-securities': 'read', 'investments-routing': 'none' } },
       { moduleId: 'street-rates', access: 'read', subModules: { 'street-rates-dashboard': 'read', 'street-rates-config': 'none' } },
     ]
@@ -523,7 +518,8 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
         }
       },
       { moduleId: 'performance-management', access: 'write' },
-      { moduleId: 'forecasting', access: 'write', subModules: { 'forecasting-dashboard': 'full', 'scenarios': 'write', 'forecasting-audit': 'read', 'forecasting-settings': 'write' } },
+      fpaModulePermission('FIN_OFF')!,
+      fundraisingModulePermission('FIN_OFF')!,
       { moduleId: 'investments', access: 'write', subModules: { 'investments-terminal': 'full', 'investments-trades': 'write', 'investments-market-data': 'read', 'investments-securities': 'read', 'investments-routing': 'none' } },
       { moduleId: 'street-rates', access: 'read', subModules: { 'street-rates-dashboard': 'read', 'street-rates-config': 'none' } },
     ]
@@ -564,7 +560,8 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
         }
       },
       { moduleId: 'performance-management', access: 'write' },
-      { moduleId: 'forecasting', access: 'write', subModules: { 'forecasting-dashboard': 'full', 'scenarios': 'write', 'forecasting-audit': 'read', 'forecasting-settings': 'write' } },
+      fpaModulePermission('ACCOUNTANT')!,
+      fundraisingModulePermission('ACCOUNTANT')!,
       { moduleId: 'investments', access: 'write', subModules: { 'investments-terminal': 'full', 'investments-trades': 'write', 'investments-market-data': 'read', 'investments-securities': 'read', 'investments-routing': 'none' } },
       { moduleId: 'street-rates', access: 'read', subModules: { 'street-rates-dashboard': 'read', 'street-rates-config': 'none' } },
     ]
@@ -601,6 +598,7 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
         }
       },
       { moduleId: 'performance-management', access: 'write' },
+      fpaModulePermission('FIN_ASST')!,
     ]
   },
 
@@ -664,6 +662,7 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
         moduleId: 'performance-management',
         access: 'full',
       },
+      fpaModulePermission('SALES_MGR')!,
     ]
   },
 
@@ -812,6 +811,8 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
         }
       },
       { moduleId: 'events-management', access: 'full' },
+      fpaModulePermission('OPS_MGR')!,
+      fundraisingModulePermission('OPS_MGR')!,
       {
         moduleId: 'accounting',
         access: 'read',
@@ -1221,6 +1222,7 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'purchase-requisitions': 'write',
         }
       },
+      fpaModulePermission('HR_MGR')!,
     ]
   },
 
@@ -1412,6 +1414,8 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'purchase-requisitions': 'write',
         }
       },
+      fpaModulePermission('MKT_MGR')!,
+      fundraisingModulePermission('MKT_MGR')!,
     ]
   },
 
@@ -1809,16 +1813,8 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'user-scorecard': 'full',
         }
       },
-      {
-        moduleId: 'forecasting',
-        access: 'full',
-        subModules: {
-          'forecasting-dashboard': 'full',
-          'scenarios': 'full',
-          'forecasting-audit': 'full',
-          'forecasting-settings': 'full',
-        }
-      },
+      fpaModulePermission('SYSADMIN')!,
+      fundraisingModulePermission('SYSADMIN')!,
       {
         moduleId: 'investments',
         access: 'full',
@@ -2046,16 +2042,8 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
         }
       },
       { moduleId: 'events-management', access: 'read' },
-      {
-        moduleId: 'forecasting',
-        access: 'full',
-        subModules: {
-          'forecasting-dashboard': 'full',
-          'scenarios': 'full',
-          'forecasting-audit': 'full',
-          'forecasting-settings': 'full',
-        }
-      },
+      fpaModulePermission('CEO')!,
+      fundraisingModulePermission('CEO')!,
       {
         moduleId: 'investments',
         access: 'full',
@@ -2182,6 +2170,7 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
         }
       },
       { moduleId: 'admin-management', access: 'read' },
+      fundraisingModulePermission('CIO')!,
     ]
   },
 
@@ -2208,6 +2197,8 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'financial-reports': 'read',
         }
       },
+      fpaModulePermission('BOARD_CHAIR')!,
+      fundraisingModulePermission('BOARD_CHAIR')!,
     ]
   },
 
@@ -2234,6 +2225,8 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'financial-reports': 'read',
         }
       },
+      fpaModulePermission('BOARD_MEMBER')!,
+      fundraisingModulePermission('BOARD_MEMBER')!,
     ]
   },
 
@@ -2326,6 +2319,7 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'user-scorecard': 'read',
         }
       },
+      fundraisingModulePermission('FUND_MGR')!,
     ]
   },
 
@@ -2441,6 +2435,7 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'purchase-requisitions': 'write',
         }
       },
+      fpaModulePermission('INV_ANALYST')!,
     ]
   },
 
@@ -2534,6 +2529,7 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'lp-colleagues': 'full',
         }
       },
+      fpaModulePermission('LIMITED_PARTNER')!,
     ]
   },
 

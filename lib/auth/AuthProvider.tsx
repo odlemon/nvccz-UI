@@ -12,15 +12,17 @@ interface AuthProviderProps {
 export function AuthProvider({ children }: AuthProviderProps) {
   const dispatch = useAppDispatch()
   const pathname = usePathname()
-  const { isAuthenticated, isLoading } = useAppSelector((state) => state.auth)
+  const { isLoading, isFetchingDetails } = useAppSelector((state) => state.auth)
 
   useEffect(() => {
     // Check if user is already authenticated on app load
     dispatch(checkAuthStatus())
   }, [dispatch])
 
-  // Show loading state while checking authentication, but not on login page or during login process
-  if (isLoading && pathname !== '/login') {
+  const waitingForSession = isLoading || isFetchingDetails
+
+  // Show loading state while checking authentication, but not on login page
+  if (waitingForSession && pathname !== '/login') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-cyan-50">
         <div className="text-center">

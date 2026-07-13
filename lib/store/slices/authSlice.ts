@@ -25,13 +25,14 @@ export interface AuthState {
   error: string | null
 }
 
-// Initial state
+// Initial state — isLoading starts true so ModuleGuards don't flash Access Denied
+// before AuthProvider finishes checkAuthStatus on first paint.
 const initialState: AuthState = {
   user: null,
   userDetails: null,
   token: null,
   isAuthenticated: false,
-  isLoading: false,
+  isLoading: true,
   isFetchingDetails: false,
   error: null,
 }
@@ -279,8 +280,12 @@ const authSlice = createSlice({
         state.error = null
       })
       // Check auth status
+      .addCase(checkAuthStatus.pending, (state) => {
+        state.isLoading = true
+      })
       .addCase(checkAuthStatus.fulfilled, (state, action) => {
         state.isAuthenticated = true
+        state.isLoading = false
         state.user = {
           id: action.payload.user.id,
           email: action.payload.user.email,
@@ -294,21 +299,29 @@ const authSlice = createSlice({
         // If we have user profile, set it
         if (action.payload.userProfile) {
           state.userDetails = action.payload.userProfile
-          state.user.role = action.payload.userProfile.role.name
+          state.user.role = action.payload.userProfile.role?.name || action.payload.user.role || 'applicant'
           const permissions: Array<{ name: string; value: boolean }> = []
-          Object.entries(action.payload.userProfile.role.permissions).forEach(([key, values]) => {
-            if (Array.isArray(values)) {
-              values.forEach((value) => {
-                permissions.push({ name: `${key}:${value}`, value: true })
-              })
-            }
-          })
+          const rolePerms = action.payload.userProfile.role?.permissions
+          if (Array.isArray(rolePerms)) {
+            rolePerms.forEach((p: { name?: string; value?: boolean }) => {
+              if (p?.name) permissions.push({ name: p.name, value: !!p.value })
+            })
+          } else if (rolePerms && typeof rolePerms === 'object') {
+            Object.entries(rolePerms).forEach(([key, values]) => {
+              if (Array.isArray(values)) {
+                values.forEach((value) => {
+                  permissions.push({ name: `${key}:${value}`, value: true })
+                })
+              }
+            })
+          }
           state.user.permissions = permissions
         }
         
         state.error = null
       })
       .addCase(checkAuthStatus.rejected, (state) => {
+        state.isLoading = false
         state.isAuthenticated = false
         state.user = null
         state.userDetails = null

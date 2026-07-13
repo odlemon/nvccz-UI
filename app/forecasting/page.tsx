@@ -1,13 +1,10 @@
 import { ModuleGuard } from "@/components/permissions/PermissionGuards"
-import { ForecastingLayout } from "@/components/layout/forecasting-layout"
-import { ForecastingDashboard } from "@/components/forecasting/forecasting-dashboard"
+import { FpaHomeBoard } from "@/components/fpa/fpa-home-board"
 
-export default function ForecastingPage() {
+export default function FpaHomePage() {
   return (
-    <ModuleGuard moduleId="forecasting" subModuleId="forecasting-dashboard">
-      <ForecastingLayout>
-        <ForecastingDashboard />
-      </ForecastingLayout>
+    <ModuleGuard moduleId="forecasting" subModuleId="fpa-home">
+      <FpaHomeBoard />
     </ModuleGuard>
   )
 }

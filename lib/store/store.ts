@@ -13,7 +13,7 @@ import uiReducer from './slices/uiSlice'
 import fundsReducer from './slices/fundsSlice'
 import reconciliationReducer from './slices/reconciliationSlice'
 import shortTermInvestmentsReducer from './slices/shortTermInvestmentsSlice'
-import forecastingReducer from './slices/forecastingSlice'
+import fpaReducer from './slices/fpaSlice'
 import investmentsReducer from './slices/investmentsSlice'
 
 export const store = configureStore({
@@ -32,7 +32,7 @@ export const store = configureStore({
     ui: uiReducer,
     funds: fundsReducer,
     shortTermInvestments: shortTermInvestmentsReducer,
-    forecasting: forecastingReducer,
+    fpa: fpaReducer,
     investments: investmentsReducer,
   },
   // ...existing middleware...

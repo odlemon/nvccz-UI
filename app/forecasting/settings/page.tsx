@@ -1,15 +1,10 @@
 import { ModuleGuard } from "@/components/permissions/PermissionGuards"
-import { ForecastingLayout } from "@/components/layout/forecasting-layout"
-import { EntitySettings } from "@/components/forecasting/entity-settings"
+import { FpaSettings } from "@/components/fpa/fpa-settings"
 
-export default function ForecastingSettingsPage() {
+export default function FpaSettingsPage() {
   return (
-    <ModuleGuard moduleId="forecasting" subModuleId="forecasting-settings">
-      <ForecastingLayout>
-        <div className="p-6">
-          <EntitySettings />
-        </div>
-      </ForecastingLayout>
+    <ModuleGuard moduleId="forecasting" subModuleId="fpa-settings">
+      <FpaSettings />
     </ModuleGuard>
   )
 }

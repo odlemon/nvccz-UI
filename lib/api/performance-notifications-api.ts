@@ -19,6 +19,8 @@ export interface AppNotificationData {
   dealId?: string
   eventId?: string
   authorId?: string
+  /** FP&A budget cycle id for BUDGET_* notification deep links */
+  cycleId?: string
   /** Primary deep-link path returned by backend */
   path?: string
   /** Alternative path (e.g. taskPath when modalTarget is deal-card) */

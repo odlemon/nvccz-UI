@@ -49,19 +49,48 @@ interface LevelGuardProps extends PermissionGuardProps {
  *   <InvoicesList />
  * </ModuleGuard>
  */
+function DefaultAccessDenied() {
+  return (
+    <div className="flex min-h-[40vh] items-center justify-center p-8">
+      <div className="max-w-md text-center space-y-2">
+        <p className="text-lg font-semibold text-[#0f172a]">Access denied</p>
+        <p className="text-sm text-[#64748b]">
+          You do not have permission to view this section. Ask an admin if you need access.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+function GuardLoading() {
+  return (
+    <div className="flex min-h-[40vh] items-center justify-center p-8">
+      <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#e2e8f0] border-t-[#2563eb]" />
+    </div>
+  )
+}
+
 export function ModuleGuard({ 
   moduleId, 
   subModuleId, 
   children, 
-  fallback = null 
+  fallback
 }: ModuleGuardProps) {
-  const hasAccess = useHasPermission(moduleId, subModuleId);
+  const { isLoading, hasModuleAccess, hasSubModuleAccess } = useRolePermissions()
+  const hasAccess = subModuleId
+    ? hasSubModuleAccess(moduleId, subModuleId)
+    : hasModuleAccess(moduleId)
 
-  if (!hasAccess) {
-    return <>{fallback}</>;
+  // Never show Access Denied until auth/permissions are ready
+  if (isLoading) {
+    return <GuardLoading />
   }
 
-  return <>{children}</>;
+  if (!hasAccess) {
+    return <>{fallback ?? <DefaultAccessDenied />}</>
+  }
+
+  return <>{children}</>
 }
 
 /**

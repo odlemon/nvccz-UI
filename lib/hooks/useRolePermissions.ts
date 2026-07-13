@@ -55,30 +55,52 @@ export interface UseRolePermissionsReturn {
  * Hook to manage role-based permissions
  */
 export function useRolePermissions(): UseRolePermissionsReturn {
-  const { userDetails, isAuthenticated, isFetchingDetails } = useSelector(
-    (state: RootState) => state.auth
-  );
+  const {
+    user,
+    userDetails,
+    isAuthenticated,
+    isFetchingDetails,
+    isLoading: authBootstrapping,
+  } = useSelector((state: RootState) => state.auth);
 
   // Check if user is admin (has access to all modules)
   const isAdmin = useMemo(() => {
     if (!userDetails) return false;
-    // Check if role name is 'admin' (case-insensitive)
-    return userDetails.role?.name?.toLowerCase() === 'admin';
+    const roleName =
+      typeof (userDetails as { role?: unknown }).role === "string"
+        ? String((userDetails as { role: string }).role)
+        : userDetails.role?.name;
+    const code = userDetails.roleCode?.toLowerCase();
+    return roleName?.toLowerCase() === "admin" || code === "admin";
   }, [userDetails]);
 
-  // Extract role code from userDetails
+  // Extract role code from userDetails (fall back to login cookie user)
   const roleCode = useMemo(() => {
-    if (!userDetails) return null;
-    // If roleCode exists, use it
-    if (userDetails.roleCode) {
-      return userDetails.roleCode as RoleCode;
+    const fromDetails = userDetails?.roleCode;
+    const fromUser =
+      user && typeof (user as { roleCode?: string }).roleCode === "string"
+        ? (user as { roleCode?: string }).roleCode
+        : null;
+    const fromRoleObj =
+      userDetails?.role &&
+      typeof userDetails.role === "object" &&
+      typeof (userDetails.role as { code?: string }).code === "string"
+        ? (userDetails.role as { code?: string }).code
+        : null;
+    const code = fromDetails || fromRoleObj || fromUser || null;
+
+    if (code && code.toLowerCase() !== "admin") {
+      return code as RoleCode;
     }
     // If no roleCode but is admin, return CEO (highest access)
     if (isAdmin) {
-      return 'CEO' as RoleCode;
+      return "CEO" as RoleCode;
+    }
+    if (code) {
+      return code as RoleCode;
     }
     return null;
-  }, [userDetails, isAdmin]);
+  }, [userDetails, user, isAdmin]);
 
   // Get full permissions for the role
   const permissions = useMemo(() => {
@@ -183,8 +205,11 @@ export function useRolePermissions(): UseRolePermissionsReturn {
     // Full permissions object
     permissions,
     
-    // Loading state
-    isLoading: isFetchingDetails,
+    // Loading until auth settles — avoids Access Denied flash on first paint
+    isLoading:
+      authBootstrapping ||
+      isFetchingDetails ||
+      (isAuthenticated && !userDetails && !roleCode),
   };
 }
 

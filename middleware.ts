@@ -87,11 +87,45 @@ const routePermissions: Record<string, { module: string; subModule?: string }> =
   '/events': { module: 'events-management' },
   '/events/my-events': { module: 'events-management', subModule: 'my-events' },
 
-  // Forecasting routes
-  '/forecasting': { module: 'forecasting', subModule: 'forecasting-dashboard' },
-  '/forecasting/scenarios': { module: 'forecasting', subModule: 'scenarios' },
-  '/forecasting/audit': { module: 'forecasting', subModule: 'forecasting-audit' },
-  '/forecasting/settings': { module: 'forecasting', subModule: 'forecasting-settings' },
+  // FP&A / Forecasting routes
+  '/forecasting': { module: 'forecasting', subModule: 'fpa-home' },
+  '/forecasting/models': { module: 'forecasting', subModule: 'fpa-models' },
+  '/forecasting/budget': { module: 'forecasting', subModule: 'fpa-budget' },
+  '/forecasting/rolling-forecast': { module: 'forecasting', subModule: 'fpa-rolling' },
+  '/forecasting/scenarios': { module: 'forecasting', subModule: 'fpa-scenarios' },
+  '/forecasting/drivers': { module: 'forecasting', subModule: 'fpa-drivers' },
+  '/forecasting/workforce': { module: 'forecasting', subModule: 'fpa-workforce' },
+  '/forecasting/revenue': { module: 'forecasting', subModule: 'fpa-revenue' },
+  '/forecasting/expenses': { module: 'forecasting', subModule: 'fpa-expenses' },
+  '/forecasting/cash-flow': { module: 'forecasting', subModule: 'fpa-cashflow' },
+  '/forecasting/variance': { module: 'forecasting', subModule: 'fpa-variance' },
+  '/forecasting/reports': { module: 'forecasting', subModule: 'fpa-reports' },
+  '/forecasting/workflow': { module: 'forecasting', subModule: 'fpa-workflow' },
+  '/forecasting/model-builder': { module: 'forecasting', subModule: 'fpa-model-builder' },
+  '/forecasting/settings': { module: 'forecasting', subModule: 'fpa-settings' },
+  '/forecasting/audit': { module: 'forecasting', subModule: 'fpa-home' },
+
+  // Fundraising & Investor Relations
+  '/fundraising': { module: 'fundraising', subModule: 'fr-dashboard' },
+  '/fundraising/campaigns': { module: 'fundraising', subModule: 'fr-campaigns' },
+  '/fundraising/investors': { module: 'fundraising', subModule: 'fr-investors' },
+  '/fundraising/contacts': { module: 'fundraising', subModule: 'fr-contacts' },
+  '/fundraising/pipeline': { module: 'fundraising', subModule: 'fr-pipeline' },
+  '/fundraising/mandates': { module: 'fundraising', subModule: 'fr-mandates' },
+  '/fundraising/due-diligence': { module: 'fundraising', subModule: 'fr-due-diligence' },
+  '/fundraising/data-rooms': { module: 'fundraising', subModule: 'fr-data-rooms' },
+  '/fundraising/communications': { module: 'fundraising', subModule: 'fr-communications' },
+  '/fundraising/meetings': { module: 'fundraising', subModule: 'fr-meetings' },
+  '/fundraising/documents': { module: 'fundraising', subModule: 'fr-documents' },
+  '/fundraising/agreements': { module: 'fundraising', subModule: 'fr-agreements' },
+  '/fundraising/commitments': { module: 'fundraising', subModule: 'fr-commitments' },
+  '/fundraising/onboarding': { module: 'fundraising', subModule: 'fr-onboarding' },
+  '/fundraising/placement-agents': { module: 'fundraising', subModule: 'fr-placement-agents' },
+  '/fundraising/forecasts': { module: 'fundraising', subModule: 'fr-forecasts' },
+  '/fundraising/reports': { module: 'fundraising', subModule: 'fr-reports' },
+  '/fundraising/approvals': { module: 'fundraising', subModule: 'fr-approvals' },
+  '/fundraising/audit': { module: 'fundraising', subModule: 'fr-audit' },
+  '/fundraising/settings': { module: 'fundraising', subModule: 'fr-settings' },
 
   // Admin Management routes
   '/admin': { module: 'admin-management' },
@@ -181,6 +215,11 @@ export function middleware(request: NextRequest) {
         if (!hasAccess) {
           return NextResponse.redirect(new URL('/application-portal', request.url))
         }
+      }
+
+      // Admin / ops manager bypass RBAC map (JWT may use roleCode "admin")
+      if (roleName === 'admin' || roleCode === 'OPS_MGR' || (roleCode as string)?.toLowerCase() === 'admin') {
+        return NextResponse.next()
       }
 
       // Only check route permissions if user has roleCode and not already on error page

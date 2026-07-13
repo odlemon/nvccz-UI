@@ -58,16 +58,177 @@ const TYPE_ICON_COLOR: Record<string, { icon: any; bg: string; text: string }> =
   CYCLE_CREATED: { icon: Calendar, bg: "bg-indigo-100", text: "text-indigo-600" },
   event: { icon: Calendar, bg: "bg-purple-100", text: "text-purple-600" },
   SYSTEM: { icon: Bell, bg: "bg-gray-100", text: "text-gray-600" },
+  BUDGET_OWNER_ASSIGNED: {
+    icon: ClipboardList,
+    bg: "bg-blue-100",
+    text: "text-blue-600",
+  },
+  BUDGET_SUBMITTED_FOR_REVIEW: {
+    icon: ClipboardList,
+    bg: "bg-amber-100",
+    text: "text-amber-600",
+  },
+  BUDGET_PENDING_CFO_REVIEW: {
+    icon: ClipboardList,
+    bg: "bg-amber-100",
+    text: "text-amber-600",
+  },
+  BUDGET_RETURNED_FOR_CORRECTION: {
+    icon: AlertTriangle,
+    bg: "bg-orange-100",
+    text: "text-orange-600",
+  },
+  BUDGET_CFO_APPROVED: { icon: Check, bg: "bg-green-100", text: "text-green-600" },
+  BUDGET_CYCLE_LOCKED: { icon: CheckCheck, bg: "bg-slate-100", text: "text-slate-600" },
+  BUDGET_BOARD_PACK_READY: {
+    icon: ListTree,
+    bg: "bg-emerald-100",
+    text: "text-emerald-600",
+  },
+  BUDGET_TASK_SUBMITTED: {
+    icon: ClipboardList,
+    bg: "bg-amber-100",
+    text: "text-amber-600",
+  },
+  BUDGET_TASK_ASSIGNED: {
+    icon: ClipboardList,
+    bg: "bg-blue-100",
+    text: "text-blue-600",
+  },
+  BUDGET_TASK_RETURNED: {
+    icon: AlertTriangle,
+    bg: "bg-orange-100",
+    text: "text-orange-600",
+  },
+  BUDGET_TASK_APPROVED: { icon: Check, bg: "bg-green-100", text: "text-green-600" },
 }
 
 const getTypeStyle = (type: string) => {
-  return TYPE_ICON_COLOR[type] || TYPE_ICON_COLOR.SYSTEM
+  if (TYPE_ICON_COLOR[type]) return TYPE_ICON_COLOR[type]
+  if (type.startsWith("BUDGET_")) {
+    return {
+      icon: ClipboardList,
+      bg: "bg-sky-100",
+      text: "text-sky-600",
+    }
+  }
+  return TYPE_ICON_COLOR.SYSTEM
+}
+
+const BUDGET_OWNER_WORK_TYPES = new Set([
+  "BUDGET_OWNER_ASSIGNED",
+  "BUDGET_TASK_ASSIGNED",
+])
+
+const BUDGET_WORKFLOW_TYPES = new Set([
+  "BUDGET_SUBMITTED_FOR_REVIEW",
+  "BUDGET_PENDING_CFO_REVIEW",
+  "BUDGET_CFO_APPROVED",
+  "BUDGET_CYCLE_LOCKED",
+  "BUDGET_RETURNED_FOR_CORRECTION",
+  "BUDGET_TASK_SUBMITTED",
+  "BUDGET_TASK_RETURNED",
+  "BUDGET_TASK_APPROVED",
+  "BUDGET_BOARD_PACK_READY",
+])
+
+function budgetTaskIdFromNotification(n: AppNotification): string | null {
+  const d = n.data || {}
+  if (typeof d.taskId === "string" && d.taskId) return d.taskId
+  if (
+    n.relatedEntityId &&
+    (n.relatedEntity === "BudgetTask" ||
+      n.relatedEntity === "FpaBudgetTask" ||
+      n.relatedEntity === "budget_task" ||
+      String(n.relatedEntity || "").toLowerCase().includes("budgettask"))
+  ) {
+    return n.relatedEntityId
+  }
+  return null
+}
+
+function buildBudgetDeepLink(
+  cycleId: string,
+  opts?: { workflow?: boolean; taskId?: string | null },
+): string {
+  const base = opts?.workflow ? "/forecasting/workflow" : "/forecasting/budget"
+  const params = new URLSearchParams({ cycleId })
+  if (opts?.workflow && opts.taskId) params.set("taskId", opts.taskId)
+  return `${base}?${params.toString()}`
+}
+
+/** Map backend `/fpa/budgeting/{cycleId}` deep links to the app route. */
+export function remapFpaBudgetPath(
+  path: string,
+  opts?: { workflow?: boolean; taskId?: string | null },
+): string {
+  const match = path.match(/^\/fpa\/budgeting\/([^/?#]+)/i)
+  if (match?.[1]) {
+    return buildBudgetDeepLink(match[1], opts)
+  }
+  if (/^\/fpa\/budgeting\/?/i.test(path)) {
+    return opts?.workflow ? "/forecasting/workflow" : "/forecasting/budget"
+  }
+  return path
+}
+
+function budgetCycleIdFromNotification(n: AppNotification): string | null {
+  const d = n.data || {}
+  if (typeof d.cycleId === "string" && d.cycleId) return d.cycleId
+  if (
+    n.relatedEntityId &&
+    (n.relatedEntity === "BudgetCycle" ||
+      n.relatedEntity === "FpaBudgetCycle" ||
+      n.relatedEntity === "budget_cycle" ||
+      String(n.relatedEntity || "").toLowerCase().includes("budget"))
+  ) {
+    return n.relatedEntityId
+  }
+  const candidate = d.path || d.taskPath || n.link
+  if (typeof candidate === "string") {
+    const match = candidate.match(/\/fpa\/budgeting\/([^/?#]+)/i)
+    if (match?.[1]) return match[1]
+    try {
+      const url = new URL(candidate, "http://local")
+      const q = url.searchParams.get("cycleId")
+      if (q) return q
+    } catch {
+      /* ignore */
+    }
+  }
+  return null
 }
 
 /** Pick the best deep-link path from a notification's data payload. */
 export const getNotificationPath = (n: AppNotification): string | null => {
   const d = n.data || {}
-  
+
+  // 0. FP&A budget notifications (before TASK_ — budget payloads may include taskId)
+  if (
+    n.type.startsWith("BUDGET_") ||
+    String(n.relatedEntity || "").toLowerCase().includes("budget")
+  ) {
+    const toWorkflow =
+      BUDGET_WORKFLOW_TYPES.has(n.type) ||
+      (n.type.startsWith("BUDGET_") && !BUDGET_OWNER_WORK_TYPES.has(n.type))
+    const cycleId = budgetCycleIdFromNotification(n)
+    const taskId = budgetTaskIdFromNotification(n)
+    if (cycleId) {
+      return buildBudgetDeepLink(cycleId, {
+        workflow: toWorkflow,
+        taskId: toWorkflow ? taskId : null,
+      })
+    }
+    const explicit = d.path || d.taskPath || n.link
+    if (explicit) {
+      return remapFpaBudgetPath(explicit, {
+        workflow: toWorkflow,
+        taskId: toWorkflow ? taskId : null,
+      })
+    }
+    return toWorkflow ? "/forecasting/workflow" : "/forecasting/budget"
+  }
+
   // 1. Task-specific deep-linking
   if (n.type.startsWith("TASK_") || d.taskId || d.modalTarget === "kanban-task") {
     const taskId = d.taskId || n.relatedEntityId
@@ -92,8 +253,9 @@ export const getNotificationPath = (n: AppNotification): string | null => {
     return "/performance/configuration/strategy"
   }
 
-  // 5. Fallback to explicit paths or link
-  return d.path || d.taskPath || n.link || null
+  // 5. Fallback — remap legacy FPA paths if present
+  const fallback = d.path || d.taskPath || n.link || null
+  return fallback ? remapFpaBudgetPath(fallback) : null
 }
 
 export function NotificationsBell() {

@@ -38,7 +38,7 @@ import performanceTasksReducer from './slices/performanceTasksSlice'
 import performanceReviewsReducer from './slices/performanceReviewsSlice'
 import notificationsReducer from './slices/notificationsSlice'
 import portfolioReportingReducer from './slices/portfolioReportingSlice'
-import forecastingReducer from './slices/forecastingSlice'
+import fpaReducer from './slices/fpaSlice'
 import investmentsReducer from './slices/investmentsSlice'
 import streetRatesReducer from './slices/streetRatesSlice'
 import fundPerformanceReportingReducer from './slices/fundPerformanceReportingSlice'
@@ -84,7 +84,7 @@ export const store = configureStore({
     performanceReviews: performanceReviewsReducer,
     notifications: notificationsReducer,
     portfolioReporting: portfolioReportingReducer,
-    forecasting: forecastingReducer,
+    fpa: fpaReducer,
     investments: investmentsReducer,
     streetRates: streetRatesReducer,
     fundPerformanceReporting: fundPerformanceReportingReducer,

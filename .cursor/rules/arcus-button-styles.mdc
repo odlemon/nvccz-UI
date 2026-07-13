@@ -1,0 +1,32 @@
+---
+description: Always use Arcus system button styles (pill radius) — never invent new button shapes from mockups
+alwaysApply: true
+---
+
+# Arcus button styles (mandatory)
+
+Regardless of mockups or design refs, **always match existing Arcus control styles** — especially border radius. Reference: Payroll and shared `Button` usage (e.g. `/payroll` on [dev.arcus.co.zw](https://dev.arcus.co.zw/payroll)).
+
+## Rules
+
+- **Buttons are pills:** use `rounded-full` on all action buttons (primary, secondary, outline, ghost icon buttons).
+- **Do not** use `rounded-md` / `rounded-lg` / `rounded-xl` on buttons for a “sharper design” look.
+- Prefer shared `Button` from `@/components/ui/button` with `className="rounded-full …"` (and existing variants like `gradient-create`, `gradient-info`, `outline`).
+- Typical primary CTA sizing in-app: `rounded-full h-10 px-6 shadow-sm` (or `h-9`/`h-8` for denser toolbars — still `rounded-full`).
+- Filter chips / toolbar selects that look like buttons should also be `rounded-full`.
+- Cards, tables, and panels may keep their own radii; this rule is about **buttons and button-like controls**.
+
+## Examples
+
+```tsx
+// ❌ BAD — design-mock radius
+<button className="h-9 rounded-md bg-[#2563eb] px-3 text-xs text-white">Save</button>
+
+// ✅ GOOD — Arcus pill
+<Button variant="gradient-info" className="rounded-full h-10 px-6 shadow-sm">Save</Button>
+
+// ✅ GOOD — raw button still pill
+<button type="button" className="h-9 rounded-full bg-[#2563eb] px-4 text-xs font-medium text-white">Save</button>
+```
+
+When wiring a new module from Figma/mockups, **restyle controls to Arcus** even if the mock shows square or lightly rounded buttons.

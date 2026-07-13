@@ -9,6 +9,8 @@ export interface AppUser {
   createdAt: string
   updatedAt: string
   lastSeen?: string
+  departmentId?: string | null
+  department?: { id?: string; name?: string } | string | null
   role?: {
     id: string
     name: string

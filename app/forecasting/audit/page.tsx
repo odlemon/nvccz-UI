@@ -1,15 +1,13 @@
 import { ModuleGuard } from "@/components/permissions/PermissionGuards"
-import { ForecastingLayout } from "@/components/layout/forecasting-layout"
-import { AuditFeedPage } from "@/components/forecasting/audit-feed-page"
+import { FpaComingSoon } from "@/components/fpa/fpa-coming-soon"
 
-export default function ForecastingAuditPage() {
+export default function FpaAuditPage() {
   return (
-    <ModuleGuard moduleId="forecasting" subModuleId="forecasting-audit">
-      <ForecastingLayout>
-        <div className="p-6">
-          <AuditFeedPage />
-        </div>
-      </ForecastingLayout>
+    <ModuleGuard moduleId="forecasting" subModuleId="fpa-home">
+      <FpaComingSoon
+          title="Audit Logs"
+          description="Material edits, approvals and lock attempts will appear here once the API is connected."
+        />
     </ModuleGuard>
   )
 }

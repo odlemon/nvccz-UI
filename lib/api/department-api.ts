@@ -36,8 +36,11 @@ export interface DepartmentCreateResponse extends ApiResponse {
 }
 
 export interface DepartmentsResponse extends ApiResponse {
-  count: number
-  departments: Department[]
+  count?: number
+  /** Canonical list from GET /departments */
+  data?: Department[]
+  /** Legacy shape — some callers still read this */
+  departments?: Department[]
 }
 
 export interface GoalCreateRequest {
@@ -95,23 +98,35 @@ class DepartmentApiService {
     return response.departments || []
   }
 
-  // Get all departments with optional filters (legacy endpoint - keep for backwards compatibility)
+  /**
+   * GET /departments — active rows by default.
+   * Pass includeInactive: true to include inactive departments.
+   * Response: { success, data: [{ id, name, … }], count }
+   */
   async getDepartments(filters?: {
-    isActive?: boolean;
-    branch?: string;
+    includeInactive?: boolean
+    /** @deprecated Prefer omit (active default) or includeInactive; ignored by current API */
+    isActive?: boolean
+    branch?: string
   }): Promise<DepartmentsResponse> {
-    const queryParams = new URLSearchParams();
-    if (filters?.isActive !== undefined) {
-      queryParams.append('isActive', filters.isActive.toString());
+    const queryParams = new URLSearchParams()
+    if (filters?.includeInactive === true) {
+      queryParams.append('includeInactive', 'true')
     }
     if (filters?.branch) {
-      queryParams.append('branch', filters.branch);
+      queryParams.append('branch', filters.branch)
     }
-    
-    const queryString = queryParams.toString();
-    const url = queryString ? `/departments?${queryString}` : '/departments';
-    
-    return apiClient.get<DepartmentsResponse>(url)
+
+    const queryString = queryParams.toString()
+    const url = queryString ? `/departments?${queryString}` : '/departments'
+
+    const res = await apiClient.get<DepartmentsResponse>(url)
+    const list = Array.isArray(res?.data)
+      ? res.data
+      : Array.isArray(res?.departments)
+        ? res.departments
+        : []
+    return { ...res, data: list, departments: list, count: res.count ?? list.length }
   }
 
   // Create a new department
