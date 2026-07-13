@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Topbar } from '@/components/arcus/topbar'
 import { StatusBadge } from '@/components/arcus/status-badge'
 import { cn } from '@/lib/utils'
-import { ChevronDown, Calendar, MoreHorizontal, X } from 'lucide-react'
+import { Check, ChevronsUpDown, Download, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { OrdersSubNav } from '@/components/investments-v2/orders-subnav'
 import { useAppDispatch, useAppSelector } from '@/lib/store'
@@ -24,6 +24,16 @@ import {
 } from '@/lib/store/slices/investmentOpsSlice'
 import { priceChange } from '@/lib/api/investments-api'
 import type { OrderStatus } from '@/lib/api/investment-ops-api'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { DatePicker } from '@/components/ui/date-picker'
+import { useThemeContainer } from '@/components/investments-v2/ui/use-theme-container'
+import { exportRowsToCsv } from '@/components/investments-v2/ui/export-csv'
+import { ConfirmDialog } from '@/components/investments-v2/ui/confirm-dialog'
+import { ConfirmReasonDialog } from '@/components/investments-v2/ui/confirm-reason-dialog'
 
 const ORDER_STATUS_LABEL: Record<string, string> = {
   DRAFT: 'draft',
@@ -33,18 +43,6 @@ const ORDER_STATUS_LABEL: Record<string, string> = {
   EXECUTED: 'executed',
   REJECTED: 'rejected',
   CANCELLED: 'cancelled',
-}
-
-function DropdownField({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex flex-col gap-1">
-      <label className="text-[11px]" style={{ color: '#64748b' }}>{label}</label>
-      <div className="flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer" style={{ background: '#1e2330', border: '1px solid rgba(255,255,255,0.07)' }}>
-        <span className="text-[12.5px]" style={{ color: '#94a3b8' }}>{value}</span>
-        <ChevronDown className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#64748b' }} />
-      </div>
-    </div>
-  )
 }
 
 const NEW_ORDER_EMPTY = {
@@ -71,10 +69,22 @@ export default function TradingPage() {
     orderPreviewLoading,
   } = useAppSelector((s) => s.investmentOps)
 
-  const [longShort, setLongShort] = useState<'Long' | 'Short'>('Long')
+  const { ref: rootRef, container: themeContainer } = useThemeContainer()
+
   const [showNewOrder, setShowNewOrder] = useState(false)
   const [form, setForm] = useState(NEW_ORDER_EMPTY)
   const [previewedKey, setPreviewedKey] = useState<string | null>(null)
+  const [fundComboOpen, setFundComboOpen] = useState(false)
+  const [instrumentComboOpen, setInstrumentComboOpen] = useState(false)
+
+  const [searchText, setSearchText] = useState('')
+  const [statusFilter, setStatusFilter] = useState('All')
+  const [sideFilter, setSideFilter] = useState('All')
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined)
+  const [dateTo, setDateTo] = useState<Date | undefined>(undefined)
+
+  const [reasonDialog, setReasonDialog] = useState<{ action: 'reject' | 'cancel'; id: string; orderRef: string } | null>(null)
+  const [executeConfirm, setExecuteConfirm] = useState<{ id: string; orderRef: string } | null>(null)
 
   const previewKey = JSON.stringify([form.fundId, form.instrumentId, form.side, form.quantity, form.executionPrice])
 
@@ -159,21 +169,21 @@ export default function TradingPage() {
     }
   }
 
-  const handleAction = async (action: 'submit' | 'approve' | 'send-to-broker' | 'execute' | 'reject' | 'cancel', id: string, orderRef: string) => {
+  const runAction = async (action: 'submit' | 'approve' | 'send-to-broker' | 'execute', id: string, orderRef: string) => {
     try {
-      if (action === 'reject' || action === 'cancel') {
-        const reason = window.prompt(`Reason for ${action === 'reject' ? 'rejecting' : 'cancelling'} ${orderRef}:`)
-        if (!reason) return
-        await dispatch((action === 'reject' ? rejectOrder : cancelOrder)({ id, reason })).unwrap()
-      } else if (action === 'submit') {
-        await dispatch(submitOrder(id)).unwrap()
-      } else if (action === 'approve') {
-        await dispatch(approveOrder(id)).unwrap()
-      } else if (action === 'send-to-broker') {
-        await dispatch(sendOrderToBroker(id)).unwrap()
-      } else {
-        await dispatch(executeOrder(id)).unwrap()
-      }
+      if (action === 'submit') await dispatch(submitOrder(id)).unwrap()
+      else if (action === 'approve') await dispatch(approveOrder(id)).unwrap()
+      else if (action === 'send-to-broker') await dispatch(sendOrderToBroker(id)).unwrap()
+      else await dispatch(executeOrder(id)).unwrap()
+      toast.success(`${orderRef} updated`)
+    } catch (err: any) {
+      toast.error('Action failed', { description: err.message })
+    }
+  }
+
+  const runReasonAction = async (action: 'reject' | 'cancel', id: string, orderRef: string, reason: string) => {
+    try {
+      await dispatch((action === 'reject' ? rejectOrder : cancelOrder)({ id, reason })).unwrap()
       toast.success(`${orderRef} updated`)
     } catch (err: any) {
       toast.error('Action failed', { description: err.message })
@@ -195,8 +205,35 @@ export default function TradingPage() {
     }
   }
 
+  const selectedFund = portfolios.find((f) => f.id === form.fundId)
+  const selectedInstrument = instruments.find((i) => i.id === form.instrumentId)
+
+  const filteredOrders = useMemo(() => {
+    const q = searchText.trim().toLowerCase()
+    return orders.filter((o) => {
+      if (statusFilter !== 'All' && o.status !== statusFilter) return false
+      if (sideFilter !== 'All' && o.side !== sideFilter) return false
+      const createdAt = new Date(o.createdAt)
+      if (dateFrom && createdAt < dateFrom) return false
+      if (dateTo && createdAt > new Date(dateTo.getTime() + 24 * 60 * 60 * 1000 - 1)) return false
+      if (q) {
+        const haystack = [o.orderRef, o.instrument?.ticker ?? '', o.instrument?.fullName ?? ''].join(' ').toLowerCase()
+        if (!haystack.includes(q)) return false
+      }
+      return true
+    })
+  }, [orders, searchText, statusFilter, sideFilter, dateFrom, dateTo])
+
+  const handleExport = () => {
+    exportRowsToCsv(
+      `orders-${new Date().toISOString().slice(0, 10)}.csv`,
+      ['Order Ref', 'Instrument', 'Side', 'Quantity', 'Price', 'Currency', 'Status'],
+      filteredOrders.map((o) => [o.orderRef, o.instrument?.ticker ?? '', o.side, o.quantity, o.executionPrice, o.tradeCurrency, o.status])
+    )
+  }
+
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div ref={rootRef} className="flex flex-col h-full overflow-hidden">
       <Topbar title="Orders" />
 
       <OrdersSubNav />
@@ -207,64 +244,44 @@ export default function TradingPage() {
         <div className="arcus-card">
           <div className="flex items-center justify-between px-4 py-3">
             <span className="text-white text-[13px] font-semibold">Filters</span>
-            <button onClick={openNewOrder} className="btn-white text-[12px] py-1 px-4">New Order</button>
-          </div>
-
-          {/* Filter chips row */}
-          <div className="flex items-center gap-2 px-4 pb-3 flex-wrap">
-            {['All Portfolios', 'Default View', 'From: 11 Oct, 21', 'As of: 11 Oct, 21'].map((chip, i) => (
-              <button key={i} className="sort-pill text-[11px]">
-                {chip} <ChevronDown className="w-3 h-3" />
-              </button>
-            ))}
-            <button className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: '#1e2330', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <MoreHorizontal className="w-3.5 h-3.5" style={{ color: '#64748b' }} />
-            </button>
-          </div>
-
-          {/* 3-column filter grid */}
-          <div className="grid grid-cols-3 gap-4 px-4 pb-4">
-            {/* Row 1 */}
-            <DropdownField label="Closed Positions" value="Exclude" />
-            <div className="flex flex-col gap-1">
-              <label className="text-[11px]" style={{ color: '#64748b' }}>Quantity from/to</label>
-              <div className="flex items-center px-3 py-2 rounded-lg" style={{ background: '#1e2330', border: '1px solid rgba(255,255,255,0.07)' }}>
-                <input placeholder="Enter text" className="bg-transparent outline-none text-[12.5px] w-full" style={{ color: '#94a3b8' }} />
-              </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="pill" onClick={handleExport}>
+                <Download className="w-3 h-3" /> Export
+              </Button>
+              <Button variant="default" size="pill" onClick={openNewOrder}>New Order</Button>
             </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-[11px]" style={{ color: '#64748b' }}>Quantity</label>
-              <div className="flex items-center gap-4 px-3 py-2 rounded-lg" style={{ background: '#1e2330', border: '1px solid rgba(255,255,255,0.07)', height: '38px' }}>
-                {(['Long','Short'] as const).map(v => (
-                  <label key={v} className="flex items-center gap-1.5 cursor-pointer">
-                    <div
-                      onClick={() => setLongShort(v)}
-                      className="w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center cursor-pointer"
-                      style={{ borderColor: longShort === v ? '#3b82f6' : '#64748b' }}
-                    >
-                      {longShort === v && <div className="w-1.5 h-1.5 rounded-full" style={{ background: '#3b82f6' }} />}
-                    </div>
-                    <span className="text-[12px]" style={{ color: longShort === v ? '#e2e8f0' : '#64748b' }}>{v}</span>
-                  </label>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap px-4 pb-4">
+            <Input
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              placeholder="Search order ref or instrument…"
+              className="w-64"
+            />
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-40 rounded-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent container={themeContainer}>
+                <SelectItem value="All">All Statuses</SelectItem>
+                {Object.keys(ORDER_STATUS_LABEL).map((s) => (
+                  <SelectItem key={s} value={s}>{ORDER_STATUS_LABEL[s]}</SelectItem>
                 ))}
-              </div>
-            </div>
-
-            {/* Row 2 */}
-            <div className="flex flex-col gap-1">
-              <label className="text-[11px]" style={{ color: '#64748b' }}>Expiry/Maturity from/to</label>
-              <div className="flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer" style={{ background: '#1e2330', border: '1px solid rgba(255,255,255,0.07)' }}>
-                <span className="text-[12.5px]" style={{ color: '#64748b' }}>Select</span>
-                <Calendar className="w-3.5 h-3.5" style={{ color: '#64748b' }} />
-              </div>
-            </div>
-            <DropdownField label="Portfolio" value="No filter" />
-            <DropdownField label="Folder" value="No filter" />
-
-            {/* Row 3 */}
-            <DropdownField label="Instrument type" value="No filter" />
-            <DropdownField label="Currency" value="No filter" />
-            <DropdownField label="Industry" value="No filter" />
+              </SelectContent>
+            </Select>
+            <Select value={sideFilter} onValueChange={setSideFilter}>
+              <SelectTrigger className="w-32 rounded-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent container={themeContainer}>
+                <SelectItem value="All">All Sides</SelectItem>
+                <SelectItem value="BUY">BUY</SelectItem>
+                <SelectItem value="SELL">SELL</SelectItem>
+              </SelectContent>
+            </Select>
+            <DatePicker value={dateFrom} onChange={setDateFrom} placeholder="From date" className="w-40" allowFutureDates container={themeContainer} />
+            <DatePicker value={dateTo} onChange={setDateTo} placeholder="To date" className="w-40" allowFutureDates container={themeContainer} />
           </div>
         </div>
 
@@ -280,81 +297,104 @@ export default function TradingPage() {
             <div className="grid grid-cols-4 gap-3 p-4">
               <div>
                 <label className="text-[10px] text-[#64748b] uppercase tracking-wider block mb-1">Fund</label>
-                <select
-                  value={form.fundId}
-                  onChange={(e) => field('fundId', e.target.value)}
-                  className="w-full bg-[#1e2330] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#c8d3e8] outline-none focus:border-[#3b82f6]/60"
-                >
-                  <option value="" disabled>Select fund…</option>
-                  {portfolios.map((f) => (
-                    <option key={f.id} value={f.id}>{f.name} ({f.baseCurrencyCode})</option>
-                  ))}
-                </select>
+                <Select value={form.fundId} onValueChange={(v) => field('fundId', v)}>
+                  <SelectTrigger className="w-full rounded-full">
+                    <SelectValue placeholder="Select fund…" />
+                  </SelectTrigger>
+                  <SelectContent container={themeContainer}>
+                    {portfolios.map((f) => (
+                      <SelectItem key={f.id} value={f.id}>{f.name} ({f.baseCurrencyCode})</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <label className="text-[10px] text-[#64748b] uppercase tracking-wider block mb-1">Instrument</label>
-                <select
-                  value={form.instrumentId}
-                  onChange={(e) => handleInstrumentChange(e.target.value)}
-                  className="w-full bg-[#1e2330] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#c8d3e8] outline-none focus:border-[#3b82f6]/60"
-                >
-                  <option value="" disabled>Select instrument…</option>
-                  {instruments.map((i) => (
-                    <option key={i.id} value={i.id}>{i.ticker} — {i.fullName}</option>
-                  ))}
-                </select>
+                <Popover open={instrumentComboOpen} onOpenChange={setInstrumentComboOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" role="combobox" aria-expanded={instrumentComboOpen} className="w-full justify-between rounded-full font-normal">
+                      <span className="truncate">{selectedInstrument ? `${selectedInstrument.ticker} — ${selectedInstrument.fullName}` : 'Select instrument…'}</span>
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[320px] p-0" align="start" container={themeContainer}>
+                    <Command>
+                      <CommandInput placeholder="Search ticker or name…" />
+                      <CommandList>
+                        <CommandEmpty>No instruments found.</CommandEmpty>
+                        <CommandGroup>
+                          {instruments.map((i) => (
+                            <CommandItem
+                              key={i.id}
+                              value={`${i.ticker} ${i.fullName}`}
+                              onSelect={() => {
+                                handleInstrumentChange(i.id)
+                                setInstrumentComboOpen(false)
+                              }}
+                            >
+                              <Check className={cn('mr-2 h-4 w-4', form.instrumentId === i.id ? 'opacity-100' : 'opacity-0')} />
+                              {i.ticker} — {i.fullName}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
               <div>
                 <label className="text-[10px] text-[#64748b] uppercase tracking-wider block mb-1">Side</label>
-                <select
-                  value={form.side}
-                  onChange={(e) => field('side', e.target.value)}
-                  className="w-full bg-[#1e2330] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#c8d3e8] outline-none focus:border-[#3b82f6]/60"
-                >
-                  <option value="BUY">BUY</option>
-                  <option value="SELL">SELL</option>
-                </select>
+                <Select value={form.side} onValueChange={(v) => field('side', v)}>
+                  <SelectTrigger className="w-full rounded-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent container={themeContainer}>
+                    <SelectItem value="BUY">BUY</SelectItem>
+                    <SelectItem value="SELL">SELL</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <label className="text-[10px] text-[#64748b] uppercase tracking-wider block mb-1">Quantity</label>
-                <input
+                <Input
                   type="number"
                   placeholder="0"
                   value={form.quantity}
                   onChange={(e) => field('quantity', e.target.value)}
-                  className="w-full bg-[#1e2330] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#c8d3e8] outline-none focus:border-[#3b82f6]/60 font-mono"
+                  className="font-mono"
                 />
               </div>
               <div>
                 <label className="text-[10px] text-[#64748b] uppercase tracking-wider block mb-1">Execution Price</label>
-                <input
+                <Input
                   type="number"
                   placeholder="0.00"
                   value={form.executionPrice}
                   onChange={(e) => field('executionPrice', e.target.value)}
-                  className="w-full bg-[#1e2330] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#c8d3e8] outline-none focus:border-[#3b82f6]/60 font-mono"
+                  className="font-mono"
                 />
               </div>
               <div>
                 <label className="text-[10px] text-[#64748b] uppercase tracking-wider block mb-1">Order Type</label>
-                <select
-                  value={form.orderType}
-                  onChange={(e) => field('orderType', e.target.value)}
-                  className="w-full bg-[#1e2330] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#c8d3e8] outline-none focus:border-[#3b82f6]/60"
-                >
-                  <option value="MARKET">MARKET</option>
-                  <option value="LIMIT">LIMIT</option>
-                </select>
+                <Select value={form.orderType} onValueChange={(v) => field('orderType', v)}>
+                  <SelectTrigger className="w-full rounded-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent container={themeContainer}>
+                    <SelectItem value="MARKET">MARKET</SelectItem>
+                    <SelectItem value="LIMIT">LIMIT</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               {form.orderType === 'LIMIT' && (
                 <div>
                   <label className="text-[10px] text-[#64748b] uppercase tracking-wider block mb-1">Limit Price</label>
-                  <input
+                  <Input
                     type="number"
                     placeholder="0.00"
                     value={form.limitPrice}
                     onChange={(e) => field('limitPrice', e.target.value)}
-                    className="w-full bg-[#1e2330] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#c8d3e8] outline-none focus:border-[#3b82f6]/60 font-mono"
+                    className="font-mono"
                   />
                 </div>
               )}
@@ -410,21 +450,13 @@ export default function TradingPage() {
               <div className="flex-1 text-[10px]" style={{ color: '#64748b' }}>
                 Creates a draft order pending compliance review and approval — it will not route to the broker until approved.
               </div>
-              <button
-                onClick={handlePreview}
-                disabled={orderPreviewLoading}
-                className="bg-[#1e2330] text-[#60a5fa] text-xs px-3 py-1.5 rounded border border-[#3b82f6]/30 hover:bg-[#252b3a] disabled:opacity-60"
-              >
+              <Button variant="outline" size="pill" onClick={handlePreview} disabled={orderPreviewLoading}>
                 {orderPreviewLoading ? 'Checking…' : 'Preview'}
-              </button>
-              <button className="bg-[#1e2330] text-[#94a3b8] text-xs px-3 py-1.5 rounded border border-white/[0.06] hover:bg-[#252b3a]" onClick={() => setShowNewOrder(false)}>Cancel</button>
-              <button
-                onClick={handleSubmitOrder}
-                disabled={orderCreating}
-                className="bg-[#2563eb] text-white text-xs font-medium px-4 py-1.5 rounded hover:bg-[#1d4ed8] disabled:opacity-60"
-              >
+              </Button>
+              <Button variant="outline" size="pill" onClick={() => setShowNewOrder(false)}>Cancel</Button>
+              <Button variant="default" size="pill" onClick={handleSubmitOrder} disabled={orderCreating}>
                 {orderCreating ? 'Creating…' : 'Create Order'}
-              </button>
+              </Button>
             </div>
           </div>
         )}
@@ -461,7 +493,7 @@ export default function TradingPage() {
                 </tr>
               </thead>
               <tbody>
-                {orders.map((o) => (
+                {filteredOrders.map((o) => (
                   <tr key={o.id}>
                     <td style={{ color: '#94a3b8' }} className="font-mono text-[11px]">{o.orderRef}</td>
                     <td style={{ color: '#e2e8f0' }} className="font-medium font-mono">{o.instrument?.ticker ?? '—'}</td>
@@ -476,24 +508,33 @@ export default function TradingPage() {
                     <td><StatusBadge status={ORDER_STATUS_LABEL[o.status] ?? o.status} /></td>
                     <td>
                       <div className="flex items-center gap-1.5">
-                        {nextActions(o.status).map((a) => (
-                          <button
-                            key={a.key}
-                            disabled={!!orderActionLoadingById[o.id]}
-                            onClick={() => handleAction(a.key, o.id, o.orderRef)}
-                            className="text-[10px] px-2 py-1 rounded border border-white/[0.08] hover:bg-[#1e2330] disabled:opacity-50"
-                            style={{ color: a.key === 'reject' || a.key === 'cancel' ? '#ef4444' : '#60a5fa' }}
-                          >
-                            {a.label}
-                          </button>
-                        ))}
+                        {nextActions(o.status).map((a) => {
+                          const isReasonAction = a.key === 'cancel' || a.key === 'reject'
+                          const isExecute = a.key === 'execute'
+                          return (
+                            <Button
+                              key={a.key}
+                              size="sm"
+                              variant="outline"
+                              className={cn('rounded-full', isReasonAction && 'text-destructive border-destructive/30 hover:bg-destructive/10')}
+                              disabled={!!orderActionLoadingById[o.id]}
+                              onClick={() => {
+                                if (isReasonAction) setReasonDialog({ action: a.key as 'reject' | 'cancel', id: o.id, orderRef: o.orderRef })
+                                else if (isExecute) setExecuteConfirm({ id: o.id, orderRef: o.orderRef })
+                                else runAction(a.key as 'submit' | 'approve' | 'send-to-broker', o.id, o.orderRef)
+                              }}
+                            >
+                              {a.label}
+                            </Button>
+                          )
+                        })}
                       </div>
                     </td>
                   </tr>
                 ))}
-                {orders.length === 0 && !ordersLoading && (
+                {filteredOrders.length === 0 && !ordersLoading && (
                   <tr>
-                    <td colSpan={8} className="text-center py-8 text-[12px]" style={{ color: '#64748b' }}>No orders yet.</td>
+                    <td colSpan={8} className="text-center py-8 text-[12px]" style={{ color: '#64748b' }}>No orders match the current filters.</td>
                   </tr>
                 )}
               </tbody>
@@ -501,6 +542,38 @@ export default function TradingPage() {
           </div>
         </div>
       </div>
+
+      {reasonDialog && (
+        <ConfirmReasonDialog
+          open={!!reasonDialog}
+          onOpenChange={(o) => !o && setReasonDialog(null)}
+          title={`${reasonDialog.action === 'reject' ? 'Reject' : 'Cancel'} Order ${reasonDialog.orderRef}`}
+          description="This action cannot be undone. Please provide a reason."
+          confirmLabel={reasonDialog.action === 'reject' ? 'Reject Order' : 'Cancel Order'}
+          onConfirm={(reason) => {
+            const d = reasonDialog
+            setReasonDialog(null)
+            if (d) runReasonAction(d.action, d.id, d.orderRef, reason)
+          }}
+          container={themeContainer}
+        />
+      )}
+
+      {executeConfirm && (
+        <ConfirmDialog
+          open={!!executeConfirm}
+          onOpenChange={(o) => !o && setExecuteConfirm(null)}
+          title={`Execute Order ${executeConfirm.orderRef}`}
+          description="This will execute the trade in the market. This action cannot be undone."
+          confirmLabel="Execute Trade"
+          onConfirm={() => {
+            const d = executeConfirm
+            setExecuteConfirm(null)
+            if (d) runAction('execute', d.id, d.orderRef)
+          }}
+          container={themeContainer}
+        />
+      )}
     </div>
   )
 }

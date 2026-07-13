@@ -5,8 +5,16 @@ import { Topbar } from '@/components/arcus/topbar'
 import { StatusBadge } from '@/components/arcus/status-badge'
 import { OrdersSubNav } from '@/components/investments-v2/orders-subnav'
 import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
+import { Check, ChevronsUpDown } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '@/lib/store'
 import { fetchPortfolios, fetchInstruments, fetchComplianceRules, runSimulation } from '@/lib/store/slices/investmentOpsSlice'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useThemeContainer } from '@/components/investments-v2/ui/use-theme-container'
 
 function outcomeBadgeStatus(outcome: string) {
   if (outcome === 'PASSED') return 'passed'
@@ -27,7 +35,10 @@ export default function SimulationPage() {
   const { portfolios, instruments, complianceRules, simulationRun, simulationRunning } = useAppSelector(
     (s) => s.investmentOps
   )
+  const { ref: rootRef, container: themeContainer } = useThemeContainer()
   const [form, setForm] = useState(SCENARIO_EMPTY)
+  const [formError, setFormError] = useState('')
+  const [instrumentComboOpen, setInstrumentComboOpen] = useState(false)
 
   useEffect(() => {
     dispatch(fetchPortfolios())
@@ -40,12 +51,16 @@ export default function SimulationPage() {
 
   const field = (key: keyof typeof form, value: string) => setForm((p) => ({ ...p, [key]: value }))
 
+  const selectedInstrument = instruments.find((i) => i.id === form.instrumentId)
+
   const handleRun = async () => {
+    setFormError('')
     const fund = portfolios.find((f) => f.id === form.fundId)
     const inst = instruments.find((i) => i.id === form.instrumentId)
     const quantity = Number(form.quantity)
     const price = Number(form.price)
     if (!fund || !inst || quantity <= 0 || price <= 0) {
+      setFormError('Fill in fund, instrument, quantity, and price')
       toast.error('Fill in fund, instrument, quantity, and price')
       return
     }
@@ -54,6 +69,7 @@ export default function SimulationPage() {
         runSimulation({ fundId: fund.id, scenario: { side: form.side, instrumentId: inst.id, quantity, price } })
       ).unwrap()
     } catch (err: any) {
+      setFormError(err.message || 'Simulation failed')
       toast.error('Simulation failed', { description: err.message })
     }
   }
@@ -61,7 +77,7 @@ export default function SimulationPage() {
   const result = simulationRun?.resultJson
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div ref={rootRef} className="flex flex-col h-full overflow-hidden">
       <Topbar title="Orders" />
 
       <OrdersSubNav />
@@ -75,71 +91,90 @@ export default function SimulationPage() {
           </div>
           <div className="grid grid-cols-4 gap-3 p-4">
             <div>
-              <label className="text-[10px] text-[#64748b] uppercase tracking-wider block mb-1">Fund</label>
-              <select
-                value={form.fundId}
-                onChange={(e) => field('fundId', e.target.value)}
-                className="w-full bg-[#1e2330] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#c8d3e8] outline-none focus:border-[#3b82f6]/60"
-              >
-                <option value="" disabled>Select fund…</option>
-                {portfolios.map((f) => (
-                  <option key={f.id} value={f.id}>{f.name} ({f.baseCurrencyCode})</option>
-                ))}
-              </select>
+              <label className="text-[10px] text-[#64748b] uppercase tracking-wider block mb-1">Fund *</label>
+              <Select value={form.fundId} onValueChange={(v) => field('fundId', v)}>
+                <SelectTrigger className="w-full rounded-full">
+                  <SelectValue placeholder="Select fund…" />
+                </SelectTrigger>
+                <SelectContent container={themeContainer}>
+                  {portfolios.map((f) => (
+                    <SelectItem key={f.id} value={f.id}>{f.name} ({f.baseCurrencyCode})</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div>
-              <label className="text-[10px] text-[#64748b] uppercase tracking-wider block mb-1">Instrument</label>
-              <select
-                value={form.instrumentId}
-                onChange={(e) => field('instrumentId', e.target.value)}
-                className="w-full bg-[#1e2330] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#c8d3e8] outline-none focus:border-[#3b82f6]/60"
-              >
-                <option value="" disabled>Select instrument…</option>
-                {instruments.map((i) => (
-                  <option key={i.id} value={i.id}>{i.ticker} — {i.fullName}</option>
-                ))}
-              </select>
+              <label className="text-[10px] text-[#64748b] uppercase tracking-wider block mb-1">Instrument *</label>
+              <Popover open={instrumentComboOpen} onOpenChange={setInstrumentComboOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" role="combobox" aria-expanded={instrumentComboOpen} className="w-full justify-between rounded-full font-normal">
+                    <span className="truncate">{selectedInstrument ? `${selectedInstrument.ticker} — ${selectedInstrument.fullName}` : 'Select instrument…'}</span>
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[320px] p-0" align="start" container={themeContainer}>
+                  <Command>
+                    <CommandInput placeholder="Search ticker or name…" />
+                    <CommandList>
+                      <CommandEmpty>No instruments found.</CommandEmpty>
+                      <CommandGroup>
+                        {instruments.map((i) => (
+                          <CommandItem
+                            key={i.id}
+                            value={`${i.ticker} ${i.fullName}`}
+                            onSelect={() => {
+                              field('instrumentId', i.id)
+                              setInstrumentComboOpen(false)
+                            }}
+                          >
+                            <Check className={cn('mr-2 h-4 w-4', form.instrumentId === i.id ? 'opacity-100' : 'opacity-0')} />
+                            {i.ticker} — {i.fullName}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
             <div>
-              <label className="text-[10px] text-[#64748b] uppercase tracking-wider block mb-1">Side</label>
-              <select
-                value={form.side}
-                onChange={(e) => field('side', e.target.value)}
-                className="w-full bg-[#1e2330] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#c8d3e8] outline-none focus:border-[#3b82f6]/60"
-              >
-                <option value="BUY">BUY</option>
-                <option value="SELL">SELL</option>
-              </select>
+              <label className="text-[10px] text-[#64748b] uppercase tracking-wider block mb-1">Side *</label>
+              <Select value={form.side} onValueChange={(v) => field('side', v)}>
+                <SelectTrigger className="w-full rounded-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent container={themeContainer}>
+                  <SelectItem value="BUY">BUY</SelectItem>
+                  <SelectItem value="SELL">SELL</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div>
-              <label className="text-[10px] text-[#64748b] uppercase tracking-wider block mb-1">Quantity</label>
-              <input
+              <label className="text-[10px] text-[#64748b] uppercase tracking-wider block mb-1">Quantity *</label>
+              <Input
                 type="number"
                 placeholder="0"
                 value={form.quantity}
                 onChange={(e) => field('quantity', e.target.value)}
-                className="w-full bg-[#1e2330] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#c8d3e8] outline-none focus:border-[#3b82f6]/60 font-mono"
+                className="font-mono"
               />
             </div>
             <div>
-              <label className="text-[10px] text-[#64748b] uppercase tracking-wider block mb-1">Price</label>
-              <input
+              <label className="text-[10px] text-[#64748b] uppercase tracking-wider block mb-1">Price *</label>
+              <Input
                 type="number"
                 placeholder="0.00"
                 value={form.price}
                 onChange={(e) => field('price', e.target.value)}
-                className="w-full bg-[#1e2330] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#c8d3e8] outline-none focus:border-[#3b82f6]/60 font-mono"
+                className="font-mono"
               />
             </div>
           </div>
+          {formError && <div className="text-[11px] text-[#EF4444] px-4 pb-2">{formError}</div>}
           <div className="flex items-center justify-end gap-2 px-4 pb-4">
-            <button
-              onClick={handleRun}
-              disabled={simulationRunning}
-              className="bg-[#2563eb] text-white text-xs font-medium px-4 py-1.5 rounded hover:bg-[#1d4ed8] disabled:opacity-60"
-            >
+            <Button variant="default" size="pill" onClick={handleRun} disabled={simulationRunning}>
               {simulationRunning ? 'Running…' : 'Run Simulation'}
-            </button>
+            </Button>
           </div>
         </div>
 

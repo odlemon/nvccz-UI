@@ -278,7 +278,7 @@
 .btn-white {
   background: #fff;
   color: #0f172a;
-  border-radius: 20px;
+  border-radius: 6px;
   padding: 5px 16px;
   font-size: 12px;
   font-weight: 600;
@@ -292,7 +292,7 @@
   background: transparent;
   color: #94a3b8;
   border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 20px;
+  border-radius: 6px;
   padding: 5px 14px;
   font-size: 12px;
   font-weight: 500;
@@ -305,7 +305,7 @@
 .btn-blue {
   background: #3b82f6;
   color: #fff;
-  border-radius: 20px;
+  border-radius: 6px;
   padding: 5px 16px;
   font-size: 12px;
   font-weight: 600;
@@ -564,7 +564,7 @@
 .investments-terminal.dark .btn-white {
   background: #fff;
   color: #0f172a;
-  border-radius: 20px;
+  border-radius: 6px;
   padding: 5px 16px;
   font-size: 12px;
   font-weight: 600;
@@ -578,7 +578,7 @@
   background: transparent;
   color: #94a3b8;
   border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 20px;
+  border-radius: 6px;
   padding: 5px 14px;
   font-size: 12px;
   font-weight: 500;
@@ -591,7 +591,7 @@
 .investments-terminal.dark .btn-blue {
   background: #3b82f6;
   color: #fff;
-  border-radius: 20px;
+  border-radius: 6px;
   padding: 5px 16px;
   font-size: 12px;
   font-weight: 600;
@@ -606,7 +606,7 @@
   background: #ffffff;
   color: #0f172a;
   border: 1px solid rgba(0,0,0,0.1);
-  border-radius: 20px;
+  border-radius: 6px;
   padding: 5px 16px;
   font-size: 12px;
   font-weight: 600;
@@ -620,7 +620,7 @@
   background: transparent;
   color: #64748b;
   border: 1px solid rgba(0,0,0,0.15);
-  border-radius: 20px;
+  border-radius: 6px;
   padding: 5px 14px;
   font-size: 12px;
   font-weight: 500;
@@ -633,7 +633,7 @@
 .investments-terminal.light .btn-blue {
   background: #2563eb;
   color: #fff;
-  border-radius: 20px;
+  border-radius: 6px;
   padding: 5px 16px;
   font-size: 12px;
   font-weight: 600;

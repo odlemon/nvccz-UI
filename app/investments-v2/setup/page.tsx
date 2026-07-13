@@ -4,7 +4,14 @@ import { Fragment, useEffect, useState } from 'react'
 import { PageHeader } from '@/components/investments-v2/page-header'
 import { StatusBadge } from '@/components/arcus/status-badge'
 import { cn } from '@/lib/utils'
-import { Plus, X, ChevronDown, ChevronRight } from 'lucide-react'
+import { Check, ChevronDown, ChevronRight, ChevronsUpDown, Download, Plus, X } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
+import { useThemeContainer } from '@/components/investments-v2/ui/use-theme-container'
+import { exportRowsToCsv } from '@/components/investments-v2/ui/export-csv'
 import { useAppDispatch, useAppSelector } from '@/lib/store'
 import { fetchUsers } from '@/lib/store/slices/adminSlice'
 import {
@@ -30,6 +37,9 @@ import {
   fetchSetupSettings,
   updateSetupSettings,
 } from '@/lib/store/slices/investmentOpsSlice'
+import { useSortedPaginated } from '@/components/investments-v2/ui/use-sorted-paginated'
+import { SortableTh } from '@/components/investments-v2/ui/sortable-th'
+import { TablePagination } from '@/components/investments-v2/ui/table-pagination'
 
 const setupTabs = ['Funds', 'System Settings', 'Brokers', 'Custodians', 'Commissions', 'Currencies', 'Countries', 'Issuers', 'Markets', 'Instrument Types', 'Price APIs']
 
@@ -67,8 +77,10 @@ export default function SetupPage() {
     setupSettings, setupSettingsSaving,
   } = useAppSelector((s) => s.investmentOps)
   const { users } = useAppSelector((s) => s.admin)
+  const { ref: rootRef, container: themeContainer } = useThemeContainer()
 
   const [activeTab, setActiveTab] = useState('System Settings')
+  const [userComboOpenFundId, setUserComboOpenFundId] = useState<string | null>(null)
 
   const [showNewFund, setShowNewFund] = useState(false)
   const [fundForm, setFundForm] = useState(NEW_FUND_EMPTY)
@@ -236,8 +248,81 @@ export default function SetupPage() {
     )
   }
 
+  type FundSortKey = 'name' | 'baseCurrency' | 'totalAmount' | 'remainingAmount' | 'status'
+  const fundsTable = useSortedPaginated<(typeof setupFunds)[number], FundSortKey>(
+    setupFunds,
+    (f, key) => {
+      if (key === 'baseCurrency') return f.listedEquityFundConfig?.baseCurrencyCode ?? ''
+      if (key === 'totalAmount') return Number(f.totalAmount)
+      if (key === 'remainingAmount') return Number(f.remainingAmount)
+      if (key === 'status') return f.status
+      return f.name
+    },
+    'name',
+    10
+  )
+
+  type StakeholderSortKey = 'name' | 'contactEmail' | 'status'
+  const brokersTable = useSortedPaginated<(typeof brokers)[number], StakeholderSortKey>(
+    brokers,
+    (b, key) => (key === 'status' ? (b.isActive ? 1 : 0) : b[key]),
+    'name',
+    10
+  )
+  const custodiansTable = useSortedPaginated<(typeof custodians)[number], StakeholderSortKey>(
+    custodians,
+    (c, key) => (key === 'status' ? (c.isActive ? 1 : 0) : c[key]),
+    'name',
+    10
+  )
+
+  type CommissionSortKey = 'stakeholder' | 'rateBps' | 'currency' | 'status'
+  const commissionsTable = useSortedPaginated<(typeof commissions)[number], CommissionSortKey>(
+    commissions,
+    (c, key) => {
+      if (key === 'stakeholder') return stakeholderName(c.stakeholderProfileId)
+      if (key === 'rateBps') return c.rateBps
+      if (key === 'currency') return c.currencyCode
+      return c.isActive ? 1 : 0
+    },
+    'stakeholder',
+    10
+  )
+
+  type CurrencySortKey = 'code' | 'name' | 'status'
+  const currenciesTable = useSortedPaginated<(typeof setupCurrencies)[number], CurrencySortKey>(
+    setupCurrencies,
+    (c, key) => (key === 'status' ? (c.isActive ? 1 : 0) : c[key]),
+    'code',
+    10
+  )
+
+  type CountrySortKey = 'countryCode' | 'countryName' | 'region'
+  const countriesTable = useSortedPaginated<(typeof countries)[number], CountrySortKey>(
+    countries,
+    (c, key) => c[key],
+    'countryName',
+    10
+  )
+
+  type IssuerSortKey = 'issuerCode' | 'legalName' | 'countryCode'
+  const issuersTable = useSortedPaginated<(typeof issuers)[number], IssuerSortKey>(
+    issuers,
+    (i, key) => i[key] ?? '',
+    'legalName',
+    10
+  )
+
+  type MarketSortKey = 'marketCode' | 'marketName' | 'countryCode'
+  const marketsTable = useSortedPaginated<(typeof markets)[number], MarketSortKey>(
+    markets,
+    (m, key) => m[key] ?? '',
+    'marketName',
+    10
+  )
+
   return (
-    <div className="flex flex-col h-full w-full">
+    <div ref={rootRef} className="flex flex-col h-full w-full">
       <PageHeader title="Setup & Administration" />
 
       <div className="flex items-center gap-4 px-4 pt-3 pb-0 border-b flex-shrink-0 overflow-x-auto" style={{ borderColor: 'var(--border)' }}>
@@ -254,9 +339,31 @@ export default function SetupPage() {
           <div className="bg-[#0D1526] border border-white/[0.06] rounded-md overflow-hidden">
             <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/[0.06]">
               <div className="text-xs font-semibold text-[#E8EDF5]">Funds</div>
-              <button onClick={() => setShowNewFund(true)} className="flex items-center gap-1.5 bg-[#2563EB] text-white text-xs font-medium px-3 py-1.5 rounded hover:bg-[#1D4ED8]">
-                <Plus className="w-3 h-3" /> New Fund
-              </button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="pill"
+                  onClick={() =>
+                    exportRowsToCsv(
+                      `funds-${new Date().toISOString().slice(0, 10)}.csv`,
+                      ['Name', 'Base Currency', 'Fund Purpose', 'Total Amount', 'Remaining', 'Status'],
+                      fundsTable.sorted.map((f) => [
+                        f.name,
+                        f.listedEquityFundConfig?.baseCurrencyCode ?? '',
+                        f.fundPurpose,
+                        f.totalAmount,
+                        f.remainingAmount,
+                        f.status,
+                      ])
+                    )
+                  }
+                >
+                  <Download className="w-3 h-3" /> Export
+                </Button>
+                <Button variant="default" size="pill" onClick={() => setShowNewFund(true)}>
+                  <Plus className="w-3 h-3" /> New Fund
+                </Button>
+              </div>
             </div>
 
             {showNewFund && (
@@ -268,25 +375,22 @@ export default function SetupPage() {
                 <div className="grid grid-cols-3 gap-3">
                   <div>
                     <label className="text-[10px] text-[#6B7A95] uppercase tracking-wider block mb-1">Name</label>
-                    <input value={fundForm.name} onChange={(e) => setFundForm((p) => ({ ...p, name: e.target.value }))}
-                      className="w-full bg-[#111C30] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#C8D3E8] outline-none focus:border-[#2563EB]/60" />
+                    <Input value={fundForm.name} onChange={(e) => setFundForm((p) => ({ ...p, name: e.target.value }))} />
                   </div>
                   <div>
                     <label className="text-[10px] text-[#6B7A95] uppercase tracking-wider block mb-1">Description</label>
-                    <input value={fundForm.description} onChange={(e) => setFundForm((p) => ({ ...p, description: e.target.value }))}
-                      className="w-full bg-[#111C30] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#C8D3E8] outline-none focus:border-[#2563EB]/60" />
+                    <Input value={fundForm.description} onChange={(e) => setFundForm((p) => ({ ...p, description: e.target.value }))} />
                   </div>
                   <div>
                     <label className="text-[10px] text-[#6B7A95] uppercase tracking-wider block mb-1">Base Currency</label>
-                    <input value={fundForm.baseCurrencyCode} onChange={(e) => setFundForm((p) => ({ ...p, baseCurrencyCode: e.target.value }))}
-                      className="w-full bg-[#111C30] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#C8D3E8] outline-none focus:border-[#2563EB]/60 font-mono" />
+                    <Input value={fundForm.baseCurrencyCode} onChange={(e) => setFundForm((p) => ({ ...p, baseCurrencyCode: e.target.value }))} className="font-mono" />
                   </div>
                 </div>
                 <div className="flex items-center justify-end gap-2 mt-3">
-                  <button onClick={() => setShowNewFund(false)} className="bg-[#111C30] text-[#A8B4C8] text-xs px-3 py-1.5 rounded border border-white/[0.06] hover:bg-[#1A2540]">Cancel</button>
-                  <button onClick={handleCreateFund} disabled={setupFundCreating} className="bg-[#2563EB] text-white text-xs font-medium px-4 py-1.5 rounded hover:bg-[#1D4ED8] disabled:opacity-50">
+                  <Button variant="outline" size="pill" onClick={() => setShowNewFund(false)}>Cancel</Button>
+                  <Button variant="default" size="pill" onClick={handleCreateFund} disabled={setupFundCreating}>
                     {setupFundCreating ? 'Saving…' : 'Save Fund'}
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}
@@ -295,16 +399,16 @@ export default function SetupPage() {
               <thead>
                 <tr>
                   <th />
-                  <th>Name</th>
-                  <th>Base Currency</th>
+                  <SortableTh col="name" label="Name" sortKey={fundsTable.sortKey} sortDir={fundsTable.sortDir} onSort={fundsTable.toggleSort} />
+                  <SortableTh col="baseCurrency" label="Base Currency" sortKey={fundsTable.sortKey} sortDir={fundsTable.sortDir} onSort={fundsTable.toggleSort} />
                   <th>Fund Purpose</th>
-                  <th className="text-right">Total Amount</th>
-                  <th className="text-right">Remaining</th>
-                  <th>Status</th>
+                  <SortableTh col="totalAmount" label="Total Amount" sortKey={fundsTable.sortKey} sortDir={fundsTable.sortDir} onSort={fundsTable.toggleSort} align="right" />
+                  <SortableTh col="remainingAmount" label="Remaining" sortKey={fundsTable.sortKey} sortDir={fundsTable.sortDir} onSort={fundsTable.toggleSort} align="right" />
+                  <SortableTh col="status" label="Status" sortKey={fundsTable.sortKey} sortDir={fundsTable.sortDir} onSort={fundsTable.toggleSort} />
                 </tr>
               </thead>
               <tbody>
-                {setupFunds.map((fund) => {
+                {fundsTable.pageRows.map((fund) => {
                   const isExpanded = expandedFundId === fund.id
                   const cfgForm = configFormByFundId[fund.id]
                   const mgrForm = managerFormByFundId[fund.id]
@@ -328,33 +432,33 @@ export default function SetupPage() {
                                 <div className="grid grid-cols-4 gap-3">
                                   <div>
                                     <label className="text-[10px] text-[#6B7A95] uppercase tracking-wider block mb-1">Base Currency</label>
-                                    <input value={cfgForm.baseCurrencyCode}
+                                    <Input value={cfgForm.baseCurrencyCode}
                                       onChange={(e) => setConfigFormByFundId((p) => ({ ...p, [fund.id]: { ...p[fund.id], baseCurrencyCode: e.target.value } }))}
-                                      className="w-full bg-[#111C30] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#C8D3E8] outline-none focus:border-[#2563EB]/60 font-mono" />
+                                      className="font-mono" />
                                   </div>
                                   <div>
                                     <label className="text-[10px] text-[#6B7A95] uppercase tracking-wider block mb-1">Trust Bank ID</label>
-                                    <input value={cfgForm.trustBankId}
+                                    <Input value={cfgForm.trustBankId}
                                       onChange={(e) => setConfigFormByFundId((p) => ({ ...p, [fund.id]: { ...p[fund.id], trustBankId: e.target.value } }))}
-                                      className="w-full bg-[#111C30] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#C8D3E8] outline-none focus:border-[#2563EB]/60 font-mono" />
+                                      className="font-mono" />
                                   </div>
                                   <div>
                                     <label className="text-[10px] text-[#6B7A95] uppercase tracking-wider block mb-1">Broker</label>
-                                    <select value={cfgForm.brokerProfileId}
-                                      onChange={(e) => setConfigFormByFundId((p) => ({ ...p, [fund.id]: { ...p[fund.id], brokerProfileId: e.target.value } }))}
-                                      className="w-full bg-[#111C30] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#C8D3E8] outline-none focus:border-[#2563EB]/60">
-                                      <option value="">—</option>
-                                      {brokers.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-                                    </select>
+                                    <Select value={cfgForm.brokerProfileId} onValueChange={(v) => setConfigFormByFundId((p) => ({ ...p, [fund.id]: { ...p[fund.id], brokerProfileId: v } }))}>
+                                      <SelectTrigger className="w-full rounded-full"><SelectValue placeholder="—" /></SelectTrigger>
+                                      <SelectContent container={themeContainer}>
+                                        {brokers.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+                                      </SelectContent>
+                                    </Select>
                                   </div>
                                   <div>
                                     <label className="text-[10px] text-[#6B7A95] uppercase tracking-wider block mb-1">Custodian</label>
-                                    <select value={cfgForm.custodianProfileId}
-                                      onChange={(e) => setConfigFormByFundId((p) => ({ ...p, [fund.id]: { ...p[fund.id], custodianProfileId: e.target.value } }))}
-                                      className="w-full bg-[#111C30] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#C8D3E8] outline-none focus:border-[#2563EB]/60">
-                                      <option value="">—</option>
-                                      {custodians.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                                    </select>
+                                    <Select value={cfgForm.custodianProfileId} onValueChange={(v) => setConfigFormByFundId((p) => ({ ...p, [fund.id]: { ...p[fund.id], custodianProfileId: v } }))}>
+                                      <SelectTrigger className="w-full rounded-full"><SelectValue placeholder="—" /></SelectTrigger>
+                                      <SelectContent container={themeContainer}>
+                                        {custodians.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                                      </SelectContent>
+                                    </Select>
                                   </div>
                                 </div>
                                 {fund.listedEquityFundConfig?.coaMappingJson && (
@@ -366,29 +470,59 @@ export default function SetupPage() {
                                   </div>
                                 )}
                                 <div className="flex justify-end mt-2">
-                                  <button onClick={() => handleSaveConfig(fund.id)} disabled={fundConfigSaving}
-                                    className="bg-[#2563EB] text-white text-[11px] font-medium px-3 py-1.5 rounded hover:bg-[#1D4ED8] disabled:opacity-50">
+                                  <Button size="sm" variant="default" className="rounded-full" onClick={() => handleSaveConfig(fund.id)} disabled={fundConfigSaving}>
                                     {fundConfigSaving ? 'Saving…' : 'Save Config'}
-                                  </button>
+                                  </Button>
                                 </div>
                               </div>
 
                               <div>
                                 <div className="text-[11px] font-semibold text-[#E8EDF5] mb-2">Assign Manager</div>
                                 <div className="flex items-center gap-2">
-                                  <select value={mgrForm.userId}
-                                    onChange={(e) => setManagerFormByFundId((p) => ({ ...p, [fund.id]: { ...p[fund.id], userId: e.target.value } }))}
-                                    className="flex-1 bg-[#111C30] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#C8D3E8] outline-none focus:border-[#2563EB]/60">
-                                    <option value="" disabled>Select user…</option>
-                                    {users.map((u) => <option key={u.id} value={u.id}>{userLabel(u)}</option>)}
-                                  </select>
-                                  <input value={mgrForm.role}
+                                  <Popover open={userComboOpenFundId === fund.id} onOpenChange={(o) => setUserComboOpenFundId(o ? fund.id : null)}>
+                                    <PopoverTrigger asChild>
+                                      <Button variant="outline" role="combobox" className="flex-1 justify-between rounded-full font-normal">
+                                        <span className="truncate">
+                                          {(() => {
+                                            const u = users.find((u) => u.id === mgrForm.userId)
+                                            return u ? userLabel(u) : 'Select user…'
+                                          })()}
+                                        </span>
+                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                      </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-[320px] p-0" align="start" container={themeContainer}>
+                                      <Command>
+                                        <CommandInput placeholder="Search users…" />
+                                        <CommandList>
+                                          <CommandEmpty>No users found.</CommandEmpty>
+                                          <CommandGroup>
+                                            {users.map((u) => (
+                                              <CommandItem
+                                                key={u.id}
+                                                value={userLabel(u)}
+                                                onSelect={() => {
+                                                  setManagerFormByFundId((p) => ({ ...p, [fund.id]: { ...p[fund.id], userId: u.id } }))
+                                                  setUserComboOpenFundId(null)
+                                                }}
+                                              >
+                                                <Check className={cn('mr-2 h-4 w-4', mgrForm.userId === u.id ? 'opacity-100' : 'opacity-0')} />
+                                                {userLabel(u)}
+                                              </CommandItem>
+                                            ))}
+                                          </CommandGroup>
+                                        </CommandList>
+                                      </Command>
+                                    </PopoverContent>
+                                  </Popover>
+                                  <Input
+                                    value={mgrForm.role}
                                     onChange={(e) => setManagerFormByFundId((p) => ({ ...p, [fund.id]: { ...p[fund.id], role: e.target.value } }))}
-                                    className="w-40 bg-[#111C30] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#C8D3E8] outline-none focus:border-[#2563EB]/60 font-mono" />
-                                  <button onClick={() => handleAssignManager(fund.id)} disabled={fundManagerAssigning}
-                                    className="bg-[#2563EB] text-white text-[11px] font-medium px-3 py-1.5 rounded hover:bg-[#1D4ED8] disabled:opacity-50 whitespace-nowrap">
+                                    className="w-40 font-mono"
+                                  />
+                                  <Button size="sm" variant="default" className="rounded-full whitespace-nowrap" onClick={() => handleAssignManager(fund.id)} disabled={fundManagerAssigning}>
                                     {fundManagerAssigning ? 'Assigning…' : 'Assign'}
-                                  </button>
+                                  </Button>
                                 </div>
                               </div>
                             </div>
@@ -410,19 +544,19 @@ export default function SetupPage() {
           <div className="bg-[#0D1526] border border-white/[0.06] rounded-md overflow-hidden">
             <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/[0.06]">
               <div className="text-xs font-semibold text-[#E8EDF5]">System Settings</div>
-              <button onClick={handleSaveSettings} disabled={setupSettingsSaving} className="text-[#60A5FA] text-[10px] hover:underline disabled:opacity-50">
+              <Button variant="outline" size="pill" onClick={handleSaveSettings} disabled={setupSettingsSaving}>
                 {setupSettingsSaving ? 'Saving…' : 'Save Changes'}
-              </button>
+              </Button>
             </div>
             <div className="divide-y divide-white/[0.04]">
               <div className="flex items-center justify-between px-4 py-3 hover:bg-white/[0.02]">
                 <div className="text-xs text-[#A8B4C8] w-56">Stale Price Threshold</div>
                 <div className="flex-1 max-w-xs flex items-center gap-2">
-                  <input
+                  <Input
                     type="number"
                     value={settingsForm.staleHours}
                     onChange={(e) => setSettingsForm((p) => ({ ...p, staleHours: e.target.value }))}
-                    className="w-24 bg-[#111C30] border border-white/[0.08] rounded px-2.5 py-1 text-xs text-[#C8D3E8] outline-none focus:border-[#2563EB]/60 font-mono"
+                    className="w-24 font-mono"
                   />
                   <span className="text-[10px] text-[#6B7A95]">hours</span>
                 </div>
@@ -441,10 +575,10 @@ export default function SetupPage() {
               </div>
               <div className="flex items-center justify-between px-4 py-3 hover:bg-white/[0.02]">
                 <div className="text-xs text-[#A8B4C8] w-56">Default Valuation Method</div>
-                <input
+                <Input
                   value={settingsForm.valuationMethod}
                   onChange={(e) => setSettingsForm((p) => ({ ...p, valuationMethod: e.target.value }))}
-                  className="flex-1 max-w-xs bg-[#111C30] border border-white/[0.08] rounded px-2.5 py-1 text-xs text-[#C8D3E8] outline-none focus:border-[#2563EB]/60 font-mono"
+                  className="flex-1 max-w-xs font-mono"
                 />
               </div>
             </div>
@@ -455,9 +589,24 @@ export default function SetupPage() {
           <div className="bg-[#0D1526] border border-white/[0.06] rounded-md overflow-hidden">
             <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/[0.06]">
               <div className="text-xs font-semibold text-[#E8EDF5]">Brokers</div>
-              <button onClick={() => setShowNewBroker(true)} className="flex items-center gap-1.5 bg-[#2563EB] text-white text-xs font-medium px-3 py-1.5 rounded hover:bg-[#1D4ED8]">
-                <Plus className="w-3 h-3" /> Add Broker
-              </button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="pill"
+                  onClick={() =>
+                    exportRowsToCsv(
+                      `brokers-${new Date().toISOString().slice(0, 10)}.csv`,
+                      ['Name', 'Contact Email', 'Delivery Mode', 'Status'],
+                      brokersTable.sorted.map((b) => [b.name, b.contactEmail, b.deliveryMode, b.isActive ? 'active' : 'inactive'])
+                    )
+                  }
+                >
+                  <Download className="w-3 h-3" /> Export
+                </Button>
+                <Button variant="default" size="pill" onClick={() => setShowNewBroker(true)}>
+                  <Plus className="w-3 h-3" /> Add Broker
+                </Button>
+              </div>
             </div>
             {showNewBroker && (
               <div className="p-4 border-b border-white/[0.06]">
@@ -468,27 +617,32 @@ export default function SetupPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-[10px] text-[#6B7A95] uppercase tracking-wider block mb-1">Name</label>
-                    <input value={brokerForm.name} onChange={(e) => setBrokerForm((p) => ({ ...p, name: e.target.value }))}
-                      className="w-full bg-[#111C30] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#C8D3E8] outline-none focus:border-[#2563EB]/60" />
+                    <Input value={brokerForm.name} onChange={(e) => setBrokerForm((p) => ({ ...p, name: e.target.value }))} />
                   </div>
                   <div>
                     <label className="text-[10px] text-[#6B7A95] uppercase tracking-wider block mb-1">Contact Email</label>
-                    <input value={brokerForm.contactEmail} onChange={(e) => setBrokerForm((p) => ({ ...p, contactEmail: e.target.value }))}
-                      className="w-full bg-[#111C30] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#C8D3E8] outline-none focus:border-[#2563EB]/60" />
+                    <Input value={brokerForm.contactEmail} onChange={(e) => setBrokerForm((p) => ({ ...p, contactEmail: e.target.value }))} />
                   </div>
                 </div>
                 <div className="flex items-center justify-end gap-2 mt-3">
-                  <button onClick={() => setShowNewBroker(false)} className="bg-[#111C30] text-[#A8B4C8] text-xs px-3 py-1.5 rounded border border-white/[0.06] hover:bg-[#1A2540]">Cancel</button>
-                  <button onClick={handleCreateBroker} disabled={brokerCreating} className="bg-[#2563EB] text-white text-xs font-medium px-4 py-1.5 rounded hover:bg-[#1D4ED8] disabled:opacity-50">
+                  <Button variant="outline" size="pill" onClick={() => setShowNewBroker(false)}>Cancel</Button>
+                  <Button variant="default" size="pill" onClick={handleCreateBroker} disabled={brokerCreating}>
                     {brokerCreating ? 'Saving…' : 'Save Broker'}
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}
             <table className="arcus-table">
-              <thead><tr><th>Name</th><th>Contact Email</th><th>Delivery Mode</th><th>Status</th></tr></thead>
+              <thead>
+                <tr>
+                  <SortableTh col="name" label="Name" sortKey={brokersTable.sortKey} sortDir={brokersTable.sortDir} onSort={brokersTable.toggleSort} />
+                  <SortableTh col="contactEmail" label="Contact Email" sortKey={brokersTable.sortKey} sortDir={brokersTable.sortDir} onSort={brokersTable.toggleSort} />
+                  <th>Delivery Mode</th>
+                  <SortableTh col="status" label="Status" sortKey={brokersTable.sortKey} sortDir={brokersTable.sortDir} onSort={brokersTable.toggleSort} />
+                </tr>
+              </thead>
               <tbody>
-                {brokers.map((b) => (
+                {brokersTable.pageRows.map((b) => (
                   <tr key={b.id}>
                     <td className="text-[#C8D3E8] font-medium">{b.name}</td>
                     <td className="text-[#A8B4C8]">{b.contactEmail}</td>
@@ -499,6 +653,7 @@ export default function SetupPage() {
                 {brokers.length === 0 && <tr><td colSpan={4} className="text-center py-8 text-[12px]" style={{ color: '#64748b' }}>No brokers configured.</td></tr>}
               </tbody>
             </table>
+            <TablePagination page={brokersTable.page} totalPages={brokersTable.totalPages} onPageChange={brokersTable.setPage} rowsShown={brokersTable.pageRows.length} totalRows={brokersTable.totalRows} />
           </div>
         )}
 
@@ -506,9 +661,24 @@ export default function SetupPage() {
           <div className="bg-[#0D1526] border border-white/[0.06] rounded-md overflow-hidden">
             <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/[0.06]">
               <div className="text-xs font-semibold text-[#E8EDF5]">Custodians</div>
-              <button onClick={() => setShowNewCustodian(true)} className="flex items-center gap-1.5 bg-[#2563EB] text-white text-xs font-medium px-3 py-1.5 rounded hover:bg-[#1D4ED8]">
-                <Plus className="w-3 h-3" /> Add Custodian
-              </button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="pill"
+                  onClick={() =>
+                    exportRowsToCsv(
+                      `custodians-${new Date().toISOString().slice(0, 10)}.csv`,
+                      ['Name', 'Contact Email', 'Delivery Mode', 'Status'],
+                      custodiansTable.sorted.map((c) => [c.name, c.contactEmail, c.deliveryMode, c.isActive ? 'active' : 'inactive'])
+                    )
+                  }
+                >
+                  <Download className="w-3 h-3" /> Export
+                </Button>
+                <Button variant="default" size="pill" onClick={() => setShowNewCustodian(true)}>
+                  <Plus className="w-3 h-3" /> Add Custodian
+                </Button>
+              </div>
             </div>
             {showNewCustodian && (
               <div className="p-4 border-b border-white/[0.06]">
@@ -519,27 +689,32 @@ export default function SetupPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-[10px] text-[#6B7A95] uppercase tracking-wider block mb-1">Name</label>
-                    <input value={custodianForm.name} onChange={(e) => setCustodianForm((p) => ({ ...p, name: e.target.value }))}
-                      className="w-full bg-[#111C30] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#C8D3E8] outline-none focus:border-[#2563EB]/60" />
+                    <Input value={custodianForm.name} onChange={(e) => setCustodianForm((p) => ({ ...p, name: e.target.value }))} />
                   </div>
                   <div>
                     <label className="text-[10px] text-[#6B7A95] uppercase tracking-wider block mb-1">Contact Email</label>
-                    <input value={custodianForm.contactEmail} onChange={(e) => setCustodianForm((p) => ({ ...p, contactEmail: e.target.value }))}
-                      className="w-full bg-[#111C30] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#C8D3E8] outline-none focus:border-[#2563EB]/60" />
+                    <Input value={custodianForm.contactEmail} onChange={(e) => setCustodianForm((p) => ({ ...p, contactEmail: e.target.value }))} />
                   </div>
                 </div>
                 <div className="flex items-center justify-end gap-2 mt-3">
-                  <button onClick={() => setShowNewCustodian(false)} className="bg-[#111C30] text-[#A8B4C8] text-xs px-3 py-1.5 rounded border border-white/[0.06] hover:bg-[#1A2540]">Cancel</button>
-                  <button onClick={handleCreateCustodian} disabled={custodianCreating} className="bg-[#2563EB] text-white text-xs font-medium px-4 py-1.5 rounded hover:bg-[#1D4ED8] disabled:opacity-50">
+                  <Button variant="outline" size="pill" onClick={() => setShowNewCustodian(false)}>Cancel</Button>
+                  <Button variant="default" size="pill" onClick={handleCreateCustodian} disabled={custodianCreating}>
                     {custodianCreating ? 'Saving…' : 'Save Custodian'}
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}
             <table className="arcus-table">
-              <thead><tr><th>Name</th><th>Contact Email</th><th>Delivery Mode</th><th>Status</th></tr></thead>
+              <thead>
+                <tr>
+                  <SortableTh col="name" label="Name" sortKey={custodiansTable.sortKey} sortDir={custodiansTable.sortDir} onSort={custodiansTable.toggleSort} />
+                  <SortableTh col="contactEmail" label="Contact Email" sortKey={custodiansTable.sortKey} sortDir={custodiansTable.sortDir} onSort={custodiansTable.toggleSort} />
+                  <th>Delivery Mode</th>
+                  <SortableTh col="status" label="Status" sortKey={custodiansTable.sortKey} sortDir={custodiansTable.sortDir} onSort={custodiansTable.toggleSort} />
+                </tr>
+              </thead>
               <tbody>
-                {custodians.map((c) => (
+                {custodiansTable.pageRows.map((c) => (
                   <tr key={c.id}>
                     <td className="text-[#C8D3E8] font-medium">{c.name}</td>
                     <td className="text-[#A8B4C8]">{c.contactEmail}</td>
@@ -550,6 +725,7 @@ export default function SetupPage() {
                 {custodians.length === 0 && <tr><td colSpan={4} className="text-center py-8 text-[12px]" style={{ color: '#64748b' }}>No custodians configured.</td></tr>}
               </tbody>
             </table>
+            <TablePagination page={custodiansTable.page} totalPages={custodiansTable.totalPages} onPageChange={custodiansTable.setPage} rowsShown={custodiansTable.pageRows.length} totalRows={custodiansTable.totalRows} />
           </div>
         )}
 
@@ -557,9 +733,31 @@ export default function SetupPage() {
           <div className="bg-[#0D1526] border border-white/[0.06] rounded-md overflow-hidden">
             <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/[0.06]">
               <div className="text-xs font-semibold text-[#E8EDF5]">Commission Rates</div>
-              <button onClick={() => setShowNewCommission(true)} className="flex items-center gap-1.5 bg-[#2563EB] text-white text-xs font-medium px-3 py-1.5 rounded hover:bg-[#1D4ED8]">
-                <Plus className="w-3 h-3" /> Add Commission
-              </button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="pill"
+                  onClick={() =>
+                    exportRowsToCsv(
+                      `commissions-${new Date().toISOString().slice(0, 10)}.csv`,
+                      ['Stakeholder', 'Instrument Type', 'Rate (bps)', 'Flat Fee', 'Currency', 'Status'],
+                      commissionsTable.sorted.map((c) => [
+                        stakeholderName(c.stakeholderProfileId),
+                        c.instrumentTypeCode ?? 'All',
+                        c.rateBps,
+                        c.flatFee ?? '',
+                        c.currencyCode,
+                        c.isActive ? 'active' : 'inactive',
+                      ])
+                    )
+                  }
+                >
+                  <Download className="w-3 h-3" /> Export
+                </Button>
+                <Button variant="default" size="pill" onClick={() => setShowNewCommission(true)}>
+                  <Plus className="w-3 h-3" /> Add Commission
+                </Button>
+              </div>
             </div>
             {showNewCommission && (
               <div className="p-4 border-b border-white/[0.06]">
@@ -570,30 +768,39 @@ export default function SetupPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-[10px] text-[#6B7A95] uppercase tracking-wider block mb-1">Stakeholder</label>
-                    <select value={commissionForm.stakeholderProfileId} onChange={(e) => setCommissionForm((p) => ({ ...p, stakeholderProfileId: e.target.value }))}
-                      className="w-full bg-[#111C30] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#C8D3E8] outline-none focus:border-[#2563EB]/60">
-                      <option value="" disabled>Select stakeholder…</option>
-                      {stakeholders.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.profileType})</option>)}
-                    </select>
+                    <Select value={commissionForm.stakeholderProfileId} onValueChange={(v) => setCommissionForm((p) => ({ ...p, stakeholderProfileId: v }))}>
+                      <SelectTrigger className="w-full rounded-full"><SelectValue placeholder="Select stakeholder…" /></SelectTrigger>
+                      <SelectContent container={themeContainer}>
+                        {stakeholders.map((s) => <SelectItem key={s.id} value={s.id}>{s.name} ({s.profileType})</SelectItem>)}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div>
                     <label className="text-[10px] text-[#6B7A95] uppercase tracking-wider block mb-1">Rate (bps)</label>
-                    <input type="number" value={commissionForm.rateBps} onChange={(e) => setCommissionForm((p) => ({ ...p, rateBps: e.target.value }))}
-                      className="w-full bg-[#111C30] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#C8D3E8] outline-none focus:border-[#2563EB]/60 font-mono" />
+                    <Input type="number" value={commissionForm.rateBps} onChange={(e) => setCommissionForm((p) => ({ ...p, rateBps: e.target.value }))} className="font-mono" />
                   </div>
                 </div>
                 <div className="flex items-center justify-end gap-2 mt-3">
-                  <button onClick={() => setShowNewCommission(false)} className="bg-[#111C30] text-[#A8B4C8] text-xs px-3 py-1.5 rounded border border-white/[0.06] hover:bg-[#1A2540]">Cancel</button>
-                  <button onClick={handleCreateCommission} disabled={commissionCreating} className="bg-[#2563EB] text-white text-xs font-medium px-4 py-1.5 rounded hover:bg-[#1D4ED8] disabled:opacity-50">
+                  <Button variant="outline" size="pill" onClick={() => setShowNewCommission(false)}>Cancel</Button>
+                  <Button variant="default" size="pill" onClick={handleCreateCommission} disabled={commissionCreating}>
                     {commissionCreating ? 'Saving…' : 'Save Commission'}
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}
             <table className="arcus-table">
-              <thead><tr><th>Stakeholder</th><th>Instrument Type</th><th className="text-right">Rate (bps)</th><th className="text-right">Flat Fee</th><th>Currency</th><th>Status</th></tr></thead>
+              <thead>
+                <tr>
+                  <SortableTh col="stakeholder" label="Stakeholder" sortKey={commissionsTable.sortKey} sortDir={commissionsTable.sortDir} onSort={commissionsTable.toggleSort} />
+                  <th>Instrument Type</th>
+                  <SortableTh col="rateBps" label="Rate (bps)" sortKey={commissionsTable.sortKey} sortDir={commissionsTable.sortDir} onSort={commissionsTable.toggleSort} align="right" />
+                  <th className="text-right">Flat Fee</th>
+                  <SortableTh col="currency" label="Currency" sortKey={commissionsTable.sortKey} sortDir={commissionsTable.sortDir} onSort={commissionsTable.toggleSort} />
+                  <SortableTh col="status" label="Status" sortKey={commissionsTable.sortKey} sortDir={commissionsTable.sortDir} onSort={commissionsTable.toggleSort} />
+                </tr>
+              </thead>
               <tbody>
-                {commissions.map((c) => (
+                {commissionsTable.pageRows.map((c) => (
                   <tr key={c.id}>
                     <td className="text-[#C8D3E8]">{stakeholderName(c.stakeholderProfileId)}</td>
                     <td className="text-[#6B7A95]">{c.instrumentTypeCode ?? 'All'}</td>
@@ -606,6 +813,7 @@ export default function SetupPage() {
                 {commissions.length === 0 && <tr><td colSpan={6} className="text-center py-8 text-[12px]" style={{ color: '#64748b' }}>No commission rates configured.</td></tr>}
               </tbody>
             </table>
+            <TablePagination page={commissionsTable.page} totalPages={commissionsTable.totalPages} onPageChange={commissionsTable.setPage} rowsShown={commissionsTable.pageRows.length} totalRows={commissionsTable.totalRows} />
           </div>
         )}
 
@@ -613,9 +821,24 @@ export default function SetupPage() {
           <div className="bg-[#0D1526] border border-white/[0.06] rounded-md overflow-hidden">
             <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/[0.06]">
               <div className="text-xs font-semibold text-[#E8EDF5]">Currencies</div>
-              <button onClick={() => setShowNewCurrency(true)} className="flex items-center gap-1.5 bg-[#2563EB] text-white text-xs font-medium px-3 py-1.5 rounded hover:bg-[#1D4ED8]">
-                <Plus className="w-3 h-3" /> Add Currency
-              </button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="pill"
+                  onClick={() =>
+                    exportRowsToCsv(
+                      `currencies-${new Date().toISOString().slice(0, 10)}.csv`,
+                      ['Code', 'Name', 'Symbol', 'Default', 'Status'],
+                      currenciesTable.sorted.map((c) => [c.code, c.name, c.symbol, c.isDefault ? 'Yes' : '', c.isActive ? 'active' : 'inactive'])
+                    )
+                  }
+                >
+                  <Download className="w-3 h-3" /> Export
+                </Button>
+                <Button variant="default" size="pill" onClick={() => setShowNewCurrency(true)}>
+                  <Plus className="w-3 h-3" /> Add Currency
+                </Button>
+              </div>
             </div>
             {showNewCurrency && (
               <div className="p-4 border-b border-white/[0.06]">
@@ -626,32 +849,37 @@ export default function SetupPage() {
                 <div className="grid grid-cols-3 gap-3">
                   <div>
                     <label className="text-[10px] text-[#6B7A95] uppercase tracking-wider block mb-1">Code</label>
-                    <input value={currencyForm.code} onChange={(e) => setCurrencyForm((p) => ({ ...p, code: e.target.value }))}
-                      className="w-full bg-[#111C30] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#C8D3E8] outline-none focus:border-[#2563EB]/60 font-mono" />
+                    <Input value={currencyForm.code} onChange={(e) => setCurrencyForm((p) => ({ ...p, code: e.target.value }))} className="font-mono" />
                   </div>
                   <div>
                     <label className="text-[10px] text-[#6B7A95] uppercase tracking-wider block mb-1">Name</label>
-                    <input value={currencyForm.name} onChange={(e) => setCurrencyForm((p) => ({ ...p, name: e.target.value }))}
-                      className="w-full bg-[#111C30] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#C8D3E8] outline-none focus:border-[#2563EB]/60" />
+                    <Input value={currencyForm.name} onChange={(e) => setCurrencyForm((p) => ({ ...p, name: e.target.value }))} />
                   </div>
                   <div>
                     <label className="text-[10px] text-[#6B7A95] uppercase tracking-wider block mb-1">Symbol</label>
-                    <input value={currencyForm.symbol} onChange={(e) => setCurrencyForm((p) => ({ ...p, symbol: e.target.value }))}
-                      className="w-full bg-[#111C30] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#C8D3E8] outline-none focus:border-[#2563EB]/60 font-mono" />
+                    <Input value={currencyForm.symbol} onChange={(e) => setCurrencyForm((p) => ({ ...p, symbol: e.target.value }))} className="font-mono" />
                   </div>
                 </div>
                 <div className="flex items-center justify-end gap-2 mt-3">
-                  <button onClick={() => setShowNewCurrency(false)} className="bg-[#111C30] text-[#A8B4C8] text-xs px-3 py-1.5 rounded border border-white/[0.06] hover:bg-[#1A2540]">Cancel</button>
-                  <button onClick={handleCreateCurrency} disabled={setupCurrencyCreating} className="bg-[#2563EB] text-white text-xs font-medium px-4 py-1.5 rounded hover:bg-[#1D4ED8] disabled:opacity-50">
+                  <Button variant="outline" size="pill" onClick={() => setShowNewCurrency(false)}>Cancel</Button>
+                  <Button variant="default" size="pill" onClick={handleCreateCurrency} disabled={setupCurrencyCreating}>
                     {setupCurrencyCreating ? 'Saving…' : 'Save Currency'}
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}
             <table className="arcus-table">
-              <thead><tr><th>Code</th><th>Name</th><th>Symbol</th><th>Default</th><th>Status</th></tr></thead>
+              <thead>
+                <tr>
+                  <SortableTh col="code" label="Code" sortKey={currenciesTable.sortKey} sortDir={currenciesTable.sortDir} onSort={currenciesTable.toggleSort} />
+                  <SortableTh col="name" label="Name" sortKey={currenciesTable.sortKey} sortDir={currenciesTable.sortDir} onSort={currenciesTable.toggleSort} />
+                  <th>Symbol</th>
+                  <th>Default</th>
+                  <SortableTh col="status" label="Status" sortKey={currenciesTable.sortKey} sortDir={currenciesTable.sortDir} onSort={currenciesTable.toggleSort} />
+                </tr>
+              </thead>
               <tbody>
-                {setupCurrencies.map((c) => (
+                {currenciesTable.pageRows.map((c) => (
                   <tr key={c.id}>
                     <td className="text-[#60A5FA] font-mono font-bold">{c.code}</td>
                     <td className="text-[#C8D3E8] font-medium">{c.name}</td>
@@ -663,6 +891,7 @@ export default function SetupPage() {
                 {setupCurrencies.length === 0 && <tr><td colSpan={5} className="text-center py-8 text-[12px]" style={{ color: '#64748b' }}>No currencies configured.</td></tr>}
               </tbody>
             </table>
+            <TablePagination page={currenciesTable.page} totalPages={currenciesTable.totalPages} onPageChange={currenciesTable.setPage} rowsShown={currenciesTable.pageRows.length} totalRows={currenciesTable.totalRows} />
           </div>
         )}
 
@@ -670,9 +899,24 @@ export default function SetupPage() {
           <div className="bg-[#0D1526] border border-white/[0.06] rounded-md overflow-hidden">
             <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/[0.06]">
               <div className="text-xs font-semibold text-[#E8EDF5]">Countries</div>
-              <button onClick={() => setShowNewCountry(true)} className="flex items-center gap-1.5 bg-[#2563EB] text-white text-xs font-medium px-3 py-1.5 rounded hover:bg-[#1D4ED8]">
-                <Plus className="w-3 h-3" /> Add Country
-              </button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="pill"
+                  onClick={() =>
+                    exportRowsToCsv(
+                      `countries-${new Date().toISOString().slice(0, 10)}.csv`,
+                      ['Code', 'Name', 'Region', 'Status'],
+                      countriesTable.sorted.map((c) => [c.countryCode, c.countryName, c.region, c.isActive ? 'active' : 'inactive'])
+                    )
+                  }
+                >
+                  <Download className="w-3 h-3" /> Export
+                </Button>
+                <Button variant="default" size="pill" onClick={() => setShowNewCountry(true)}>
+                  <Plus className="w-3 h-3" /> Add Country
+                </Button>
+              </div>
             </div>
             {showNewCountry && (
               <div className="p-4 border-b border-white/[0.06]">
@@ -683,32 +927,36 @@ export default function SetupPage() {
                 <div className="grid grid-cols-3 gap-3">
                   <div>
                     <label className="text-[10px] text-[#6B7A95] uppercase tracking-wider block mb-1">Country Code</label>
-                    <input value={countryForm.countryCode} onChange={(e) => setCountryForm((p) => ({ ...p, countryCode: e.target.value }))}
-                      className="w-full bg-[#111C30] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#C8D3E8] outline-none focus:border-[#2563EB]/60 font-mono" />
+                    <Input value={countryForm.countryCode} onChange={(e) => setCountryForm((p) => ({ ...p, countryCode: e.target.value }))} className="font-mono" />
                   </div>
                   <div>
                     <label className="text-[10px] text-[#6B7A95] uppercase tracking-wider block mb-1">Country Name</label>
-                    <input value={countryForm.countryName} onChange={(e) => setCountryForm((p) => ({ ...p, countryName: e.target.value }))}
-                      className="w-full bg-[#111C30] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#C8D3E8] outline-none focus:border-[#2563EB]/60" />
+                    <Input value={countryForm.countryName} onChange={(e) => setCountryForm((p) => ({ ...p, countryName: e.target.value }))} />
                   </div>
                   <div>
                     <label className="text-[10px] text-[#6B7A95] uppercase tracking-wider block mb-1">Region</label>
-                    <input value={countryForm.region} onChange={(e) => setCountryForm((p) => ({ ...p, region: e.target.value }))}
-                      className="w-full bg-[#111C30] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#C8D3E8] outline-none focus:border-[#2563EB]/60" />
+                    <Input value={countryForm.region} onChange={(e) => setCountryForm((p) => ({ ...p, region: e.target.value }))} />
                   </div>
                 </div>
                 <div className="flex items-center justify-end gap-2 mt-3">
-                  <button onClick={() => setShowNewCountry(false)} className="bg-[#111C30] text-[#A8B4C8] text-xs px-3 py-1.5 rounded border border-white/[0.06] hover:bg-[#1A2540]">Cancel</button>
-                  <button onClick={handleCreateCountry} disabled={countryCreating} className="bg-[#2563EB] text-white text-xs font-medium px-4 py-1.5 rounded hover:bg-[#1D4ED8] disabled:opacity-50">
+                  <Button variant="outline" size="pill" onClick={() => setShowNewCountry(false)}>Cancel</Button>
+                  <Button variant="default" size="pill" onClick={handleCreateCountry} disabled={countryCreating}>
                     {countryCreating ? 'Saving…' : 'Save Country'}
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}
             <table className="arcus-table">
-              <thead><tr><th>Code</th><th>Name</th><th>Region</th><th>Status</th></tr></thead>
+              <thead>
+                <tr>
+                  <SortableTh col="countryCode" label="Code" sortKey={countriesTable.sortKey} sortDir={countriesTable.sortDir} onSort={countriesTable.toggleSort} />
+                  <SortableTh col="countryName" label="Name" sortKey={countriesTable.sortKey} sortDir={countriesTable.sortDir} onSort={countriesTable.toggleSort} />
+                  <SortableTh col="region" label="Region" sortKey={countriesTable.sortKey} sortDir={countriesTable.sortDir} onSort={countriesTable.toggleSort} />
+                  <th>Status</th>
+                </tr>
+              </thead>
               <tbody>
-                {countries.map((c) => (
+                {countriesTable.pageRows.map((c) => (
                   <tr key={c.id}>
                     <td className="text-[#60A5FA] font-mono font-bold">{c.countryCode}</td>
                     <td className="text-[#C8D3E8] font-medium">{c.countryName}</td>
@@ -719,6 +967,7 @@ export default function SetupPage() {
                 {countries.length === 0 && <tr><td colSpan={4} className="text-center py-8 text-[12px]" style={{ color: '#64748b' }}>No countries configured.</td></tr>}
               </tbody>
             </table>
+            <TablePagination page={countriesTable.page} totalPages={countriesTable.totalPages} onPageChange={countriesTable.setPage} rowsShown={countriesTable.pageRows.length} totalRows={countriesTable.totalRows} />
           </div>
         )}
 
@@ -727,17 +976,28 @@ export default function SetupPage() {
             <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/[0.06]">
               <div className="text-xs font-semibold text-[#E8EDF5]">Issuers</div>
               <div className="flex items-center gap-2">
-                <select
-                  value={issuerCountryFilter}
-                  onChange={(e) => setIssuerCountryFilter(e.target.value)}
-                  className="bg-[#111C30] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#C8D3E8] outline-none focus:border-[#2563EB]/60"
+                <Select value={issuerCountryFilter} onValueChange={setIssuerCountryFilter}>
+                  <SelectTrigger className="w-44 rounded-full"><SelectValue placeholder="Select country…" /></SelectTrigger>
+                  <SelectContent container={themeContainer}>
+                    {countries.map((c) => <SelectItem key={c.id} value={c.countryCode}>{c.countryName} ({c.countryCode})</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="outline"
+                  size="pill"
+                  onClick={() =>
+                    exportRowsToCsv(
+                      `issuers-${new Date().toISOString().slice(0, 10)}.csv`,
+                      ['Code', 'Legal Name', 'Country', 'Sector', 'Status'],
+                      issuersTable.sorted.map((i) => [i.issuerCode, i.legalName, i.countryCode, i.sector ?? '', i.isActive ? 'active' : 'inactive'])
+                    )
+                  }
                 >
-                  <option value="" disabled>Select country…</option>
-                  {countries.map((c) => <option key={c.id} value={c.countryCode}>{c.countryName} ({c.countryCode})</option>)}
-                </select>
-                <button onClick={() => setShowNewIssuer(true)} className="flex items-center gap-1.5 bg-[#2563EB] text-white text-xs font-medium px-3 py-1.5 rounded hover:bg-[#1D4ED8]">
+                  <Download className="w-3 h-3" /> Export
+                </Button>
+                <Button variant="default" size="pill" onClick={() => setShowNewIssuer(true)}>
                   <Plus className="w-3 h-3" /> Add Issuer
-                </button>
+                </Button>
               </div>
             </div>
             {showNewIssuer && (
@@ -749,35 +1009,42 @@ export default function SetupPage() {
                 <div className="grid grid-cols-3 gap-3">
                   <div>
                     <label className="text-[10px] text-[#6B7A95] uppercase tracking-wider block mb-1">Issuer Code</label>
-                    <input value={issuerForm.issuerCode} onChange={(e) => setIssuerForm((p) => ({ ...p, issuerCode: e.target.value }))}
-                      className="w-full bg-[#111C30] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#C8D3E8] outline-none focus:border-[#2563EB]/60 font-mono" />
+                    <Input value={issuerForm.issuerCode} onChange={(e) => setIssuerForm((p) => ({ ...p, issuerCode: e.target.value }))} className="font-mono" />
                   </div>
                   <div>
                     <label className="text-[10px] text-[#6B7A95] uppercase tracking-wider block mb-1">Legal Name</label>
-                    <input value={issuerForm.legalName} onChange={(e) => setIssuerForm((p) => ({ ...p, legalName: e.target.value }))}
-                      className="w-full bg-[#111C30] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#C8D3E8] outline-none focus:border-[#2563EB]/60" />
+                    <Input value={issuerForm.legalName} onChange={(e) => setIssuerForm((p) => ({ ...p, legalName: e.target.value }))} />
                   </div>
                   <div>
                     <label className="text-[10px] text-[#6B7A95] uppercase tracking-wider block mb-1">Country</label>
-                    <select value={issuerForm.countryCode} onChange={(e) => setIssuerForm((p) => ({ ...p, countryCode: e.target.value }))}
-                      className="w-full bg-[#111C30] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#C8D3E8] outline-none focus:border-[#2563EB]/60">
-                      <option value="" disabled>Select country…</option>
-                      {countries.map((c) => <option key={c.id} value={c.countryCode}>{c.countryName} ({c.countryCode})</option>)}
-                    </select>
+                    <Select value={issuerForm.countryCode} onValueChange={(v) => setIssuerForm((p) => ({ ...p, countryCode: v }))}>
+                      <SelectTrigger className="w-full rounded-full"><SelectValue placeholder="Select country…" /></SelectTrigger>
+                      <SelectContent container={themeContainer}>
+                        {countries.map((c) => <SelectItem key={c.id} value={c.countryCode}>{c.countryName} ({c.countryCode})</SelectItem>)}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
                 <div className="flex items-center justify-end gap-2 mt-3">
-                  <button onClick={() => setShowNewIssuer(false)} className="bg-[#111C30] text-[#A8B4C8] text-xs px-3 py-1.5 rounded border border-white/[0.06] hover:bg-[#1A2540]">Cancel</button>
-                  <button onClick={handleCreateIssuer} disabled={issuerCreating} className="bg-[#2563EB] text-white text-xs font-medium px-4 py-1.5 rounded hover:bg-[#1D4ED8] disabled:opacity-50">
+                  <Button variant="outline" size="pill" onClick={() => setShowNewIssuer(false)}>Cancel</Button>
+                  <Button variant="default" size="pill" onClick={handleCreateIssuer} disabled={issuerCreating}>
                     {issuerCreating ? 'Saving…' : 'Save Issuer'}
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}
             <table className="arcus-table">
-              <thead><tr><th>Code</th><th>Legal Name</th><th>Country</th><th>Sector</th><th>Status</th></tr></thead>
+              <thead>
+                <tr>
+                  <SortableTh col="issuerCode" label="Code" sortKey={issuersTable.sortKey} sortDir={issuersTable.sortDir} onSort={issuersTable.toggleSort} />
+                  <SortableTh col="legalName" label="Legal Name" sortKey={issuersTable.sortKey} sortDir={issuersTable.sortDir} onSort={issuersTable.toggleSort} />
+                  <SortableTh col="countryCode" label="Country" sortKey={issuersTable.sortKey} sortDir={issuersTable.sortDir} onSort={issuersTable.toggleSort} />
+                  <th>Sector</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
               <tbody>
-                {issuers.map((i) => (
+                {issuersTable.pageRows.map((i) => (
                   <tr key={i.id}>
                     <td className="text-[#60A5FA] font-mono font-bold">{i.issuerCode}</td>
                     <td className="text-[#C8D3E8] font-medium">{i.legalName}</td>
@@ -793,6 +1060,7 @@ export default function SetupPage() {
                 )}
               </tbody>
             </table>
+            <TablePagination page={issuersTable.page} totalPages={issuersTable.totalPages} onPageChange={issuersTable.setPage} rowsShown={issuersTable.pageRows.length} totalRows={issuersTable.totalRows} />
           </div>
         )}
 
@@ -800,9 +1068,24 @@ export default function SetupPage() {
           <div className="bg-[#0D1526] border border-white/[0.06] rounded-md overflow-hidden">
             <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/[0.06]">
               <div className="text-xs font-semibold text-[#E8EDF5]">Markets</div>
-              <button onClick={() => setShowNewMarket(true)} className="flex items-center gap-1.5 bg-[#2563EB] text-white text-xs font-medium px-3 py-1.5 rounded hover:bg-[#1D4ED8]">
-                <Plus className="w-3 h-3" /> Add Market
-              </button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="pill"
+                  onClick={() =>
+                    exportRowsToCsv(
+                      `markets-${new Date().toISOString().slice(0, 10)}.csv`,
+                      ['Code', 'Name', 'Country', 'Exchange Code', 'Status'],
+                      marketsTable.sorted.map((m) => [m.marketCode, m.marketName, m.countryCode, m.exchangeCode ?? '', m.isActive ? 'active' : 'inactive'])
+                    )
+                  }
+                >
+                  <Download className="w-3 h-3" /> Export
+                </Button>
+                <Button variant="default" size="pill" onClick={() => setShowNewMarket(true)}>
+                  <Plus className="w-3 h-3" /> Add Market
+                </Button>
+              </div>
             </div>
             {showNewMarket && (
               <div className="p-4 border-b border-white/[0.06]">
@@ -813,32 +1096,37 @@ export default function SetupPage() {
                 <div className="grid grid-cols-3 gap-3">
                   <div>
                     <label className="text-[10px] text-[#6B7A95] uppercase tracking-wider block mb-1">Market Code</label>
-                    <input value={marketForm.marketCode} onChange={(e) => setMarketForm((p) => ({ ...p, marketCode: e.target.value }))}
-                      className="w-full bg-[#111C30] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#C8D3E8] outline-none focus:border-[#2563EB]/60 font-mono" />
+                    <Input value={marketForm.marketCode} onChange={(e) => setMarketForm((p) => ({ ...p, marketCode: e.target.value }))} className="font-mono" />
                   </div>
                   <div>
                     <label className="text-[10px] text-[#6B7A95] uppercase tracking-wider block mb-1">Market Name</label>
-                    <input value={marketForm.marketName} onChange={(e) => setMarketForm((p) => ({ ...p, marketName: e.target.value }))}
-                      className="w-full bg-[#111C30] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#C8D3E8] outline-none focus:border-[#2563EB]/60" />
+                    <Input value={marketForm.marketName} onChange={(e) => setMarketForm((p) => ({ ...p, marketName: e.target.value }))} />
                   </div>
                   <div>
                     <label className="text-[10px] text-[#6B7A95] uppercase tracking-wider block mb-1">Country Code</label>
-                    <input value={marketForm.countryCode} onChange={(e) => setMarketForm((p) => ({ ...p, countryCode: e.target.value }))}
-                      className="w-full bg-[#111C30] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#C8D3E8] outline-none focus:border-[#2563EB]/60 font-mono" />
+                    <Input value={marketForm.countryCode} onChange={(e) => setMarketForm((p) => ({ ...p, countryCode: e.target.value }))} className="font-mono" />
                   </div>
                 </div>
                 <div className="flex items-center justify-end gap-2 mt-3">
-                  <button onClick={() => setShowNewMarket(false)} className="bg-[#111C30] text-[#A8B4C8] text-xs px-3 py-1.5 rounded border border-white/[0.06] hover:bg-[#1A2540]">Cancel</button>
-                  <button onClick={handleCreateMarket} disabled={marketCreating} className="bg-[#2563EB] text-white text-xs font-medium px-4 py-1.5 rounded hover:bg-[#1D4ED8] disabled:opacity-50">
+                  <Button variant="outline" size="pill" onClick={() => setShowNewMarket(false)}>Cancel</Button>
+                  <Button variant="default" size="pill" onClick={handleCreateMarket} disabled={marketCreating}>
                     {marketCreating ? 'Saving…' : 'Save Market'}
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}
             <table className="arcus-table">
-              <thead><tr><th>Code</th><th>Name</th><th>Country</th><th>Exchange Code</th><th>Status</th></tr></thead>
+              <thead>
+                <tr>
+                  <SortableTh col="marketCode" label="Code" sortKey={marketsTable.sortKey} sortDir={marketsTable.sortDir} onSort={marketsTable.toggleSort} />
+                  <SortableTh col="marketName" label="Name" sortKey={marketsTable.sortKey} sortDir={marketsTable.sortDir} onSort={marketsTable.toggleSort} />
+                  <SortableTh col="countryCode" label="Country" sortKey={marketsTable.sortKey} sortDir={marketsTable.sortDir} onSort={marketsTable.toggleSort} />
+                  <th>Exchange Code</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
               <tbody>
-                {markets.map((m) => (
+                {marketsTable.pageRows.map((m) => (
                   <tr key={m.id}>
                     <td className="text-[#60A5FA] font-mono font-bold">{m.marketCode}</td>
                     <td className="text-[#C8D3E8] font-medium">{m.marketName}</td>
@@ -850,6 +1138,7 @@ export default function SetupPage() {
                 {markets.length === 0 && <tr><td colSpan={5} className="text-center py-8 text-[12px]" style={{ color: '#64748b' }}>No markets configured.</td></tr>}
               </tbody>
             </table>
+            <TablePagination page={marketsTable.page} totalPages={marketsTable.totalPages} onPageChange={marketsTable.setPage} rowsShown={marketsTable.pageRows.length} totalRows={marketsTable.totalRows} />
           </div>
         )}
 
@@ -900,9 +1189,9 @@ export default function SetupPage() {
           <div className="bg-[#0D1526] border border-white/[0.06] rounded-md overflow-hidden">
             <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/[0.06]">
               <div className="text-xs font-semibold text-[#E8EDF5]">Instrument Types</div>
-              <button className="flex items-center gap-1.5 bg-[#2563EB] text-white text-xs font-medium px-3 py-1.5 rounded hover:bg-[#1D4ED8]">
+              <Button variant="default" size="pill">
                 <Plus className="w-3 h-3" /> Add Type
-              </button>
+              </Button>
             </div>
             {/* Category pills */}
             <div className="flex flex-wrap gap-2 px-4 py-3 border-b border-white/[0.04]">

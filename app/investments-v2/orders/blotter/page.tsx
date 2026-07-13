@@ -1,11 +1,11 @@
 'use client'
 
-import { Fragment, useEffect, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { Topbar } from '@/components/arcus/topbar'
 import { StatusBadge } from '@/components/arcus/status-badge'
 import { OrdersSubNav } from '@/components/investments-v2/orders-subnav'
 import { cn } from '@/lib/utils'
-import { Plus, Filter, Download, X, ChevronDown, ChevronRight } from 'lucide-react'
+import { Plus, Download, X, ChevronDown, ChevronRight } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '@/lib/store'
 import {
   fetchPortfolios,
@@ -18,6 +18,18 @@ import {
 } from '@/lib/store/slices/investmentOpsSlice'
 import { investmentOpsApi } from '@/lib/api/investment-ops-api'
 import type { RoutingHop } from '@/lib/api/investments-api'
+import { useSortedPaginated } from '@/components/investments-v2/ui/use-sorted-paginated'
+import { SortableTh } from '@/components/investments-v2/ui/sortable-th'
+import { TablePagination } from '@/components/investments-v2/ui/table-pagination'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { DatePicker } from '@/components/ui/date-picker'
+import { useThemeContainer } from '@/components/investments-v2/ui/use-theme-container'
+import { exportRowsToCsv } from '@/components/investments-v2/ui/export-csv'
+import { ConfirmDialog } from '@/components/investments-v2/ui/confirm-dialog'
+
+type TradeSortKey = 'tradeRef' | 'ticker' | 'side' | 'quantity' | 'netConsideration' | 'executedAt'
 
 function settlementBadgeStatus(s: string) {
   if (s === 'SETTLED') return 'settled'
@@ -72,11 +84,21 @@ export default function TradeBlotterPage() {
     hopActionLoadingById,
     tradeRoutingHopsLoadingById,
   } = useAppSelector((s) => s.investmentOps)
+  const { ref: rootRef, container: themeContainer } = useThemeContainer()
+
   const [showNewOrder, setShowNewOrder] = useState(false)
   const [formData, setFormData] = useState(newOrderFields)
   const [expandedTradeId, setExpandedTradeId] = useState<string | null>(null)
   const [settlementErrorById, setSettlementErrorById] = useState<Record<string, string>>({})
   const [settlementDownloadingById, setSettlementDownloadingById] = useState<Record<string, boolean>>({})
+
+  const [searchText, setSearchText] = useState('')
+  const [sideFilter, setSideFilter] = useState('All')
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined)
+  const [dateTo, setDateTo] = useState<Date | undefined>(undefined)
+
+  const [executeConfirm, setExecuteConfirm] = useState<{ id: string; tradeRef: string } | null>(null)
+  const [cancelHopConfirm, setCancelHopConfirm] = useState<{ tradeId: string; hopId: string; target: string } | null>(null)
 
   useEffect(() => {
     dispatch(fetchPortfolios())
@@ -84,6 +106,39 @@ export default function TradeBlotterPage() {
   }, [dispatch])
 
   const fundName = (fundId: string) => portfolios.find((f) => f.id === fundId)?.name ?? '—'
+
+  const filteredTrades = useMemo(() => {
+    const q = searchText.trim().toLowerCase()
+    return opsTrades.filter((t) => {
+      if (sideFilter !== 'All' && t.side !== sideFilter) return false
+      if (t.executedAt) {
+        const executed = new Date(t.executedAt)
+        if (dateFrom && executed < dateFrom) return false
+        if (dateTo && executed > new Date(dateTo.getTime() + 24 * 60 * 60 * 1000 - 1)) return false
+      }
+      if (q) {
+        const haystack = [t.tradeRef, t.security?.symbol ?? '', t.security?.name ?? ''].join(' ').toLowerCase()
+        if (!haystack.includes(q)) return false
+      }
+      return true
+    })
+  }, [opsTrades, searchText, sideFilter, dateFrom, dateTo])
+
+  const getTradeSortValue = (t: (typeof opsTrades)[number], key: TradeSortKey) => {
+    if (key === 'ticker') return t.security?.symbol ?? ''
+    if (key === 'executedAt') return t.executedAt ? new Date(t.executedAt).getTime() : 0
+    return t[key] as string | number
+  }
+  const {
+    pageRows: tradeRows,
+    sortKey: tradeSortKey,
+    sortDir: tradeSortDir,
+    toggleSort: toggleTradeSort,
+    page: tradePage,
+    setPage: setTradePage,
+    totalPages: tradeTotalPages,
+    totalRows: tradeTotalRows,
+  } = useSortedPaginated<(typeof opsTrades)[number], TradeSortKey>(filteredTrades, getTradeSortValue, 'executedAt', 15)
 
   const toggleTrade = (id: string) => {
     if (expandedTradeId === id) {
@@ -118,29 +173,64 @@ export default function TradeBlotterPage() {
     }
   }
 
+  const handleExport = () => {
+    exportRowsToCsv(
+      `blotter-${new Date().toISOString().slice(0, 10)}.csv`,
+      ['Trade ID', 'Portfolio', 'Ticker', 'Side', 'Qty', 'Exec Price', 'Gross', 'Fees', 'Net', 'Trade Date'],
+      filteredTrades.map((t) => [
+        t.tradeRef,
+        fundName(t.fundId),
+        t.security?.symbol ?? '',
+        t.side,
+        t.quantity,
+        t.executionPrice,
+        t.grossConsideration,
+        t.fees,
+        t.netConsideration,
+        t.executedAt ? new Date(t.executedAt).toLocaleDateString() : '',
+      ])
+    )
+  }
+
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div ref={rootRef} className="flex flex-col h-full overflow-hidden">
       <Topbar title="Trade Blotter" subtitle="Executed & Pending Trades" showPeriod={false} />
 
       <OrdersSubNav />
 
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="text-xs text-[#6B7A95]">{opsTradesLoading ? 'Loading…' : `${opsTrades.length} trades`}</div>
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="text-xs text-[#6B7A95]">{opsTradesLoading ? 'Loading…' : `${filteredTrades.length} of ${opsTrades.length} trades`}</div>
           <div className="flex items-center gap-2">
-            <button className="flex items-center gap-1.5 text-[#6B7A95] hover:text-[#A8B4C8] text-xs px-2 py-1.5 bg-[#111C30] border border-white/[0.06] rounded">
-              <Filter className="w-3 h-3" /> Filter
-            </button>
-            <button className="flex items-center gap-1.5 text-[#6B7A95] hover:text-[#A8B4C8] text-xs px-2 py-1.5 bg-[#111C30] border border-white/[0.06] rounded">
+            <Button variant="outline" size="pill" onClick={handleExport}>
               <Download className="w-3 h-3" /> Export
-            </button>
-            <button
-              onClick={() => setShowNewOrder(true)}
-              className="flex items-center gap-1.5 bg-[#2563EB] text-white text-xs font-medium px-3 py-1.5 rounded hover:bg-[#1D4ED8]"
-            >
+            </Button>
+            <Button variant="default" size="pill" onClick={() => setShowNewOrder(true)}>
               <Plus className="w-3 h-3" /> New Order
-            </button>
+            </Button>
           </div>
+        </div>
+
+        {/* Filter bar */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <Input
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            placeholder="Search trade ID or ticker…"
+            className="w-64"
+          />
+          <Select value={sideFilter} onValueChange={setSideFilter}>
+            <SelectTrigger className="w-32 rounded-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent container={themeContainer}>
+              <SelectItem value="All">All Sides</SelectItem>
+              <SelectItem value="BUY">BUY</SelectItem>
+              <SelectItem value="SELL">SELL</SelectItem>
+            </SelectContent>
+          </Select>
+          <DatePicker value={dateFrom} onChange={setDateFrom} placeholder="From date" className="w-40" allowFutureDates container={themeContainer} />
+          <DatePicker value={dateTo} onChange={setDateTo} placeholder="To date" className="w-40" allowFutureDates container={themeContainer} />
         </div>
 
         {/* New Order Modal */}
@@ -162,34 +252,34 @@ export default function TradeBlotterPage() {
                 { label: 'Limit Price', key: 'limitPrice', type: 'number', placeholder: '0.00' },
                 { label: 'Broker', key: 'broker', type: 'select', options: ['Goldman Sachs', 'JP Morgan', 'Morgan Stanley', 'Citi', 'Macquarie', 'CLSA'] },
                 { label: 'Currency', key: 'currency', type: 'select', options: ['USD', 'EUR', 'GBP', 'JPY', 'ZAR'] },
-              ].map((field) => (
-                <div key={field.key}>
-                  <label className="text-[10px] text-[#6B7A95] uppercase tracking-wider block mb-1">{field.label}</label>
-                  {field.type === 'select' ? (
-                    <select
-                      value={(formData as any)[field.key]}
-                      onChange={e => setFormData(p => ({ ...p, [field.key]: e.target.value }))}
-                      className="w-full bg-[#111C30] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#C8D3E8] outline-none focus:border-[#2563EB]/60"
-                    >
-                      {field.options!.map(o => <option key={o} value={o}>{o}</option>)}
-                    </select>
+              ].map((f) => (
+                <div key={f.key}>
+                  <label className="text-[10px] text-[#6B7A95] uppercase tracking-wider block mb-1">{f.label}</label>
+                  {f.type === 'select' ? (
+                    <Select value={(formData as any)[f.key]} onValueChange={(v) => setFormData((p) => ({ ...p, [f.key]: v }))}>
+                      <SelectTrigger className="w-full rounded-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent container={themeContainer}>
+                        {f.options!.map((o) => (
+                          <SelectItem key={o} value={o}>{o}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   ) : (
-                    <input
-                      type={field.type}
-                      placeholder={field.placeholder}
-                      value={(formData as any)[field.key]}
-                      onChange={e => setFormData(p => ({ ...p, [field.key]: e.target.value }))}
-                      className="w-full bg-[#111C30] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#C8D3E8] outline-none focus:border-[#2563EB]/60 font-mono"
+                    <Input
+                      type={f.type}
+                      placeholder={f.placeholder}
+                      value={(formData as any)[f.key]}
+                      onChange={(e) => setFormData((p) => ({ ...p, [f.key]: e.target.value }))}
+                      className="font-mono"
                     />
                   )}
                 </div>
               ))}
               <div className="col-span-4">
                 <label className="text-[10px] text-[#6B7A95] uppercase tracking-wider block mb-1">Notes</label>
-                <input
-                  placeholder="Trade notes or instructions..."
-                  className="w-full bg-[#111C30] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#C8D3E8] outline-none focus:border-[#2563EB]/60"
-                />
+                <Input placeholder="Trade notes or instructions..." />
               </div>
             </div>
             <div className="flex items-center gap-2 mt-3 pt-3 border-t border-white/[0.06]">
@@ -197,8 +287,8 @@ export default function TradeBlotterPage() {
                 Estimated consideration: <span className="text-[#C8D3E8] font-mono">Calculating...</span>
                 &nbsp;·&nbsp; Compliance check: <span className="text-[#10B981]">Passed</span>
               </div>
-              <button className="bg-[#111C30] text-[#A8B4C8] text-xs px-3 py-1.5 rounded border border-white/[0.06] hover:bg-[#1A2540]" onClick={() => setShowNewOrder(false)}>Cancel</button>
-              <button className="bg-[#2563EB] text-white text-xs font-medium px-4 py-1.5 rounded hover:bg-[#1D4ED8]">Submit Order</button>
+              <Button variant="outline" size="pill" onClick={() => setShowNewOrder(false)}>Cancel</Button>
+              <Button variant="default" size="pill">Submit Order</Button>
             </div>
           </div>
         )}
@@ -210,19 +300,19 @@ export default function TradeBlotterPage() {
               <thead>
                 <tr>
                   <th />
-                  <th>Trade ID</th>
+                  <SortableTh col="tradeRef" label="Trade ID" sortKey={tradeSortKey} sortDir={tradeSortDir} onSort={toggleTradeSort} />
                   <th>Portfolio</th>
-                  <th>Ticker</th>
+                  <SortableTh col="ticker" label="Ticker" sortKey={tradeSortKey} sortDir={tradeSortDir} onSort={toggleTradeSort} />
                   <th>Instrument</th>
-                  <th>Side</th>
-                  <th className="text-right">Qty</th>
+                  <SortableTh col="side" label="Side" sortKey={tradeSortKey} sortDir={tradeSortDir} onSort={toggleTradeSort} />
+                  <SortableTh col="quantity" label="Qty" sortKey={tradeSortKey} sortDir={tradeSortDir} onSort={toggleTradeSort} align="right" />
                   <th className="text-right">Exec Price</th>
                   <th className="text-right">Gross</th>
                   <th className="text-right">Fees</th>
-                  <th className="text-right">Net</th>
+                  <SortableTh col="netConsideration" label="Net" sortKey={tradeSortKey} sortDir={tradeSortDir} onSort={toggleTradeSort} align="right" />
                   <th>Broker</th>
                   <th>Custodian</th>
-                  <th>Trade Date</th>
+                  <SortableTh col="executedAt" label="Trade Date" sortKey={tradeSortKey} sortDir={tradeSortDir} onSort={toggleTradeSort} />
                   <th>Val Date</th>
                   <th>Settlement</th>
                   <th>Accounting</th>
@@ -230,7 +320,7 @@ export default function TradeBlotterPage() {
                 </tr>
               </thead>
               <tbody>
-                {opsTrades.map((t) => {
+                {tradeRows.map((t) => {
                   const isExpanded = expandedTradeId === t.id
                   const hopsLoading = !!tradeRoutingHopsLoadingById[t.id]
                   const settlementError = settlementErrorById[t.id]
@@ -273,21 +363,25 @@ export default function TradeBlotterPage() {
                             <div className="px-6 py-3 space-y-3" style={{ background: 'rgba(59,130,246,0.04)', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
                               <div className="flex items-center gap-2">
                                 {t.status === 'DRAFT' && (
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); dispatch(executeTrade(t.id)) }}
+                                  <Button
+                                    size="sm"
+                                    variant="default"
+                                    className="rounded-full"
                                     disabled={!!tradeActionLoadingById[t.id]}
-                                    className="bg-[#2563EB] text-white text-xs font-medium px-3 py-1.5 rounded hover:bg-[#1D4ED8] disabled:opacity-50"
+                                    onClick={(e) => { e.stopPropagation(); setExecuteConfirm({ id: t.id, tradeRef: t.tradeRef }) }}
                                   >
                                     Execute Trade
-                                  </button>
+                                  </Button>
                                 )}
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); handleDownloadSettlement(t.id, t.tradeRef) }}
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="rounded-full"
                                   disabled={settlementDownloading}
-                                  className="flex items-center gap-1.5 text-[#A8B4C8] hover:text-white text-xs px-3 py-1.5 bg-[#111C30] border border-white/[0.08] rounded disabled:opacity-50"
+                                  onClick={(e) => { e.stopPropagation(); handleDownloadSettlement(t.id, t.tradeRef) }}
                                 >
                                   <Download className="w-3 h-3" /> {settlementDownloading ? 'Downloading…' : 'Download Settlement Document'}
-                                </button>
+                                </Button>
                                 {settlementError && <span className="text-[11px] text-[#EF4444]">{settlementError}</span>}
                               </div>
 
@@ -317,15 +411,20 @@ export default function TradeBlotterPage() {
                                       <td>
                                         <div className="flex items-center gap-1.5">
                                           {hopActions(hop.status).map((a) => (
-                                            <button
+                                            <Button
                                               key={a.key}
+                                              size="sm"
+                                              variant="outline"
+                                              className={cn('rounded-full', a.key === 'cancel' && 'text-destructive border-destructive/30 hover:bg-destructive/10')}
                                               disabled={!!hopActionLoadingById[hop.id]}
-                                              onClick={(e) => { e.stopPropagation(); handleHopAction(a.key, t.id, hop.id) }}
-                                              className="text-[10px] px-2 py-1 rounded border border-white/[0.08] hover:bg-[#1e2330] disabled:opacity-50"
-                                              style={{ color: a.key === 'cancel' ? '#ef4444' : '#60a5fa' }}
+                                              onClick={(e) => {
+                                                e.stopPropagation()
+                                                if (a.key === 'cancel') setCancelHopConfirm({ tradeId: t.id, hopId: hop.id, target: hop.target })
+                                                else handleHopAction(a.key, t.id, hop.id)
+                                              }}
                                             >
                                               {a.label}
-                                            </button>
+                                            </Button>
                                           ))}
                                         </div>
                                       </td>
@@ -350,16 +449,49 @@ export default function TradeBlotterPage() {
                     </Fragment>
                   )
                 })}
-                {opsTrades.length === 0 && !opsTradesLoading && (
+                {filteredTrades.length === 0 && !opsTradesLoading && (
                   <tr>
-                    <td colSpan={18} className="text-center py-8 text-[12px]" style={{ color: '#64748b' }}>No trades yet.</td>
+                    <td colSpan={18} className="text-center py-8 text-[12px]" style={{ color: '#64748b' }}>No trades match the current filters.</td>
                   </tr>
                 )}
               </tbody>
             </table>
           </div>
+          <TablePagination page={tradePage} totalPages={tradeTotalPages} onPageChange={setTradePage} rowsShown={tradeRows.length} totalRows={tradeTotalRows} />
         </div>
       </div>
+
+      {executeConfirm && (
+        <ConfirmDialog
+          open={!!executeConfirm}
+          onOpenChange={(o) => !o && setExecuteConfirm(null)}
+          title={`Execute Trade ${executeConfirm.tradeRef}`}
+          description="This will execute the trade and route it for settlement. This action cannot be undone."
+          confirmLabel="Execute Trade"
+          onConfirm={() => {
+            const d = executeConfirm
+            setExecuteConfirm(null)
+            if (d) dispatch(executeTrade(d.id))
+          }}
+          container={themeContainer}
+        />
+      )}
+
+      {cancelHopConfirm && (
+        <ConfirmDialog
+          open={!!cancelHopConfirm}
+          onOpenChange={(o) => !o && setCancelHopConfirm(null)}
+          title={`Cancel Routing Hop — ${cancelHopConfirm.target}`}
+          description="This will cancel this routing hop. This action cannot be undone."
+          confirmLabel="Cancel Hop"
+          onConfirm={() => {
+            const d = cancelHopConfirm
+            setCancelHopConfirm(null)
+            if (d) handleHopAction('cancel', d.tradeId, d.hopId)
+          }}
+          container={themeContainer}
+        />
+      )}
     </div>
   )
 }

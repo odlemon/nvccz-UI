@@ -77,6 +77,8 @@ function HoldingsAccordion({ label, holdings, total, pct, dot }: {
           </span>
         </td>
         <td className="font-mono" style={{ color: 'var(--muted-foreground)' }}>{pct}</td>
+        <td className="font-mono" style={{ color: 'var(--muted-foreground)' }}>—</td>
+        <td className="font-mono" style={{ color: 'var(--muted-foreground)' }}>—</td>
         <td style={{ color: 'var(--foreground)', fontWeight: 600 }}>{holdings.length}</td>
         <td className="font-mono" style={{ color: 'var(--muted-foreground)' }}>{fmt(total)}</td>
         <td className="font-mono" style={{ color: 'var(--muted-foreground)' }}>0.00</td>
@@ -85,19 +87,22 @@ function HoldingsAccordion({ label, holdings, total, pct, dot }: {
       {expanded && holdings.map((h) => (
         <tr key={h.id} style={{ background: 'rgba(59,130,246,0.05)' }}>
           <td style={{ color: 'var(--muted-foreground)', paddingLeft: '2.5rem' }} className="text-[11px]">
-            {h.security?.symbol ?? h.securityId.slice(0, 8)}
+            <div className="flex flex-col leading-tight">
+              <span>{h.security?.symbol ?? h.securityId.slice(0, 8)}</span>
+              {h.security?.name && <span className="text-[10px] opacity-70">{h.security.name}</span>}
+            </div>
           </td>
           <td className="font-mono text-[11px]" style={{ color: 'var(--muted-foreground)' }}>
             {fmt(effectiveHoldingValue(h))}
           </td>
+          <td className="font-mono text-[11px]" style={{ color: 'var(--muted-foreground)' }}>—</td>
+          <td className="font-mono text-[11px]" style={{ color: 'var(--muted-foreground)' }}>—</td>
+          <td className="font-mono text-[11px]" style={{ color: 'var(--muted-foreground)' }}>—</td>
           <td className="font-mono text-[11px]" style={{ color: 'var(--muted-foreground)' }}>
             {h.quantity.toLocaleString()}
           </td>
-          <td className="text-[11px]" style={{ color: 'var(--muted-foreground)' }}>
-            {h.security?.name ?? '—'}
-          </td>
           <td className="font-mono text-[11px]" style={{ color: 'var(--muted-foreground)' }}>
-            {h.wac?.toFixed(4) ?? '—'}
+            {fmt(effectiveHoldingValue(h))}
           </td>
           <td className="font-mono text-[11px]" style={{ color: h.unrealizedPnl && h.unrealizedPnl >= 0 ? '#10b981' : '#f43f5e' }}>
             {h.unrealizedPnl != null ? fmt(h.unrealizedPnl) : '—'}
@@ -172,11 +177,10 @@ export default function PortfoliosPage() {
   // Country/exchange rings — now real, from getPortfolioExposure().byExchange
   const countryRings = useMemo(() => {
     if (!portfolioExposure?.byExchange.length) return []
-    const colors = ['#3b82f6', '#6366f1', '#8b5cf6', '#0ea5e9']
-    const radii = [68, 53, 38, 23]
+    const radii = [68, 58, 48, 38, 28, 18]
     return portfolioExposure.byExchange
-      .slice(0, 4)
-      .map((e, i) => ({ label: e.key, pct: Math.round(e.pct), color: colors[i], r: radii[i] }))
+      .slice(0, 6)
+      .map((e, i) => ({ label: e.key, pct: Math.round(e.pct), color: DOT_COLORS[i % DOT_COLORS.length], r: radii[i] }))
   }, [portfolioExposure])
 
   // Sector bars — still a client-derived proxy (no sector-exposure endpoint provided yet)
@@ -201,7 +205,7 @@ export default function PortfoliosPage() {
   const currencyPie = useMemo(() => {
     if (!dashboardCurrencyExposure.length) return []
     const grand = dashboardCurrencyExposure.reduce((s, e) => s + e.value, 0)
-    const colors = ['#3b82f6', '#8b5cf6', '#6366f1', '#0ea5e9']
+    const colors = ['#4F7FEA', '#93B4F5', '#9B7FD6', '#D9E0F5']
     return dashboardCurrencyExposure
       .slice()
       .sort((a, b) => b.value - a.value)
@@ -283,12 +287,14 @@ export default function PortfoliosPage() {
                   <table className="arcus-table">
                     <thead>
                       <tr>
-                        <th>Asset Class / Security</th>
-                        <th>Total Value</th>
+                        <th>Included</th>
+                        <th>Total</th>
                         <th>In%</th>
+                        <th>Interest</th>
+                        <th>Dividend</th>
                         <th>Positions</th>
                         <th>Exposure</th>
-                        <th>P&amp;L</th>
+                        <th>Margin</th>
                         <th>Valuedate</th>
                       </tr>
                     </thead>
@@ -310,7 +316,14 @@ export default function PortfoliosPage() {
 
               {/* ── 3 inline charts ── */}
               {!portfolioHoldingsLoading && portfolioHoldings.length > 0 && (
-                <div className="grid grid-cols-3 gap-0" style={{ borderTop: '1px solid var(--border)' }}>
+                <div
+                  className="grid grid-cols-3 gap-0"
+                  style={{
+                    borderTop: '1px solid var(--border)',
+                    background:
+                      'radial-gradient(circle at 15% 30%, rgba(99,102,241,0.10), transparent 60%), radial-gradient(circle at 85% 70%, rgba(139,92,246,0.08), transparent 55%)',
+                  }}
+                >
                   {/* Country/exchange rings — real */}
                   <div className="flex gap-4 p-4 items-center" style={{ borderRight: '1px solid var(--border)' }}>
                     {countryRings.length > 0 ? (
@@ -374,7 +387,7 @@ export default function PortfoliosPage() {
                       <>
                         <ResponsiveContainer width={110} height={110}>
                           <PieChart>
-                            <Pie data={currencyPie} cx="50%" cy="50%" innerRadius={30} outerRadius={50} paddingAngle={3} dataKey="value" strokeWidth={0}>
+                            <Pie data={currencyPie} cx="50%" cy="50%" outerRadius={52} paddingAngle={1} dataKey="value" strokeWidth={0}>
                               {currencyPie.map((e, i) => <Cell key={i} fill={e.color} />)}
                             </Pie>
                           </PieChart>

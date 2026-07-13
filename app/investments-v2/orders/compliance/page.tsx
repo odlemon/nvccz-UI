@@ -5,7 +5,7 @@ import { Topbar } from '@/components/arcus/topbar'
 import { StatusBadge } from '@/components/arcus/status-badge'
 import { OrdersSubNav } from '@/components/investments-v2/orders-subnav'
 import { cn } from '@/lib/utils'
-import { X } from 'lucide-react'
+import { Download, X } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '@/lib/store'
 import {
   fetchPortfolios,
@@ -14,6 +14,11 @@ import {
   createComplianceRule,
   createComplianceOverride,
 } from '@/lib/store/slices/investmentOpsSlice'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { useThemeContainer } from '@/components/investments-v2/ui/use-theme-container'
+import { exportRowsToCsv } from '@/components/investments-v2/ui/export-csv'
+import { ConfirmReasonDialog } from '@/components/investments-v2/ui/confirm-reason-dialog'
 
 function resultBadgeStatus(outcome: string) {
   if (outcome === 'PASSED') return 'passed'
@@ -39,8 +44,13 @@ export default function CompliancePage() {
     complianceOverrideSubmittingByOrderId,
     selectedFundId,
   } = useAppSelector((s) => s.investmentOps)
+  const { ref: rootRef, container: themeContainer } = useThemeContainer()
+
   const [showAddRule, setShowAddRule] = useState(false)
   const [ruleForm, setRuleForm] = useState(newRuleFields)
+  const [ruleFormError, setRuleFormError] = useState('')
+  const [searchText, setSearchText] = useState('')
+  const [overrideDialog, setOverrideDialog] = useState<{ orderId: string; orderRef: string } | null>(null)
 
   useEffect(() => {
     dispatch(fetchPortfolios())
@@ -59,33 +69,55 @@ export default function CompliancePage() {
     )
   }, [orders])
 
+  const filteredResults = useMemo(() => {
+    const q = searchText.trim().toLowerCase()
+    if (!q) return results
+    return results.filter(({ order: o }) => {
+      const haystack = [o.orderRef, o.instrument?.ticker ?? '', fundName(o.fundId)].join(' ').toLowerCase()
+      return haystack.includes(q)
+    })
+  }, [results, searchText])
+
   const passedCount = results.filter((x) => x.result.outcome === 'PASSED').length
   const warningCount = results.filter((x) => x.result.outcome === 'WARNING').length
   const failedCount = results.filter((x) => x.result.outcome === 'BREACH').length
   const activeRulesCount = complianceRules.filter((r) => r.isActive).length
 
   const handleAddRule = async () => {
-    if (!ruleForm.ruleCode || !ruleForm.ruleName || !ruleForm.thresholdValue) return
-    await dispatch(
-      createComplianceRule({
-        ruleCode: ruleForm.ruleCode,
-        ruleName: ruleForm.ruleName,
-        ruleType: ruleForm.ruleType,
-        thresholdValue: Number(ruleForm.thresholdValue),
-      })
-    )
-    setRuleForm(newRuleFields)
-    setShowAddRule(false)
+    setRuleFormError('')
+    if (!ruleForm.ruleCode || !ruleForm.ruleName || !ruleForm.ruleType || !ruleForm.thresholdValue) {
+      setRuleFormError('Rule Code, Rule Name, Rule Type, and Threshold Value are all required.')
+      return
+    }
+    try {
+      await dispatch(
+        createComplianceRule({
+          ruleCode: ruleForm.ruleCode,
+          ruleName: ruleForm.ruleName,
+          ruleType: ruleForm.ruleType,
+          thresholdValue: Number(ruleForm.thresholdValue),
+        })
+      ).unwrap()
+      setRuleForm(newRuleFields)
+      setShowAddRule(false)
+    } catch (err: any) {
+      setRuleFormError(err?.message || 'Failed to create rule')
+    }
   }
 
-  const handleRequestOverride = (orderId: string) => {
-    const reason = window.prompt('Reason for requesting a compliance override:')
-    if (!reason) return
-    dispatch(createComplianceOverride({ orderId, reason }))
+  const handleExport = () => {
+    exportRowsToCsv(
+      `compliance-results-${new Date().toISOString().slice(0, 10)}.csv`,
+      ['Order ID', 'Portfolio', 'Ticker', 'Side', 'Rule Checked', 'Result'],
+      filteredResults.map(({ order: o, result: r }) => {
+        const rule = complianceRules.find((cr) => cr.id === r.ruleId)
+        return [o.orderRef, fundName(o.fundId), o.instrument?.ticker ?? '', o.side, rule?.ruleName ?? r.ruleId ?? '', r.outcome]
+      })
+    )
   }
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div ref={rootRef} className="flex flex-col h-full overflow-hidden">
       <Topbar title="Compliance" subtitle="Pre-trade checks & mandate rules" showPeriod={false} />
 
       <OrdersSubNav />
@@ -108,8 +140,19 @@ export default function CompliancePage() {
 
         {/* Compliance results */}
         <div className="bg-[#0D1526] border border-white/[0.06] rounded-md overflow-hidden">
-          <div className="px-4 py-2.5 border-b border-white/[0.06]">
+          <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/[0.06] flex-wrap gap-2">
             <div className="text-xs font-semibold text-[#E8EDF5]">Pre-Trade Compliance Results</div>
+            <div className="flex items-center gap-2">
+              <Input
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+                placeholder="Search order ref or ticker…"
+                className="w-56"
+              />
+              <Button variant="outline" size="pill" onClick={handleExport}>
+                <Download className="w-3 h-3" /> Export
+              </Button>
+            </div>
           </div>
           <table className="arcus-table">
             <thead>
@@ -127,7 +170,7 @@ export default function CompliancePage() {
               </tr>
             </thead>
             <tbody>
-              {results.map(({ order: o, result: r }) => {
+              {filteredResults.map(({ order: o, result: r }) => {
                 const rule = complianceRules.find((cr) => cr.id === r.ruleId)
                 return (
                   <tr key={r.id}>
@@ -144,13 +187,15 @@ export default function CompliancePage() {
                     <td><StatusBadge status={resultBadgeStatus(r.outcome)} /></td>
                     <td>
                       {r.outcome === 'BREACH' ? (
-                        <button
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="rounded-full text-[#F59E0B] border-[#F59E0B]/30 hover:bg-[#F59E0B]/10"
                           disabled={!!complianceOverrideSubmittingByOrderId[o.id]}
-                          onClick={() => handleRequestOverride(o.id)}
-                          className="text-[10px] text-[#F59E0B] hover:underline disabled:opacity-50"
+                          onClick={() => setOverrideDialog({ orderId: o.id, orderRef: o.orderRef })}
                         >
                           Request Override
-                        </button>
+                        </Button>
                       ) : (
                         <span className="text-[10px] text-[#4B5A72]">—</span>
                       )}
@@ -158,7 +203,7 @@ export default function CompliancePage() {
                   </tr>
                 )
               })}
-              {results.length === 0 && (
+              {filteredResults.length === 0 && (
                 <tr>
                   <td colSpan={10} className="text-center py-8 text-[12px]" style={{ color: '#64748b' }}>No compliance results yet.</td>
                 </tr>
@@ -171,7 +216,7 @@ export default function CompliancePage() {
         <div className="bg-[#0D1526] border border-white/[0.06] rounded-md overflow-hidden">
           <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/[0.06]">
             <div className="text-xs font-semibold text-[#E8EDF5]">Active Mandate Rules</div>
-            <button onClick={() => setShowAddRule(true)} className="text-[#60A5FA] text-[10px] hover:underline">+ Add Rule</button>
+            <Button variant="default" size="pill" onClick={() => setShowAddRule(true)}>+ Add Rule</Button>
           </div>
 
           {showAddRule && (
@@ -184,51 +229,47 @@ export default function CompliancePage() {
               </div>
               <div className="grid grid-cols-4 gap-3">
                 <div>
-                  <label className="text-[10px] text-[#6B7A95] uppercase tracking-wider block mb-1">Rule Code</label>
-                  <input
+                  <label className="text-[10px] text-[#6B7A95] uppercase tracking-wider block mb-1">Rule Code *</label>
+                  <Input
                     value={ruleForm.ruleCode}
                     onChange={(e) => setRuleForm((p) => ({ ...p, ruleCode: e.target.value }))}
                     placeholder="e.g. MAX_WEIGHT"
-                    className="w-full bg-[#111C30] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#C8D3E8] outline-none focus:border-[#2563EB]/60 font-mono"
+                    className="font-mono"
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] text-[#6B7A95] uppercase tracking-wider block mb-1">Rule Name</label>
-                  <input
+                  <label className="text-[10px] text-[#6B7A95] uppercase tracking-wider block mb-1">Rule Name *</label>
+                  <Input
                     value={ruleForm.ruleName}
                     onChange={(e) => setRuleForm((p) => ({ ...p, ruleName: e.target.value }))}
                     placeholder="e.g. Max 25% single name"
-                    className="w-full bg-[#111C30] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#C8D3E8] outline-none focus:border-[#2563EB]/60"
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] text-[#6B7A95] uppercase tracking-wider block mb-1">Rule Type</label>
-                  <input
+                  <label className="text-[10px] text-[#6B7A95] uppercase tracking-wider block mb-1">Rule Type *</label>
+                  <Input
                     value={ruleForm.ruleType}
                     onChange={(e) => setRuleForm((p) => ({ ...p, ruleType: e.target.value }))}
-                    className="w-full bg-[#111C30] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#C8D3E8] outline-none focus:border-[#2563EB]/60 font-mono"
+                    className="font-mono"
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] text-[#6B7A95] uppercase tracking-wider block mb-1">Threshold Value</label>
-                  <input
+                  <label className="text-[10px] text-[#6B7A95] uppercase tracking-wider block mb-1">Threshold Value *</label>
+                  <Input
                     type="number"
                     value={ruleForm.thresholdValue}
                     onChange={(e) => setRuleForm((p) => ({ ...p, thresholdValue: e.target.value }))}
                     placeholder="0"
-                    className="w-full bg-[#111C30] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#C8D3E8] outline-none focus:border-[#2563EB]/60 font-mono"
+                    className="font-mono"
                   />
                 </div>
               </div>
+              {ruleFormError && <div className="text-[11px] text-[#EF4444] mt-2">{ruleFormError}</div>}
               <div className="flex items-center justify-end gap-2 mt-3">
-                <button onClick={() => setShowAddRule(false)} className="bg-[#111C30] text-[#A8B4C8] text-xs px-3 py-1.5 rounded border border-white/[0.06] hover:bg-[#1A2540]">Cancel</button>
-                <button
-                  onClick={handleAddRule}
-                  disabled={complianceRuleCreating}
-                  className="bg-[#2563EB] text-white text-xs font-medium px-4 py-1.5 rounded hover:bg-[#1D4ED8] disabled:opacity-50"
-                >
+                <Button variant="outline" size="pill" onClick={() => setShowAddRule(false)}>Cancel</Button>
+                <Button variant="default" size="pill" onClick={handleAddRule} disabled={complianceRuleCreating}>
                   {complianceRuleCreating ? 'Saving…' : 'Save Rule'}
-                </button>
+                </Button>
               </div>
             </div>
           )}
@@ -260,6 +301,23 @@ export default function CompliancePage() {
           </table>
         </div>
       </div>
+
+      {overrideDialog && (
+        <ConfirmReasonDialog
+          open={!!overrideDialog}
+          onOpenChange={(o) => !o && setOverrideDialog(null)}
+          title={`Request Override — ${overrideDialog.orderRef}`}
+          description="Requesting an override lets this order proceed despite a compliance breach. Provide a reason for the audit trail."
+          reasonLabel="Reason for override"
+          confirmLabel="Request Override"
+          onConfirm={(reason) => {
+            const d = overrideDialog
+            setOverrideDialog(null)
+            if (d) dispatch(createComplianceOverride({ orderId: d.orderId, reason }))
+          }}
+          container={themeContainer}
+        />
+      )}
     </div>
   )
 }

@@ -8,10 +8,17 @@ import { cn } from '@/lib/utils'
 import { Filter, Download, Search, Loader2, Folder, FolderOpen } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '@/lib/store'
 import { fetchPortfolios, fetchPortfolioTransactions, setOpsSelectedFundId } from '@/lib/store/slices/investmentOpsSlice'
+import { Button } from '@/components/ui/button'
+import { DatePicker } from '@/components/ui/date-picker'
+import { useThemeContainer } from '@/components/investments-v2/ui/use-theme-container'
+import { exportRowsToCsv } from '@/components/investments-v2/ui/export-csv'
+import { useSortedPaginated } from '@/components/investments-v2/ui/use-sorted-paginated'
+import { SortableTh } from '@/components/investments-v2/ui/sortable-th'
+import { TablePagination } from '@/components/investments-v2/ui/table-pagination'
 
 const TXN_TYPES = ['All', 'PURCHASE', 'SALE'] as const
 
-const PAGE_SIZE = 12
+type TxnSortKey = 'tradeRef' | 'symbol' | 'quantity' | 'price' | 'tradeDate' | 'realizedPnl'
 
 function Spinner() {
   return <Loader2 className="w-4 h-4 animate-spin" style={{ color: 'var(--muted-foreground)' }} />
@@ -21,10 +28,13 @@ export default function TransactionsPage() {
   const dispatch = useAppDispatch()
   const { portfolios, portfoliosLoading, selectedFundId, portfolioTransactions, portfolioTransactionsLoading } =
     useAppSelector((s) => s.investmentOps)
+  const { ref: rootRef, container: themeContainer } = useThemeContainer()
 
   const [typeFilter, setTypeFilter] = useState<(typeof TXN_TYPES)[number]>('All')
   const [search, setSearch] = useState('')
-  const [page, setPage] = useState(1)
+  const [showFilters, setShowFilters] = useState(false)
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined)
+  const [dateTo, setDateTo] = useState<Date | undefined>(undefined)
 
   useEffect(() => {
     dispatch(fetchPortfolios())
@@ -41,19 +51,49 @@ export default function TransactionsPage() {
         !search ||
         t.symbol.toLowerCase().includes(search.toLowerCase()) ||
         t.tradeRef.toLowerCase().includes(search.toLowerCase())
-      return matchType && matchSearch
+      const tradeDate = new Date(t.tradeDate)
+      const matchFrom = !dateFrom || tradeDate >= dateFrom
+      const matchTo = !dateTo || tradeDate <= new Date(dateTo.getTime() + 24 * 60 * 60 * 1000 - 1)
+      return matchType && matchSearch && matchFrom && matchTo
     })
-  }, [portfolioTransactions, typeFilter, search])
+  }, [portfolioTransactions, typeFilter, search, dateFrom, dateTo])
 
-  useEffect(() => {
-    setPage(1)
-  }, [typeFilter, search, selectedFundId])
+  const getTxnSortValue = (t: (typeof portfolioTransactions)[number], key: TxnSortKey) => {
+    if (key === 'tradeDate') return new Date(t.tradeDate).getTime()
+    if (key === 'realizedPnl') return t.realizedPnl ?? 0
+    return t[key]
+  }
+  const {
+    pageRows,
+    sortKey,
+    sortDir,
+    toggleSort,
+    page,
+    setPage,
+    totalPages,
+    totalRows,
+  } = useSortedPaginated<(typeof portfolioTransactions)[number], TxnSortKey>(filtered, getTxnSortValue, 'tradeDate', 12)
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
-  const pageRows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  const handleExport = () => {
+    exportRowsToCsv(
+      `transactions-${new Date().toISOString().slice(0, 10)}.csv`,
+      ['Trade Ref', 'Symbol', 'Type', 'Quantity', 'Price', 'Status', 'Trade Date', 'Journal Entry', 'Realized P&L'],
+      filtered.map((txn) => [
+        txn.tradeRef,
+        txn.symbol,
+        txn.type === 'PURCHASE' ? 'BUY' : 'SELL',
+        txn.quantity,
+        txn.price,
+        txn.status,
+        new Date(txn.tradeDate).toLocaleString(),
+        txn.journalEntryId ? new Date(txn.tradeDate).toLocaleString() : '',
+        txn.realizedPnl ?? '',
+      ])
+    )
+  }
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div ref={rootRef} className="flex flex-col h-full overflow-hidden">
       <PageHeader title="Transactions" />
       <PortfoliosSubNav />
 
@@ -92,7 +132,7 @@ export default function TransactionsPage() {
           </div>
           <div className="flex items-center gap-2">
             <div
-              className="flex items-center gap-1.5 rounded px-2.5 py-1.5"
+              className="flex items-center gap-1.5 rounded-full px-2.5 py-1.5"
               style={{ background: 'var(--muted)', border: '1px solid var(--border)' }}
             >
               <Search className="w-3.5 h-3.5" style={{ color: 'var(--muted-foreground)' }} />
@@ -104,20 +144,27 @@ export default function TransactionsPage() {
                 style={{ color: 'var(--foreground)' }}
               />
             </div>
-            <button
-              className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded"
-              style={{ color: 'var(--muted-foreground)', background: 'var(--muted)', border: '1px solid var(--border)' }}
-            >
+            <Button variant="outline" size="pill" onClick={() => setShowFilters((v) => !v)}>
               <Filter className="w-3 h-3" /> Filter
-            </button>
-            <button
-              className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded"
-              style={{ color: 'var(--muted-foreground)', background: 'var(--muted)', border: '1px solid var(--border)' }}
-            >
+            </Button>
+            <Button variant="outline" size="pill" onClick={handleExport}>
               <Download className="w-3 h-3" /> Export
-            </button>
+            </Button>
           </div>
         </div>
+
+        {showFilters && (
+          <div className="flex items-center gap-2 flex-wrap arcus-card px-4 py-3">
+            <span className="text-[11px]" style={{ color: 'var(--muted-foreground)' }}>Trade date range:</span>
+            <DatePicker value={dateFrom} onChange={setDateFrom} placeholder="From date" className="w-40" allowFutureDates container={themeContainer} />
+            <DatePicker value={dateTo} onChange={setDateTo} placeholder="To date" className="w-40" allowFutureDates container={themeContainer} />
+            {(dateFrom || dateTo) && (
+              <Button variant="ghost" size="sm" onClick={() => { setDateFrom(undefined); setDateTo(undefined) }}>
+                Clear
+              </Button>
+            )}
+          </div>
+        )}
 
         <div className="arcus-card">
           <div className="arcus-card-header">
@@ -139,15 +186,15 @@ export default function TransactionsPage() {
               <table className="arcus-table">
                 <thead>
                   <tr>
-                    <th>Trade Ref</th>
-                    <th>Symbol</th>
+                    <SortableTh col="tradeRef" label="Trade Ref" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                    <SortableTh col="symbol" label="Symbol" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                     <th>Type</th>
-                    <th className="text-right">Quantity</th>
-                    <th className="text-right">Price</th>
+                    <SortableTh col="quantity" label="Quantity" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} align="right" />
+                    <SortableTh col="price" label="Price" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} align="right" />
                     <th>Status</th>
-                    <th>Trade Date</th>
+                    <SortableTh col="tradeDate" label="Trade Date" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                     <th>Journal Entry</th>
-                    <th className="text-right">Realized P&amp;L</th>
+                    <SortableTh col="realizedPnl" label="Realized P&L" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} align="right" />
                   </tr>
                 </thead>
                 <tbody>
@@ -176,9 +223,11 @@ export default function TransactionsPage() {
                       <td>
                         <StatusBadge status={txn.status.toLowerCase().replace(/_/g, ' ')} />
                       </td>
-                      <td style={{ color: 'var(--muted-foreground)' }}>{new Date(txn.tradeDate).toLocaleDateString()}</td>
+                      <td className="font-mono text-[11px]" style={{ color: 'var(--muted-foreground)' }}>
+                        {new Date(txn.tradeDate).toLocaleString()}
+                      </td>
                       <td className="font-mono text-[11px]" style={{ color: txn.journalEntryId ? '#10b981' : 'var(--muted-foreground)' }}>
-                        {txn.journalEntryId ? 'Posted' : '—'}
+                        {txn.journalEntryId ? new Date(txn.tradeDate).toLocaleString() : '—'}
                       </td>
                       <td
                         className="text-right font-mono"
@@ -193,30 +242,7 @@ export default function TransactionsPage() {
             )}
           </div>
 
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between px-4 py-2.5" style={{ borderTop: '1px solid var(--border)' }}>
-              <span className="text-[11px]" style={{ color: 'var(--muted-foreground)' }}>
-                Showing {pageRows.length} out of {filtered.length} results
-              </span>
-              <div className="flex items-center gap-1">
-                <button className="pg-btn" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}>
-                  ‹
-                </button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-                  <button key={p} onClick={() => setPage(p)} className={cn('pg-btn', page === p && 'active')}>
-                    {p}
-                  </button>
-                ))}
-                <button
-                  className="pg-btn"
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={page >= totalPages}
-                >
-                  ›
-                </button>
-              </div>
-            </div>
-          )}
+          <TablePagination page={page} totalPages={totalPages} onPageChange={setPage} rowsShown={pageRows.length} totalRows={totalRows} />
         </div>
       </div>
     </div>

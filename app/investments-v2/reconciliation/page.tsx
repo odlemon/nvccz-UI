@@ -120,7 +120,7 @@ export default function ReconciliationPage() {
             <select
               value={runReconType}
               onChange={(e) => setRunReconType(e.target.value as 'HOLDINGS' | 'CUSTODIAN_POSITION')}
-              className="bg-[#111C30] border border-white/[0.06] rounded px-2 py-1.5 text-xs text-[#A8B4C8] outline-none"
+              className="bg-[#111C30] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#C8D3E8] outline-none focus:border-[#2563EB]/60"
             >
               <option value="HOLDINGS">Holdings</option>
               <option value="CUSTODIAN_POSITION">Custodian Position</option>

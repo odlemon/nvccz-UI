@@ -1,12 +1,17 @@
 'use client'
 
-import { Fragment, useEffect, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { Topbar } from '@/components/arcus/topbar'
 import { StatusBadge } from '@/components/arcus/status-badge'
 import { OrdersSubNav } from '@/components/investments-v2/orders-subnav'
-import { X } from 'lucide-react'
+import { Download, X } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '@/lib/store'
 import { fetchPortfolios, fetchModelPortfolios, createModelPortfolio, fetchModelPortfolioDrift } from '@/lib/store/slices/investmentOpsSlice'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useThemeContainer } from '@/components/investments-v2/ui/use-theme-container'
+import { exportRowsToCsv } from '@/components/investments-v2/ui/export-csv'
 
 const NEW_MODEL_EMPTY = {
   name: '',
@@ -25,10 +30,13 @@ export default function ModelPortfoliosPage() {
     modelPortfolioDriftById,
     modelPortfolioDriftLoadingById,
   } = useAppSelector((s) => s.investmentOps)
+  const { ref: rootRef, container: themeContainer } = useThemeContainer()
   const [showNewModel, setShowNewModel] = useState(false)
   const [form, setForm] = useState(NEW_MODEL_EMPTY)
+  const [formError, setFormError] = useState('')
   const [driftFundByModelId, setDriftFundByModelId] = useState<Record<string, string>>({})
   const [expandedModelId, setExpandedModelId] = useState<string | null>(null)
+  const [searchText, setSearchText] = useState('')
 
   useEffect(() => {
     dispatch(fetchPortfolios())
@@ -37,18 +45,32 @@ export default function ModelPortfoliosPage() {
 
   const field = (key: keyof typeof form, value: string) => setForm((p) => ({ ...p, [key]: value }))
 
+  const filteredModels = useMemo(() => {
+    const q = searchText.trim().toLowerCase()
+    if (!q) return modelPortfolios
+    return modelPortfolios.filter((m) => m.name.toLowerCase().includes(q))
+  }, [modelPortfolios, searchText])
+
   const handleCreate = async () => {
-    if (!form.name || !form.targetWeightPct) return
-    await dispatch(
-      createModelPortfolio({
-        name: form.name,
-        allocations: [
-          { allocationType: form.allocationType, allocationKey: form.allocationKey, targetWeightPct: Number(form.targetWeightPct) },
-        ],
-      })
-    )
-    setForm(NEW_MODEL_EMPTY)
-    setShowNewModel(false)
+    setFormError('')
+    if (!form.name || !form.targetWeightPct) {
+      setFormError('Name and Target Weight % are required.')
+      return
+    }
+    try {
+      await dispatch(
+        createModelPortfolio({
+          name: form.name,
+          allocations: [
+            { allocationType: form.allocationType, allocationKey: form.allocationKey, targetWeightPct: Number(form.targetWeightPct) },
+          ],
+        })
+      ).unwrap()
+      setForm(NEW_MODEL_EMPTY)
+      setShowNewModel(false)
+    } catch (err: any) {
+      setFormError(err?.message || 'Failed to create model portfolio')
+    }
   }
 
   const handleCheckDrift = (modelId: string) => {
@@ -58,17 +80,37 @@ export default function ModelPortfoliosPage() {
     setExpandedModelId(modelId)
   }
 
+  const handleExport = () => {
+    exportRowsToCsv(
+      `model-portfolios-${new Date().toISOString().slice(0, 10)}.csv`,
+      ['Name', 'Strategy', 'Base Currency', 'Allocations', 'Status'],
+      filteredModels.map((m) => [
+        m.name,
+        m.strategyCode ?? '',
+        m.baseCurrencyCode,
+        m.allocations.map((a) => `${a.allocationKey}: ${a.targetWeightPct}%`).join('; '),
+        m.isActive ? 'active' : 'inactive',
+      ])
+    )
+  }
+
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div ref={rootRef} className="flex flex-col h-full overflow-hidden">
       <Topbar title="Orders" />
 
       <OrdersSubNav />
 
       <div className="flex-1 overflow-y-auto p-5 space-y-4">
         <div className="arcus-card">
-          <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+          <div className="flex items-center justify-between px-4 py-3 flex-wrap gap-2" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
             <span className="text-white text-[13px] font-semibold">Model Portfolios</span>
-            <button onClick={() => setShowNewModel(true)} className="btn-white text-[12px] py-1 px-4">+ New Model</button>
+            <div className="flex items-center gap-2">
+              <Input value={searchText} onChange={(e) => setSearchText(e.target.value)} placeholder="Search model name…" className="w-56" />
+              <Button variant="outline" size="pill" onClick={handleExport}>
+                <Download className="w-3 h-3" /> Export
+              </Button>
+              <Button variant="default" size="pill" onClick={() => setShowNewModel(true)}>+ New Model</Button>
+            </div>
           </div>
 
           {showNewModel && (
@@ -81,50 +123,46 @@ export default function ModelPortfoliosPage() {
               </div>
               <div className="grid grid-cols-4 gap-3">
                 <div>
-                  <label className="text-[10px] text-[#64748b] uppercase tracking-wider block mb-1">Name</label>
-                  <input
+                  <label className="text-[10px] text-[#64748b] uppercase tracking-wider block mb-1">Name *</label>
+                  <Input
                     value={form.name}
                     onChange={(e) => field('name', e.target.value)}
                     placeholder="e.g. Balanced ZSE"
-                    className="w-full bg-[#1e2330] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#c8d3e8] outline-none focus:border-[#3b82f6]/60"
                   />
                 </div>
                 <div>
                   <label className="text-[10px] text-[#64748b] uppercase tracking-wider block mb-1">Allocation Type</label>
-                  <input
+                  <Input
                     value={form.allocationType}
                     onChange={(e) => field('allocationType', e.target.value)}
-                    className="w-full bg-[#1e2330] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#c8d3e8] outline-none focus:border-[#3b82f6]/60 font-mono"
+                    className="font-mono"
                   />
                 </div>
                 <div>
                   <label className="text-[10px] text-[#64748b] uppercase tracking-wider block mb-1">Allocation Key</label>
-                  <input
+                  <Input
                     value={form.allocationKey}
                     onChange={(e) => field('allocationKey', e.target.value)}
-                    className="w-full bg-[#1e2330] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#c8d3e8] outline-none focus:border-[#3b82f6]/60 font-mono"
+                    className="font-mono"
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] text-[#64748b] uppercase tracking-wider block mb-1">Target Weight %</label>
-                  <input
+                  <label className="text-[10px] text-[#64748b] uppercase tracking-wider block mb-1">Target Weight % *</label>
+                  <Input
                     type="number"
                     value={form.targetWeightPct}
                     onChange={(e) => field('targetWeightPct', e.target.value)}
                     placeholder="0"
-                    className="w-full bg-[#1e2330] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#c8d3e8] outline-none focus:border-[#3b82f6]/60 font-mono"
+                    className="font-mono"
                   />
                 </div>
               </div>
+              {formError && <div className="text-[11px] text-[#EF4444] mt-2">{formError}</div>}
               <div className="flex items-center justify-end gap-2 mt-3">
-                <button onClick={() => setShowNewModel(false)} className="bg-[#1e2330] text-[#94a3b8] text-xs px-3 py-1.5 rounded border border-white/[0.06] hover:bg-[#252b3a]">Cancel</button>
-                <button
-                  onClick={handleCreate}
-                  disabled={modelPortfolioCreating}
-                  className="bg-[#2563eb] text-white text-xs font-medium px-4 py-1.5 rounded hover:bg-[#1d4ed8] disabled:opacity-60"
-                >
+                <Button variant="outline" size="pill" onClick={() => setShowNewModel(false)}>Cancel</Button>
+                <Button variant="default" size="pill" onClick={handleCreate} disabled={modelPortfolioCreating}>
                   {modelPortfolioCreating ? 'Saving…' : 'Save Model'}
-                </button>
+                </Button>
               </div>
             </div>
           )}
@@ -142,7 +180,7 @@ export default function ModelPortfoliosPage() {
                 </tr>
               </thead>
               <tbody>
-                {modelPortfolios.map((m) => {
+                {filteredModels.map((m) => {
                   const isExpanded = expandedModelId === m.id
                   const drift = modelPortfolioDriftById[m.id]
                   const driftLoading = !!modelPortfolioDriftLoadingById[m.id]
@@ -160,24 +198,25 @@ export default function ModelPortfoliosPage() {
                         <td><StatusBadge status={m.isActive ? 'active' : 'inactive'} /></td>
                         <td>
                           <div className="flex items-center gap-1.5">
-                            <select
-                              value={driftFundByModelId[m.id] ?? ''}
-                              onChange={(e) => setDriftFundByModelId((p) => ({ ...p, [m.id]: e.target.value }))}
-                              className="bg-[#1e2330] border border-white/[0.08] rounded px-2 py-1 text-[11px] text-[#c8d3e8] outline-none focus:border-[#3b82f6]/60"
-                            >
-                              <option value="" disabled>Fund…</option>
-                              {portfolios.map((f) => (
-                                <option key={f.id} value={f.id}>{f.name}</option>
-                              ))}
-                            </select>
-                            <button
+                            <Select value={driftFundByModelId[m.id] ?? ''} onValueChange={(v) => setDriftFundByModelId((p) => ({ ...p, [m.id]: v }))}>
+                              <SelectTrigger className="w-32 rounded-full">
+                                <SelectValue placeholder="Fund…" />
+                              </SelectTrigger>
+                              <SelectContent container={themeContainer}>
+                                {portfolios.map((f) => (
+                                  <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="rounded-full"
                               onClick={() => handleCheckDrift(m.id)}
                               disabled={!driftFundByModelId[m.id] || driftLoading}
-                              className="text-[10px] px-2 py-1 rounded border border-white/[0.08] hover:bg-[#1e2330] disabled:opacity-50"
-                              style={{ color: '#60a5fa' }}
                             >
                               {driftLoading ? 'Checking…' : 'Check Drift'}
-                            </button>
+                            </Button>
                           </div>
                         </td>
                       </tr>
@@ -216,9 +255,9 @@ export default function ModelPortfoliosPage() {
                     </Fragment>
                   )
                 })}
-                {modelPortfolios.length === 0 && !modelPortfoliosLoading && (
+                {filteredModels.length === 0 && !modelPortfoliosLoading && (
                   <tr>
-                    <td colSpan={6} className="text-center py-8 text-[12px]" style={{ color: '#64748b' }}>No model portfolios yet.</td>
+                    <td colSpan={6} className="text-center py-8 text-[12px]" style={{ color: '#64748b' }}>No model portfolios match the current filters.</td>
                   </tr>
                 )}
               </tbody>

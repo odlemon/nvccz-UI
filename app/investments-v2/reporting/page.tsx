@@ -1,13 +1,25 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { PageHeader } from '@/components/investments-v2/page-header'
 import { StatusBadge } from '@/components/arcus/status-badge'
 import { cn } from '@/lib/utils'
-import { Download, FileText, Plus, X } from 'lucide-react'
+import { Check, ChevronsUpDown, Download, FileText, Plus, X } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '@/lib/store'
 import { fetchPortfolios, fetchReportTemplates, fetchReports, generateReport } from '@/lib/store/slices/investmentOpsSlice'
 import { investmentOpsApi } from '@/lib/api/investment-ops-api'
+import { useSortedPaginated } from '@/components/investments-v2/ui/use-sorted-paginated'
+import { SortableTh } from '@/components/investments-v2/ui/sortable-th'
+import { TablePagination } from '@/components/investments-v2/ui/table-pagination'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { DatePicker } from '@/components/ui/date-picker'
+
+type ReportSortKey = 'type' | 'createdAt' | 'status'
 
 const FORMAT_EXTENSION: Record<string, string> = {
   DOCX: 'docx',
@@ -41,6 +53,20 @@ export default function ReportingPage() {
   const [form, setForm] = useState(NEW_REPORT_EMPTY)
   const [formError, setFormError] = useState('')
   const [downloadingById, setDownloadingById] = useState<Record<string, boolean>>({})
+  const [reportTypeComboOpen, setReportTypeComboOpen] = useState(false)
+  const [searchText, setSearchText] = useState('')
+  const [tableScopeFilter, setTableScopeFilter] = useState('All')
+  const [tableScopeComboOpen, setTableScopeComboOpen] = useState(false)
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined)
+  const [dateTo, setDateTo] = useState<Date | undefined>(undefined)
+  // Radix popovers/selects portal into document.body by default, which sits
+  // outside the .investments-terminal div that scopes the dark/light theme
+  // CSS variables — without this, portaled dropdowns render with the app's
+  // default (light) theme regardless of the investments-v2 theme toggle.
+  const [themeContainer, setThemeContainer] = useState<HTMLElement | null>(null)
+  const rootRef = useCallback((node: HTMLDivElement | null) => {
+    if (node) setThemeContainer(node.closest('.investments-terminal'))
+  }, [])
 
   useEffect(() => {
     dispatch(fetchReportTemplates())
@@ -62,6 +88,40 @@ export default function ReportingPage() {
     () => (activeTab === 'All' ? reportRuns : reportRuns.filter((r) => r.scopeType === activeTab)),
     [reportRuns, activeTab]
   )
+
+  const getReportSortValue = (r: (typeof reportRuns)[number], key: ReportSortKey) => {
+    if (key === 'type') return r.reportTypeName
+    if (key === 'status') return r.status
+    return new Date(r.createdAt).getTime()
+  }
+
+  const filteredRuns = useMemo(() => {
+    const q = searchText.trim().toLowerCase()
+    return visibleRuns.filter((r) => {
+      if (tableScopeFilter !== 'All' && r.scopeType !== tableScopeFilter) return false
+      const createdAt = new Date(r.createdAt)
+      if (dateFrom && createdAt < dateFrom) return false
+      if (dateTo && createdAt > new Date(dateTo.getTime() + 24 * 60 * 60 * 1000 - 1)) return false
+      if (q) {
+        const haystack = [r.reportTypeName, r.fundName ?? r.clientName ?? '', r.requestedBy?.name ?? '']
+          .join(' ')
+          .toLowerCase()
+        if (!haystack.includes(q)) return false
+      }
+      return true
+    })
+  }, [visibleRuns, searchText, tableScopeFilter, dateFrom, dateTo])
+
+  const {
+    pageRows: runRows,
+    sortKey: runSortKey,
+    sortDir: runSortDir,
+    toggleSort: toggleRunSort,
+    page: runPage,
+    setPage: setRunPage,
+    totalPages: runTotalPages,
+    totalRows: runTotalRows,
+  } = useSortedPaginated<(typeof reportRuns)[number], ReportSortKey>(filteredRuns, getReportSortValue, 'createdAt', 10)
 
   const fundName = (fundId: string | null) => (fundId ? portfolios.find((f) => f.id === fundId)?.name ?? '—' : null)
   const selectedTemplate = reportTemplates.find((t) => t.code === form.reportType)
@@ -134,13 +194,13 @@ export default function ReportingPage() {
   }
 
   return (
-    <div className="flex flex-col h-full w-full">
+    <div ref={rootRef} className="flex flex-col h-full w-full">
       <PageHeader title="Reporting" />
 
       <div className="flex items-center gap-4 px-4 pt-3 pb-0 border-b flex-shrink-0 overflow-x-auto" style={{ borderColor: 'var(--border)' }}>
         {scopeTabs.map(t => (
           <button key={t} onClick={() => setActiveTab(t)}
-            className={cn('text-xs pb-2 border-b-2 whitespace-nowrap', activeTab === t ? 'border-[#2563EB] text-[#60A5FA]' : 'border-transparent text-[#6B7A95] hover:text-[#A8B4C8]')}>
+            className={cn('text-xs pb-2 border-b-2 whitespace-nowrap', activeTab === t ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground')}>
             {t}
           </button>
         ))}
@@ -153,153 +213,217 @@ export default function ReportingPage() {
             <button
               key={tmpl.code}
               onClick={() => handlePickTemplate(tmpl.code)}
-              className="bg-[#0D1526] border border-white/[0.06] rounded-md p-3 text-left hover:border-[#2563EB]/40 transition-colors"
+              className="bg-card border border-border rounded-md p-3 text-left hover:border-primary/40 transition-colors"
             >
-              <div className="w-8 h-8 rounded bg-[#1E3A5F] flex items-center justify-center mb-2">
-                <FileText className="w-4 h-4 text-[#60A5FA]" />
+              <div className="w-8 h-8 rounded bg-accent flex items-center justify-center mb-2">
+                <FileText className="w-4 h-4 text-accent-foreground" />
               </div>
-              <div className="text-[11px] font-semibold text-[#C8D3E8] leading-tight">{tmpl.name}</div>
-              <div className="text-[10px] text-[#4B5A72] mt-0.5 leading-tight">{tmpl.description}</div>
+              <div className="text-[11px] font-semibold text-foreground leading-tight">{tmpl.name}</div>
+              <div className="text-[10px] text-muted-foreground mt-0.5 leading-tight">{tmpl.description}</div>
             </button>
           ))}
           {visibleTemplates.length === 0 && !reportTemplatesLoading && (
-            <div className="col-span-6 text-center py-6 text-[12px]" style={{ color: '#64748b' }}>No report templates available.</div>
+            <div className="col-span-6 text-center py-6 text-[12px] text-muted-foreground">No report templates available.</div>
           )}
         </div>
 
         {/* Report library */}
-        <div className="bg-[#0D1526] border border-white/[0.06] rounded-md overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/[0.06]">
-            <div className="text-xs font-semibold text-[#E8EDF5]">Report Library</div>
-            <button onClick={() => setShowGenerate(true)} className="flex items-center gap-1.5 bg-[#2563EB] text-white text-xs font-medium px-3 py-1.5 rounded hover:bg-[#1D4ED8]">
+        <div className="bg-card border border-border rounded-md overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-2.5 border-b border-border">
+            <div className="text-xs font-semibold text-foreground">Report Library</div>
+            <Button variant="default" size="pill" onClick={() => setShowGenerate(true)}>
               <Plus className="w-3 h-3" /> Generate Report
-            </button>
+            </Button>
           </div>
 
           {showGenerate && (
-            <div className="p-4 border-b border-white/[0.06]">
+            <div className="p-4 border-b border-border">
               <div className="flex items-center justify-between mb-3">
-                <div className="text-[12px] font-semibold text-[#E8EDF5]">Generate Report</div>
-                <button onClick={() => setShowGenerate(false)} className="text-[#6B7A95] hover:text-[#EF4444]">
+                <div className="text-[12px] font-semibold text-foreground">Generate Report</div>
+                <button onClick={() => setShowGenerate(false)} className="text-muted-foreground hover:text-destructive">
                   <X className="w-4 h-4" />
                 </button>
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="text-[10px] text-[#6B7A95] uppercase tracking-wider block mb-1">Report Type</label>
-                  <select
-                    value={form.reportType}
-                    onChange={(e) => handleReportTypeChange(e.target.value)}
-                    className="w-full bg-[#111C30] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#C8D3E8] outline-none focus:border-[#2563EB]/60"
-                  >
-                    <option value="" disabled>Select report type…</option>
-                    {reportTemplates.map((t) => (
-                      <option key={t.code} value={t.code}>{t.name}</option>
-                    ))}
-                  </select>
+                  <label className="text-[10px] text-muted-foreground uppercase tracking-wider block mb-1">Report Type</label>
+                  <Popover open={reportTypeComboOpen} onOpenChange={setReportTypeComboOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={reportTypeComboOpen}
+                        className="w-full justify-between rounded-full font-normal"
+                      >
+                        <span className="truncate">{selectedTemplate?.name ?? 'Select report type…'}</span>
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[260px] p-0" align="start" container={themeContainer}>
+                      <Command>
+                        <CommandInput placeholder="Search report type…" />
+                        <CommandList>
+                          <CommandEmpty>No report types found.</CommandEmpty>
+                          <CommandGroup>
+                            {reportTemplates.map((t) => (
+                              <CommandItem
+                                key={t.code}
+                                value={t.name}
+                                onSelect={() => {
+                                  handleReportTypeChange(t.code)
+                                  setReportTypeComboOpen(false)
+                                }}
+                              >
+                                <Check className={cn('mr-2 h-4 w-4', form.reportType === t.code ? 'opacity-100' : 'opacity-0')} />
+                                {t.name}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 <div>
-                  <label className="text-[10px] text-[#6B7A95] uppercase tracking-wider block mb-1">Format</label>
-                  <select
-                    value={form.format}
-                    onChange={(e) => setForm((p) => ({ ...p, format: e.target.value }))}
-                    className="w-full bg-[#111C30] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#C8D3E8] outline-none focus:border-[#2563EB]/60"
-                  >
-                    <option value="" disabled>Select format…</option>
-                    {(selectedTemplate?.supportedFormats ?? []).map((f) => (
-                      <option key={f} value={f}>{f}</option>
-                    ))}
-                  </select>
+                  <label className="text-[10px] text-muted-foreground uppercase tracking-wider block mb-1">Format</label>
+                  <Select value={form.format} onValueChange={(v) => setForm((p) => ({ ...p, format: v }))}>
+                    <SelectTrigger className="w-full rounded-full">
+                      <SelectValue placeholder="Select format…" />
+                    </SelectTrigger>
+                    <SelectContent container={themeContainer}>
+                      {(selectedTemplate?.supportedFormats ?? []).map((f) => (
+                        <SelectItem key={f} value={f}>{f}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 {selectedTemplate?.requiresFundId && (
                   <div>
-                    <label className="text-[10px] text-[#6B7A95] uppercase tracking-wider block mb-1">Fund</label>
-                    <div className="px-2.5 py-1.5 text-xs text-[#94a3b8] bg-[#111C30] border border-white/[0.08] rounded">
-                      {fundName(selectedFundId) ?? '—'}
-                    </div>
+                    <label className="text-[10px] text-muted-foreground uppercase tracking-wider block mb-1">Fund</label>
+                    <Input value={fundName(selectedFundId) ?? '—'} disabled readOnly />
                   </div>
                 )}
                 {selectedTemplate?.requiresClientId && (
                   <div>
-                    <label className="text-[10px] text-[#6B7A95] uppercase tracking-wider block mb-1">Client ID</label>
-                    <input
+                    <label className="text-[10px] text-muted-foreground uppercase tracking-wider block mb-1">Client ID</label>
+                    <Input
                       value={form.clientId}
                       onChange={(e) => setForm((p) => ({ ...p, clientId: e.target.value }))}
                       placeholder="Client mandate ID"
-                      className="w-full bg-[#111C30] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#C8D3E8] outline-none focus:border-[#2563EB]/60 font-mono"
+                      className="font-mono"
                     />
                   </div>
                 )}
                 <div className="col-span-3">
-                  <label className="text-[10px] text-[#6B7A95] uppercase tracking-wider block mb-1">Parameters (JSON)</label>
-                  <textarea
+                  <label className="text-[10px] text-muted-foreground uppercase tracking-wider block mb-1">Parameters (JSON)</label>
+                  <Textarea
                     value={form.parameters}
                     onChange={(e) => setForm((p) => ({ ...p, parameters: e.target.value }))}
                     rows={4}
                     placeholder='{"periodStart": "2026-01-01", "periodEnd": "2026-03-31"}'
-                    className="w-full bg-[#111C30] border border-white/[0.08] rounded px-2.5 py-1.5 text-xs text-[#C8D3E8] outline-none focus:border-[#2563EB]/60 font-mono"
+                    className="font-mono"
                   />
                 </div>
               </div>
-              {formError && <div className="text-[11px] text-[#EF4444] mt-2">{formError}</div>}
+              {formError && <div className="text-[11px] text-destructive mt-2">{formError}</div>}
               <div className="flex items-center justify-end gap-2 mt-3">
-                <button onClick={() => setShowGenerate(false)} className="bg-[#111C30] text-[#A8B4C8] text-xs px-3 py-1.5 rounded border border-white/[0.06] hover:bg-[#1A2540]">Cancel</button>
-                <button
-                  onClick={handleGenerate}
-                  disabled={reportGenerating}
-                  className="bg-[#2563EB] text-white text-xs font-medium px-4 py-1.5 rounded hover:bg-[#1D4ED8] disabled:opacity-50"
-                >
+                <Button variant="outline" size="pill" onClick={() => setShowGenerate(false)}>Cancel</Button>
+                <Button variant="default" size="pill" onClick={handleGenerate} disabled={reportGenerating}>
                   {reportGenerating ? 'Generating…' : 'Generate'}
-                </button>
+                </Button>
               </div>
             </div>
           )}
 
+          {/* Report Library filters */}
+          <div className="flex items-center gap-2 flex-wrap p-4 border-b border-border">
+            <Input
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              placeholder="Search by type, fund/client, or requester…"
+              className="w-64"
+            />
+            <Popover open={tableScopeComboOpen} onOpenChange={setTableScopeComboOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" role="combobox" aria-expanded={tableScopeComboOpen} className="w-40 justify-between rounded-full font-normal">
+                  <span className="truncate">{tableScopeFilter}</span>
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-40 p-0" align="start" container={themeContainer}>
+                <Command>
+                  <CommandInput placeholder="Search scope…" />
+                  <CommandList>
+                    <CommandEmpty>No scopes found.</CommandEmpty>
+                    <CommandGroup>
+                      {scopeTabs.map((t) => (
+                        <CommandItem
+                          key={t}
+                          value={t}
+                          onSelect={() => {
+                            setTableScopeFilter(t)
+                            setTableScopeComboOpen(false)
+                          }}
+                        >
+                          <Check className={cn('mr-2 h-4 w-4', tableScopeFilter === t ? 'opacity-100' : 'opacity-0')} />
+                          {t}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+            <DatePicker value={dateFrom} onChange={setDateFrom} placeholder="From date" className="w-40" allowFutureDates container={themeContainer} />
+            <DatePicker value={dateTo} onChange={setDateTo} placeholder="To date" className="w-40" allowFutureDates container={themeContainer} />
+          </div>
+
           <table className="arcus-table">
             <thead>
               <tr>
-                <th>Report ID</th>
-                <th>Type</th>
+                <SortableTh col="type" label="Type" sortKey={runSortKey} sortDir={runSortDir} onSort={toggleRunSort} />
                 <th>Format</th>
                 <th>Scope</th>
                 <th>Requested By</th>
-                <th>Created At</th>
-                <th>Status</th>
+                <SortableTh col="createdAt" label="Created At" sortKey={runSortKey} sortDir={runSortDir} onSort={toggleRunSort} />
+                <SortableTh col="status" label="Status" sortKey={runSortKey} sortDir={runSortDir} onSort={toggleRunSort} />
                 <th>Action</th>
               </tr>
             </thead>
             <tbody>
-              {visibleRuns.map(r => (
+              {runRows.map(r => (
                 <tr key={r.id}>
-                  <td className="text-[#60A5FA] font-mono text-[11px]">{r.id}</td>
                   <td>
-                    <span className="text-[10px] bg-[#1E3A5F] text-[#60A5FA] px-2 py-0.5 rounded">{r.reportTypeName}</span>
+                    <span className="text-[10px] bg-accent text-accent-foreground px-2 py-0.5 rounded">{r.reportTypeName}</span>
                   </td>
-                  <td className="text-[#6B7A95]">{r.format}</td>
-                  <td className="text-[#A8B4C8]">{r.fundName ?? r.clientName ?? 'Firm-wide'}</td>
-                  <td className="text-[#A8B4C8]">{r.requestedBy?.name ?? '—'}</td>
-                  <td className="text-[#6B7A95]">{new Date(r.createdAt).toLocaleString()}</td>
+                  <td className="text-muted-foreground">{r.format}</td>
+                  <td className="text-muted-foreground">{r.fundName ?? r.clientName ?? 'Firm-wide'}</td>
+                  <td className="text-muted-foreground">{r.requestedBy?.name ?? '—'}</td>
+                  <td className="text-muted-foreground">{new Date(r.createdAt).toLocaleString()}</td>
                   <td><StatusBadge status={r.status === 'COMPLETED' ? 'completed' : r.status.toLowerCase()} /></td>
                   <td>
                     {r.downloadAvailable && (
-                      <button
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="rounded-full"
                         disabled={!!downloadingById[r.id]}
                         onClick={() => handleDownload(r)}
-                        className="flex items-center gap-1 text-[#60A5FA] text-[10px] hover:underline disabled:opacity-50"
                       >
                         <Download className="w-3 h-3" /> {downloadingById[r.id] ? 'Downloading…' : 'Download'}
-                      </button>
+                      </Button>
                     )}
                   </td>
                 </tr>
               ))}
-              {visibleRuns.length === 0 && !reportRunsLoading && (
+              {filteredRuns.length === 0 && !reportRunsLoading && (
                 <tr>
-                  <td colSpan={8} className="text-center py-8 text-[12px]" style={{ color: '#64748b' }}>No reports generated yet.</td>
+                  <td colSpan={7} className="text-center py-8 text-[12px] text-muted-foreground">No reports generated yet.</td>
                 </tr>
               )}
             </tbody>
           </table>
+          <TablePagination page={runPage} totalPages={runTotalPages} onPageChange={setRunPage} rowsShown={runRows.length} totalRows={runTotalRows} />
         </div>
       </div>
     </div>

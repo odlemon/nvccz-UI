@@ -19,6 +19,9 @@ import {
   fetchInstrumentTypes,
   fetchSetupSettings, updateSetupSettings,
 } from '@/lib/store/slices/investmentOpsSlice'
+import { useSortedPaginated } from '@/components/investments-v2/ui/use-sorted-paginated'
+import { SortableTh } from '@/components/investments-v2/ui/sortable-th'
+import { TablePagination } from '@/components/investments-v2/ui/table-pagination'
 
 const setupTabs = ['Setup', 'Broker/Counterparties', 'Commissions', 'Countries', 'Currencies', 'Instrument Types', 'Issuer', 'Markets']
 
@@ -186,6 +189,65 @@ export default function PortfolioSetupPage() {
     setIssuerForm(NEW_ISSUER_EMPTY)
     setShowNewIssuer(false)
   }
+
+  type StakeholderSortKey = 'name' | 'contactEmail' | 'status'
+  const brokersTable = useSortedPaginated<(typeof brokers)[number], StakeholderSortKey>(
+    brokers,
+    (b, key) => (key === 'status' ? (b.isActive ? 1 : 0) : b[key]),
+    'name',
+    10
+  )
+  const custodiansTable = useSortedPaginated<(typeof custodians)[number], StakeholderSortKey>(
+    custodians,
+    (c, key) => (key === 'status' ? (c.isActive ? 1 : 0) : c[key]),
+    'name',
+    10
+  )
+
+  type CommissionSortKey = 'stakeholder' | 'rateBps' | 'currency' | 'status'
+  const commissionsTable = useSortedPaginated<(typeof commissions)[number], CommissionSortKey>(
+    commissions,
+    (c, key) => {
+      if (key === 'stakeholder') return stakeholderName(c.stakeholderProfileId)
+      if (key === 'rateBps') return c.rateBps
+      if (key === 'currency') return c.currencyCode
+      return c.isActive ? 1 : 0
+    },
+    'stakeholder',
+    10
+  )
+
+  type CountrySortKey = 'countryCode' | 'countryName' | 'region'
+  const countriesTable = useSortedPaginated<(typeof countries)[number], CountrySortKey>(
+    countries,
+    (c, key) => c[key],
+    'countryName',
+    10
+  )
+
+  type CurrencySortKey = 'code' | 'name' | 'status'
+  const currenciesTable = useSortedPaginated<(typeof setupCurrencies)[number], CurrencySortKey>(
+    setupCurrencies,
+    (c, key) => (key === 'status' ? (c.isActive ? 1 : 0) : c[key]),
+    'code',
+    10
+  )
+
+  type IssuerSortKey = 'issuerCode' | 'legalName' | 'countryCode'
+  const issuersTable = useSortedPaginated<(typeof issuers)[number], IssuerSortKey>(
+    issuers,
+    (i, key) => i[key] ?? '',
+    'legalName',
+    10
+  )
+
+  type MarketSortKey = 'marketCode' | 'marketName' | 'countryCode'
+  const marketsTable = useSortedPaginated<(typeof markets)[number], MarketSortKey>(
+    markets,
+    (m, key) => m[key] ?? '',
+    'marketName',
+    10
+  )
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -367,9 +429,15 @@ export default function PortfolioSetupPage() {
                 </div>
               )}
               <table className="arcus-table">
-                <thead><tr><th>Name</th><th>Contact Email</th><th>Status</th></tr></thead>
+                <thead>
+                  <tr>
+                    <SortableTh col="name" label="Name" sortKey={brokersTable.sortKey} sortDir={brokersTable.sortDir} onSort={brokersTable.toggleSort} />
+                    <SortableTh col="contactEmail" label="Contact Email" sortKey={brokersTable.sortKey} sortDir={brokersTable.sortDir} onSort={brokersTable.toggleSort} />
+                    <SortableTh col="status" label="Status" sortKey={brokersTable.sortKey} sortDir={brokersTable.sortDir} onSort={brokersTable.toggleSort} />
+                  </tr>
+                </thead>
                 <tbody>
-                  {brokers.map((b) => (
+                  {brokersTable.pageRows.map((b) => (
                     <tr key={b.id}>
                       <td style={{ color: '#e2e8f0' }}>{b.name}</td>
                       <td style={{ color: '#94a3b8' }}>{b.contactEmail}</td>
@@ -379,6 +447,7 @@ export default function PortfolioSetupPage() {
                   {brokers.length === 0 && <tr><td colSpan={3} className="text-center py-6 text-[12px]" style={{ color: '#64748b' }}>No brokers configured.</td></tr>}
                 </tbody>
               </table>
+              <TablePagination page={brokersTable.page} totalPages={brokersTable.totalPages} onPageChange={brokersTable.setPage} rowsShown={brokersTable.pageRows.length} totalRows={brokersTable.totalRows} />
             </div>
 
             <div className="arcus-card">
@@ -403,9 +472,15 @@ export default function PortfolioSetupPage() {
                 </div>
               )}
               <table className="arcus-table">
-                <thead><tr><th>Name</th><th>Contact Email</th><th>Status</th></tr></thead>
+                <thead>
+                  <tr>
+                    <SortableTh col="name" label="Name" sortKey={custodiansTable.sortKey} sortDir={custodiansTable.sortDir} onSort={custodiansTable.toggleSort} />
+                    <SortableTh col="contactEmail" label="Contact Email" sortKey={custodiansTable.sortKey} sortDir={custodiansTable.sortDir} onSort={custodiansTable.toggleSort} />
+                    <SortableTh col="status" label="Status" sortKey={custodiansTable.sortKey} sortDir={custodiansTable.sortDir} onSort={custodiansTable.toggleSort} />
+                  </tr>
+                </thead>
                 <tbody>
-                  {custodians.map((c) => (
+                  {custodiansTable.pageRows.map((c) => (
                     <tr key={c.id}>
                       <td style={{ color: '#e2e8f0' }}>{c.name}</td>
                       <td style={{ color: '#94a3b8' }}>{c.contactEmail}</td>
@@ -415,6 +490,7 @@ export default function PortfolioSetupPage() {
                   {custodians.length === 0 && <tr><td colSpan={3} className="text-center py-6 text-[12px]" style={{ color: '#64748b' }}>No custodians configured.</td></tr>}
                 </tbody>
               </table>
+              <TablePagination page={custodiansTable.page} totalPages={custodiansTable.totalPages} onPageChange={custodiansTable.setPage} rowsShown={custodiansTable.pageRows.length} totalRows={custodiansTable.totalRows} />
             </div>
           </div>
         )}
@@ -447,9 +523,18 @@ export default function PortfolioSetupPage() {
               </div>
             )}
             <table className="arcus-table">
-              <thead><tr><th>Stakeholder</th><th>Instrument Type</th><th className="text-right">Rate (bps)</th><th className="text-right">Flat Fee</th><th>Currency</th><th>Status</th></tr></thead>
+              <thead>
+                <tr>
+                  <SortableTh col="stakeholder" label="Stakeholder" sortKey={commissionsTable.sortKey} sortDir={commissionsTable.sortDir} onSort={commissionsTable.toggleSort} />
+                  <th>Instrument Type</th>
+                  <SortableTh col="rateBps" label="Rate (bps)" sortKey={commissionsTable.sortKey} sortDir={commissionsTable.sortDir} onSort={commissionsTable.toggleSort} align="right" />
+                  <th className="text-right">Flat Fee</th>
+                  <SortableTh col="currency" label="Currency" sortKey={commissionsTable.sortKey} sortDir={commissionsTable.sortDir} onSort={commissionsTable.toggleSort} />
+                  <SortableTh col="status" label="Status" sortKey={commissionsTable.sortKey} sortDir={commissionsTable.sortDir} onSort={commissionsTable.toggleSort} />
+                </tr>
+              </thead>
               <tbody>
-                {commissions.map((c) => (
+                {commissionsTable.pageRows.map((c) => (
                   <tr key={c.id}>
                     <td style={{ color: '#e2e8f0' }}>{stakeholderName(c.stakeholderProfileId)}</td>
                     <td style={{ color: '#64748b' }}>{c.instrumentTypeCode ?? 'All'}</td>
@@ -462,6 +547,7 @@ export default function PortfolioSetupPage() {
                 {commissions.length === 0 && <tr><td colSpan={6} className="text-center py-6 text-[12px]" style={{ color: '#64748b' }}>No commission rates configured.</td></tr>}
               </tbody>
             </table>
+            <TablePagination page={commissionsTable.page} totalPages={commissionsTable.totalPages} onPageChange={commissionsTable.setPage} rowsShown={commissionsTable.pageRows.length} totalRows={commissionsTable.totalRows} />
           </div>
         )}
 
@@ -486,9 +572,16 @@ export default function PortfolioSetupPage() {
               </div>
             )}
             <table className="arcus-table">
-              <thead><tr><th>Code</th><th>Name</th><th>Region</th><th>Status</th></tr></thead>
+              <thead>
+                <tr>
+                  <SortableTh col="countryCode" label="Code" sortKey={countriesTable.sortKey} sortDir={countriesTable.sortDir} onSort={countriesTable.toggleSort} />
+                  <SortableTh col="countryName" label="Name" sortKey={countriesTable.sortKey} sortDir={countriesTable.sortDir} onSort={countriesTable.toggleSort} />
+                  <SortableTh col="region" label="Region" sortKey={countriesTable.sortKey} sortDir={countriesTable.sortDir} onSort={countriesTable.toggleSort} />
+                  <th>Status</th>
+                </tr>
+              </thead>
               <tbody>
-                {countries.map((c) => (
+                {countriesTable.pageRows.map((c) => (
                   <tr key={c.id}>
                     <td className="font-mono font-bold" style={{ color: '#60A5FA' }}>{c.countryCode}</td>
                     <td style={{ color: '#e2e8f0' }}>{c.countryName}</td>
@@ -499,6 +592,7 @@ export default function PortfolioSetupPage() {
                 {countries.length === 0 && <tr><td colSpan={4} className="text-center py-6 text-[12px]" style={{ color: '#64748b' }}>No countries configured.</td></tr>}
               </tbody>
             </table>
+            <TablePagination page={countriesTable.page} totalPages={countriesTable.totalPages} onPageChange={countriesTable.setPage} rowsShown={countriesTable.pageRows.length} totalRows={countriesTable.totalRows} />
           </div>
         )}
 
@@ -523,9 +617,17 @@ export default function PortfolioSetupPage() {
               </div>
             )}
             <table className="arcus-table">
-              <thead><tr><th>Code</th><th>Name</th><th>Symbol</th><th>Default</th><th>Status</th></tr></thead>
+              <thead>
+                <tr>
+                  <SortableTh col="code" label="Code" sortKey={currenciesTable.sortKey} sortDir={currenciesTable.sortDir} onSort={currenciesTable.toggleSort} />
+                  <SortableTh col="name" label="Name" sortKey={currenciesTable.sortKey} sortDir={currenciesTable.sortDir} onSort={currenciesTable.toggleSort} />
+                  <th>Symbol</th>
+                  <th>Default</th>
+                  <SortableTh col="status" label="Status" sortKey={currenciesTable.sortKey} sortDir={currenciesTable.sortDir} onSort={currenciesTable.toggleSort} />
+                </tr>
+              </thead>
               <tbody>
-                {setupCurrencies.map((c) => (
+                {currenciesTable.pageRows.map((c) => (
                   <tr key={c.id}>
                     <td className="font-mono font-bold" style={{ color: '#60A5FA' }}>{c.code}</td>
                     <td style={{ color: '#e2e8f0' }}>{c.name}</td>
@@ -537,6 +639,7 @@ export default function PortfolioSetupPage() {
                 {setupCurrencies.length === 0 && <tr><td colSpan={5} className="text-center py-6 text-[12px]" style={{ color: '#64748b' }}>No currencies configured.</td></tr>}
               </tbody>
             </table>
+            <TablePagination page={currenciesTable.page} totalPages={currenciesTable.totalPages} onPageChange={currenciesTable.setPage} rowsShown={currenciesTable.pageRows.length} totalRows={currenciesTable.totalRows} />
           </div>
         )}
 
@@ -592,9 +695,17 @@ export default function PortfolioSetupPage() {
               </div>
             )}
             <table className="arcus-table">
-              <thead><tr><th>Code</th><th>Legal Name</th><th>Country</th><th>Sector</th><th>Status</th></tr></thead>
+              <thead>
+                <tr>
+                  <SortableTh col="issuerCode" label="Code" sortKey={issuersTable.sortKey} sortDir={issuersTable.sortDir} onSort={issuersTable.toggleSort} />
+                  <SortableTh col="legalName" label="Legal Name" sortKey={issuersTable.sortKey} sortDir={issuersTable.sortDir} onSort={issuersTable.toggleSort} />
+                  <SortableTh col="countryCode" label="Country" sortKey={issuersTable.sortKey} sortDir={issuersTable.sortDir} onSort={issuersTable.toggleSort} />
+                  <th>Sector</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
               <tbody>
-                {issuers.map((i) => (
+                {issuersTable.pageRows.map((i) => (
                   <tr key={i.id}>
                     <td className="font-mono font-bold" style={{ color: '#60A5FA' }}>{i.issuerCode}</td>
                     <td style={{ color: '#e2e8f0' }}>{i.legalName}</td>
@@ -610,6 +721,7 @@ export default function PortfolioSetupPage() {
                 )}
               </tbody>
             </table>
+            <TablePagination page={issuersTable.page} totalPages={issuersTable.totalPages} onPageChange={issuersTable.setPage} rowsShown={issuersTable.pageRows.length} totalRows={issuersTable.totalRows} />
           </div>
         )}
 
@@ -634,9 +746,17 @@ export default function PortfolioSetupPage() {
               </div>
             )}
             <table className="arcus-table">
-              <thead><tr><th>Code</th><th>Name</th><th>Country</th><th>Exchange Code</th><th>Status</th></tr></thead>
+              <thead>
+                <tr>
+                  <SortableTh col="marketCode" label="Code" sortKey={marketsTable.sortKey} sortDir={marketsTable.sortDir} onSort={marketsTable.toggleSort} />
+                  <SortableTh col="marketName" label="Name" sortKey={marketsTable.sortKey} sortDir={marketsTable.sortDir} onSort={marketsTable.toggleSort} />
+                  <SortableTh col="countryCode" label="Country" sortKey={marketsTable.sortKey} sortDir={marketsTable.sortDir} onSort={marketsTable.toggleSort} />
+                  <th>Exchange Code</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
               <tbody>
-                {markets.map((m) => (
+                {marketsTable.pageRows.map((m) => (
                   <tr key={m.id}>
                     <td className="font-mono font-bold" style={{ color: '#60A5FA' }}>{m.marketCode}</td>
                     <td style={{ color: '#e2e8f0' }}>{m.marketName}</td>
@@ -648,6 +768,7 @@ export default function PortfolioSetupPage() {
                 {markets.length === 0 && <tr><td colSpan={5} className="text-center py-6 text-[12px]" style={{ color: '#64748b' }}>No markets configured.</td></tr>}
               </tbody>
             </table>
+            <TablePagination page={marketsTable.page} totalPages={marketsTable.totalPages} onPageChange={marketsTable.setPage} rowsShown={marketsTable.pageRows.length} totalRows={marketsTable.totalRows} />
           </div>
         )}
       </div>

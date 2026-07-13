@@ -319,7 +319,7 @@ export default function PricesPage() {
           </div>
           <div className="flex items-center gap-2">
             <div
-              className="flex items-center gap-1.5 rounded px-2.5 py-1.5"
+              className="flex items-center gap-1.5 rounded-full px-2.5 py-1.5"
               style={{ background: 'var(--muted)', border: '1px solid var(--border)' }}
             >
               <Search className="w-3.5 h-3.5" style={{ color: 'var(--muted-foreground)' }} />
@@ -334,7 +334,7 @@ export default function PricesPage() {
             <button
               onClick={() => dispatch(fetchLatestPrices())}
               disabled={pricesLoading}
-              className="flex items-center gap-1.5 text-white text-xs font-medium px-3 py-1.5 rounded"
+              className="flex items-center gap-1.5 text-white text-xs font-medium px-3 py-1.5 rounded-full"
               style={{ background: '#2563eb' }}
             >
               <RefreshCw className={cn('w-3 h-3', pricesLoading && 'animate-spin')} />

@@ -15,6 +15,7 @@ interface DatePickerProps {
   className?: string
   disabled?: boolean
   allowFutureDates?: boolean
+  container?: React.ComponentProps<typeof PopoverContent>["container"]
 }
 
 export function DatePicker({
@@ -24,6 +25,7 @@ export function DatePicker({
   className,
   disabled = false,
   allowFutureDates = false,
+  container,
 }: DatePickerProps) {
   const [open, setOpen] = React.useState(false)
 
@@ -48,7 +50,7 @@ export function DatePicker({
           <ChevronDownIcon className="h-4 w-4 flex-shrink-0 ml-2" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="start">
+      <PopoverContent className="w-auto p-0" align="start" container={container}>
         <Calendar
           mode="single"
           selected={value}

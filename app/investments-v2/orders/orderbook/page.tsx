@@ -3,11 +3,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Topbar } from '@/components/arcus/topbar'
 import { cn } from '@/lib/utils'
-import { ChevronDown } from 'lucide-react'
+import { Download } from 'lucide-react'
 import { OrdersSubNav } from '@/components/investments-v2/orders-subnav'
 import { useAppDispatch, useAppSelector } from '@/lib/store'
 import { fetchPortfolios, fetchOrders } from '@/lib/store/slices/investmentOpsSlice'
 import type { OrderStatus } from '@/lib/api/investment-ops-api'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { exportRowsToCsv } from '@/components/investments-v2/ui/export-csv'
 
 // ── Orderbook sub-tabs ────────────────────────────────────────────
 const obTabs = ['Orderbook', 'New', 'Pending', 'Executed'] as const
@@ -53,6 +56,8 @@ export default function OrderbookPage() {
   const { portfolios, orders, ordersTotal, ordersLoading } = useAppSelector((s) => s.investmentOps)
   const [obTab, setObTab] = useState<ObTab>('Orderbook')
   const [activePage, setActivePage] = useState(1)
+  const [searchText, setSearchText] = useState('')
+  const [sortNewestFirst, setSortNewestFirst] = useState(true)
 
   useEffect(() => {
     dispatch(fetchPortfolios())
@@ -64,8 +69,36 @@ export default function OrderbookPage() {
 
   const fundName = (fundId: string) => portfolios.find((f) => f.id === fundId)?.name ?? '—'
 
-  const rows = useMemo(() => orders.filter((o) => matchesTab(o.status, obTab)), [orders, obTab])
+  const rows = useMemo(() => {
+    const q = searchText.trim().toLowerCase()
+    const filtered = orders.filter((o) => {
+      if (!matchesTab(o.status, obTab)) return false
+      if (!q) return true
+      const haystack = [o.instrument?.ticker ?? '', o.instrument?.fullName ?? '', o.instrument?.instrumentCode ?? ''].join(' ').toLowerCase()
+      return haystack.includes(q)
+    })
+    return [...filtered].sort((a, b) => {
+      const dir = sortNewestFirst ? -1 : 1
+      return dir * (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+    })
+  }, [orders, obTab, searchText, sortNewestFirst])
   const pageCount = Math.max(1, Math.ceil(ordersTotal / PAGE_SIZE))
+
+  const handleExport = () => {
+    exportRowsToCsv(
+      `orderbook-${new Date().toISOString().slice(0, 10)}.csv`,
+      ['Status', 'Portfolio', 'Ticker', 'Instrument', 'Quantity', 'Price', 'Order Type'],
+      rows.map((o) => [
+        ORDER_STATUS_LABEL[o.status] ?? o.status,
+        fundName(o.fundId),
+        o.instrument?.ticker ?? o.instrument?.instrumentCode ?? '',
+        o.instrument?.fullName ?? o.instrument?.shortName ?? '',
+        o.quantity,
+        o.limitPrice ?? o.executionPrice,
+        o.orderType,
+      ])
+    )
+  }
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -105,13 +138,16 @@ export default function OrderbookPage() {
         {/* ── Orderbook ── */}
         <div className="arcus-card">
           {/* Card header with title + sort + new blotter */}
-          <div className="flex items-center justify-between px-4 pt-3 pb-0">
+          <div className="flex items-center justify-between px-4 pt-3 pb-0 flex-wrap gap-2">
             <span className="text-white text-[13px] font-semibold">Orderbook</span>
             <div className="flex items-center gap-2">
-              <button className="sort-pill text-[11px]">
-                Sort by: New <ChevronDown className="w-3 h-3" />
-              </button>
-              <button className="btn-white text-[12px] py-1 px-4">New Blotter</button>
+              <Button variant="outline" size="pill" onClick={() => setSortNewestFirst((v) => !v)}>
+                Sort by: {sortNewestFirst ? 'Newest' : 'Oldest'}
+              </Button>
+              <Button variant="outline" size="pill" onClick={handleExport}>
+                <Download className="w-3 h-3" /> Export
+              </Button>
+              <Button variant="default" size="pill">New Blotter</Button>
             </div>
           </div>
 
@@ -126,6 +162,16 @@ export default function OrderbookPage() {
                 {t}
               </button>
             ))}
+          </div>
+
+          {/* Search */}
+          <div className="px-4 pt-3">
+            <Input
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              placeholder="Search ticker or instrument…"
+              className="w-64"
+            />
           </div>
 
           {/* Table */}
