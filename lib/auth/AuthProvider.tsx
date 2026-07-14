@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { useAppDispatch, useAppSelector } from '@/lib/store'
 import { checkAuthStatus } from '@/lib/store/slices/authSlice'
@@ -9,17 +9,26 @@ interface AuthProviderProps {
   children: React.ReactNode
 }
 
+const AUTH_BOOT_TIMEOUT_MS = 10000
+
 export function AuthProvider({ children }: AuthProviderProps) {
   const dispatch = useAppDispatch()
   const pathname = usePathname()
-  const { isLoading, isFetchingDetails } = useAppSelector((state) => state.auth)
+  const { isLoading } = useAppSelector((state) => state.auth)
+  const [bootTimedOut, setBootTimedOut] = useState(false)
 
   useEffect(() => {
     // Check if user is already authenticated on app load
     dispatch(checkAuthStatus())
   }, [dispatch])
 
-  const waitingForSession = isLoading || isFetchingDetails
+  useEffect(() => {
+    const timer = setTimeout(() => setBootTimedOut(true), AUTH_BOOT_TIMEOUT_MS)
+    return () => clearTimeout(timer)
+  }, [])
+
+  // Only block the app on initial session resolution — not on background profile refresh
+  const waitingForSession = isLoading && !bootTimedOut
 
   // Show loading state while checking authentication, but not on login page
   if (waitingForSession && pathname !== '/login') {

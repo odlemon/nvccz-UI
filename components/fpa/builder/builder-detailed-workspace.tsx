@@ -47,7 +47,11 @@ import {
   buildDetailedRows,
   impactNodeNames,
   type DetailedAuditRow,
+  type DetailedCellMeta,
   type DetailedExceptionRow,
+  type DetailedMappingRow,
+  type DetailedSensitivityView,
+  type DetailedTraceView,
   type DetailedValidationCheck,
   type DetailedWorkspaceRow,
 } from "@/lib/fpa/detailed-workspace-adapters"
@@ -192,13 +196,13 @@ function FormulaHighlight({
 }
 
 const DEMO_MAPPINGS = [
-  { source: "GL_ACCOUNT.4000", system: "NetSuite GL", target: "Payroll Expense", ok: true },
-  { source: "GL_ACCOUNT.6100", system: "NetSuite GL", target: "Marketing Spend", ok: true },
-  { source: "SALES_ORDER.AMOUNT", system: "Salesforce", target: "New Bookings", ok: true },
-  { source: "HR_HEADCOUNT", system: "Workday HR", target: "Headcount", ok: true },
-  { source: "BANK_CASH_BALANCE", system: "Plaid (Bank)", target: "Cash Balance", ok: true },
-  { source: "GL_ACCOUNT.7000", system: "NetSuite GL", target: "Other Operating Expense", ok: false },
-  { source: "GL_ACCOUNT.7200", system: "NetSuite GL", target: "R&D Expense", ok: false },
+  { source: "CSV.PAYROLL_EXPENSE", system: "Custom / CSV", target: "Payroll Expense", ok: true },
+  { source: "GL_ACCOUNT.6100", system: "Accounting GL", target: "Marketing Spend", ok: true },
+  { source: "CRM.NEW_BOOKINGS", system: "CRM", target: "New Bookings", ok: true },
+  { source: "PR.HEADCOUNT", system: "Payroll", target: "Headcount", ok: true },
+  { source: "BANK.CASH_BALANCE", system: "Banking", target: "Cash Balance", ok: true },
+  { source: "PROC.PO_AMOUNT", system: "Procurement", target: "Other Operating Expense", ok: false },
+  { source: "MANUAL.RD_DRIVER", system: "Manual", target: "R&D Expense", ok: false },
 ]
 
 const DEMO_AUDIT = [
@@ -207,7 +211,7 @@ const DEMO_AUDIT = [
   { id: "a3", time: "May 11, 2026 4:22 PM", user: "James Okonkwo", action: "Added Line Item", details: "Cash Balance" },
   { id: "a4", time: "May 11, 2026 11:05 AM", user: "Priya Shah", action: "Updated Driver", details: "Churn" },
   { id: "a5", time: "May 10, 2026 2:38 PM", user: "Michael Chen", action: "Validated Module", details: "Revenue & P&L" },
-  { id: "a6", time: "May 9, 2026 10:15 AM", user: "Sarah Delgado", action: "Imported Data", details: "NetSuite GL" },
+  { id: "a6", time: "May 9, 2026 10:15 AM", user: "Sarah Delgado", action: "Imported Data", details: "Custom / CSV" },
 ]
 
 const AUDIT_AVATAR_COLORS: Record<string, { bg: string; text: string }> = {
@@ -263,11 +267,6 @@ const DEMO_VALIDATION_CHECKS = [
 ]
 
 type DetailModalKind = "mappings" | "audit" | "exceptions" | "validation" | null
-const IMPACT_CHART_MONTHS = ["Jan '26", "Mar '26", "May '26", "Jul '26", "Sep '26", "Nov '26"]
-const IMPACT_BASE_CASE = [1.02, 1.12, 1.22, 1.32, 1.42, 1.52]
-const IMPACT_SCENARIO = [1.08, 1.2, 1.32, 1.45, 1.58, 1.72]
-const IMPACT_Y_MIN = 0.5
-const IMPACT_Y_MAX = 2.0
 
 type Props = {
   model: FpaModel | null
@@ -276,7 +275,12 @@ type Props = {
   canEdit: boolean
   onBack: () => void
   onOpenHistory: () => void
+  onOpenModelSettings?: () => void
   onTestCalc: () => void
+  onPublish?: () => void
+  /** True when model/version is already published — keep Publish disabled. */
+  publishDisabled?: boolean
+  modelPublished?: boolean
   onLeafChange: (leaf: SelectedModuleLeaf) => void
   onSelectRow?: (row: { id: string; name: string; formula: string; kind: "INPUT" | "CALCULATED" }) => void
   lineItems?: FpaLineItem[]
@@ -284,16 +288,33 @@ type Props = {
   periodLabels?: string[]
   periodKeys?: string[]
   previewByLine?: Record<string, Array<number | null>>
+  fyTotals?: Record<string, number> | null
+  gridGrain?: "monthly" | "quarterly" | "annual"
+  onGridGrainChange?: (grain: "monthly" | "quarterly" | "annual") => void
   selectedLineItemId?: string | null
   auditRows?: DetailedAuditRow[]
   exceptionRows?: DetailedExceptionRow[]
   validationSummary?: { total: number; passed: number; warnings: number; errors: number }
   validationChecks?: DetailedValidationCheck[]
+  mappingRows?: DetailedMappingRow[]
+  mappedPct?: number
+  mappingsInferred?: boolean
+  sensitivity?: DetailedSensitivityView | null
+  cellMeta?: DetailedCellMeta | null
+  cellTrace?: DetailedTraceView | null
   formulaImpact?: {
     precedents?: FpaFormulaImpactNode[]
     dependents?: FpaFormulaImpactNode[]
   } | null
   onCellCommit?: (lineItemId: string, periodIndex: number, value: number) => void
+  onFormulaCommit?: (lineItemId: string, expression: string) => void
+  onAddLineItem?: () => void
+  onOpenCreateMapping?: (defaults?: { targetLineItemId?: string }) => void
+  onEditMapping?: (row: DetailedMappingRow) => void
+  onRefreshMappings?: () => void
+  onSeedMappingCatalog?: () => void
+  onImportSourceFile?: () => void
+  onRunSensitivity?: (driverLineItemId: string, shockPct: number) => void
   onValidate?: () => void
 }
 
@@ -304,7 +325,11 @@ export function BuilderDetailedWorkspace({
   canEdit,
   onBack,
   onOpenHistory,
+  onOpenModelSettings,
   onTestCalc,
+  onPublish,
+  publishDisabled = false,
+  modelPublished = false,
   onLeafChange,
   onSelectRow,
   lineItems = [],
@@ -312,13 +337,30 @@ export function BuilderDetailedWorkspace({
   periodLabels = [],
   periodKeys = [],
   previewByLine = {},
+  fyTotals = null,
+  gridGrain,
+  onGridGrainChange,
   selectedLineItemId,
   auditRows,
   exceptionRows,
   validationSummary,
   validationChecks,
+  mappingRows,
+  mappedPct: mappedPctProp,
+  mappingsInferred = false,
+  sensitivity,
+  cellMeta = null,
+  cellTrace = null,
   formulaImpact,
   onCellCommit,
+  onFormulaCommit,
+  onAddLineItem,
+  onOpenCreateMapping,
+  onEditMapping,
+  onRefreshMappings,
+  onSeedMappingCatalog,
+  onImportSourceFile,
+  onRunSensitivity,
   onValidate,
 }: Props) {
   const useLiveGrid = lineItems.length > 0 && periodLabels.length > 0
@@ -327,9 +369,9 @@ export function BuilderDetailedWorkspace({
   const liveRows = useMemo(
     () =>
       useLiveGrid
-        ? buildDetailedRows(lineItems, monthHeaders.length, previewByLine)
+        ? buildDetailedRows(lineItems, monthHeaders.length, previewByLine, fyTotals)
         : rowsForWorkspace(leaf?.leafId),
-    [useLiveGrid, lineItems, monthHeaders.length, previewByLine, leaf?.leafId],
+    [useLiveGrid, lineItems, monthHeaders.length, previewByLine, fyTotals, leaf?.leafId],
   )
 
   const [rows, setRows] = useState<WorkspaceRow[]>(() => liveRows)
@@ -339,7 +381,9 @@ export function BuilderDetailedWorkspace({
     return prefer?.id || "ebitda"
   })
   const [showHidden, setShowHidden] = useState(false)
-  const [grain, setGrain] = useState<"Monthly" | "Quarterly" | "Annual">("Monthly")
+  const grainFromProp =
+    gridGrain === "quarterly" ? "Quarterly" : gridGrain === "annual" ? "Annual" : "Monthly"
+  const [grain, setGrain] = useState<"Monthly" | "Quarterly" | "Annual">(grainFromProp)
   const [gridView, setGridView] = useState<"grid" | "columns" | "filter">("grid")
   const [editing, setEditing] = useState<{ rowId: string; col: number | "formula" } | null>(null)
   const [draft, setDraft] = useState("")
@@ -356,6 +400,15 @@ export function BuilderDetailedWorkspace({
   )
   const [focusExceptions, setFocusExceptions] = useState(false)
   const [detailModal, setDetailModal] = useState<DetailModalKind>(null)
+  const [shockPct, setShockPct] = useState(5)
+
+  useEffect(() => {
+    if (gridGrain) {
+      setGrain(
+        gridGrain === "quarterly" ? "Quarterly" : gridGrain === "annual" ? "Annual" : "Monthly",
+      )
+    }
+  }, [gridGrain])
 
   useEffect(() => {
     setRows(liveRows)
@@ -370,23 +423,7 @@ export function BuilderDetailedWorkspace({
         message: "Detailed grid using demo P&L — no live line items or periods",
         impact: "Line Item Builder shows SRD mock instead of API values",
       })
-      return
     }
-    logFpaGap({
-      category: "missing",
-      path: "/v1/fpa/models/:id/data-mappings",
-      method: "GET",
-      message: "Data Mapping card uses demo rows until mappings API ships",
-      impact: "Mapping coverage and row actions are not backed by API",
-    })
-    logFpaGap({
-      category: "missing",
-      path: "/v1/fpa/models/:id/sensitivity-analysis",
-      method: "POST",
-      message: "Impact Analysis card uses demo chart until sensitivity API ships",
-      impact: "Driver shock metrics are not computed from calc engine",
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- log once per workspace mode
   }, [useLiveGrid])
 
   useEffect(() => {
@@ -435,8 +472,19 @@ export function BuilderDetailedWorkspace({
   const exceptionData = exceptionRows ?? DEMO_EXCEPTIONS
   const valSummary = validationSummary ?? VALIDATION_SUMMARY
   const valChecks = validationChecks ?? DEMO_VALIDATION_CHECKS
+  const mappingData: DetailedMappingRow[] =
+    mappingRows ??
+    DEMO_MAPPINGS.map((m, i) => ({
+      id: `demo-${i}`,
+      source: m.source,
+      system: m.system,
+      target: m.target,
+      targetLineItemId: null,
+      ok: m.ok,
+      status: m.ok ? "MAPPED" : "UNMAPPED",
+    }))
 
-  const filteredMaps = DEMO_MAPPINGS.filter((m) => {
+  const filteredMaps = mappingData.filter((m) => {
     if (mapSystem !== "All Sources" && m.system !== mapSystem) return false
     if (mapUnmappedOnly && m.ok) return false
     const q = mapQ.trim().toLowerCase()
@@ -447,7 +495,12 @@ export function BuilderDetailedWorkspace({
       m.system.toLowerCase().includes(q)
     )
   })
-  const mappedPct = 96
+  const mappedPct =
+    typeof mappedPctProp === "number"
+      ? mappedPctProp
+      : mappingData.length
+        ? Math.round((mappingData.filter((m) => m.ok).length / mappingData.length) * 100)
+        : 0
 
   const exceptions = exceptionData
   const excFiltered = (() => {
@@ -468,12 +521,65 @@ export function BuilderDetailedWorkspace({
     ? impactNodeNames(formulaImpact.dependents)
     : undefined
 
+  const selectMappedRow = (row: DetailedMappingRow) => {
+    setMapSelectedSource(row.source)
+    const match =
+      (row.targetLineItemId && rows.find((r) => r.id === row.targetLineItemId)) ||
+      rows.find((r) => r.name === row.target)
+    if (match) {
+      selectRow(match)
+    }
+    if (canEdit && onEditMapping && !String(row.id).startsWith("suggested-")) {
+      onEditMapping(row)
+      return
+    }
+    if (match) {
+      toast.message(`Selected ${row.target}`, {
+        description: `${row.source} · ${row.system}`,
+      })
+    } else if (!row.ok) {
+      toast.message(`${row.target} needs mapping`, {
+        description: `${row.source} · ${row.system}`,
+      })
+    } else {
+      toast.message(`Mapped: ${row.source} → ${row.target}`)
+    }
+  }
+
+  const selectException = (entry: DetailedExceptionRow) => {
+    setExcSelectedId(entry.id)
+    const match =
+      (entry.lineItemId && rows.find((r) => r.id === entry.lineItemId)) ||
+      rows.find((r) => r.name === entry.lineItem)
+    if (match) {
+      selectRow(match)
+      setTraceOpen(true)
+    }
+    toast.message(`${entry.lineItem}: ${entry.issue}`, {
+      description: `${entry.impact} impact · ${entry.sev}`,
+    })
+  }
+
   const validatedLabel =
     validation.valid === true
-      ? "Validated"
+      ? validation.warningCount
+        ? `Validated · ${validation.warningCount} warn`
+        : "Validated"
       : validation.valid === false
         ? `${validation.errorCount} errors`
         : "Validated"
+
+  const publishBlocked =
+    !onPublish || validation.valid === false || !canEdit || publishDisabled
+  const publishTitle = !onPublish
+    ? "Publish unavailable"
+    : publishDisabled
+      ? modelPublished
+        ? "This model is already published"
+        : "This version is already published or locked"
+      : validation.valid === false
+        ? "Fix validation errors before publish"
+        : "Publish workspace version"
 
   const selectRow = (row: WorkspaceRow) => {
     setSelectedId(row.id)
@@ -520,6 +626,9 @@ export function BuilderDetailedWorkspace({
           formula: next === "—" ? "" : next,
           kind: row.kind,
         })
+      }
+      if (useLiveGrid && onFormulaCommit && next !== "—") {
+        onFormulaCommit(rowId, next.startsWith("=") ? next : `=${next}`)
       }
       setEditing(null)
       return
@@ -619,11 +728,22 @@ export function BuilderDetailedWorkspace({
           <History className="w-3.5 h-3.5" />
           Change History
         </button>
+        {onOpenModelSettings ? (
+          <button
+            type="button"
+            onClick={onOpenModelSettings}
+            className="h-8 rounded-full border border-[#e2e8f0] bg-white px-3 text-[12px] font-medium text-[#334155] hover:bg-[#f8fafc]"
+            title="Edit calendar and base currency"
+          >
+            Calendar
+          </button>
+        ) : null}
         <button
           type="button"
-          disabled
-          title="Publish API coming"
-          className="h-8 inline-flex items-center gap-1 rounded-md bg-[#2563eb] px-3 text-[12px] font-medium text-white disabled:opacity-50"
+          disabled={publishBlocked}
+          title={publishTitle}
+          onClick={() => onPublish?.()}
+          className="h-8 inline-flex items-center gap-1 rounded-full bg-[#2563eb] px-3 text-[12px] font-medium text-white shadow-sm hover:bg-[#1d4ed8] disabled:opacity-50"
         >
           Publish
           <ChevronDown className="w-3.5 h-3.5 opacity-80" />
@@ -651,7 +771,13 @@ export function BuilderDetailedWorkspace({
               View
               <select
                 value={grain}
-                onChange={(e) => setGrain(e.target.value as typeof grain)}
+                onChange={(e) => {
+                  const next = e.target.value as typeof grain
+                  setGrain(next)
+                  const apiGrain =
+                    next === "Quarterly" ? "quarterly" : next === "Annual" ? "annual" : "monthly"
+                  onGridGrainChange?.(apiGrain)
+                }}
                 className="h-8 rounded-md border border-[#e2e8f0] bg-white pl-2.5 pr-7 text-[12px] font-medium text-[#0f172a] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20"
               >
                 <option value="Monthly">Monthly</option>
@@ -674,9 +800,9 @@ export function BuilderDetailedWorkspace({
 
             <button
               type="button"
-              disabled={!canEdit}
-              onClick={() => toast.message("Add line item — demo")}
-              className="h-8 inline-flex items-center gap-1.5 rounded-md bg-[#2563eb] px-3 text-[12px] font-medium text-white hover:bg-[#1d4ed8] disabled:opacity-50"
+              disabled={!canEdit || !onAddLineItem}
+              onClick={() => onAddLineItem?.()}
+              className="h-8 inline-flex items-center gap-1.5 rounded-full bg-[#2563eb] px-3 text-[12px] font-medium text-white hover:bg-[#1d4ed8] disabled:opacity-50 shadow-sm"
             >
               <Plus className="w-3.5 h-3.5" />
               Add Line Item
@@ -925,8 +1051,14 @@ export function BuilderDetailedWorkspace({
             onClose={() => setTraceOpen(false)}
             precedents={tracePrecedents}
             dependents={traceDependents}
+            cellMeta={cellMeta}
+            cellTrace={cellTrace}
+            preferLiveChain={useLiveGrid}
             onNavigate={(name) => {
-              const match = rows.find((r) => r.name === name)
+              const match =
+                rows.find((r) => r.name === name) ||
+                rows.find((r) => r.id === name) ||
+                rows.find((r) => name.includes(r.name))
               if (match) {
                 selectRow(match)
                 setTraceOpen(true)
@@ -939,7 +1071,13 @@ export function BuilderDetailedWorkspace({
           <DataMappingPanel
             mappedPct={mappedPct}
             rows={filteredMaps}
-            allCount={DEMO_MAPPINGS.length}
+            allCount={mappingData.length}
+            inferred={mappingsInferred}
+            canEdit={canEdit}
+            systems={[
+              "All Sources",
+              ...Array.from(new Set(mappingData.map((m) => m.system).filter(Boolean))),
+            ]}
             system={mapSystem}
             onSystem={setMapSystem}
             query={mapQ}
@@ -947,23 +1085,14 @@ export function BuilderDetailedWorkspace({
             unmappedOnly={mapUnmappedOnly}
             onUnmappedOnly={setMapUnmappedOnly}
             selectedSource={mapSelectedSource}
-            onSelectRow={(row) => {
-              setMapSelectedSource(row.source)
-              const match = rows.find((r) => r.name === row.target)
-              if (match) {
-                selectRow(match)
-                toast.message(`Selected ${row.target}`, {
-                  description: `${row.source} · ${row.system}`,
-                })
-              } else if (!row.ok) {
-                toast.message(`${row.target} needs mapping`, {
-                  description: `${row.source} · ${row.system}`,
-                })
-              } else {
-                toast.message(`Mapped: ${row.source} → ${row.target}`)
-              }
-            }}
+            onSelectRow={selectMappedRow}
             onViewAll={() => setDetailModal("mappings")}
+            onAddMapping={() =>
+              onOpenCreateMapping?.({ targetLineItemId: selectedId || undefined })
+            }
+            onRefresh={onRefreshMappings}
+            onSeedCatalog={onSeedMappingCatalog}
+            onImportFile={onImportSourceFile}
           />
           <AuditLogPanel
             rows={auditData}
@@ -993,17 +1122,7 @@ export function BuilderDetailedWorkspace({
             onTab={(t) => setExcTab(t)}
             rows={excFiltered}
             selectedId={excSelectedId}
-            onSelectRow={(entry) => {
-              setExcSelectedId(entry.id)
-              const match = rows.find((r) => r.name === entry.lineItem)
-              if (match) {
-                selectRow(match)
-                setTraceOpen(true)
-              }
-              toast.message(`${entry.lineItem}: ${entry.issue}`, {
-                description: `${entry.impact} impact · ${entry.sev}`,
-              })
-            }}
+            onSelectRow={selectException}
             errN={errN}
             warnN={warnN}
             infoN={infoN}
@@ -1017,20 +1136,28 @@ export function BuilderDetailedWorkspace({
             total={totalChecks}
             onViewReport={() => setDetailModal("validation")}
           />
-          <ImpactAnalysisPanel row={selected} />
+          <ImpactAnalysisPanel
+            row={selected}
+            sensitivity={sensitivity ?? null}
+            lineItems={lineItems}
+            shockPct={shockPct}
+            onShockPct={setShockPct}
+            canRun={Boolean(onRunSensitivity)}
+            onRun={(driverId, pct) => onRunSensitivity?.(driverId, pct)}
+          />
         </div>
       </div>
 
       <AnalyticsDetailModal
         kind={detailModal}
         onClose={() => setDetailModal(null)}
+        mappingRows={mappingData}
         auditRows={auditData}
         exceptionRows={exceptions}
         validationChecks={valChecks}
         onSelectMapping={(row) => {
-          setMapSelectedSource(row.source)
-          const match = rows.find((r) => r.name === row.target)
-          if (match) selectRow(match)
+          setDetailModal(null)
+          selectMappedRow(row)
         }}
         onSelectAudit={(entry) => {
           setDetailModal(null)
@@ -1050,15 +1177,14 @@ export function BuilderDetailedWorkspace({
           })
         }}
         onSelectException={(entry) => {
-          setExcSelectedId(entry.id)
-          const match = rows.find((r) => r.name === entry.lineItem)
-          if (match) {
-            selectRow(match)
-            setTraceOpen(true)
-          }
+          setDetailModal(null)
+          selectException(entry)
         }}
         onSelectValidation={(check) => {
-          const match = rows.find((r) => r.name === check.module) || rows[0]
+          const match =
+            (check.lineItemId && rows.find((r) => r.id === check.lineItemId)) ||
+            rows.find((r) => r.name === check.module) ||
+            rows[0]
           if (match) selectRow(match)
         }}
       />
@@ -1114,6 +1240,9 @@ function FormulaTracePanel({
   onNavigate,
   precedents: precedentsOverride,
   dependents: dependentsOverride,
+  cellMeta,
+  cellTrace,
+  preferLiveChain,
 }: {
   row: WorkspaceRow | undefined
   rows: WorkspaceRow[]
@@ -1125,6 +1254,9 @@ function FormulaTracePanel({
   onNavigate: (name: string) => void
   precedents?: string[]
   dependents?: string[]
+  cellMeta?: DetailedCellMeta | null
+  cellTrace?: DetailedTraceView | null
+  preferLiveChain?: boolean
 }) {
   const name = row?.name || "—"
   const formula = row?.formula && row.formula !== "—" ? row.formula : ""
@@ -1137,22 +1269,42 @@ function FormulaTracePanel({
 
   const precedents = useMemo(() => {
     if (precedentsOverride?.length) return precedentsOverride
-    if (name === "EBITDA") return ["Net ARR", "Payroll Expense", "Marketing Spend"]
-    if (name === "Net ARR") return ["Starting ARR", "New Bookings", "Churn"]
-    if (name === "Cash Balance") return ["Cash Balance", "EBITDA", "CapEx"]
-    if (name === "Payroll Expense") return ["Headcount", "Avg Fully Burdened Cost"]
+    if (!preferLiveChain) {
+      if (name === "EBITDA") return ["Net ARR", "Payroll Expense", "Marketing Spend"]
+      if (name === "Net ARR") return ["Starting ARR", "New Bookings", "Churn"]
+      if (name === "Cash Balance") return ["Cash Balance", "EBITDA", "CapEx"]
+      if (name === "Payroll Expense") return ["Headcount", "Avg Fully Burdened Cost"]
+    }
     if (isCalc) return extractRefs(formula)
     return []
-  }, [precedentsOverride, name, isCalc, formula])
+  }, [precedentsOverride, name, isCalc, formula, preferLiveChain])
 
   const dependents = useMemo(() => {
     if (dependentsOverride?.length) return dependentsOverride
-    if (name === "EBITDA") return ["Cash Balance", "Free Cash Flow"]
-    if (name === "Net ARR") return ["EBITDA", "Cash Balance"]
-    if (name === "Starting ARR" || name === "New Bookings" || name === "Churn") return ["Net ARR"]
-    if (name === "Payroll Expense" || name === "Marketing Spend") return ["EBITDA"]
+    if (!preferLiveChain) {
+      if (name === "EBITDA") return ["Cash Balance", "Free Cash Flow"]
+      if (name === "Net ARR") return ["EBITDA", "Cash Balance"]
+      if (name === "Starting ARR" || name === "New Bookings" || name === "Churn") return ["Net ARR"]
+      if (name === "Payroll Expense" || name === "Marketing Spend") return ["EBITDA"]
+    }
     return []
-  }, [dependentsOverride, name])
+  }, [dependentsOverride, name, preferLiveChain])
+
+  const fmtWhen = (iso?: string | null) => {
+    if (!iso) return "—"
+    const d = new Date(iso)
+    if (Number.isNaN(d.getTime())) return iso
+    return d.toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    })
+  }
+
+  const statusRaw = String(cellMeta?.validationStatus || "").toUpperCase()
+  const statusOk = !statusRaw || statusRaw === "VALID" || statusRaw === "PASSED" || statusRaw === "OK"
 
   const tabs = [
     { id: "summary" as const, label: "Summary" },
@@ -1239,26 +1391,45 @@ function FormulaTracePanel({
               <MetaRow label="Data Type" value="USD" />
               <MetaRow label="Aggregation" value="Monthly" />
               <MetaRow label="Format" value="#,##0" mono />
-              <MetaRow label="Last Calculated" value="May 12, 2026 9:12 AM" />
+              <MetaRow label="Last Calculated" value={fmtWhen(cellMeta?.lastCalculatedAt)} />
               <div>
                 <dt className="text-[#94a3b8]">Status</dt>
                 <dd className="mt-0.5">
-                  <span className="inline-flex items-center gap-0.5 rounded-full bg-[#dcfce7] px-1.5 py-0.5 text-[9px] font-medium text-[#166534]">
+                  <span
+                    className={cn(
+                      "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-medium",
+                      statusOk
+                        ? "bg-[#dcfce7] text-[#166534]"
+                        : "bg-[#fef2f2] text-[#b91c1c]",
+                    )}
+                  >
                     <CheckCircle2 className="w-3 h-3" />
-                    Valid
+                    {cellMeta?.validationStatus || (statusOk ? "Valid" : "Issue")}
                   </span>
                 </dd>
               </div>
               <div>
                 <dt className="text-[#94a3b8]">Formula Updated</dt>
                 <dd className="font-medium text-[#0f172a] mt-0.5 leading-tight text-[9px]">
-                  May 8, 2026 4:31 PM by Michael Chen
+                  {cellMeta?.formulaUpdatedAt
+                    ? `${fmtWhen(cellMeta.formulaUpdatedAt)}${
+                        cellMeta.formulaUpdatedByName
+                          ? ` by ${cellMeta.formulaUpdatedByName}`
+                          : ""
+                      }`
+                    : "—"}
                 </dd>
               </div>
             </dl>
             <div className="min-w-0">
               <p className="text-[10px] font-semibold text-[#0f172a] mb-1">Calculation Chain</p>
-              <CalcChainFlow byName={byName} onNavigate={onNavigate} focusName={name} />
+              <CalcChainFlow
+                byName={byName}
+                onNavigate={onNavigate}
+                focusName={name}
+                liveTrace={preferLiveChain ? cellTrace : null}
+                preferLive={preferLiveChain}
+              />
             </div>
           </div>
         )}
@@ -1286,7 +1457,14 @@ function FormulaTracePanel({
         {tab === "chain" && (
           <div>
             <p className="text-[10px] font-semibold text-[#0f172a] mb-2">Calculation Chain</p>
-            <CalcChainFlow byName={byName} onNavigate={onNavigate} focusName={name} wide />
+            <CalcChainFlow
+              byName={byName}
+              onNavigate={onNavigate}
+              focusName={name}
+              wide
+              liveTrace={preferLiveChain ? cellTrace : null}
+              preferLive={preferLiveChain}
+            />
           </div>
         )}
       </div>
@@ -1430,24 +1608,90 @@ function chainEdgePath(from: ChainNodeDef, to: ChainNodeDef) {
   return `M ${a.x} ${a.y} C ${a.x} ${mid}, ${b.x} ${mid}, ${b.x} ${b.y}`
 }
 
+function layoutLiveTrace(trace: DetailedTraceView): {
+  nodes: ChainNodeDef[]
+  edges: Array<[string, string]>
+} {
+  const cols = Math.min(3, Math.max(1, Math.ceil(Math.sqrt(trace.nodes.length))))
+  const nodeW = 78
+  const nodeH = 36
+  const gapX = 14
+  const gapY = 28
+  const startX = 12
+  const startY = 12
+  const nodes: ChainNodeDef[] = trace.nodes.map((n, i) => {
+    const col = i % cols
+    const row = Math.floor(i / cols)
+    return {
+      id: n.id,
+      label: n.label,
+      x: startX + col * (nodeW + gapX),
+      y: startY + row * (nodeH + gapY),
+      w: nodeW,
+      h: nodeH,
+      kind: n.kind,
+    }
+  })
+  const idSet = new Set(nodes.map((n) => n.id))
+  const edges: Array<[string, string]> = trace.edges
+    .filter((e) => idSet.has(e.from) && idSet.has(e.to))
+    .map((e) => [e.from, e.to])
+  return { nodes, edges }
+}
+
 function CalcChainFlow({
   byName,
   onNavigate,
   focusName,
   wide,
+  liveTrace,
+  preferLive,
 }: {
   byName: Map<string, WorkspaceRow>
   onNavigate: (name: string) => void
   focusName: string
   wide?: boolean
+  liveTrace?: DetailedTraceView | null
+  preferLive?: boolean
 }) {
+  const live = preferLive ? liveTrace : null
+  if (preferLive && (!live || live.nodes.length === 0)) {
+    return (
+      <div className="rounded-lg border border-[#e2e8f0] bg-[#fafbfc] px-3 py-4 text-[10px] text-[#64748b] leading-snug">
+        No calculation chain for this cell yet. Run Test Calculation, or select a CALCULATED line
+        item that has cell values.
+      </div>
+    )
+  }
+  if (preferLive && live && live.nodes.length === 1 && live.edges.length === 0) {
+    const only = live.nodes[0]
+    return (
+      <div className="rounded-lg border border-[#e2e8f0] bg-[#fafbfc] px-3 py-3 text-[10px] text-[#64748b] leading-snug space-y-1">
+        <p className="font-medium text-[#0f172a]">{only.label}</p>
+        <p>
+          Single-node trace
+          {only.value != null ? ` · ${only.value}` : ""} — typical for INPUT drivers. Pick a
+          CALCULATED row to see precedents → result.
+        </p>
+      </div>
+    )
+  }
+
   const showCash = focusName === "Cash Balance"
-  const nodes = showCash ? [...CHAIN_LAYOUT, CASH_NODE] : CHAIN_LAYOUT
-  const edges = showCash
-    ? [...CHAIN_EDGES, ["ebitda", "cash-balance"] as [string, string]]
-    : CHAIN_EDGES
+  const laidOut = live ? layoutLiveTrace(live) : null
+  const nodes = laidOut
+    ? laidOut.nodes
+    : showCash
+      ? [...CHAIN_LAYOUT, CASH_NODE]
+      : CHAIN_LAYOUT
+  const edges = laidOut
+    ? laidOut.edges
+    : showCash
+      ? [...CHAIN_EDGES, ["ebitda", "cash-balance"] as [string, string]]
+      : CHAIN_EDGES
 
   const nodeById = new Map(nodes.map((n) => [n.id, n]))
+  const liveVal = (id: string) => live?.nodes.find((n) => n.id === id)?.value
   const val = (label: string) => byName.get(label)?.fy
 
   const kindStyles: Record<ChainNodeKind, { stroke: string; bar: string }> = {
@@ -1456,7 +1700,14 @@ function CalcChainFlow({
     result: { stroke: "#86efac", bar: "#16a34a" },
   }
 
-  const vbH = showCash ? 240 : 200
+  const maxY = nodes.reduce((m, n) => Math.max(m, n.y + n.h), 0)
+  const vbH = Math.max(live ? maxY + 24 : showCash ? 240 : 200, 120)
+  const vbW = live
+    ? Math.max(
+        280,
+        nodes.reduce((m, n) => Math.max(m, n.x + n.w), 0) + 16,
+      )
+    : 280
 
   return (
     <div
@@ -1466,7 +1717,7 @@ function CalcChainFlow({
       )}
     >
       <svg
-        viewBox={`0 0 280 ${vbH}`}
+        viewBox={`0 0 ${vbW} ${vbH}`}
         className="w-full h-auto block"
         role="img"
         aria-label="Calculation chain flow"
@@ -1503,9 +1754,21 @@ function CalcChainFlow({
 
         {nodes.map((node) => {
           const styles = kindStyles[node.kind]
-          const value = val(node.label)
-          const isFocus = node.label === focusName
-          const valueColor = value != null && value < 0 ? "#dc2626" : "#334155"
+          const liveV = liveVal(node.id)
+          const demoV = val(node.label)
+          const value =
+            liveV != null
+              ? typeof liveV === "number"
+                ? liveV
+                : Number(liveV)
+              : demoV
+          const isFocus = node.label === focusName || live?.nodes.some(
+            (n) => n.id === node.id && n.label === focusName,
+          )
+          const valueColor =
+            typeof value === "number" && Number.isFinite(value) && value < 0
+              ? "#dc2626"
+              : "#334155"
 
           return (
             <g
@@ -1555,7 +1818,11 @@ function CalcChainFlow({
                 fontWeight="500"
                 fill={valueColor}
               >
-                {value != null ? formatCell(value, "currency") : "—"}
+                {typeof value === "number" && Number.isFinite(value)
+                  ? formatCell(value, "currency")
+                  : liveV != null
+                    ? String(liveV)
+                    : "—"}
               </text>
             </g>
           )
@@ -1581,6 +1848,9 @@ function DataMappingPanel({
   mappedPct,
   rows,
   allCount,
+  inferred,
+  canEdit,
+  systems,
   system,
   onSystem,
   query,
@@ -1590,10 +1860,17 @@ function DataMappingPanel({
   selectedSource,
   onSelectRow,
   onViewAll,
+  onAddMapping,
+  onRefresh,
+  onSeedCatalog,
+  onImportFile,
 }: {
   mappedPct: number
-  rows: typeof DEMO_MAPPINGS
+  rows: DetailedMappingRow[]
   allCount: number
+  inferred?: boolean
+  canEdit?: boolean
+  systems: string[]
   system: string
   onSystem: (s: string) => void
   query: string
@@ -1601,24 +1878,83 @@ function DataMappingPanel({
   unmappedOnly: boolean
   onUnmappedOnly: (v: boolean) => void
   selectedSource: string | null
-  onSelectRow: (row: (typeof DEMO_MAPPINGS)[number]) => void
+  onSelectRow: (row: DetailedMappingRow) => void
   onViewAll: () => void
+  onAddMapping?: () => void
+  onRefresh?: () => void
+  onSeedCatalog?: () => void
+  onImportFile?: () => void
 }) {
-  const systems = ["All Sources", "NetSuite GL", "Salesforce", "Workday HR", "Plaid (Bank)"]
+  const systemOptions = systems.length > 1 ? systems : ["All Sources"]
 
   return (
     <section className="rounded-xl border border-[#e2e8f0] bg-white shadow-sm flex flex-col min-h-[320px] overflow-hidden">
-      <div className="flex items-center justify-between border-b border-[#e2e8f0] px-3 py-2.5 shrink-0">
-        <h3 className="text-[12px] font-semibold text-[#0f172a] inline-flex items-center gap-1.5">
-          <Database className="w-3.5 h-3.5 text-[#64748b]" />
+      <div className="flex items-center justify-between border-b border-[#e2e8f0] px-3 py-2.5 shrink-0 gap-2">
+        <h3 className="text-[12px] font-semibold text-[#0f172a] inline-flex items-center gap-1.5 min-w-0">
+          <Database className="w-3.5 h-3.5 text-[#64748b] shrink-0" />
           Data Mapping
         </h3>
-        <span className="inline-flex items-center rounded-full bg-[#dcfce7] px-2 py-0.5 text-[10px] font-semibold text-[#166534]">
-          {mappedPct}% Mapped
-        </span>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {inferred ? (
+            <span className="inline-flex items-center rounded-full bg-[#eff6ff] px-2 py-0.5 text-[10px] font-semibold text-[#1d4ed8]">
+              {allCount} suggested
+            </span>
+          ) : (
+            <span className="inline-flex items-center rounded-full bg-[#dcfce7] px-2 py-0.5 text-[10px] font-semibold text-[#166534]">
+              {mappedPct}% Mapped
+            </span>
+          )}
+          {canEdit && onAddMapping ? (
+            <button
+              type="button"
+              onClick={onAddMapping}
+              className="h-7 inline-flex items-center gap-1 rounded-full bg-[#2563eb] px-2.5 text-[10px] font-medium text-white shadow-sm hover:bg-[#1d4ed8]"
+            >
+              <Plus className="w-3 h-3" />
+              Add
+            </button>
+          ) : null}
+        </div>
       </div>
 
       <div className="flex-1 min-h-0 p-3 flex flex-col gap-2.5">
+        {inferred ? (
+          <p className="text-[10px] text-[#64748b] leading-snug -mt-0.5">
+            No connector seed on this model yet — add mappings below, or seed the catalog from
+            backend. Suggested rows are derived from line items until real mappings exist.
+          </p>
+        ) : null}
+        {(onRefresh || onSeedCatalog || onImportFile) && (
+          <div className="flex flex-wrap gap-1.5 shrink-0 -mt-0.5">
+            {onRefresh ? (
+              <button
+                type="button"
+                onClick={onRefresh}
+                className="h-7 rounded-full border border-[#e2e8f0] px-2.5 text-[10px] font-medium text-[#475569] hover:bg-[#f8fafc]"
+              >
+                Refresh from connectors
+              </button>
+            ) : null}
+            {canEdit && onSeedCatalog ? (
+              <button
+                type="button"
+                onClick={onSeedCatalog}
+                className="h-7 rounded-full border border-[#bfdbfe] bg-[#eff6ff] px-2.5 text-[10px] font-medium text-[#1d4ed8] hover:bg-[#dbeafe]"
+              >
+                Seed catalog
+              </button>
+            ) : null}
+            {canEdit && onImportFile ? (
+              <button
+                type="button"
+                onClick={onImportFile}
+                className="h-7 rounded-full border border-[#bbf7d0] bg-[#f0fdf4] px-2.5 text-[10px] font-medium text-[#15803d] hover:bg-[#dcfce7]"
+              >
+                Import CSV / Excel
+              </button>
+            ) : null}
+          </div>
+        )}
         <div className="flex gap-2 shrink-0">
           <div className="relative">
             <select
@@ -1627,7 +1963,7 @@ function DataMappingPanel({
               aria-label="Source System"
               className="h-8 appearance-none rounded-md border border-[#e2e8f0] bg-white pl-2.5 pr-7 text-[11px] text-[#0f172a] min-w-[118px]"
             >
-              {systems.map((s) => (
+              {systemOptions.map((s) => (
                 <option key={s} value={s}>
                   {s}
                 </option>
@@ -1661,15 +1997,18 @@ function DataMappingPanel({
               {rows.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="py-6 text-center text-[11px] text-[#94a3b8]">
-                    No mappings match your filters.
+                    {allCount === 0
+                      ? "Add line items to suggest source mappings, or seed connectors on the backend."
+                      : "No mappings match your filters."}
                   </td>
                 </tr>
               ) : (
                 rows.map((r) => {
                   const selected = selectedSource === r.source
+                  const suggested = String(r.status).toUpperCase() === "SUGGESTED"
                   return (
                     <tr
-                      key={r.source}
+                      key={r.id}
                       tabIndex={0}
                       role="button"
                       onClick={() => onSelectRow(r)}
@@ -1694,7 +2033,14 @@ function DataMappingPanel({
                       <td className="py-2 pr-2 text-[#334155] whitespace-nowrap">{r.target}</td>
                       <td className="py-2 text-center">
                         {r.ok ? (
-                          <CheckCircle2 className="w-4 h-4 text-[#16a34a] mx-auto" aria-label="Mapped" />
+                          suggested ? (
+                            <Info
+                              className="w-4 h-4 text-[#2563eb] mx-auto"
+                              aria-label="Suggested from structure"
+                            />
+                          ) : (
+                            <CheckCircle2 className="w-4 h-4 text-[#16a34a] mx-auto" aria-label="Mapped" />
+                          )
                         ) : (
                           <AlertTriangle
                             className="w-4 h-4 text-[#d97706] mx-auto"
@@ -1732,6 +2078,7 @@ function DataMappingPanel({
 
         <p className="text-[9px] text-[#94a3b8] -mt-1">
           Showing {rows.length} of {allCount}
+          {inferred ? " · suggested" : ""}
           {unmappedOnly ? " · unmapped" : ""}
           {system !== "All Sources" ? ` · ${system}` : ""}
         </p>
@@ -2073,13 +2420,60 @@ function ValidationSummaryCard({
   )
 }
 
-function ImpactAnalysisPanel({ row }: { row: WorkspaceRow | undefined }) {
-  const baseName =
-    row?.name === "EBITDA" || row?.name === "Cash Balance" ? "Net ARR" : row?.name || "Net ARR"
-  const ebitdaDelta = 84965
-  const cashDelta = 84965
-  const ebitdaPct = 5.19
-  const cashPct = 5.19
+function ImpactAnalysisPanel({
+  row,
+  sensitivity,
+  lineItems,
+  shockPct,
+  onShockPct,
+  canRun,
+  onRun,
+}: {
+  row: WorkspaceRow | undefined
+  sensitivity: DetailedSensitivityView | null
+  lineItems: FpaLineItem[]
+  shockPct: number
+  onShockPct: (n: number) => void
+  canRun?: boolean
+  onRun?: (driverLineItemId: string, shockPct: number) => void
+}) {
+  const drivers = useMemo(
+    () => lineItems.filter((li) => li.id && li.name),
+    [lineItems],
+  )
+  const [driverId, setDriverId] = useState(() => row?.id || "")
+
+  useEffect(() => {
+    if (row?.id && drivers.some((d) => d.id === row.id)) {
+      setDriverId(row.id)
+      return
+    }
+    setDriverId((prev) => prev || drivers[0]?.id || "")
+  }, [row?.id, drivers])
+
+  const fallbackName = row?.name || "Driver"
+  const useLive = sensitivity != null
+  const driverName =
+    sensitivity?.driverName ||
+    drivers.find((d) => d.id === driverId)?.name ||
+    fallbackName
+  const shockLabel = sensitivity?.shockLabel || `+${shockPct}%`
+  const impacts = useLive
+    ? sensitivity?.impacts || []
+    : [
+        { lineItemId: "ebitda", name: "EBITDA", deltaTotal: 84965, deltaPct: 5.19 },
+        { lineItemId: "cash", name: "Cash Balance", deltaTotal: 84965, deltaPct: 5.19 },
+      ]
+  const months = useLive && sensitivity?.months?.length
+    ? sensitivity.months
+    : ["Jan '26", "Mar '26", "May '26", "Jul '26", "Sep '26", "Nov '26"]
+  const baseCase = useLive && sensitivity?.baseCase?.length
+    ? sensitivity.baseCase
+    : [1.02, 1.12, 1.22, 1.32, 1.42, 1.52]
+  const shocked = useLive && sensitivity?.shocked?.length
+    ? sensitivity.shocked
+    : [1.08, 1.2, 1.32, 1.45, 1.58, 1.72]
+  const unitLabel = sensitivity?.unitLabel || "USD (000s)"
 
   const chartW = 280
   const chartH = 160
@@ -2089,130 +2483,207 @@ function ImpactAnalysisPanel({ row }: { row: WorkspaceRow | undefined }) {
   const padB = 24
   const plotW = chartW - padL - padR
   const plotH = chartH - padT - padB
-  const ySpan = IMPACT_Y_MAX - IMPACT_Y_MIN
+  const allVals = [...baseCase, ...shocked]
+  const yMin = Math.min(...allVals, 0)
+  const yMax = Math.max(...allVals, 1)
+  const ySpan = Math.max(yMax - yMin, 1e-6)
 
-  const toX = (i: number) => padL + (i / (IMPACT_BASE_CASE.length - 1)) * plotW
-  const toY = (v: number) => padT + plotH - ((v - IMPACT_Y_MIN) / ySpan) * plotH
-  const basePts = IMPACT_BASE_CASE.map((v, i) => `${toX(i)},${toY(v)}`).join(" ")
-  const scenPts = IMPACT_SCENARIO.map((v, i) => `${toX(i)},${toY(v)}`).join(" ")
+  const toX = (i: number) => padL + (i / Math.max(baseCase.length - 1, 1)) * plotW
+  const toY = (v: number) => padT + plotH - ((v - yMin) / ySpan) * plotH
+  const basePts = baseCase.map((v, i) => `${toX(i)},${toY(v)}`).join(" ")
+  const scenPts = shocked.map((v, i) => `${toX(i)},${toY(v)}`).join(" ")
 
-  const yTicks = [
-    { v: 2.0, label: "2.0M" },
-    { v: 1.5, label: "1.5M" },
-    { v: 1.0, label: "1.0M" },
-    { v: 0.5, label: "500K" },
-  ]
+  const yTicks = [yMax, (yMax + yMin) / 2, yMin].map((v) => ({
+    v,
+    label:
+      Math.abs(v) >= 1_000_000
+        ? `${(v / 1_000_000).toFixed(1)}M`
+        : Math.abs(v) >= 1000
+          ? `${(v / 1000).toFixed(0)}K`
+          : v.toFixed(1),
+  }))
+
+  const fmtDelta = (n: number) => {
+    const sign = n >= 0 ? "+" : ""
+    return `${sign}${Math.round(n).toLocaleString()}`
+  }
+  const fmtPct = (n: number) => `${n >= 0 ? "+" : ""}${n.toFixed(2)}%`
+  const deltaColor = (n: number) => (n >= 0 ? "text-[#16a34a]" : "text-[#dc2626]")
+
+  const leftCards = impacts.slice(0, 2)
 
   return (
     <section className="rounded-xl border border-[#e2e8f0] bg-white shadow-sm flex flex-col min-h-[320px] overflow-hidden">
-      <div className="border-b border-[#e2e8f0] px-3 py-2.5 shrink-0">
+      <div className="border-b border-[#e2e8f0] px-3 py-2.5 shrink-0 space-y-2">
         <h3 className="text-[12px] font-semibold text-[#0f172a]">
           Impact Analysis{" "}
-          <span className="font-normal text-[#64748b]">(if {baseName} +5%)</span>
+          <span className="font-normal text-[#64748b]">
+            (if {driverName} {shockLabel})
+          </span>
         </h3>
+        {canRun ? (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <select
+              value={driverId}
+              onChange={(e) => setDriverId(e.target.value)}
+              aria-label="Sensitivity driver"
+              className="h-7 max-w-[140px] rounded-full border border-[#e2e8f0] bg-white px-2 text-[10px] text-[#0f172a]"
+            >
+              {drivers.length === 0 ? (
+                <option value="">No drivers</option>
+              ) : (
+                drivers.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}
+                  </option>
+                ))
+              )}
+            </select>
+            <label className="inline-flex items-center gap-1 text-[10px] text-[#64748b]">
+              Shock
+              <input
+                type="number"
+                min={-50}
+                max={100}
+                step={1}
+                value={shockPct}
+                onChange={(e) => onShockPct(Number(e.target.value) || 0)}
+                className="h-7 w-14 rounded-full border border-[#e2e8f0] px-2 text-[10px] text-[#0f172a] tabular-nums"
+              />
+              %
+            </label>
+            <button
+              type="button"
+              disabled={!driverId}
+              onClick={() => driverId && onRun?.(driverId, shockPct)}
+              className="h-7 rounded-full bg-[#2563eb] px-3 text-[10px] font-medium text-white shadow-sm hover:bg-[#1d4ed8] disabled:opacity-50"
+            >
+              Run
+            </button>
+          </div>
+        ) : null}
       </div>
 
       <div className="flex-1 min-h-0 p-3 flex gap-3">
         <div className="flex flex-col gap-2.5 shrink-0 w-[118px]">
-          <div className="rounded-lg border border-[#e2e8f0] bg-white px-3 py-3 flex-1 flex flex-col justify-center">
-            <p className="text-[10px] text-[#64748b] mb-1.5">EBITDA Impact</p>
-            <p className="text-[15px] font-bold text-[#16a34a] leading-none tabular-nums">
-              +{ebitdaDelta.toLocaleString()}
-            </p>
-            <p className="text-[11px] font-medium text-[#16a34a] mt-1 tabular-nums">+{ebitdaPct}%</p>
-          </div>
-          <div className="rounded-lg border border-[#e2e8f0] bg-white px-3 py-3 flex-1 flex flex-col justify-center">
-            <p className="text-[10px] text-[#64748b] mb-1.5">Cash Balance Impact</p>
-            <p className="text-[15px] font-bold text-[#16a34a] leading-none tabular-nums">
-              +{cashDelta.toLocaleString()}
-            </p>
-            <p className="text-[11px] font-medium text-[#16a34a] mt-1 tabular-nums">+{cashPct}%</p>
-          </div>
+          {leftCards.length === 0 ? (
+            <div className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc] px-3 py-3 flex-1 flex items-center">
+              <p className="text-[10px] text-[#64748b] leading-snug">
+                {sensitivity?.emptyMessage || "No impact metrics for this driver."}
+              </p>
+            </div>
+          ) : (
+            leftCards.map((imp) => (
+              <div
+                key={imp.lineItemId}
+                className="rounded-lg border border-[#e2e8f0] bg-white px-3 py-3 flex-1 flex flex-col justify-center"
+              >
+                <p className="text-[10px] text-[#64748b] mb-1.5 truncate" title={imp.name}>
+                  {imp.name} Impact
+                </p>
+                <p className={cn("text-[15px] font-bold leading-none tabular-nums", deltaColor(imp.deltaTotal))}>
+                  {fmtDelta(imp.deltaTotal)}
+                </p>
+                <p className={cn("text-[11px] font-medium mt-1 tabular-nums", deltaColor(imp.deltaPct))}>
+                  {fmtPct(imp.deltaPct)}
+                </p>
+              </div>
+            ))
+          )}
         </div>
 
         <div className="flex-1 min-w-0 flex flex-col min-h-[200px]">
-          <div className="flex items-center justify-center gap-4 mb-1 text-[9px] text-[#64748b] shrink-0">
-            <span className="inline-flex items-center gap-1.5">
-              <svg width="20" height="8" aria-hidden>
-                <line x1="0" y1="4" x2="14" y2="4" stroke="#2563eb" strokeWidth="1.5" strokeDasharray="3 2" />
-                <circle cx="17" cy="4" r="2" fill="#2563eb" />
-              </svg>
-              Base Case
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <svg width="20" height="8" aria-hidden>
-                <line x1="0" y1="4" x2="14" y2="4" stroke="#16a34a" strokeWidth="1.5" />
-                <rect x="15" y="2" width="4" height="4" rx="0.5" fill="#16a34a" />
-              </svg>
-              {baseName} +5%
-            </span>
-          </div>
+          {!useLive && leftCards.length > 0 ? (
+            <p className="text-[9px] text-[#94a3b8] mb-1">Demo preview — waiting for sensitivity API data</p>
+          ) : null}
+          {sensitivity?.emptyMessage && leftCards.length === 0 ? (
+            <p className="text-[11px] text-[#64748b] m-auto text-center px-4">{sensitivity.emptyMessage}</p>
+          ) : (
+            <>
+              <div className="flex items-center justify-center gap-4 mb-1 text-[9px] text-[#64748b] shrink-0">
+                <span className="inline-flex items-center gap-1.5">
+                  <svg width="20" height="8" aria-hidden>
+                    <line x1="0" y1="4" x2="14" y2="4" stroke="#2563eb" strokeWidth="1.5" strokeDasharray="3 2" />
+                    <circle cx="17" cy="4" r="2" fill="#2563eb" />
+                  </svg>
+                  Base Case
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <svg width="20" height="8" aria-hidden>
+                    <line x1="0" y1="4" x2="14" y2="4" stroke="#16a34a" strokeWidth="1.5" />
+                    <rect x="15" y="2" width="4" height="4" rx="0.5" fill="#16a34a" />
+                  </svg>
+                  {driverName} {shockLabel}
+                </span>
+              </div>
 
-          <svg viewBox={`0 0 ${chartW} ${chartH}`} className="w-full flex-1" preserveAspectRatio="xMidYMid meet">
-            <text
-              x={8}
-              y={padT + plotH / 2}
-              fontSize="7"
-              fill="#94a3b8"
-              textAnchor="middle"
-              transform={`rotate(-90 8 ${padT + plotH / 2})`}
-            >
-              USD (000s)
-            </text>
-
-            {yTicks.map(({ v, label }) => (
-              <g key={v}>
-                <line
-                  x1={padL}
-                  y1={toY(v)}
-                  x2={chartW - padR}
-                  y2={toY(v)}
-                  stroke="#f1f5f9"
-                  strokeWidth="1"
-                />
-                <text x={padL - 4} y={toY(v) + 2} fontSize="7" fill="#94a3b8" textAnchor="end">
-                  {label}
+              <svg viewBox={`0 0 ${chartW} ${chartH}`} className="w-full flex-1" preserveAspectRatio="xMidYMid meet">
+                <text
+                  x={8}
+                  y={padT + plotH / 2}
+                  fontSize="7"
+                  fill="#94a3b8"
+                  textAnchor="middle"
+                  transform={`rotate(-90 8 ${padT + plotH / 2})`}
+                >
+                  {unitLabel}
                 </text>
-              </g>
-            ))}
 
-            <polyline
-              fill="none"
-              stroke="#2563eb"
-              strokeWidth="1.5"
-              strokeDasharray="4 3"
-              points={basePts}
-            />
-            <polyline fill="none" stroke="#16a34a" strokeWidth="1.5" points={scenPts} />
+                {yTicks.map(({ v, label }) => (
+                  <g key={`${v}-${label}`}>
+                    <line
+                      x1={padL}
+                      y1={toY(v)}
+                      x2={chartW - padR}
+                      y2={toY(v)}
+                      stroke="#f1f5f9"
+                      strokeWidth="1"
+                    />
+                    <text x={padL - 4} y={toY(v) + 2} fontSize="7" fill="#94a3b8" textAnchor="end">
+                      {label}
+                    </text>
+                  </g>
+                ))}
 
-            {IMPACT_BASE_CASE.map((v, i) => (
-              <circle key={`b${i}`} cx={toX(i)} cy={toY(v)} r="2.5" fill="#ffffff" stroke="#2563eb" strokeWidth="1.5" />
-            ))}
-            {IMPACT_SCENARIO.map((v, i) => (
-              <rect
-                key={`s${i}`}
-                x={toX(i) - 2.5}
-                y={toY(v) - 2.5}
-                width="5"
-                height="5"
-                rx="0.5"
-                fill="#16a34a"
-              />
-            ))}
+                <polyline
+                  fill="none"
+                  stroke="#2563eb"
+                  strokeWidth="1.5"
+                  strokeDasharray="4 3"
+                  points={basePts}
+                />
+                <polyline fill="none" stroke="#16a34a" strokeWidth="1.5" points={scenPts} />
 
-            {IMPACT_CHART_MONTHS.map((m, i) => (
-              <text
-                key={m}
-                x={toX(i)}
-                y={chartH - 6}
-                fontSize="7"
-                fill="#94a3b8"
-                textAnchor="middle"
-              >
-                {m}
-              </text>
-            ))}
-          </svg>
+                {baseCase.map((v, i) => (
+                  <circle key={`b${i}`} cx={toX(i)} cy={toY(v)} r="2.5" fill="#ffffff" stroke="#2563eb" strokeWidth="1.5" />
+                ))}
+                {shocked.map((v, i) => (
+                  <rect
+                    key={`s${i}`}
+                    x={toX(i) - 2.5}
+                    y={toY(v) - 2.5}
+                    width="5"
+                    height="5"
+                    rx="0.5"
+                    fill="#16a34a"
+                  />
+                ))}
+
+                {months.map((m, i) => (
+                  <text
+                    key={`${m}-${i}`}
+                    x={toX(i)}
+                    y={chartH - 6}
+                    fontSize="7"
+                    fill="#94a3b8"
+                    textAnchor="middle"
+                  >
+                    {m}
+                  </text>
+                ))}
+              </svg>
+            </>
+          )}
         </div>
       </div>
     </section>
@@ -2228,6 +2699,7 @@ function validationStatusStyle(status: "passed" | "warning" | "error") {
 function AnalyticsDetailModal({
   kind,
   onClose,
+  mappingRows,
   auditRows,
   exceptionRows,
   validationChecks,
@@ -2238,10 +2710,11 @@ function AnalyticsDetailModal({
 }: {
   kind: DetailModalKind
   onClose: () => void
+  mappingRows: DetailedMappingRow[]
   auditRows: DetailedAuditRow[]
   exceptionRows: DetailedExceptionRow[]
   validationChecks: DetailedValidationCheck[]
-  onSelectMapping: (row: (typeof DEMO_MAPPINGS)[number]) => void
+  onSelectMapping: (row: DetailedMappingRow) => void
   onSelectAudit: (entry: DetailedAuditRow) => void
   onSelectException: (entry: DetailedExceptionRow) => void
   onSelectValidation: (check: DetailedValidationCheck) => void
@@ -2253,6 +2726,7 @@ function AnalyticsDetailModal({
   const passedN = validationChecks.filter((c) => c.status === "passed").length
   const valWarnN = validationChecks.filter((c) => c.status === "warning").length
   const valErrN = validationChecks.filter((c) => c.status === "error").length
+  const mappedN = mappingRows.filter((m) => m.ok).length
 
   const titles: Record<Exclude<DetailModalKind, null>, string> = {
     mappings: "All Data Mappings",
@@ -2262,7 +2736,7 @@ function AnalyticsDetailModal({
   }
 
   const descriptions: Record<Exclude<DetailModalKind, null>, string> = {
-    mappings: `${DEMO_MAPPINGS.length} source fields mapped across all systems`,
+    mappings: `${mappingRows.length} source fields · ${mappedN} mapped`,
     audit: `${auditRows.length} recent changes to this model`,
     exceptions: `${exceptionRows.length} items · ${errN} errors · ${warnN} warnings · ${infoN} info`,
     validation: `${validationChecks.length} checks · ${passedN} passed · ${valWarnN} warnings · ${valErrN} errors`,
@@ -2293,9 +2767,16 @@ function AnalyticsDetailModal({
                 </tr>
               </thead>
               <tbody>
-                {DEMO_MAPPINGS.map((r) => (
+                {mappingRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-8 text-center text-[#94a3b8]">
+                      No source fields in the mapping catalog yet.
+                    </td>
+                  </tr>
+                ) : (
+                  mappingRows.map((r) => (
                   <tr
-                    key={r.source}
+                    key={r.id}
                     tabIndex={0}
                     role="button"
                     onClick={() => onSelectMapping(r)}
@@ -2321,7 +2802,8 @@ function AnalyticsDetailModal({
                       )}
                     </td>
                   </tr>
-                ))}
+                  ))
+                )}
               </tbody>
             </table>
           )}

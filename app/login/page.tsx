@@ -19,7 +19,7 @@ function LoginForm() {
   const [showPassword, setShowPassword] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const dispatch = useAppDispatch()
-  const { error, isAuthenticated, userDetails, isFetchingDetails } = useAppSelector((state) => state.auth)
+  const { error, isAuthenticated, userDetails, isFetchingDetails, user } = useAppSelector((state) => state.auth)
   const router = useRouter()
 
   const {
@@ -42,9 +42,11 @@ function LoginForm() {
     }
   }, [dispatch])
 
-  // Handle redirect after user details are fetched
+  // Handle redirect after login (with or without full profile)
   useEffect(() => {
-    if (isAuthenticated && userDetails && !isFetchingDetails && isSubmitting) {
+    if (!isAuthenticated || !isSubmitting || isFetchingDetails) return
+
+    if (userDetails) {
       const redirect = getRoleBasedRedirect(userDetails, userDetails.role.name.toLowerCase() === 'applicant')
 
       if (redirect.shouldRedirect) {
@@ -52,13 +54,26 @@ function LoginForm() {
           description: `Welcome back, ${userDetails.firstName}!`
         })
 
-        // Small delay to ensure cookies are set
         setTimeout(() => {
           window.location.href = redirect.path
         }, 100)
       }
+      setIsSubmitting(false)
+      return
     }
-  }, [isAuthenticated, userDetails, isFetchingDetails, isSubmitting, router])
+
+    if (user) {
+      const roleName = (user.role || 'admin').toLowerCase()
+      const path = roleName === 'applicant' ? '/application-portal' : '/'
+      toast.success('Login successful!', {
+        description: `Welcome back, ${user.firstName}!`
+      })
+      setTimeout(() => {
+        window.location.href = path
+      }, 100)
+      setIsSubmitting(false)
+    }
+  }, [isAuthenticated, userDetails, isFetchingDetails, isSubmitting, user, router])
 
   const onSubmit = async (data: LoginFormData) => {
     if (isSubmitting) return // Prevent double submission

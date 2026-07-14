@@ -1,23 +1,14 @@
 "use client"
 
 import { Suspense } from "react"
-import { useParams, useSearchParams } from "next/navigation"
+import { useParams } from "next/navigation"
 import { Loader2 } from "lucide-react"
 import { ModuleGuard } from "@/components/permissions/PermissionGuards"
 import { FpaWorksheet } from "@/components/fpa/fpa-worksheet"
-import { PlanningWorkspaceBoard } from "@/components/fpa/planning/planning-workspace-board"
 
 function WorksheetRoute() {
   const params = useParams()
-  const searchParams = useSearchParams()
   const modelId = params.id as string
-  const inBudgetContext = Boolean(searchParams.get("cycleId"))
-
-  // Model Planning workspace — hardcoded SRD board until planning APIs are ready.
-  if (!inBudgetContext) {
-    return <PlanningWorkspaceBoard modelId={modelId} />
-  }
-
   return <FpaWorksheet modelId={modelId} />
 }
 

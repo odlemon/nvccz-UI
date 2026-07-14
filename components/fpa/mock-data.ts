@@ -398,6 +398,133 @@ export const mockSensitivity = [
   { driver: "Collection Days", low: "-$0.6M", mid: "$0.0M", high: "+$0.5M" },
 ]
 
+/** SRD §16 — canonical scenario set for comparison boards */
+export const SRD_SCENARIO_NAMES = [
+  "Base Case",
+  "Upside Case",
+  "Downside Case",
+  "FX Shock",
+  "Hiring Freeze",
+  "Cost Reduction",
+  "Fundraising Case",
+  "Expansion Case",
+] as const
+
+export const mockScenarioCompareValues: Record<string, Record<string, number>> = {
+  "Base Case": {
+    REVENUE: 125800000,
+    COGS: -48430000,
+    GROSS_PROFIT: 77370000,
+    GROSS_MARGIN: 61.5,
+    OPEX: -24650000,
+    EBITDA: 52720000,
+    EBITDA_MARGIN: 41.9,
+    CAPEX: -8250000,
+    HEADCOUNT: 532,
+  },
+  "Upside Case": {
+    REVENUE: 138300000,
+    COGS: -51720000,
+    GROSS_PROFIT: 86580000,
+    GROSS_MARGIN: 62.6,
+    OPEX: -23860000,
+    EBITDA: 62720000,
+    EBITDA_MARGIN: 45.3,
+    CAPEX: -8600000,
+    HEADCOUNT: 548,
+  },
+  "Downside Case": {
+    REVENUE: 113200000,
+    COGS: -44200000,
+    GROSS_PROFIT: 69000000,
+    GROSS_MARGIN: 61.0,
+    OPEX: -22800000,
+    EBITDA: 46200000,
+    EBITDA_MARGIN: 40.8,
+    CAPEX: -7100000,
+    HEADCOUNT: 516,
+  },
+  "FX Shock": {
+    REVENUE: 118400000,
+    COGS: -46800000,
+    GROSS_PROFIT: 71600000,
+    GROSS_MARGIN: 60.5,
+    OPEX: -25100000,
+    EBITDA: 46500000,
+    EBITDA_MARGIN: 39.3,
+    CAPEX: -8000000,
+    HEADCOUNT: 528,
+  },
+  "Hiring Freeze": {
+    REVENUE: 127100000,
+    COGS: -47900000,
+    GROSS_PROFIT: 79200000,
+    GROSS_MARGIN: 62.3,
+    OPEX: -22900000,
+    EBITDA: 56300000,
+    EBITDA_MARGIN: 44.3,
+    CAPEX: -7800000,
+    HEADCOUNT: 520,
+  },
+  "Cost Reduction": {
+    REVENUE: 121000000,
+    COGS: -47200000,
+    GROSS_PROFIT: 73800000,
+    GROSS_MARGIN: 61.0,
+    OPEX: -21500000,
+    EBITDA: 52300000,
+    EBITDA_MARGIN: 43.2,
+    CAPEX: -6500000,
+    HEADCOUNT: 510,
+  },
+  "Fundraising Case": {
+    REVENUE: 130500000,
+    COGS: -49800000,
+    GROSS_PROFIT: 80700000,
+    GROSS_MARGIN: 61.8,
+    OPEX: -25200000,
+    EBITDA: 55500000,
+    EBITDA_MARGIN: 42.5,
+    CAPEX: -9200000,
+    HEADCOUNT: 540,
+  },
+  "Expansion Case": {
+    REVENUE: 144600000,
+    COGS: -53200000,
+    GROSS_PROFIT: 91400000,
+    GROSS_MARGIN: 63.2,
+    OPEX: -26800000,
+    EBITDA: 64600000,
+    EBITDA_MARGIN: 44.7,
+    CAPEX: -11200000,
+    HEADCOUNT: 572,
+  },
+}
+
+export const mockScenarioAssumptions: Record<string, Record<string, number>> = {
+  "Revenue Growth": { "Base Case": 4.5, "Upside Case": 12.5, "Downside Case": -6.7, "FX Shock": -2.0, "Hiring Freeze": 5.3, "Cost Reduction": 1.0, "Fundraising Case": 8.0, "Expansion Case": 15.0 },
+  "Price Change": { "Base Case": 3.0, "Upside Case": 6.0, "Downside Case": -2.5, "FX Shock": -4.0, "Hiring Freeze": 2.0, "Cost Reduction": 0.5, "Fundraising Case": 3.5, "Expansion Case": 5.0 },
+  "Volume Growth": { "Base Case": 5.5, "Upside Case": 8.0, "Downside Case": -3.5, "FX Shock": -1.5, "Hiring Freeze": 4.0, "Cost Reduction": 2.0, "Fundraising Case": 6.0, "Expansion Case": 10.0 },
+  "Opex Growth": { "Base Case": 6.0, "Upside Case": 2.0, "Downside Case": -3.0, "FX Shock": 4.0, "Hiring Freeze": -4.0, "Cost Reduction": -8.0, "Fundraising Case": 5.0, "Expansion Case": 9.0 },
+  "Tax Rate": { "Base Case": 22.0, "Upside Case": 21.0, "Downside Case": 22.5, "FX Shock": 22.3, "Hiring Freeze": 22.0, "Cost Reduction": 22.0, "Fundraising Case": 21.5, "Expansion Case": 22.0 },
+  "FX Rate (USD/EUR)": { "Base Case": 1.09, "Upside Case": 1.10, "Downside Case": 1.05, "FX Shock": 0.98, "Hiring Freeze": 1.09, "Cost Reduction": 1.08, "Fundraising Case": 1.09, "Expansion Case": 1.11 },
+}
+
+export const mockRollingForecastTrend = [
+  { m: "Jan", actual: 9.2, forecast: 9.0, budget: 9.0 },
+  { m: "Feb", actual: 9.5, forecast: 9.3, budget: 9.2 },
+  { m: "Mar", actual: 9.8, forecast: 9.6, budget: 9.5 },
+  { m: "Apr", actual: 10.1, forecast: 9.9, budget: 9.8 },
+  { m: "May", actual: 10.4, forecast: 10.2, budget: 10.0 },
+  { m: "Jun", actual: null, forecast: 10.6, budget: 10.2 },
+  { m: "Jul", actual: null, forecast: 10.9, budget: 10.4 },
+  { m: "Aug", actual: null, forecast: 11.2, budget: 10.6 },
+  { m: "Sep", actual: null, forecast: 11.5, budget: 10.8 },
+  { m: "Oct", actual: null, forecast: 11.8, budget: 11.0 },
+  { m: "Nov", actual: null, forecast: 12.1, budget: 11.2 },
+  { m: "Dec", actual: null, forecast: 12.4, budget: 11.4 },
+]
+
 export const mockCashRunwayCompare = [
   { case: "Downside", months: 10.2 },
   { case: "Base", months: 14.2 },
@@ -450,18 +577,159 @@ export const mockVarKpis = [
 ]
 
 export const mockVarDeptRows = [
-  { dept: "Total Company", actual: 125.8, budget: 121.5, forecast: 124.0, varB: 4.3, varBp: 3.6, varF: 1.8, commentary: "green" as const },
-  { dept: "Marketing", actual: 12.4, budget: 11.0, forecast: 11.8, varB: 1.4, varBp: 12.7, varF: 0.6, commentary: "yellow" as const },
-  { dept: "Sales", actual: 48.2, budget: 45.0, forecast: 47.0, varB: 3.2, varBp: 7.1, varF: 1.2, commentary: "green" as const },
-  { dept: "Product Development", actual: 18.6, budget: 19.4, forecast: 19.0, varB: -0.8, varBp: -4.1, varF: -0.4, commentary: "red" as const },
-  { dept: "Operations", actual: 22.1, budget: 21.5, forecast: 21.8, varB: 0.6, varBp: 2.8, varF: 0.3, commentary: "green" as const },
-  { dept: "Shared Services", actual: 9.8, budget: 10.5, forecast: 10.2, varB: -0.7, varBp: -6.7, varF: -0.4, commentary: "yellow" as const },
+  {
+    dept: "Total Company",
+    actual: 125.8,
+    budget: 121.5,
+    forecast: 127.2,
+    varB: 4.3,
+    varBp: 3.6,
+    varF: -1.3,
+    commentary: "yellow" as const,
+    commentaryDone: 3,
+    commentaryTotal: 8,
+    isSummary: true,
+  },
+  {
+    dept: "Marketing",
+    actual: 8.2,
+    budget: 7.8,
+    forecast: 8.1,
+    varB: 0.4,
+    varBp: 5.1,
+    varF: 0.1,
+    commentary: "green" as const,
+    commentaryDone: 2,
+    commentaryTotal: 2,
+  },
+  {
+    dept: "Sales",
+    actual: 52.5,
+    budget: 50.1,
+    forecast: 52.0,
+    varB: 2.4,
+    varBp: 4.8,
+    varF: 0.5,
+    commentary: "green" as const,
+    commentaryDone: 1,
+    commentaryTotal: 1,
+  },
+  {
+    dept: "Product Development",
+    actual: 15.0,
+    budget: 16.2,
+    forecast: 15.5,
+    varB: -1.2,
+    varBp: -7.4,
+    varF: -0.5,
+    commentary: "red" as const,
+    commentaryDone: 1,
+    commentaryTotal: 2,
+  },
+  {
+    dept: "Customer Success",
+    actual: 9.1,
+    budget: 8.5,
+    forecast: 9.0,
+    varB: 0.6,
+    varBp: 7.1,
+    varF: 0.1,
+    commentary: "yellow" as const,
+    commentaryDone: 3,
+    commentaryTotal: 3,
+  },
+  {
+    dept: "IT",
+    actual: 11.4,
+    budget: 10.9,
+    forecast: 11.2,
+    varB: 0.5,
+    varBp: 4.6,
+    varF: 0.2,
+    commentary: "green" as const,
+    commentaryDone: 2,
+    commentaryTotal: 3,
+  },
+  {
+    dept: "Finance",
+    actual: 3.9,
+    budget: 4.2,
+    forecast: 4.0,
+    varB: -0.3,
+    varBp: -7.1,
+    varF: -0.1,
+    commentary: "yellow" as const,
+    commentaryDone: 2,
+    commentaryTotal: 3,
+  },
+  {
+    dept: "People & Culture",
+    actual: 5.7,
+    budget: 5.9,
+    forecast: 5.8,
+    varB: -0.2,
+    varBp: -3.4,
+    varF: -0.1,
+    commentary: "red" as const,
+    commentaryDone: 0,
+    commentaryTotal: 1,
+  },
+  {
+    dept: "Legal",
+    actual: 0.85,
+    budget: 0.85,
+    forecast: 0.85,
+    varB: 0,
+    varBp: 0,
+    varF: 0,
+    commentary: "green" as const,
+    commentaryDone: 1,
+    commentaryTotal: 1,
+  },
+  {
+    dept: "Operations",
+    actual: 14.1,
+    budget: 13.8,
+    forecast: 14.0,
+    varB: 0.3,
+    varBp: 2.2,
+    varF: 0.1,
+    commentary: "yellow" as const,
+    commentaryDone: 2,
+    commentaryTotal: 3,
+  },
+  {
+    dept: "R&D",
+    actual: 3.45,
+    budget: 3.2,
+    forecast: 3.35,
+    varB: 0.25,
+    varBp: 7.8,
+    varF: 0.1,
+    commentary: "green" as const,
+    commentaryDone: 2,
+    commentaryTotal: 2,
+  },
+  {
+    dept: "Shared Services",
+    actual: 1.8,
+    budget: 2.1,
+    forecast: 2.0,
+    varB: -0.3,
+    varBp: -14.3,
+    varF: -0.2,
+    commentary: "red" as const,
+    commentaryDone: 0,
+    commentaryTotal: 2,
+  },
 ]
 
 export const mockCommentaryReqs = [
-  { dept: "Product Development", area: "Headcount", owner: "Devon Lane", due: "May 22", variance: "$(0.80M)", status: "Overdue" as const },
-  { dept: "Marketing", area: "Campaign spend", owner: "Jane Cooper", due: "May 24", variance: "+$1.40M", status: "In Progress" as const },
-  { dept: "Shared Services", area: "Facilities", owner: "Esther Howard", due: "May 26", variance: "$(0.70M)", status: "Submitted" as const },
+  { dept: "Product Development", area: "Headcount", owner: "Devon Lane", due: "May 30, 2025", variance: "$(0.80M)", status: "Overdue" as const },
+  { dept: "Shared Services", area: "Professional Fees", owner: "Carly Fisher", due: "May 30, 2025", variance: "$(0.30M)", status: "Overdue" as const },
+  { dept: "Finance", area: "Other Opex", owner: "Jane Cooper", due: "May 28, 2025", variance: "$(0.10M)", status: "In Progress" as const },
+  { dept: "Sales", area: "Commissions", owner: "Wade Warren", due: "May 28, 2025", variance: "$1.00M", status: "In Progress" as const },
+  { dept: "Marketing", area: "Advertising", owner: "Jane Cooper", due: "May 26, 2025", variance: "$0.40M", status: "Submitted" as const },
 ]
 
 export const mockVarTrend = [
@@ -480,11 +748,16 @@ export const mockVarTrend = [
 ]
 
 export const mockVarTornado = [
-  { dept: "Sales", value: 3.2 },
-  { dept: "Marketing", value: 1.4 },
-  { dept: "Operations", value: 0.6 },
-  { dept: "Shared Services", value: -0.7 },
-  { dept: "Product Development", value: -0.8 },
+  { dept: "Sales", value: 2.4 },
+  { dept: "Marketing", value: 0.4 },
+  { dept: "Customer Success", value: 0.6 },
+  { dept: "IT", value: 0.5 },
+  { dept: "R&D", value: 0.25 },
+  { dept: "Operations", value: 0.3 },
+  { dept: "Product Development", value: -1.2 },
+  { dept: "Finance", value: -0.3 },
+  { dept: "People & Culture", value: -0.2 },
+  { dept: "Shared Services", value: -0.3 },
 ]
 
 // —— Remaining tabs ——
@@ -554,4 +827,172 @@ export const mockSettingsSections = [
   { title: "Actuals sync sources", desc: "Accounting, Payroll, Procurement, Cashbook" },
   { title: "Variance thresholds", desc: "Materiality % and absolute $ for commentary" },
   { title: "Default workflow", desc: "Maker-checker stages and SLA days" },
+]
+
+// —— Revenue tab ——
+export const mockRevKpis = [
+  { label: "Total Revenue", value: "$125.8M", delta: "▲ 4.2% vs Budget", up: true, spark: [98, 102, 108, 112, 118, 122, 125.8] },
+  { label: "YoY Growth", value: "18.4%", delta: "▲ 2.1 pp vs Plan", up: true, spark: [12, 13, 14, 15, 16, 17, 18.4] },
+  { label: "ARR Mix", value: "58%", delta: "Subscription share", up: true, spark: [52, 53, 54, 55, 56, 57, 58] },
+  { label: "Pipeline Cover", value: "1.4×", delta: "▲ 0.2× vs Q1", up: true, spark: [1.0, 1.05, 1.1, 1.15, 1.2, 1.3, 1.4] },
+  { label: "Gross Margin", value: "60.7%", delta: "▲ 30 bps vs Budget", up: true, spark: [58, 58.5, 59, 59.5, 60, 60.3, 60.7] },
+]
+
+export const mockRevStreamRows = [
+  { id: "sub", name: "Subscription ARR", region: "Global", method: "Subscribers × Fee", actual: 72.4, budget: 69.8, forecast: 73.1, yoy: 22.1, share: 58, entity: "North America" },
+  { id: "con", name: "Contract Revenue", region: "EMEA", method: "Contract ÷ Months", actual: 31.2, budget: 30.5, forecast: 31.8, yoy: 14.5, share: 25, entity: "EMEA" },
+  { id: "vol", name: "Volume / Price", region: "APAC", method: "Units × ASP", actual: 15.8, budget: 14.9, forecast: 16.0, yoy: 11.2, share: 12, entity: "APAC" },
+  { id: "pip", name: "Pipeline Weighted", region: "North America", method: "Value × Prob %", actual: 6.4, budget: 6.3, forecast: 6.9, yoy: 8.4, share: 5, entity: "North America" },
+]
+
+export const mockRevByRegion = [
+  { region: "North America", actual: 58.2, budget: 55.8, forecast: 59.1 },
+  { region: "EMEA", actual: 34.6, budget: 33.2, forecast: 35.0 },
+  { region: "APAC", actual: 22.4, budget: 21.5, forecast: 22.8 },
+  { region: "LATAM", actual: 10.6, budget: 11.0, forecast: 10.3 },
+]
+
+export const mockRevMonthly = [
+  { m: "Jan", actual: 9.2, budget: 9.0, forecast: 9.1 },
+  { m: "Feb", actual: 9.5, budget: 9.2, forecast: 9.4 },
+  { m: "Mar", actual: 9.8, budget: 9.5, forecast: 9.7 },
+  { m: "Apr", actual: 10.1, budget: 9.8, forecast: 10.0 },
+  { m: "May", actual: 10.4, budget: 10.0, forecast: 10.3 },
+  { m: "Jun", actual: null, budget: 10.2, forecast: 10.6 },
+  { m: "Jul", actual: null, budget: 10.4, forecast: 10.8 },
+  { m: "Aug", actual: null, budget: 10.6, forecast: 11.0 },
+]
+
+export const mockRevDrivers = [
+  { name: "Revenue Growth %", value: 4.5, unit: "%", impact: "+$5.1M at +1pp" },
+  { name: "Churn Rate", value: 2.8, unit: "%", impact: "-$2.2M at +0.5pp" },
+  { name: "ASP", value: 1240, unit: "$", impact: "+$1.8M at +5%" },
+  { name: "Win Rate", value: 32, unit: "%", impact: "+$3.4M at +5pp" },
+]
+
+// —— Expenses tab ——
+export const mockExpKpis = [
+  { label: "Total OpEx", value: "$86.4M", delta: "▼ -2.1% vs Budget", up: true, spark: [72, 74, 76, 78, 80, 83, 86.4] },
+  { label: "Budget Utilization", value: "94.2%", delta: "▲ 1.8 pp vs Apr", up: false, spark: [88, 89, 90, 91, 92, 93, 94.2] },
+  { label: "Run Rate", value: "$88.1M", delta: "Annualized May", up: false, spark: [82, 83, 84, 85, 86, 87, 88.1] },
+  { label: "Savings vs Budget", value: "$1.8M", delta: "▲ Favorable", up: true, spark: [0.2, 0.4, 0.6, 0.9, 1.1, 1.5, 1.8] },
+  { label: "Headcount Cost", value: "$42.6M", delta: "49% of OpEx", up: false, spark: [38, 39, 40, 41, 41.5, 42, 42.6] },
+]
+
+export const mockExpDeptRows = [
+  { id: "mkt", dept: "Marketing", category: "Advertising", budget: 11.0, actual: 12.1, runRate: 12.4, forecast: 12.4, headcount: 45, entity: "North America", status: "over" as const },
+  { id: "sal", dept: "Sales", category: "Commissions", budget: 28.0, actual: 27.5, runRate: 27.8, forecast: 28.2, headcount: 120, entity: "North America", status: "ok" as const },
+  { id: "it", dept: "IT", category: "Software", budget: 9.5, actual: 9.8, runRate: 10.0, forecast: 10.1, headcount: 88, entity: "EMEA", status: "watch" as const },
+  { id: "ga", dept: "G&A", category: "Professional Fees", budget: 7.2, actual: 7.0, runRate: 7.1, forecast: 7.1, headcount: 32, entity: "EMEA", status: "ok" as const },
+  { id: "eng", dept: "Engineering", category: "Payroll", budget: 18.2, actual: 18.0, runRate: 18.4, forecast: 18.6, headcount: 210, entity: "North America", status: "watch" as const },
+  { id: "ops", dept: "Operations", category: "Facilities", budget: 6.8, actual: 7.55, runRate: 7.6, forecast: 7.4, headcount: 88, entity: "APAC", status: "over" as const },
+  { id: "hr", dept: "People & Culture", category: "Payroll", budget: 5.9, actual: 5.7, runRate: 5.8, forecast: 5.8, headcount: 52, entity: "EMEA", status: "ok" as const },
+]
+
+export const mockExpCategoryMix = [
+  { name: "Payroll", value: 42.6, color: "#2563eb" },
+  { name: "Marketing", value: 12.4, color: "#7c3aed" },
+  { name: "Sales", value: 28.2, color: "#0d9488" },
+  { name: "IT & Software", value: 10.1, color: "#f59e0b" },
+  { name: "G&A", value: 7.1, color: "#64748b" },
+  { name: "Other", value: 6.0, color: "#94a3b8" },
+]
+
+export const mockExpMonthly = [
+  { m: "Jan", budget: 6.8, actual: 6.9, forecast: 6.85 },
+  { m: "Feb", budget: 6.9, actual: 7.0, forecast: 6.95 },
+  { m: "Mar", budget: 7.0, actual: 7.1, forecast: 7.05 },
+  { m: "Apr", budget: 7.1, actual: 7.2, forecast: 7.15 },
+  { m: "May", budget: 7.2, actual: 7.4, forecast: 7.35 },
+  { m: "Jun", budget: 7.3, actual: null, forecast: 7.45 },
+  { m: "Jul", budget: 7.4, actual: null, forecast: 7.55 },
+  { m: "Aug", budget: 7.5, actual: null, forecast: 7.65 },
+]
+
+// —— Cash Flow tab ——
+export const mockCashKpis = [
+  { label: "Closing Cash", value: "$38.4M", delta: "▲ 8.7% vs Apr", up: true, spark: [32, 33.2, 34.1, 35, 36.2, 37.5, 38.4] },
+  { label: "Cash Runway", value: "14.2 mo", delta: "▲ 1.1 mo vs Budget", up: true, spark: [11.5, 12, 12.4, 12.8, 13.2, 13.8, 14.2] },
+  { label: "Net Cash Flow", value: "$2.2M", delta: "May inflow", up: true, spark: [0.8, 1.0, 0.9, 1.1, 1.4, 1.8, 2.2] },
+  { label: "Collections", value: "$10.4M", delta: "▲ 3.0% vs Budget", up: true, spark: [9.2, 9.5, 9.8, 10.1, 10.2, 10.3, 10.4] },
+  { label: "Min Threshold", value: "$15.0M", delta: "Policy floor", up: true, spark: [15, 15, 15, 15, 15, 15, 15] },
+]
+
+export const mockCashStatementRows = [
+  { id: "open", line: "Opening Cash", type: "total" as const, jan: 32.0, feb: 33.2, mar: 34.1, apr: 35.0, may: 36.2, jun: 37.1, jul: 38.0, aug: 38.8 },
+  { id: "col", line: "Collections", type: "inflow" as const, jan: 9.2, feb: 9.5, mar: 9.8, apr: 10.1, may: 10.4, jun: 10.6, jul: 10.8, aug: 11.0 },
+  { id: "oth-in", line: "Other Inflows", type: "inflow" as const, jan: 0.4, feb: 0.3, mar: 0.5, apr: 0.4, may: 0.6, jun: 0.5, jul: 0.4, aug: 0.5 },
+  { id: "pay", line: "Payroll Out", type: "outflow" as const, jan: -4.1, feb: -4.1, mar: -4.2, apr: -4.3, may: -4.4, jun: -4.5, jul: -4.6, aug: -4.7 },
+  { id: "sup", line: "Supplier Payments", type: "outflow" as const, jan: -3.2, feb: -3.3, mar: -3.4, apr: -3.5, may: -3.6, jun: -3.7, jul: -3.8, aug: -3.9 },
+  { id: "capex", line: "CapEx", type: "outflow" as const, jan: -1.2, feb: -0.8, mar: -1.5, apr: -0.9, may: -1.1, jun: -1.4, jul: -0.7, aug: -1.0 },
+  { id: "debt", line: "Debt Service", type: "outflow" as const, jan: -0.5, feb: -0.5, mar: -0.5, apr: -0.5, may: -0.5, jun: -0.5, jul: -0.5, aug: -0.5 },
+  { id: "close", line: "Closing Cash", type: "total" as const, jan: 33.2, feb: 34.1, mar: 35.0, apr: 36.2, may: 38.4, jun: 39.1, jul: 40.1, aug: 41.2 },
+]
+
+export const mockCashMonthly = [
+  { m: "Jan", inflow: 9.6, outflow: -8.9, net: 0.7, closing: 33.2 },
+  { m: "Feb", inflow: 9.8, outflow: -8.7, net: 1.1, closing: 34.1 },
+  { m: "Mar", inflow: 10.3, outflow: -9.4, net: 0.9, closing: 35.0 },
+  { m: "Apr", inflow: 10.5, outflow: -9.2, net: 1.3, closing: 36.2 },
+  { m: "May", inflow: 11.0, outflow: -8.6, net: 2.4, closing: 38.4 },
+  { m: "Jun", inflow: 11.1, outflow: -10.1, net: 1.0, closing: 39.1 },
+  { m: "Jul", inflow: 11.2, outflow: -9.6, net: 1.6, closing: 40.1 },
+  { m: "Aug", inflow: 11.5, outflow: -10.1, net: 1.4, closing: 41.2 },
+]
+
+export const mockCashRunwayScenarios = [
+  { scenario: "Downside", months: 10.2, closing: 25.1 },
+  { scenario: "Base", months: 14.2, closing: 38.4 },
+  { scenario: "Upside", months: 17.6, closing: 53.2 },
+]
+
+export const mockCashDrivers = [
+  { name: "Collection Days", value: 45, unit: "days", impact: "+$0.6M at +5 days" },
+  { name: "Payroll Timing", value: 2, unit: "days", impact: "Shift outflow by 2 days" },
+  { name: "FX Rate", value: 28.4, unit: "ZiG/USD", impact: "±$0.4M sensitivity" },
+  { name: "Min Cash Policy", value: 15, unit: "M", impact: "Treasury floor" },
+]
+
+// —— Workforce tab ——
+export const mockWfKpis = [
+  { label: "Total Headcount", value: "532", delta: "▲ 12 vs Budget", up: true, spark: [498, 505, 512, 518, 524, 528, 532] },
+  { label: "Payroll Cost", value: "$42.6M", delta: "▲ 3.2% vs Budget", up: false, spark: [38, 39, 40, 41, 41.5, 42, 42.6] },
+  { label: "Net Hires (YTD)", value: "+34", delta: "23 hires · 9 exits", up: true, spark: [4, 8, 12, 18, 22, 28, 34] },
+  { label: "Attrition Rate", value: "8.2%", delta: "▼ 0.6 pp vs Plan", up: true, spark: [9.5, 9.2, 9.0, 8.8, 8.6, 8.4, 8.2] },
+  { label: "Open Roles", value: "18", delta: "6 critical", up: false, spark: [24, 22, 21, 20, 19, 18, 18] },
+]
+
+export const mockWfDeptRows = [
+  { id: "eng", dept: "Engineering", entity: "North America", hc: 210, budgetHc: 205, salary: 18.2, avgSalary: 86.7, hires: 12, attrition: 4, openRoles: 8, status: "hiring" as const },
+  { id: "sal", dept: "Sales", entity: "North America", hc: 120, budgetHc: 118, salary: 8.4, avgSalary: 70.0, hires: 6, attrition: 2, openRoles: 4, status: "on-track" as const },
+  { id: "ops", dept: "Operations", entity: "APAC", hc: 88, budgetHc: 90, salary: 5.6, avgSalary: 63.6, hires: 2, attrition: 2, openRoles: 1, status: "on-track" as const },
+  { id: "mkt", dept: "Marketing", entity: "North America", hc: 45, budgetHc: 48, salary: 3.1, avgSalary: 68.9, hires: 3, attrition: 1, openRoles: 2, status: "under" as const },
+  { id: "cs", dept: "Customer Success", entity: "EMEA", hc: 38, budgetHc: 36, salary: 2.8, avgSalary: 73.7, hires: 4, attrition: 1, openRoles: 1, status: "over" as const },
+  { id: "fin", dept: "Finance", entity: "EMEA", hc: 31, budgetHc: 32, salary: 2.4, avgSalary: 77.4, hires: 1, attrition: 0, openRoles: 1, status: "on-track" as const },
+]
+
+export const mockWfHirePlan = [
+  { month: "Jun", planned: 8, actual: 6 },
+  { month: "Jul", planned: 10, actual: null },
+  { month: "Aug", planned: 12, actual: null },
+  { month: "Sep", planned: 9, actual: null },
+  { month: "Oct", planned: 7, actual: null },
+  { month: "Nov", planned: 5, actual: null },
+  { month: "Dec", planned: 4, actual: null },
+]
+
+export const mockWfAttritionTrend = [
+  { m: "Jan", rate: 9.5 },
+  { m: "Feb", rate: 9.2 },
+  { m: "Mar", rate: 9.0 },
+  { m: "Apr", rate: 8.8 },
+  { m: "May", rate: 8.2 },
+  { m: "Jun", rate: 8.0 },
+]
+
+export const mockWfDrivers = [
+  { name: "Salary Inflation", value: 6.0, unit: "%", impact: "+$2.1M at +1pp" },
+  { name: "Merit Increase", value: 4.5, unit: "%", impact: "Annual cycle Jul 1" },
+  { name: "Backfill SLA", value: 45, unit: "days", impact: "Avg time to hire" },
+  { name: "Contractor Mix", value: 8, unit: "%", impact: "Of total payroll" },
 ]

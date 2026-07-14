@@ -1,3 +1,5 @@
+import { safeJsonStringify } from '@/lib/utils/safe-json'
+
 // Cookie utility functions
 export const getCookie = (name: string): string | null => {
   if (typeof document === 'undefined') {
@@ -6,9 +8,9 @@ export const getCookie = (name: string): string | null => {
 
   const cookies = document.cookie.split(';')
   for (const cookie of cookies) {
-    const [cookieName, cookieValue] = cookie.trim().split('=')
-    if (cookieName === name) {
-      return cookieValue
+    const trimmed = cookie.trim()
+    if (trimmed.startsWith(`${name}=`)) {
+      return trimmed.slice(name.length + 1)
     }
   }
   return null
@@ -85,7 +87,7 @@ export interface CookieOptions {
 export const setUserProfile = (profile: any): void => {
   const profileKey = process.env.NEXT_PUBLIC_AUTH_PROFILE_KEY || 'userProfile'
   const maxAge = parseInt(process.env.NEXT_PUBLIC_AUTH_COOKIE_MAX_AGE || '604800') // 7 days
-  setCookie(profileKey, encodeURIComponent(JSON.stringify(profile)), { maxAge })
+  setCookie(profileKey, encodeURIComponent(safeJsonStringify(profile)), { maxAge })
 }
 
 // Get user profile

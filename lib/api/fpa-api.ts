@@ -187,9 +187,101 @@ export interface FpaAuditEntry {
   action: string
   entityType?: string
   entityId?: string | null
+  lineItemId?: string | null
+  moduleId?: string | null
+  cellId?: string | null
   summary?: string
+  details?: string | null
   before?: unknown
   after?: unknown
+}
+
+export interface FpaDataMappingEntry {
+  id: string
+  sourceField: string
+  sourceSystem: string
+  targetLineItemId?: string | null
+  targetLineItemName?: string | null
+  status: string
+  notes?: string | null
+  lastSyncedAt?: string | null
+  moduleId?: string | null
+}
+
+export interface FpaDataMappingsResponse {
+  summary: {
+    total: number
+    mapped: number
+    unmapped?: number
+    pct: number
+  }
+  entries: FpaDataMappingEntry[]
+  nextCursor?: string | null
+}
+
+export interface FpaExceptionItem {
+  id?: string
+  severity: string
+  impact?: string | null
+  issueCode?: string | null
+  code?: string | null
+  type?: string | null
+  message: string
+  lineItemId?: string | null
+  lineItemName?: string | null
+  moduleId?: string | null
+  mappingId?: string | null
+  periodDate?: string | null
+  source?: string | null
+}
+
+export interface FpaExceptionsResponse {
+  modelId?: string
+  versionId?: string | null
+  scenarioId?: string | null
+  moduleId?: string | null
+  counts: {
+    total?: number
+    errors: number
+    warnings: number
+    info: number
+    high?: number
+    medium?: number
+    low?: number
+  }
+  items: FpaExceptionItem[]
+}
+
+export interface FpaSensitivityImpact {
+  lineItemId: string
+  name: string
+  code?: string
+  baseTotal?: number
+  shockedTotal?: number
+  deltaTotal: number
+  deltaPct: number
+}
+
+export interface FpaSensitivityAnalysis {
+  driver: {
+    lineItemId: string
+    code?: string
+    name: string
+    shock: { type: string; value: number }
+    shockLabel?: string
+  }
+  impacts: FpaSensitivityImpact[]
+  series: {
+    periods: string[]
+    baseCase: number[]
+    shocked: number[]
+    unit?: string
+    lineItemId?: string
+    lineItemName?: string
+  }
+  versionId?: string
+  scenarioId?: string
+  message?: string
 }
 
 export interface FpaLineItemTemplate {
@@ -413,23 +505,49 @@ export interface FpaGridPeriod {
   key?: string
   label?: string
   periodRole?: "ACTUAL" | "FORECAST" | string
+  readOnly?: boolean
 }
 
 export interface FpaGridResponse {
   modelId: string
   versionId?: string
   scenarioId?: string
+  moduleId?: string | null
+  grain?: "monthly" | "quarterly" | "annual" | string
   page: number
   pageSize: number
   total: number
   lineItems: FpaLineItem[]
   cells: FpaCell[]
   periods?: FpaGridPeriod[]
+  /** FY totals by lineItemId using each item's summaryMethod (SUM/AVG/LAST). */
+  fyTotals?: Record<string, number>
   actualCutoff?: string | null
   ownerName?: string | null
   ownerAvatarUrl?: string | null
   /** Present when grid is loaded with cycleId — departments the caller may edit. */
   assignedDepartmentIds?: string[]
+}
+
+export interface FpaValidationCheckItem {
+  key: string
+  label: string
+  status: "PASSED" | "WARNING" | "ERROR" | string
+  detail?: string | null
+  moduleId?: string | null
+  moduleName?: string | null
+}
+
+export interface FpaValidationChecksResponse {
+  modelId: string
+  passed: boolean
+  summary: {
+    total: number
+    passed: number
+    warnings: number
+    errors: number
+  }
+  checks: FpaValidationCheckItem[]
 }
 
 export interface FpaGridValidation {
@@ -1033,13 +1151,21 @@ export const fpaApi = {
 
   listDimensions: () => apiClient.get<ApiResponse<FpaDimension[]>>(`${FPA}/dimensions`),
 
-  /** Heal missing default formulas (Gross Profit / EBITDA) on older models. Idempotent. */
+  /** Heal missing default formulas + minimal scope/COA when empty. Idempotent. */
   seedModelDefaults: (modelId: string) =>
     apiClient.post<
       ApiResponse<{
-        modelId: string
-        formulasCreated: number
-        formulas?: FpaFormula[]
+        modelId?: string
+        formulasCreated?: number
+        formulas?: FpaFormula[] | { modelId?: string; formulasCreated?: number; formulas?: FpaFormula[] }
+        scopeCoa?: {
+          modelId?: string
+          seededScope?: boolean
+          seededCoa?: boolean
+          entityIds?: string[]
+          departmentIds?: string[]
+          accountIds?: string[]
+        }
       }>
     >(`${FPA}/models/${modelId}/seed-defaults`, {}),
 
@@ -1077,6 +1203,11 @@ export const fpaApi = {
         circularCheck?: { passed: boolean; path?: string[] | null }
       }>
     >(`${FPA}/models/${modelId}/validation-summary`),
+
+  getValidationChecks: (modelId: string) =>
+    apiClient.get<ApiResponse<FpaValidationChecksResponse>>(
+      `${FPA}/models/${modelId}/validation-checks`,
+    ),
 
   bulkCreateLineItems: (
     modelId: string,
@@ -1350,11 +1481,150 @@ export const fpaApi = {
       userId?: string
       from?: string
       to?: string
+      moduleId?: string
+      entityType?: string
     },
   ) =>
     apiClient.get<
       ApiResponse<{ entries: FpaAuditEntry[]; nextCursor?: string | null } | FpaAuditEntry[]>
     >(`${FPA}/models/${modelId}/audit${qs(params)}`),
+
+  getDataMappings: (
+    modelId: string,
+    params?: {
+      moduleId?: string
+      sourceSystem?: string
+      q?: string
+      unmappedOnly?: boolean
+      limit?: number
+      cursor?: string
+    },
+  ) =>
+    apiClient.get<ApiResponse<FpaDataMappingsResponse>>(
+      `${FPA}/models/${modelId}/data-mappings${qs(params)}`,
+    ),
+
+  createDataMapping: (
+    modelId: string,
+    body: {
+      sourceSystem: string
+      sourceField: string
+      targetLineItemId: string
+      status?: string
+      notes?: string
+      moduleId?: string
+    },
+  ) =>
+    apiClient.post<ApiResponse<FpaDataMappingEntry>>(
+      `${FPA}/models/${modelId}/data-mappings`,
+      body,
+    ),
+
+  updateDataMapping: (
+    modelId: string,
+    mappingId: string,
+    body: Partial<{
+      sourceSystem: string
+      sourceField: string
+      targetLineItemId: string | null
+      status: string
+      notes: string | null
+      moduleId: string | null
+    }>,
+  ) =>
+    apiClient.put<ApiResponse<FpaDataMappingEntry>>(
+      `${FPA}/models/${modelId}/data-mappings/${mappingId}`,
+      body,
+    ),
+
+  deleteDataMapping: (modelId: string, mappingId: string) =>
+    apiClient.delete<ApiResponse<{ deleted: boolean; id: string }>>(
+      `${FPA}/models/${modelId}/data-mappings/${mappingId}`,
+    ),
+
+  /**
+   * Seed Arcus-owned source-field catalog (Custom/CSV, Excel, API, Manual, Procurement,
+   * Fixed Assets, Stock, Portfolio, Accounting GL, Payroll, CRM, Banking, Loan).
+   * SaaS connectors (NetSuite/Salesforce/…) are blocked server-side.
+   */
+  seedDataMappingCatalog: (
+    modelId: string,
+    body?: {
+      systems?: string[]
+      moduleId?: string
+      replaceExisting?: boolean
+    },
+  ) =>
+    apiClient.post<
+      ApiResponse<{
+        createdFields: number
+        createdMappings: number
+        summary: FpaDataMappingsResponse["summary"]
+      }>
+    >(`${FPA}/models/${modelId}/data-mappings/seed-catalog`, body || {}),
+
+  refreshDataMappings: (
+    modelId: string,
+    body?: { replaceExisting?: boolean },
+  ) =>
+    apiClient.post<ApiResponse<FpaDataMappingsResponse>>(
+      `${FPA}/models/${modelId}/data-mappings/refresh`,
+      body ?? { replaceExisting: false },
+    ),
+
+  /**
+   * Multipart CSV/Excel ingest for mapping catalog (shipped 80e6e1c).
+   * POST /v1/fpa/models/:id/data-mappings/import
+   * form fields: file, sourceSystem ("Custom / CSV" | "Excel"), optional moduleId
+   */
+  importDataMappingFile: (
+    modelId: string,
+    args: { file: File; sourceSystem: string; moduleId?: string },
+  ) => {
+    const form = new FormData()
+    form.append("file", args.file)
+    form.append("sourceSystem", args.sourceSystem)
+    if (args.moduleId) form.append("moduleId", args.moduleId)
+    return apiClient.postFormData<
+      ApiResponse<{
+        createdFields?: number
+        createdMappings?: number
+        rowsImported?: number
+        summary?: FpaDataMappingsResponse["summary"]
+      }>
+    >(`${FPA}/models/${modelId}/data-mappings/import`, form)
+  },
+
+  getExceptions: (
+    modelId: string,
+    params?: {
+      versionId?: string
+      scenarioId?: string
+      moduleId?: string
+      severity?: string
+      limit?: number
+      cursor?: string
+    },
+  ) =>
+    apiClient.get<ApiResponse<FpaExceptionsResponse>>(
+      `${FPA}/models/${modelId}/exceptions${qs(params)}`,
+    ),
+
+  runSensitivityAnalysis: (
+    modelId: string,
+    body: {
+      versionId: string
+      scenarioId: string
+      driverLineItemId: string
+      shock: { type: "PERCENT" | "ABSOLUTE"; value: number }
+      targetLineItemIds?: string[]
+      periodRange?: { from: string; to: string }
+    },
+  ) =>
+    apiClient.post<ApiResponse<FpaSensitivityAnalysis>>(
+      `${FPA}/models/${modelId}/sensitivity-analysis`,
+      body,
+    ),
 
   // —— Templates ——
   listLineItemTemplates: () =>
@@ -1385,6 +1655,7 @@ export const fpaApi = {
       pageSize?: number
       lineItemId?: string
       moduleId?: string
+      grain?: "monthly" | "quarterly" | "annual"
     },
   ) => apiClient.get<ApiResponse<FpaGridResponse>>(`${FPA}/models/${modelId}/grid${qs(params)}`),
 
@@ -1585,6 +1856,14 @@ export const fpaApi = {
   listScenarios: (modelId?: string) =>
     apiClient.get<ApiResponse<FpaScenario[]>>(`${FPA}/scenarios${qs({ modelId })}`),
 
+  /** Nested REST — same payload as listScenarios(?modelId=). */
+  listModelScenarios: (modelId: string) =>
+    apiClient.get<ApiResponse<FpaScenario[]>>(`${FPA}/models/${modelId}/scenarios`),
+
+  /** Nested REST — versions for a model (also embedded on GET /models/:id). */
+  listModelVersions: (modelId: string) =>
+    apiClient.get<ApiResponse<FpaVersion[]>>(`${FPA}/models/${modelId}/versions`),
+
   createScenario: (body: {
     modelId: string
     name: string
@@ -1644,12 +1923,26 @@ export const fpaApi = {
 
   seedVersionCells: (
     versionId: string,
-    body?: { scenarioId?: string; sourceVersionId?: string | null },
+    body?: {
+      scenarioId?: string
+      sourceVersionId?: string | null
+      fillMissing?: boolean
+      force?: boolean
+    },
   ) =>
-    apiClient.post<ApiResponse<{ cellCount?: number; seeded?: number; version?: FpaVersion }>>(
-      `${FPA}/versions/${versionId}/seed-cells`,
-      body ?? {},
-    ),
+    apiClient.post<
+      ApiResponse<{
+        versionId?: string
+        cellCount?: number
+        seeded?: number
+        cellsSeeded?: number
+        filled?: number
+        filledMissing?: boolean
+        total?: number
+        skipped?: boolean
+        version?: FpaVersion
+      }>
+    >(`${FPA}/versions/${versionId}/seed-cells`, body ?? {}),
 
   // —— Workflow & tasks ——
   listWorkflows: (params?: { modelId?: string; workflowType?: string; status?: string }) =>

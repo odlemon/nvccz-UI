@@ -18,6 +18,7 @@ import {
   canPerformAction,
   RolePermissions
 } from '@/lib/config/role-permissions';
+import { resolveRoleCode } from '@/lib/utils/resolve-role-code';
 
 interface RootState {
   auth: AuthState;
@@ -65,6 +66,9 @@ export function useRolePermissions(): UseRolePermissionsReturn {
 
   // Check if user is admin (has access to all modules)
   const isAdmin = useMemo(() => {
+    const loginRole = user?.role?.toLowerCase();
+    if (loginRole === "admin" || loginRole === "administrator") return true;
+
     if (!userDetails) return false;
     const roleName =
       typeof (userDetails as { role?: unknown }).role === "string"
@@ -72,7 +76,7 @@ export function useRolePermissions(): UseRolePermissionsReturn {
         : userDetails.role?.name;
     const code = userDetails.roleCode?.toLowerCase();
     return roleName?.toLowerCase() === "admin" || code === "admin";
-  }, [userDetails]);
+  }, [userDetails, user]);
 
   // Extract role code from userDetails (fall back to login cookie user)
   const roleCode = useMemo(() => {
@@ -81,13 +85,14 @@ export function useRolePermissions(): UseRolePermissionsReturn {
       user && typeof (user as { roleCode?: string }).roleCode === "string"
         ? (user as { roleCode?: string }).roleCode
         : null;
+    const fromLoginRole = user?.role ? resolveRoleCode(user.role) : null;
     const fromRoleObj =
       userDetails?.role &&
       typeof userDetails.role === "object" &&
       typeof (userDetails.role as { code?: string }).code === "string"
         ? (userDetails.role as { code?: string }).code
         : null;
-    const code = fromDetails || fromRoleObj || fromUser || null;
+    const code = fromDetails || fromRoleObj || fromUser || fromLoginRole || null;
 
     if (code && code.toLowerCase() !== "admin") {
       return code as RoleCode;
@@ -208,8 +213,7 @@ export function useRolePermissions(): UseRolePermissionsReturn {
     // Loading until auth settles — avoids Access Denied flash on first paint
     isLoading:
       authBootstrapping ||
-      isFetchingDetails ||
-      (isAuthenticated && !userDetails && !roleCode),
+      (isFetchingDetails && !userDetails && !roleCode),
   };
 }
 

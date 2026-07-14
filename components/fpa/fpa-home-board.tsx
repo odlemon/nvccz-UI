@@ -38,6 +38,7 @@ import {
 } from "recharts"
 import { toast } from "sonner"
 import { FpaPageHeader } from "./fpa-page-header"
+import { KpiSparkline } from "./kpi-sparkline"
 import { cn } from "@/lib/utils"
 import {
   Dialog,
@@ -715,45 +716,6 @@ function Avatar({ src, alt, className }: { src: string; alt: string; className?:
   )
 }
 
-function Sparkline({ values, dashed }: { values: number[]; dashed?: boolean }) {
-  const w = 112
-  const h = 52
-  const padY = 4
-  const min = Math.min(...values)
-  const max = Math.max(...values)
-  const span = Math.max(max - min, 1e-6)
-  const coords = values.map((v, i) => {
-    const x = (i / (values.length - 1)) * (w - 4) + 2
-    const y = h - padY - ((v - min) / span) * (h - padY * 2)
-    return { x, y }
-  })
-  const pts = coords.map((c) => `${c.x},${c.y}`).join(" ")
-  return (
-    <svg width={w} height={h} className="shrink-0" aria-hidden>
-      <polyline
-        fill="none"
-        stroke={BLUE_BRIGHT}
-        strokeWidth="3"
-        strokeLinejoin="round"
-        strokeLinecap="round"
-        strokeDasharray={dashed ? "5 4" : undefined}
-        points={pts}
-      />
-      {coords.map((c, i) => (
-        <circle
-          key={i}
-          cx={c.x}
-          cy={c.y}
-          r={3.25}
-          fill="#ffffff"
-          stroke={BLUE_BRIGHT}
-          strokeWidth="2"
-        />
-      ))}
-    </svg>
-  )
-}
-
 function EndValueLabel({
   x,
   y,
@@ -939,15 +901,23 @@ function ScenarioTable({
   compact?: boolean
   activeScenario?: string
 }) {
+  const headers = compact
+    ? SCENARIO_HEADERS.filter(
+        (h) =>
+          ["Base Case", "Upside", "Downside"].includes(h.name) ||
+          h.name === activeScenario,
+      )
+    : SCENARIO_HEADERS
+
   return (
-    <div className="rounded-md border border-[#e2e8f0] overflow-x-auto">
-      <table className="w-full text-[11px] border-collapse min-w-[640px]">
+    <div className="rounded-md border border-[#e2e8f0] overflow-x-auto -mx-0.5">
+      <table className="w-full text-[11px] border-collapse min-w-0">
         <thead>
           <tr className="bg-[#f8fafc]">
-            <th className="py-2.5 px-2 text-left font-semibold text-[#1e293b] border-b border-[#e2e8f0] sticky left-0 bg-[#f8fafc] z-[1]">
+            <th className="py-2.5 px-2 text-left font-semibold text-[#1e293b] border-b border-[#e2e8f0] sticky left-0 bg-[#f8fafc] z-[1] whitespace-nowrap">
               Scenario
             </th>
-            {SCENARIO_HEADERS.map((h) => (
+            {headers.map((h) => (
               <th
                 key={h.name}
                 className={cn(
@@ -962,39 +932,49 @@ function ScenarioTable({
           </tr>
         </thead>
         <tbody>
-          {SCENARIOS.map((r, i) => (
-            <tr key={r.metric}>
-              <td
-                className={cn(
-                  "py-3 px-2 font-semibold text-[#1e293b] sticky left-0 bg-white z-[1]",
-                  i < SCENARIOS.length - 1 && "border-b border-[#e2e8f0]",
-                )}
-              >
-                {r.metric}
-              </td>
-              {r.cells.map((cell) => (
+          {SCENARIOS.map((r, i) => {
+            const cells = compact
+              ? r.cells.filter(
+                  (c) =>
+                    ["Base Case", "Upside", "Downside"].includes(c.label) ||
+                    c.label === activeScenario,
+                )
+              : r.cells
+            return (
+              <tr key={r.metric}>
                 <td
-                  key={cell.label}
                   className={cn(
-                    "py-3 px-1.5 text-center border-l border-[#e2e8f0]",
+                    "py-3 px-2 font-semibold text-[#1e293b] sticky left-0 bg-white z-[1] whitespace-nowrap",
                     i < SCENARIOS.length - 1 && "border-b border-[#e2e8f0]",
-                    !compact && "min-w-[96px]",
-                    activeScenario === cell.label && "bg-[#eff6ff]/70",
                   )}
                 >
-                  <p className="font-bold text-[#1e293b] tabular-nums leading-tight">{cell.value}</p>
-                  <p
+                  {r.metric}
+                </td>
+                {cells.map((cell) => (
+                  <td
+                    key={cell.label}
                     className={cn(
-                      "text-[10px] font-semibold mt-1 leading-none",
-                      cell.up ? "text-[#15803d]" : "text-[#b91c1c]",
+                      "py-3 px-1.5 text-center border-l border-[#e2e8f0]",
+                      i < SCENARIOS.length - 1 && "border-b border-[#e2e8f0]",
+                      activeScenario === cell.label && "bg-[#eff6ff]/70",
                     )}
                   >
-                    {cell.delta}
-                  </p>
-                </td>
-              ))}
-            </tr>
-          ))}
+                    <p className="font-bold text-[#1e293b] tabular-nums leading-tight whitespace-nowrap">
+                      {cell.value}
+                    </p>
+                    <p
+                      className={cn(
+                        "text-[10px] font-semibold mt-1 leading-none whitespace-nowrap",
+                        cell.up ? "text-[#15803d]" : "text-[#b91c1c]",
+                      )}
+                    >
+                      {cell.delta}
+                    </p>
+                  </td>
+                ))}
+              </tr>
+            )
+          })}
         </tbody>
       </table>
     </div>
@@ -1003,12 +983,19 @@ function ScenarioTable({
 
 function DeptTable({
   rows,
+  compact,
 }: {
   rows: typeof OVER_BUDGET_ALL
+  compact?: boolean
 }) {
   return (
-    <div className="rounded-md border border-[#e2e8f0] overflow-hidden">
-      <table className="w-full text-[11px] border-collapse min-w-[560px]">
+    <div className="rounded-md border border-[#e2e8f0] overflow-x-auto">
+      <table
+        className={cn(
+          "w-full text-[11px] border-collapse",
+          compact ? "min-w-[420px]" : "min-w-[560px]",
+        )}
+      >
         <thead>
           <tr className="bg-[#f7fafc]">
             <th className="py-2.5 px-2.5 text-left font-semibold text-[#1a202c] border-b border-[#e2e8f0]">
@@ -1023,9 +1010,11 @@ function DeptTable({
             <th className="py-2.5 px-2.5 text-right font-semibold text-[#1a202c] border-b border-[#e2e8f0]">
               Variance
             </th>
-            <th className="py-2.5 px-2.5 text-left font-semibold text-[#1a202c] border-b border-[#e2e8f0]">
-              Owner
-            </th>
+            {!compact ? (
+              <th className="py-2.5 px-2.5 text-left font-semibold text-[#1a202c] border-b border-[#e2e8f0]">
+                Owner
+              </th>
+            ) : null}
             <th className="py-2.5 px-2.5 text-center font-semibold text-[#1a202c] border-b border-[#e2e8f0]">
               Status
             </th>
@@ -1036,7 +1025,7 @@ function DeptTable({
             <tr key={`${r.dept}-${r.period}-${i}`} className="bg-white hover:bg-[#fafbfc]">
               <td
                 className={cn(
-                  "py-2.5 px-2.5 text-[#2d3748]",
+                  "py-2.5 px-2.5 text-[#2d3748] whitespace-nowrap",
                   i < rows.length - 1 && "border-b border-[#e2e8f0]",
                 )}
               >
@@ -1044,7 +1033,7 @@ function DeptTable({
               </td>
               <td
                 className={cn(
-                  "py-2.5 px-2.5 text-right tabular-nums font-bold text-[#1a202c]",
+                  "py-2.5 px-2.5 text-right tabular-nums font-bold text-[#1a202c] whitespace-nowrap",
                   i < rows.length - 1 && "border-b border-[#e2e8f0]",
                 )}
               >
@@ -1052,7 +1041,7 @@ function DeptTable({
               </td>
               <td
                 className={cn(
-                  "py-2.5 px-2.5 text-right tabular-nums font-bold text-[#1a202c]",
+                  "py-2.5 px-2.5 text-right tabular-nums font-bold text-[#1a202c] whitespace-nowrap",
                   i < rows.length - 1 && "border-b border-[#e2e8f0]",
                 )}
               >
@@ -1060,30 +1049,32 @@ function DeptTable({
               </td>
               <td
                 className={cn(
-                  "py-2.5 px-2.5 text-right tabular-nums font-bold text-[#e53e3e]",
+                  "py-2.5 px-2.5 text-right tabular-nums font-bold text-[#e53e3e] whitespace-nowrap",
                   i < rows.length - 1 && "border-b border-[#e2e8f0]",
                 )}
               >
                 {r.variance}
               </td>
-              <td
-                className={cn(
-                  "py-2.5 px-2.5",
-                  i < rows.length - 1 && "border-b border-[#e2e8f0]",
-                )}
-              >
-                <span className="inline-flex items-center gap-2 min-w-0">
-                  <Avatar src={r.photo} alt={r.owner} className="h-7 w-7" />
-                  <span className="text-[#2d3748] truncate">{r.owner}</span>
-                </span>
-              </td>
+              {!compact ? (
+                <td
+                  className={cn(
+                    "py-2.5 px-2.5",
+                    i < rows.length - 1 && "border-b border-[#e2e8f0]",
+                  )}
+                >
+                  <span className="inline-flex items-center gap-2 min-w-0">
+                    <Avatar src={r.photo} alt={r.owner} className="h-7 w-7" />
+                    <span className="text-[#2d3748] truncate">{r.owner}</span>
+                  </span>
+                </td>
+              ) : null}
               <td
                 className={cn(
                   "py-2.5 px-2.5 text-center",
                   i < rows.length - 1 && "border-b border-[#e2e8f0]",
                 )}
               >
-                <span className="inline-flex items-center h-6 px-2.5 rounded-[6px] text-[10px] font-semibold bg-[#fecaca] text-[#991b1b]">
+                <span className="inline-flex items-center h-6 px-2.5 rounded-[6px] text-[10px] font-semibold bg-[#fecaca] text-[#991b1b] whitespace-nowrap">
                   Over Budget
                 </span>
               </td>
@@ -1166,12 +1157,14 @@ export function FpaHomeBoard() {
       />
 
       <div className="w-full max-w-full px-3 sm:px-4 py-3 space-y-3 overflow-x-hidden">
-        {/* KPI strip */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+        {/* KPI strip — 5-up only on xl so values + sparklines never collide */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3">
           {kpis.map((kpi) => (
-            <div key={kpi.id} className={cn(CARD, "px-4 pt-3.5 pb-3.5")}>
+            <div key={kpi.id} className={cn(CARD, "px-4 pt-3.5 pb-3.5 min-w-0 overflow-hidden")}>
               <div className="flex items-start justify-between gap-2">
-                <p className="text-[13px] font-semibold text-[#0f172a] leading-none">{kpi.label}</p>
+                <p className="text-[13px] font-semibold text-[#0f172a] leading-snug pr-1">
+                  {kpi.label}
+                </p>
                 <CardMenu
                   items={[
                     {
@@ -1192,12 +1185,12 @@ export function FpaHomeBoard() {
                   ]}
                 />
               </div>
-              <div className="mt-3 flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-[26px] font-bold text-[#0f172a] tabular-nums leading-none tracking-tight">
+              <div className="mt-3 flex items-end justify-between gap-3 min-w-0">
+                <div className="min-w-0 flex-1">
+                  <p className="text-[22px] sm:text-[24px] font-bold text-[#0f172a] tabular-nums leading-tight tracking-tight whitespace-nowrap">
                     {kpi.value}
                   </p>
-                  <p className="mt-2 text-[12px] leading-none whitespace-nowrap">
+                  <p className="mt-1.5 text-[11px] sm:text-[12px] leading-snug">
                     <span
                       className={cn(
                         "font-semibold",
@@ -1209,16 +1202,15 @@ export function FpaHomeBoard() {
                     <span className="text-[#64748b] font-normal"> {kpi.vs}</span>
                   </p>
                 </div>
-                <Sparkline values={kpi.spark} dashed={kpi.dashed} />
+                <KpiSparkline values={kpi.spark} dashed={kpi.dashed} />
               </div>
             </div>
           ))}
         </div>
 
-        {/* Trend · Scenarios · Workflow */}
-        {/* Trend · Scenarios · Workflow — Trend matches Departments width (5/12) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-3">
-          <section className={cn(CARD, "md:col-span-2 lg:col-span-5 flex flex-col min-h-[280px] sm:min-h-[320px] min-w-0")}>
+        {/* Trend · Scenarios · Workflow — stack until lg */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
+          <section className={cn(CARD, "lg:col-span-5 flex flex-col min-h-[280px] sm:min-h-[320px] min-w-0")}>
             <div className="flex flex-wrap items-center justify-between gap-2 px-4 sm:px-5 pt-4 pb-2">
               <div className="flex items-center gap-1.5 min-w-0">
                 <h2 className="text-[14px] font-semibold text-[#0f172a] truncate">
@@ -1285,9 +1277,12 @@ export function FpaHomeBoard() {
               </div>
             </div>
 
-            <div className="flex-1 min-h-[220px] sm:min-h-[240px] px-1 sm:px-2 pb-3 min-w-0 overflow-hidden">
+            <div className="flex-1 min-h-[200px] sm:min-h-[240px] px-1 sm:px-2 pb-3 min-w-0 overflow-hidden">
               <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={trendData} margin={{ top: 10, right: 48, left: 0, bottom: 4 }}>
+                <ComposedChart
+                  data={trendData}
+                  margin={{ top: 10, right: 28, left: 0, bottom: 4 }}
+                >
                   <defs>
                     <linearGradient id="revFill" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor={BLUE_BRIGHT} stopOpacity={0.4} />
@@ -1300,17 +1295,17 @@ export function FpaHomeBoard() {
                     tick={{ fontSize: 10, fill: "#64748b" }}
                     axisLine={false}
                     tickLine={false}
-                    interval={0}
+                    interval="preserveStartEnd"
+                    minTickGap={28}
                     dy={4}
                   />
                   <YAxis
                     tick={{ fontSize: 10, fill: "#64748b" }}
                     axisLine={false}
                     tickLine={false}
-                    width={40}
-                    ticks={[0, 20, 40, 60, 80, 100, 120, 140]}
+                    width={36}
                     tickFormatter={(v) => (v === 0 ? "0" : `${v}M`)}
-                    domain={[0, 140]}
+                    domain={[0, "auto"]}
                   />
                   <Tooltip
                     contentStyle={{ borderRadius: 6, border: "1px solid #e2e8f0", fontSize: 11 }}
@@ -1358,7 +1353,7 @@ export function FpaHomeBoard() {
             </div>
           </section>
 
-          <section className={cn(CARD, "md:col-span-1 lg:col-span-4 flex flex-col min-w-0")}>
+          <section className={cn(CARD, "lg:col-span-4 flex flex-col min-w-0")}>
             <div className="flex items-center gap-1.5 px-4 pt-3.5 pb-3">
               <h2 className="text-[14px] font-semibold text-[#1e293b]">Scenario Comparison</h2>
               <button
@@ -1389,7 +1384,7 @@ export function FpaHomeBoard() {
             </div>
           </section>
 
-          <section className={cn(CARD, "md:col-span-1 lg:col-span-3 flex flex-col min-w-0")}>
+          <section className={cn(CARD, "lg:col-span-3 flex flex-col min-w-0")}>
             <div className="flex items-center gap-1.5 px-4 pt-3.5 pb-3">
               <h2 className="text-[14px] font-semibold text-[#1f2937]">Budget Workflow Progress</h2>
               <button
@@ -1404,8 +1399,8 @@ export function FpaHomeBoard() {
               </button>
             </div>
 
-            <div className="px-3 sm:px-4 flex-1 flex flex-col sm:flex-row items-center gap-3 min-h-[160px]">
-              <div className="h-[132px] w-[132px] sm:h-[148px] sm:w-[148px] relative shrink-0">
+            <div className="px-3 sm:px-4 flex-1 flex flex-col xl:flex-row items-center gap-4 min-h-[160px]">
+              <div className="h-[132px] w-[132px] sm:h-[140px] sm:w-[140px] relative shrink-0">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
@@ -1430,7 +1425,7 @@ export function FpaHomeBoard() {
                 </div>
               </div>
 
-              <ul className="space-y-3.5 min-w-0 flex-1">
+              <ul className="w-full space-y-3 min-w-0 flex-1">
                 {WORKFLOW_DONUT.map((d) => (
                   <li key={d.name}>
                     <button
@@ -1439,14 +1434,14 @@ export function FpaHomeBoard() {
                         toast.message(d.name, { description: `${d.pct} ${d.count}` })
                         openModal("workflow")
                       }}
-                      className="w-full flex items-center gap-2 text-left hover:opacity-80"
+                      className="w-full grid grid-cols-[auto_1fr_auto] items-center gap-2 text-left hover:opacity-80"
                     >
                       <i
                         className="h-2.5 w-2.5 rounded-full shrink-0"
                         style={{ backgroundColor: d.color }}
                       />
-                      <span className="text-[12px] text-[#4b5563] min-w-0 truncate">{d.name}</span>
-                      <span className="ml-auto text-right whitespace-nowrap">
+                      <span className="text-[12px] text-[#4b5563] truncate">{d.name}</span>
+                      <span className="text-right whitespace-nowrap">
                         <span className="text-[12px] font-bold text-[#1f2937] tabular-nums">
                           {d.pct}
                         </span>{" "}
@@ -1474,10 +1469,9 @@ export function FpaHomeBoard() {
           </section>
         </div>
 
-        {/* Over budget · Cash · Activity */}
-        {/* Over budget · Cash · Activity — Departments same width as Trend (5/12) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-3">
-          <section className={cn(CARD, "md:col-span-2 lg:col-span-5 min-w-0")}>
+        {/* Over budget · Cash · Activity — stack until lg */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
+          <section className={cn(CARD, "lg:col-span-5 min-w-0")}>
             <div className="flex items-center justify-between gap-2 px-4 pt-3.5 pb-3">
               <div className="flex items-center gap-1.5 min-w-0">
                 <h2 className="text-[14px] font-semibold text-[#1a202c]">Departments Over Budget</h2>
@@ -1522,7 +1516,7 @@ export function FpaHomeBoard() {
                   No over-budget departments for {deptPeriod}.
                 </p>
               ) : (
-                <DeptTable rows={deptRows} />
+                <DeptTable rows={deptRows} compact />
               )}
               <button
                 type="button"
@@ -1534,7 +1528,7 @@ export function FpaHomeBoard() {
             </div>
           </section>
 
-          <section className={cn(CARD, "md:col-span-1 lg:col-span-4 flex flex-col min-w-0")}>
+          <section className={cn(CARD, "lg:col-span-4 flex flex-col min-w-0")}>
             <div className="flex items-center justify-between gap-2 px-5 pt-4 pb-2">
               <div className="flex items-center gap-1.5 min-w-0">
                 <h2 className="text-[14px] font-semibold text-[#1a1a1a]">Cash Runway</h2>
@@ -1645,7 +1639,7 @@ export function FpaHomeBoard() {
             </div>
           </section>
 
-          <section className={cn(CARD, "md:col-span-1 lg:col-span-3 flex flex-col min-w-0")}>
+          <section className={cn(CARD, "lg:col-span-3 flex flex-col min-w-0")}>
             <div className="flex items-center justify-between gap-2 px-5 pt-4 pb-3">
               <div className="flex items-center gap-1.5 min-w-0">
                 <h2 className="text-[14px] font-semibold text-[#1f2937]">Recent Activity</h2>

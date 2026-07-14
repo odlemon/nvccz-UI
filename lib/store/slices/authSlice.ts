@@ -1,6 +1,33 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit'
 import { authApiService, UserDetails, LoginCredentials } from '@/lib/api/auth-api'
 import { getAuthToken, getAuthUser, getUserProfile, setCookie, setUserProfile, clearAuthCookies } from '@/lib/utils/cookies'
+import { safeJsonStringify } from '@/lib/utils/safe-json'
+
+function rolePermissionsToArray(
+  rolePerms: unknown
+): Array<{ name: string; value: boolean }> {
+  const permissions: Array<{ name: string; value: boolean }> = []
+  if (!rolePerms) return permissions
+
+  if (Array.isArray(rolePerms)) {
+    rolePerms.forEach((p: { name?: string; value?: boolean }) => {
+      if (p?.name) permissions.push({ name: p.name, value: !!p.value })
+    })
+    return permissions
+  }
+
+  if (typeof rolePerms === 'object') {
+    Object.entries(rolePerms as Record<string, unknown>).forEach(([key, values]) => {
+      if (Array.isArray(values)) {
+        values.forEach((value) => {
+          permissions.push({ name: `${key}:${String(value)}`, value: true })
+        })
+      }
+    })
+  }
+
+  return permissions
+}
 
 // Types
 export interface User {
@@ -51,7 +78,7 @@ export const loginUser = createAsyncThunk(
         const maxAge = parseInt(process.env.NEXT_PUBLIC_AUTH_COOKIE_MAX_AGE || '604800') // 7 days
 
         setCookie(tokenKey, response.token, { maxAge })
-        setCookie(userKey, encodeURIComponent(JSON.stringify(response.user)), { maxAge })
+        setCookie(userKey, encodeURIComponent(safeJsonStringify(response.user)), { maxAge })
       }
 
       // Fetch full user details
@@ -64,15 +91,34 @@ export const loginUser = createAsyncThunk(
   }
 )
 
+const AUTH_DETAILS_TIMEOUT_MS = 8000
+
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error(message)), ms)
+    }),
+  ])
+}
+
 export const fetchUserDetails = createAsyncThunk(
   'auth/fetchUserDetails',
   async (userId: string, { rejectWithValue }) => {
     try {
-      const response = await authApiService.getUserDetails(userId)
+      const response = await withTimeout(
+        authApiService.getUserDetails(userId),
+        AUTH_DETAILS_TIMEOUT_MS,
+        'User details request timed out',
+      )
       
       // Store full user profile in cookies
       if (typeof document !== 'undefined') {
-        setUserProfile(response.data)
+        try {
+          setUserProfile(response.data)
+        } catch {
+          /* profile cookie is optional — do not block auth */
+        }
       }
 
       return response.data
@@ -114,17 +160,19 @@ export const checkAuthStatus = createAsyncThunk(
       const userProfile = getUserProfile()
 
       if (token && user) {
-        // If we have profile, use it, otherwise fetch it
         if (userProfile) {
           return { token, user, userProfile }
-        } else {
-          // Fetch user details if not in cookies
-          dispatch(fetchUserDetails(user.id))
+        }
+
+        try {
+          const details = await dispatch(fetchUserDetails(user.id)).unwrap()
+          return { token, user, userProfile: details }
+        } catch {
           return { token, user, userProfile: null }
         }
-      } else {
-        return rejectWithValue('No valid session found')
       }
+
+      return rejectWithValue('No valid session found')
     } catch (error) {
       return rejectWithValue('Auth check failed')
     }
@@ -139,7 +187,11 @@ export const refreshUserDetails = createAsyncThunk(
       
       // Update profile in cookies
       if (typeof document !== 'undefined') {
-        setUserProfile(response.data)
+        try {
+          setUserProfile(response.data)
+        } catch {
+          /* optional cookie */
+        }
       }
 
       return response.data
@@ -186,9 +238,12 @@ const authSlice = createSlice({
     },
     updateUserDetails: (state, action: PayloadAction<UserDetails>) => {
       state.userDetails = action.payload
-      // Update profile in cookies
       if (typeof document !== 'undefined') {
-        setUserProfile(action.payload)
+        try {
+          setUserProfile(action.payload)
+        } catch {
+          /* optional cookie */
+        }
       }
     },
   },
@@ -231,16 +286,7 @@ const authSlice = createSlice({
         // Update user with role info
         if (state.user) {
           state.user.role = action.payload.role.name
-          // Convert permissions to array format
-          const permissions: Array<{ name: string; value: boolean }> = []
-          Object.entries(action.payload.role.permissions).forEach(([key, values]) => {
-            if (Array.isArray(values)) {
-              values.forEach((value) => {
-                permissions.push({ name: `${key}:${value}`, value: true })
-              })
-            }
-          })
-          state.user.permissions = permissions
+          state.user.permissions = rolePermissionsToArray(action.payload.role.permissions)
         }
       })
       .addCase(fetchUserDetails.rejected, (state, action) => {
@@ -257,15 +303,7 @@ const authSlice = createSlice({
         // Update user with role info
         if (state.user) {
           state.user.role = action.payload.role.name
-          const permissions: Array<{ name: string; value: boolean }> = []
-          Object.entries(action.payload.role.permissions).forEach(([key, values]) => {
-            if (Array.isArray(values)) {
-              values.forEach((value) => {
-                permissions.push({ name: `${key}:${value}`, value: true })
-              })
-            }
-          })
-          state.user.permissions = permissions
+          state.user.permissions = rolePermissionsToArray(action.payload.role.permissions)
         }
       })
       .addCase(refreshUserDetails.rejected, (state) => {
@@ -300,22 +338,9 @@ const authSlice = createSlice({
         if (action.payload.userProfile) {
           state.userDetails = action.payload.userProfile
           state.user.role = action.payload.userProfile.role?.name || action.payload.user.role || 'applicant'
-          const permissions: Array<{ name: string; value: boolean }> = []
-          const rolePerms = action.payload.userProfile.role?.permissions
-          if (Array.isArray(rolePerms)) {
-            rolePerms.forEach((p: { name?: string; value?: boolean }) => {
-              if (p?.name) permissions.push({ name: p.name, value: !!p.value })
-            })
-          } else if (rolePerms && typeof rolePerms === 'object') {
-            Object.entries(rolePerms).forEach(([key, values]) => {
-              if (Array.isArray(values)) {
-                values.forEach((value) => {
-                  permissions.push({ name: `${key}:${value}`, value: true })
-                })
-              }
-            })
-          }
-          state.user.permissions = permissions
+          state.user.permissions = rolePermissionsToArray(
+            action.payload.userProfile.role?.permissions
+          )
         }
         
         state.error = null

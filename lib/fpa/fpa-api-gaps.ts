@@ -3,6 +3,8 @@
  * Safe for client bundles; dumps to sessionStorage + console.
  */
 
+import { safeJsonStringify, sanitizeForJson } from '@/lib/utils/safe-json'
+
 export type FpaApiGap = {
   at: string
   method?: string
@@ -24,7 +26,7 @@ export function logFpaGap(gap: Omit<FpaApiGap, 'at'> & { at?: string }) {
     path: gap.path,
     status: gap.status,
     request: gap.request,
-    response: gap.response,
+    response: gap.response != null ? sanitizeForJson(gap.response) : undefined,
     message: gap.message,
     impact: gap.impact,
     category: gap.category,
@@ -34,7 +36,7 @@ export function logFpaGap(gap: Omit<FpaApiGap, 'at'> & { at?: string }) {
     try {
       const prev: FpaApiGap[] = JSON.parse(sessionStorage.getItem(KEY) || '[]')
       prev.push(entry)
-      sessionStorage.setItem(KEY, JSON.stringify(prev.slice(-200)))
+      sessionStorage.setItem(KEY, safeJsonStringify(prev.slice(-200)))
     } catch {
       /* ignore */
     }

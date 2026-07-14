@@ -42,10 +42,14 @@ type Props = {
   onValidate: () => void
   onTestCalc: () => void
   onChangeHistory: () => void
+  onOpenModelSettings?: () => void
   onPublish?: () => void
   /** Design polish: show A.3 mock labels until live publish metadata is wired. */
   hardcodeChrome?: boolean
   versionLocked?: boolean
+  /** True when model or selected version is already published — Publish must stay off. */
+  publishDisabled?: boolean
+  modelPublished?: boolean
   onReopenWorkspace?: () => void
 }
 
@@ -65,9 +69,12 @@ export function BuilderHeader({
   onValidate,
   onTestCalc,
   onChangeHistory,
+  onOpenModelSettings,
   onPublish,
   hardcodeChrome = true,
   versionLocked = false,
+  publishDisabled = false,
+  modelPublished = false,
   onReopenWorkspace,
 }: Props) {
   const selectedModel = models.find((m) => m.id === modelId)
@@ -252,7 +259,7 @@ export function BuilderHeader({
             Test Calc
           </button>
 
-          <div className="inline-flex h-10 rounded-md overflow-hidden">
+          <div className="inline-flex h-10 rounded-full overflow-hidden">
             <button
               type="button"
               disabled={
@@ -260,17 +267,22 @@ export function BuilderHeader({
                 !modelId ||
                 !onPublish ||
                 busyKey === "publish" ||
-                validation.valid === false
+                validation.valid === false ||
+                publishDisabled
               }
               title={
                 !onPublish
                   ? "Publish API coming"
-                  : validation.valid === false
-                    ? "Fix validation errors before publishing"
-                    : "Publish workspace version"
+                  : publishDisabled
+                    ? modelPublished
+                      ? "This model is already published"
+                      : "This version is already published or locked"
+                    : validation.valid === false
+                      ? "Fix validation errors before publishing"
+                      : "Publish workspace version"
               }
               onClick={() => onPublish?.()}
-              className="h-10 inline-flex items-center gap-2 bg-[#2563eb] px-3.5 text-[13px] font-medium text-white hover:bg-[#1d4ed8] disabled:opacity-50 disabled:cursor-not-allowed"
+              className="h-10 inline-flex items-center gap-2 rounded-l-full bg-[#2563eb] px-3.5 text-[13px] font-medium text-white hover:bg-[#1d4ed8] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {busyKey === "publish" ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -283,7 +295,7 @@ export function BuilderHeader({
               type="button"
               disabled
               title="Publish options coming"
-              className="h-10 w-9 inline-flex items-center justify-center border-l border-white/30 bg-[#2563eb] text-white disabled:opacity-80 cursor-not-allowed"
+              className="h-10 w-9 inline-flex items-center justify-center rounded-r-full border-l border-white/30 bg-[#2563eb] text-white disabled:opacity-80 cursor-not-allowed"
               aria-label="Publish options"
             >
               <ChevronDown className="w-4 h-4" />
@@ -293,11 +305,21 @@ export function BuilderHeader({
           <button
             type="button"
             onClick={onChangeHistory}
-            className="h-10 w-10 inline-flex items-center justify-center rounded-md border border-[#e2e8f0] bg-white text-[#64748b] hover:bg-[#f8fafc]"
+            className="h-10 w-10 inline-flex items-center justify-center rounded-full border border-[#e2e8f0] bg-white text-[#64748b] hover:bg-[#f8fafc]"
             aria-label="More actions"
           >
             <MoreHorizontal className="w-4 h-4" />
           </button>
+          {onOpenModelSettings ? (
+            <button
+              type="button"
+              onClick={onOpenModelSettings}
+              className="h-10 rounded-full border border-[#e2e8f0] bg-white px-3.5 text-[13px] font-medium text-[#334155] hover:bg-[#f8fafc]"
+              title="Edit calendar and base currency"
+            >
+              Calendar
+            </button>
+          ) : null}
         </div>
       </div>
     </div>

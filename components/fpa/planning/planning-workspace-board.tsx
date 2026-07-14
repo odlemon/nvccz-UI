@@ -22,6 +22,7 @@ import {
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { FpaPageHeader } from "@/components/fpa/fpa-page-header"
+import { KpiSparkline } from "@/components/fpa/kpi-sparkline"
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
@@ -520,22 +521,15 @@ export function PlanningWorkspaceBoard({ modelId }: Props) {
 }
 
 function Sparkline({ values, color }: { values: number[]; color: string }) {
-  const w = 76
-  const h = 30
-  const min = Math.min(...values)
-  const max = Math.max(...values)
-  const span = Math.max(max - min, 1e-6)
-  const pts = values
-    .map((v, i) => {
-      const x = (i / (values.length - 1)) * w
-      const y = h - ((v - min) / span) * (h - 4) - 2
-      return `${x},${y}`
-    })
-    .join(" ")
   return (
-    <svg width={w} height={h} className="shrink-0 mt-0.5" aria-hidden>
-      <polyline fill="none" stroke={color} strokeWidth="1.75" strokeLinejoin="round" points={pts} />
-    </svg>
+    <KpiSparkline
+      values={values}
+      color={color}
+      width={56}
+      height={22}
+      strokeWidth={1.25}
+      showDots={false}
+    />
   )
 }
 

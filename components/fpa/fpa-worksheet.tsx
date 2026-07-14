@@ -1,7 +1,8 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { useSearchParams } from "next/navigation"
+import Link from "next/link"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import {
   Loader2,
   Upload,
@@ -18,12 +19,13 @@ import {
   Check,
   X,
   MoreVertical,
-  AlertTriangle,
   AlertCircle,
   Lock,
   Calculator,
   Pencil,
   Import,
+  Columns2,
+  Percent,
 } from "lucide-react"
 import { toast } from "sonner"
 import { FpaPageHeader } from "./fpa-page-header"
@@ -33,6 +35,7 @@ import {
   asNumber,
   fpaApi,
   formatMoney,
+  type FpaBudgetCycle,
   type FpaCell,
   type FpaCellComment,
   type FpaDriver,
@@ -55,8 +58,28 @@ import { useFpaPermissions } from "@/lib/hooks/useFpaPermissions"
 import { departmentApiService } from "@/lib/api/department-api"
 import {
   formatCashRunway,
+  DEMO_COMPARE_KPIS,
+  PlanningWorkspaceChrome,
+  PlanningWorkspaceInsights,
+  PlanningWorkspaceKpiStrip,
+  type PlanningCycleOption,
+  type PlanningDriverRow,
+  type PlanningKpi,
+  type PlanningTrendPoint,
+  type PlanningWorkflowStep,
+  type PlanningWorkspaceView,
 } from "@/components/fpa/planning/planning-workspace-chrome"
-import { PlanningWorkspaceBoard } from "@/components/fpa/planning/planning-workspace-board"
+import {
+  PlanningCollabSidebar,
+  PlanningTasksCard,
+  planningAvatarTone,
+  planningInitials,
+  type PlanningActivity,
+  type PlanningApproval,
+  type PlanningComment,
+  type PlanningTask,
+} from "@/components/fpa/planning/planning-collab-sidebar"
+import { PlanningScenarioCompareView } from "@/components/fpa/planning/planning-scenario-compare-view"
 import { cn } from "@/lib/utils"
 import {
   Select,
@@ -71,14 +94,69 @@ type ViewMode = "amounts" | "thousands" | "pct_change"
 type PeriodCol = { key: string; iso: string; label: string; band: "ACTUAL" | "FORECAST" }
 type AggCol = { key: string; label: string; periodKeys: string[] }
 
-/** Small radius (~6px) for cards + secondary toolbar — Submit is the only pill. */
-const CARD = "rounded-md border border-[#e2e8f0] bg-white shadow-sm"
+/** Shared ~8px radius across the planning worksheet (matches workspace chrome). */
+const R = "rounded-lg"
+const CARD = `${R} border border-[#e4e7ec] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.05)]`
 const TOOL_BTN =
-  "h-8 inline-flex items-center gap-1.5 rounded-md border border-[#e2e8f0] bg-white px-2.5 text-xs text-[#475569] hover:bg-[#f8fafc] disabled:opacity-50"
+  `h-8 inline-flex items-center gap-1.5 ${R} border border-[#d0d5dd] bg-white px-2.5 text-xs text-[#475569] hover:bg-[#f9fafb] disabled:opacity-50`
 const TOOL_BTN_PRIMARY =
-  "h-8 inline-flex items-center gap-1.5 rounded-full bg-[#2563eb] px-4 text-xs font-medium text-white hover:bg-[#1d4ed8] disabled:opacity-50"
+  `h-8 inline-flex items-center gap-1.5 ${R} bg-[#1570ef] px-4 text-xs font-medium text-white hover:bg-[#175cd3] disabled:opacity-50`
+const GRID_TOOL =
+  `h-8 inline-flex items-center justify-center gap-1.5 ${R} border border-[#d0d5dd] bg-white px-2.5 text-[12px] font-medium text-[#344054] hover:bg-[#f9fafb] disabled:opacity-50`
 const SELECT_TRIGGER =
-  "h-8 w-[9.5rem] rounded-md border border-[#e2e8f0] bg-white text-xs shadow-none"
+  `h-8 w-[9.5rem] ${R} border border-[#d0d5dd] bg-white text-xs shadow-none`
+
+function mapCycleWorkflow(cycle: FpaBudgetCycle | null): PlanningWorkflowStep[] {
+  if (!cycle) return []
+  const status = String(cycle.status || "").toUpperCase()
+  const stage = String(cycle.currentStage || "").toUpperCase()
+  let active = 0
+  if (
+    status === "APPROVED" ||
+    status === "LOCKED" ||
+    stage === "LOCK" ||
+    stage === "REPORTS"
+  ) {
+    active = 3
+  } else if (
+    status === "PENDING_FPA_REVIEW" ||
+    status === "PENDING_CFO_REVIEW" ||
+    status === "RETURNED_FOR_CORRECTION" ||
+    stage === "FPA_REVIEW" ||
+    stage === "CFO_REVIEW" ||
+    stage === "VALIDATE"
+  ) {
+    active = 2
+  } else if (status === "PENDING_VALIDATION" || stage === "OWNER_INPUT") {
+    active = 1
+  } else {
+    active = 0
+  }
+  const labels = ["Draft", "Submitted", "Under Review", "Approved"] as const
+  return labels.map((label, i) => ({
+    id: `wf-${i}`,
+    label,
+    status: i < active ? "done" : i === active ? "active" : "pending",
+    actor: cycle.name || "Planning cycle",
+    when: status.replace(/_/g, " "),
+  }))
+}
+
+function formatRelativeWhen(iso?: string | null): string {
+  if (!iso) return ""
+  const t = new Date(iso).getTime()
+  if (!Number.isFinite(t)) return ""
+  const diff = Date.now() - t
+  const mins = Math.round(diff / 60000)
+  if (mins < 60) return `${Math.max(1, mins)}m ago`
+  const hrs = Math.round(mins / 60)
+  if (hrs < 48) return `${hrs}h ago`
+  return new Date(iso).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  })
+}
 
 function monthKey(iso: string) {
   const d = new Date(iso)
@@ -239,6 +317,8 @@ function cellStateMeta(state: CellState) {
 
 export function FpaWorksheet({ modelId }: { modelId: string }) {
   const searchParams = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
   const dispatch = useAppDispatch()
   const budgetCycleId = searchParams.get("cycleId")
   const budgetTaskId = searchParams.get("taskId")
@@ -248,11 +328,21 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
   const budgetDueDate = searchParams.get("dueDate")
   const queryVersionId = searchParams.get("versionId")
   const queryScenarioId = searchParams.get("scenarioId")
+  const workspaceView: PlanningWorkspaceView =
+    searchParams.get("view") === "compare" ? "compare" : "planning"
   const inBudgetContext = Boolean(budgetCycleId)
   const { selectedScenarioId, selectedVersionId, tasks, dashboard, models, versions, scenarios } =
     useAppSelector((s) => s.fpa)
   const { canEditGrid, canSubmitTask, canExportBoardPack } = useFpaPermissions()
   const [planningDrivers, setPlanningDrivers] = useState<FpaDriver[]>([])
+  const [planningCycles, setPlanningCycles] = useState<PlanningCycleOption[]>([])
+  const [activeCycleDetail, setActiveCycleDetail] = useState<FpaBudgetCycle | null>(null)
+  const [collabComments, setCollabComments] = useState<PlanningComment[]>([])
+  const [collabTasks, setCollabTasks] = useState<PlanningTask[]>([])
+  const [collabActivity, setCollabActivity] = useState<PlanningActivity[]>([])
+  const [collabReloadKey, setCollabReloadKey] = useState(0)
+  const [compareScenarioIds, setCompareScenarioIds] = useState<string[]>([])
+  const [compareKpis, setCompareKpis] = useState<PlanningKpi[]>([])
 
   const [loading, setLoading] = useState(true)
   const [model, setModel] = useState<FpaModel | null>(null)
@@ -266,12 +356,10 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
   const [editDraft, setEditDraft] = useState("")
   const [displayMode, setDisplayMode] = useState<DisplayMode>("monthly")
   const [viewMode, setViewMode] = useState<ViewMode>("amounts")
-  const [detailsOpen, setDetailsOpen] = useState(true)
+  const [detailsOpen, setDetailsOpen] = useState(false)
   const [modelDetailsOpen, setModelDetailsOpen] = useState(false)
-  const [validationOpen, setValidationOpen] = useState(true)
   const [validationErrors, setValidationErrors] = useState<FpaGridValidation[]>([])
   const [deptById, setDeptById] = useState<Map<string, string>>(new Map())
-  const validationSectionRef = useRef<HTMLDivElement>(null)
   const [focusLineId, setFocusLineId] = useState<string | null>(null)
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(() => new Set())
   const [gridPeriods, setGridPeriods] = useState<FpaGridPeriod[]>([])
@@ -286,6 +374,8 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
   const [growthOpen, setGrowthOpen] = useState(false)
   const [growthRate, setGrowthRate] = useState("5")
   const [bulkOpen, setBulkOpen] = useState(false)
+  const [columnsMenuOpen, setColumnsMenuOpen] = useState(false)
+  const [gridMoreOpen, setGridMoreOpen] = useState(false)
   const [exportModalOpen, setExportModalOpen] = useState(false)
   const [exportTarget, setExportTarget] = useState<{
     url?: string | null
@@ -323,13 +413,6 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
     },
     [deptById, budgetDepartmentId, budgetDepartmentName],
   )
-
-  const focusValidationMessages = useCallback(() => {
-    setValidationOpen(true)
-    requestAnimationFrame(() => {
-      validationSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
-    })
-  }, [])
 
   const modelFromStore = models.find((m) => m.id === modelId)
   const version = versions.find((v) => v.id === selectedVersionId)
@@ -391,30 +474,52 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
     selectedVersionId,
   ])
 
-  const planningKpis = useMemo(() => {
-    const k = dashboard?.kpis
-    if (!k) return []
+  const planningKpis = useMemo((): PlanningKpi[] => {
+    const k = dashboard?.kpis as
+      | {
+          revenue?: number
+          ebitda?: number
+          runwayMonths?: number
+          opex?: number
+          varianceToPlan?: number
+          sparklines?: {
+            revenue?: number[]
+            ebitda?: number[]
+            runwayMonths?: number[]
+            closingCash?: number[]
+          }
+        }
+      | undefined
+    if (!k) {
+      return [
+        { label: "Revenue", value: "—" },
+        { label: "Opex", value: "—" },
+        { label: "EBITDA", value: "—" },
+        { label: "Cash Runway", value: "—" },
+        { label: "Variance to Plan", value: "—" },
+      ]
+    }
     const runway = asNumber(k.runwayMonths)
+    const opex =
+      k.opex != null
+        ? k.opex
+        : Math.max(0, asNumber(k.revenue) - asNumber(k.ebitda))
     return [
       {
         label: "Revenue",
-        value: formatMoney(k.revenue),
-        delta: undefined as string | undefined,
+        value: formatMoney(k.revenue) || "—",
         spark: k.sparklines?.revenue,
         sparkColor: "#2563eb",
       },
       {
         label: "Opex",
-        value: formatMoney(
-          (k as { opex?: number }).opex ??
-            Math.max(0, asNumber(k.revenue) - asNumber(k.ebitda)),
-        ),
+        value: formatMoney(opex) || "—",
         spark: k.sparklines?.closingCash,
         sparkColor: "#7c3aed",
       },
       {
         label: "EBITDA",
-        value: formatMoney(k.ebitda),
+        value: formatMoney(k.ebitda) || "—",
         spark: k.sparklines?.ebitda,
         sparkColor: "#0d9488",
       },
@@ -426,11 +531,120 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
       },
       {
         label: "Variance to Plan",
-        value: "—",
+        value: k.varianceToPlan != null ? formatMoney(k.varianceToPlan) : "—",
         sparkColor: "#16a34a",
       },
     ]
   }, [dashboard?.kpis])
+
+  const driverRows = useMemo((): PlanningDriverRow[] => {
+    return planningDrivers.map((d) => ({
+      id: d.id,
+      name: d.name || d.code,
+      value: d.value,
+      unit: d.unit,
+      prior: null,
+    }))
+  }, [planningDrivers])
+
+  const trendPoints = useMemo((): PlanningTrendPoint[] => {
+    if (!lineItems.length || !cells.length || !gridPeriods.length) return []
+    const findLi = (re: RegExp) =>
+      lineItems.find((li) => re.test(li.name) || re.test(li.code || ""))
+    const rev = findLi(/^revenue$/i) || findLi(/total\s*revenue/i) || findLi(/revenue/i)
+    const opex =
+      findLi(/operating\s*expense/i) || findLi(/\bopex\b/i) || findLi(/op\s*ex/i)
+    if (!rev && !opex) return []
+    const byKey = new Map<string, FpaCell>()
+    for (const c of cells) {
+      const pk = c.periodDate ? monthKey(c.periodDate) : ""
+      if (!pk || !c.lineItemId) continue
+      byKey.set(`${c.lineItemId}|${pk}`, c)
+    }
+
+    let cutoffKey = actualCutoff ? monthKey(actualCutoff) : ""
+    if (!cutoffKey) {
+      for (const p of gridPeriods) {
+        const key = p.key || (p.periodDate ? monthKey(p.periodDate) : "")
+        if (!key) continue
+        if (String(p.periodRole || "").toUpperCase() === "ACTUAL" && key > cutoffKey) {
+          cutoffKey = key
+        }
+      }
+    }
+    if (!cutoffKey) {
+      for (const c of cells) {
+        if (String(c.sourceType || "").toUpperCase() === "ACTUAL") {
+          const k = monthKey(c.periodDate)
+          if (k > cutoffKey) cutoffKey = k
+        }
+      }
+    }
+
+    return gridPeriods.slice(0, 12).map((p) => {
+      const iso = p.periodDate || ""
+      const key = p.key || (iso ? monthKey(iso) : "")
+      const label =
+        p.label ||
+        (iso
+          ? new Date(iso).toLocaleDateString("en-US", {
+              month: "short",
+              timeZone: "UTC",
+            })
+          : key)
+      const band = String(p.periodRole || "").toUpperCase()
+      const isActual =
+        band === "ACTUAL" || (cutoffKey ? key <= cutoffKey : false)
+      const revCell = rev ? byKey.get(`${rev.id}|${key}`) : undefined
+      const opexCell = opex ? byKey.get(`${opex.id}|${key}`) : undefined
+      const revVal = revCell != null ? asNumber(revCell.value) : undefined
+      const opexVal = opexCell != null ? asNumber(opexCell.value) : undefined
+      const scale = (n: number | undefined) =>
+        n != null && Number.isFinite(n) ? n / 1_000_000 : undefined
+      const revScaled = scale(revVal)
+      const opexScaled = scale(opexVal)
+      return {
+        label,
+        revenueActual: isActual ? revScaled : undefined,
+        revenuePlan: revScaled,
+        opexActual: isActual ? opexScaled : undefined,
+        opexPlan: opexScaled,
+      }
+    })
+  }, [lineItems, cells, gridPeriods, actualCutoff])
+
+  const workflowSteps = useMemo(
+    () => mapCycleWorkflow(activeCycleDetail),
+    [activeCycleDetail],
+  )
+
+  const viewByLabel = useMemo(() => {
+    if (budgetDepartmentName) return budgetDepartmentName
+    if (assignedDepartmentIds.length === 1) {
+      return deptById.get(assignedDepartmentIds[0]) || "Assigned department"
+    }
+    if (assignedDepartmentIds.length > 1) {
+      return `${assignedDepartmentIds.length} departments`
+    }
+    return "Total Company"
+  }, [budgetDepartmentName, assignedDepartmentIds, deptById])
+
+  const viewByOptions = useMemo(() => {
+    const opts = [{ id: "total", label: "Total Company" }]
+    if (budgetDepartmentId && budgetDepartmentName) {
+      opts.push({ id: budgetDepartmentId, label: budgetDepartmentName })
+    }
+    for (const id of assignedDepartmentIds) {
+      if (opts.some((o) => o.id === id)) continue
+      opts.push({ id, label: deptById.get(id) || id })
+    }
+    return opts
+  }, [
+    assignedDepartmentIds,
+    budgetDepartmentId,
+    budgetDepartmentName,
+    deptById,
+  ])
 
   const modelScenarios = useMemo(() => {
     const fromStore = scenarios.filter((s) => !s.modelId || s.modelId === modelId)
@@ -445,7 +659,6 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
   }, [versions, model?.versions, modelId])
 
   useEffect(() => {
-    if (inBudgetContext || !modelId) return
     void dispatch(
       fetchFpaDashboard({
         modelId,
@@ -463,7 +676,252 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
         else setPlanningDrivers([])
       })
       .catch(() => setPlanningDrivers([]))
-  }, [inBudgetContext, modelId, selectedVersionId, selectedScenarioId, dispatch])
+  }, [modelId, selectedVersionId, selectedScenarioId, dispatch])
+
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const res = await fpaApi.listBudgetCycles({ modelId })
+        const rows = res.success && Array.isArray(res.data) ? res.data : []
+        const filtered = rows.filter((c) => !c.modelId || c.modelId === modelId)
+        if (!cancelled) {
+          setPlanningCycles(
+            filtered.map((c) => ({
+              id: c.id,
+              name: c.name || `FY${c.fiscalYear} cycle`,
+            })),
+          )
+        }
+      } catch {
+        if (!cancelled) setPlanningCycles([])
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [modelId])
+
+  useEffect(() => {
+    if (!budgetCycleId) {
+      setActiveCycleDetail(null)
+      return
+    }
+    let cancelled = false
+    void fpaApi
+      .getBudgetCycle(budgetCycleId)
+      .then((res) => {
+        if (!cancelled && res.success && res.data) setActiveCycleDetail(res.data)
+      })
+      .catch(() => {
+        if (!cancelled) setActiveCycleDetail(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [budgetCycleId])
+
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      const comments: PlanningComment[] = []
+      const tasks: PlanningTask[] = []
+      const activity: PlanningActivity[] = []
+
+      if (budgetCycleId) {
+        try {
+          const [cRes, tRes, aRes] = await Promise.all([
+            fpaApi.listBudgetCycleComments(budgetCycleId),
+            fpaApi.listBudgetCycleTasks(budgetCycleId),
+            fpaApi.listBudgetApprovalEvents(budgetCycleId),
+          ])
+          if (cRes.success && Array.isArray(cRes.data)) {
+            for (const c of cRes.data) {
+              const author = c.authorName || "User"
+              comments.push({
+                id: c.id,
+                author,
+                initials: planningInitials(author),
+                avatarTone: planningAvatarTone(author),
+                when: formatRelativeWhen(c.createdAt),
+                body: c.body || "",
+              })
+            }
+          }
+          if (tRes.success && Array.isArray(tRes.data)) {
+            for (const t of tRes.data) {
+              const st = String(t.status || "").toUpperCase()
+              tasks.push({
+                id: t.id,
+                title: t.title || "Planning task",
+                assignee: t.assigneeName || t.departmentName || "Unassigned",
+                due: t.dueDate
+                  ? new Date(t.dueDate).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      timeZone: "UTC",
+                    })
+                  : "",
+                done: st === "COMPLETED" || st === "APPROVED" || st === "CLOSED",
+              })
+            }
+          }
+          if (aRes.success && Array.isArray(aRes.data)) {
+            for (const e of aRes.data.slice(0, 12)) {
+              activity.push({
+                id: String(e.id || `${e.action}-${e.createdAt}`),
+                when: formatRelativeWhen(e.createdAt),
+                text: `${e.actorName || "User"} · ${String(e.action || e.rawAction || "Update").replace(/_/g, " ")}`,
+              })
+            }
+          }
+        } catch {
+          /* keep empty */
+        }
+      }
+
+      if (selected?.id) {
+        try {
+          const res = await fpaApi.listCellComments(modelId, selected.id)
+          if (res.success && Array.isArray(res.data)) {
+            for (const c of res.data) {
+              const author =
+                (c as { authorName?: string; userName?: string }).authorName ||
+                (c as { userName?: string }).userName ||
+                "User"
+              comments.unshift({
+                id: `cell-${c.id}`,
+                author,
+                initials: planningInitials(author),
+                avatarTone: planningAvatarTone(author),
+                when: formatRelativeWhen(
+                  (c as { createdAt?: string }).createdAt || null,
+                ),
+                body: `[Cell] ${(c as { body?: string; text?: string }).body || (c as { text?: string }).text || ""}`,
+              })
+            }
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+
+      if (!cancelled) {
+        setCollabComments(comments)
+        setCollabTasks(tasks)
+        setCollabActivity(activity)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [budgetCycleId, selected?.id, modelId, collabReloadKey])
+
+  const onCycleChange = useCallback(
+    (id: string) => {
+      const sp = new URLSearchParams(searchParams.toString())
+      if (id) sp.set("cycleId", id)
+      else sp.delete("cycleId")
+      const q = sp.toString()
+      router.replace(q ? `${pathname}?${q}` : pathname)
+    },
+    [searchParams, router, pathname],
+  )
+
+  const onWorkspaceViewChange = useCallback(
+    (view: PlanningWorkspaceView) => {
+      const sp = new URLSearchParams(searchParams.toString())
+      if (view === "compare") sp.set("view", "compare")
+      else sp.delete("view")
+      const q = sp.toString()
+      router.replace(q ? `${pathname}?${q}` : pathname)
+    },
+    [searchParams, router, pathname],
+  )
+
+  // Seed compare selection when entering compare mode or when scenarios load.
+  useEffect(() => {
+    if (workspaceView !== "compare") return
+    setCompareScenarioIds((prev) => {
+      const valid = prev.filter((id) => modelScenarios.some((s) => s.id === id))
+      if (valid.length >= 2) return valid
+      const seed = new Set<string>()
+      const prefer = (re: RegExp) =>
+        modelScenarios.find((s) => re.test(s.name) || re.test(s.scenarioType || ""))
+      const budget = prefer(/budget/i)
+      if (budget) seed.add(budget.id)
+      if (selectedScenarioId && modelScenarios.some((s) => s.id === selectedScenarioId)) {
+        seed.add(selectedScenarioId)
+      }
+      for (const s of modelScenarios) {
+        if (seed.size >= Math.min(5, modelScenarios.length)) break
+        seed.add(s.id)
+      }
+      return Array.from(seed)
+    })
+  }, [workspaceView, modelScenarios, selectedScenarioId])
+
+  const collabApprovals = useMemo((): PlanningApproval[] => {
+    return collabActivity.map((a) => {
+      const t = a.text.toLowerCase()
+      let status: PlanningApproval["status"] = "pending"
+      if (/approv/.test(t)) status = "approved"
+      else if (/return/.test(t)) status = "returned"
+      else if (/submit/.test(t)) status = "submitted"
+      return { id: a.id, when: a.when, text: a.text, status }
+    })
+  }, [collabActivity])
+
+  const reloadPlanningShell = useCallback(() => {
+    void dispatch(
+      fetchFpaDashboard({
+        modelId,
+        versionId: selectedVersionId || undefined,
+      }),
+    )
+    setCollabReloadKey((k) => k + 1)
+  }, [dispatch, modelId, selectedVersionId])
+
+  const onDriverSave = useCallback(
+    async (id: string, value: number) => {
+      try {
+        const res = await fpaApi.updateDriver(id, { value })
+        if (!res.success) throw new Error(res.message || "Driver update failed")
+        setPlanningDrivers((prev) =>
+          prev.map((d) => (d.id === id ? { ...d, value } : d)),
+        )
+        toast.success("Driver updated")
+      } catch (err) {
+        toast.error(errorMessage(err))
+      }
+    },
+    [],
+  )
+
+  const onAddCollabComment = useCallback(
+    async (body: string) => {
+      try {
+        if (budgetCycleId) {
+          const res = await fpaApi.postBudgetCycleComment(budgetCycleId, { body })
+          if (!res.success) throw new Error(res.message || "Comment failed")
+          toast.success("Comment posted")
+          setCollabReloadKey((k) => k + 1)
+          return
+        }
+        if (selected?.id) {
+          const res = await fpaApi.addCellComment(modelId, selected.id, { body })
+          if (!res.success) throw new Error(res.message || "Comment failed")
+          toast.success("Cell comment posted")
+          setCollabReloadKey((k) => k + 1)
+          return
+        }
+        toast.message("Select a planning cycle or a grid cell to comment")
+      } catch (err) {
+        toast.error(errorMessage(err))
+      }
+    },
+    [budgetCycleId, selected?.id, modelId],
+  )
 
   const budgetSubmitUnmet = useMemo(() => {
     if (!inBudgetContext) return [] as string[]
@@ -835,7 +1293,11 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
     }
     return [...byYear.entries()]
       .sort((a, b) => a[0] - b[0])
-      .map(([y, keys]) => ({ key: `FY${y}`, label: `FY${y}`, periodKeys: keys }))
+      .map(([y, keys]) => ({
+        key: `FY${y}`,
+        label: `FY${y} Total`,
+        periodKeys: keys,
+      }))
   }, [periods])
 
   const cellMap = useMemo(() => {
@@ -1378,7 +1840,7 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
 
   const visibleMonthCols = displayMode === "monthly" ? periods : []
   const visibleAggCols =
-    displayMode === "quarterly" ? [...quarterCols, ...fyCols] : [...quarterCols, ...fyCols]
+    displayMode === "quarterly" ? [...quarterCols, ...fyCols] : [...fyCols]
 
   const displayValue = (lineId: string, periodKey: string, value: number) =>
     formatViewValue(value, viewMode, priorFor(lineId, periodKey))
@@ -1389,18 +1851,35 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
     const ro = isReadOnly(cell)
     const isSel = selected?.id === cell?.id
     const isEditing = cell && editingCellId === cell.id
-    const bandBg = p.band === "ACTUAL" ? "bg-[#f8fafc]" : "bg-[#eff6ff]/40"
+    const isRoot = !row.parentId || !rows.some((r) => r.id === row.parentId)
 
     if (!cell) {
       return (
-        <td key={p.key} className={cn("px-0.5 py-0.5 border-b border-[#f1f5f9]", bandBg)}>
-          <span className="block text-right text-[#cbd5e1] px-2 py-1.5">—</span>
+        <td
+          key={p.key}
+          className={cn(
+            "px-3 py-2.5 border-b border-r border-[#eaecf0] text-right text-[#98a2b3]",
+            isRoot && "bg-[#f5f8ff]",
+          )}
+        >
+          —
         </td>
       )
     }
 
+    const shown =
+      viewMode === "amounts" && value === 0
+        ? "—"
+        : displayValue(row.id, p.key, value)
+
     return (
-      <td key={p.key} className={cn("px-0.5 py-0.5 border-b border-[#f1f5f9]", bandBg)}>
+      <td
+        key={p.key}
+        className={cn(
+          "px-1 py-1 border-b border-r border-[#eaecf0]",
+          isRoot && "bg-[#f5f8ff]",
+        )}
+      >
         {isEditing ? (
           <input
             ref={editInputRef}
@@ -1419,692 +1898,505 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
                 cancelEdit()
               }
             }}
-            className="w-full min-w-[4.5rem] text-right tabular-nums px-2 py-1.5 rounded-[3px] border-2 border-[#2563eb] outline-none"
+            className="w-full min-w-[4.5rem] text-right tabular-nums px-2 py-1.5 rounded-md border border-[#2563eb] outline-none"
           />
         ) : (
           <button
             type="button"
             className={cn(
-              "w-full text-right tabular-nums px-2 py-1.5 rounded-[3px] border-2 border-transparent",
-              ro ? "text-[#64748b]" : "text-[#0f172a] hover:border-[#93c5fd] cursor-text",
+              "w-full text-right tabular-nums px-2 py-1.5 rounded-md border border-transparent",
+              isRoot ? "font-semibold text-[#1d4ed8]" : ro ? "text-[#475467]" : "text-[#101828]",
+              !ro && canEditGrid && "hover:border-[#b2ddff] cursor-text",
               isSel && "border-[#2563eb] bg-white",
             )}
             onClick={() => void selectCell(cell, !ro && canEditGrid)}
             title={ro ? cellStateMeta(cellState(cell)).hint : "Click to edit"}
           >
-            <span className="inline-flex items-center justify-end gap-1 w-full">
-              {(() => {
-                const st = cellState(cell)
-                if (st === "INPUT") return null
-                const { Icon } = cellStateMeta(st)
-                return <Icon className="w-3 h-3 text-[#94a3b8] shrink-0" aria-hidden />
-              })()}
-              {displayValue(row.id, p.key, value)}
-            </span>
+            {shown}
           </button>
         )}
       </td>
     )
   }
 
-  if (!inBudgetContext) {
-    return <PlanningWorkspaceBoard modelId={modelId} />
-  }
-
   return (
     <div className="min-h-full bg-[#f1f5f9] flex flex-col">
       <FpaPageHeader
-        title="Planning Worksheet"
+        title={
+          workspaceView === "compare"
+            ? "Scenario Comparison"
+            : inBudgetContext
+              ? "Planning Worksheet"
+              : "Model Planning"
+        }
+        hideFilters
+        hideSearch
       />
 
       <div className="flex-1 p-3 sm:p-4 space-y-3">
-        <div className="space-y-3 min-w-0">
-        {/* Header card */}
-        <div className={cn(CARD, "px-4 py-3.5")}>
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0 flex-1">
-              <h2 className="text-[17px] font-semibold text-[#0f172a] tracking-tight truncate">
-                {displayName}
-              </h2>
-              <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-3xl">
-                <div>
-                  <p className="text-[11px] font-medium text-[#94a3b8]">
-                    Owner
-                  </p>
-                  <div className="mt-1.5 inline-flex items-center gap-2 text-[13px] font-medium text-[#0f172a]">
-                    {ownerAvatarUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={ownerAvatarUrl}
-                        alt=""
-                        className="h-6 w-6 shrink-0 rounded-full object-cover bg-[#e2e8f0]"
-                      />
-                    ) : (
-                      <span className="h-6 w-6 shrink-0 rounded-full bg-[#e2e8f0] text-[10px] font-semibold flex items-center justify-center text-[#475569]">
-                        {initials(ownerName === "—" ? "?" : ownerName)}
-                      </span>
-                    )}
-                    <span className="truncate">{ownerName}</span>
-                  </div>
-                </div>
-                <div>
-                  <p className="text-[11px] font-medium text-[#94a3b8]">
-                    Status
-                  </p>
-                  <div className="mt-1.5 inline-flex items-center gap-1.5 text-[13px] font-medium text-[#0f172a]">
-                    <span
-                      className={cn(
-                        "h-2 w-2 rounded-full",
-                        String(statusLabel).toUpperCase().includes("LOCK") ||
-                          String(statusLabel).toUpperCase() === "APPROVED"
-                          ? "bg-[#16a34a]"
-                          : String(statusLabel).toUpperCase().includes("PROGRESS") ||
-                              String(statusLabel).toUpperCase().includes("WORKING")
-                            ? "bg-[#16a34a]"
-                            : "bg-[#2563eb]",
-                      )}
-                    />
-                    {String(statusLabel).replace(/_/g, " ")}
-                  </div>
-                </div>
-                <div>
-                  <p className="text-[11px] font-medium text-[#94a3b8]">
-                    Currency
-                  </p>
-                  <p className="mt-1.5 text-[13px] font-medium text-[#0f172a]">{currency}</p>
-                </div>
-                <div>
-                  <p className="text-[11px] font-medium text-[#94a3b8]">
-                    Last Updated
-                  </p>
-                  <p className="mt-1.5 text-[13px] font-medium text-[#0f172a]">
-                    {formatWhen(lastUpdated)}
-                  </p>
-                </div>
-              </div>
+        <PlanningWorkspaceChrome
+          versions={modelVersions}
+          versionId={selectedVersionId}
+          scenarios={modelScenarios}
+          scenarioId={selectedScenarioId}
+          modelId={modelId}
+          kpis={planningKpis}
+          currency={currency}
+          cycles={planningCycles}
+          cycleId={budgetCycleId}
+          onCycleChange={onCycleChange}
+          drivers={driverRows}
+          canEditDrivers={canEditGrid}
+          onVersionChange={(id) => {
+            dispatch(setSelectedVersionId(id))
+            const sp = new URLSearchParams(searchParams.toString())
+            sp.set("versionId", id)
+            const q = sp.toString()
+            router.replace(q ? `${pathname}?${q}` : pathname)
+          }}
+          onScenarioChange={(id) => {
+            dispatch(setSelectedScenarioId(id))
+            const sp = new URLSearchParams(searchParams.toString())
+            sp.set("scenarioId", id)
+            const q = sp.toString()
+            router.replace(q ? `${pathname}?${q}` : pathname)
+          }}
+          onRefresh={reloadPlanningShell}
+          onDriverSave={onDriverSave}
+          viewByLabel={viewByLabel}
+          viewByOptions={viewByOptions}
+          workspaceView={workspaceView}
+          onWorkspaceViewChange={onWorkspaceViewChange}
+          compareScenarioIds={compareScenarioIds}
+          onCompareScenarioIdsChange={setCompareScenarioIds}
+          hideKpis
+        />
+
+        {workspaceView === "compare" ? (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-stretch">
+            <div className="lg:col-span-9 min-w-0 space-y-3">
+              <PlanningWorkspaceKpiStrip
+                kpis={compareKpis}
+                currency={currency}
+                demoFallback={DEMO_COMPARE_KPIS}
+                showFooter={false}
+                onRefresh={reloadPlanningShell}
+              />
+              <PlanningScenarioCompareView
+                modelId={modelId}
+                versionId={selectedVersionId}
+                scenarios={modelScenarios}
+                scenarioId={selectedScenarioId}
+                currency={currency}
+                selectedIds={compareScenarioIds}
+                onSelectedIdsChange={setCompareScenarioIds}
+                onKpisChange={setCompareKpis}
+              />
             </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={() => setModelDetailsOpen((v) => !v)}
-                className={TOOL_BTN}
-              >
-                <Info className="w-3.5 h-3.5" />
-                Model Details
-              </button>
-              <button type="button" className={cn(TOOL_BTN, "px-2")} aria-label="More">
-                <MoreVertical className="w-3.5 h-3.5" />
-              </button>
+            <div
+              className="lg:col-span-3 flex flex-col gap-3 min-h-[480px] lg:sticky lg:top-3"
+              style={{ height: "calc(100vh - 6.5rem)" }}
+            >
+              <PlanningCollabSidebar
+                className="flex-1 min-h-0"
+                mode="compare"
+                comments={collabComments}
+                activity={collabActivity}
+                approvals={collabApprovals}
+                onAddComment={(body) => void onAddCollabComment(body)}
+                commentPlaceholder="Add a comment..."
+              />
             </div>
           </div>
-          {modelDetailsOpen && (
-            <div className="mt-3 rounded-md border border-[#e2e8f0] bg-[#f8fafc] px-3 py-2.5 text-[12px] text-[#475569] grid sm:grid-cols-2 gap-2">
-              <p>
-                <span className="text-[#94a3b8]">Type</span> {model?.modelType || "—"}
-              </p>
-              <p>
-                <span className="text-[#94a3b8]">Granularity</span> {model?.timeGranularity || "—"}
-              </p>
-              <p>
-                <span className="text-[#94a3b8]">Start</span>{" "}
-                {model?.startPeriod ? monthLabel(model.startPeriod) : "—"}
-              </p>
-              <p>
-                <span className="text-[#94a3b8]">End</span>{" "}
-                {model?.endPeriod ? monthLabel(model.endPeriod) : "—"}
-              </p>
-              {model?.description ? (
-                <p className="sm:col-span-2">
-                  <span className="text-[#94a3b8]">Description</span> {model.description}
-                </p>
-              ) : null}
+        ) : (
+        <>
+        <div className="space-y-3">
+        <PlanningWorkspaceKpiStrip
+          kpis={planningKpis}
+          currency={currency}
+          viewByLabel={viewByLabel}
+          viewByOptions={viewByOptions}
+          onRefresh={reloadPlanningShell}
+        />
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-stretch">
+          <div className="lg:col-span-9 space-y-3 min-w-0">
+        <div className={cn(CARD, "overflow-hidden")}>
+          {/* Design header: title + primary grid controls */}
+          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[#e2e8f0] px-4 py-3">
+            <div className="min-w-0">
+              <h3 className="text-[15px] font-semibold text-[#101828] tracking-tight">
+                Planning Grid
+              </h3>
+              <p className="text-[12px] text-[#667085] mt-0.5">All values in {currency}</p>
             </div>
-          )}
-        </div>
-
-        {inBudgetContext && (
-          <div className={cn(CARD, "px-4 py-3")}>
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0 space-y-1.5">
-                <p className="text-[11px] font-medium uppercase tracking-wide text-[#94a3b8]">
-                  Budget owner workspace
-                </p>
-                <h3 className="text-sm font-semibold text-[#0f172a] truncate">
-                  {budgetCycleName || "Planning cycle"}
-                  {budgetDepartmentName ? (
-                    <span className="font-normal text-[#64748b]">
-                      {" "}
-                      · {budgetDepartmentName}
-                    </span>
-                  ) : null}
-                </h3>
-                <p className="text-[11px] text-[#64748b]">
-                  {assignedDepartmentIds.length
-                    ? `Scoped to ${assignedDepartmentIds.length} assigned department${
-                        assignedDepartmentIds.length === 1 ? "" : "s"
-                      } for this cycle.`
-                    : budgetDepartmentName
-                      ? `Department scope: ${budgetDepartmentName}.`
-                      : "Loaded with cycle context — department rows follow assignment."}
-                </p>
-                <div className="flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-[#475569]">
-                  <span>
-                    Due{" "}
-                    <span className="font-medium text-[#0f172a]">
-                      {budgetDueDate
-                        ? new Date(budgetDueDate + "T12:00:00Z").toLocaleDateString("en-US", {
-                            month: "short",
-                            day: "numeric",
-                            year: "numeric",
-                            timeZone: "UTC",
-                          })
-                        : "Due date pending"}
-                    </span>
-                  </span>
-                  <span>
-                    Validation{" "}
-                    <span
-                      className={cn(
-                        "font-medium",
-                        validationPanelItems.length ? "text-[#b45309]" : "text-[#0f172a]",
-                      )}
-                    >
-                      {validationPanelItems.length}
-                    </span>
-                  </span>
-                </div>
-                {budgetSubmitUnmet.length > 0 && (
-                  <div className="mt-2 rounded-md border border-[#fed7aa] bg-[#fff7ed] px-3 py-2">
-                    <p className="text-[11px] text-[#9a3412]">
-                      Cannot submit. {budgetSubmitUnmet.length}{" "}
-                      {budgetSubmitUnmet.length === 1
-                        ? "requirement remains"
-                        : "requirements remain"}
-                      .{" "}
-                      <button
-                        type="button"
-                        className="font-semibold text-[#c2410c] underline underline-offset-2"
-                        onClick={focusValidationMessages}
-                      >
-                        View in Validation Messages
-                      </button>
-                    </p>
-                  </div>
-                )}
-                {canSubmitTask && submitTaskId ? (
-                  <textarea
-                    className="mt-2 w-full min-h-[52px] rounded-md border border-[#e2e8f0] px-2.5 py-2 text-[11px] text-[#0f172a] placeholder:text-[#94a3b8]"
-                    placeholder="Change notes (what changed vs prior)…"
-                    value={changeNotesDraft}
-                    onChange={(e) => setChangeNotesDraft(e.target.value)}
-                  />
-                ) : null}
-              </div>
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
               <button
                 type="button"
-                className={TOOL_BTN_PRIMARY}
-                disabled={
-                  anyBusy ||
-                  loading ||
-                  !submitTaskId ||
-                  !canSubmitTask ||
-                  budgetSubmitUnmet.length > 0
+                className={cn(
+                  GRID_TOOL,
+                  "min-w-8 px-2",
+                  viewMode === "pct_change" && "border-[#2563eb] bg-[#eff6ff] text-[#2563eb]",
+                )}
+                title="Toggle % change view"
+                onClick={() =>
+                  setViewMode((m) => (m === "pct_change" ? "amounts" : "pct_change"))
                 }
-                title={
-                  budgetSubmitUnmet.length
-                    ? `${budgetSubmitUnmet.length} requirements remain`
-                    : submitTaskId
-                      ? "Submit owner task"
-                      : "No open workflow task"
-                }
-                onClick={async () => {
-                  if (!submitTaskId || budgetSubmitUnmet.length) {
-                    if (budgetSubmitUnmet.length) focusValidationMessages()
-                    return
-                  }
-                  setBusyKey("submit")
-                  try {
-                    const res = await fpaApi.submitTask(submitTaskId, {
-                      changeNotes: changeNotesDraft.trim() || undefined,
-                    })
-                    if (!res.success) throw new Error(res.message || "Submit failed")
-                    toast.success("Task submitted")
-                    setChangeNotesDraft("")
-                    setBoundTaskId(null)
-                    setOwnerCanSubmit(false)
-                    setOwnerUnmet([])
-                  } catch (err) {
-                    const code = (err as { response?: { code?: string } })?.response?.code
-                    const apiErrs = (
-                      err as { response?: { errors?: Array<{ message?: string }> } }
-                    )?.response?.errors
-                    if (code === "SUBMISSION_BLOCKED" && Array.isArray(apiErrs) && apiErrs.length) {
-                      setOwnerUnmet(apiErrs.map((e) => e.message || "Requirement unmet"))
-                      setOwnerCanSubmit(false)
-                      focusValidationMessages()
-                      toast.error(
-                        `Cannot submit. ${apiErrs.length} requirement${
-                          apiErrs.length === 1 ? "" : "s"
-                        } remain.`,
-                      )
-                    } else {
-                      toast.error(errorMessage(err))
-                    }
-                  } finally {
-                    setBusyKey(null)
-                  }
+              >
+                <Percent className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                className={GRID_TOOL}
+                title="Auto-fit columns to content"
+                onClick={() => {
+                  setDisplayMode("monthly")
+                  setViewMode("amounts")
+                  toast.success("Columns auto-fitted")
                 }}
               >
-                {isBusy("submit") ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Send className="w-3.5 h-3.5" />
-                )}
-                Submit
+                Auto-fit
               </button>
-            </div>
-          </div>
-        )}
+              <div className="relative">
+                <button
+                  type="button"
+                  className={GRID_TOOL}
+                  title="Column layout"
+                  onClick={() => setColumnsMenuOpen((v) => !v)}
+                >
+                  <Columns2 className="w-3.5 h-3.5" />
+                  Columns
+                </button>
+                {columnsMenuOpen ? (
+                  <>
+                    <button
+                      type="button"
+                      className="fixed inset-0 z-10 cursor-default"
+                      aria-label="Close columns"
+                      onClick={() => setColumnsMenuOpen(false)}
+                    />
+                    <div className="absolute right-0 top-full z-20 mt-1 w-44 rounded-md border border-[#e2e8f0] bg-white py-1 shadow-md">
+                      <button
+                        type="button"
+                        className="w-full px-3 py-1.5 text-left text-[12px] hover:bg-[#f8fafc]"
+                        onClick={() => {
+                          setDisplayMode("monthly")
+                          setColumnsMenuOpen(false)
+                        }}
+                      >
+                        Monthly periods
+                      </button>
+                      <button
+                        type="button"
+                        className="w-full px-3 py-1.5 text-left text-[12px] hover:bg-[#f8fafc]"
+                        onClick={() => {
+                          setDisplayMode("quarterly")
+                          setColumnsMenuOpen(false)
+                        }}
+                      >
+                        Quarterly roll-up
+                      </button>
+                      <button
+                        type="button"
+                        className="w-full px-3 py-1.5 text-left text-[12px] hover:bg-[#f8fafc]"
+                        onClick={() => {
+                          setViewMode("thousands")
+                          setColumnsMenuOpen(false)
+                        }}
+                      >
+                        Values in thousands
+                      </button>
+                      <button
+                        type="button"
+                        className="w-full px-3 py-1.5 text-left text-[12px] hover:bg-[#f8fafc]"
+                        onClick={() => {
+                          setViewMode("amounts")
+                          setColumnsMenuOpen(false)
+                        }}
+                      >
+                        Full amounts
+                      </button>
+                    </div>
+                  </>
+                ) : null}
+              </div>
 
-        {/* Toolbar — not a card */}
-        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              className={TOOL_BTN}
-              disabled={anyBusy || loading || !canEditGrid}
-              title="Import prior-year GL/actual figures into this sheet"
-              onClick={() => void runTool("sync")}
-            >
-              {isBusy("sync") ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <Download className="w-3.5 h-3.5" />
-              )}
-              Import
-            </button>
-            <button
-              type="button"
-              className={TOOL_BTN}
-              disabled={anyBusy || loading || !canExportBoardPack}
-              title="Queue a management report export"
-              onClick={() => void onExport()}
-            >
-              {isBusy("export") ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <Upload className="w-3.5 h-3.5" />
-              )}
-              Export
-            </button>
-            <button
-              type="button"
-              className={TOOL_BTN}
-              disabled={anyBusy || loading || !canEditGrid}
-              title="Copy prior period into later months"
-              onClick={() => void runTool("copy")}
-            >
-              {isBusy("copy") ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <Copy className="w-3.5 h-3.5" />
-              )}
-              Copy Forward
-            </button>
-            <button
-              type="button"
-              className={TOOL_BTN}
-              disabled={anyBusy || loading || !canEditGrid}
-              title="Spread annual total evenly across periods"
-              onClick={() => void runTool("spread")}
-            >
-              {isBusy("spread") ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <LayoutGrid className="w-3.5 h-3.5" />
-              )}
-              Spread
-              <ChevronDown className="w-3 h-3 text-[#94a3b8]" />
-            </button>
-            <div className="relative">
+              <span className="hidden sm:inline-block h-5 w-px bg-[#e2e8f0] mx-0.5" aria-hidden />
+
               <button
                 type="button"
-                className={TOOL_BTN}
+                className={GRID_TOOL}
+                title="Import actuals from GL"
+                disabled={anyBusy || loading || !canEditGrid}
+                onClick={() => void runTool("sync")}
+              >
+                {isBusy("sync") ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Download className="w-3.5 h-3.5" />
+                )}
+                Import
+              </button>
+              <button
+                type="button"
+                className={GRID_TOOL}
+                title="Copy selected value into later months"
                 disabled={anyBusy || loading || !canEditGrid || !selected}
-                title="Percentage increase from the selected period forward"
+                onClick={() => void runTool("copy")}
+              >
+                {isBusy("copy") ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Copy className="w-3.5 h-3.5" />
+                )}
+                Copy
+              </button>
+              <button
+                type="button"
+                className={GRID_TOOL}
+                title="Spread selected value evenly across months"
+                disabled={anyBusy || loading || !canEditGrid || !selected}
+                onClick={() => void runTool("spread")}
+              >
+                {isBusy("spread") ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <LayoutGrid className="w-3.5 h-3.5" />
+                )}
+                Spread
+              </button>
+              <button
+                type="button"
+                className={cn(GRID_TOOL, growthOpen && "border-[#2563eb] bg-[#eff6ff] text-[#2563eb]")}
+                title="Apply growth % along the line"
+                disabled={anyBusy || loading || !canEditGrid || !selected}
                 onClick={() => {
                   setBulkOpen(false)
+                  setCommentOpen(false)
                   setGrowthOpen((v) => !v)
                 }}
               >
-                {isBusy("growth") ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <TrendingUp className="w-3.5 h-3.5" />
-                )}
-                Apply Growth
-                <ChevronDown className="w-3 h-3 text-[#94a3b8]" />
+                <TrendingUp className="w-3.5 h-3.5" />
+                Growth
               </button>
-              {growthOpen && (
-                <div className="absolute left-0 top-full z-20 mt-1 w-56 rounded-md border border-[#e2e8f0] bg-white p-2 shadow-md">
-                  <label className="text-[11px] text-[#64748b]">Rate %</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={growthRate}
-                    onChange={(e) => setGrowthRate(e.target.value)}
-                    className="mt-1 h-8 w-full rounded-md border border-[#e2e8f0] px-2 text-xs"
-                  />
-                  <button
-                    type="button"
-                    className="mt-2 h-8 w-full rounded-md bg-[#2563eb] text-xs font-medium text-white disabled:opacity-50"
-                    disabled={anyBusy || !selected}
-                    onClick={() => void runTool("growth")}
-                  >
-                    Apply
-                  </button>
-                </div>
-              )}
-            </div>
-
-            <div className="relative">
               <button
                 type="button"
-                className={TOOL_BTN}
+                className={cn(GRID_TOOL, bulkOpen && "border-[#2563eb] bg-[#eff6ff] text-[#2563eb]")}
+                title="Bulk fill / calculated operations"
                 disabled={anyBusy || loading || !canEditGrid || !selected}
-                title="Server-validated bulk cell operations"
                 onClick={() => {
                   setGrowthOpen(false)
+                  setCommentOpen(false)
                   setBulkOpen((v) => !v)
                 }}
               >
-                {busyKey?.startsWith("bulk:") ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <MoreVertical className="w-3.5 h-3.5" />
-                )}
+                <Calculator className="w-3.5 h-3.5" />
                 Bulk
-                <ChevronDown className="w-3 h-3 text-[#94a3b8]" />
               </button>
-              {bulkOpen && (
-                <div className="absolute left-0 top-full z-20 mt-1 w-56 rounded-md border border-[#e2e8f0] bg-white py-1 shadow-md">
-                  {(
-                    [
-                      ["FILL_RIGHT", "Fill right"],
-                      ["FILL_DOWN", "Fill down"],
-                      ["COPY_PRIOR_PERIOD", "Copy prior period"],
-                      ["COPY_PRIOR_YEAR", "Copy prior year"],
-                      ["PERCENT_INCREASE", `% increase (${growthRate}%)`],
-                      ["PERCENT_DECREASE", `% decrease (${growthRate}%)`],
-                      ["CLEAR_EDITABLE", "Clear editable"],
-                    ] as const
-                  ).map(([op, label]) => (
-                    <button
-                      key={op}
-                      type="button"
-                      className="w-full px-3 py-1.5 text-left text-xs text-[#0f172a] hover:bg-[#f8fafc]"
-                      onClick={() => void runBulkOp(op)}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {inBudgetContext && (
-            <button
-              type="button"
-              className={TOOL_BTN_PRIMARY}
-              disabled={
-                anyBusy ||
-                loading ||
-                !submitTaskId ||
-                !canSubmitTask ||
-                (inBudgetContext && budgetSubmitUnmet.length > 0)
-              }
-              title={
-                inBudgetContext && budgetSubmitUnmet.length
-                  ? `Cannot submit — ${budgetSubmitUnmet.length} requirements remain`
-                  : submitTaskId
-                    ? "Submit open workflow task"
-                    : "No open workflow task for this model"
-              }
-              onClick={async () => {
-                if (!submitTaskId) return
-                if (inBudgetContext && budgetSubmitUnmet.length) {
-                  focusValidationMessages()
-                  toast.error(
-                    `Cannot submit. ${budgetSubmitUnmet.length} requirements remain.`,
-                  )
-                  return
-                }
-                setBusyKey("submit")
-                try {
-                  const res = await fpaApi.submitTask(submitTaskId, {
-                    changeNotes: changeNotesDraft.trim() || undefined,
-                  })
-                  if (!res.success) throw new Error(res.message || "Submit failed")
-                  toast.success("Task submitted")
-                  setChangeNotesDraft("")
-                  setBoundTaskId(null)
-                  if (inBudgetContext) {
-                    setOwnerCanSubmit(false)
-                    setOwnerUnmet([])
-                  }
-                } catch (err) {
-                  const code = (err as { response?: { code?: string } })?.response?.code
-                  const apiErrs = (
-                    err as { response?: { errors?: Array<{ message?: string }> } }
-                  )?.response?.errors
-                  if (code === "SUBMISSION_BLOCKED" && Array.isArray(apiErrs) && apiErrs.length) {
-                    setOwnerUnmet(apiErrs.map((e) => e.message || "Requirement unmet"))
-                    setOwnerCanSubmit(false)
-                    toast.error(
-                      `Cannot submit. ${apiErrs.length} requirement${
-                        apiErrs.length === 1 ? "" : "s"
-                      } remain.`,
-                    )
-                  } else {
-                    toast.error(errorMessage(err))
-                  }
-                } finally {
-                  setBusyKey(null)
-                }
-              }}
-            >
-              {isBusy("submit") ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <Send className="w-3.5 h-3.5" />
-              )}
-              Submit
-            </button>
-            )}
-            <div className="relative">
               <button
                 type="button"
-                className={TOOL_BTN}
+                className={cn(GRID_TOOL, commentOpen && "border-[#2563eb] bg-[#eff6ff] text-[#2563eb]")}
+                title="Comment on selected cell"
                 disabled={!selected}
-                title="Add a comment on the selected cell"
                 onClick={() => {
+                  setGrowthOpen(false)
+                  setBulkOpen(false)
                   setCommentOpen((v) => !v)
                   setDetailsOpen(true)
                 }}
               >
                 <MessageSquare className="w-3.5 h-3.5" />
-                Add Comment
+                Comment
               </button>
-              {commentOpen && selected && (
-                <div className="absolute left-0 top-full z-20 mt-1 w-64 rounded-md border border-[#e2e8f0] bg-white p-2 shadow-md">
-                  <textarea
-                    value={commentDraft}
-                    onChange={(e) => setCommentDraft(e.target.value)}
-                    rows={3}
-                    placeholder="Write a comment…"
-                    className="w-full rounded-md border border-[#e2e8f0] px-2 py-1.5 text-xs"
-                  />
+
+              <div className="relative">
+                <button
+                  type="button"
+                  className={cn(GRID_TOOL, "min-w-8 px-2")}
+                  title="More actions"
+                  onClick={() => setGridMoreOpen((v) => !v)}
+                  aria-label="More"
+                >
+                  <MoreVertical className="w-4 h-4" />
+                </button>
+                {gridMoreOpen ? (
+                  <>
+                    <button
+                      type="button"
+                      className="fixed inset-0 z-10 cursor-default"
+                      aria-label="Close more"
+                      onClick={() => setGridMoreOpen(false)}
+                    />
+                    <div className="absolute right-0 top-full z-20 mt-1 w-52 rounded-lg border border-[#e2e8f0] bg-white py-1 shadow-md">
+                      <button
+                        type="button"
+                        className="w-full px-3 py-1.5 text-left text-[12px] hover:bg-[#f8fafc] inline-flex items-center gap-2 disabled:opacity-50"
+                        disabled={anyBusy || loading || !canExportBoardPack}
+                        onClick={() => {
+                          setGridMoreOpen(false)
+                          void onExport()
+                        }}
+                      >
+                        <Upload className="w-3.5 h-3.5 text-[#64748b]" /> Export
+                      </button>
+                      <button
+                        type="button"
+                        className="w-full px-3 py-1.5 text-left text-[12px] hover:bg-[#f8fafc] inline-flex items-center gap-2 disabled:opacity-50"
+                        disabled={!selected}
+                        onClick={() => {
+                          setGridMoreOpen(false)
+                          setDetailsOpen(true)
+                        }}
+                      >
+                        <Maximize2 className="w-3.5 h-3.5 text-[#64748b]" /> Cell details
+                      </button>
+                      {inBudgetContext && canSubmitTask ? (
+                        <button
+                          type="button"
+                          className="w-full px-3 py-1.5 text-left text-[12px] hover:bg-[#f8fafc] inline-flex items-center gap-2 text-[#2563eb] font-medium disabled:opacity-50"
+                          disabled={
+                            anyBusy ||
+                            loading ||
+                            !submitTaskId ||
+                            budgetSubmitUnmet.length > 0
+                          }
+                          onClick={() => {
+                            setGridMoreOpen(false)
+                            toast.message("Use Submit on the budget banner above the grid")
+                          }}
+                        >
+                          <Send className="w-3.5 h-3.5" /> Submit plan
+                        </button>
+                      ) : null}
+                    </div>
+                  </>
+                ) : null}
+              </div>
+            </div>
+          </div>
+
+          {/* Inline popovers for growth / bulk / comment when opened from More */}
+          {(growthOpen || bulkOpen || commentOpen) && (
+            <div className="border-b border-[#e2e8f0] bg-[#f8fafc] px-4 py-2 flex flex-wrap gap-3">
+              {growthOpen && (
+                <div className="inline-flex items-end gap-2 rounded-md border border-[#e2e8f0] bg-white p-2">
+                  <label className="text-[11px] text-[#64748b]">
+                    Growth %
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={growthRate}
+                      onChange={(e) => setGrowthRate(e.target.value)}
+                      className="mt-0.5 block h-8 w-20 rounded-md border border-[#e2e8f0] px-2 text-[12px]"
+                    />
+                  </label>
                   <button
                     type="button"
-                    className="mt-2 h-8 w-full rounded-md bg-[#2563eb] text-xs font-medium text-white disabled:opacity-50"
-                    disabled={anyBusy || !commentDraft.trim()}
-                    onClick={() => void submitComment()}
+                    className={GRID_TOOL}
+                    disabled={!selected || anyBusy}
+                    onClick={() => void runTool("growth")}
                   >
-                    {isBusy("comment") ? "Saving…" : "Post comment"}
+                    Apply
+                  </button>
+                  <button type="button" className={GRID_TOOL} onClick={() => setGrowthOpen(false)}>
+                    Close
                   </button>
                 </div>
               )}
+              {bulkOpen && (
+                <div className="inline-flex flex-wrap items-center gap-1 rounded-md border border-[#e2e8f0] bg-white p-2">
+                  {(
+                    [
+                      ["FILL_RIGHT", "Fill right"],
+                      ["FILL_DOWN", "Fill down"],
+                      ["COPY_PRIOR_PERIOD", "Copy prior"],
+                      ["CLEAR_EDITABLE", "Clear"],
+                    ] as const
+                  ).map(([op, label]) => (
+                    <button
+                      key={op}
+                      type="button"
+                      className={GRID_TOOL}
+                      onClick={() => void runBulkOp(op)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                  <button type="button" className={GRID_TOOL} onClick={() => setBulkOpen(false)}>
+                    Close
+                  </button>
+                </div>
+              )}
+              {commentOpen && selected && (
+                <div className="flex w-full max-w-md flex-col gap-1 rounded-md border border-[#e2e8f0] bg-white p-2">
+                  <textarea
+                    className="min-h-[52px] w-full rounded-md border border-[#e2e8f0] px-2 py-1.5 text-[12px]"
+                    placeholder="Comment on selected cell…"
+                    value={commentDraft}
+                    onChange={(e) => setCommentDraft(e.target.value)}
+                  />
+                  <div className="flex gap-2 justify-end">
+                    <button type="button" className={GRID_TOOL} onClick={() => setCommentOpen(false)}>
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className={cn(GRID_TOOL, "bg-[#2563eb] text-white border-[#2563eb]")}
+                      disabled={!commentDraft.trim()}
+                      onClick={() => void onAddCollabComment(commentDraft.trim())}
+                    >
+                      Post
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-1.5">
-              <span className="text-[11px] text-[#64748b]">View</span>
-              <Select value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
-                <SelectTrigger className={SELECT_TRIGGER}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="rounded-md">
-                  <SelectItem value="amounts" className="text-xs">
-                    $ Amounts
-                  </SelectItem>
-                  <SelectItem value="thousands" className="text-xs">
-                    $ Thousands
-                  </SelectItem>
-                  <SelectItem value="pct_change" className="text-xs">
-                    % MoM Change
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-[11px] text-[#64748b]">Display</span>
-              <Select value={displayMode} onValueChange={(v) => setDisplayMode(v as DisplayMode)}>
-                <SelectTrigger className={cn(SELECT_TRIGGER, "w-[8.5rem]")}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="rounded-md">
-                  <SelectItem value="monthly" className="text-xs">
-                    Monthly
-                  </SelectItem>
-                  <SelectItem value="quarterly" className="text-xs">
-                    Quarterly
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <button
-              type="button"
-              className={cn(TOOL_BTN, "px-2")}
-              title={detailsOpen ? "Hide cell details" : "Show cell details"}
-              onClick={() => setDetailsOpen((v) => !v)}
-            >
-              <Maximize2 className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
+          )}
 
         {!selectedVersionId || !selectedScenarioId ? (
-          <div className={cn(CARD, "p-8 text-sm text-[#64748b]")}>
+          <div className="p-8 text-sm text-[#64748b]">
             Select a version and scenario in the header, or open a model that has defaults.
           </div>
         ) : loading ? (
-          <div className={cn(CARD, "flex items-center justify-center gap-2 py-16 text-[#64748b]")}>
+          <div className="flex items-center justify-center gap-2 py-12 text-[#64748b]">
             <Loader2 className="w-5 h-5 animate-spin" /> Loading grid…
           </div>
         ) : (
           <>
             {/* Grid + details side-by-side; validation under grid — cards never touch */}
-            <div className="flex flex-col sm:flex-row gap-3 items-start min-h-0">
-              <div className="flex-1 min-w-0 w-full flex flex-col gap-3">
-                <div className={cn(CARD, "overflow-hidden")}>
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-b border-[#e2e8f0] bg-[#f8fafc] px-3 py-2">
-                    <span className="text-[10px] font-semibold uppercase tracking-wide text-[#94a3b8]">
-                      Cell states
-                    </span>
-                    {(
-                      [
-                        "INPUT",
-                        "ACTUAL",
-                        "CALCULATED",
-                        "LOCKED",
-                        "IMPORTED",
-                      ] as CellState[]
-                    ).map((st) => {
-                      const { label, Icon, hint } = cellStateMeta(st)
-                      const editable = st === "INPUT"
-                      return (
-                        <span
-                          key={st}
-                          className="inline-flex items-center gap-1 text-[11px] text-[#475569]"
-                          title={hint}
-                        >
-                          <Icon className="h-3 w-3 shrink-0 text-[#64748b]" aria-hidden />
-                          <span className="font-medium text-[#0f172a]">{label}</span>
-                          <span className="text-[#94a3b8]">
-                            {editable ? "editable" : "read-only"}
-                          </span>
-                        </span>
-                      )
-                    })}
-                  </div>
-                  <div className="overflow-x-auto max-h-[min(520px,55vh)] overflow-y-auto">
-                    <table className="w-full text-xs min-w-[960px] border-collapse">
+            <div className="flex flex-col sm:flex-row gap-3 items-start min-h-0 max-h-[min(480px,52vh)]">
+              <div className="flex-1 min-w-0 w-full flex flex-col gap-3 min-h-0 overflow-auto">
+                <div className="overflow-hidden">
+                  <div className="overflow-x-auto max-h-[min(420px,48vh)] overflow-y-auto">
+                    <table className="w-full text-[12px] min-w-[960px] border-collapse">
                       <thead>
-                        <tr>
-                          <th
-                            rowSpan={2}
-                            className="sticky left-0 top-0 z-[3] bg-white text-left px-3 py-2 font-medium text-[#64748b] min-w-[200px] border-b border-[#e2e8f0]"
-                          >
-                            Line item
+                        <tr className="border-b border-[#eaecf0]">
+                          <th className="sticky left-0 top-0 z-[3] bg-white text-left px-4 py-2.5 font-medium text-[#667085] min-w-[200px] border-r border-[#eaecf0]">
+                            Department
                           </th>
-                          {displayMode === "monthly" && actualPeriods.length > 0 && (
-                            <th
-                              colSpan={actualPeriods.length}
-                              className="sticky top-0 z-[2] px-2 py-1.5 text-center text-[10px] font-semibold tracking-wider text-[#64748b] bg-[#f1f5f9] border-b border-[#e2e8f0]"
-                            >
-                              ACTUALS
-                            </th>
-                          )}
-                          {displayMode === "monthly" && forecastPeriods.length > 0 && (
-                            <th
-                              colSpan={forecastPeriods.length}
-                              className="sticky top-0 z-[2] px-2 py-1.5 text-center text-[10px] font-semibold tracking-wider text-[#2563eb] bg-[#dbeafe]/70 border-b border-[#e2e8f0]"
-                            >
-                              FORECAST
-                            </th>
-                          )}
+                          {displayMode === "monthly"
+                            ? visibleMonthCols.map((p) => (
+                                <th
+                                  key={p.key}
+                                  className="sticky top-0 z-[2] bg-white px-3 py-2.5 font-medium text-center text-[#667085] whitespace-nowrap border-r border-[#eaecf0]"
+                                >
+                                  {p.label.replace(/\s+\d{4}$/, "") || p.label}
+                                </th>
+                              ))
+                            : null}
                           {visibleAggCols.map((c) => (
                             <th
                               key={c.key}
-                              rowSpan={2}
-                              className="sticky top-0 z-[2] px-2 py-2 font-medium text-right text-[#64748b] whitespace-nowrap border-b border-l border-[#e2e8f0] bg-[#f8fafc]"
+                              className="sticky top-0 z-[2] px-3 py-2.5 font-medium text-right text-[#667085] whitespace-nowrap bg-[#f9fafb] border-l border-[#eaecf0]"
                             >
                               {c.label}
                             </th>
                           ))}
                         </tr>
-                        {displayMode === "monthly" && (
-                          <tr className="border-b border-[#e2e8f0]">
-                            {visibleMonthCols.map((p) => (
-                              <th
-                                key={p.key}
-                                className={cn(
-                                  "sticky top-[28px] z-[2] px-2 py-2 font-medium text-right whitespace-nowrap",
-                                  p.band === "ACTUAL"
-                                    ? "text-[#64748b] bg-[#f8fafc]"
-                                    : "text-[#2563eb] bg-[#eff6ff]/60",
-                                )}
-                              >
-                                {p.label}
-                              </th>
-                            ))}
-                          </tr>
-                        )}
                       </thead>
                       <tbody>
                         {visibleRows.map(({ row, depth, hasChildren }) => {
                           const expanded = !collapsedIds.has(row.id)
+                          const isRoot = depth === 0
                           return (
                             <tr
                               key={row.id}
@@ -2112,35 +2404,54 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
                                 if (el) rowRefs.current.set(row.id, el)
                                 else rowRefs.current.delete(row.id)
                               }}
-                              className={cn(focusLineId === row.id && "bg-[#eff6ff]/60")}
+                              className={cn(
+                                isRoot && "bg-[#f5f8ff]",
+                                focusLineId === row.id && !isRoot && "bg-[#eff6ff]/60",
+                              )}
                             >
-                              <td className="sticky left-0 z-[1] bg-white px-2 py-1.5 border-b border-[#f1f5f9]">
+                              <td
+                                className={cn(
+                                  "sticky left-0 z-[1] px-3 py-2.5 border-b border-r border-[#eaecf0]",
+                                  isRoot ? "bg-[#f5f8ff]" : "bg-white",
+                                )}
+                              >
                                 <div
-                                  className="flex items-start gap-1"
-                                  style={{ paddingLeft: depth * 12 }}
+                                  className="flex items-center gap-1.5"
+                                  style={{ paddingLeft: Math.max(0, depth) * 14 }}
                                 >
                                   <button
                                     type="button"
-                                    className="mt-0.5 h-5 w-5 shrink-0 inline-flex items-center justify-center text-[#94a3b8] hover:text-[#475569]"
+                                    className={cn(
+                                      "h-5 w-5 shrink-0 inline-flex items-center justify-center",
+                                      hasChildren
+                                        ? "text-[#667085] hover:text-[#101828]"
+                                        : "text-transparent pointer-events-none",
+                                    )}
                                     aria-label={expanded ? "Collapse" : "Expand"}
                                     onClick={() => {
                                       if (hasChildren) toggleRow(row.id)
                                     }}
                                   >
-                                    {hasChildren && expanded ? (
-                                      <ChevronDown className="w-3.5 h-3.5" />
+                                    {hasChildren ? (
+                                      expanded ? (
+                                        <ChevronDown className="w-3.5 h-3.5" />
+                                      ) : (
+                                        <ChevronRight className="w-3.5 h-3.5" />
+                                      )
                                     ) : (
-                                      <ChevronRight className="w-3.5 h-3.5" />
+                                      <span className="w-3.5" />
                                     )}
                                   </button>
-                                  <div className="min-w-0">
-                                    <div className="font-medium text-[#0f172a] leading-tight">
-                                      {row.name}
-                                    </div>
-                                    <div className="text-[10px] text-[#94a3b8] mt-0.5">
-                                      {unitSubtitle(row)}
-                                    </div>
-                                  </div>
+                                  <span
+                                    className={cn(
+                                      "leading-tight truncate",
+                                      isRoot
+                                        ? "font-semibold text-[#1d4ed8]"
+                                        : "font-medium text-[#101828]",
+                                    )}
+                                  >
+                                    {row.name}
+                                  </span>
                                 </div>
                               </td>
                               {displayMode === "monthly" &&
@@ -2154,9 +2465,11 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
                                 return (
                                   <td
                                     key={col.key}
-                                    className="px-2 py-2 text-right tabular-nums text-[#0f172a] font-medium border-b border-l border-[#f1f5f9] bg-[#fafafa]"
+                                    className="px-3 py-2.5 text-right tabular-nums text-[#101828] font-semibold border-b border-l border-[#eaecf0] bg-[#f9fafb]"
                                   >
-                                    {formatViewValue(sum, viewMode, priorSum)}
+                                    {sum === 0 && viewMode === "amounts"
+                                      ? "—"
+                                      : formatViewValue(sum, viewMode, priorSum)}
                                   </td>
                                 )
                               })}
@@ -2181,89 +2494,9 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
                     </table>
                   </div>
                 </div>
-
-                {/* Validation under grid */}
-                <div className={CARD} ref={validationSectionRef}>
-                  <button
-                    type="button"
-                    className="w-full flex items-center gap-2 px-4 py-3 text-left"
-                    onClick={() => setValidationOpen((v) => !v)}
-                  >
-                    <span className="text-sm font-semibold text-[#0f172a]">
-                      Validation Messages
-                    </span>
-                    <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#2563eb] px-1.5 text-[10px] font-semibold text-white">
-                      {validationPanelItems.length}
-                    </span>
-                    <span className="ml-auto text-[#94a3b8]">
-                      {validationOpen ? (
-                        <ChevronDown className="w-4 h-4" />
-                      ) : (
-                        <ChevronRight className="w-4 h-4" />
-                      )}
-                    </span>
-                  </button>
-                  {validationOpen && (
-                    <div className="px-4 pb-3">
-                      {validationPanelItems.length === 0 ? (
-                        <p className="text-[12px] text-[#94a3b8] py-2 border-t border-[#f1f5f9]">
-                          No validation messages from the API.
-                        </p>
-                      ) : (
-                        <ul className="divide-y divide-[#f1f5f9] border-t border-[#f1f5f9]">
-                          {validationPanelItems.map((item) => {
-                            const tone = item.tone
-                            return (
-                              <li
-                                key={item.key}
-                                className="flex flex-wrap items-center gap-3 py-2.5 text-[12px]"
-                              >
-                                {tone === "warning" ? (
-                                  <AlertTriangle className="w-4 h-4 text-[#d97706] shrink-0" />
-                                ) : (
-                                  <AlertCircle className="w-4 h-4 text-[#dc2626] shrink-0" />
-                                )}
-                                <div className="min-w-0 flex-1">
-                                  <p className="font-medium text-[#0f172a]">{item.title}</p>
-                                  <p className="text-[#64748b] mt-0.5">{item.message}</p>
-                                </div>
-                                <span
-                                  className={cn(
-                                    "font-medium shrink-0",
-                                    tone === "warning" ? "text-[#d97706]" : "text-[#dc2626]",
-                                  )}
-                                >
-                                  {tone === "warning" ? "Warning" : "Error"}
-                                </span>
-                                {(item.field || item.lineItemId) && (
-                                  <button
-                                    type="button"
-                                    className="text-[#2563eb] font-medium shrink-0"
-                                    onClick={() => {
-                                      const key = String(item.field || item.lineItemId)
-                                      const match = rows.find(
-                                        (r) =>
-                                          r.code === key ||
-                                          r.id === key ||
-                                          r.name.toLowerCase() === key.toLowerCase(),
-                                      )
-                                      if (match) setFocusLineId(match.id)
-                                    }}
-                                  >
-                                    Go to row
-                                  </button>
-                                )}
-                              </li>
-                            )
-                          })}
-                        </ul>
-                      )}
-                    </div>
-                  )}
-                </div>
               </div>
 
-              {detailsOpen && (
+              {selected && detailsOpen ? (
                 <aside
                   className={cn(
                     CARD,
@@ -2274,15 +2507,19 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
                     <h3 className="text-sm font-semibold text-[#0f172a]">Cell Details</h3>
                     <button
                       type="button"
-                      className="text-[#94a3b8] p-1 rounded-md hover:bg-[#f1f5f9]"
-                      aria-label="Close"
-                      onClick={() => setDetailsOpen(false)}
+                      className="text-[#94a3b8] p-1 rounded-full hover:bg-[#f1f5f9]"
+                      aria-label="Close cell details"
+                      onClick={() => {
+                        setDetailsOpen(false)
+                        setSelected(null)
+                        setEditingCellId(null)
+                        setCommentOpen(false)
+                      }}
                     >
                       <X className="w-4 h-4" />
                     </button>
                   </div>
-                  {selected ? (
-                    <div className="flex-1 overflow-y-auto p-4 space-y-4 text-sm">
+                  <div className="flex-1 overflow-y-auto p-4 space-y-4 text-sm">
                       <div>
                         <p className="text-[13px] font-semibold text-[#0f172a]">
                           {selectedLineName} — {monthLabel(selected.periodDate)}
@@ -2482,15 +2719,40 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
                         )}
                       </div>
                     </div>
-                  ) : (
-                    <p className="p-4 text-xs text-[#94a3b8]">Select a cell to see details.</p>
-                  )}
                 </aside>
-              )}
+              ) : null}
             </div>
           </>
         )}
           </div>
+
+        <PlanningWorkspaceInsights
+          drivers={driverRows}
+          canEditDrivers={canEditGrid}
+          onDriverSave={onDriverSave}
+          trendPoints={trendPoints}
+          workflowSteps={workflowSteps}
+        />
+          </div>
+
+          <div
+            className="lg:col-span-3 flex flex-col gap-3 min-h-[480px] lg:sticky lg:top-3"
+            style={{ height: "calc(100vh - 6.5rem)" }}
+          >
+            <PlanningCollabSidebar
+              className="flex-1 min-h-0"
+              comments={collabComments}
+              tasks={collabTasks}
+              activity={collabActivity}
+              onAddComment={(body) => void onAddCollabComment(body)}
+              commentPlaceholder="Add a comment..."
+            />
+            <PlanningTasksCard tasks={collabTasks} />
+          </div>
+        </div>
+        </div>
+        </>
+        )}
       </div>
 
       <FpaExportDownloadModal
