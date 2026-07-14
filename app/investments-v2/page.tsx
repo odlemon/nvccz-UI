@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { BarChart, Bar, Cell, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts'
-import { ChevronDown, Loader2, RefreshCw } from 'lucide-react'
+import { Loader2, RefreshCw } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '@/lib/store'
 import {
   fetchDashboardSummary,
@@ -14,6 +14,8 @@ import {
 } from '@/lib/store/slices/investmentOpsSlice'
 import { PageHeader } from '@/components/investments-v2/page-header'
 import { cn } from '@/lib/utils'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useThemeContainer } from '@/components/investments-v2/ui/use-theme-container'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function fmt(n: number) {
@@ -42,15 +44,15 @@ const ALLOCATION_COLORS: Record<string, string> = {
 // ── Concentric rings SVG ──────────────────────────────────────────────────────
 interface Ring { r: number; pct: number; color: string; width: number }
 function ConcentricRings({ rings }: { rings: Ring[] }) {
-  const cx = 80, cy = 80
+  const cx = 110, cy = 110
   return (
-    <svg width="160" height="160" viewBox="0 0 160 160">
+    <svg width="220" height="220" viewBox="0 0 220 220">
       {rings.map((ring, i) => {
         const circ = 2 * Math.PI * ring.r
         const dash = (ring.pct / 100) * circ
         return (
           <g key={i}>
-            <circle cx={cx} cy={cy} r={ring.r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={ring.width} />
+            <circle cx={cx} cy={cy} r={ring.r} fill="none" stroke="rgba(255,255,255,0.16)" strokeWidth={ring.width} />
             <circle
               cx={cx} cy={cy} r={ring.r}
               fill="none" stroke={ring.color} strokeWidth={ring.width}
@@ -83,40 +85,39 @@ function Spinner() {
 }
 
 // ── Period dropdown ───────────────────────────────────────────────────────────
-function PeriodPill({ value, onChange }: { value: string; onChange: (v: 'MTD' | 'QTD' | 'YTD') => void }) {
+function PeriodPill({ value, onChange, container }: {
+  value: string
+  onChange: (v: 'MTD' | 'QTD' | 'YTD') => void
+  container?: HTMLElement | null
+}) {
   return (
-    <div className="relative inline-flex">
-      <select
-        value={value}
-        onChange={e => onChange(e.target.value as 'MTD' | 'QTD' | 'YTD')}
-        className="sort-pill text-[11px] appearance-none pr-5 cursor-pointer"
-        style={{ background: 'transparent' }}
-      >
-        {PERIOD_OPTIONS.map(p => <option key={p} value={p}>{p}</option>)}
-      </select>
-      <ChevronDown className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3" />
-    </div>
+    <Select value={value} onValueChange={(v) => onChange(v as 'MTD' | 'QTD' | 'YTD')}>
+      <SelectTrigger className="h-7 rounded-full text-[11px] w-20 bg-transparent border-border text-foreground hover:bg-accent/40">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent container={container}>
+        {PERIOD_OPTIONS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+      </SelectContent>
+    </Select>
   )
 }
 
 // ── Fund selector dropdown ────────────────────────────────────────────────────
-function FundPill({ funds, selectedId, onChange }: {
+function FundPill({ funds, selectedId, onChange, container }: {
   funds: Array<{ id: string; name: string }>
   selectedId: string | null
   onChange: (id: string) => void
+  container?: HTMLElement | null
 }) {
   return (
-    <div className="relative inline-flex">
-      <select
-        value={selectedId ?? ''}
-        onChange={e => onChange(e.target.value)}
-        className="sort-pill text-[11px] appearance-none pr-5 cursor-pointer"
-        style={{ background: 'transparent', maxWidth: '160px' }}
-      >
-        {funds.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
-      </select>
-      <ChevronDown className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3" />
-    </div>
+    <Select value={selectedId ?? ''} onValueChange={onChange}>
+      <SelectTrigger className="h-7 rounded-full text-[11px] max-w-[200px] bg-transparent border-border text-foreground hover:bg-accent/40">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent container={container}>
+        {funds.map(f => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}
+      </SelectContent>
+    </Select>
   )
 }
 
@@ -133,6 +134,7 @@ export default function DashboardPage() {
   } = useAppSelector(s => s.investmentOps)
 
   const [period, setPeriod] = useState<'MTD' | 'QTD' | 'YTD'>('MTD')
+  const { ref: rootRef, container: themeContainer } = useThemeContainer()
 
   // Initial load
   useEffect(() => {
@@ -174,9 +176,8 @@ export default function DashboardPage() {
 
   const allocationRings = useMemo(() => {
     if (!dashboardAllocation) return []
-    const radii = [68, 53, 38, 23, 12, 8, 4]
+    const radii = [104, 90, 76, 62, 48, 34, 20, 6]
     return Object.entries(dashboardAllocation)
-      .filter(([, bucket]) => bucket.value > 0)
       .sort((a, b) => b[1].value - a[1].value)
       .slice(0, radii.length)
       .map(([label, bucket], i) => ({
@@ -184,7 +185,7 @@ export default function DashboardPage() {
         pct: Math.round(bucket.pct),
         color: ALLOCATION_COLORS[label] ?? DOT_COLORS[i % DOT_COLORS.length],
         r: radii[i],
-        width: 10,
+        width: 8,
       }))
   }, [dashboardAllocation])
 
@@ -192,7 +193,7 @@ export default function DashboardPage() {
   const selectedFundRow = portfolioRows.find(p => p.fundId === selectedFundId)
 
   return (
-    <div className="flex flex-col h-full w-full">
+    <div ref={rootRef} className="flex flex-col h-full w-full">
       <PageHeader title="Dashboard" />
 
       <div className="flex-1 overflow-y-auto p-5 space-y-4">
@@ -201,7 +202,7 @@ export default function DashboardPage() {
         {dashboardFunds.length > 0 && (
           <div className="flex items-center gap-3">
             <span className="text-[12px]" style={{ color: 'var(--muted-foreground)' }}>Fund:</span>
-            <FundPill funds={dashboardFunds} selectedId={selectedFundId} onChange={id => dispatch(setOpsSelectedFundId(id))} />
+            <FundPill funds={dashboardFunds} selectedId={selectedFundId} onChange={id => dispatch(setOpsSelectedFundId(id))} container={themeContainer} />
             {selectedFundRow && (
               <span className="text-[12px]" style={{ color: 'var(--muted-foreground)' }}>
                 Base currency: <span style={{ color: 'var(--foreground)' }}>{selectedFundRow.baseCurrency}</span>
@@ -219,8 +220,13 @@ export default function DashboardPage() {
             <div className="arcus-card-header">
               <span className="text-[13px] font-semibold" style={{ color: 'var(--foreground)' }}>Portfolios</span>
               <div className="flex items-center gap-2">
-                <PeriodPill value={period} onChange={setPeriod} />
-                <button onClick={handleRecalculate} disabled={recalculating} className="btn-white text-[12px] py-1 px-4 flex items-center gap-1.5 disabled:opacity-60">
+                <PeriodPill value={period} onChange={setPeriod} container={themeContainer} />
+                <button
+                  onClick={handleRecalculate}
+                  disabled={recalculating}
+                  className="btn-white text-[12px] py-1 px-4 flex items-center gap-1.5 disabled:opacity-60"
+                  style={{ borderRadius: '9999px' }}
+                >
                   <RefreshCw className={cn('w-3 h-3', recalculating && 'animate-spin')} />
                   Recalculate
                 </button>
@@ -295,17 +301,17 @@ export default function DashboardPage() {
           </div>
 
           {/* Asset Allocation card */}
-          <div className="rounded-2xl p-4 flex flex-col" style={{ background: 'linear-gradient(145deg, #2d1f6e 0%, #3730a3 50%, #1e1b4b 100%)' }}>
+          <div className="p-4 flex flex-col" style={{ borderRadius: '24px', background: 'linear-gradient(155deg, #8b7ae8 0%, #6d5cd6 45%, #4c3fa8 100%)' }}>
             <div className="flex items-center justify-between mb-3">
               <span className="text-white text-[13px] font-semibold">Asset Allocation</span>
             </div>
             <div className="flex items-center justify-center my-2">
               {dashboardAllocationLoading ? (
-                <div className="w-[160px] h-[160px] flex items-center justify-center"><Spinner /></div>
+                <div className="w-[220px] h-[220px] flex items-center justify-center"><Spinner /></div>
               ) : allocationRings.length > 0 ? (
                 <ConcentricRings rings={allocationRings} />
               ) : (
-                <div className="w-[160px] h-[160px] flex items-center justify-center text-[11px]" style={{ color: '#c4b5fd' }}>
+                <div className="w-[220px] h-[220px] flex items-center justify-center text-[11px]" style={{ color: 'rgba(255,255,255,0.85)' }}>
                   No data
                 </div>
               )}
@@ -314,7 +320,7 @@ export default function DashboardPage() {
               {allocationRings.map(r => (
                 <div key={r.label} className="flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: r.color }} />
-                  <span className="text-[11px]" style={{ color: '#c4b5fd' }}>{r.label} ({r.pct}%)</span>
+                  <span className="text-[11px]" style={{ color: 'rgba(255,255,255,0.85)' }}>{r.label} ({r.pct}%)</span>
                 </div>
               ))}
             </div>

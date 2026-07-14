@@ -7,12 +7,16 @@ import { PortfoliosSubNav } from '@/components/investments-v2/portfolios-subnav'
 import { SecurityFormDialog } from '@/components/investments-v2/security-form-dialog'
 import { StatusBadge } from '@/components/arcus/status-badge'
 import { cn } from '@/lib/utils'
-import { RefreshCw, Search, Plus, ChevronDown, ChevronRight, Loader2 } from 'lucide-react'
+import { RefreshCw, Search, Plus, ChevronDown, ChevronRight, Loader2, Filter, Download } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '@/lib/store'
 import { fetchSecurities, fetchLatestPrices, fetchSecurityPriceHistory } from '@/lib/store/slices/investmentsSlice'
 import { fetchIngestBatches, fetchIngestBatchDetail } from '@/lib/store/slices/investmentOpsSlice'
 import { priceChange, type Security } from '@/lib/api/investments-api'
 import { useRolePermissions } from '@/lib/hooks/useRolePermissions'
+import { Button } from '@/components/ui/button'
+import { DatePicker } from '@/components/ui/date-picker'
+import { useThemeContainer } from '@/components/investments-v2/ui/use-theme-container'
+import { exportRowsToCsv } from '@/components/investments-v2/ui/export-csv'
 
 const EXCHANGES = ['All', 'ZSE', 'VFEX', 'SECZIM', 'NASDAQ', 'NYSE'] as const
 const PAGE_SIZE = 12
@@ -43,6 +47,10 @@ export default function PricesPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [expandedBatchId, setExpandedBatchId] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [showFilters, setShowFilters] = useState(false)
+  const [pricedFrom, setPricedFrom] = useState<Date | undefined>(undefined)
+  const [pricedTo, setPricedTo] = useState<Date | undefined>(undefined)
+  const { ref: rootRef, container: themeContainer } = useThemeContainer()
 
   useEffect(() => {
     dispatch(fetchSecurities())
@@ -96,11 +104,35 @@ export default function PricesPage() {
 
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return rows
-    return rows.filter(
-      (r) => r.security.symbol.toLowerCase().includes(q) || r.security.name.toLowerCase().includes(q)
+    return rows.filter((r) => {
+      if (q && !r.security.symbol.toLowerCase().includes(q) && !r.security.name.toLowerCase().includes(q)) return false
+      if (pricedFrom || pricedTo) {
+        if (!r.tick) return false
+        const pricedAt = new Date(r.tick.pricedAt)
+        if (pricedFrom && pricedAt < pricedFrom) return false
+        if (pricedTo && pricedAt > new Date(pricedTo.getTime() + 24 * 60 * 60 * 1000 - 1)) return false
+      }
+      return true
+    })
+  }, [rows, search, pricedFrom, pricedTo])
+
+  const handleExport = () => {
+    exportRowsToCsv(
+      `prices-${new Date().toISOString().slice(0, 10)}.csv`,
+      ['Ticker', 'Name', 'Exchange', 'Currency', 'Prev Close', 'Price', 'Change', 'Change %', 'Priced At'],
+      filteredRows.map(({ security: sec, tick, change }) => [
+        sec.symbol,
+        sec.name,
+        sec.exchangeCode,
+        sec.listingCurrencyCode,
+        change.prevClose ?? '',
+        change.price ?? '',
+        change.abs ?? '',
+        change.pct ?? '',
+        tick ? new Date(tick.pricedAt).toLocaleString() : '',
+      ])
     )
-  }, [rows, search])
+  }
 
   const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE))
   const pageRows = filteredRows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
@@ -119,7 +151,7 @@ export default function PricesPage() {
   }, null)
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div ref={rootRef} className="flex flex-col h-full overflow-hidden">
       <PageHeader
         title="Prices"
         actions={
@@ -331,6 +363,12 @@ export default function PricesPage() {
                 style={{ color: 'var(--foreground)' }}
               />
             </div>
+            <Button variant="outline" size="pill" onClick={() => setShowFilters((v) => !v)}>
+              <Filter className="w-3 h-3" /> Filter
+            </Button>
+            <Button variant="outline" size="pill" onClick={handleExport}>
+              <Download className="w-3 h-3" /> Export
+            </Button>
             <button
               onClick={() => dispatch(fetchLatestPrices())}
               disabled={pricesLoading}
@@ -342,6 +380,19 @@ export default function PricesPage() {
             </button>
           </div>
         </div>
+
+        {showFilters && (
+          <div className="flex items-center gap-2 flex-wrap arcus-card px-4 py-3">
+            <span className="text-[11px]" style={{ color: 'var(--muted-foreground)' }}>Priced date range:</span>
+            <DatePicker value={pricedFrom} onChange={setPricedFrom} placeholder="From date" className="w-40" allowFutureDates container={themeContainer} />
+            <DatePicker value={pricedTo} onChange={setPricedTo} placeholder="To date" className="w-40" allowFutureDates container={themeContainer} />
+            {(pricedFrom || pricedTo) && (
+              <Button variant="ghost" size="sm" onClick={() => { setPricedFrom(undefined); setPricedTo(undefined) }}>
+                Clear
+              </Button>
+            )}
+          </div>
+        )}
 
         {/* Latest prices — collapsible accordion table */}
         <div className="arcus-card">

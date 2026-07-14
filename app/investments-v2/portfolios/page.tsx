@@ -76,32 +76,32 @@ function HoldingsAccordion({ label, holdings, total, pct, dot }: {
             {fmt(total)}
           </span>
         </td>
-        <td className="font-mono" style={{ color: 'var(--muted-foreground)' }}>{pct}</td>
+        <td className="font-mono font-semibold" style={{ color: 'var(--foreground)' }}>{pct}</td>
         <td className="font-mono" style={{ color: 'var(--muted-foreground)' }}>—</td>
         <td className="font-mono" style={{ color: 'var(--muted-foreground)' }}>—</td>
         <td style={{ color: 'var(--foreground)', fontWeight: 600 }}>{holdings.length}</td>
-        <td className="font-mono" style={{ color: 'var(--muted-foreground)' }}>{fmt(total)}</td>
-        <td className="font-mono" style={{ color: 'var(--muted-foreground)' }}>0.00</td>
+        <td className="font-mono font-semibold" style={{ color: 'var(--foreground)' }}>{fmt(total)}</td>
+        <td className="font-mono font-semibold" style={{ color: 'var(--foreground)' }}>0.00</td>
         <td style={{ color: 'var(--muted-foreground)' }}>—</td>
       </tr>
       {expanded && holdings.map((h) => (
         <tr key={h.id} style={{ background: 'rgba(59,130,246,0.05)' }}>
           <td style={{ color: 'var(--muted-foreground)', paddingLeft: '2.5rem' }} className="text-[11px]">
             <div className="flex flex-col leading-tight">
-              <span>{h.security?.symbol ?? h.securityId.slice(0, 8)}</span>
+              <span style={{ color: 'var(--foreground)' }}>{h.security?.symbol ?? h.securityId.slice(0, 8)}</span>
               {h.security?.name && <span className="text-[10px] opacity-70">{h.security.name}</span>}
             </div>
           </td>
-          <td className="font-mono text-[11px]" style={{ color: 'var(--muted-foreground)' }}>
+          <td className="font-mono text-[11px] font-semibold" style={{ color: 'var(--foreground)' }}>
             {fmt(effectiveHoldingValue(h))}
           </td>
           <td className="font-mono text-[11px]" style={{ color: 'var(--muted-foreground)' }}>—</td>
           <td className="font-mono text-[11px]" style={{ color: 'var(--muted-foreground)' }}>—</td>
           <td className="font-mono text-[11px]" style={{ color: 'var(--muted-foreground)' }}>—</td>
-          <td className="font-mono text-[11px]" style={{ color: 'var(--muted-foreground)' }}>
+          <td className="font-mono text-[11px] font-semibold" style={{ color: 'var(--foreground)' }}>
             {h.quantity.toLocaleString()}
           </td>
-          <td className="font-mono text-[11px]" style={{ color: 'var(--muted-foreground)' }}>
+          <td className="font-mono text-[11px] font-semibold" style={{ color: 'var(--foreground)' }}>
             {fmt(effectiveHoldingValue(h))}
           </td>
           <td className="font-mono text-[11px]" style={{ color: h.unrealizedPnl && h.unrealizedPnl >= 0 ? '#10b981' : '#f43f5e' }}>
@@ -453,7 +453,7 @@ export default function PortfoliosPage() {
                           <td className="text-right font-mono" style={{ color: 'var(--foreground)' }}>
                             {txn.quantity.toLocaleString()}
                           </td>
-                          <td className="text-right font-mono" style={{ color: 'var(--muted-foreground)' }}>
+                          <td className="text-right font-mono" style={{ color: 'var(--foreground)' }}>
                             {txn.price.toFixed(4)}
                           </td>
                           <td>

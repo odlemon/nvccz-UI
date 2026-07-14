@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { format } from 'date-fns'
 import { PageHeader } from '@/components/investments-v2/page-header'
 import { StatusBadge } from '@/components/arcus/status-badge'
 import { cn } from '@/lib/utils'
@@ -13,7 +14,6 @@ import { SortableTh } from '@/components/investments-v2/ui/sortable-th'
 import { TablePagination } from '@/components/investments-v2/ui/table-pagination'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -30,11 +30,38 @@ const FORMAT_EXTENSION: Record<string, string> = {
   JSON: 'json',
 }
 
+// Per-report-type parameter shape — the generate API has no machine-readable
+// parameter schema (only scopeType/requiresFundId/requiresClientId), so this
+// mirrors the documented payload examples per report type.
+type ParamField = 'periodStart' | 'periodEnd' | 'valuationDate' | 'benchmarkName' | 'assetManagerName'
+
+const REPORT_PARAM_FIELDS: Record<string, ParamField[]> = {
+  CLIENT_PORTFOLIO_VALUATION: ['valuationDate'],
+  PORTFOLIO_VALUATION: [],
+  TRADE_BLOTTER: [],
+  HOLDINGS_SUMMARY: [],
+  COMPLIANCE_SUMMARY: [],
+  RECONCILIATION_SUMMARY: [],
+}
+const DEFAULT_PARAM_FIELDS: ParamField[] = ['periodStart', 'periodEnd', 'valuationDate', 'benchmarkName', 'assetManagerName']
+
+const PARAM_FIELD_LABELS: Record<ParamField, string> = {
+  periodStart: 'Period Start',
+  periodEnd: 'Period End',
+  valuationDate: 'Valuation Date',
+  benchmarkName: 'Benchmark Name',
+  assetManagerName: 'Asset Manager Name',
+}
+
 const NEW_REPORT_EMPTY = {
   reportType: '',
   format: '',
   clientId: '',
-  parameters: '{}',
+  periodStart: undefined as Date | undefined,
+  periodEnd: undefined as Date | undefined,
+  valuationDate: undefined as Date | undefined,
+  benchmarkName: 'ZSE Industrial Index',
+  assetManagerName: 'Arcus Asset Management',
 }
 
 export default function ReportingPage() {
@@ -125,6 +152,7 @@ export default function ReportingPage() {
 
   const fundName = (fundId: string | null) => (fundId ? portfolios.find((f) => f.id === fundId)?.name ?? '—' : null)
   const selectedTemplate = reportTemplates.find((t) => t.code === form.reportType)
+  const paramFields = REPORT_PARAM_FIELDS[form.reportType] ?? DEFAULT_PARAM_FIELDS
 
   const handleReportTypeChange = (code: string) => {
     const tmpl = reportTemplates.find((t) => t.code === code)
@@ -150,13 +178,19 @@ export default function ReportingPage() {
       setFormError('This report requires a client ID')
       return
     }
-    let parameters: Record<string, any>
-    try {
-      parameters = JSON.parse(form.parameters || '{}')
-    } catch {
-      setFormError('Parameters must be valid JSON')
-      return
+    for (const f of paramFields) {
+      if (!form[f]) {
+        setFormError(`${PARAM_FIELD_LABELS[f]} is required for this report type`)
+        return
+      }
     }
+    const parameters: Record<string, any> = {}
+    if (paramFields.includes('periodStart') && form.periodStart) parameters.periodStart = format(form.periodStart, 'yyyy-MM-dd')
+    if (paramFields.includes('periodEnd') && form.periodEnd) parameters.periodEnd = format(form.periodEnd, 'yyyy-MM-dd')
+    if (paramFields.includes('valuationDate') && form.valuationDate) parameters.valuationDate = format(form.valuationDate, 'yyyy-MM-dd')
+    if (paramFields.includes('benchmarkName') && form.benchmarkName) parameters.benchmarkName = form.benchmarkName
+    if (paramFields.includes('assetManagerName') && form.assetManagerName) parameters.assetManagerName = form.assetManagerName
+
     try {
       await dispatch(
         generateReport({
@@ -287,7 +321,7 @@ export default function ReportingPage() {
                 <div>
                   <label className="text-[10px] text-muted-foreground uppercase tracking-wider block mb-1">Format</label>
                   <Select value={form.format} onValueChange={(v) => setForm((p) => ({ ...p, format: v }))}>
-                    <SelectTrigger className="w-full rounded-full">
+                    <SelectTrigger className="w-full rounded-full bg-muted border-input text-foreground">
                       <SelectValue placeholder="Select format…" />
                     </SelectTrigger>
                     <SelectContent container={themeContainer}>
@@ -300,7 +334,7 @@ export default function ReportingPage() {
                 {selectedTemplate?.requiresFundId && (
                   <div>
                     <label className="text-[10px] text-muted-foreground uppercase tracking-wider block mb-1">Fund</label>
-                    <Input value={fundName(selectedFundId) ?? '—'} disabled readOnly />
+                    <Input value={fundName(selectedFundId) ?? '—'} disabled readOnly className="bg-muted border-input text-foreground" />
                   </div>
                 )}
                 {selectedTemplate?.requiresClientId && (
@@ -310,20 +344,55 @@ export default function ReportingPage() {
                       value={form.clientId}
                       onChange={(e) => setForm((p) => ({ ...p, clientId: e.target.value }))}
                       placeholder="Client mandate ID"
-                      className="font-mono"
+                      className="font-mono bg-muted border-input text-foreground"
                     />
                   </div>
                 )}
-                <div className="col-span-3">
-                  <label className="text-[10px] text-muted-foreground uppercase tracking-wider block mb-1">Parameters (JSON)</label>
-                  <Textarea
-                    value={form.parameters}
-                    onChange={(e) => setForm((p) => ({ ...p, parameters: e.target.value }))}
-                    rows={4}
-                    placeholder='{"periodStart": "2026-01-01", "periodEnd": "2026-03-31"}'
-                    className="font-mono"
-                  />
-                </div>
+                {paramFields.includes('periodStart') && (
+                  <div>
+                    <label className="text-[10px] text-muted-foreground uppercase tracking-wider block mb-1">Period Start</label>
+                    <DatePicker value={form.periodStart} onChange={(d) => setForm((p) => ({ ...p, periodStart: d }))} className="w-full" container={themeContainer} />
+                  </div>
+                )}
+                {paramFields.includes('periodEnd') && (
+                  <div>
+                    <label className="text-[10px] text-muted-foreground uppercase tracking-wider block mb-1">Period End</label>
+                    <DatePicker value={form.periodEnd} onChange={(d) => setForm((p) => ({ ...p, periodEnd: d }))} className="w-full" container={themeContainer} />
+                  </div>
+                )}
+                {paramFields.includes('valuationDate') && (
+                  <div>
+                    <label className="text-[10px] text-muted-foreground uppercase tracking-wider block mb-1">Valuation Date</label>
+                    <DatePicker value={form.valuationDate} onChange={(d) => setForm((p) => ({ ...p, valuationDate: d }))} className="w-full" container={themeContainer} />
+                  </div>
+                )}
+                {paramFields.includes('benchmarkName') && (
+                  <div>
+                    <label className="text-[10px] text-muted-foreground uppercase tracking-wider block mb-1">Benchmark Name</label>
+                    <Input
+                      value={form.benchmarkName}
+                      onChange={(e) => setForm((p) => ({ ...p, benchmarkName: e.target.value }))}
+                      placeholder="e.g. ZSE Industrial Index"
+                      className="bg-muted border-input text-foreground"
+                    />
+                  </div>
+                )}
+                {paramFields.includes('assetManagerName') && (
+                  <div>
+                    <label className="text-[10px] text-muted-foreground uppercase tracking-wider block mb-1">Asset Manager Name</label>
+                    <Input
+                      value={form.assetManagerName}
+                      onChange={(e) => setForm((p) => ({ ...p, assetManagerName: e.target.value }))}
+                      placeholder="e.g. Arcus Asset Management"
+                      className="bg-muted border-input text-foreground"
+                    />
+                  </div>
+                )}
+                {paramFields.length === 0 && !selectedTemplate?.requiresFundId && !selectedTemplate?.requiresClientId && (
+                  <div className="col-span-3 text-[11px] text-muted-foreground">
+                    This report type takes no additional parameters.
+                  </div>
+                )}
               </div>
               {formError && <div className="text-[11px] text-destructive mt-2">{formError}</div>}
               <div className="flex items-center justify-end gap-2 mt-3">
@@ -341,7 +410,7 @@ export default function ReportingPage() {
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
               placeholder="Search by type, fund/client, or requester…"
-              className="w-64"
+              className="w-64 bg-muted border-input text-foreground"
             />
             <Popover open={tableScopeComboOpen} onOpenChange={setTableScopeComboOpen}>
               <PopoverTrigger asChild>

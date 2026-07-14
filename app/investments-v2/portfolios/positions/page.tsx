@@ -197,7 +197,7 @@ export default function PositionsPage() {
                       <td className="text-right font-mono" style={{ color: 'var(--foreground)' }}>
                         {h.quantity.toLocaleString()}
                       </td>
-                      <td className="text-right font-mono" style={{ color: 'var(--muted-foreground)' }}>
+                      <td className="text-right font-mono" style={{ color: 'var(--foreground)' }}>
                         {h.wac.toFixed(4)}
                       </td>
                       <td className="text-right font-mono" style={{ color: 'var(--foreground)' }}>

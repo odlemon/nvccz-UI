@@ -594,20 +594,7 @@ export const MODULE_CONFIG: ModuleConfig[] = [
         icon: CiTrophy,
         description: "Detailed view of a specific valuation",
       },
-      {
-        id: "reports",
-        name: "Financial Reports",
-        path: "/application-portal/reports",
-        icon: CiText,
-        description: "Detailed view of a specific report",
-      },
-      {
-        id: "application-portal-settings",
-        name: "Settings",
-        path: "/application-portal/settings",
-        icon: CiSettings,
-        description: "Company letterhead and portal settings",
-      },
+ 
     ],
   },
 

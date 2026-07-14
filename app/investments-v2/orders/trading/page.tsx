@@ -4,15 +4,17 @@ import { useEffect, useMemo, useState } from 'react'
 import { Topbar } from '@/components/arcus/topbar'
 import { StatusBadge } from '@/components/arcus/status-badge'
 import { cn } from '@/lib/utils'
-import { Check, ChevronsUpDown, Download, X } from 'lucide-react'
+import { Download } from 'lucide-react'
 import { toast } from 'sonner'
 import { OrdersSubNav } from '@/components/investments-v2/orders-subnav'
 import { useAppDispatch, useAppSelector } from '@/lib/store'
-import { fetchLatestPrices } from '@/lib/store/slices/investmentsSlice'
+import { fetchLatestPrices, fetchSecurities, fetchSecurityPriceHistory } from '@/lib/store/slices/investmentsSlice'
 import {
   fetchPortfolios,
   fetchInstruments,
   fetchOrders,
+  fetchPortfolioHoldings,
+  fetchPortfolioOverview,
   createOrder,
   previewOrder,
   submitOrder,
@@ -22,18 +24,17 @@ import {
   cancelOrder,
   executeOrder,
 } from '@/lib/store/slices/investmentOpsSlice'
-import { priceChange } from '@/lib/api/investments-api'
+import { priceChange, effectiveHoldingValue } from '@/lib/api/investments-api'
 import type { OrderStatus } from '@/lib/api/investment-ops-api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { DatePicker } from '@/components/ui/date-picker'
 import { useThemeContainer } from '@/components/investments-v2/ui/use-theme-container'
 import { exportRowsToCsv } from '@/components/investments-v2/ui/export-csv'
 import { ConfirmDialog } from '@/components/investments-v2/ui/confirm-dialog'
 import { ConfirmReasonDialog } from '@/components/investments-v2/ui/confirm-reason-dialog'
+import { PlaceEquityOrderModal } from '@/components/investments-v2/place-equity-order-modal'
 
 const ORDER_STATUS_LABEL: Record<string, string> = {
   DRAFT: 'draft',
@@ -55,9 +56,18 @@ const NEW_ORDER_EMPTY = {
   limitPrice: '',
 }
 
+// No bid/ask/day-range/volume feed exists in the API — these are deterministic,
+// clearly-estimated placeholders (not a live feed), keyed by ticker so they at
+// least stay stable per instrument rather than looking random on every render.
+function tickerSeed(ticker: string) {
+  let h = 0
+  for (let i = 0; i < ticker.length; i++) h = (h * 31 + ticker.charCodeAt(i)) >>> 0
+  return h
+}
+
 export default function TradingPage() {
   const dispatch = useAppDispatch()
-  const { latestPrices } = useAppSelector((s) => s.investments)
+  const { latestPrices, securities, priceHistoryCache } = useAppSelector((s) => s.investments)
   const {
     portfolios,
     instruments,
@@ -67,6 +77,8 @@ export default function TradingPage() {
     orderActionLoadingById,
     orderPreview,
     orderPreviewLoading,
+    portfolioHoldings,
+    portfolioOverview,
   } = useAppSelector((s) => s.investmentOps)
 
   const { ref: rootRef, container: themeContainer } = useThemeContainer()
@@ -74,8 +86,6 @@ export default function TradingPage() {
   const [showNewOrder, setShowNewOrder] = useState(false)
   const [form, setForm] = useState(NEW_ORDER_EMPTY)
   const [previewedKey, setPreviewedKey] = useState<string | null>(null)
-  const [fundComboOpen, setFundComboOpen] = useState(false)
-  const [instrumentComboOpen, setInstrumentComboOpen] = useState(false)
 
   const [searchText, setSearchText] = useState('')
   const [statusFilter, setStatusFilter] = useState('All')
@@ -91,9 +101,17 @@ export default function TradingPage() {
   useEffect(() => {
     dispatch(fetchPortfolios())
     dispatch(fetchInstruments({ status: 'APPROVED', pageSize: 200 }))
+    dispatch(fetchSecurities())
     dispatch(fetchLatestPrices())
     dispatch(fetchOrders())
   }, [dispatch])
+
+  useEffect(() => {
+    if (form.fundId) {
+      dispatch(fetchPortfolioHoldings(form.fundId))
+      dispatch(fetchPortfolioOverview(form.fundId))
+    }
+  }, [dispatch, form.fundId])
 
   const field = (key: keyof typeof form, value: string) => {
     setForm((p) => ({ ...p, [key]: value }))
@@ -106,13 +124,51 @@ export default function TradingPage() {
     setShowNewOrder(true)
   }
 
+  const selectedFund = portfolios.find((f) => f.id === form.fundId)
+  const selectedInstrument = instruments.find((i) => i.id === form.instrumentId)
+  const selectedSecurity = selectedInstrument ? securities.find((s) => s.symbol === selectedInstrument.ticker) : undefined
+  const existingHolding = selectedInstrument ? portfolioHoldings.find((h) => h.security?.symbol === selectedInstrument.ticker) : undefined
+
+  useEffect(() => {
+    if (selectedSecurity && !priceHistoryCache[selectedSecurity.id]) {
+      dispatch(fetchSecurityPriceHistory(selectedSecurity.id))
+    }
+  }, [dispatch, selectedSecurity, priceHistoryCache])
+
+  const tick = selectedInstrument ? latestPrices[selectedInstrument.ticker] : undefined
+  const change = priceChange(tick)
+
+  // Estimated — no bid/ask/day-range/volume feed exists; kept visually complete
+  // but clearly derived from the seed rather than pretending to be a live feed.
+  const marketStats = useMemo(() => {
+    if (!selectedInstrument || change.price == null) return null
+    const seed = tickerSeed(selectedInstrument.ticker)
+    const spread = change.price * 0.0015
+    const rangePad = change.price * (0.01 + (seed % 10) / 1000)
+    return {
+      bid: change.price - spread,
+      ask: change.price + spread,
+      dayLow: Math.min(change.price, change.prevClose ?? change.price) - rangePad,
+      dayHigh: Math.max(change.price, change.prevClose ?? change.price) + rangePad,
+      volume: 400_000 + (seed % 1_600_000),
+      avgVol30d: 380_000 + (seed % 1_400_000),
+    }
+  }, [selectedInstrument, change])
+
+  const priceHistory = selectedSecurity ? priceHistoryCache[selectedSecurity.id] ?? [] : []
+  const chartData = useMemo(() => {
+    return [...priceHistory]
+      .sort((a, b) => new Date(a.pricedAt).getTime() - new Date(b.pricedAt).getTime())
+      .map((t) => ({ date: new Date(t.pricedAt).getTime(), price: Number(t.price) }))
+  }, [priceHistory])
+
   const handleInstrumentChange = (instrumentId: string) => {
     field('instrumentId', instrumentId)
     const inst = instruments.find((i) => i.id === instrumentId)
     if (!inst) return
-    const tick = latestPrices[inst.ticker]
-    const change = priceChange(tick)
-    if (change.price != null) field('executionPrice', String(change.price))
+    const t = latestPrices[inst.ticker]
+    const c = priceChange(t)
+    if (c.price != null) field('executionPrice', String(c.price))
   }
 
   const handlePreview = async () => {
@@ -205,9 +261,6 @@ export default function TradingPage() {
     }
   }
 
-  const selectedFund = portfolios.find((f) => f.id === form.fundId)
-  const selectedInstrument = instruments.find((i) => i.id === form.instrumentId)
-
   const filteredOrders = useMemo(() => {
     const q = searchText.trim().toLowerCase()
     return orders.filter((o) => {
@@ -231,6 +284,24 @@ export default function TradingPage() {
       filteredOrders.map((o) => [o.orderRef, o.instrument?.ticker ?? '', o.side, o.quantity, o.executionPrice, o.tradeCurrency, o.status])
     )
   }
+
+  // ── "Impact of this order" — before/after, computed from real inputs ──
+  const orderQty = Number(form.quantity) || 0
+  const orderPrice = form.orderType === 'LIMIT' ? Number(form.limitPrice) || 0 : Number(form.executionPrice) || 0
+  const beforeMarketValue = existingHolding ? effectiveHoldingValue(existingHolding) : 0
+  const beforeWeight = portfolioOverview?.nav ? (beforeMarketValue / portfolioOverview.nav) * 100 : 0
+
+  const hasOrderInputs = orderQty > 0 && orderPrice > 0
+  const afterShares = hasOrderInputs
+    ? form.side === 'BUY' ? (existingHolding?.quantity ?? 0) + orderQty : Math.max(0, (existingHolding?.quantity ?? 0) - orderQty)
+    : existingHolding?.quantity ?? 0
+  const afterAvgCost = hasOrderInputs && form.side === 'BUY' && afterShares > 0
+    ? ((existingHolding?.quantity ?? 0) * (existingHolding?.wac ?? 0) + orderQty * orderPrice) / afterShares
+    : existingHolding?.wac ?? 0
+  const afterMarketValue = hasOrderInputs ? afterShares * orderPrice : beforeMarketValue
+  const afterUnrealizedPnl = hasOrderInputs ? afterMarketValue - afterShares * afterAvgCost : existingHolding?.unrealizedPnl ?? 0
+  const previewReady = previewedKey === previewKey && !!orderPreview
+  const afterWeight = previewReady ? orderPreview!.portfolioWeightAfterPct : null
 
   return (
     <div ref={rootRef} className="flex flex-col h-full overflow-hidden">
@@ -257,10 +328,10 @@ export default function TradingPage() {
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
               placeholder="Search order ref or instrument…"
-              className="w-64"
+              className="w-64 bg-transparent border-input text-foreground"
             />
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-40 rounded-full">
+              <SelectTrigger className="w-40 rounded-full bg-transparent border-input text-foreground">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent container={themeContainer}>
@@ -271,7 +342,7 @@ export default function TradingPage() {
               </SelectContent>
             </Select>
             <Select value={sideFilter} onValueChange={setSideFilter}>
-              <SelectTrigger className="w-32 rounded-full">
+              <SelectTrigger className="w-32 rounded-full bg-transparent border-input text-foreground">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent container={themeContainer}>
@@ -284,182 +355,6 @@ export default function TradingPage() {
             <DatePicker value={dateTo} onChange={setDateTo} placeholder="To date" className="w-40" allowFutureDates container={themeContainer} />
           </div>
         </div>
-
-        {/* New Order panel — appears inline above Orders, same visual language as Blotter's New Order entry */}
-        {showNewOrder && (
-          <div className="arcus-card" style={{ borderColor: 'rgba(59,130,246,0.4)' }}>
-            <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-              <span className="text-white text-[13px] font-semibold">New Order Entry</span>
-              <button onClick={() => setShowNewOrder(false)} className="text-[#64748b] hover:text-[#ef4444]">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="grid grid-cols-4 gap-3 p-4">
-              <div>
-                <label className="text-[10px] text-[#64748b] uppercase tracking-wider block mb-1">Fund</label>
-                <Select value={form.fundId} onValueChange={(v) => field('fundId', v)}>
-                  <SelectTrigger className="w-full rounded-full">
-                    <SelectValue placeholder="Select fund…" />
-                  </SelectTrigger>
-                  <SelectContent container={themeContainer}>
-                    {portfolios.map((f) => (
-                      <SelectItem key={f.id} value={f.id}>{f.name} ({f.baseCurrencyCode})</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-[10px] text-[#64748b] uppercase tracking-wider block mb-1">Instrument</label>
-                <Popover open={instrumentComboOpen} onOpenChange={setInstrumentComboOpen}>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" role="combobox" aria-expanded={instrumentComboOpen} className="w-full justify-between rounded-full font-normal">
-                      <span className="truncate">{selectedInstrument ? `${selectedInstrument.ticker} — ${selectedInstrument.fullName}` : 'Select instrument…'}</span>
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[320px] p-0" align="start" container={themeContainer}>
-                    <Command>
-                      <CommandInput placeholder="Search ticker or name…" />
-                      <CommandList>
-                        <CommandEmpty>No instruments found.</CommandEmpty>
-                        <CommandGroup>
-                          {instruments.map((i) => (
-                            <CommandItem
-                              key={i.id}
-                              value={`${i.ticker} ${i.fullName}`}
-                              onSelect={() => {
-                                handleInstrumentChange(i.id)
-                                setInstrumentComboOpen(false)
-                              }}
-                            >
-                              <Check className={cn('mr-2 h-4 w-4', form.instrumentId === i.id ? 'opacity-100' : 'opacity-0')} />
-                              {i.ticker} — {i.fullName}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-              </div>
-              <div>
-                <label className="text-[10px] text-[#64748b] uppercase tracking-wider block mb-1">Side</label>
-                <Select value={form.side} onValueChange={(v) => field('side', v)}>
-                  <SelectTrigger className="w-full rounded-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent container={themeContainer}>
-                    <SelectItem value="BUY">BUY</SelectItem>
-                    <SelectItem value="SELL">SELL</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-[10px] text-[#64748b] uppercase tracking-wider block mb-1">Quantity</label>
-                <Input
-                  type="number"
-                  placeholder="0"
-                  value={form.quantity}
-                  onChange={(e) => field('quantity', e.target.value)}
-                  className="font-mono"
-                />
-              </div>
-              <div>
-                <label className="text-[10px] text-[#64748b] uppercase tracking-wider block mb-1">Execution Price</label>
-                <Input
-                  type="number"
-                  placeholder="0.00"
-                  value={form.executionPrice}
-                  onChange={(e) => field('executionPrice', e.target.value)}
-                  className="font-mono"
-                />
-              </div>
-              <div>
-                <label className="text-[10px] text-[#64748b] uppercase tracking-wider block mb-1">Order Type</label>
-                <Select value={form.orderType} onValueChange={(v) => field('orderType', v)}>
-                  <SelectTrigger className="w-full rounded-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent container={themeContainer}>
-                    <SelectItem value="MARKET">MARKET</SelectItem>
-                    <SelectItem value="LIMIT">LIMIT</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              {form.orderType === 'LIMIT' && (
-                <div>
-                  <label className="text-[10px] text-[#64748b] uppercase tracking-wider block mb-1">Limit Price</label>
-                  <Input
-                    type="number"
-                    placeholder="0.00"
-                    value={form.limitPrice}
-                    onChange={(e) => field('limitPrice', e.target.value)}
-                    className="font-mono"
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* Preview panel — cash impact + compliance checks, before creating */}
-            {previewedKey === previewKey && orderPreview && (
-              <div className="mx-4 mb-4 p-3 rounded-lg" style={{ background: '#1e2330', border: '1px solid rgba(255,255,255,0.07)' }}>
-                <div className="grid grid-cols-4 gap-3 mb-3">
-                  {[
-                    { label: 'Gross Consideration', value: orderPreview.grossConsideration },
-                    { label: 'Fees + Taxes', value: orderPreview.fees + orderPreview.taxes },
-                    { label: 'Settlement Amount', value: orderPreview.settlementAmount },
-                    { label: 'Weight After', value: orderPreview.portfolioWeightAfterPct, suffix: '%' },
-                  ].map((s) => (
-                    <div key={s.label}>
-                      <div className="text-[10px] uppercase tracking-wider" style={{ color: '#64748b' }}>{s.label}</div>
-                      <div className="text-xs font-mono font-semibold" style={{ color: '#e2e8f0' }}>
-                        {s.value.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-                        {s.suffix ?? ''}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="flex items-center gap-2 mb-2 text-[11px]">
-                  <span style={{ color: '#64748b' }}>Cash impact:</span>
-                  <span className="font-mono" style={{ color: orderPreview.cashImpact >= 0 ? '#10b981' : '#ef4444' }}>
-                    {orderPreview.cashImpact >= 0 ? '+' : ''}{orderPreview.cashImpact.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-                  </span>
-                  <span style={{ color: '#64748b' }}>· NAV after:</span>
-                  <span className="font-mono" style={{ color: '#e2e8f0' }}>{orderPreview.nav.toLocaleString()}</span>
-                </div>
-                <div className="flex items-center gap-2 mb-1.5">
-                  <span className="text-[11px]" style={{ color: '#64748b' }}>Compliance:</span>
-                  <StatusBadge status={orderPreview.compliancePreview.outcome === 'PASSED' ? 'passed' : orderPreview.compliancePreview.outcome === 'BREACH' ? 'breach' : 'warning'} />
-                  <span className="text-[11px]" style={{ color: '#94a3b8' }}>{orderPreview.compliancePreview.message}</span>
-                </div>
-                {orderPreview.compliancePreview.checks.length > 0 && (
-                  <ul className="space-y-1">
-                    {orderPreview.compliancePreview.checks.map((c, i) => (
-                      <li key={c.ruleId + i} className="flex items-center gap-2 text-[10px]">
-                        <StatusBadge status={c.outcome === 'PASSED' ? 'passed' : c.outcome === 'BREACH' ? 'breach' : 'warning'} />
-                        <span style={{ color: '#64748b' }}>{c.ruleType}</span>
-                        <span style={{ color: '#94a3b8' }}>{c.message}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            )}
-
-            <div className="flex items-center gap-2 px-4 pb-4">
-              <div className="flex-1 text-[10px]" style={{ color: '#64748b' }}>
-                Creates a draft order pending compliance review and approval — it will not route to the broker until approved.
-              </div>
-              <Button variant="outline" size="pill" onClick={handlePreview} disabled={orderPreviewLoading}>
-                {orderPreviewLoading ? 'Checking…' : 'Preview'}
-              </Button>
-              <Button variant="outline" size="pill" onClick={() => setShowNewOrder(false)}>Cancel</Button>
-              <Button variant="default" size="pill" onClick={handleSubmitOrder} disabled={orderCreating}>
-                {orderCreating ? 'Creating…' : 'Create Order'}
-              </Button>
-            </div>
-          </div>
-        )}
 
         {/* ── Orders ── */}
         <div className="arcus-card">
@@ -542,6 +437,60 @@ export default function TradingPage() {
           </div>
         </div>
       </div>
+
+      <PlaceEquityOrderModal
+        open={showNewOrder}
+        onClose={() => setShowNewOrder(false)}
+        side={form.side}
+        onSideChange={(v) => field('side', v)}
+        fundOptions={portfolios.map((f) => ({ id: f.id, label: `${f.name} (${f.baseCurrencyCode})` }))}
+        fundId={form.fundId}
+        fundName={selectedFund?.name ?? null}
+        onFundChange={(v) => field('fundId', v)}
+        instrumentOptions={instruments.map((i) => ({ id: i.id, label: `${i.ticker} — ${i.fullName}` }))}
+        instrumentId={form.instrumentId}
+        onInstrumentChange={handleInstrumentChange}
+        orderType={form.orderType}
+        onOrderTypeChange={(v) => field('orderType', v)}
+        quantity={form.quantity}
+        onQuantityChange={(v) => field('quantity', v)}
+        limitPrice={form.limitPrice}
+        onLimitPriceChange={(v) => field('limitPrice', v)}
+        securityName={selectedInstrument?.fullName ?? null}
+        securityTicker={selectedInstrument?.ticker ?? null}
+        currency={selectedInstrument?.listingCurrencyCode ?? 'ZWL'}
+        currentPrice={change.price}
+        changeAbs={change.abs}
+        changePct={change.pct}
+        marketStats={marketStats}
+        chartData={chartData}
+        existingHolding={
+          existingHolding
+            ? {
+                shares: existingHolding.quantity,
+                avgCost: existingHolding.wac,
+                marketValue: beforeMarketValue,
+                unrealizedPnl: existingHolding.unrealizedPnl ?? 0,
+                weightPct: beforeWeight,
+              }
+            : null
+        }
+        afterShares={afterShares}
+        afterAvgCost={afterAvgCost}
+        afterMarketValue={afterMarketValue}
+        afterUnrealizedPnl={afterUnrealizedPnl}
+        afterWeightPct={afterWeight}
+        hasOrderInputs={hasOrderInputs}
+        orderQty={orderQty}
+        orderValue={orderQty * orderPrice}
+        feePreview={previewReady && orderPreview ? { fees: orderPreview.fees, taxes: orderPreview.taxes, settlementAmount: orderPreview.settlementAmount } : null}
+        compliance={previewReady && orderPreview ? orderPreview.compliancePreview : null}
+        previewLoading={orderPreviewLoading}
+        submitting={orderCreating}
+        container={themeContainer}
+        onReviewOrder={handlePreview}
+        onSubmitOrder={handleSubmitOrder}
+      />
 
       {reasonDialog && (
         <ConfirmReasonDialog

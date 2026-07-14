@@ -127,8 +127,8 @@ export function InvestmentsV2Sidebar() {
   }
 
   const sidebarStyles = theme === 'dark'
-    ? { background: '#1a1d24', borderRight: '1px solid rgba(255,255,255,0.06)' }
-    : { background: '#ffffff', borderRight: '1px solid rgba(0,0,0,0.08)' }
+    ? { background: '#1a1d24' }
+    : { background: '#ffffff' }
 
   const logoBoxStyles = theme === 'dark'
     ? { background: '#3b82f6' }
