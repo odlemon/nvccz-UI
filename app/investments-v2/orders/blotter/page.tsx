@@ -5,7 +5,7 @@ import { Topbar } from '@/components/arcus/topbar'
 import { StatusBadge } from '@/components/arcus/status-badge'
 import { OrdersSubNav } from '@/components/investments-v2/orders-subnav'
 import { cn } from '@/lib/utils'
-import { Plus, Download, X, ChevronDown, ChevronRight } from 'lucide-react'
+import { Plus, Download, ChevronDown, ChevronRight } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '@/lib/store'
 import {
   fetchPortfolios,
@@ -28,6 +28,7 @@ import { DatePicker } from '@/components/ui/date-picker'
 import { useThemeContainer } from '@/components/investments-v2/ui/use-theme-container'
 import { exportRowsToCsv } from '@/components/investments-v2/ui/export-csv'
 import { ConfirmDialog } from '@/components/investments-v2/ui/confirm-dialog'
+import { NewEquityOrderModal } from '@/components/investments-v2/new-equity-order-modal'
 
 type TradeSortKey = 'tradeRef' | 'ticker' | 'side' | 'quantity' | 'netConsideration' | 'executedAt'
 
@@ -61,19 +62,6 @@ function hopActions(status: string): Array<{ key: 'confirm' | 'retry' | 'cancel'
   return actions
 }
 
-const newOrderFields = {
-  portfolio: 'Equity World',
-  ticker: '',
-  instrument: '',
-  side: 'BUY',
-  qty: '',
-  orderType: 'MARKET',
-  limitPrice: '',
-  broker: '',
-  currency: 'USD',
-  notes: '',
-}
-
 export default function TradeBlotterPage() {
   const dispatch = useAppDispatch()
   const {
@@ -87,7 +75,6 @@ export default function TradeBlotterPage() {
   const { ref: rootRef, container: themeContainer } = useThemeContainer()
 
   const [showNewOrder, setShowNewOrder] = useState(false)
-  const [formData, setFormData] = useState(newOrderFields)
   const [expandedTradeId, setExpandedTradeId] = useState<string | null>(null)
   const [settlementErrorById, setSettlementErrorById] = useState<Record<string, string>>({})
   const [settlementDownloadingById, setSettlementDownloadingById] = useState<Record<string, boolean>>({})
@@ -232,66 +219,6 @@ export default function TradeBlotterPage() {
           <DatePicker value={dateFrom} onChange={setDateFrom} placeholder="From date" className="w-40" allowFutureDates container={themeContainer} />
           <DatePicker value={dateTo} onChange={setDateTo} placeholder="To date" className="w-40" allowFutureDates container={themeContainer} />
         </div>
-
-        {/* New Order Modal */}
-        {showNewOrder && (
-          <div className="bg-[#0D1526] border border-[#2563EB]/40 rounded-md p-4">
-            <div className="flex items-center justify-between mb-3">
-              <div className="text-xs font-semibold text-[#E8EDF5]">New Order Entry</div>
-              <button onClick={() => setShowNewOrder(false)} className="text-[#6B7A95] hover:text-[#EF4444]">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="grid grid-cols-4 gap-3">
-              {[
-                { label: 'Portfolio', key: 'portfolio', type: 'select', options: ['Equity World', 'Multi Asset', 'Fixed Income', 'Asia Select'] },
-                { label: 'Ticker / ISIN', key: 'ticker', type: 'text', placeholder: 'e.g. NVDA' },
-                { label: 'Side', key: 'side', type: 'select', options: ['BUY', 'SELL'] },
-                { label: 'Quantity', key: 'qty', type: 'number', placeholder: '0' },
-                { label: 'Order Type', key: 'orderType', type: 'select', options: ['MARKET', 'LIMIT', 'STOP', 'GTC', 'FOK'] },
-                { label: 'Limit Price', key: 'limitPrice', type: 'number', placeholder: '0.00' },
-                { label: 'Broker', key: 'broker', type: 'select', options: ['Goldman Sachs', 'JP Morgan', 'Morgan Stanley', 'Citi', 'Macquarie', 'CLSA'] },
-                { label: 'Currency', key: 'currency', type: 'select', options: ['USD', 'EUR', 'GBP', 'JPY', 'ZAR'] },
-              ].map((f) => (
-                <div key={f.key}>
-                  <label className="text-[10px] text-[#6B7A95] uppercase tracking-wider block mb-1">{f.label}</label>
-                  {f.type === 'select' ? (
-                    <Select value={(formData as any)[f.key]} onValueChange={(v) => setFormData((p) => ({ ...p, [f.key]: v }))}>
-                      <SelectTrigger className="w-full rounded-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent container={themeContainer}>
-                        {f.options!.map((o) => (
-                          <SelectItem key={o} value={o}>{o}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <Input
-                      type={f.type}
-                      placeholder={f.placeholder}
-                      value={(formData as any)[f.key]}
-                      onChange={(e) => setFormData((p) => ({ ...p, [f.key]: e.target.value }))}
-                      className="font-mono"
-                    />
-                  )}
-                </div>
-              ))}
-              <div className="col-span-4">
-                <label className="text-[10px] text-[#6B7A95] uppercase tracking-wider block mb-1">Notes</label>
-                <Input placeholder="Trade notes or instructions..." />
-              </div>
-            </div>
-            <div className="flex items-center gap-2 mt-3 pt-3 border-t border-white/[0.06]">
-              <div className="flex-1 text-[10px] text-[#6B7A95]">
-                Estimated consideration: <span className="text-[#C8D3E8] font-mono">Calculating...</span>
-                &nbsp;·&nbsp; Compliance check: <span className="text-[#10B981]">Passed</span>
-              </div>
-              <Button variant="outline" size="pill" onClick={() => setShowNewOrder(false)}>Cancel</Button>
-              <Button variant="default" size="pill">Submit Order</Button>
-            </div>
-          </div>
-        )}
 
         {/* Blotter table */}
         <div className="bg-[#0D1526] border border-white/[0.06] rounded-md overflow-hidden">
@@ -460,6 +387,13 @@ export default function TradeBlotterPage() {
           <TablePagination page={tradePage} totalPages={tradeTotalPages} onPageChange={setTradePage} rowsShown={tradeRows.length} totalRows={tradeTotalRows} />
         </div>
       </div>
+
+      <NewEquityOrderModal
+        open={showNewOrder}
+        onClose={() => setShowNewOrder(false)}
+        container={themeContainer}
+        onOrderCreated={() => dispatch(fetchOpsTrades())}
+      />
 
       {executeConfirm && (
         <ConfirmDialog
