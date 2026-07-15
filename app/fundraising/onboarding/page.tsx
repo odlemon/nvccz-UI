@@ -1,13 +1,10 @@
 import { ModuleGuard } from "@/components/permissions/PermissionGuards"
-import { FundraisingComingSoon } from "@/components/fundraising/fundraising-coming-soon"
+import { FundraisingOnboarding } from "@/components/fundraising/fundraising-onboarding"
 
 export default function Page() {
   return (
     <ModuleGuard moduleId="fundraising" subModuleId="fr-onboarding">
-      <FundraisingComingSoon
-        title="Client Onboarding"
-        description="KYC, compliance and mandate activation readiness."
-      />
+      <FundraisingOnboarding />
     </ModuleGuard>
   )
 }

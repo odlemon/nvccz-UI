@@ -577,6 +577,133 @@ export interface FpaScenario {
   status?: string
 }
 
+/** Canonical compare metric unit codes (backend contract). */
+export type FpaCompareMetricUnit = "CURRENCY" | "PERCENT" | "COUNT" | string
+
+export interface FpaScenarioCompareMetric {
+  code: string
+  label: string
+  unit?: FpaCompareMetricUnit
+  higherIsFavourable?: boolean
+  /** Values keyed by scenario id (null when unavailable). */
+  values: Record<string, number | null>
+  /** Absolute variance vs anchor, keyed by non-anchor scenario id. */
+  varianceAbs?: Record<string, number | null>
+  /** Percent variance vs anchor, keyed by non-anchor scenario id. */
+  variancePct?: Record<string, number | null>
+}
+
+export interface FpaScenarioCompareAssumptionCell {
+  driverId?: string | null
+  value: number | null
+}
+
+export interface FpaScenarioCompareAssumption {
+  driverId?: string | null
+  driverCode: string
+  driverName: string
+  unit?: string | null
+  category?: string | null
+  byScenario: Record<string, FpaScenarioCompareAssumptionCell | number | null>
+}
+
+export interface FpaScenarioCompareWaterfallStep {
+  key: string
+  label: string
+  value?: number | null
+  delta?: number | null
+}
+
+export interface FpaScenarioCompareWaterfall {
+  metricCode: string
+  fromScenarioId?: string
+  toScenarioId?: string
+  steps: FpaScenarioCompareWaterfallStep[]
+}
+
+export interface FpaScenarioCompareSensitivityRow {
+  driverCode: string
+  driverName: string
+  low: number
+  base: number
+  high: number
+  impactMetric?: string
+  unit?: string
+}
+
+/** Enriched multi-scenario compare payload (preferred). */
+export interface FpaScenarioCompareResult {
+  versionId: string
+  anchorScenarioId: string
+  scenarios: Array<{ id: string; name: string; scenarioType?: string }>
+  metrics: FpaScenarioCompareMetric[]
+  assumptions?: FpaScenarioCompareAssumption[]
+  waterfall?: FpaScenarioCompareWaterfall | null
+  sensitivity?: FpaScenarioCompareSensitivityRow[]
+  /** Legacy pair compare (still accepted if enriched fields absent). */
+  left?: { id: string; name: string }
+  right?: { id: string; name: string }
+  rows?: Array<{ code: string; left: number; right: number; delta: number }>
+}
+
+export interface FpaScenarioCompareRequest {
+  versionId: string
+  scenarioIds?: string[]
+  compareScenarioId?: string
+  anchorScenarioId?: string
+  metrics?: string[]
+  includeAssumptions?: boolean
+  includeWaterfall?: boolean
+  includeSensitivity?: boolean
+  waterfallMetric?: string
+  waterfallFromScenarioId?: string
+  waterfallToScenarioId?: string
+}
+
+export interface FpaDriverBulkUpdateItem {
+  driverId?: string
+  code?: string
+  scenarioId?: string
+  value: number
+  unit?: string | null
+  name?: string
+}
+
+export interface FpaPlanningSummaryKpi {
+  code: string
+  label: string
+  value: number
+  displayValue?: string
+  deltaPct?: number | null
+  deltaLabel?: string | null
+  up?: boolean
+  unit?: string
+  sparkline?: number[]
+}
+
+export interface FpaPlanningSummary {
+  modelId: string
+  versionId: string
+  scenarioId: string
+  currency?: string
+  kpis: FpaPlanningSummaryKpi[]
+  trend?: Array<{
+    period: string
+    label?: string
+    actual?: number | null
+    plan?: number | null
+  }>
+  workflowSteps?: Array<{
+    id: string
+    name: string
+    stage?: string
+    status?: string
+    completedTasks?: number
+    totalTasks?: number
+    percent?: number
+  }>
+}
+
 export interface FpaVersion {
   id: string
   modelId?: string
@@ -753,6 +880,94 @@ export interface FpaBudgetCycleCreateRequest {
 
 export type FpaBudgetCycleUpdateRequest = Partial<Omit<FpaBudgetCycleCreateRequest, 'modelId'>> & {
   owners?: FpaBudgetOwnerCreate[]
+}
+
+// —— Model Planning Cycles (distinct entity from PlanningBudgetCycle) ——
+// Naming note: the backend returns the cycle name as snake_case `cycle_name`
+// and the source model as `sourceModelId` (not `modelId`). The request body
+// uses `name` (not `cycle_name`).
+
+export type FpaModelPlanningCycleStatus = 'DRAFT' | 'OPEN' | 'CLOSED' | 'ARCHIVED' | string
+
+export interface FpaModelPlanningCycle {
+  id: string
+  /** Backend returns the cycle name as snake_case `cycle_name`. */
+  cycle_name: string
+  financialYear: number
+  planningType: FpaPlanningType
+  sourceModelId: string
+  sourceModelVersionId: string
+  actualsCutoffPeriod?: string | null
+  forecastStartPeriod?: string | null
+  planningHorizon?: number | null
+  baseScenarioId?: string | null
+  submissionDeadline?: string | null
+  approvalWorkflowId?: string | null
+  planningOwnerId?: string | null
+  status: FpaModelPlanningCycleStatus
+  createdById?: string | null
+  createdAt?: string | null
+  updatedAt?: string | null
+}
+
+export interface FpaModelPlanningCycleCreateRequest {
+  name: string
+  financialYear: number
+  planningType: FpaPlanningType
+  sourceModelId: string
+  sourceModelVersionId: string
+  actualsCutoffPeriod?: string | null
+  forecastStartPeriod?: string | null
+  planningHorizon?: number | null
+  baseScenarioId?: string | null
+  submissionDeadline?: string | null
+  approvalWorkflowId?: string | null
+  planningOwnerId?: string | null
+}
+
+export type FpaModelPlanningCycleUpdateRequest = Partial<FpaModelPlanningCycleCreateRequest>
+
+export interface FpaModelPlanningCycleSourceModel {
+  id: string
+  name: string
+  code?: string | null
+}
+
+export interface FpaModelPlanningCycleSourceVersion {
+  id: string
+  modelId: string
+  label: string
+  status?: string | null
+  isPublished?: boolean | null
+  createdAt?: string | null
+}
+
+export interface FpaModelPlanningCycleSourceScenario {
+  id: string
+  modelId: string
+  name: string
+  type?: string | null
+}
+
+export interface FpaModelPlanningCycleSources {
+  planningTypes: FpaPlanningType[]
+  models: FpaModelPlanningCycleSourceModel[]
+  versions: FpaModelPlanningCycleSourceVersion[]
+  scenarios: FpaModelPlanningCycleSourceScenario[]
+}
+
+export interface FpaModelPlanningCycleWorkspace {
+  cycle: FpaModelPlanningCycle
+  model: { id: string; name?: string | null; code?: string | null }
+  version: { id: string; label?: string | null; status?: string | null }
+  scenarios: FpaModelPlanningCycleSourceScenario[]
+  grid: { modelId: string; versionId: string; baseScenarioId?: string | null }
+}
+
+export interface FpaModelPlanningCycleListResponse {
+  items: FpaModelPlanningCycle[]
+  total: number
+  count: number
 }
 
 export interface FpaSetupValidationError {
@@ -1385,6 +1600,15 @@ export const fpaApi = {
     },
   ) => apiClient.put<ApiResponse<FpaDriver>>(`${FPA}/drivers/${driverId}`, body),
 
+  /** Bulk driver value updates (assumptions editor / multi-scenario save). */
+  bulkUpdateDrivers: (
+    modelId: string,
+    body: { versionId: string; updates: FpaDriverBulkUpdateItem[] },
+  ) =>
+    apiClient.put<
+      ApiResponse<{ updated: number; drivers: FpaDriver[] }>
+    >(`${FPA}/models/${modelId}/drivers/bulk`, body),
+
   // —— Formulas ——
   validateFormula: (expression: string) =>
     apiClient.post<
@@ -1889,18 +2113,20 @@ export const fpaApi = {
       body ?? {},
     ),
 
-  compareScenarios: (
-    scenarioId: string,
-    body: { versionId: string; compareScenarioId?: string; scenarioIds?: string[] },
+  compareScenarios: (scenarioId: string, body: FpaScenarioCompareRequest) =>
+    apiClient.post<ApiResponse<FpaScenarioCompareResult>>(
+      `${FPA}/scenarios/${scenarioId}/compare`,
+      body,
+    ),
+
+  /** Scoped KPIs / trend / workflow for Planning Workspace chrome. */
+  getPlanningSummary: (
+    modelId: string,
+    params: { versionId: string; scenarioId: string },
   ) =>
-    apiClient.post<
-      ApiResponse<{
-        left: { id: string; name: string }
-        right: { id: string; name: string }
-        versionId: string
-        rows: Array<{ code: string; left: number; right: number; delta: number }>
-      }>
-    >(`${FPA}/scenarios/${scenarioId}/compare`, body),
+    apiClient.get<ApiResponse<FpaPlanningSummary>>(
+      `${FPA}/models/${modelId}/planning-summary${qs(params)}`,
+    ),
 
   // —— Versions ——
   createVersion: (body: { modelId: string; name: string }) =>
@@ -2265,5 +2491,43 @@ export const fpaApi = {
   ) =>
     apiClient.get<ApiResponse<unknown[]>>(
       `/forecast-entities/${entityId}/chart-of-accounts${qs(params)}`,
+    ),
+
+  // —— Model Planning Cycles (distinct from /budget-cycles) ——
+  listModelPlanningCycles: (params?: {
+    modelId?: string
+    planningType?: string
+    status?: string
+    ownerId?: string
+  }) =>
+    apiClient.get<ApiResponse<FpaModelPlanningCycleListResponse>>(
+      `${FPA}/model-planning/cycles${qs(params)}`,
+    ),
+
+  createModelPlanningCycle: (body: FpaModelPlanningCycleCreateRequest) =>
+    apiClient.post<ApiResponse<FpaModelPlanningCycle>>(`${FPA}/model-planning/cycles`, body),
+
+  getModelPlanningCycle: (id: string) =>
+    apiClient.get<ApiResponse<FpaModelPlanningCycle>>(`${FPA}/model-planning/cycles/${id}`),
+
+  getModelPlanningCycleWorkspace: (id: string) =>
+    apiClient.get<ApiResponse<FpaModelPlanningCycleWorkspace>>(
+      `${FPA}/model-planning/cycles/${id}/workspace`,
+    ),
+
+  updateModelPlanningCycle: (id: string, body: FpaModelPlanningCycleUpdateRequest) =>
+    apiClient.put<ApiResponse<FpaModelPlanningCycle>>(
+      `${FPA}/model-planning/cycles/${id}`,
+      body,
+    ),
+
+  deleteModelPlanningCycle: (id: string) =>
+    apiClient.delete<ApiResponse<{ id: string; deleted: boolean }>>(
+      `${FPA}/model-planning/cycles/${id}`,
+    ),
+
+  listModelPlanningCycleSources: (modelId?: string) =>
+    apiClient.get<ApiResponse<FpaModelPlanningCycleSources>>(
+      `${FPA}/model-planning/cycles/sources${qs(modelId ? { modelId } : undefined)}`,
     ),
 }

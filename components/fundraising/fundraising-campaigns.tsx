@@ -16,6 +16,8 @@ import {
   Users,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { Button } from "@/components/ui/button"
+import { FrCampaignWizard } from "@/components/fundraising/fundraising-create-wizards"
 import {
   CAMPAIGN_MATERIALS,
   CAMPAIGN_TABS,
@@ -77,7 +79,7 @@ function PanelHeader({ title, link = "View all" }: { title: string; link?: strin
     <div className="flex items-center justify-between border-b border-[#f1f5f9] px-4 py-3.5">
       <h2 className="text-[13px] font-semibold text-[#0f172a]">{title}</h2>
       {link ? (
-        <button type="button" className="text-[11px] font-medium text-[#4f46e5] hover:underline">
+        <button type="button" className="text-[11px] font-medium text-[#2563eb] hover:underline">
           {link}
         </button>
       ) : null}
@@ -264,7 +266,7 @@ function CommunicationsPanel({
         <div className="mt-auto shrink-0 p-3">
           <button
             type="button"
-            className="flex w-full items-center justify-center rounded-[8px] border border-[#e2e8f0] bg-[#fafbfc] py-2.5 text-[12px] font-medium text-[#4f46e5] hover:bg-[#f8fafc]"
+            className="flex w-full items-center justify-center rounded-full border border-[#e2e8f0] bg-[#fafbfc] py-2.5 text-[12px] font-medium text-[#2563eb] hover:bg-[#f8fafc]"
           >
             View full timeline
           </button>
@@ -469,6 +471,7 @@ function TabContent({ activeTab }: { activeTab: string }) {
 
 export function FundraisingCampaigns() {
   const [activeTab, setActiveTab] = useState<string>("overview")
+  const [createOpen, setCreateOpen] = useState(false)
 
   return (
     <div className="mx-auto max-w-[1600px] space-y-4 p-4 sm:space-y-5 sm:p-5 md:p-6">
@@ -494,7 +497,7 @@ export function FundraisingCampaigns() {
                   className={cn(
                     "relative px-3 py-2.5 text-xs font-medium transition-colors sm:px-4 sm:text-[13px]",
                     activeTab === tab.id
-                      ? "text-[#4f46e5] after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-[#4f46e5]"
+                      ? "text-blue-600 after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-gradient-to-r after:from-blue-600 after:to-cyan-600"
                       : "text-[#64748b] hover:text-[#334155]",
                   )}
                 >
@@ -511,24 +514,24 @@ export function FundraisingCampaigns() {
         </div>
 
         <div className="flex shrink-0 flex-wrap items-center gap-2">
-          <button
-            type="button"
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[#e2e8f0] bg-white px-4 text-sm font-medium text-[#334155] shadow-sm hover:bg-[#f8fafc]"
-          >
+          <Button type="button" variant="outline" className="rounded-full h-10 px-6 gap-2 shadow-sm">
             <Download className="h-4 w-4" />
             Export
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-[#4f46e5] px-5 text-sm font-medium text-white shadow-sm hover:bg-[#4338ca]"
+            variant="gradient-info"
+            className="rounded-full h-10 px-6 shadow-sm font-semibold text-xs gap-2"
+            onClick={() => setCreateOpen(true)}
           >
             <Plus className="h-4 w-4" />
             New Campaign
-          </button>
+          </Button>
         </div>
       </div>
 
       <TabContent activeTab={activeTab} />
+      <FrCampaignWizard open={createOpen} onOpenChange={setCreateOpen} />
     </div>
   )
 }

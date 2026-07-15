@@ -1663,7 +1663,7 @@ const CREATE_CYCLE_STEPS = [
 
 type CreateCycleStepId = (typeof CREATE_CYCLE_STEPS)[number]["id"]
 
-function CreateBudgetCycleModal({
+export function CreateBudgetCycleModal({
   models,
   initialModelId,
   initialVersionId,

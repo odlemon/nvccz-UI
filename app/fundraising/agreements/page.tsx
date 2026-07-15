@@ -1,13 +1,10 @@
-import { ModuleGuard } from "@/components/permissions/PermissionGuards"
-import { FundraisingComingSoon } from "@/components/fundraising/fundraising-coming-soon"
+﻿import { ModuleGuard } from "@/components/permissions/PermissionGuards"
+import { FundraisingAgreements } from "@/components/fundraising/fundraising-agreements"
 
 export default function Page() {
   return (
     <ModuleGuard moduleId="fundraising" subModuleId="fr-agreements">
-      <FundraisingComingSoon
-        title="Agreements & Signatures"
-        description="NDAs, subscriptions, IMAs and electronic signatures."
-      />
+      <FundraisingAgreements />
     </ModuleGuard>
   )
 }

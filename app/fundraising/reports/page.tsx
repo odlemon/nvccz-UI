@@ -1,13 +1,10 @@
-import { ModuleGuard } from "@/components/permissions/PermissionGuards"
-import { FundraisingComingSoon } from "@/components/fundraising/fundraising-coming-soon"
+﻿import { ModuleGuard } from "@/components/permissions/PermissionGuards"
+import { FundraisingReports } from "@/components/fundraising/fundraising-reports"
 
 export default function Page() {
   return (
     <ModuleGuard moduleId="fundraising" subModuleId="fr-reports">
-      <FundraisingComingSoon
-        title="Reports"
-        description="Fundraising progress, conversion and concentration reports."
-      />
+      <FundraisingReports />
     </ModuleGuard>
   )
 }

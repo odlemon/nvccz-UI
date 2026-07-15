@@ -22,9 +22,20 @@ import {
   formatMoney,
   fpaApi,
   type FpaDriver,
+  type FpaDriverBulkUpdateItem,
   type FpaScenario,
+  type FpaScenarioCompareAssumption,
+  type FpaScenarioCompareSensitivityRow,
+  type FpaScenarioCompareWaterfall,
 } from "@/lib/api/fpa-api"
 import { errorMessage, logFpaGap } from "@/lib/fpa/fpa-api-gaps"
+import {
+  assumptionCellDriverId,
+  assumptionCellValue,
+  emptyCompareSkeleton,
+  mapCompareResultToRows,
+  type CompareMetricRow,
+} from "@/lib/fpa/scenario-compare"
 import type { PlanningKpi } from "@/components/fpa/planning/planning-workspace-chrome"
 import {
   Dialog,
@@ -35,30 +46,7 @@ import {
 } from "@/components/ui/dialog"
 
 /** Canonical metric order for the compare table (SRD / design). */
-const CANONICAL_METRICS = [
-  { code: "REVENUE", label: "Revenue", match: /revenue/i },
-  { code: "COGS", label: "COGS", match: /cogs|cost\s*of\s*(goods|sales)|cos\b/i },
-  { code: "GROSS_PROFIT", label: "Gross Profit", match: /gross\s*profit/i },
-  { code: "GROSS_MARGIN", label: "Gross Margin", match: /gross\s*margin/i, pct: true },
-  { code: "OPEX", label: "Opex", match: /opex|operating\s*exp/i },
-  { code: "EBITDA", label: "EBITDA", match: /ebitda/i },
-  { code: "EBITDA_MARGIN", label: "EBITDA Margin", match: /ebitda\s*margin/i, pct: true },
-  { code: "CAPEX", label: "Capex", match: /capex|capital\s*exp/i },
-  { code: "HEADCOUNT", label: "Headcount (FTE)", match: /headcount|fte/i, count: true },
-] as const
-
-type ScenarioValues = Record<string, number | null>
-
-type MetricRow = {
-  code: string
-  label: string
-  isPct?: boolean
-  isCount?: boolean
-  byScenario: ScenarioValues
-  varianceAbs: number | null
-  variancePct: number | null
-  higherIsFavourable: boolean
-}
+type MetricRow = CompareMetricRow
 
 type Props = {
   modelId: string
@@ -72,21 +60,6 @@ type Props = {
   onSelectedIdsChange?: (ids: string[]) => void
   /** Push remapped KPIs up to the worksheet strip. */
   onKpisChange?: (kpis: PlanningKpi[]) => void
-}
-
-function higherIsFavourable(code: string): boolean {
-  const c = code.toUpperCase()
-  if (
-    c.includes("COGS") ||
-    c.includes("OPEX") ||
-    c.includes("EXPENSE") ||
-    c.includes("COST") ||
-    c.includes("CAPEX") ||
-    c.includes("TAX")
-  ) {
-    return false
-  }
-  return true
 }
 
 function formatMetric(n: number | null | undefined, opts?: { pct?: boolean; count?: boolean }) {
@@ -120,129 +93,7 @@ function getScenarioColor(name: string): string {
   return "#667085" // Grey
 }
 
-const DEMO_COMPARE_VALUES: Record<string, Record<string, number>> = {
-  "Budget 2026": {
-    REVENUE: 118200000,
-    COGS: -44720000,
-    GROSS_PROFIT: 73480000,
-    GROSS_MARGIN: 62.2,
-    OPEX: -23160000,
-    EBITDA: 50320000,
-    EBITDA_MARGIN: 42.6,
-    CAPEX: -7500000,
-    HEADCOUNT: 550,
-  },
-  "Forecast Q3": {
-    REVENUE: 128400000,
-    COGS: -48430000,
-    GROSS_PROFIT: 79970000,
-    GROSS_MARGIN: 62.3,
-    OPEX: -24650000,
-    EBITDA: 55320000,
-    EBITDA_MARGIN: 43.1,
-    CAPEX: -8250000,
-    HEADCOUNT: 568,
-  },
-  "Best Case": {
-    REVENUE: 142850000,
-    COGS: -51720000,
-    GROSS_PROFIT: 91130000,
-    GROSS_MARGIN: 63.8,
-    OPEX: -23860000,
-    EBITDA: 67270000,
-    EBITDA_MARGIN: 47.1,
-    CAPEX: -8600000,
-    HEADCOUNT: 596,
-  },
-  "Base Case": {
-    REVENUE: 128400000,
-    COGS: -48430000,
-    GROSS_PROFIT: 79970000,
-    GROSS_MARGIN: 62.3,
-    OPEX: -24650000,
-    EBITDA: 55320000,
-    EBITDA_MARGIN: 43.1,
-    CAPEX: -8250000,
-    HEADCOUNT: 568,
-  },
-  "Downside": {
-    REVENUE: 102540000,
-    COGS: -39420000,
-    GROSS_PROFIT: 63120000,
-    GROSS_MARGIN: 61.5,
-    OPEX: -21020000,
-    EBITDA: 42100000,
-    EBITDA_MARGIN: 41.1,
-    CAPEX: -6100000,
-    HEADCOUNT: 512,
-  },
-}
-
-function findDemoScenarioValues(name: string) {
-  const norm = name.toLowerCase().replace(/[^a-z0-9]/g, "")
-  if (norm.includes("budget2026") || norm === "budget") return DEMO_COMPARE_VALUES["Budget 2026"]
-  if (norm.includes("forecastq3") || norm === "forecast") return DEMO_COMPARE_VALUES["Forecast Q3"]
-  if (norm.includes("bestcase") || norm === "upside" || norm === "best") return DEMO_COMPARE_VALUES["Best Case"]
-  if (norm.includes("basecase") || norm === "base") return DEMO_COMPARE_VALUES["Base Case"]
-  if (norm.includes("downside")) return DEMO_COMPARE_VALUES["Downside"]
-  return null
-}
-
-const DEMO_ASSUMPTIONS: Record<string, Record<string, number>> = {
-  "Revenue Growth": {
-    "Budget 2026": 6.0,
-    "Forecast Q3": 8.7,
-    "Best Case": 12.5,
-    "Base Case": 8.7,
-    "Downside": -4.0,
-  },
-  "Price Change": {
-    "Budget 2026": 2.0,
-    "Forecast Q3": 3.2,
-    "Best Case": 6.0,
-    "Base Case": 3.0,
-    "Downside": -2.5,
-  },
-  "Volume Growth": {
-    "Budget 2026": 4.0,
-    "Forecast Q3": 5.1,
-    "Best Case": 8.0,
-    "Base Case": 5.5,
-    "Downside": -3.5,
-  },
-  "Opex Growth": {
-    "Budget 2026": 5.0,
-    "Forecast Q3": 6.4,
-    "Best Case": 2.0,
-    "Base Case": 6.0,
-    "Downside": -3.0,
-  },
-  "Tax Rate": {
-    "Budget 2026": 22.0,
-    "Forecast Q3": 22.3,
-    "Best Case": 21.0,
-    "Base Case": 22.0,
-    "Downside": 22.5,
-  },
-  "FX Rate (USD/EUR)": {
-    "Budget 2026": 1.08,
-    "Forecast Q3": 1.09,
-    "Best Case": 1.10,
-    "Base Case": 1.09,
-    "Downside": 1.05,
-  },
-}
-
-function findDemoAssumptions(name: string) {
-  for (const [key, valMap] of Object.entries(DEMO_ASSUMPTIONS)) {
-    if (
-      name.toLowerCase().replace(/[^a-z]/g, "").includes(key.toLowerCase().replace(/[^a-z]/g, ""))
-    ) {
-      return valMap
-    }
-  }
-  return null
-}
+const DEMO_ASSUMPTIONS: Record<string, Record<string, number>> = {}
 
 export function PlanningScenarioCompareView({
   modelId,
@@ -264,8 +115,12 @@ export function PlanningScenarioCompareView({
   const [assumptionDrivers, setAssumptionDrivers] = useState<
     Array<{ scenarioId: string; scenarioName: string; drivers: FpaDriver[] }>
   >([])
+  const [apiAssumptions, setApiAssumptions] = useState<FpaScenarioCompareAssumption[]>([])
+  const [apiWaterfall, setApiWaterfall] = useState<FpaScenarioCompareWaterfall | null>(null)
+  const [apiSensitivity, setApiSensitivity] = useState<FpaScenarioCompareSensitivityRow[]>([])
+  const [savingAssumptions, setSavingAssumptions] = useState(false)
 
-  // Assumptions state for dynamic updates
+  // Local overlays after save (keyed by driver name -> scenario name -> value)
   const [customAssumptions, setCustomAssumptions] = useState<Record<string, Record<string, number>>>(DEMO_ASSUMPTIONS)
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [editDriverName, setEditDriverName] = useState("Revenue Growth")
@@ -313,155 +168,111 @@ export function PlanningScenarioCompareView({
   const runCompare = useCallback(async () => {
     const selected = scenarios.filter((s) => selectedIds.includes(s.id))
     if (!versionId || !anchorId || selectedIds.length < 2) {
-      setRows(emptySkeleton(selected))
+      setRows(emptyCompareSkeleton(selected))
+      setApiAssumptions([])
+      setApiWaterfall(null)
+      setApiSensitivity([])
       return
     }
     const others = selectedIds.filter((id) => id !== anchorId)
     if (!others.length) {
-      setRows(emptySkeleton(selected))
+      setRows(emptyCompareSkeleton(selected))
       return
     }
 
     setLoading(true)
     try {
-      const results = await Promise.all(
-        others.map(async (compareId) => {
-          const res = await fpaApi.compareScenarios(anchorId, {
-            versionId,
-            compareScenarioId: compareId,
-          })
-          if (!res.success || !res.data) {
-            throw new Error(res.message || "Compare failed")
-          }
-          return { compareId, data: res.data }
-        }),
-      )
-
-      const byCode = new Map<
-        string,
-        { label: string; byScenario: ScenarioValues; isPct?: boolean; isCount?: boolean }
-      >()
-
-      for (const m of CANONICAL_METRICS) {
-        byCode.set(m.code, {
-          label: m.label,
-          byScenario: Object.fromEntries(selectedIds.map((id) => [id, null])),
-          isPct: "pct" in m && m.pct,
-          isCount: "count" in m && m.count,
-        })
-      }
-
-      for (const { compareId, data } of results) {
-        for (const r of data.rows || []) {
-          const code = String(r.code || "").toUpperCase()
-          const canon = CANONICAL_METRICS.find((m) => m.match.test(r.code) || m.code === code)
-          const key = canon?.code || code || r.code
-          const label = canon?.label || r.code
-          if (!byCode.has(key)) {
-            byCode.set(key, {
-              label,
-              byScenario: Object.fromEntries(selectedIds.map((id) => [id, null])),
-              isPct: canon && "pct" in canon && canon.pct,
-              isCount: canon && "count" in canon && canon.count,
-            })
-          }
-          const entry = byCode.get(key)!
-          entry.byScenario[anchorId] = asNumber(r.left)
-          entry.byScenario[compareId] = asNumber(r.right)
-        }
-      }
-
-      const metricRows: MetricRow[] = Array.from(byCode.entries()).map(([code, entry]) => {
-        // Overlay / Fallback with demo values for perfect design match
-        for (const sId of selectedIds) {
-          const sName = scenarios.find((s) => s.id === sId)?.name || sId
-          const demoVal = findDemoScenarioValues(sName)?.[code]
-          if (demoVal !== undefined) {
-            entry.byScenario[sId] = demoVal
-          }
-        }
-
-        const budgetVal = entry.byScenario[anchorId]
-        const primaryOther = others[0]
-        const otherVal = primaryOther != null ? entry.byScenario[primaryOther] : null
-        let varianceAbs: number | null = null
-        let variancePct: number | null = null
-        if (
-          budgetVal != null &&
-          otherVal != null &&
-          Number.isFinite(budgetVal) &&
-          Number.isFinite(otherVal)
-        ) {
-          varianceAbs = otherVal - budgetVal
-          variancePct = budgetVal !== 0 ? (varianceAbs / Math.abs(budgetVal)) * 100 : null
-        }
-        return {
-          code,
-          label: entry.label,
-          isPct: entry.isPct,
-          isCount: entry.isCount,
-          byScenario: entry.byScenario,
-          varianceAbs,
-          variancePct,
-          higherIsFavourable: higherIsFavourable(code),
-        }
+      const res = await fpaApi.compareScenarios(anchorId, {
+        versionId,
+        scenarioIds: selectedIds,
+        anchorScenarioId: anchorId,
+        includeAssumptions: true,
+        includeWaterfall: true,
+        includeSensitivity: true,
+        waterfallMetric:
+          waterfallMetric === "revenue"
+            ? "REVENUE"
+            : waterfallMetric === "opex"
+              ? "OPEX"
+              : "EBITDA",
+        waterfallFromScenarioId: anchorId,
+        waterfallToScenarioId: others[0],
+        compareScenarioId: others[0],
       })
-
-      metricRows.sort((a, b) => {
-        const ai = CANONICAL_METRICS.findIndex((m) => m.code === a.code)
-        const bi = CANONICAL_METRICS.findIndex((m) => m.code === b.code)
-        if (ai === -1 && bi === -1) return a.label.localeCompare(b.label)
-        if (ai === -1) return 1
-        if (bi === -1) return -1
-        return ai - bi
-      })
-
-      setRows(metricRows)
+      if (!res.success || !res.data) {
+        throw new Error(res.message || "Compare failed")
+      }
+      const data = res.data
+      setRows(mapCompareResultToRows(data, selectedIds, anchorId, others[0]))
+      setApiAssumptions(Array.isArray(data.assumptions) ? data.assumptions : [])
+      setApiWaterfall(data.waterfall ?? null)
+      setApiSensitivity(Array.isArray(data.sensitivity) ? data.sensitivity : [])
     } catch (err) {
-      console.warn("API compare failed, loading mockup values:", err)
-      // Robust mockup fallback if network fails
-      const fallbackRows: MetricRow[] = CANONICAL_METRICS.map((m) => {
-        const scenarioVals: ScenarioValues = {}
-        for (const sId of selectedIds) {
-          const sName = scenarios.find((s) => s.id === sId)?.name || sId
-          scenarioVals[sId] = findDemoScenarioValues(sName)?.[m.code] ?? null
-        }
-        const budgetVal = scenarioVals[anchorId]
-        const primaryOther = others[0]
-        const otherVal = primaryOther != null ? scenarioVals[primaryOther] : null
-        let varianceAbs: number | null = null
-        let variancePct: number | null = null
-        if (
-          budgetVal != null &&
-          otherVal != null &&
-          Number.isFinite(budgetVal) &&
-          Number.isFinite(otherVal)
-        ) {
-          varianceAbs = otherVal - budgetVal
-          variancePct = budgetVal !== 0 ? (varianceAbs / Math.abs(budgetVal)) * 100 : null
-        }
-        return {
-          code: m.code,
-          label: m.label,
-          isPct: "pct" in m && m.pct,
-          isCount: "count" in m && m.count,
-          byScenario: scenarioVals,
-          varianceAbs,
-          variancePct,
-          higherIsFavourable: higherIsFavourable(m.code),
-        }
+      logFpaGap({
+        category: "broken",
+        path: `/v1/fpa/scenarios/${anchorId}/compare`,
+        method: "POST",
+        message: errorMessage(err),
+        impact: "Scenario compare: trying legacy pair compares",
+        response: err,
       })
-      setRows(fallbackRows)
+      try {
+        const results = await Promise.all(
+          others.map(async (compareId) => {
+            const res = await fpaApi.compareScenarios(anchorId, {
+              versionId,
+              compareScenarioId: compareId,
+              scenarioIds: [anchorId, compareId],
+            })
+            if (!res.success || !res.data) throw new Error(res.message || "Compare failed")
+            return { compareId, data: res.data }
+          }),
+        )
+        let merged = emptyCompareSkeleton(selected)
+        for (const { compareId, data } of results) {
+          const part = mapCompareResultToRows(data, [anchorId, compareId], anchorId, compareId)
+          merged = merged.map((row) => {
+            const hit = part.find((p) => p.code === row.code)
+            if (!hit) return row
+            return {
+              ...row,
+              byScenario: {
+                ...row.byScenario,
+                [anchorId]: hit.byScenario[anchorId] ?? row.byScenario[anchorId],
+                [compareId]: hit.byScenario[compareId] ?? null,
+              },
+              varianceAbs: compareId === others[0] ? hit.varianceAbs : row.varianceAbs,
+              variancePct: compareId === others[0] ? hit.variancePct : row.variancePct,
+            }
+          })
+        }
+        setRows(merged)
+        setApiAssumptions([])
+        setApiWaterfall(null)
+        setApiSensitivity([])
+      } catch (err2) {
+        logFpaGap({
+          category: "broken",
+          path: `/v1/fpa/scenarios/${anchorId}/compare`,
+          method: "POST",
+          message: errorMessage(err2),
+          impact: "Scenario compare empty",
+          response: err2,
+        })
+        setRows(emptyCompareSkeleton(selected))
+        setApiAssumptions([])
+        setApiWaterfall(null)
+        setApiSensitivity([])
+      }
     } finally {
       setLoading(false)
     }
-  }, [versionId, anchorId, selectedIds, scenarios])
+  }, [versionId, anchorId, selectedIds, scenarios, waterfallMetric])
 
   useEffect(() => {
     void runCompare()
   }, [runCompare])
 
-  // Driver assumptions across selected scenarios
   useEffect(() => {
     if (!modelId || !selectedIds.length) {
       setAssumptionDrivers([])
@@ -498,8 +309,8 @@ export function PlanningScenarioCompareView({
 
   const kpis = useMemo((): PlanningKpi[] => {
     const pick = (re: RegExp) => rows.find((r) => re.test(r.code) || re.test(r.label))
-    const revenue = pick(/REVENUE/)
-    const ebitda = pick(/EBITDA/)
+    const revenue = pick(/^REVENUE$/)
+    const ebitda = pick(/^EBITDA$/)
     const margin = pick(/GROSS_MARGIN/)
     const headcount = pick(/HEADCOUNT/)
     const mk = (row: MetricRow | undefined, label: string): PlanningKpi => {
@@ -511,7 +322,8 @@ export function PlanningScenarioCompareView({
         (row.varianceAbs < 0 && !row.higherIsFavourable)
           ? "up"
           : "down"
-      const primaryOther = selectedIds.find((id) => id !== anchorId) || selectedIds[1] || selectedIds[0]
+      const primaryOther =
+        selectedIds.find((id) => id !== anchorId) || selectedIds[1] || selectedIds[0]
       const display =
         primaryOther != null
           ? formatMetric(row.byScenario[primaryOther], {
@@ -548,54 +360,68 @@ export function PlanningScenarioCompareView({
     onKpisChange?.(kpis)
   }, [kpis, onKpisChange])
 
-  // Process driver assumptions visually for mock-alignment
   const assumptionMatrix = useMemo(() => {
-    const driverList = [
-      { name: "Revenue Growth", code: "REV_GROWTH", unit: "% YoY" },
-      { name: "Price Change", code: "PRICE_CHANGE", unit: "% YoY" },
-      { name: "Volume Growth", code: "VOL_GROWTH", unit: "% YoY" },
-      { name: "Opex Growth", code: "OPEX_GROWTH", unit: "% YoY" },
-      { name: "Tax Rate", code: "TAX_RATE", unit: "%" },
-      { name: "FX Rate (USD/EUR)", code: "FX_RATE", unit: "" },
-    ]
+    if (apiAssumptions.length) {
+      return apiAssumptions.map((a) => {
+        const byScenario: Record<string, string> = {}
+        const unit = a.unit || "%"
+        for (const sId of selectedIds) {
+          const sName = scenarios.find((s) => s.id === sId)?.name || sId
+          const custom = customAssumptions[a.driverName]?.[sName]
+          const raw = custom !== undefined ? custom : assumptionCellValue(a.byScenario?.[sId])
+          if (raw == null || !Number.isFinite(raw)) byScenario[sId] = "—"
+          else if (String(unit).includes("%")) {
+            byScenario[sId] = raw < 0 ? `(${Math.abs(raw).toFixed(1)}%)` : `${raw.toFixed(1)}%`
+          } else byScenario[sId] = raw.toFixed(2)
+        }
+        return { name: a.driverName, code: a.driverCode, unit: unit || null, byScenario }
+      })
+    }
 
-    return driverList.map((driver) => {
+    const driverNames = new Map<string, { name: string; code: string; unit: string }>()
+    for (const pack of assumptionDrivers) {
+      for (const d of pack.drivers) {
+        const key = d.code || d.name
+        if (!driverNames.has(key)) {
+          driverNames.set(key, { name: d.name, code: d.code, unit: d.unit || "%" })
+        }
+      }
+    }
+    for (const name of Object.keys(customAssumptions)) {
+      if (![...driverNames.values()].some((d) => d.name === name)) {
+        driverNames.set(name, {
+          name,
+          code: name.toUpperCase().replace(/\s+/g, "_"),
+          unit: "%",
+        })
+      }
+    }
+
+    return Array.from(driverNames.values()).map((driver) => {
       const byScenario: Record<string, string> = {}
-      const valMap = customAssumptions[driver.name]
-
       for (const sId of selectedIds) {
         const sName = scenarios.find((s) => s.id === sId)?.name || sId
-        // Fetch from state if available, otherwise fallback to API/demo
         const pack = assumptionDrivers.find((p) => p.scenarioId === sId)
-        const liveDriverVal = pack?.drivers.find(
+        const live = pack?.drivers.find(
           (d) =>
-            d.code === driver.code ||
-            d.name?.toLowerCase().includes(driver.name.toLowerCase()),
-        )?.value
-
-        let valStr = "—"
-        if (valMap && valMap[sName] !== undefined) {
-          const rawVal = valMap[sName]
-          valStr = driver.unit.includes("%")
-            ? `${rawVal >= 0 ? "" : ""}${rawVal.toFixed(1)}%`
-            : rawVal.toFixed(2)
-          // format negative percentages as (4.0%)
-          if (rawVal < 0 && driver.unit.includes("%")) {
-            valStr = `(${Math.abs(rawVal).toFixed(1)}%)`
-          }
-        } else if (liveDriverVal !== undefined && liveDriverVal !== null) {
-          valStr = String(liveDriverVal)
-        }
-        byScenario[sId] = valStr
+            d.code === driver.code || d.name?.toLowerCase() === driver.name.toLowerCase(),
+        )
+        const custom = customAssumptions[driver.name]?.[sName]
+        const raw =
+          custom !== undefined ? custom : live?.value != null ? asNumber(live.value) : null
+        if (raw == null || !Number.isFinite(raw)) byScenario[sId] = "—"
+        else if (String(driver.unit).includes("%")) {
+          byScenario[sId] = raw < 0 ? `(${Math.abs(raw).toFixed(1)}%)` : `${raw.toFixed(1)}%`
+        } else byScenario[sId] = raw.toFixed(2)
       }
-
       return {
         name: driver.name,
+        code: driver.code,
         unit: driver.unit || null,
         byScenario,
       }
     })
-  }, [assumptionDrivers, selectedIds, scenarios, customAssumptions])
+  }, [apiAssumptions, assumptionDrivers, selectedIds, scenarios, customAssumptions])
 
   const anchorName =
     selectedScenarios.find((s) => s.id === anchorId)?.name || "Budget"
@@ -603,32 +429,91 @@ export function PlanningScenarioCompareView({
   const openEditDialogForDriver = (driverName: string) => {
     setEditDriverName(driverName)
     const currentVals: Record<string, string> = {}
-    const valMap = customAssumptions[driverName]
+    const apiRow = apiAssumptions.find((a) => a.driverName === driverName)
     for (const sId of selectedIds) {
       const sName = scenarios.find((s) => s.id === sId)?.name || sId
-      const raw = valMap?.[sName]
-      currentVals[sName] = raw !== undefined ? String(raw) : ""
+      const custom = customAssumptions[driverName]?.[sName]
+      const fromApi = apiRow ? assumptionCellValue(apiRow.byScenario?.[sId]) : null
+      const raw = custom !== undefined ? custom : fromApi
+      currentVals[sName] = raw != null ? String(raw) : ""
     }
     setEditScenarioValues(currentVals)
     setIsEditOpen(true)
   }
 
-  const saveAssumptions = () => {
-    setCustomAssumptions((prev) => {
-      const nextMap = { ...prev[editDriverName] }
-      for (const [sName, strVal] of Object.entries(editScenarioValues)) {
-        const val = parseFloat(strVal.replace(/[()%\s]/g, "")) * (strVal.includes("(") ? -1 : 1)
-        if (!isNaN(val)) {
-          nextMap[sName] = val
+  const saveAssumptions = async () => {
+    if (!versionId) {
+      toast.error("Select a version before saving assumptions")
+      return
+    }
+    setSavingAssumptions(true)
+    const updates: FpaDriverBulkUpdateItem[] = []
+    for (const [sName, strVal] of Object.entries(editScenarioValues)) {
+      const s = scenarios.find((x) => x.name === sName)
+      if (!s) continue
+      const cleaned = strVal.replace(/[()%\s]/g, "")
+      const val = parseFloat(cleaned) * (strVal.includes("(") ? -1 : 1)
+      if (Number.isNaN(val)) continue
+      const apiRow = apiAssumptions.find((a) => a.driverName === editDriverName)
+      const cellId = apiRow ? assumptionCellDriverId(apiRow.byScenario?.[s.id]) : null
+      const pack = assumptionDrivers.find((p) => p.scenarioId === s.id)
+      const live = pack?.drivers.find(
+        (d) =>
+          d.name?.toLowerCase() === editDriverName.toLowerCase() ||
+          d.code === apiRow?.driverCode,
+      )
+      const driverId = cellId || live?.id || null
+      if (driverId) {
+        updates.push({
+          driverId,
+          value: val,
+          scenarioId: s.id,
+          unit: apiRow?.unit || live?.unit || "%",
+        })
+      } else if (apiRow?.driverCode) {
+        updates.push({
+          code: apiRow.driverCode,
+          scenarioId: s.id,
+          value: val,
+          unit: apiRow.unit || "%",
+          name: apiRow.driverName,
+        })
+      }
+    }
+    try {
+      if (updates.length && modelId) {
+        const bulk = await fpaApi.bulkUpdateDrivers(modelId, { versionId, updates })
+        if (!bulk.success) {
+          for (const u of updates) {
+            if (u.driverId) await fpaApi.updateDriver(u.driverId, { value: u.value, unit: u.unit })
+          }
         }
       }
-      return {
-        ...prev,
-        [editDriverName]: nextMap,
-      }
-    })
-    setIsEditOpen(false)
-    toast.success("Assumptions updated successfully")
+      setCustomAssumptions((prev) => {
+        const nextMap = { ...(prev[editDriverName] || {}) }
+        for (const [sName, strVal] of Object.entries(editScenarioValues)) {
+          const cleaned = strVal.replace(/[()%\s]/g, "")
+          const val = parseFloat(cleaned) * (strVal.includes("(") ? -1 : 1)
+          if (!Number.isNaN(val)) nextMap[sName] = val
+        }
+        return { ...prev, [editDriverName]: nextMap }
+      })
+      setIsEditOpen(false)
+      toast.success("Assumptions saved")
+      void runCompare()
+    } catch (err) {
+      logFpaGap({
+        category: "broken",
+        path: `/v1/fpa/models/${modelId}/drivers/bulk`,
+        method: "PUT",
+        message: errorMessage(err),
+        impact: "Assumption edits not persisted",
+        response: err,
+      })
+      toast.error("Could not save assumptions")
+    } finally {
+      setSavingAssumptions(false)
+    }
   }
 
   return (
@@ -839,7 +724,7 @@ export function PlanningScenarioCompareView({
           </div>
 
           <div className="flex-1 min-h-[190px] flex items-center justify-center">
-            <WaterfallChart metric={waterfallMetric} />
+            <WaterfallChart metric={waterfallMetric} apiWaterfall={apiWaterfall} />
           </div>
 
           <div className="mt-3 pt-3 border-t border-[#f2f4f7] flex items-center justify-between">
@@ -986,6 +871,11 @@ export function PlanningScenarioCompareView({
       </div>
 
       {/* Interactive assumptions dialog */}
+      <section className="rounded-xl border border-[#eaecf0] bg-white p-4 shadow-sm">
+        <h3 className="text-[14px] font-semibold text-[#101828] mb-2">Sensitivity Matrix</h3>
+        <SensitivityBoard rows={apiSensitivity} />
+      </section>
+
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
         <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto">
           <DialogHeader>
@@ -1031,10 +921,11 @@ export function PlanningScenarioCompareView({
             </button>
             <button
               type="button"
-              onClick={saveAssumptions}
-              className="h-9 rounded-lg bg-[#2563eb] px-4 text-[13px] font-semibold text-white hover:bg-[#1d4ed8]"
+              onClick={() => void saveAssumptions()}
+              disabled={savingAssumptions}
+              className="h-9 rounded-full bg-[#2563eb] px-4 text-[13px] font-semibold text-white hover:bg-[#1d4ed8] disabled:opacity-60"
             >
-              Save Changes
+              {savingAssumptions ? "Saving…" : "Save Changes"}
             </button>
           </DialogFooter>
         </DialogContent>
@@ -1043,124 +934,88 @@ export function PlanningScenarioCompareView({
   )
 }
 
-function emptySkeleton(scenarios: FpaScenario[]): MetricRow[] {
-  const ids = scenarios.map((s) => s.id)
-  return CANONICAL_METRICS.map((m) => ({
-    code: m.code,
-    label: m.label,
-    isPct: "pct" in m && m.pct,
-    isCount: "count" in m && m.count,
-    byScenario: Object.fromEntries(ids.map((id) => [id, null])),
-    varianceAbs: null,
-    variancePct: null,
-    higherIsFavourable: higherIsFavourable(m.code),
-  }))
-}
+function WaterfallChart({
+  metric = "revenue",
+  apiWaterfall,
+}: {
+  metric?: "revenue" | "ebitda" | "opex"
+  apiWaterfall?: FpaScenarioCompareWaterfall | null
+}) {
+  void metric
+  const fromApi =
+    apiWaterfall?.steps?.length
+      ? apiWaterfall.steps.map((s, i, arr) => {
+          const isEnd = i === 0 || i === arr.length - 1 || s.key === "anchor" || s.key === "result"
+          const delta = s.delta != null ? asNumber(s.delta) : null
+          const value = s.value != null ? asNumber(s.value) : delta != null ? delta : 0
+          const millions = value / 1_000_000
+          if (isEnd && s.value != null) {
+            return {
+              label: s.label,
+              value: millions,
+              displayValue: `${millions.toFixed(1)}M`,
+              type: "total" as const,
+            }
+          }
+          const d = delta ?? value
+          const m = d / 1_000_000
+          return {
+            label: s.label,
+            value: m,
+            displayValue: m >= 0 ? `+${m.toFixed(1)}M` : `(${Math.abs(m).toFixed(1)}M)`,
+            type: (m >= 0 ? "increase" : "decrease") as "increase" | "decrease",
+          }
+        })
+      : null
 
-function WaterfallChart({ metric = "revenue" }: { metric?: "revenue" | "ebitda" | "opex" }) {
-  const revenueBars = [
-    { label: "Budget 2026", value: 118.2, displayValue: "118.2M", type: "total" as const },
-    { label: "Price", value: 10.2, displayValue: "+10.2M", type: "increase" as const },
-    { label: "Volume", value: 5.1, displayValue: "+5.1M", type: "increase" as const },
-    { label: "Mix", value: -3.2, displayValue: "(3.2M)", type: "decrease" as const },
-    { label: "Other Income", value: 2.6, displayValue: "+2.6M", type: "increase" as const },
-    { label: "Opex", value: -4.5, displayValue: "(2.5M)", type: "decrease" as const },
-    { label: "Forecast Q3", value: 128.4, displayValue: "128.4M", type: "total" as const },
-  ]
-
-  const ebitdaBars = [
-    { label: "Budget 2026", value: 50.3, displayValue: "50.3M", type: "total" as const },
-    { label: "Revenue Delta", value: 6.5, displayValue: "+6.5M", type: "increase" as const },
-    { label: "COGS Delta", value: -3.7, displayValue: "(3.7M)", type: "decrease" as const },
-    { label: "Opex Delta", value: -1.5, displayValue: "(1.5M)", type: "decrease" as const },
-    { label: "Other Income", value: 3.7, displayValue: "+3.7M", type: "increase" as const },
-    { label: "Forecast Q3", value: 55.3, displayValue: "55.3M", type: "total" as const },
-  ]
-
-  const opexBars = [
-    { label: "Budget 2026", value: 23.2, displayValue: "23.2M", type: "total" as const },
-    { label: "Marketing", value: 1.0, displayValue: "+1.0M", type: "increase" as const },
-    { label: "Headcount", value: 1.5, displayValue: "+1.5M", type: "increase" as const },
-    { label: "Facilities", value: -0.6, displayValue: "(0.6M)", type: "decrease" as const },
-    { label: "Other Admin", value: -0.5, displayValue: "(0.5M)", type: "decrease" as const },
-    { label: "Forecast Q3", value: 24.6, displayValue: "24.6M", type: "total" as const },
-  ]
-
-  const barsMap = {
-    revenue: { bars: revenueBars, max: 140, ticks: [0, 20, 40, 60, 80, 100, 120, 140] },
-    ebitda: { bars: ebitdaBars, max: 60, ticks: [0, 10, 20, 30, 40, 50, 60] },
-    opex: { bars: opexBars, max: 30, ticks: [0, 5, 10, 15, 20, 25, 30] },
+  if (!fromApi?.length) {
+    return (
+      <p className="text-[12px] text-[#94a3b8] text-center px-4">
+        Waterfall data will appear when the compare API returns a bridge for this selection.
+      </p>
+    )
   }
 
-  const activeSet = barsMap[metric] || barsMap.revenue
-  const bars = activeSet.bars
-  const scaleMax = activeSet.max
-  const ticks = activeSet.ticks
+  const bars = fromApi
+  const scaleMax = Math.max(40, ...bars.map((b) => Math.abs(b.value))) * 1.15
+  const ticks = Array.from({ length: 5 }, (_, i) => Math.round((scaleMax / 4) * i))
 
   const margin = { top: 22, bottom: 25, left: 35, right: 10 }
   const w = 480
   const h = 180
   const chartHeight = h - margin.top - margin.bottom
   const barWidth = 38
-  const spacing = (w - margin.left - margin.right - bars.length * barWidth) / (bars.length - 1)
+  const spacing =
+    bars.length > 1
+      ? (w - margin.left - margin.right - bars.length * barWidth) / (bars.length - 1)
+      : 0
 
-  const startValue = bars[0].value
-  let current = startValue
-
+  let current = bars[0]?.type === "total" ? bars[0].value : 0
   const computedBars = bars.map((bar, i) => {
     const x = margin.left + i * (barWidth + spacing)
     let y = 0
     let height = 0
     let color = ""
-
     if (bar.type === "total") {
-      height = (bar.value / scaleMax) * chartHeight
+      height = (Math.abs(bar.value) / scaleMax) * chartHeight
       y = margin.top + chartHeight - height
-      color = "#2563eb" // Solid Blue
+      color = "#2563eb"
+      current = bar.value
     } else {
       const startY = current
       const endY = current + bar.value
       current = endY
-
       const valMax = Math.max(startY, endY)
       const valMin = Math.min(startY, endY)
-
       y = margin.top + (1 - valMax / scaleMax) * chartHeight
-      height = ((valMax - valMin) / scaleMax) * chartHeight
-      color = bar.type === "increase" ? "#12b76a" : "#f04438" // Green / Red
+      height = Math.max(((valMax - valMin) / scaleMax) * chartHeight, 2)
+      color = bar.type === "increase" ? "#12b76a" : "#f04438"
     }
-
-    return {
-      ...bar,
-      x,
-      y,
-      height,
-      color,
-    }
+    return { ...bar, x, y, height, color }
   })
-
-  // Connectors
-  const connectors: Array<{ x1: number; y1: number; x2: number; y2: number }> = []
-  for (let i = 0; i < computedBars.length - 1; i++) {
-    const b1 = computedBars[i]
-    const b2 = computedBars[i + 1]
-    let y = 0
-    if (b2.type === "total") {
-      y = b2.y
-    } else {
-      y = b2.value >= 0 ? b2.y + b2.height : b2.y
-    }
-    connectors.push({
-      x1: b1.x + barWidth,
-      y1: y,
-      x2: b2.x,
-      y2: y,
-    })
-  }
 
   return (
     <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-full">
-      {/* Grid lines */}
       {ticks.map((tick) => {
         const y = margin.top + (1 - tick / scaleMax) * chartHeight
         return (
@@ -1185,72 +1040,80 @@ function WaterfallChart({ metric = "revenue" }: { metric?: "revenue" | "ebitda" 
           </g>
         )
       })}
-
       <text x={5} y={12} className="fill-[#667085] text-[9px] font-semibold">
         USD M
       </text>
-
-      {/* Connectors */}
-      {connectors.map((c, i) => (
-        <line
-          key={i}
-          x1={c.x1}
-          y1={c.y1}
-          x2={c.x2}
-          y2={c.y2}
-          stroke="#98a2b3"
-          strokeWidth={1}
-          strokeDasharray="3,3"
-        />
+      {computedBars.map((bar) => (
+        <g key={bar.label}>
+          <rect x={bar.x} y={bar.y} width={barWidth} height={bar.height} fill={bar.color} rx={1.5} />
+          <text
+            x={bar.x + barWidth / 2}
+            y={bar.type === "decrease" ? bar.y + bar.height + 11 : bar.y - 5}
+            textAnchor="middle"
+            className={cn(
+              "text-[9px] tabular-nums",
+              bar.type === "total"
+                ? "fill-[#101828] font-bold"
+                : bar.type === "increase"
+                  ? "fill-[#079455] font-semibold"
+                  : "fill-[#d92d20] font-semibold",
+            )}
+          >
+            {bar.displayValue}
+          </text>
+          <text
+            x={bar.x + barWidth / 2}
+            y={h - 6}
+            textAnchor="middle"
+            className="fill-[#667085] text-[8.5px] font-medium"
+          >
+            {bar.label}
+          </text>
+        </g>
       ))}
-
-      {/* Bars */}
-      {computedBars.map((bar, i) => {
-        const isUp = bar.type === "increase"
-        const isTotal = bar.type === "total"
-        const labelY = isTotal
-          ? bar.y - 5
-          : isUp
-            ? bar.y - 5
-            : bar.y + bar.height + 11
-
-        const labelColor = isTotal
-          ? "fill-[#101828] font-bold"
-          : isUp
-            ? "fill-[#079455] font-semibold"
-            : "fill-[#d92d20] font-semibold"
-
-        return (
-          <g key={bar.label}>
-            <rect
-              x={bar.x}
-              y={bar.y}
-              width={barWidth}
-              height={bar.height}
-              fill={bar.color}
-              rx={1.5}
-            />
-            {/* Value Label */}
-            <text
-              x={bar.x + barWidth / 2}
-              y={labelY}
-              textAnchor="middle"
-              className={cn("text-[9px] tabular-nums", labelColor)}
-            >
-              {bar.displayValue}
-            </text>
-            {/* X Axis Label */}
-            <text
-              x={bar.x + barWidth / 2}
-              y={h - 6}
-              textAnchor="middle"
-              className="fill-[#667085] text-[8.5px] font-medium"
-            >
-              {bar.label}
-            </text>
-          </g>
-        )
-      })}
     </svg>
+  )
+}
+
+function SensitivityBoard({ rows }: { rows: FpaScenarioCompareSensitivityRow[] }) {
+  if (!rows.length) {
+    return (
+      <p className="text-[12px] text-[#94a3b8] px-1 py-2">
+        Sensitivity matrix will load when the compare API returns sensitivity rows.
+      </p>
+    )
+  }
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-[11px] border-collapse">
+        <thead>
+          <tr className="text-left text-[#667085] border-b border-[#eaecf0]">
+            <th className="py-2 pr-3 font-semibold">Driver</th>
+            <th className="py-2 px-2 font-semibold text-right">Low</th>
+            <th className="py-2 px-2 font-semibold text-right">Base</th>
+            <th className="py-2 px-2 font-semibold text-right">High</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.driverCode} className="border-b border-[#f2f4f7]">
+              <td className="py-2 pr-3 font-medium text-[#344054]">{r.driverName}</td>
+              <td className="py-2 px-2 text-right tabular-nums text-[#f04438]">
+                {r.low}
+                {r.unit || "%"}
+              </td>
+              <td className="py-2 px-2 text-right tabular-nums text-[#344054]">
+                {r.base}
+                {r.unit || "%"}
+              </td>
+              <td className="py-2 px-2 text-right tabular-nums text-[#12b76a]">
+                {r.high}
+                {r.unit || "%"}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   )
 }

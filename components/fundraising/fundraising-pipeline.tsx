@@ -21,6 +21,8 @@ import {
   Target,
   Users,
 } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { FrOpportunityWizard } from "@/components/fundraising/fundraising-create-wizards"
 import {
   Area,
   CartesianGrid,
@@ -344,6 +346,7 @@ export function FundraisingPipeline() {
   const [meetingsOpen, setMeetingsOpen] = useState(false)
   const [activityOpen, setActivityOpen] = useState(false)
   const [oppsOpen, setOppsOpen] = useState(false)
+  const [createOppOpen, setCreateOppOpen] = useState(false)
 
   const kpis = KPIS_BY_FILTER[filter]
   const stages = STAGES_BY_FILTER[filter]
@@ -391,7 +394,7 @@ export function FundraisingPipeline() {
                 className={cn(
                   "h-8 rounded-full px-3.5 text-xs font-medium transition-colors",
                   filter === f.id
-                    ? "bg-[#4f46e5] text-white shadow-sm"
+                    ? "bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-sm"
                     : "bg-[#f1f5f9] text-[#64748b] hover:bg-[#e2e8f0]",
                 )}
               >
@@ -403,20 +406,23 @@ export function FundraisingPipeline() {
 
         <div className="flex flex-col items-stretch sm:items-end gap-2 shrink-0">
           <div className="flex flex-wrap items-center gap-2">
-            <button
+            <Button
               type="button"
-              className="inline-flex h-10 flex-1 sm:flex-none items-center justify-center gap-2 rounded-full border border-[#e2e8f0] bg-white px-4 text-sm font-medium text-[#334155] hover:bg-[#f8fafc] shadow-sm"
+              variant="outline"
+              className="rounded-full h-10 px-6 flex-1 sm:flex-none gap-2 shadow-sm"
             >
               <Download className="w-4 h-4" />
               Export
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
-              className="inline-flex h-10 flex-1 sm:flex-none items-center justify-center gap-2 rounded-full bg-[#4f46e5] px-5 text-sm font-medium text-white hover:bg-[#4338ca] shadow-sm"
+              variant="gradient-info"
+              className="rounded-full h-10 px-6 shadow-sm font-semibold text-xs gap-2 flex-1 sm:flex-none"
+              onClick={() => setCreateOppOpen(true)}
             >
               <Plus className="w-4 h-4" />
               Add Opportunity
-            </button>
+            </Button>
             <div className="relative flex-1 sm:flex-none min-w-[148px]">
               <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#64748b]">
                 {viewMode === "board" ? (
@@ -452,7 +458,10 @@ export function FundraisingPipeline() {
       </div>
 
       {viewMode === "board" ? (
-        <FundraisingPipelineBoard filter={filter} />
+        <FundraisingPipelineBoard
+          filter={filter}
+          onAddOpportunity={() => setCreateOppOpen(true)}
+        />
       ) : (
         <>
       {/* KPI strip */}
@@ -917,6 +926,8 @@ export function FundraisingPipeline() {
       </Dialog>
         </>
       )}
+
+      <FrOpportunityWizard open={createOppOpen} onOpenChange={setCreateOppOpen} />
     </div>
   )
 }

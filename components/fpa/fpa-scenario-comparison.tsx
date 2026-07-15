@@ -2,18 +2,29 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "next/navigation"
-import { Copy, ArrowUpRight, Loader2, Search, Sliders, Plus, Info } from "lucide-react"
+import { Copy, ArrowUpRight, Loader2, Search, Plus, Info, Sliders } from "lucide-react"
 import { toast } from "sonner"
-import { formatMoney, fpaApi, type FpaScenario } from "@/lib/api/fpa-api"
+import {
+  asNumber,
+  formatMoney,
+  fpaApi,
+  type FpaScenario,
+  type FpaScenarioCompareSensitivityRow,
+  type FpaScenarioCompareWaterfall,
+} from "@/lib/api/fpa-api"
 import { useAppDispatch, useAppSelector } from "@/lib/store"
-import { setSelectedModelId, setSelectedScenarioId, setSelectedVersionId } from "@/lib/store/slices/fpaSlice"
+import {
+  bootstrapFpaSelection,
+  setSelectedModelId,
+  setSelectedScenarioId,
+  setSelectedVersionId,
+} from "@/lib/store/slices/fpaSlice"
 import { errorMessage, logFpaGap } from "@/lib/fpa/fpa-api-gaps"
 import {
-  mockScenarioAssumptions,
-  mockScenarioCompareValues,
-  mockSensitivity,
-  SRD_SCENARIO_NAMES,
-} from "@/components/fpa/mock-data"
+  emptyCompareSkeleton,
+  mapCompareResultToRows,
+  type CompareMetricRow,
+} from "@/lib/fpa/scenario-compare"
 import {
   Dialog,
   DialogContent,
@@ -25,42 +36,6 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 
 const R = "rounded-lg"
-
-function mergeWithSrdScenarios(apiList: FpaScenario[], modelId: string): FpaScenario[] {
-  const byNorm = new Map(apiList.map((s) => [s.name.toLowerCase().replace(/[^a-z0-9]/g, ""), s]))
-  const merged = [...apiList]
-  for (const name of SRD_SCENARIO_NAMES) {
-    const norm = name.toLowerCase().replace(/[^a-z0-9]/g, "")
-    const exists = [...byNorm.keys()].some(
-      (k) => k.includes(norm.replace("case", "")) || norm.includes(k.replace("case", "")),
-    )
-    if (!exists) {
-      merged.push({
-        id: `srd-${norm}`,
-        modelId,
-        name,
-        scenarioType: name.includes("Base") ? "BASE" : name.includes("Upside") ? "UPSIDE" : name.includes("Downside") ? "DOWNSIDE" : "WHAT_IF",
-        isDefault: name === "Base Case",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      } as FpaScenario)
-    }
-  }
-  return merged
-}
-
-function getScenarioMockValues(name: string) {
-  if (mockScenarioCompareValues[name]) return mockScenarioCompareValues[name]
-  const norm = name.toLowerCase().replace(/[^a-z0-9]/g, "")
-  for (const [key, vals] of Object.entries(mockScenarioCompareValues)) {
-    const kn = key.toLowerCase().replace(/[^a-z0-9]/g, "")
-    if (norm.includes(kn.replace("case", "")) || kn.includes(norm.replace("case", ""))) return vals
-  }
-  if (norm.includes("upside") || norm.includes("best")) return mockScenarioCompareValues["Upside Case"]
-  if (norm.includes("downside")) return mockScenarioCompareValues["Downside Case"]
-  if (norm.includes("base")) return mockScenarioCompareValues["Base Case"]
-  return null
-}
 
 const TONE_COLORS = {
   budget: { border: "border-[#7c3aed]/30", bg: "bg-[#f9f5ff]", text: "text-[#6941c6]", dot: "#7c3aed" },
@@ -92,58 +67,59 @@ function scenarioInherits(name: string): string {
   return "None (Root)"
 }
 
-const CANONICAL_METRICS = [
-  { code: "REVENUE", label: "Revenue", match: /revenue/i },
-  { code: "COGS", label: "COGS", match: /cogs|cost\s*of\s*(goods|sales)/i },
-  { code: "GROSS_PROFIT", label: "Gross Profit", match: /gross\s*profit/i },
-  { code: "GROSS_MARGIN", label: "Gross Margin", match: /gross\s*margin/i, pct: true },
-  { code: "OPEX", label: "Opex", match: /opex|operating\s*exp/i },
-  { code: "EBITDA", label: "EBITDA", match: /ebitda/i },
-  { code: "EBITDA_MARGIN", label: "EBITDA Margin", match: /ebitda\s*margin/i, pct: true },
-  { code: "CAPEX", label: "Capex", match: /capex|capital\s*exp/i },
-  { code: "HEADCOUNT", label: "Headcount (FTE)", match: /headcount|fte/i, count: true },
-] as const
-
-type ScenarioValues = Record<string, number | null>
-
-type MetricRow = {
-  code: string
+type WaterfallBar = {
   label: string
-  isPct?: boolean
-  isCount?: boolean
-  byScenario: ScenarioValues
-  varianceAbs: number | null
-  variancePct: number | null
+  value: number
+  displayValue: string
+  type: "total" | "increase" | "decrease"
 }
 
-const DEMO_ASSUMPTIONS = mockScenarioAssumptions
+function waterfallFromApi(wf: FpaScenarioCompareWaterfall | null | undefined): WaterfallBar[] {
+  if (!wf?.steps?.length) return []
+  return wf.steps.map((s, i, arr) => {
+    const isEnd = i === 0 || i === arr.length - 1 || s.key === "anchor" || s.key === "result"
+    const delta = s.delta != null ? asNumber(s.delta) : null
+    const value = s.value != null ? asNumber(s.value) : delta != null ? delta : 0
+    const millions = value / 1_000_000
+    if (isEnd && s.value != null) {
+      return {
+        label: s.label,
+        value: Number(millions.toFixed(1)),
+        displayValue: `${millions.toFixed(1)}M`,
+        type: "total" as const,
+      }
+    }
+    const d = (delta ?? value) / 1_000_000
+    return {
+      label: s.label,
+      value: Number(d.toFixed(1)),
+      displayValue: d >= 0 ? `+${d.toFixed(1)}M` : `(${Math.abs(d).toFixed(1)}M)`,
+      type: (d >= 0 ? "increase" : "decrease") as "increase" | "decrease",
+    }
+  })
+}
 
 export function FpaScenarioComparison() {
   const dispatch = useAppDispatch()
   const searchParams = useSearchParams()
-  const { selectedModelId, selectedVersionId, selectedScenarioId, scenarios } = useAppSelector((s) => s.fpa)
+  const { selectedModelId, selectedVersionId, selectedScenarioId, scenarios, models } = useAppSelector(
+    (s) => s.fpa,
+  )
 
   const [list, setList] = useState<FpaScenario[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [anchorId, setAnchorId] = useState<string | null>(null)
-  
-  // Interactive Controls
+  const [tableRows, setTableRows] = useState<CompareMetricRow[]>([])
+  const [assumptionMatrix, setAssumptionMatrix] = useState<
+    Array<{ name: string; unit: string | null; byScenario: Record<string, string> }>
+  >([])
+  const [sensitivityRows, setSensitivityRows] = useState<FpaScenarioCompareSensitivityRow[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [metricUnit, setMetricUnit] = useState<"$" | "%">("$")
-  
-  // Waterfall configuration state
-  const [waterfallBars, setWaterfallBars] = useState([
-    { label: "Base Case", value: 125.8, displayValue: "125.8M", type: "total" as const },
-    { label: "Price", value: 4.2, displayValue: "+4.2M", type: "increase" as const },
-    { label: "Volume", value: 5.1, displayValue: "+5.1M", type: "increase" as const },
-    { label: "Mix", value: -2.2, displayValue: "(2.2M)", type: "decrease" as const },
-    { label: "FX", value: -1.8, displayValue: "(1.8M)", type: "decrease" as const },
-    { label: "Opex", value: -0.7, displayValue: "(0.7M)", type: "decrease" as const },
-    { label: "Upside Case", value: 138.3, displayValue: "138.3M", type: "total" as const },
-  ])
+  const [waterfallBars, setWaterfallBars] = useState<WaterfallBar[]>([])
   const [isWaterfallModalOpen, setIsWaterfallModalOpen] = useState(false)
-  const [tempWaterfallBars, setTempWaterfallBars] = useState<typeof waterfallBars>([])
+  const [tempWaterfallBars, setTempWaterfallBars] = useState<WaterfallBar[]>([])
 
   useEffect(() => {
     const mid = searchParams.get("modelId")
@@ -153,6 +129,15 @@ export function FpaScenarioComparison() {
     if (vid) dispatch(setSelectedVersionId(vid))
     if (sid) dispatch(setSelectedScenarioId(sid))
   }, [searchParams, dispatch])
+
+  useEffect(() => {
+    if (!selectedModelId) {
+      void dispatch(bootstrapFpaSelection({}))
+    }
+  }, [dispatch, selectedModelId])
+
+  const effectiveVersionId =
+    selectedVersionId || models.find((m) => m.id === selectedModelId)?.defaultVersionId || null
 
   const load = useCallback(async () => {
     if (!selectedModelId) {
@@ -164,16 +149,18 @@ export function FpaScenarioComparison() {
     try {
       const res = await fpaApi.listScenarios(selectedModelId)
       if (!res.success) throw new Error(res.message || "Scenarios failed")
-      const raw = res.data?.length ? res.data : scenarios
-      const data = mergeWithSrdScenarios(raw, selectedModelId)
+      const data = res.data?.length
+        ? res.data
+        : scenarios.filter((s) => !s.modelId || s.modelId === selectedModelId)
       setList(data)
       setSelectedIds((prev) => {
-        if (prev.length) return prev.filter((id) => data.some((s) => s.id === id))
-        return data.map((s) => s.id)
+        const valid = prev.filter((id) => data.some((s) => s.id === id))
+        if (valid.length) return valid
+        return data.slice(0, Math.min(5, data.length)).map((s) => s.id)
       })
       setAnchorId((prev) => {
         if (prev && data.some((s) => s.id === prev)) return prev
-        const base = data.find((s) => /base/i.test(s.name))
+        const base = data.find((s) => /base/i.test(s.name) || s.scenarioType === "BASE")
         return base?.id || selectedScenarioId || data[0]?.id || null
       })
     } catch (err) {
@@ -182,10 +169,10 @@ export function FpaScenarioComparison() {
         path: "/v1/fpa/scenarios",
         method: "GET",
         message: errorMessage(err),
-        impact: "Scenarios tab shows demo data",
+        impact: "Scenarios tab empty",
         response: err,
       })
-      setList(mergeWithSrdScenarios(scenarios, selectedModelId))
+      setList(scenarios.filter((s) => !s.modelId || s.modelId === selectedModelId))
     } finally {
       setLoading(false)
     }
@@ -195,15 +182,74 @@ export function FpaScenarioComparison() {
     void load()
   }, [load])
 
-  useEffect(() => {
-    if (!selectedModelId && list.length === 0) {
-      const demo = mergeWithSrdScenarios([], "demo")
-      setList(demo)
-      setSelectedIds(demo.map((s) => s.id))
-      setAnchorId(demo.find((s) => /base/i.test(s.name))?.id ?? null)
-      setLoading(false)
+  const runCompare = useCallback(async () => {
+    const liveIds = selectedIds.filter((id) => list.some((s) => s.id === id))
+    if (!selectedModelId || !effectiveVersionId || !anchorId || liveIds.length < 2) {
+      setTableRows(emptyCompareSkeleton(list.filter((s) => liveIds.includes(s.id))))
+      setAssumptionMatrix([])
+      setSensitivityRows([])
+      setWaterfallBars([])
+      return
     }
-  }, [selectedModelId, list.length])
+    try {
+      const others = liveIds.filter((id) => id !== anchorId)
+      const res = await fpaApi.compareScenarios(anchorId, {
+        versionId: effectiveVersionId,
+        scenarioIds: liveIds,
+        anchorScenarioId: anchorId,
+        includeAssumptions: true,
+        includeWaterfall: true,
+        includeSensitivity: true,
+        compareScenarioId: others[0],
+        waterfallFromScenarioId: anchorId,
+        waterfallToScenarioId: others[0],
+      })
+      if (!res.success || !res.data) throw new Error(res.message || "Compare failed")
+      const data = res.data
+      setTableRows(mapCompareResultToRows(data, liveIds, anchorId, others[0]))
+      setSensitivityRows(Array.isArray(data.sensitivity) ? data.sensitivity : [])
+      setWaterfallBars(waterfallFromApi(data.waterfall))
+      setAssumptionMatrix(
+        (data.assumptions || []).map((a) => {
+          const byScenario: Record<string, string> = {}
+          const unit = a.unit || "%"
+          for (const sId of liveIds) {
+            const cell = a.byScenario?.[sId]
+            const raw =
+              cell == null
+                ? null
+                : typeof cell === "number"
+                  ? cell
+                  : cell.value == null
+                    ? null
+                    : asNumber(cell.value)
+            if (raw == null || !Number.isFinite(raw)) byScenario[sId] = "—"
+            else if (String(unit).includes("%")) {
+              byScenario[sId] = raw < 0 ? `(${Math.abs(raw).toFixed(1)}%)` : `${raw.toFixed(1)}%`
+            } else byScenario[sId] = raw.toFixed(2)
+          }
+          return { name: a.driverName, unit: unit || null, byScenario }
+        }),
+      )
+    } catch (err) {
+      logFpaGap({
+        category: "broken",
+        path: `/v1/fpa/scenarios/${anchorId}/compare`,
+        method: "POST",
+        message: errorMessage(err),
+        impact: "Scenarios compare matrix empty",
+        response: err,
+      })
+      setTableRows(emptyCompareSkeleton(list.filter((s) => liveIds.includes(s.id))))
+      setAssumptionMatrix([])
+      setSensitivityRows([])
+      setWaterfallBars([])
+    }
+  }, [selectedModelId, effectiveVersionId, anchorId, selectedIds, list])
+
+  useEffect(() => {
+    void runCompare()
+  }, [runCompare])
 
   const toggleSelected = (id: string) => {
     setSelectedIds((prev) => {
@@ -215,126 +261,96 @@ export function FpaScenarioComparison() {
     })
   }
 
-  // Duplicate scenario in local state instantly
-  const duplicateScenario = (sId: string) => {
+  const duplicateScenario = async (sId: string) => {
     const target = list.find((s) => s.id === sId)
-    if (!target) return
-    const newScenario: FpaScenario = {
-      ...target,
-      id: `copy-${Date.now()}`,
-      name: `${target.name} Copy`,
-      scenarioType: target.scenarioType,
+    if (!target || !effectiveVersionId) {
+      toast.error("Select a model version before duplicating")
+      return
     }
-    setList((prev) => [...prev, newScenario])
-    setSelectedIds((prev) => [...prev, newScenario.id])
-    toast.success(`Duplicated scenario: "${target.name}"`)
+    try {
+      const res = await fpaApi.copyScenario(sId, {
+        versionId: effectiveVersionId,
+        name: `${target.name} Copy`,
+        scenarioType: target.scenarioType || "CUSTOM",
+      })
+      if (!res.success || !res.data) throw new Error(res.message || "Copy failed")
+      const created = res.data.scenario
+      toast.success(`Duplicated “${target.name}”`, {
+        description: `${res.data.cellsCopied ?? 0} cells · ${res.data.driversCopied ?? 0} drivers`,
+      })
+      await load()
+      if (created?.id) setSelectedIds((prev) => [...prev, created.id])
+    } catch (err) {
+      logFpaGap({
+        category: "broken",
+        path: `/v1/fpa/scenarios/${sId}/copy`,
+        method: "POST",
+        message: errorMessage(err),
+        impact: "Duplicate scenario failed",
+        response: err,
+      })
+      toast.error("Could not duplicate scenario")
+    }
   }
 
-  // Promote scenario in local state instantly
-  const promoteScenario = (sId: string) => {
+  const promoteScenario = async (sId: string) => {
     const target = list.find((s) => s.id === sId)
     if (!target) return
-    setList((prev) =>
-      prev.map((s) =>
-        s.id === sId
-          ? { ...s, name: `${s.name} (Active Forecast)`, scenarioType: "FORECAST" }
-          : s,
-      ),
-    )
-    toast.success(`Promoted scenario: "${target.name}" to Active Forecast`)
+    try {
+      const res = await fpaApi.promoteScenario(sId, {
+        versionId: effectiveVersionId || undefined,
+        name: "Active Forecast",
+      })
+      if (!res.success) throw new Error(res.message || "Promote failed")
+      toast.success(`Promoted “${target.name}” to Active Forecast`)
+      await load()
+      void runCompare()
+    } catch (err) {
+      logFpaGap({
+        category: "broken",
+        path: `/v1/fpa/scenarios/${sId}/promote`,
+        method: "POST",
+        message: errorMessage(err),
+        impact: "Promote scenario failed",
+        response: err,
+      })
+      toast.error("Could not promote scenario")
+    }
   }
 
-  // Build the comparison matrix rows with overlays
-  const tableRows = useMemo(() => {
-    const others = selectedIds.filter((id) => id !== anchorId)
-    const activeScenarios = list.filter((s) => selectedIds.includes(s.id))
+  const createScenario = async () => {
+    if (!selectedModelId) {
+      toast.error("Select a model first")
+      return
+    }
+    const name = window.prompt("New scenario name")
+    if (!name?.trim()) return
+    try {
+      const res = await fpaApi.createScenario({
+        modelId: selectedModelId,
+        name: name.trim(),
+        scenarioType: "WHAT_IF",
+      })
+      if (!res.success || !res.data) throw new Error(res.message || "Create failed")
+      toast.success(`Created scenario “${res.data.name}”`)
+      await load()
+      if (res.data.id) setSelectedIds((prev) => [...prev, res.data!.id])
+    } catch (err) {
+      logFpaGap({
+        category: "broken",
+        path: "/v1/fpa/scenarios",
+        method: "POST",
+        message: errorMessage(err),
+        impact: "Create scenario failed",
+        response: err,
+      })
+      toast.error("Could not create scenario")
+    }
+  }
 
-    return CANONICAL_METRICS.map((m) => {
-      const byScenario: ScenarioValues = {}
-      for (const sId of selectedIds) {
-        const s = list.find((x) => x.id === sId)
-        const name = s?.name || sId
-        const value = getScenarioMockValues(name)?.[m.code] ?? null
-        byScenario[sId] = value
-      }
-
-      const anchorVal = byScenario[anchorId || ""]
-      const primaryOther = others[0]
-      const otherVal = primaryOther != null ? byScenario[primaryOther] : null
-      let varianceAbs: number | null = null
-      let variancePct: number | null = null
-
-      if (anchorVal != null && otherVal != null) {
-        varianceAbs = otherVal - anchorVal
-        variancePct = anchorVal !== 0 ? (varianceAbs / Math.abs(anchorVal)) * 100 : null
-      }
-
-      return {
-        code: m.code,
-        label: m.label,
-        isPct: "pct" in m && m.pct,
-        isCount: "count" in m && m.count,
-        byScenario,
-        varianceAbs,
-        variancePct,
-      }
-    })
-  }, [list, selectedIds, anchorId])
-
-  // Filtered rows for Metric Table Search
   const filteredRows = useMemo(() => {
     return tableRows.filter((r) => r.label.toLowerCase().includes(searchQuery.toLowerCase()))
   }, [tableRows, searchQuery])
-
-  // Process driver assumptions visually for range tracks
-  const assumptionMatrix = useMemo(() => {
-    const driverList = [
-      { name: "Revenue Growth", unit: "% YoY" },
-      { name: "Price Change", unit: "% YoY" },
-      { name: "Volume Growth", unit: "% YoY" },
-      { name: "Opex Growth", unit: "% YoY" },
-      { name: "Tax Rate", unit: "%" },
-      { name: "FX Rate (USD/EUR)", unit: "" },
-    ]
-
-    const activeScenarios = list.filter((s) => selectedIds.includes(s.id))
-
-    return driverList.map((driver) => {
-      const byScenario: Record<string, string> = {}
-      const valMap = DEMO_ASSUMPTIONS[driver.name]
-
-      for (const s of activeScenarios) {
-        let rawVal: number | undefined
-        if (valMap) {
-          rawVal = valMap[s.name]
-          if (rawVal === undefined) {
-            for (const [k, v] of Object.entries(valMap)) {
-              if (s.name.toLowerCase().includes(k.toLowerCase().split(" ")[0])) {
-                rawVal = v
-                break
-              }
-            }
-          }
-        }
-        let valStr = "—"
-        if (rawVal !== undefined) {
-          valStr = driver.unit.includes("%")
-            ? `${rawVal.toFixed(1)}%`
-            : rawVal.toFixed(2)
-          if (rawVal < 0 && driver.unit.includes("%")) {
-            valStr = `(${Math.abs(rawVal).toFixed(1)}%)`
-          }
-        }
-        byScenario[s.id] = valStr
-      }
-
-      return {
-        name: driver.name,
-        unit: driver.unit || null,
-        byScenario,
-      }
-    })
-  }, [list, selectedIds])
 
   const openWaterfallConfig = () => {
     setTempWaterfallBars([...waterfallBars])
@@ -342,31 +358,35 @@ export function FpaScenarioComparison() {
   }
 
   const saveWaterfallConfig = () => {
-    // Dynamic recalculation of the bridge final sum
     const nextBars = [...tempWaterfallBars]
+    if (nextBars.length < 2) {
+      setIsWaterfallModalOpen(false)
+      return
+    }
     const budgetVal = nextBars[0].value
     const adjustments = nextBars.slice(1, -1)
     const finalVal = adjustments.reduce((acc, curr) => acc + curr.value, budgetVal)
-
     nextBars[nextBars.length - 1] = {
       ...nextBars[nextBars.length - 1],
       value: Number(finalVal.toFixed(1)),
       displayValue: `${finalVal.toFixed(1)}M`,
     }
-
-    // Format display values
-    const finalFormatted = nextBars.map((bar, idx) => {
+    const finalFormatted = nextBars.map((bar) => {
       if (bar.type === "total") return bar
       return {
         ...bar,
-        displayValue: bar.value >= 0 ? `+${bar.value.toFixed(1)}M` : `(${Math.abs(bar.value).toFixed(1)}M)`,
+        displayValue:
+          bar.value >= 0 ? `+${bar.value.toFixed(1)}M` : `(${Math.abs(bar.value).toFixed(1)}M)`,
       }
     })
-
     setWaterfallBars(finalFormatted)
     setIsWaterfallModalOpen(false)
-    toast.success("Waterfall bridge updated successfully")
+    toast.message("Local waterfall preview updated", {
+      description: "Server bridge refreshes on the next compare call.",
+    })
   }
+
+  void metricUnit
 
   return (
     <div className="min-h-full bg-[#f1f5f9] flex flex-col w-full">
@@ -387,7 +407,7 @@ export function FpaScenarioComparison() {
             >
               Select All
             </Button>
-            <Button variant="gradient-info" className="rounded-full h-9 px-4 text-xs shadow-sm" onClick={() => toast.message("Create scenario", { description: "Opens model builder scenario wizard" })}>
+            <Button variant="gradient-info" className="rounded-full h-9 px-4 text-xs shadow-sm" onClick={() => void createScenario()}>
               <Plus className="size-3.5" />
               New Scenario
             </Button>
@@ -398,7 +418,7 @@ export function FpaScenarioComparison() {
       <div className="p-4 sm:p-5 space-y-4 w-full flex-1">
         {!selectedModelId ? (
           <p className="text-sm text-[#667085]">
-            Select a model in the global header to load live scenario data. Showing SRD demo scenarios below.
+            Select a model in the global header to load live scenario data.
           </p>
         ) : null}
         {(selectedModelId || list.length > 0) && !loading ? (
@@ -407,7 +427,7 @@ export function FpaScenarioComparison() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <h3 className="text-[14px] font-semibold text-[#101828]">Available Planning Scenarios</h3>
-                <span className="text-[11px] text-[#667085]">{selectedIds.length} selected · {list.length} total (SRD set)</span>
+                <span className="text-[11px] text-[#667085]">{selectedIds.length} selected · {list.length} total</span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 {list.map((s) => {
@@ -444,7 +464,7 @@ export function FpaScenarioComparison() {
                       <div className="flex items-center justify-between border-t border-[#f2f4f7] pt-2.5 mt-4" onClick={(e) => e.stopPropagation()}>
                         <button
                           type="button"
-                          onClick={() => duplicateScenario(s.id)}
+                          onClick={() => void duplicateScenario(s.id)}
                           className="text-[10.5px] font-semibold text-[#2563eb] hover:underline inline-flex items-center gap-0.5"
                         >
                           <Copy className="w-2.5 h-2.5" /> Duplicate
@@ -452,7 +472,7 @@ export function FpaScenarioComparison() {
                         {!s.name.includes("Forecast") && (
                           <button
                             type="button"
-                            onClick={() => promoteScenario(s.id)}
+                            onClick={() => void promoteScenario(s.id)}
                             className="text-[10.5px] font-semibold text-[#2563eb] hover:underline inline-flex items-center gap-0.5"
                           >
                             <ArrowUpRight className="w-2.5 h-2.5" /> Promote
@@ -704,18 +724,29 @@ export function FpaScenarioComparison() {
                     </tr>
                   </thead>
                   <tbody>
-                    {mockSensitivity.map((row) => (
+                    {(sensitivityRows.length ? sensitivityRows : []).map((row) => (
                       <tr
-                        key={row.driver}
+                        key={row.driverCode || row.driverName}
                         className="border-t border-[#f2f4f7] hover:bg-[#f9fafb] cursor-pointer"
-                        onClick={() => toast.message(row.driver, { description: `Low ${row.low} · Base ${row.mid} · High ${row.high}` })}
+                        onClick={() =>
+                          toast.message(row.driverName, {
+                            description: `Low ${row.low} · Base ${row.base} · High ${row.high}`,
+                          })
+                        }
                       >
-                        <td className="px-4 py-3 font-medium text-[#101828]">{row.driver}</td>
+                        <td className="px-4 py-3 font-medium text-[#101828]">{row.driverName}</td>
                         <td className="px-4 py-3 text-right tabular-nums text-[#f04438]">{row.low}</td>
-                        <td className="px-4 py-3 text-right tabular-nums text-[#667085]">{row.mid}</td>
+                        <td className="px-4 py-3 text-right tabular-nums text-[#667085]">{row.base}</td>
                         <td className="px-4 py-3 text-right tabular-nums text-[#12b76a]">{row.high}</td>
                       </tr>
                     ))}
+                    {!sensitivityRows.length ? (
+                      <tr>
+                        <td colSpan={4} className="px-4 py-6 text-center text-[12px] text-[#94a3b8]">
+                          Sensitivity rows appear when the compare API returns them.
+                        </td>
+                      </tr>
+                    ) : null}
                   </tbody>
                 </table>
               </div>
@@ -804,7 +835,21 @@ function WaterfallChart({ bars }: { bars: Array<{ label: string; value: number; 
   const h = 180
   const chartHeight = h - margin.top - margin.bottom
   const barWidth = 38
-  const spacing = (w - margin.left - margin.right - bars.length * barWidth) / (bars.length - 1)
+
+  // Empty state — compare API returned no waterfall bridge for this selection.
+  // (Without this guard, bars[0].value throws and the error boundary blanks the page.)
+  if (!bars.length) {
+    return (
+      <p className="text-[12px] text-[#94a3b8] text-center px-4">
+        Waterfall data will appear when the compare API returns a bridge for this selection.
+      </p>
+    )
+  }
+
+  const spacing =
+    bars.length > 1
+      ? (w - margin.left - margin.right - bars.length * barWidth) / (bars.length - 1)
+      : 0
 
   const startValue = bars[0].value
   let current = startValue

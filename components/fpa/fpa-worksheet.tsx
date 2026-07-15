@@ -43,6 +43,7 @@ import {
   type FpaGridValidation,
   type FpaLineItem,
   type FpaModel,
+  type FpaPlanningSummary,
 } from "@/lib/api/fpa-api"
 import { usersApi, type AppUser } from "@/lib/api/users-api"
 import { useAppDispatch, useAppSelector } from "@/lib/store"
@@ -58,7 +59,6 @@ import { useFpaPermissions } from "@/lib/hooks/useFpaPermissions"
 import { departmentApiService } from "@/lib/api/department-api"
 import {
   formatCashRunway,
-  DEMO_COMPARE_KPIS,
   PlanningWorkspaceChrome,
   PlanningWorkspaceInsights,
   PlanningWorkspaceKpiStrip,
@@ -343,6 +343,7 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
   const [collabReloadKey, setCollabReloadKey] = useState(0)
   const [compareScenarioIds, setCompareScenarioIds] = useState<string[]>([])
   const [compareKpis, setCompareKpis] = useState<PlanningKpi[]>([])
+  const [planningSummary, setPlanningSummary] = useState<FpaPlanningSummary | null>(null)
 
   const [loading, setLoading] = useState(true)
   const [model, setModel] = useState<FpaModel | null>(null)
@@ -475,6 +476,23 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
   ])
 
   const planningKpis = useMemo((): PlanningKpi[] => {
+    if (planningSummary?.kpis?.length) {
+      return planningSummary.kpis.map((k) => ({
+        label: k.label,
+        value: k.displayValue || (k.unit === "PERCENT"
+          ? `${asNumber(k.value).toFixed(1)}%`
+          : k.unit === "MONTHS"
+            ? formatCashRunway(asNumber(k.value))
+            : formatMoney(k.value) || "—"),
+        delta:
+          k.deltaPct != null
+            ? `${k.up === false ? "▼" : "▲"} ${Math.abs(asNumber(k.deltaPct)).toFixed(1)}%${k.deltaLabel ? ` ${k.deltaLabel}` : ""}`
+            : undefined,
+        deltaTone: k.up === false ? "down" : k.up ? "up" : "neutral",
+        spark: k.sparkline,
+        sparkColor: "#2563eb",
+      }))
+    }
     const k = dashboard?.kpis as
       | {
           revenue?: number
@@ -535,7 +553,7 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
         sparkColor: "#16a34a",
       },
     ]
-  }, [dashboard?.kpis])
+  }, [planningSummary, dashboard?.kpis])
 
   const driverRows = useMemo((): PlanningDriverRow[] => {
     return planningDrivers.map((d) => ({
@@ -548,6 +566,13 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
   }, [planningDrivers])
 
   const trendPoints = useMemo((): PlanningTrendPoint[] => {
+    if (planningSummary?.trend?.length) {
+      return planningSummary.trend.map((t) => ({
+        label: t.label || t.period,
+        revenueActual: t.actual ?? undefined,
+        revenuePlan: t.plan ?? undefined,
+      }))
+    }
     if (!lineItems.length || !cells.length || !gridPeriods.length) return []
     const findLi = (re: RegExp) =>
       lineItems.find((li) => re.test(li.name) || re.test(li.code || ""))
@@ -611,12 +636,29 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
         opexPlan: opexScaled,
       }
     })
-  }, [lineItems, cells, gridPeriods, actualCutoff])
+  }, [planningSummary, lineItems, cells, gridPeriods, actualCutoff])
 
-  const workflowSteps = useMemo(
-    () => mapCycleWorkflow(activeCycleDetail),
-    [activeCycleDetail],
-  )
+  const workflowSteps = useMemo((): PlanningWorkflowStep[] => {
+    if (planningSummary?.workflowSteps?.length) {
+      return planningSummary.workflowSteps.map((s) => {
+        const st = String(s.status || "").toUpperCase()
+        const status: PlanningWorkflowStep["status"] =
+          st === "COMPLETE" || st === "DONE"
+            ? "done"
+            : st === "IN_PROGRESS" || st === "ACTIVE"
+              ? "active"
+              : "pending"
+        return {
+          id: s.id,
+          label: s.name,
+          status,
+          actor: s.stage || "",
+          when: s.percent != null ? `${s.percent}%` : "",
+        }
+      })
+    }
+    return mapCycleWorkflow(activeCycleDetail)
+  }, [planningSummary, activeCycleDetail])
 
   const viewByLabel = useMemo(() => {
     if (budgetDepartmentName) return budgetDepartmentName
@@ -676,8 +718,81 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
         else setPlanningDrivers([])
       })
       .catch(() => setPlanningDrivers([]))
+
+    if (!selectedVersionId || !selectedScenarioId) {
+      setPlanningSummary(null)
+      return
+    }
+    let cancelled = false
+    void fpaApi
+      .getPlanningSummary(modelId, {
+        versionId: selectedVersionId,
+        scenarioId: selectedScenarioId,
+      })
+      .then((res) => {
+        if (cancelled) return
+        if (res.success && res.data) setPlanningSummary(res.data)
+        else {
+          setPlanningSummary(null)
+          if (!res.success) {
+            logFpaGap({
+              category: "missing",
+              path: `/v1/fpa/models/${modelId}/planning-summary`,
+              method: "GET",
+              message: res.message || "Planning summary unavailable",
+              impact: "KPI strip falls back to home dashboard",
+            })
+          }
+        }
+      })
+      .catch((err) => {
+        if (cancelled) return
+        setPlanningSummary(null)
+        logFpaGap({
+          category: "broken",
+          path: `/v1/fpa/models/${modelId}/planning-summary`,
+          method: "GET",
+          message: errorMessage(err),
+          impact: "KPI strip falls back to home dashboard",
+          response: err,
+        })
+      })
+    return () => {
+      cancelled = true
+    }
   }, [modelId, selectedVersionId, selectedScenarioId, dispatch])
 
+  const reloadPlanningShell = useCallback(() => {
+    void dispatch(bootstrapFpaSelection(modelId))
+    void dispatch(
+      fetchFpaDashboard({
+        modelId,
+        versionId: selectedVersionId || undefined,
+      }),
+    )
+    void fpaApi
+      .listDrivers({
+        modelId,
+        versionId: selectedVersionId || undefined,
+        scenarioId: selectedScenarioId || undefined,
+      })
+      .then((res) => {
+        if (res.success) setPlanningDrivers(res.data || [])
+      })
+      .catch(() => {})
+    if (selectedVersionId && selectedScenarioId) {
+      void fpaApi
+        .getPlanningSummary(modelId, {
+          versionId: selectedVersionId,
+          scenarioId: selectedScenarioId,
+        })
+        .then((res) => {
+          if (res.success && res.data) setPlanningSummary(res.data)
+        })
+        .catch(() => {})
+    }
+    setCollabReloadKey((k) => k + 1)
+  }, [dispatch, modelId, selectedVersionId, selectedScenarioId])
   useEffect(() => {
     let cancelled = false
     void (async () => {
@@ -871,16 +986,6 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
       return { id: a.id, when: a.when, text: a.text, status }
     })
   }, [collabActivity])
-
-  const reloadPlanningShell = useCallback(() => {
-    void dispatch(
-      fetchFpaDashboard({
-        modelId,
-        versionId: selectedVersionId || undefined,
-      }),
-    )
-    setCollabReloadKey((k) => k + 1)
-  }, [dispatch, modelId, selectedVersionId])
 
   const onDriverSave = useCallback(
     async (id: string, value: number) => {
@@ -1978,7 +2083,6 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
               <PlanningWorkspaceKpiStrip
                 kpis={compareKpis}
                 currency={currency}
-                demoFallback={DEMO_COMPARE_KPIS}
                 showFooter={false}
                 onRefresh={reloadPlanningShell}
               />

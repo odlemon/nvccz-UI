@@ -1,0 +1,104 @@
+[explore] opening /login
+[explore] after-login URL: http://localhost:3000/
+[explore] navigating -> /forecasting
+[explore]   [forecasting] title="Arcus - Investment ERP" heading="FP&A Home" bodyLen=2453
+[explore] navigating -> /forecasting/models
+[explore]   [models] title="" heading="Server Error" bodyLen=0
+[explore] navigating -> /forecasting/scenarios
+[explore]   [scenarios] title="Arcus - Investment ERP" heading="Scenarios" bodyLen=1416
+[explore] no /worksheet link found on models page
+
+===== EXPLORATION REPORT =====
+After-login URL: http://localhost:3000/
+
+-- API calls seen --
+200 POST https://dev-api.arcus.co.zw/api/auth/login
+200 GET https://dev-api.arcus.co.zw/api/users/cmislgonq0001unfkpukqyiah
+200 GET https://dev-api.arcus.co.zw/api/homepage/notifications?limit=50&offset=0
+200 GET https://dev-api.arcus.co.zw/api/exchange-rate-display/widget?context=GENERIC&from=USD&to=ZWG
+200 GET https://newsdata.io/api/1/latest?apikey=pub_593f3f328cd54e43b55ccfb18adfd9e8&q=Zimbabwe&language=en
+200 GET https://api.currencyfreaks.com/v2.0/rates/latest?apikey=953b77c417de4ecb8532656e79132541
+200 GET https://widget-sheriff.tradingview-widget.com/sheriff/api/v1/rules/search?origin=http%3A%2F%2Flocalhost%3A3000
+200 GET https://widget-sheriff.tradingview-widget.com/sheriff/api/v1/rules/search?origin=http%3A%2F%2Flocalhost%3A3000
+200 GET https://dev-api.arcus.co.zw/api/homepage/notifications?limit=50&offset=0
+200 GET https://randomuser.me/api/portraits/men/22.jpg
+200 GET https://dev-api.arcus.co.zw/api/v1/fpa/models
+200 GET https://randomuser.me/api/portraits/women/44.jpg
+200 GET https://randomuser.me/api/portraits/men/32.jpg
+200 GET https://randomuser.me/api/portraits/women/68.jpg
+200 GET https://randomuser.me/api/portraits/men/75.jpg
+200 GET https://dev-api.arcus.co.zw/api/v1/fpa/models/cmriumdfwef94e1434fe0d35b
+200 GET http://localhost:3000/forecasting/models
+200 GET http://localhost:3000/_next/static/chunks/app/forecasting/models/page.js
+200 GET https://dev-api.arcus.co.zw/api/v1/fpa/models
+200 GET https://dev-api.arcus.co.zw/api/homepage/notifications?limit=50&offset=0
+200 GET https://dev-api.arcus.co.zw/api/v1/fpa/models/cmriumdfwef94e1434fe0d35b
+500 GET http://localhost:3000/forecasting/models/cmriumdfwef94e1434fe0d35b/worksheet?_rsc=mtild
+500 GET http://localhost:3000/forecasting/models/cmriumdfwef94e1434fe0d35b/worksheet
+200 GET http://localhost:3000/forecasting/scenarios
+200 GET http://localhost:3000/_next/static/chunks/app/forecasting/scenarios/page.js
+200 GET https://dev-api.arcus.co.zw/api/homepage/notifications?limit=50&offset=0
+200 GET https://dev-api.arcus.co.zw/api/v1/fpa/models
+200 GET https://dev-api.arcus.co.zw/api/v1/fpa/models
+200 GET https://dev-api.arcus.co.zw/api/v1/fpa/models/cmriumdfwef94e1434fe0d35b
+200 GET https://dev-api.arcus.co.zw/api/v1/fpa/models/cmriumdfwef94e1434fe0d35b
+200 GET https://dev-api.arcus.co.zw/api/v1/fpa/scenarios?modelId=cmriumdfwef94e1434fe0d35b
+200 GET https://dev-api.arcus.co.zw/api/v1/fpa/scenarios?modelId=cmriumdfwef94e1434fe0d35b
+200 POST https://dev-api.arcus.co.zw/api/v1/fpa/scenarios/cmriumdj6be6b301ecd70d51e/compare
+200 POST https://dev-api.arcus.co.zw/api/v1/fpa/scenarios/cmriumdj6be6b301ecd70d51e/compare
+
+-- Console errors --
+Access to fetch at 'http://ss8008o44k04k0kogoskcsg8.31.220.82.129.sslip.io/api/zse/top-losers' from origin 'http://localhost:3000' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.
+Failed to load resource: net::ERR_FAILED
+Error fetching top losers: TypeError: Failed to fetch
+    at fetchTopLosers (webpack-internal:///(app-pages-browser)/./lib/api/financial-data.ts:121:32)
+    at eval (webpack-internal:///(app-pages-browser)/./lib/store/slices/financialDataSlice.ts:96:89)
+    at eval (webpack-internal:///(app-pages-br
+Access to fetch at 'http://ss8008o44k04k0kogoskcsg8.31.220.82.129.sslip.io/api/zse/market-indices' from origin 'http://localhost:3000' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.
+Failed to load resource: net::ERR_FAILED
+Error fetching market indices: TypeError: Failed to fetch
+    at fetchMarketIndices (webpack-internal:///(app-pages-browser)/./lib/api/financial-data.ts:133:32)
+    at eval (webpack-internal:///(app-pages-browser)/./lib/store/slices/financialDataSlice.ts:105:93)
+    at eval (webpack-internal:///(app
+Access to fetch at 'http://ss8008o44k04k0kogoskcsg8.31.220.82.129.sslip.io/api/zse/top-gainers' from origin 'http://localhost:3000' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.
+Failed to load resource: net::ERR_FAILED
+Error fetching top gainers: TypeError: Failed to fetch
+    at fetchTopGainers (webpack-internal:///(app-pages-browser)/./lib/api/financial-data.ts:109:32)
+    at eval (webpack-internal:///(app-pages-browser)/./lib/store/slices/financialDataSlice.ts:87:90)
+    at eval (webpack-internal:///(app-pages-
+Access to fetch at 'http://ss8008o44k04k0kogoskcsg8.31.220.82.129.sslip.io/api/zse/sector-indices' from origin 'http://localhost:3000' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.
+Failed to load resource: net::ERR_FAILED
+Error fetching sector indices: TypeError: Failed to fetch
+    at fetchSectorIndices (webpack-internal:///(app-pages-browser)/./lib/api/financial-data.ts:145:32)
+    at eval (webpack-internal:///(app-pages-browser)/./lib/store/slices/financialDataSlice.ts:114:93)
+    at eval (webpack-internal:///(app
+Access to fetch at 'http://ss8008o44k04k0kogoskcsg8.31.220.82.129.sslip.io/api/tradingview/african-indices' from origin 'http://localhost:3000' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.
+Failed to load resource: net::ERR_FAILED
+Error fetching African indices: TypeError: Failed to fetch
+    at fetchAfricanIndices (webpack-internal:///(app-pages-browser)/./lib/api/financial-data.ts:157:32)
+    at eval (webpack-internal:///(app-pages-browser)/./lib/store/slices/financialDataSlice.ts:123:94)
+    at eval (webpack-internal:///(a
+Access to fetch at 'http://ss8008o44k04k0kogoskcsg8.31.220.82.129.sslip.io/api/tradingview/world-indices' from origin 'http://localhost:3000' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.
+Failed to load resource: net::ERR_FAILED
+Error fetching world indices: TypeError: Failed to fetch
+    at fetchWorldIndices (webpack-internal:///(app-pages-browser)/./lib/api/financial-data.ts:169:32)
+    at eval (webpack-internal:///(app-pages-browser)/./lib/store/slices/financialDataSlice.ts:132:92)
+    at eval (webpack-internal:///(app-p
+Warning: A props object containing a "key" prop is being spread into JSX:
+  let props = %s;
+  <%s {...props} />
+React keys must be passed directly to JSX without using spread:
+  let props = %s;
+  <%s key={someKey} {...props} />%s {key: someKey, r: ..., strokeWidth: ..., fill: ..., fillOpacity: ..., 
+Warning: A props object containing a "key" prop is being spread into JSX:
+  let props = %s;
+  <%s {...props} />
+React keys must be passed directly to JSX without using spread:
+  let props = %s;
+  <%s key={someKey} {...props} />%s {key: someKey, r: ..., stroke: ..., strokeWidth: ..., strokeDasharray:
+Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+PAGEERROR: Jest worker encountered 2 child process exceptions, exceeding retry limit
+Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+
+-- Screenshots in C:\Users\lysp\Downloads\nvccz-new\qa-explore --

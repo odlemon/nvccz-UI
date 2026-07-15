@@ -1,13 +1,10 @@
-import { ModuleGuard } from "@/components/permissions/PermissionGuards"
-import { FundraisingComingSoon } from "@/components/fundraising/fundraising-coming-soon"
+﻿import { ModuleGuard } from "@/components/permissions/PermissionGuards"
+import { FundraisingSettings } from "@/components/fundraising/fundraising-settings"
 
 export default function Page() {
   return (
     <ModuleGuard moduleId="fundraising" subModuleId="fr-settings">
-      <FundraisingComingSoon
-        title="Settings"
-        description="Pipeline stages, probabilities, templates and module configuration."
-      />
+      <FundraisingSettings />
     </ModuleGuard>
   )
 }

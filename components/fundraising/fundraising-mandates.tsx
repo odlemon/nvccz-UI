@@ -18,6 +18,8 @@ import {
   X,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { Button } from "@/components/ui/button"
+import { FrMandateWizard } from "@/components/fundraising/fundraising-create-wizards"
 import {
   MANDATES,
   TOTAL_MANDATES,
@@ -30,8 +32,8 @@ import {
 const CARD =
   "rounded-[12px] border border-[#e2e8f0] bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
 
-/** Design tokens — 6px controls, 4px badges */
-const R6 = "rounded-[6px]"
+/** Design tokens — pills for controls, 4px badges */
+const R6 = "rounded-full"
 const R4 = "rounded-[4px]"
 
 const STAGE_BADGE: Record<MandateStage, string> = {
@@ -230,7 +232,7 @@ function DetailPanel({ mandate, onClose }: { mandate: MandateRow; onClose: () =>
           <button
             type="button"
             className={cn(
-              "inline-flex h-9 items-center justify-center gap-1.5 bg-[#4f46e5] px-3.5 text-xs font-medium text-white hover:bg-[#4338ca]",
+              "inline-flex h-9 items-center justify-center gap-1.5 bg-gradient-to-r from-blue-600 to-cyan-600 px-3.5 text-xs font-medium text-white shadow-sm hover:from-blue-700 hover:to-cyan-700",
               R6,
             )}
           >
@@ -441,6 +443,7 @@ export function FundraisingMandates() {
   const [selectedId, setSelectedId] = useState<string>("m1")
   const [checked, setChecked] = useState<Set<string>>(new Set())
   const [page, setPage] = useState(1)
+  const [createOpen, setCreateOpen] = useState(false)
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -477,33 +480,27 @@ export function FundraisingMandates() {
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-semibold tracking-tight text-[#0f172a] sm:text-[28px]">Mandates</h1>
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            className={cn(
-              "inline-flex h-10 items-center justify-center gap-2 border border-[#e2e8f0] bg-white px-4 text-sm font-medium text-[#334155] shadow-sm hover:bg-[#f8fafc]",
-              R6,
-            )}
-          >
+          <Button type="button" variant="outline" className="rounded-full h-10 px-6 gap-2 shadow-sm">
             <Download className="h-4 w-4" />
             Export
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-[#4f46e5] px-5 text-sm font-medium text-white shadow-sm hover:bg-[#4338ca]"
+            variant="gradient-info"
+            className="rounded-full h-10 px-6 shadow-sm font-semibold text-xs gap-2"
+            onClick={() => setCreateOpen(true)}
           >
             <Plus className="h-4 w-4" />
             Add Mandate
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
-            className={cn(
-              "inline-flex h-10 w-10 items-center justify-center border border-[#e2e8f0] bg-white text-[#64748b] shadow-sm hover:bg-[#f8fafc]",
-              R6,
-            )}
+            variant="outline"
+            className="rounded-full h-10 w-10 p-0 shadow-sm"
             aria-label="More options"
           >
             <MoreHorizontal className="h-4 w-4" />
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -765,6 +762,7 @@ export function FundraisingMandates() {
           </div>
         )}
       </div>
+      <FrMandateWizard open={createOpen} onOpenChange={setCreateOpen} />
     </div>
   )
 }

@@ -235,7 +235,7 @@ function DetailPanel({ card }: { card: BoardCard }) {
                 </div>
                 <button
                   type="button"
-                  className="rounded-md p-1 text-[#94a3b8] hover:bg-[#f1f5f9] hover:text-[#475569] shrink-0"
+                  className="rounded-full p-1 text-[#94a3b8] hover:bg-[#f1f5f9] hover:text-[#475569] shrink-0"
                   aria-label="More options"
                 >
                   <MoreHorizontal className="w-4 h-4" />
@@ -280,7 +280,7 @@ function DetailPanel({ card }: { card: BoardCard }) {
           </div>
           <button
             type="button"
-            className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-[#e2e8f0] bg-[#f8fafc] text-[#64748b] hover:bg-[#f1f5f9]"
+            className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#e2e8f0] bg-[#f8fafc] text-[#64748b] hover:bg-[#f1f5f9]"
             aria-label="Add action"
           >
             <Plus className="w-3.5 h-3.5" />
@@ -345,7 +345,13 @@ function DetailPanel({ card }: { card: BoardCard }) {
   )
 }
 
-export function FundraisingPipelineBoard({ filter }: { filter: PipelineFilter }) {
+export function FundraisingPipelineBoard({
+  filter,
+  onAddOpportunity,
+}: {
+  filter: PipelineFilter
+  onAddOpportunity?: () => void
+}) {
   const cards = useMemo(() => filterBoardCards(filter), [filter])
   const [selectedId, setSelectedId] = useState<string | null>("q1")
 
@@ -456,6 +462,7 @@ export function FundraisingPipelineBoard({ filter }: { filter: PipelineFilter })
                   <div className="px-2.5 pb-2.5 shrink-0">
                     <button
                       type="button"
+                      onClick={() => onAddOpportunity?.()}
                       className="w-full h-9 rounded-full text-xs font-medium text-[#64748b] hover:bg-white hover:text-[#334155] border border-transparent hover:border-[#e2e8f0] transition-colors inline-flex items-center justify-center gap-1"
                     >
                       <Plus className="w-3.5 h-3.5" />

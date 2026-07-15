@@ -1,13 +1,10 @@
-import { ModuleGuard } from "@/components/permissions/PermissionGuards"
-import { FundraisingComingSoon } from "@/components/fundraising/fundraising-coming-soon"
+﻿import { ModuleGuard } from "@/components/permissions/PermissionGuards"
+import { FundraisingForecasts } from "@/components/fundraising/fundraising-forecasts"
 
 export default function Page() {
   return (
     <ModuleGuard moduleId="fundraising" subModuleId="fr-forecasts">
-      <FundraisingComingSoon
-        title="Forecasts & Analytics"
-        description="Weighted pipeline, coverage ratio and expected fee revenue."
-      />
+      <FundraisingForecasts />
     </ModuleGuard>
   )
 }

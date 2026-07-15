@@ -393,14 +393,8 @@ export function PlanningWorkspaceChrome({
   const cycleOptions = cycles !== undefined ? cycles : DEMO_CYCLES
   const activeCycle = cycleId ?? localCycle
 
-  // Prefer live KPIs; fall back to design-reference strip when all empty.
-  const displayKpis = enrichKpis(
-    kpis.length && kpis.some((k) => k.value && k.value !== "—")
-      ? kpis.slice(0, 5)
-      : inCompare
-        ? DEMO_COMPARE_KPIS
-        : DEMO_KPIS,
-  )
+  // Prefer live KPIs; do not invent demo metrics when API returns empty.
+  const displayKpis = enrichKpis(kpis.length ? kpis.slice(0, 5) : [])
 
   const scenariosHref = `/forecasting/scenarios?modelId=${encodeURIComponent(modelId)}${
     versionId ? `&versionId=${encodeURIComponent(versionId)}` : ""
@@ -416,31 +410,34 @@ export function PlanningWorkspaceChrome({
   const designNames = inCompare ? COMPARE_SCENARIO_NAMES : DESIGN_SCENARIO_NAMES
 
   const scenarioTabs = useMemo(() => {
-    const byLower = new Map(
-      scenarios.map((s) => [String(s.name || "").trim().toLowerCase(), s] as const),
-    )
-    const ordered: FpaScenario[] = []
-    for (const name of designNames) {
-      const hit = byLower.get(name.toLowerCase())
-      if (hit) {
-        ordered.push(hit)
-        byLower.delete(name.toLowerCase())
-      } else {
-        ordered.push({
+    // Prefer live API scenarios only — do not invent __demo__ tabs when data exists.
+    if (scenarios.length > 0) {
+      const byLower = new Map(
+        scenarios.map((s) => [String(s.name || "").trim().toLowerCase(), s] as const),
+      )
+      const ordered: FpaScenario[] = []
+      for (const name of designNames) {
+        const hit = byLower.get(name.toLowerCase())
+        if (hit) {
+          ordered.push(hit)
+          byLower.delete(name.toLowerCase())
+        }
+      }
+      for (const s of scenarios) {
+        if (!ordered.some((o) => o.id === s.id)) ordered.push(s)
+      }
+      return ordered
+    }
+    // Empty model: show design placeholders as non-selectable demos for layout only.
+    return designNames.map(
+      (name) =>
+        ({
           id: `__demo__${name.replace(/\s+/g, "-").toLowerCase()}`,
           modelId,
           name,
           scenarioType: "CUSTOM",
-        })
-      }
-    }
-    for (const s of scenarios) {
-      const key = String(s.name || "").trim().toLowerCase()
-      if (![...designNames].some((n) => n.toLowerCase() === key)) {
-        ordered.push(s)
-      }
-    }
-    return ordered
+        }) as FpaScenario,
+    )
   }, [scenarios, modelId, designNames])
 
   const selectedCompareIds = useMemo(() => {
@@ -773,6 +770,7 @@ export function PlanningWorkspaceKpiStrip({
   viewByOptions?: Array<{ id: string; label: string }>
   onViewByChange?: (id: string) => void
   onRefresh?: () => void
+  /** @deprecated Prefer empty states over demo KPI injection. */
   demoFallback?: PlanningKpi[]
   /** When false, omit View-by controls (compare mode). */
   showFooter?: boolean
@@ -782,12 +780,8 @@ export function PlanningWorkspaceKpiStrip({
     setLocalViewBy(viewByLabel)
   }, [viewByLabel])
 
-  const fallback = demoFallback?.length ? demoFallback : DEMO_KPIS
-  const displayKpis = enrichKpis(
-    kpis.length && kpis.some((k) => k.value && k.value !== "—")
-      ? kpis.slice(0, 5)
-      : fallback,
-  )
+  void demoFallback
+  const displayKpis = enrichKpis(kpis.length ? kpis.slice(0, 5) : [])
   const viewByList =
     viewByOptions?.length
       ? viewByOptions
@@ -796,9 +790,14 @@ export function PlanningWorkspaceKpiStrip({
   return (
     <div className="rounded-lg border border-[#e4e7ec] bg-white p-3 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
-        {displayKpis.map((k) => (
-          <KpiCard key={k.label} kpi={k} />
-        ))}
+        {displayKpis.length
+          ? displayKpis.map((k) => <KpiCard key={k.label} kpi={k} />)
+          : Array.from({ length: 5 }).map((_, i) => (
+              <KpiCard
+                key={`empty-${i}`}
+                kpi={{ label: ["Revenue", "Opex", "EBITDA", "Cash Runway", "Variance to Plan"][i], value: "—" }}
+              />
+            ))}
       </div>
       {showFooter ? (
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[12px] text-[#98a2b3]">
@@ -857,22 +856,13 @@ export function PlanningWorkspaceInsights({
   Props,
   "drivers" | "canEditDrivers" | "onDriverSave" | "trendPoints" | "workflowSteps"
 >) {
-  const displayDrivers = drivers.length ? mapDrivers(drivers) : DEMO_DRIVERS
-  const driversAreDemo = !drivers.length
+  const displayDrivers = mapDrivers(drivers)
+  const driversAreDemo = false
   const displayTrend = useMemo(() => {
-    if (trendPoints.length < 2) return DEMO_TREND
-    const vals = trendPoints.flatMap((p) =>
-      [p.revenueActual, p.revenuePlan, p.opexActual, p.opexPlan].filter(
-        (n): n is number => typeof n === "number" && Number.isFinite(n),
-      ),
-    )
-    const max = vals.length ? Math.max(...vals) : 0
-    // Live grid values often land far below the design scale (e.g. 0.2M).
-    // Fall back to the reference series so the chart matches the approved look.
-    if (max < 10) return DEMO_TREND
+    if (trendPoints.length < 2) return []
     return trendPoints
   }, [trendPoints])
-  const displayWorkflow = workflowSteps?.length ? workflowSteps : DEMO_WORKFLOW
+  const displayWorkflow = workflowSteps?.length ? workflowSteps : []
 
   return (
     <div className="space-y-3">
@@ -880,7 +870,7 @@ export function PlanningWorkspaceInsights({
         <TrendChartCard points={displayTrend} />
         <DriverAssumptionsCard
           drivers={displayDrivers}
-          canEdit={driversAreDemo ? true : canEditDrivers && drivers.length > 0}
+          canEdit={canEditDrivers && drivers.length > 0}
           onSave={onDriverSave}
           demoMode={driversAreDemo}
         />
@@ -893,25 +883,18 @@ export function PlanningWorkspaceInsights({
 function enrichKpis(kpis: PlanningKpi[]): PlanningKpi[] {
   return kpis.map((k) => {
     const theme = KPI_THEMES[k.label]
-    const demo =
-      DEMO_COMPARE_KPIS.find((d) => d.label === k.label) ||
-      DEMO_KPIS.find((d) => d.label === k.label)
-    const empty = !k.value || k.value === "—"
     return {
       ...k,
-      value: empty && demo ? demo.value : k.value,
-      delta: k.delta || demo?.delta,
       spark:
         k.spark && k.spark.length > 1
           ? k.spark
           : theme?.showSpark === false
             ? undefined
-            : demo?.spark,
-      sparkColor: k.sparkColor || theme?.color || demo?.sparkColor || "#3b82f6",
+            : k.spark,
+      sparkColor: k.sparkColor || theme?.color || "#3b82f6",
       deltaTone:
         k.deltaTone ||
-        demo?.deltaTone ||
-        (k.delta?.includes("↓") ? "down" : k.delta ? "up" : "neutral"),
+        (k.delta?.includes("↓") || k.delta?.includes("▼") ? "down" : k.delta ? "up" : "neutral"),
     }
   })
 }
