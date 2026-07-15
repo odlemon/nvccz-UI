@@ -303,7 +303,10 @@ class InvestmentsApiService {
     executionPrice: number; executionCurrencyCode: string
     fees?: number
   }): Promise<InvestmentsResponse<Trade>> {
-    return apiClient.post(this.BASE_TRADES, data)
+    // Backend expects `currencyCode`, not `executionCurrencyCode` — remapped here so
+    // callers/thunks can keep using the name that matches the rest of the Trade shape.
+    const { executionCurrencyCode, ...rest } = data
+    return apiClient.post(this.BASE_TRADES, { ...rest, currencyCode: executionCurrencyCode })
   }
 
   async getTrade(id: string): Promise<InvestmentsResponse<Trade>> {

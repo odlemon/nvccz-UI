@@ -1,6 +1,5 @@
 "use client"
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -9,23 +8,26 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator"
 import { Info, Network } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { PageHeader } from "./page-header"
+import { TerminalTopbar } from "./terminal/topbar"
+import { TerminalCard } from "./terminal/card"
 
 export function RoutingConfig() {
   return (
     <div className="space-y-6 max-w-3xl">
-      <PageHeader title="Routing Configuration" subtitle="Configure broker, custodian, and settlement routing behaviour" />
+      <TerminalTopbar title="Routing Configuration" subtitle="Configure broker, custodian, and settlement routing behaviour" />
 
       {/* Broker Gateway */}
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center gap-2">
-            <Network className="w-4 h-4 text-muted-foreground" />
-            <CardTitle className="text-sm">Broker Gateway</CardTitle>
-            <Badge variant="outline" className="ml-auto text-xs">BROKER</Badge>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <TerminalCard
+        header={{
+          title: (
+            <span className="flex items-center gap-2">
+              <Network className="w-4 h-4 text-muted-foreground" /> Broker Gateway
+            </span>
+          ),
+          actions: <Badge variant="outline" className="text-xs">BROKER</Badge>,
+        }}
+      >
+        <div className="space-y-4">
           <div className="space-y-1.5">
             <Label className="text-xs">Default Broker</Label>
             <Select defaultValue="fbc_zse">
@@ -56,19 +58,21 @@ export function RoutingConfig() {
             </div>
             <Switch defaultChecked />
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </TerminalCard>
 
       {/* Custodian Network */}
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center gap-2">
-            <Network className="w-4 h-4 text-muted-foreground" />
-            <CardTitle className="text-sm">Custodian Network</CardTitle>
-            <Badge variant="outline" className="ml-auto text-xs">CUSTODIAN</Badge>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <TerminalCard
+        header={{
+          title: (
+            <span className="flex items-center gap-2">
+              <Network className="w-4 h-4 text-muted-foreground" /> Custodian Network
+            </span>
+          ),
+          actions: <Badge variant="outline" className="text-xs">CUSTODIAN</Badge>,
+        }}
+      >
+        <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5">
               <Label className="text-sm">Internal settlement mode</Label>
@@ -86,19 +90,21 @@ export function RoutingConfig() {
             <Input className="h-8 font-mono text-xs" placeholder="CUST-001" disabled />
             <p className="text-[10px] text-muted-foreground">Not required while internal settlement mode is active</p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </TerminalCard>
 
       {/* Core Banking */}
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center gap-2">
-            <Network className="w-4 h-4 text-muted-foreground" />
-            <CardTitle className="text-sm">Core Banking</CardTitle>
-            <Badge variant="outline" className="ml-auto text-xs">CORE_BANKING</Badge>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <TerminalCard
+        header={{
+          title: (
+            <span className="flex items-center gap-2">
+              <Network className="w-4 h-4 text-muted-foreground" /> Core Banking
+            </span>
+          ),
+          actions: <Badge variant="outline" className="text-xs">CORE_BANKING</Badge>,
+        }}
+      >
+        <div className="space-y-4">
           <div className="space-y-1.5">
             <Label className="text-xs">Cash Account Number</Label>
             <Input className="h-8 font-mono text-xs" defaultValue="1001-0023-004" />
@@ -107,19 +113,21 @@ export function RoutingConfig() {
             <Label className="text-xs">Hold Release Timeout (seconds)</Label>
             <Input type="number" className="h-8 font-mono text-xs" defaultValue={30} />
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </TerminalCard>
 
       {/* GL */}
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center gap-2">
-            <Network className="w-4 h-4 text-muted-foreground" />
-            <CardTitle className="text-sm">Accounting Register (GL)</CardTitle>
-            <Badge variant="outline" className="ml-auto text-xs">ACCOUNTING_GL</Badge>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <TerminalCard
+        header={{
+          title: (
+            <span className="flex items-center gap-2">
+              <Network className="w-4 h-4 text-muted-foreground" /> Accounting Register (GL)
+            </span>
+          ),
+          actions: <Badge variant="outline" className="text-xs">ACCOUNTING_GL</Badge>,
+        }}
+      >
+        <div className="space-y-4">
           <div className="space-y-1.5">
             <Label className="text-xs">Investment Asset GL Account</Label>
             <Input className="h-8 font-mono text-xs" defaultValue="1510 — Investments" />
@@ -132,8 +140,8 @@ export function RoutingConfig() {
             <Label className="text-sm">Auto-post to GL on settlement</Label>
             <Switch defaultChecked />
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </TerminalCard>
 
       <Separator />
 

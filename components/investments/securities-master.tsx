@@ -12,28 +12,20 @@ import { Switch } from "@/components/ui/switch"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, Search, Building2, Circle, Pencil, ChevronLeft, ChevronRight } from "lucide-react"
+import { Plus, Search, Pencil } from "lucide-react"
 import { toast } from "sonner"
-import { PageHeader } from "./page-header"
 import { ExchangeTag, Delta } from "./status-pills"
+import { TerminalTopbar } from "@/components/investments/terminal/topbar"
+import { TerminalStatCard } from "@/components/investments/terminal/stat-card"
+import { TerminalCard } from "@/components/investments/terminal/card"
+import { TerminalTable, TerminalThead, TerminalTr, TerminalTh, TerminalTd, TerminalEmptyRow } from "@/components/investments/terminal/data-table"
+import { TerminalStatusBadge } from "@/components/investments/terminal/status-badge"
+import { CategoryPill } from "@/components/investments/terminal/category-pill"
+import { TerminalPagination } from "@/components/investments/terminal/pagination"
 
 const PAGE_SIZE = 15
 const EXCHANGE_FILTERS = ["ALL", "ZSE", "VFEX", "SECZIM", "NYSE", "NASDAQ", "LSE"] as const
 const CURRENCIES = ["USD", "ZWG", "GBP", "EUR", "ZAR"]
-
-function Stat({ icon: Icon, label, value, tone }: { icon: any; label: string; value: string; tone?: "gain" | "muted" }) {
-  return (
-    <div className="flex items-center gap-3 rounded-xl border border-border bg-card p-4">
-      <span className={cn("flex h-9 w-9 items-center justify-center rounded-lg", tone === "gain" ? "bg-gain-muted text-gain-foreground" : "bg-accent text-accent-foreground")}>
-        <Icon className="h-4 w-4" />
-      </span>
-      <div>
-        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
-        <p className="font-mono text-lg font-semibold text-foreground">{value}</p>
-      </div>
-    </div>
-  )
-}
 
 interface SecurityFormData {
   symbol: string
@@ -79,12 +71,6 @@ export function SecuritiesMaster() {
 
   useEffect(() => { setPage(1) }, [search, exchangeFilter, onlyActive])
 
-  const pageNumbers = useMemo(() => {
-    const start = Math.max(1, safePage - 2)
-    const end = Math.min(totalPages, safePage + 2)
-    return Array.from({ length: end - start + 1 }, (_, i) => start + i)
-  }, [safePage, totalPages])
-
   const openAdd = () => { setEditTarget(null); setForm(EMPTY_FORM); setDialogOpen(true) }
   const openEdit = (e: React.MouseEvent, s: Security) => {
     e.stopPropagation()
@@ -117,28 +103,29 @@ export function SecuritiesMaster() {
 
   const activeCount = useMemo(() => securities.filter((s) => s.isActive).length, [securities])
   const exchangeCount = useMemo(() => new Set(securities.map((s) => s.exchangeCode)).size, [securities])
+  const currencyCount = useMemo(() => new Set(securities.map((s) => s.listingCurrencyCode)).size, [securities])
 
   return (
     <div className="space-y-5">
-      <PageHeader
-        title="Securities Master"
+      <TerminalTopbar
+        title="Instruments"
         subtitle="Reference data for every tradable instrument across connected exchanges"
         actions={
-          <button onClick={openAdd} className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:opacity-90">
-            <Plus className="h-4 w-4" /> Add Security
-          </button>
+          <Button size="pill" onClick={openAdd}>
+            <Plus className="h-3.5 w-3.5" /> Add Security
+          </Button>
         }
       />
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <Stat icon={Building2} label="Total instruments" value={String(securities.length)} />
-        <Stat icon={Circle} label="Active" value={String(activeCount)} tone="gain" />
-        <Stat icon={Circle} label="Inactive" value={String(securities.length - activeCount)} />
-        <Stat icon={Building2} label="Exchanges" value={String(exchangeCount)} />
+        <TerminalStatCard label="Total" value={String(securities.length)} subValue="Instruments in master" />
+        <TerminalStatCard label="Active" value={String(activeCount)} subValue={`${securities.length - activeCount} inactive`} />
+        <TerminalStatCard label="Exchanges Covered" value={String(exchangeCount)} subValue="Connected venues" />
+        <TerminalStatCard label="Currencies Covered" value={String(currencyCount)} subValue="Listing currencies" />
       </div>
 
       {/* Toolbar */}
-      <div className="flex flex-col gap-3 rounded-xl border border-border bg-card p-3 lg:flex-row lg:items-center">
+      <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-3 lg:flex-row lg:items-center">
         <div className="relative flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <input
@@ -148,18 +135,14 @@ export function SecuritiesMaster() {
             className="h-9 w-full rounded-lg border border-border bg-background pl-9 pr-3 text-sm outline-none focus:border-primary"
           />
         </div>
-        <div className="flex items-center gap-1 overflow-x-auto">
+        <div className="flex items-center gap-1.5 overflow-x-auto">
           {EXCHANGE_FILTERS.map((ex) => (
-            <button
+            <CategoryPill
               key={ex}
+              label={ex === "ALL" ? "All venues" : ex}
+              active={exchangeFilter === ex}
               onClick={() => setExchangeFilter(ex)}
-              className={cn(
-                "whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
-                exchangeFilter === ex ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {ex === "ALL" ? "All venues" : ex}
-            </button>
+            />
           ))}
         </div>
         <label className="flex shrink-0 cursor-pointer items-center gap-2 text-xs font-medium text-muted-foreground">
@@ -170,97 +153,68 @@ export function SecuritiesMaster() {
 
       {/* Table */}
       {securitiesLoading ? (
-        <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+        <div className="rounded-2xl border border-border bg-card p-4 space-y-3">
           {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-10 w-full rounded-lg" />)}
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-border bg-card">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] text-sm">
-              <thead>
-                <tr className="border-b border-border bg-muted/40 text-[11px] uppercase tracking-wide text-muted-foreground">
-                  <th className="px-4 py-3 text-left font-medium">Symbol</th>
-                  <th className="px-4 py-3 text-left font-medium">Name</th>
-                  <th className="px-4 py-3 text-center font-medium">Exchange</th>
-                  <th className="px-4 py-3 text-center font-medium">Currency</th>
-                  <th className="px-4 py-3 text-left font-medium hidden lg:table-cell">ISIN</th>
-                  <th className="px-4 py-3 text-right font-medium">Last price</th>
-                  <th className="px-4 py-3 text-right font-medium">Chg%</th>
-                  <th className="px-4 py-3 text-center font-medium">Status</th>
-                  <th className="px-4 py-3" />
-                </tr>
-              </thead>
-              <tbody>
-                {paginated.map((s) => {
-                  const tick = latestPrices[s.symbol] ?? latestPrices[s.id]
-                  const change = priceChange(tick)
-                  return (
-                    <tr key={s.id} onClick={() => openPriceDrawer(s)} className="group cursor-pointer border-b border-border/60 last:border-0 hover:bg-muted/40">
-                      <td className="px-4 py-3">
-                        <span className="font-mono text-xs font-semibold text-foreground">{s.symbol}</span>
-                      </td>
-                      <td className="px-4 py-3 text-foreground">{s.name}</td>
-                      <td className="px-4 py-3 text-center">
-                        <ExchangeTag exchange={s.exchangeCode} />
-                      </td>
-                      <td className="px-4 py-3 text-center font-mono text-xs text-muted-foreground">{s.listingCurrencyCode}</td>
-                      <td className="px-4 py-3 font-mono text-xs text-muted-foreground hidden lg:table-cell">{s.isin ?? "—"}</td>
-                      <td className="px-4 py-3 text-right font-mono tabular-nums text-foreground">
-                        {tick ? change.price?.toFixed(4) : <span className="text-muted-foreground">—</span>}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        {tick ? <Delta value={change.pct} direction={change.direction} className="text-xs" /> : <span className="text-muted-foreground">—</span>}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium", s.isActive ? "bg-gain-muted text-gain-foreground" : "bg-muted text-muted-foreground")}>
-                          <span className={cn("h-1.5 w-1.5 rounded-full", s.isActive ? "bg-gain" : "bg-muted-foreground")} />
-                          {s.isActive ? "Active" : "Inactive"}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <button
-                          onClick={(e) => openEdit(e, s)}
-                          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground group-hover:opacity-100"
-                          aria-label={`Edit ${s.symbol}`}
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>
-                      </td>
-                    </tr>
-                  )
-                })}
-                {filtered.length === 0 && (
-                  <tr>
-                    <td colSpan={9} className="px-4 py-16 text-center text-sm text-muted-foreground">No securities match your filters</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+        <TerminalCard noPadding bodyClassName="overflow-x-auto">
+          <TerminalTable className="min-w-[900px]">
+            <TerminalThead>
+              <TerminalTr>
+                <TerminalTh>Symbol</TerminalTh>
+                <TerminalTh>Name</TerminalTh>
+                <TerminalTh align="center">Exchange</TerminalTh>
+                <TerminalTh align="center">Currency</TerminalTh>
+                <TerminalTh className="hidden lg:table-cell">ISIN</TerminalTh>
+                <TerminalTh align="right">Last price</TerminalTh>
+                <TerminalTh align="right">Chg%</TerminalTh>
+                <TerminalTh align="center">Status</TerminalTh>
+                <TerminalTh />
+              </TerminalTr>
+            </TerminalThead>
+            <tbody>
+              {paginated.map((s) => {
+                const tick = latestPrices[s.symbol] ?? latestPrices[s.id]
+                const change = priceChange(tick)
+                return (
+                  <TerminalTr key={s.id} clickable onClick={() => openPriceDrawer(s)} className="group">
+                    <TerminalTd mono className="font-semibold">{s.symbol}</TerminalTd>
+                    <TerminalTd>{s.name}</TerminalTd>
+                    <TerminalTd align="center"><ExchangeTag exchange={s.exchangeCode} /></TerminalTd>
+                    <TerminalTd align="center" mono className="text-muted-foreground">{s.listingCurrencyCode}</TerminalTd>
+                    <TerminalTd mono className="hidden text-muted-foreground lg:table-cell">{s.isin ?? "—"}</TerminalTd>
+                    <TerminalTd align="right" mono>
+                      {tick ? change.price?.toFixed(4) : <span className="text-muted-foreground">—</span>}
+                    </TerminalTd>
+                    <TerminalTd align="right">
+                      {tick ? <Delta value={change.pct} direction={change.direction} className="text-xs" /> : <span className="text-muted-foreground">—</span>}
+                    </TerminalTd>
+                    <TerminalTd align="center">
+                      <TerminalStatusBadge status={s.isActive ? "ACTIVE" : "INACTIVE"} />
+                    </TerminalTd>
+                    <TerminalTd align="right">
+                      <button
+                        onClick={(e) => openEdit(e, s)}
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground group-hover:opacity-100"
+                        aria-label={`Edit ${s.symbol}`}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                    </TerminalTd>
+                  </TerminalTr>
+                )
+              })}
+              {filtered.length === 0 && <TerminalEmptyRow colSpan={9}>No securities match your filters</TerminalEmptyRow>}
+            </tbody>
+          </TerminalTable>
 
           {totalPages > 1 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t border-border bg-muted/20">
+            <div className="flex items-center justify-between border-t border-border px-4 py-3">
               <p className="text-xs text-muted-foreground">Page {safePage} of {totalPages} · {filtered.length} securities</p>
-              <div className="flex items-center gap-1">
-                <button disabled={safePage <= 1} onClick={() => setPage((p) => p - 1)} className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border bg-card disabled:opacity-40">
-                  <ChevronLeft className="w-3 h-3" />
-                </button>
-                {pageNumbers.map((n) => (
-                  <button
-                    key={n}
-                    onClick={() => setPage(n)}
-                    className={cn("inline-flex h-7 w-7 items-center justify-center rounded-full text-xs", safePage === n ? "bg-primary text-primary-foreground" : "border border-border bg-card text-foreground")}
-                  >
-                    {n}
-                  </button>
-                ))}
-                <button disabled={safePage >= totalPages} onClick={() => setPage((p) => p + 1)} className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border bg-card disabled:opacity-40">
-                  <ChevronRight className="w-3 h-3" />
-                </button>
-              </div>
+              <TerminalPagination page={safePage} totalPages={totalPages} onPageChange={setPage} />
             </div>
           )}
-        </div>
+        </TerminalCard>
       )}
 
       {/* Add / Edit dialog */}
@@ -305,7 +259,7 @@ export function SecuritiesMaster() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-            <Button className="gradient-primary text-white" onClick={handleSave} disabled={saving || !form.symbol || !form.name}>
+            <Button onClick={handleSave} disabled={saving || !form.symbol || !form.name}>
               {saving ? "Saving…" : editTarget ? "Update" : "Add Security"}
             </Button>
           </DialogFooter>

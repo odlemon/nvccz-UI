@@ -6,7 +6,7 @@ let socket: Socket | null = null
 const getWebSocketUrl = (): string => {
   const wsUrl = process.env.NEXT_PUBLIC_WS_URL
   if (wsUrl) return wsUrl
-  const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3009/api"
+  const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://31.220.82.129:3009/api"
   return apiUrl.replace(/\/api\/?$/, "")
 }
 

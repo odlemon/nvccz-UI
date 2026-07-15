@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import type { ValidationQueueItem } from "@/lib/api/investments-api"
 import { ExchangeTag } from "./status-pills"
+import { TerminalStatusBadge } from "@/components/investments/terminal/status-badge"
+import { TerminalCard } from "@/components/investments/terminal/card"
 
 interface ValidationItemCardProps {
   item: ValidationQueueItem
@@ -17,11 +19,11 @@ interface ValidationItemCardProps {
   onRejectSubmit: () => void
 }
 
-function severity(dev: number) {
+function severity(dev: number): { label: string; variant: "red" | "yellow" | "blue" } {
   const a = Math.abs(dev)
-  if (a >= 20) return { label: "Critical", cls: "bg-loss-muted text-loss-foreground ring-loss/30" }
-  if (a >= 10) return { label: "High", cls: "bg-warn-muted text-warn-foreground ring-warn/30" }
-  return { label: "Moderate", cls: "bg-accent text-accent-foreground ring-primary/20" }
+  if (a >= 20) return { label: "Critical", variant: "red" }
+  if (a >= 10) return { label: "High", variant: "yellow" }
+  return { label: "Moderate", variant: "blue" }
 }
 
 export function ValidationItemCard({
@@ -31,7 +33,7 @@ export function ValidationItemCard({
   const up = item.deviation_percent >= 0
 
   return (
-    <div className="rounded-2xl border border-border bg-card p-5">
+    <TerminalCard bodyClassName="p-5">
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-2">
           <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-warn-muted text-warn-foreground">
@@ -47,7 +49,7 @@ export function ValidationItemCard({
             </p>
           </div>
         </div>
-        <span className={cn("rounded-md px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset", sev.cls)}>{sev.label}</span>
+        <TerminalStatusBadge status={sev.label} variant={sev.variant} />
       </div>
 
       {/* Price comparison */}
@@ -100,6 +102,6 @@ export function ValidationItemCard({
           </button>
         </div>
       )}
-    </div>
+    </TerminalCard>
   )
 }

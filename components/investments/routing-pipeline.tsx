@@ -54,11 +54,11 @@ function CompactNode({ hop, onRetry }: { hop: PipelineHop; onRetry?: (hopId: str
           {hop.confirmedAt && <p>Confirmed: {new Date(hop.confirmedAt).toLocaleString()}</p>}
           {hop.attemptCount != null && <p>Attempts: {hop.attemptCount}</p>}
           {hop.externalRef && <p>Ref: {hop.externalRef}</p>}
-          {hop.lastError && <p className="text-red-400">{hop.lastError}</p>}
+          {hop.lastError && <p className="text-loss">{hop.lastError}</p>}
           {hop.payloadRef && (
             <details>
-              <summary className="cursor-pointer text-slate-400 hover:text-slate-200">View payload</summary>
-              <pre className="mt-1 text-[10px] bg-slate-800 p-1 rounded overflow-x-auto max-h-32 break-all whitespace-pre-wrap">
+              <summary className="cursor-pointer text-muted-foreground hover:text-foreground">View payload</summary>
+              <pre className="mt-1 text-[10px] bg-muted p-1 rounded overflow-x-auto max-h-32 break-all whitespace-pre-wrap">
                 {hop.payloadRef}
               </pre>
             </details>
@@ -72,9 +72,9 @@ function CompactNode({ hop, onRetry }: { hop: PipelineHop; onRetry?: (hopId: str
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>
-          <div className={cn("cursor-default p-2 rounded-lg border", hop.skipped ? "border-dashed border-slate-300" : "border-slate-200 hover:border-slate-300")}>
+          <div className={cn("cursor-default p-2 rounded-lg border", hop.skipped ? "border-dashed border-border" : "border-border hover:border-primary/40")}>
             <div className={cn("flex flex-col items-center gap-1 min-w-[100px]", hop.skipped && "opacity-60")}>
-              <span className="text-[10px] text-slate-500 font-medium">{TARGET_LABELS[hop.target]}</span>
+              <span className="text-[10px] text-muted-foreground font-medium">{TARGET_LABELS[hop.target]}</span>
               <RoutingStatusBadge status={hop.status} skipped={hop.skipped} attemptCount={hop.attemptCount} />
               {hop.status === "FAILED" && hop.id && onRetry && (
                 <Button size="sm" variant="destructive" className="h-5 text-[10px] px-2" onClick={() => onRetry(hop.id!)}>
@@ -82,12 +82,12 @@ function CompactNode({ hop, onRetry }: { hop: PipelineHop; onRetry?: (hopId: str
                 </Button>
               )}
               {hop.confirmedAt && (
-                <span className="text-[9px] text-slate-400 font-mono">{new Date(hop.confirmedAt).toLocaleTimeString()}</span>
+                <span className="text-[9px] text-muted-foreground font-mono">{new Date(hop.confirmedAt).toLocaleTimeString()}</span>
               )}
             </div>
           </div>
         </TooltipTrigger>
-        <TooltipContent side="top" className="max-w-xs bg-slate-900 text-slate-100">
+        <TooltipContent side="top" className="max-w-xs bg-popover text-popover-foreground">
           {tooltipContent}
         </TooltipContent>
       </Tooltip>
@@ -97,26 +97,26 @@ function CompactNode({ hop, onRetry }: { hop: PipelineHop; onRetry?: (hopId: str
 
 function ExpandedRow({ hop, onRetry }: { hop: PipelineHop; onRetry?: (hopId: string) => void }) {
   const borderCls = hop.skipped
-    ? "border-dashed border-slate-300 text-slate-400 bg-transparent"
+    ? "border-dashed border-border text-muted-foreground bg-transparent"
     : ({
-        STAGED: "bg-slate-100 text-slate-600 border-slate-200",
-        DISPATCHED: "bg-blue-100 text-blue-700 border-blue-200",
-        CONFIRMED: "bg-emerald-100 text-emerald-700 border-emerald-200",
-        RETRYING: "bg-amber-100 text-amber-700 border-amber-200",
-        FAILED: "bg-red-100 text-red-700 border-red-200",
-      }[hop.status] ?? "bg-slate-100 text-slate-600 border-slate-200")
+        STAGED: "bg-muted text-muted-foreground border-border",
+        DISPATCHED: "bg-accent text-accent-foreground border-primary/20",
+        CONFIRMED: "bg-gain-muted text-gain-foreground border-gain/30",
+        RETRYING: "bg-warn-muted text-warn-foreground border-warn/30",
+        FAILED: "bg-loss-muted text-loss-foreground border-loss/30",
+      }[hop.status] ?? "bg-muted text-muted-foreground border-border")
 
   return (
     <div className={cn("flex gap-3 p-3 rounded-lg border", borderCls)}>
       <div className="flex flex-col items-center gap-1 pt-0.5">
         {hop.status === "CONFIRMED" && !hop.skipped ? (
-          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+          <CheckCircle2 className="w-4 h-4 text-gain" />
         ) : hop.status === "FAILED" ? (
-          <XCircle className="w-4 h-4 text-red-600" />
+          <XCircle className="w-4 h-4 text-loss" />
         ) : hop.status === "RETRYING" ? (
-          <RotateCcw className="w-4 h-4 text-amber-600" />
+          <RotateCcw className="w-4 h-4 text-warn-foreground" />
         ) : (
-          <Clock className="w-4 h-4 text-slate-400" />
+          <Clock className="w-4 h-4 text-muted-foreground" />
         )}
         <div className="w-px flex-1 bg-current opacity-20" />
       </div>
@@ -129,8 +129,8 @@ function ExpandedRow({ hop, onRetry }: { hop: PipelineHop; onRetry?: (hopId: str
           {hop.dispatchedAt && <p>Dispatched: {new Date(hop.dispatchedAt).toLocaleString()}</p>}
           {hop.confirmedAt && <p>Confirmed: {new Date(hop.confirmedAt).toLocaleString()}</p>}
           {hop.externalRef && !hop.skipped && <p>Ref: <span className="font-mono">{hop.externalRef}</span></p>}
-          {hop.skipped && <p className="text-slate-400 italic">Custodian dispatch disabled — internal settlement mode</p>}
-          {hop.lastError && <p className="text-red-500">{hop.lastError}</p>}
+          {hop.skipped && <p className="italic">Custodian dispatch disabled — internal settlement mode</p>}
+          {hop.lastError && <p className="text-loss">{hop.lastError}</p>}
           {hop.attemptCount != null && <p>Attempts: {hop.attemptCount}</p>}
         </div>
         {hop.payloadRef && !hop.skipped && (
@@ -155,7 +155,7 @@ export function RoutingPipeline({ mode, hops, onRetry, className }: RoutingPipel
   const ordered = orderHops(hops)
 
   if (ordered.length === 0) {
-    return <p className="text-xs text-slate-400">No routing hops recorded.</p>
+    return <p className="text-xs text-muted-foreground">No routing hops recorded.</p>
   }
 
   if (mode === "expanded") {
@@ -171,7 +171,7 @@ export function RoutingPipeline({ mode, hops, onRetry, className }: RoutingPipel
       {ordered.map((hop, i) => (
         <div key={hop.id ?? hop.target} className="flex items-start gap-2">
           <CompactNode hop={hop} onRetry={onRetry} />
-          {i < ordered.length - 1 && <ArrowRight className="w-4 h-4 text-slate-300 mt-6 shrink-0" />}
+          {i < ordered.length - 1 && <ArrowRight className="w-4 h-4 text-muted-foreground/40 mt-6 shrink-0" />}
         </div>
       ))}
     </div>

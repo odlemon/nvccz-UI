@@ -17,7 +17,7 @@ export function SecurityConfigModal() {
   const dispatch = useAppDispatch()
   const { securityConfigTarget } = useAppSelector((s) => s.investments)
   const { hasSubModuleAccess } = useRolePermissions()
-  const isAdmin = hasSubModuleAccess("investments", "investments-securities")
+  const isAdmin = hasSubModuleAccess("investments", "investments-portfolios-instruments")
 
   const [alertAbove, setAlertAbove] = useState("")
   const [alertBelow, setAlertBelow] = useState("")
