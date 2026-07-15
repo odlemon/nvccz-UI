@@ -1,7 +1,7 @@
 import { getAuthToken } from "@/lib/utils/cookies"
 
 const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://31.220.82.129:3009/api"
+  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3009/api"
 
 /** Pull export job id from `/api/v1/fpa/exports/{id}/download` style paths. */
 export function extractFpaExportId(urlOrPath: string): string | null {
