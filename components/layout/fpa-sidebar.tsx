@@ -5,14 +5,14 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { ChevronsLeft, ChevronsRight } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { getModuleById } from "@/lib/config/modules"
+import { getModuleById, getModuleByPath } from "@/lib/config/modules"
 import { useRolePermissions } from "@/lib/hooks/useRolePermissions"
 
 export function FpaSidebar() {
   const pathname = usePathname()
   const { hasSubModuleAccess, isLoading, hasModuleAccess } = useRolePermissions()
   const [collapsed, setCollapsed] = useState(false)
-  const module = getModuleById("forecasting")
+  const module = getModuleByPath("/forecasting") ?? getModuleById("forecasting")
 
   const activeSubModuleId = useMemo(() => {
     if (!pathname || !module?.subModules) return null

@@ -13,7 +13,7 @@ interface ForecastingV2LayoutProps {
 }
 
 export function ForecastingV2Layout({ children }: ForecastingV2LayoutProps) {
-  const [currentModule, setCurrentModule] = useState("forecasting")
+  const [currentModule, setCurrentModule] = useState("forecasting-v2")
   const pathname = usePathname()
 
   useEffect(() => {
