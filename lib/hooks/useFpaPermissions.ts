@@ -65,6 +65,10 @@ export function useFpaPermissions() {
       canConfigureBuilder: can(FPA_ACTIONS.CONFIGURE_BUILDER),
 
       canEditGrid: can(FPA_ACTIONS.EDIT_GRID) || can(FPA_ACTIONS.EDIT_OWN_DEPARTMENT),
+      /** FP&A / admin — edit any department slice. */
+      canEditAllDepartments: can(FPA_ACTIONS.EDIT_GRID),
+      /** Department owner — only authorised department(s). */
+      canEditOwnDepartment: can(FPA_ACTIONS.EDIT_OWN_DEPARTMENT),
       canConfigureDrivers: can(FPA_ACTIONS.CONFIGURE_DRIVERS),
       canCreateScenario: can(FPA_ACTIONS.CREATE_SCENARIO),
       canCompareScenarios: can(FPA_ACTIONS.COMPARE_SCENARIOS),

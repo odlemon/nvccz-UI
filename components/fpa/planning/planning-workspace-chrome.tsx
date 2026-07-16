@@ -15,6 +15,7 @@ import {
   Download,
   GitCompare,
   MoreHorizontal,
+  Lock,
   Percent,
   Pencil,
   RefreshCw,
@@ -109,6 +110,12 @@ type Props = {
   currency?: string
   cycles?: PlanningCycleOption[]
   cycleId?: string | null
+  /** Display name when cycle list is empty but a cycle is bound (e.g. from URL). */
+  cycleName?: string | null
+  /** ISO / period date — last closed actual month (from cycle or grid). */
+  actualsCutoff?: string | null
+  /** ISO / period date — first forecast month (from cycle). */
+  forecastStart?: string | null
   onCycleChange?: (id: string) => void
   drivers: PlanningDriverRow[]
   canEditDrivers: boolean
@@ -320,6 +327,20 @@ const R = "rounded-lg"
 const PILL_TRIGGER =
   `h-7 min-w-0 w-auto ${R} border-[#d0d5dd] bg-white px-2.5 py-0 text-[11px] font-medium text-[#344054] shadow-none focus-visible:ring-1 focus-visible:ring-[#93c5fd]`
 
+function shortPeriodLabel(iso?: string | null): string | null {
+  if (!iso) return null
+  const d = new Date(iso)
+  if (!Number.isNaN(d.getTime())) {
+    return d.toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" })
+  }
+  if (/^\d{4}-\d{2}/.test(iso)) {
+    const [y, m] = iso.slice(0, 7).split("-")
+    const dt = new Date(Date.UTC(Number(y), Number(m) - 1, 1))
+    return dt.toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" })
+  }
+  return iso
+}
+
 const DEMO_WORKFLOW: PlanningWorkflowStep[] = [
   {
     id: "w1",
@@ -361,6 +382,7 @@ export function PlanningWorkspaceChrome({
   currency = "USD",
   cycles,
   cycleId,
+  cycleName,
   onCycleChange,
   onVersionChange,
   onScenarioChange,
@@ -374,6 +396,8 @@ export function PlanningWorkspaceChrome({
   hideKpis = false,
   compareScenarioIds,
   onCompareScenarioIdsChange,
+  actualsCutoff = null,
+  forecastStart = null,
 }: Props) {
   const [actionsOpen, setActionsOpen] = useState(false)
   const [scenariosMenuOpen, setScenariosMenuOpen] = useState(false)
@@ -392,6 +416,12 @@ export function PlanningWorkspaceChrome({
   // Prefer live cycles; never invent demo cycles when parent passed an array.
   const cycleOptions = cycles !== undefined ? cycles : DEMO_CYCLES
   const activeCycle = cycleId ?? localCycle
+  const activeCycleLabel =
+    cycleOptions.find((c) => c.id === activeCycle)?.name ||
+    (cycleName || "").trim() ||
+    null
+  const actualsCutoffLabel = shortPeriodLabel(actualsCutoff)
+  const forecastStartLabel = shortPeriodLabel(forecastStart)
 
   // Prefer live KPIs; do not invent demo metrics when API returns empty.
   const displayKpis = enrichKpis(kpis.length ? kpis.slice(0, 5) : [])
@@ -531,17 +561,18 @@ export function PlanningWorkspaceChrome({
                 ))}
               </SelectContent>
             </Select>
+          ) : activeCycleLabel ? (
+            <div
+              className={`mt-1 flex h-10 min-w-[180px] items-center ${R} border border-[#d0d5dd] bg-white px-3 text-[13px] font-semibold text-[#101828]`}
+              title={activeCycleLabel}
+            >
+              <span className="truncate">{activeCycleLabel}</span>
+            </div>
           ) : (
             <div
-              className={`mt-1 flex h-10 min-w-[180px] items-center gap-2 ${R} border border-dashed border-[#d0d5dd] px-3 text-[12px] text-[#667085]`}
+              className={`mt-1 flex h-10 min-w-[180px] items-center ${R} border border-dashed border-[#d0d5dd] px-3 text-[12px] text-[#667085]`}
             >
-              No cycle
-              <Link
-                href="/forecasting/budget"
-                className="font-medium text-[#1570ef] hover:underline"
-              >
-                Open Budgeting
-              </Link>
+              No cycle selected
             </div>
           )}
         </label>
@@ -732,6 +763,29 @@ export function PlanningWorkspaceChrome({
           </div>
         </div>
       </div>
+
+      {(actualsCutoffLabel || forecastStartLabel) && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-[#e4e7ec] bg-white px-3 py-2 text-[12px]">
+          <Lock className="size-3.5 text-[#667085] shrink-0" />
+          <span className="font-medium text-[#344054]">Actual vs forecast</span>
+          {actualsCutoffLabel ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#f2f4f7] px-2.5 py-0.5 text-[11px] font-medium text-[#475467]">
+              Actuals through <strong className="text-[#101828]">{actualsCutoffLabel}</strong>
+              <span className="text-[#98a2b3]">· read-only</span>
+            </span>
+          ) : null}
+          {forecastStartLabel ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#eff8ff] px-2.5 py-0.5 text-[11px] font-medium text-[#175cd3]">
+              Forecast from <strong>{forecastStartLabel}</strong>
+              <span className="text-[#53b1fd]">· editable inputs</span>
+            </span>
+          ) : actualsCutoffLabel ? (
+            <span className="text-[11px] text-[#667085]">
+              Months after cutoff are forecast (editable inputs).
+            </span>
+          ) : null}
+        </div>
+      )}
 
       {/* KPI strip rendered by parent when splitting with the collab rail */}
       {!hideKpis ? (
@@ -1877,13 +1931,13 @@ function WorkflowStatusBar({ steps }: { steps: PlanningWorkflowStep[] }) {
       {!steps.length ? (
         <div className="flex flex-wrap items-center justify-center gap-3 py-4 text-center">
           <p className="text-[12px] text-[#98a2b3]">
-            No planning cycle selected. Open a budget cycle to track Draft → Approved.
+            No planning cycle selected. Open a cycle from Model Planning to track Draft → Approved.
           </p>
           <Link
-            href="/forecasting/budget"
-            className="h-8 inline-flex items-center rounded-lg bg-[#1570ef] px-4 text-[12px] font-medium text-white hover:bg-[#175cd3]"
+            href="/forecasting/models"
+            className="h-8 inline-flex items-center rounded-full bg-[#1570ef] px-4 text-[12px] font-medium text-white hover:bg-[#175cd3]"
           >
-            Open a planning cycle
+            Open Model Planning
           </Link>
         </div>
       ) : (

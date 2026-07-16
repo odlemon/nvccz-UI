@@ -55,8 +55,14 @@ import {
 } from "@/lib/store/slices/fpaSlice"
 import { errorMessage, logFpaGap } from "@/lib/fpa/fpa-api-gaps"
 import { humanizeDeptIdsInText } from "@/lib/fpa/humanize-dept-message"
+import {
+  mapCycleTaskToPlanningTask,
+  mapOwnerSliceToPlanningTask,
+} from "@/lib/fpa/planning-task-utils"
 import { useFpaPermissions } from "@/lib/hooks/useFpaPermissions"
 import { departmentApiService } from "@/lib/api/department-api"
+import { useSelector } from "react-redux"
+import type { AuthState } from "@/lib/store/slices/authSlice"
 import {
   formatCashRunway,
   PlanningWorkspaceChrome,
@@ -79,7 +85,16 @@ import {
   type PlanningComment,
   type PlanningTask,
 } from "@/components/fpa/planning/planning-collab-sidebar"
+import type { PlanningAssignDept } from "@/components/fpa/planning/planning-assign-task-dialog"
 import { PlanningScenarioCompareView } from "@/components/fpa/planning/planning-scenario-compare-view"
+import {
+  PlanningCollabSkeleton,
+  PlanningGridSkeleton,
+  PlanningInsightsSkeleton,
+  PlanningKpiStripSkeleton,
+  PlanningTasksCardSkeleton,
+  PlanningWorksheetBodySkeleton,
+} from "@/components/fpa/planning/planning-worksheet-skeletons"
 import { cn } from "@/lib/utils"
 import {
   Select,
@@ -333,7 +348,9 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
   const inBudgetContext = Boolean(budgetCycleId)
   const { selectedScenarioId, selectedVersionId, tasks, dashboard, models, versions, scenarios } =
     useAppSelector((s) => s.fpa)
-  const { canEditGrid, canSubmitTask, canExportBoardPack } = useFpaPermissions()
+  const { canEditGrid, canEditAllDepartments, canSubmitTask, canAssignTasks, canExportBoardPack, isAdmin } =
+    useFpaPermissions()
+  const currentUserId = useSelector((s: { auth: AuthState }) => s.auth.userDetails?.id || null)
   const [planningDrivers, setPlanningDrivers] = useState<FpaDriver[]>([])
   const [planningCycles, setPlanningCycles] = useState<PlanningCycleOption[]>([])
   const [activeCycleDetail, setActiveCycleDetail] = useState<FpaBudgetCycle | null>(null)
@@ -341,6 +358,9 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
   const [collabTasks, setCollabTasks] = useState<PlanningTask[]>([])
   const [collabActivity, setCollabActivity] = useState<PlanningActivity[]>([])
   const [collabReloadKey, setCollabReloadKey] = useState(0)
+  const [collabLoading, setCollabLoading] = useState(false)
+  const [assignTaskBusy, setAssignTaskBusy] = useState(false)
+  const [completeTaskBusyId, setCompleteTaskBusyId] = useState<string | null>(null)
   const [compareScenarioIds, setCompareScenarioIds] = useState<string[]>([])
   const [compareKpis, setCompareKpis] = useState<PlanningKpi[]>([])
   const [planningSummary, setPlanningSummary] = useState<FpaPlanningSummary | null>(null)
@@ -365,6 +385,7 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(() => new Set())
   const [gridPeriods, setGridPeriods] = useState<FpaGridPeriod[]>([])
   const [actualCutoff, setActualCutoff] = useState<string | null>(null)
+  const [gridForecastStart, setGridForecastStart] = useState<string | null>(null)
   const [gridOwnerName, setGridOwnerName] = useState<string | null>(null)
   const [gridOwnerAvatar, setGridOwnerAvatar] = useState<string | null>(null)
   const [boundTaskId, setBoundTaskId] = useState<string | null>(null)
@@ -398,9 +419,11 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
       expression?: string
     }>
   } | null>(null)
-  const [assignedDepartmentIds, setAssignedDepartmentIds] = useState<string[]>([])
+  const [assignedDepartmentIds, setAssignedDepartmentIds] = useState<string[] | null>(null)
   const [ownerUnmet, setOwnerUnmet] = useState<string[]>([])
   const [ownerCanSubmit, setOwnerCanSubmit] = useState<boolean | null>(null)
+  const [mpcMyOwnerTaskId, setMpcMyOwnerTaskId] = useState<string | null>(null)
+  const [ownerWorkspaceReadOnly, setOwnerWorkspaceReadOnly] = useState(false)
   const editInputRef = useRef<HTMLInputElement>(null)
   const rowRefs = useRef<Map<string, HTMLTableRowElement>>(new Map())
 
@@ -449,31 +472,120 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
     return model?.updatedAt || null
   }, [cells, model?.updatedAt])
 
+  const cycleOwners = useMemo(() => {
+    const raw = (activeCycleDetail?.owners || []) as Array<Record<string, unknown>>
+    const out: NonNullable<FpaBudgetCycle["owners"]> = []
+    for (const row of raw) {
+      const departmentId = String(row.departmentId || row.department_id || "")
+      if (!departmentId) continue
+      out.push({
+        departmentId,
+        departmentName:
+          (row.departmentName as string | undefined) ||
+          (row.department_name as string | undefined) ||
+          deptById.get(departmentId) ||
+          undefined,
+        assigneeId:
+          (row.assigneeId as string | undefined) ||
+          (row.assignee_id as string | undefined) ||
+          undefined,
+        assigneeName:
+          (row.assigneeName as string | undefined) ||
+          (row.assignee_name as string | undefined) ||
+          undefined,
+        taskId:
+          (row.taskId as string | undefined) ||
+          (row.task_id as string | undefined) ||
+          undefined,
+        status: (row.status as string | undefined) || undefined,
+        dueDate:
+          (row.dueDate as string | undefined) ||
+          (row.due_date as string | undefined) ||
+          undefined,
+      })
+    }
+    return out
+  }, [activeCycleDetail?.owners, deptById])
+
+  /** Departments present on the loaded grid (fallback when owners[] is empty). */
+  const gridDepartmentIds = useMemo(() => {
+    const ids = new Set<string>()
+    for (const c of cells) {
+      if (c.departmentId) ids.add(String(c.departmentId))
+    }
+    return [...ids]
+  }, [cells])
+
+  const authorisedDepartmentIds = useMemo(() => {
+    // Grid `null`/`omit` = full-edit role — no FE owner lock list.
+    if (assignedDepartmentIds == null) {
+      if (isAdmin || canEditAllDepartments) return [] as string[]
+      if (!currentUserId) return [] as string[]
+      return cycleOwners
+        .filter((o) => o.assigneeId && o.assigneeId === currentUserId)
+        .map((o) => o.departmentId)
+        .filter(Boolean)
+    }
+    if (assignedDepartmentIds.length) return assignedDepartmentIds
+    if (!currentUserId) return [] as string[]
+    return cycleOwners
+      .filter((o) => o.assigneeId && o.assigneeId === currentUserId)
+      .map((o) => o.departmentId)
+      .filter(Boolean)
+  }, [
+    assignedDepartmentIds,
+    cycleOwners,
+    currentUserId,
+    isAdmin,
+    canEditAllDepartments,
+  ])
+
+  const isOwnerSliceEligible = (status?: string | null) => {
+    const st = String(status || "").toUpperCase()
+    return (
+      !st ||
+      st === "OPEN" ||
+      st === "IN_PROGRESS" ||
+      st === "RETURNED" ||
+      st === "PENDING"
+    )
+  }
+
+  /** Department-plan OWNER_SLICE task for submit — not an ad-hoc Assign task. */
+  const myOwnerTaskId = useMemo(() => {
+    if (budgetTaskId) return budgetTaskId
+    if (mpcMyOwnerTaskId) return mpcMyOwnerTaskId
+
+    // View-by department: use that owner's slice task (FP&A / admin included).
+    if (budgetDepartmentId) {
+      const byDept = cycleOwners.find(
+        (o) =>
+          o.departmentId === budgetDepartmentId &&
+          o.taskId &&
+          isOwnerSliceEligible(o.status),
+      )
+      if (byDept?.taskId) return byDept.taskId
+    }
+
+    if (!currentUserId) return null
+    const match = cycleOwners.find((o) => {
+      if (o.assigneeId !== currentUserId) return false
+      if (budgetDepartmentId && o.departmentId !== budgetDepartmentId) return false
+      return Boolean(o.taskId) && isOwnerSliceEligible(o.status)
+    })
+    return match?.taskId || null
+  }, [budgetTaskId, mpcMyOwnerTaskId, budgetDepartmentId, cycleOwners, currentUserId])
+
   const submitTaskId = useMemo(() => {
     if (!inBudgetContext) return null
-    if (budgetTaskId) return budgetTaskId
-    if (boundTaskId) return boundTaskId
-    const pool = [...(dashboard?.openTasks || []), ...tasks]
-    const open = pool.find((t) => {
-      const st = String(t.status).toUpperCase()
-      const modelOk = !t.modelId || t.modelId === modelId
-      const versionOk = !t.versionId || !selectedVersionId || t.versionId === selectedVersionId
-      return (
-        modelOk &&
-        versionOk &&
-        (st === "PENDING" || st === "IN_PROGRESS" || st === "OPEN" || st === "RETURNED")
-      )
-    })
-    return open?.id || null
-  }, [
-    inBudgetContext,
-    budgetTaskId,
-    boundTaskId,
-    dashboard?.openTasks,
-    tasks,
-    modelId,
-    selectedVersionId,
-  ])
+    // Never bind Submit my plan to an ad-hoc PLANNING task from Assign.
+    if (myOwnerTaskId) return myOwnerTaskId
+    if (boundTaskId) {
+      const boundOwner = cycleOwners.some((o) => o.taskId === boundTaskId)
+      if (boundOwner) return boundTaskId
+    }
+    return null
+  }, [inBudgetContext, myOwnerTaskId, boundTaskId, cycleOwners])
 
   const planningKpis = useMemo((): PlanningKpi[] => {
     if (planningSummary?.kpis?.length) {
@@ -556,13 +668,22 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
   }, [planningSummary, dashboard?.kpis])
 
   const driverRows = useMemo((): PlanningDriverRow[] => {
-    return planningDrivers.map((d) => ({
-      id: d.id,
-      name: d.name || d.code,
-      value: d.value,
-      unit: d.unit,
-      prior: null,
-    }))
+    return planningDrivers.map((d) => {
+      const priorRaw = d.priorActual ?? d.priorValue
+      const prior =
+        priorRaw == null || priorRaw === ""
+          ? null
+          : typeof priorRaw === "number"
+            ? priorRaw
+            : Number(priorRaw)
+      return {
+        id: d.id,
+        name: d.name || d.code,
+        value: d.value,
+        unit: d.unit,
+        prior: Number.isFinite(prior as number) ? (prior as number) : null,
+      }
+    })
   }, [planningDrivers])
 
   const trendPoints = useMemo((): PlanningTrendPoint[] => {
@@ -662,31 +783,182 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
 
   const viewByLabel = useMemo(() => {
     if (budgetDepartmentName) return budgetDepartmentName
-    if (assignedDepartmentIds.length === 1) {
-      return deptById.get(assignedDepartmentIds[0]) || "Assigned department"
+    if (budgetDepartmentId) {
+      return deptById.get(budgetDepartmentId) || "Department"
     }
-    if (assignedDepartmentIds.length > 1) {
-      return `${assignedDepartmentIds.length} departments`
+    const assigned = assignedDepartmentIds || []
+    if (assigned.length === 1) {
+      return deptById.get(assigned[0]) || "Assigned department"
+    }
+    if (assigned.length > 1) {
+      return `${assigned.length} departments`
     }
     return "Total Company"
-  }, [budgetDepartmentName, assignedDepartmentIds, deptById])
+  }, [budgetDepartmentName, budgetDepartmentId, assignedDepartmentIds, deptById])
 
   const viewByOptions = useMemo(() => {
+    // "Total Company" = all-company rollup (not a department). Real depts come from
+    // cycle owners, assigned scopes, URL, or department ids present on grid cells.
     const opts = [{ id: "total", label: "Total Company" }]
-    if (budgetDepartmentId && budgetDepartmentName) {
-      opts.push({ id: budgetDepartmentId, label: budgetDepartmentName })
+    const pushDept = (id: string, label?: string | null) => {
+      if (!id || id === "total" || opts.some((o) => o.id === id)) return
+      opts.push({
+        id,
+        label: (label && String(label).trim()) || deptById.get(id) || "Department",
+      })
     }
-    for (const id of assignedDepartmentIds) {
-      if (opts.some((o) => o.id === id)) continue
-      opts.push({ id, label: deptById.get(id) || id })
-    }
+    if (budgetDepartmentId) pushDept(budgetDepartmentId, budgetDepartmentName)
+    for (const id of assignedDepartmentIds || []) pushDept(id)
+    for (const o of cycleOwners) pushDept(o.departmentId, o.departmentName)
+    for (const id of gridDepartmentIds) pushDept(id)
     return opts
   }, [
     assignedDepartmentIds,
     budgetDepartmentId,
     budgetDepartmentName,
+    cycleOwners,
+    deptById,
+    gridDepartmentIds,
+  ])
+
+  const onViewByChange = useCallback(
+    (id: string) => {
+      const sp = new URLSearchParams(searchParams.toString())
+      if (!id || id === "total") {
+        sp.delete("departmentId")
+        sp.delete("departmentName")
+        sp.delete("taskId")
+      } else {
+        sp.set("departmentId", id)
+        const name =
+          deptById.get(id) ||
+          cycleOwners.find((o) => o.departmentId === id)?.departmentName ||
+          ""
+        if (name) sp.set("departmentName", name)
+        else sp.delete("departmentName")
+        const ownerTask = cycleOwners.find((o) => o.departmentId === id)?.taskId
+        if (ownerTask) sp.set("taskId", ownerTask)
+        else sp.delete("taskId")
+      }
+      const q = sp.toString()
+      router.replace(q ? `${pathname}?${q}` : pathname)
+    },
+    [searchParams, deptById, cycleOwners, router, pathname],
+  )
+
+  const assignDepartments = useMemo((): PlanningAssignDept[] => {
+    // Prefer cycle owners, but never leave the Assign dialog empty when View by /
+    // grid / URL already has departments (e.g. Finance selected).
+    const byId = new Map<string, PlanningAssignDept>()
+    const upsert = (
+      id: string | null | undefined,
+      name?: string | null,
+      assigneeId?: string | null,
+    ) => {
+      const deptId = String(id || "").trim()
+      if (!deptId) return
+      const prev = byId.get(deptId)
+      byId.set(deptId, {
+        id: deptId,
+        name:
+          (name && String(name).trim()) ||
+          prev?.name ||
+          deptById.get(deptId) ||
+          deptId,
+        assigneeId: assigneeId || prev?.assigneeId || null,
+      })
+    }
+    for (const o of cycleOwners) {
+      upsert(o.departmentId, o.departmentName, o.assigneeId)
+    }
+    for (const id of assignedDepartmentIds || []) upsert(id)
+    if (budgetDepartmentId) upsert(budgetDepartmentId, budgetDepartmentName)
+    for (const id of gridDepartmentIds) upsert(id)
+    // Last resort: company departments (admin assign when owners[] not on cycle yet)
+    if (byId.size === 0) {
+      for (const [id, name] of deptById.entries()) upsert(id, name)
+    }
+    return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name))
+  }, [
+    cycleOwners,
+    assignedDepartmentIds,
+    budgetDepartmentId,
+    budgetDepartmentName,
+    gridDepartmentIds,
     deptById,
   ])
+
+  const onAssignPlanningTask = useCallback(
+    async (body: {
+      title: string
+      assigneeId: string
+      departmentId?: string | null
+      dueDate?: string | null
+      priority?: string | null
+      description?: string | null
+    }) => {
+      if (!budgetCycleId) {
+        toast.error("Open a planning cycle first")
+        throw new Error("No cycle")
+      }
+      setAssignTaskBusy(true)
+      try {
+        const res = await fpaApi.createModelPlanningCycleTask(budgetCycleId, {
+          ...body,
+          modelId,
+          versionId: selectedVersionId || null,
+        })
+        if (!res.success || !res.data) {
+          throw new Error(res.message || "Could not assign task")
+        }
+        toast.success(`Task assigned · ${body.title}`)
+        setCollabReloadKey((k) => k + 1)
+      } catch (err) {
+        const code = (err as { response?: { code?: string } })?.response?.code
+        if (code === "UNKNOWN_ASSIGNEE") {
+          toast.error(errorMessage(err, "Unknown assignee"))
+        } else if (code === "UNKNOWN_DEPARTMENT") {
+          toast.error(errorMessage(err, "Unknown department"))
+        } else {
+          toast.error(errorMessage(err, "Could not assign task"))
+        }
+        throw err
+      } finally {
+        setAssignTaskBusy(false)
+      }
+    },
+    [budgetCycleId, modelId, selectedVersionId],
+  )
+
+  const onCompletePlanningTask = useCallback(
+    async (taskId: string) => {
+      if (!taskId) return
+      if (completeTaskBusyId === taskId) return
+      setCompleteTaskBusyId(taskId)
+
+      try {
+        const res = await fpaApi.patchTask(taskId, { status: "COMPLETED" })
+        if (!res.success) {
+          throw new Error(res.message || "Could not complete task")
+        }
+        toast.success("Task completed")
+        setCollabReloadKey((k) => k + 1)
+      } catch (err) {
+        const code = (err as { response?: { code?: string } })?.response?.code
+        if (code === "OWNER_SUBMIT_REQUIRED") {
+          toast.error("Use Submit my plan to complete owner slice tasks.")
+        } else if (code === "CYCLE_LOCKED") {
+          toast.error("This planning cycle is locked.")
+        } else {
+          toast.error(errorMessage(err, "Could not complete task"))
+        }
+        throw err
+      } finally {
+        setCompleteTaskBusyId(null)
+      }
+    },
+    [completeTaskBusyId],
+  )
 
   const modelScenarios = useMemo(() => {
     const fromStore = scenarios.filter((s) => !s.modelId || s.modelId === modelId)
@@ -793,29 +1065,80 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
     }
     setCollabReloadKey((k) => k + 1)
   }, [dispatch, modelId, selectedVersionId, selectedScenarioId])
+
+  /** Stage 3: after INPUT edits / spread / bulk, refresh KPIs + validations (lighter than full shell). */
+  const refreshAfterPlanEdit = useCallback(() => {
+    if (selectedVersionId && selectedScenarioId) {
+      void fpaApi
+        .getPlanningSummary(modelId, {
+          versionId: selectedVersionId,
+          scenarioId: selectedScenarioId,
+        })
+        .then((res) => {
+          if (res.success && res.data) setPlanningSummary(res.data)
+        })
+        .catch(() => {})
+      void fpaApi
+        .getGridValidations(modelId, {
+          versionId: selectedVersionId,
+          scenarioId: selectedScenarioId,
+          cycleId: budgetCycleId || undefined,
+        })
+        .then((res) => {
+          if (res.success && Array.isArray(res.data)) setValidationErrors(res.data)
+        })
+        .catch(() => {
+          /* optional */
+        })
+    }
+    void dispatch(
+      fetchFpaDashboard({
+        modelId,
+        versionId: selectedVersionId || undefined,
+      }),
+    )
+  }, [modelId, selectedVersionId, selectedScenarioId, budgetCycleId, dispatch])
   useEffect(() => {
     let cancelled = false
     void (async () => {
       try {
-        const res = await fpaApi.listBudgetCycles({ modelId })
-        const rows = res.success && Array.isArray(res.data) ? res.data : []
-        const filtered = rows.filter((c) => !c.modelId || c.modelId === modelId)
+        const res = await fpaApi.listModelPlanningCycles({ modelId })
+        const rows =
+          res.success && res.data?.items && Array.isArray(res.data.items) ? res.data.items : []
+        const filtered = rows.filter((c) => !c.sourceModelId || c.sourceModelId === modelId)
         if (!cancelled) {
-          setPlanningCycles(
-            filtered.map((c) => ({
-              id: c.id,
-              name: c.name || `FY${c.fiscalYear} cycle`,
-            })),
-          )
+          const mapped: PlanningCycleOption[] = filtered.map((c) => ({
+            id: c.id,
+            name: c.cycle_name || `FY${c.financialYear} cycle`,
+          }))
+          // Keep the URL cycle visible even if list is briefly empty / filtered out
+          if (budgetCycleId && !mapped.some((c) => c.id === budgetCycleId)) {
+            mapped.unshift({
+              id: budgetCycleId,
+              name: budgetCycleName || activeCycleDetail?.name || "Current cycle",
+            })
+          }
+          setPlanningCycles(mapped)
         }
       } catch {
-        if (!cancelled) setPlanningCycles([])
+        if (!cancelled) {
+          setPlanningCycles(
+            budgetCycleId
+              ? [
+                  {
+                    id: budgetCycleId,
+                    name: budgetCycleName || "Current cycle",
+                  },
+                ]
+              : [],
+          )
+        }
       }
     })()
     return () => {
       cancelled = true
     }
-  }, [modelId])
+  }, [modelId, budgetCycleId, budgetCycleName, activeCycleDetail?.name])
 
   useEffect(() => {
     if (!budgetCycleId) {
@@ -824,12 +1147,71 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
     }
     let cancelled = false
     void fpaApi
-      .getBudgetCycle(budgetCycleId)
+      .getModelPlanningCycle(budgetCycleId)
       .then((res) => {
-        if (!cancelled && res.success && res.data) setActiveCycleDetail(res.data)
+        if (cancelled || !res.success || !res.data) return
+        const c = res.data
+        const rawOwners = (c.owners ||
+          (c as { Owners?: unknown[] }).Owners ||
+          []) as Array<Record<string, unknown>>
+        const owners = rawOwners
+          .map((o) => {
+            const departmentId = String(o.departmentId || o.department_id || "")
+            if (!departmentId) return null
+            return {
+              departmentId,
+              departmentName:
+                (o.departmentName as string | undefined) ||
+                (o.department_name as string | undefined) ||
+                undefined,
+              assigneeId:
+                (o.assigneeId as string | undefined) ||
+                (o.assignee_id as string | undefined) ||
+                undefined,
+              assigneeName:
+                (o.assigneeName as string | undefined) ||
+                (o.assignee_name as string | undefined) ||
+                undefined,
+              taskId:
+                (o.taskId as string | undefined) ||
+                (o.task_id as string | undefined) ||
+                undefined,
+              status: (o.status as string | undefined) || undefined,
+              dueDate:
+                (o.dueDate as string | undefined) ||
+                (o.due_date as string | undefined) ||
+                undefined,
+            }
+          })
+          .filter(Boolean) as NonNullable<FpaBudgetCycle["owners"]>
+        setActiveCycleDetail({
+          id: c.id,
+          name: c.cycle_name || (c as { name?: string }).name || "Planning cycle",
+          modelId: c.sourceModelId,
+          fiscalYear: c.financialYear,
+          status: c.status as FpaBudgetCycle["status"],
+          actualsCutoffDate: c.actualsCutoffPeriod || null,
+          forecastStartPeriod: c.forecastStartPeriod || null,
+          owners,
+        } as FpaBudgetCycle)
+        setDeptById((prev) => {
+          const next = new Map(prev)
+          for (const o of owners) {
+            if (o.departmentId && o.departmentName) next.set(o.departmentId, o.departmentName)
+          }
+          return next
+        })
       })
       .catch(() => {
-        if (!cancelled) setActiveCycleDetail(null)
+        // Fallback for legacy budget-cycle worksheet links
+        void fpaApi
+          .getBudgetCycle(budgetCycleId)
+          .then((res) => {
+            if (!cancelled && res.success && res.data) setActiveCycleDetail(res.data)
+          })
+          .catch(() => {
+            if (!cancelled) setActiveCycleDetail(null)
+          })
       })
     return () => {
       cancelled = true
@@ -839,17 +1221,54 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
   useEffect(() => {
     let cancelled = false
     void (async () => {
+      setCollabLoading(true)
       const comments: PlanningComment[] = []
       const tasks: PlanningTask[] = []
       const activity: PlanningActivity[] = []
 
       if (budgetCycleId) {
+        const taskById = new Map<string, PlanningTask>()
+        for (const o of cycleOwners) {
+          const slice = mapOwnerSliceToPlanningTask({
+            departmentId: o.departmentId,
+            departmentName: o.departmentName,
+            assigneeName: o.assigneeName,
+            taskId: o.taskId,
+            status: o.status,
+            dueDate: o.dueDate,
+          })
+          if (slice) taskById.set(slice.id, slice)
+        }
+
         try {
-          const [cRes, tRes, aRes] = await Promise.all([
-            fpaApi.listBudgetCycleComments(budgetCycleId),
-            fpaApi.listBudgetCycleTasks(budgetCycleId),
-            fpaApi.listBudgetApprovalEvents(budgetCycleId),
-          ])
+          const mpcRes = await fpaApi.listModelPlanningCycleTasks(budgetCycleId)
+          if (mpcRes.success && Array.isArray(mpcRes.data)) {
+            for (const t of mpcRes.data) {
+              const mapped = mapCycleTaskToPlanningTask(
+                t,
+                cycleOwners.some((o) => o.taskId === t.id) ? "owner_slice" : "planning",
+              )
+              taskById.set(mapped.id, mapped)
+            }
+          }
+        } catch {
+          try {
+            const tRes = await fpaApi.listBudgetCycleTasks(budgetCycleId)
+            if (tRes.success && Array.isArray(tRes.data)) {
+              for (const t of tRes.data) {
+                taskById.set(t.id, mapCycleTaskToPlanningTask(t))
+              }
+            }
+          } catch {
+            /* legacy budget cycle only */
+          }
+        }
+
+        for (const t of taskById.values()) tasks.push(t)
+
+        // Comments + activity: prefer MPC-native endpoints, fall back to legacy budget-cycle.
+        try {
+          const cRes = await fpaApi.listModelPlanningCycleComments(budgetCycleId)
           if (cRes.success && Array.isArray(cRes.data)) {
             for (const c of cRes.data) {
               const author = c.authorName || "User"
@@ -863,24 +1282,29 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
               })
             }
           }
-          if (tRes.success && Array.isArray(tRes.data)) {
-            for (const t of tRes.data) {
-              const st = String(t.status || "").toUpperCase()
-              tasks.push({
-                id: t.id,
-                title: t.title || "Planning task",
-                assignee: t.assigneeName || t.departmentName || "Unassigned",
-                due: t.dueDate
-                  ? new Date(t.dueDate).toLocaleDateString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                      timeZone: "UTC",
-                    })
-                  : "",
-                done: st === "COMPLETED" || st === "APPROVED" || st === "CLOSED",
-              })
+        } catch {
+          try {
+            const cRes = await fpaApi.listBudgetCycleComments(budgetCycleId)
+            if (cRes.success && Array.isArray(cRes.data)) {
+              for (const c of cRes.data) {
+                const author = c.authorName || "User"
+                comments.push({
+                  id: c.id,
+                  author,
+                  initials: planningInitials(author),
+                  avatarTone: planningAvatarTone(author),
+                  when: formatRelativeWhen(c.createdAt),
+                  body: c.body || "",
+                })
+              }
             }
+          } catch {
+            /* ignore */
           }
+        }
+
+        try {
+          const aRes = await fpaApi.listModelPlanningCycleActivity(budgetCycleId)
           if (aRes.success && Array.isArray(aRes.data)) {
             for (const e of aRes.data.slice(0, 12)) {
               activity.push({
@@ -891,7 +1315,20 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
             }
           }
         } catch {
-          /* keep empty */
+          try {
+            const aRes = await fpaApi.listBudgetApprovalEvents(budgetCycleId)
+            if (aRes.success && Array.isArray(aRes.data)) {
+              for (const e of aRes.data.slice(0, 12)) {
+                activity.push({
+                  id: String(e.id || `${e.action}-${e.createdAt}`),
+                  when: formatRelativeWhen(e.createdAt),
+                  text: `${e.actorName || "User"} · ${String(e.action || e.rawAction || "Update").replace(/_/g, " ")}`,
+                })
+              }
+            }
+          } catch {
+            /* ignore */
+          }
         }
       }
 
@@ -926,11 +1363,12 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
         setCollabTasks(tasks)
         setCollabActivity(activity)
       }
+      if (!cancelled) setCollabLoading(false)
     })()
     return () => {
       cancelled = true
     }
-  }, [budgetCycleId, selected?.id, modelId, collabReloadKey])
+  }, [budgetCycleId, selected?.id, modelId, collabReloadKey, cycleOwners])
 
   const onCycleChange = useCallback(
     (id: string) => {
@@ -987,27 +1425,19 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
     })
   }, [collabActivity])
 
-  const onDriverSave = useCallback(
-    async (id: string, value: number) => {
-      try {
-        const res = await fpaApi.updateDriver(id, { value })
-        if (!res.success) throw new Error(res.message || "Driver update failed")
-        setPlanningDrivers((prev) =>
-          prev.map((d) => (d.id === id ? { ...d, value } : d)),
-        )
-        toast.success("Driver updated")
-      } catch (err) {
-        toast.error(errorMessage(err))
-      }
-    },
-    [],
-  )
-
   const onAddCollabComment = useCallback(
     async (body: string) => {
       try {
         if (budgetCycleId) {
-          const res = await fpaApi.postBudgetCycleComment(budgetCycleId, { body })
+          let res
+          try {
+            res = await fpaApi.postModelPlanningCycleComment(budgetCycleId, { body })
+          } catch {
+            // fall back to legacy budget-cycle endpoint
+          }
+          if (!res) {
+            res = await fpaApi.postBudgetCycleComment(budgetCycleId, { body })
+          }
           if (!res.success) throw new Error(res.message || "Comment failed")
           toast.success("Comment posted")
           setCollabReloadKey((k) => k + 1)
@@ -1030,10 +1460,26 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
 
   const budgetSubmitUnmet = useMemo(() => {
     if (!inBudgetContext) return [] as string[]
-    if (ownerUnmet.length) return ownerUnmet.map(resolveDeptMessage)
     const unmet: string[] = []
-    if (!submitTaskId) unmet.push("No open owner task is bound for this cycle.")
-    if (ownerCanSubmit === false && !ownerUnmet.length) {
+    const isOwnerTaskGapMsg = (m: string) =>
+      /owner task|department assignment|no open owner task/i.test(m)
+
+    if (!submitTaskId) {
+      if (!budgetDepartmentId && !mpcMyOwnerTaskId) {
+        unmet.push("Select your department in View by to submit that plan slice.")
+      } else {
+        unmet.push("No department plan task for this slice.")
+      }
+    }
+
+    // Prefer FE copy for owner-task gaps; keep other BE submit gates.
+    for (const raw of ownerUnmet) {
+      const m = resolveDeptMessage(raw)
+      if (isOwnerTaskGapMsg(m)) continue
+      unmet.push(m)
+    }
+
+    if (ownerCanSubmit === false && submitTaskId && !unmet.length) {
       unmet.push("Owner submit gates are not met for this cycle.")
     }
     if (validationErrors.length) {
@@ -1047,6 +1493,8 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
   }, [
     inBudgetContext,
     submitTaskId,
+    budgetDepartmentId,
+    mpcMyOwnerTaskId,
     validationErrors,
     ownerUnmet,
     ownerCanSubmit,
@@ -1094,14 +1542,21 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
           : Array.isArray((res as { departments?: unknown[] })?.departments)
             ? (res as { departments: unknown[] }).departments
             : []
-        const map = new Map<string, string>()
-        for (const raw of rows) {
-          const row = raw as { id?: string; departmentId?: string; name?: string; departmentName?: string }
-          const id = String(row.id || row.departmentId || "")
-          const name = String(row.name || row.departmentName || "")
-          if (id && name) map.set(id, name)
-        }
-        setDeptById(map)
+        setDeptById((prev) => {
+          const map = new Map(prev)
+          for (const raw of rows) {
+            const row = raw as {
+              id?: string
+              departmentId?: string
+              name?: string
+              departmentName?: string
+            }
+            const id = String(row.id || row.departmentId || "")
+            const name = String(row.name || row.departmentName || "")
+            if (id && name) map.set(id, name)
+          }
+          return map
+        })
       })
       .catch(() => {
         /* humanize falls back to "this department" */
@@ -1115,37 +1570,82 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
     if (!budgetCycleId) {
       setOwnerUnmet([])
       setOwnerCanSubmit(null)
+      setMpcMyOwnerTaskId(null)
+      setOwnerWorkspaceReadOnly(false)
       return
     }
     let cancelled = false
     void fpaApi
-      .getOwnerWorkspace(budgetCycleId)
+      .getModelPlanningOwnerWorkspace(budgetCycleId)
       .then((res) => {
         if (cancelled || !res.success || !res.data) return
-        setOwnerCanSubmit(res.data.canSubmit ?? null)
-        setOwnerUnmet((res.data.unmetRequirements || []).map((u) => u.message))
+        const data = res.data
+        setOwnerCanSubmit(data.canSubmit ?? null)
+        setOwnerUnmet((data.unmetRequirements || []).map((u) => u.message))
+        setOwnerWorkspaceReadOnly(Boolean(data.readOnly))
+        setMpcMyOwnerTaskId(data.myOwner?.taskId || null)
+        if (data.assignedDepartmentIds != null) {
+          setAssignedDepartmentIds(data.assignedDepartmentIds)
+        }
+        const owners = data.owners || []
+        if (owners.length) {
+          const mappedOwners = owners.map((o) => ({
+            departmentId: o.departmentId,
+            departmentName: o.departmentName || undefined,
+            assigneeId: o.assigneeId || undefined,
+            assigneeName: o.assigneeName || undefined,
+            taskId: o.taskId || undefined,
+            status: o.status || undefined,
+            dueDate: o.dueDate || undefined,
+          }))
+          // Seed cycle detail if getModelPlanningCycle hasn't resolved yet —
+          // otherwise owners were dropped and Assign task showed "No cycle departments".
+          setActiveCycleDetail((prev) =>
+            prev
+              ? ({ ...prev, owners: mappedOwners } as FpaBudgetCycle)
+              : ({
+                  id: budgetCycleId,
+                  name: budgetCycleName || "Planning cycle",
+                  owners: mappedOwners,
+                } as FpaBudgetCycle),
+          )
+        }
         setDeptById((prev) => {
           const next = new Map(prev)
-          for (const row of res.data.departmentBudgetRegister || []) {
-            const id = String(row.departmentId || "")
-            const name = String(row.departmentName || "")
-            if (id && name) next.set(id, name)
+          for (const o of owners) {
+            if (o.departmentId && o.departmentName) next.set(o.departmentId, o.departmentName)
           }
-          const cycleOwners = (res.data.cycle as { owners?: Array<{ departmentId?: string; departmentName?: string }> } | undefined)
-            ?.owners
-          for (const o of cycleOwners || []) {
-            const id = String(o.departmentId || "")
-            const name = String(o.departmentName || "")
-            if (id && name) next.set(id, name)
+          if (data.myOwner?.departmentId && data.myOwner.departmentName) {
+            next.set(data.myOwner.departmentId, data.myOwner.departmentName)
           }
           return next
         })
       })
       .catch(() => {
-        if (!cancelled) {
-          setOwnerUnmet([])
-          setOwnerCanSubmit(null)
-        }
+        // Legacy budget-cycle worksheet links only — never prefer this for MPC ids.
+        void fpaApi
+          .getOwnerWorkspace(budgetCycleId)
+          .then((res) => {
+            if (cancelled || !res.success || !res.data) return
+            setOwnerCanSubmit(res.data.canSubmit ?? null)
+            setOwnerUnmet((res.data.unmetRequirements || []).map((u) => u.message))
+            setDeptById((prev) => {
+              const next = new Map(prev)
+              for (const row of res.data.departmentBudgetRegister || []) {
+                const id = String(row.departmentId || "")
+                const name = String(row.departmentName || "")
+                if (id && name) next.set(id, name)
+              }
+              return next
+            })
+          })
+          .catch(() => {
+            if (!cancelled) {
+              setOwnerUnmet([])
+              setOwnerCanSubmit(null)
+              setMpcMyOwnerTaskId(null)
+            }
+          })
       })
     return () => {
       cancelled = true
@@ -1156,30 +1656,96 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
   useEffect(() => {
     let cancelled = false
     void (async () => {
-      await dispatch(bootstrapFpaSelection(modelId))
+      const boot = await dispatch(bootstrapFpaSelection(modelId))
       if (cancelled) return
+
+      const payload =
+        bootstrapFpaSelection.fulfilled.match(boot) ? boot.payload : null
+      const scenarioList = (payload?.scenarios || []).filter(
+        (s) => !s.modelId || s.modelId === modelId,
+      )
+      const versionList = (payload?.versions || []).filter(
+        (v) => !v.modelId || v.modelId === modelId,
+      )
 
       let scenarioId = queryScenarioId
       let versionId = queryVersionId
-      if ((!scenarioId || !versionId) && budgetCycleId) {
+
+      if (budgetCycleId && (!scenarioId || !versionId)) {
         try {
-          const cycleRes = await fpaApi.getBudgetCycle(budgetCycleId)
-          if (cycleRes.success && cycleRes.data) {
-            scenarioId = scenarioId || cycleRes.data.scenarioId || null
-            versionId = versionId || cycleRes.data.versionId || null
+          const mpc = await fpaApi.getModelPlanningCycle(budgetCycleId)
+          if (mpc.success && mpc.data) {
+            scenarioId = scenarioId || mpc.data.baseScenarioId || null
+            versionId = versionId || mpc.data.sourceModelVersionId || null
           }
         } catch {
-          /* keep bootstrap defaults */
+          try {
+            const cycleRes = await fpaApi.getBudgetCycle(budgetCycleId)
+            if (cycleRes.success && cycleRes.data) {
+              scenarioId = scenarioId || cycleRes.data.scenarioId || null
+              versionId = versionId || cycleRes.data.versionId || null
+            }
+          } catch {
+            /* keep fallbacks below */
+          }
         }
       }
+
+      const pickDefaultScenario = () =>
+        payload?.selectedScenarioId ||
+        scenarioList.find(
+          (s) =>
+            String(s.scenarioType || "").toUpperCase() === "BASE" ||
+            /^(base|budget)/i.test(String(s.name || "").trim()),
+        )?.id ||
+        scenarioList[0]?.id ||
+        null
+
+      if (!scenarioId) scenarioId = pickDefaultScenario()
+      if (!versionId) {
+        versionId =
+          payload?.selectedVersionId ||
+          versionList.find((v) => {
+            const st = String(v.status || "").toUpperCase()
+            return st === "LOCKED" || st === "PUBLISHED"
+          })?.id ||
+          versionList[0]?.id ||
+          null
+      }
+
       if (cancelled) return
       if (scenarioId) dispatch(setSelectedScenarioId(scenarioId))
       if (versionId) dispatch(setSelectedVersionId(versionId))
+
+      // Persist defaults in the URL so tabs / refresh stay in sync
+      const sp = new URLSearchParams(searchParams.toString())
+      let dirty = false
+      if (scenarioId && sp.get("scenarioId") !== scenarioId) {
+        sp.set("scenarioId", scenarioId)
+        dirty = true
+      }
+      if (versionId && sp.get("versionId") !== versionId) {
+        sp.set("versionId", versionId)
+        dirty = true
+      }
+      if (dirty) {
+        const q = sp.toString()
+        router.replace(q ? `${pathname}?${q}` : pathname)
+      }
     })()
     return () => {
       cancelled = true
     }
-  }, [modelId, budgetCycleId, queryScenarioId, queryVersionId, dispatch])
+  }, [
+    modelId,
+    budgetCycleId,
+    queryScenarioId,
+    queryVersionId,
+    dispatch,
+    searchParams,
+    router,
+    pathname,
+  ])
 
   useEffect(() => {
     let cancelled = false
@@ -1234,6 +1800,7 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
           versionId: selectedVersionId,
           scenarioId: selectedScenarioId,
           cycleId: budgetCycleId || undefined,
+          departmentId: budgetDepartmentId || undefined,
           pageSize: 500,
         }),
         fpaApi
@@ -1249,9 +1816,13 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
       setCells(gridRes.data.cells || [])
       setGridPeriods(gridRes.data.periods || [])
       setActualCutoff(gridRes.data.actualCutoff || null)
+      setGridForecastStart(gridRes.data.forecastStartPeriod || null)
       setGridOwnerName(gridRes.data.ownerName || null)
       setGridOwnerAvatar(gridRes.data.ownerAvatarUrl || null)
-      setAssignedDepartmentIds(gridRes.data.assignedDepartmentIds || [])
+      // null/omit = full-edit (no FE lock); keep prior owner-workspace list if grid omits
+      if (gridRes.data.assignedDepartmentIds !== undefined) {
+        setAssignedDepartmentIds(gridRes.data.assignedDepartmentIds)
+      }
 
       const rawVal = valRes?.success ? valRes.data : null
       const list = Array.isArray(rawVal)
@@ -1294,16 +1865,36 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
       setLineItems([])
       setCells([])
       setGridPeriods([])
+      setActualCutoff(null)
+      setGridForecastStart(null)
       setValidationErrors([])
-      setAssignedDepartmentIds([])
+      setAssignedDepartmentIds(null)
     } finally {
       setLoading(false)
     }
-  }, [modelId, selectedVersionId, selectedScenarioId, budgetCycleId])
+  }, [modelId, selectedVersionId, selectedScenarioId, budgetCycleId, budgetDepartmentId])
 
   useEffect(() => {
     void load()
   }, [load])
+
+  const onDriverSave = useCallback(
+    async (id: string, value: number) => {
+      try {
+        const res = await fpaApi.updateDriver(id, { value })
+        if (!res.success) throw new Error(res.message || "Driver update failed")
+        setPlanningDrivers((prev) =>
+          prev.map((d) => (d.id === id ? { ...d, value } : d)),
+        )
+        toast.success("Driver updated")
+        await load()
+        void refreshAfterPlanEdit()
+      } catch (err) {
+        toast.error(errorMessage(err))
+      }
+    },
+    [load, refreshAfterPlanEdit],
+  )
 
   useEffect(() => {
     if (editingCellId) editInputRef.current?.focus()
@@ -1315,18 +1906,51 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
     el?.scrollIntoView({ behavior: "smooth", block: "center" })
   }, [focusLineId])
 
+  const effectiveActualsCutoff = useMemo(() => {
+    return (
+      actualCutoff ||
+      activeCycleDetail?.actualsCutoffDate ||
+      null
+    )
+  }, [actualCutoff, activeCycleDetail?.actualsCutoffDate])
+
+  const effectiveForecastStart = useMemo(() => {
+    if (gridForecastStart) return gridForecastStart
+    if (activeCycleDetail?.forecastStartPeriod) return activeCycleDetail.forecastStartPeriod
+    if (!effectiveActualsCutoff) return null
+    // Next month after cutoff when neither grid nor cycle sent forecastStart
+    const d = new Date(effectiveActualsCutoff)
+    if (Number.isNaN(d.getTime())) {
+      if (/^\d{4}-\d{2}/.test(effectiveActualsCutoff)) {
+        const [y, m] = effectiveActualsCutoff.slice(0, 7).split("-").map(Number)
+        // Number("07")=7 → Date.UTC(y, 7, 1) = August (correct next month after July)
+        return new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10)
+      }
+      return null
+    }
+    const next = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1))
+    return next.toISOString().slice(0, 10)
+  }, [gridForecastStart, activeCycleDetail?.forecastStartPeriod, effectiveActualsCutoff])
+
   const periods: PeriodCol[] = useMemo(() => {
+    const cutoffKey = effectiveActualsCutoff ? monthKey(effectiveActualsCutoff) : ""
+    const applyBand = (key: string, fallback: "ACTUAL" | "FORECAST"): "ACTUAL" | "FORECAST" => {
+      if (cutoffKey) return key <= cutoffKey ? "ACTUAL" : "FORECAST"
+      return fallback
+    }
+
     const fromApi = new Map<string, PeriodCol>()
     for (const p of gridPeriods) {
       const iso = p.periodDate || p.key
       if (!iso) continue
       const key = monthKey(iso)
       const role = String(p.periodRole || "").toUpperCase()
+      const fallback: "ACTUAL" | "FORECAST" = role === "ACTUAL" ? "ACTUAL" : "FORECAST"
       fromApi.set(key, {
         key,
         iso,
         label: p.label || monthLabel(iso),
-        band: role === "ACTUAL" ? "ACTUAL" : "FORECAST",
+        band: applyBand(key, fallback),
       })
     }
 
@@ -1335,14 +1959,14 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
     for (const [key, iso] of set) {
       if (fromApi.has(key)) continue
       const cellRole = cells.find((c) => monthKey(c.periodDate) === key)?.periodRole
-      if (cellRole) {
-        fromApi.set(key, {
-          key,
-          iso,
-          label: monthLabel(iso),
-          band: String(cellRole).toUpperCase() === "ACTUAL" ? "ACTUAL" : "FORECAST",
-        })
-      }
+      const fallback: "ACTUAL" | "FORECAST" =
+        String(cellRole || "").toUpperCase() === "ACTUAL" ? "ACTUAL" : "FORECAST"
+      fromApi.set(key, {
+        key,
+        iso,
+        label: monthLabel(iso),
+        band: applyBand(key, fallback),
+      })
     }
 
     if (fromApi.size) {
@@ -1350,29 +1974,29 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
     }
 
     const sorted = [...set.entries()].sort((a, b) => a[0].localeCompare(b[0]))
-    let cutoffKey = actualCutoff ? monthKey(actualCutoff) : ""
-    if (!cutoffKey) {
+    let inferredCutoff = cutoffKey
+    if (!inferredCutoff) {
       for (const c of cells) {
         if (String(c.sourceType || "").toUpperCase() === "ACTUAL") {
           const k = monthKey(c.periodDate)
-          if (k > cutoffKey) cutoffKey = k
+          if (k > inferredCutoff) inferredCutoff = k
         }
       }
     }
-    if (!cutoffKey && sorted.length) {
+    if (!inferredCutoff && sorted.length) {
       const today = new Date()
       const todayKey = `${today.getUTCFullYear()}-${String(today.getUTCMonth() + 1).padStart(2, "0")}`
       const past = sorted.filter(([k]) => k <= todayKey)
-      cutoffKey = past.length ? past[past.length - 1][0] : ""
+      inferredCutoff = past.length ? past[past.length - 1][0] : ""
     }
 
     return sorted.map(([key, iso]) => ({
       key,
       iso,
       label: monthLabel(iso),
-      band: cutoffKey && key <= cutoffKey ? ("ACTUAL" as const) : ("FORECAST" as const),
+      band: applyBand(key, inferredCutoff && key <= inferredCutoff ? "ACTUAL" : "FORECAST"),
     }))
-  }, [cells, gridPeriods, actualCutoff])
+  }, [cells, gridPeriods, effectiveActualsCutoff])
 
   const actualPeriods = useMemo(() => periods.filter((p) => p.band === "ACTUAL"), [periods])
   const forecastPeriods = useMemo(() => periods.filter((p) => p.band === "FORECAST"), [periods])
@@ -1489,11 +2113,112 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
     [cellMap],
   )
 
-  const isReadOnly = (cell?: FpaCell) => {
+  const isOutsideOwnerScope = (cell: FpaCell) => {
+    // FP&A / admin may edit any department. Owners are limited to authorised slices.
+    if (isAdmin || canEditAllDepartments) return false
+    if (!canEditGrid) return true
+    const activeDept = budgetDepartmentId || null
+    const allowed = activeDept
+      ? authorisedDepartmentIds.includes(activeDept)
+        ? [activeDept]
+        : authorisedDepartmentIds.length
+          ? authorisedDepartmentIds
+          : [activeDept]
+      : authorisedDepartmentIds
+    if (!allowed.length) return false
+    const cellDept = cell.departmentId || null
+    // Company-level cells (no department) are not owner-editable when scopes exist
+    if (!cellDept) return true
+    return !allowed.includes(cellDept)
+  }
+
+  const isReadOnly = (cell?: FpaCell, periodBand?: "ACTUAL" | "FORECAST") => {
     if (!cell) return true
+    // SRD: periods ≤ actuals cutoff are read-only (no exceptional adjust permission yet)
+    if (periodBand === "ACTUAL") return true
+    if (cell.readOnly === true || cell.isEditable === false) return true
+    if (isOutsideOwnerScope(cell)) return true
     const state = cellState(cell)
     if (state === "INPUT" || state === "OVERRIDE") return false
-    return state === "ACTUAL" || state === "LOCKED" || state === "CALCULATED" || state === "IMPORTED" || state === "ERROR" || state === "PENDING_CALCULATION" || cell.isEditable === false
+    return (
+      state === "ACTUAL" ||
+      state === "LOCKED" ||
+      state === "CALCULATED" ||
+      state === "IMPORTED" ||
+      state === "ERROR" ||
+      state === "PENDING_CALCULATION"
+    )
+  }
+
+  const submitDepartmentSlice = async () => {
+    if (!canSubmitTask) {
+      toast.error("You do not have permission to submit")
+      return
+    }
+    if (ownerWorkspaceReadOnly) {
+      toast.error("This plan is read-only for your role")
+      return
+    }
+    if (!submitTaskId) {
+      toast.error("No open owner task is bound for this department slice")
+      return
+    }
+    if (budgetSubmitUnmet.length) {
+      toast.error(budgetSubmitUnmet[0] || "Submit requirements not met")
+      return
+    }
+    setBusyKey("submit-slice")
+    try {
+      const res = await fpaApi.submitTask(submitTaskId, {
+        changeNotes: changeNotesDraft.trim() || undefined,
+        comment: changeNotesDraft.trim() || undefined,
+      })
+      if (!res.success) throw new Error(res.message || "Submit failed")
+      toast.success(
+        budgetDepartmentName || viewByLabel !== "Total Company"
+          ? `Submitted ${budgetDepartmentName || viewByLabel} plan`
+          : "Plan submitted",
+      )
+      setChangeNotesDraft("")
+      void load()
+      setCollabReloadKey((k) => k + 1)
+      // Refresh owner workspace / task status
+      if (budgetCycleId) {
+        void fpaApi.getModelPlanningOwnerWorkspace(budgetCycleId).then((ws) => {
+          if (!ws.success || !ws.data) return
+          setOwnerCanSubmit(ws.data.canSubmit ?? null)
+          setOwnerUnmet((ws.data.unmetRequirements || []).map((u) => u.message))
+          setMpcMyOwnerTaskId(ws.data.myOwner?.taskId || null)
+          if (ws.data.owners?.length) {
+            setActiveCycleDetail((prev) =>
+              prev
+                ? ({
+                    ...prev,
+                    owners: ws.data!.owners.map((o) => ({
+                      departmentId: o.departmentId,
+                      departmentName: o.departmentName || undefined,
+                      assigneeId: o.assigneeId || undefined,
+                      assigneeName: o.assigneeName || undefined,
+                      taskId: o.taskId || undefined,
+                      status: o.status || undefined,
+                      dueDate: o.dueDate || undefined,
+                    })),
+                  } as FpaBudgetCycle)
+                : prev,
+            )
+          }
+        })
+      }
+    } catch (err) {
+      const code = (err as { response?: { code?: string } })?.response?.code
+      if (code === "OWNER_SUBMIT_BLOCKED") {
+        toast.error(errorMessage(err, "Submit blocked — unmet requirements for this slice"))
+      } else {
+        toast.error(errorMessage(err, "Submit failed"))
+      }
+    } finally {
+      setBusyKey(null)
+    }
   }
 
   const selectCell = async (cell: FpaCell, edit: boolean) => {
@@ -1504,7 +2229,8 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
     setCellDetail(null)
     setTraceOpen(false)
     setCellTrace(null)
-    if (edit && !isReadOnly(cell) && canEditGrid) {
+    const periodBand = periods.find((p) => p.key === monthKey(cell.periodDate))?.band
+    if (edit && !isReadOnly(cell, periodBand) && canEditGrid) {
       setEditingCellId(cell.id)
       setEditDraft(String(asNumber(cell.value)))
     } else {
@@ -1624,6 +2350,7 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
         setSelected((prev) => (prev?.id === cell.id ? next : prev))
       }
       cancelEdit()
+      void refreshAfterPlanEdit()
     } catch (err) {
       const status = (err as { status?: number })?.status
       const code = (err as { response?: { code?: string } })?.response?.code
@@ -1648,7 +2375,21 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
         request: { cellId: cell.id, value, recordVersion: cell.recordVersion },
         response: err,
       })
-      if (status === 409 || code === "CONFLICT") {
+      if (code === "ACTUAL_PERIOD_LOCKED") {
+        toast.error(
+          errorMessage(
+            err,
+            "Cannot edit values in actual periods (on or before actuals cutoff).",
+          ),
+        )
+      } else if (code === "DEPARTMENT_SCOPE_LOCKED") {
+        toast.error(
+          errorMessage(
+            err,
+            "Cannot edit outside your authorised department (or company rollups).",
+          ),
+        )
+      } else if (status === 409 || code === "CONFLICT") {
         const who = conflict?.changedBy ? ` by ${conflict.changedBy}` : ""
         const cur =
           conflict?.currentValue != null
@@ -1676,12 +2417,19 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
             },
           },
         })
-      } else if (code === "CELL_NOT_EDITABLE" || (status === 403 && code !== "LOCKED_VERSION")) {
-        toast.error(errorMessage(err, "This cell is not editable (CELL_NOT_EDITABLE)"))
-      } else if (code === "LOCKED_VERSION" || status === 403) {
+      } else if (code === "LOCKED_VERSION") {
         toast.error(
-          code === "LOCKED_VERSION"
-            ? errorMessage(err, "Version is locked — request reopen for a working copy")
+          errorMessage(
+            err,
+            budgetCycleId
+              ? "Version is locked — ensure cycleId is sent on cell writes"
+              : "Version is locked — open a planning cycle (cycleId) to edit, or request reopen",
+          ),
+        )
+      } else if (code === "CELL_NOT_EDITABLE" || status === 403) {
+        toast.error(
+          code === "CELL_NOT_EDITABLE"
+            ? errorMessage(err, "This cell is not editable (CELL_NOT_EDITABLE)")
             : errorMessage(err, "This cell is not editable"),
         )
       } else {
@@ -1721,6 +2469,7 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
           scenarioId: selectedScenarioId,
           lineItemId: selected.lineItemId,
           value: total,
+          method: "EVEN",
           cycleId: budgetCycleId || undefined,
         })
         if (!res.success) throw new Error(res.message || "Spread failed")
@@ -1734,6 +2483,7 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
           const byId = new Map(res.data.cells.map((c) => [c.id, c]))
           setCells((prev) => prev.map((c) => byId.get(c.id) || c))
         } else await load()
+        void refreshAfterPlanEdit()
       } else if (tool === "copy" && selected) {
         const res = await fpaApi.copyForward(modelId, {
           versionId: selectedVersionId,
@@ -1753,6 +2503,7 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
           const byId = new Map(res.data.cells.map((c) => [c.id, c]))
           setCells((prev) => prev.map((c) => byId.get(c.id) || c))
         } else await load()
+        void refreshAfterPlanEdit()
       } else if (tool === "growth" && selected) {
         const ratePct = Number(growthRate)
         if (!Number.isFinite(ratePct)) {
@@ -1776,6 +2527,7 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
           const byId = new Map(res.data.cells.map((c) => [c.id, c]))
           setCells((prev) => prev.map((c) => byId.get(c.id) || c))
         } else await load()
+        void refreshAfterPlanEdit()
       } else if (tool === "sync") {
         const res = await fpaApi.syncActuals({
           modelId,
@@ -1848,9 +2600,24 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
       toast.success(n > 0 ? `${operation.replace(/_/g, " ")} · ${n} cells` : operation.replace(/_/g, " "))
       if (res.data?.cells?.length) mergeCells(res.data.cells)
       else await load()
+      void refreshAfterPlanEdit()
     } catch (err) {
       const code = (err as { response?: { code?: string } })?.response?.code
-      if (code === "CELL_NOT_EDITABLE" || code === "LOCKED_VERSION") {
+      if (code === "ACTUAL_PERIOD_LOCKED") {
+        toast.error(
+          errorMessage(
+            err,
+            "Cannot edit values in actual periods (on or before actuals cutoff).",
+          ),
+        )
+      } else if (code === "DEPARTMENT_SCOPE_LOCKED") {
+        toast.error(
+          errorMessage(
+            err,
+            "Cannot edit outside your authorised department (or company rollups).",
+          ),
+        )
+      } else if (code === "CELL_NOT_EDITABLE" || code === "LOCKED_VERSION") {
         toast.error(errorMessage(err, code))
       } else {
         toast.error(errorMessage(err, "Bulk operation failed"))
@@ -1953,10 +2720,11 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
   const renderMonthCell = (row: FpaLineItem, p: PeriodCol) => {
     const cell = cellMap.get(`${row.id}|${p.key}`)
     const value = asNumber(cell?.value)
-    const ro = isReadOnly(cell)
+    const ro = isReadOnly(cell, p.band)
     const isSel = selected?.id === cell?.id
     const isEditing = cell && editingCellId === cell.id
     const isRoot = !row.parentId || !rows.some((r) => r.id === row.parentId)
+    const isActualCol = p.band === "ACTUAL"
 
     if (!cell) {
       return (
@@ -1965,6 +2733,7 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
           className={cn(
             "px-3 py-2.5 border-b border-r border-[#eaecf0] text-right text-[#98a2b3]",
             isRoot && "bg-[#f5f8ff]",
+            isActualCol && !isRoot && "bg-[#f8fafc]",
           )}
         >
           —
@@ -1983,6 +2752,7 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
         className={cn(
           "px-1 py-1 border-b border-r border-[#eaecf0]",
           isRoot && "bg-[#f5f8ff]",
+          isActualCol && !isRoot && "bg-[#f8fafc]",
         )}
       >
         {isEditing ? (
@@ -2012,10 +2782,17 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
               "w-full text-right tabular-nums px-2 py-1.5 rounded-md border border-transparent",
               isRoot ? "font-semibold text-[#1d4ed8]" : ro ? "text-[#475467]" : "text-[#101828]",
               !ro && canEditGrid && "hover:border-[#b2ddff] cursor-text",
+              ro && "cursor-default",
               isSel && "border-[#2563eb] bg-white",
             )}
             onClick={() => void selectCell(cell, !ro && canEditGrid)}
-            title={ro ? cellStateMeta(cellState(cell)).hint : "Click to edit"}
+            title={
+              isActualCol
+                ? "Actual period — read-only (≤ actuals cutoff)"
+                : ro
+                  ? cellStateMeta(cellState(cell)).hint
+                  : "Click to edit"
+            }
           >
             {shown}
           </button>
@@ -2049,6 +2826,9 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
           currency={currency}
           cycles={planningCycles}
           cycleId={budgetCycleId}
+          cycleName={budgetCycleName || activeCycleDetail?.name || null}
+          actualsCutoff={effectiveActualsCutoff}
+          forecastStart={effectiveForecastStart}
           onCycleChange={onCycleChange}
           drivers={driverRows}
           canEditDrivers={canEditGrid}
@@ -2070,6 +2850,7 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
           onDriverSave={onDriverSave}
           viewByLabel={viewByLabel}
           viewByOptions={viewByOptions}
+          onViewByChange={onViewByChange}
           workspaceView={workspaceView}
           onWorkspaceViewChange={onWorkspaceViewChange}
           compareScenarioIds={compareScenarioIds}
@@ -2112,18 +2893,75 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
               />
             </div>
           </div>
+        ) : loading && lineItems.length === 0 ? (
+          <PlanningWorksheetBodySkeleton />
         ) : (
         <>
         <div className="space-y-3">
-        <PlanningWorkspaceKpiStrip
-          kpis={planningKpis}
-          currency={currency}
-          viewByLabel={viewByLabel}
-          viewByOptions={viewByOptions}
-          onRefresh={reloadPlanningShell}
-        />
+        {loading && !planningKpis.length ? (
+          <PlanningKpiStripSkeleton />
+        ) : (
+          <PlanningWorkspaceKpiStrip
+            kpis={planningKpis}
+            currency={currency}
+            viewByLabel={viewByLabel}
+            viewByOptions={viewByOptions}
+            onViewByChange={onViewByChange}
+            onRefresh={reloadPlanningShell}
+          />
+        )}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-stretch">
           <div className="lg:col-span-9 space-y-3 min-w-0">
+        {inBudgetContext && canSubmitTask ? (
+          <div className={cn(CARD, "px-4 py-3 space-y-2.5")}>
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-[13px] font-semibold text-[#101828]">
+                  Submit {budgetDepartmentName || (viewByLabel !== "Total Company" ? viewByLabel : "department")}{" "}
+                  plan
+                </p>
+                <p className="text-[11px] text-[#667085] mt-0.5">
+                  Submits your department slice only. FP&amp;A consolidates after all owners submit.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[#2563eb] px-4 text-xs font-medium text-white shadow-sm hover:bg-[#1d4ed8] disabled:opacity-50"
+                disabled={anyBusy || loading || budgetSubmitUnmet.length > 0}
+                onClick={() => void submitDepartmentSlice()}
+              >
+                {busyKey === "submit-slice" ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Send className="w-3.5 h-3.5" />
+                )}
+                Submit my plan
+              </button>
+            </div>
+            {!submitTaskId ? (
+              <p className="text-[11px] text-[#b45309] bg-[#fffbeb] border border-[#fde68a] rounded-md px-2.5 py-1.5">
+                No open owner task for this slice. Select your department in View by.
+              </p>
+            ) : null}
+            {budgetSubmitUnmet.length > 0 ? (
+              <ul className="text-[11px] text-[#b91c1c] space-y-0.5 list-disc pl-4">
+                {budgetSubmitUnmet.slice(0, 4).map((m, i) => (
+                  <li key={`${i}-${m.slice(0, 24)}`}>{m}</li>
+                ))}
+              </ul>
+            ) : null}
+            <label className="block text-[11px] text-[#64748b]">
+              Change notes (optional)
+              <textarea
+                value={changeNotesDraft}
+                onChange={(e) => setChangeNotesDraft(e.target.value)}
+                rows={2}
+                className="mt-1 w-full rounded-md border border-[#e2e8f0] bg-white px-2.5 py-1.5 text-[12px] text-[#0f172a]"
+                placeholder="What changed in this department plan?"
+              />
+            </label>
+          </div>
+        ) : null}
         <div className={cn(CARD, "overflow-hidden")}>
           {/* Design header: title + primary grid controls */}
           <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[#e2e8f0] px-4 py-3">
@@ -2131,7 +2969,14 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
               <h3 className="text-[15px] font-semibold text-[#101828] tracking-tight">
                 Planning Grid
               </h3>
-              <p className="text-[12px] text-[#667085] mt-0.5">All values in {currency}</p>
+              <p className="text-[12px] text-[#667085] mt-0.5">
+                All values in {currency}
+                {budgetDepartmentName || budgetDepartmentId
+                  ? ` · scope ${budgetDepartmentName || deptById.get(budgetDepartmentId || "") || "department"}`
+                  : cycleOwners.length
+                    ? ` · ${cycleOwners.length} department owner${cycleOwners.length === 1 ? "" : "s"}`
+                    : ""}
+              </p>
             </div>
             <div className="flex flex-wrap items-center gap-2 shrink-0">
               <button
@@ -2365,7 +3210,7 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
                           }
                           onClick={() => {
                             setGridMoreOpen(false)
-                            toast.message("Use Submit on the budget banner above the grid")
+                            void submitDepartmentSlice()
                           }}
                         >
                           <Send className="w-3.5 h-3.5" /> Submit plan
@@ -2461,9 +3306,7 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
             Select a version and scenario in the header, or open a model that has defaults.
           </div>
         ) : loading ? (
-          <div className="flex items-center justify-center gap-2 py-12 text-[#64748b]">
-            <Loader2 className="w-5 h-5 animate-spin" /> Loading grid…
-          </div>
+          <PlanningGridSkeleton compact />
         ) : (
           <>
             {/* Grid + details side-by-side; validation under grid — cards never touch */}
@@ -2478,14 +3321,30 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
                             Department
                           </th>
                           {displayMode === "monthly"
-                            ? visibleMonthCols.map((p) => (
-                                <th
-                                  key={p.key}
-                                  className="sticky top-0 z-[2] bg-white px-3 py-2.5 font-medium text-center text-[#667085] whitespace-nowrap border-r border-[#eaecf0]"
-                                >
-                                  {p.label.replace(/\s+\d{4}$/, "") || p.label}
-                                </th>
-                              ))
+                            ? visibleMonthCols.map((p) => {
+                                const isActual = p.band === "ACTUAL"
+                                return (
+                                  <th
+                                    key={p.key}
+                                    className={cn(
+                                      "sticky top-0 z-[2] px-2 py-2 font-medium text-center whitespace-nowrap border-r border-[#eaecf0]",
+                                      isActual
+                                        ? "bg-[#f2f4f7] text-[#475467]"
+                                        : "bg-[#eff8ff] text-[#175cd3]",
+                                    )}
+                                    title={
+                                      isActual
+                                        ? "Actual period — read-only"
+                                        : "Forecast period — editable inputs"
+                                    }
+                                  >
+                                    <span className="inline-flex items-center justify-center gap-1">
+                                      {isActual ? <Lock className="w-3 h-3 opacity-70" /> : null}
+                                      {p.label.replace(/\s+\d{4}$/, "") || p.label}
+                                    </span>
+                                  </th>
+                                )
+                              })
                             : null}
                           {visibleAggCols.map((c) => (
                             <th
@@ -2496,6 +3355,31 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
                             </th>
                           ))}
                         </tr>
+                        {displayMode === "monthly" &&
+                        (actualPeriods.length > 0 || forecastPeriods.length > 0) ? (
+                          <tr className="border-b border-[#eaecf0]">
+                            <th className="sticky left-0 top-[37px] z-[3] bg-white px-4 py-1 text-[10px] font-medium text-[#98a2b3] border-r border-[#eaecf0]" />
+                            {visibleMonthCols.map((p) => (
+                              <th
+                                key={`band-${p.key}`}
+                                className={cn(
+                                  "sticky top-[37px] z-[2] px-1 py-1 text-[9px] font-semibold uppercase tracking-wide text-center border-r border-[#eaecf0]",
+                                  p.band === "ACTUAL"
+                                    ? "bg-[#f2f4f7] text-[#667085]"
+                                    : "bg-[#eff8ff] text-[#2e90fa]",
+                                )}
+                              >
+                                {p.band === "ACTUAL" ? "Actual" : "Forecast"}
+                              </th>
+                            ))}
+                            {visibleAggCols.map((c) => (
+                              <th
+                                key={`band-${c.key}`}
+                                className="sticky top-[37px] z-[2] bg-[#f9fafb] border-l border-[#eaecf0]"
+                              />
+                            ))}
+                          </tr>
+                        ) : null}
                       </thead>
                       <tbody>
                         {visibleRows.map(({ row, depth, hasChildren }) => {
@@ -2758,7 +3642,10 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
                         <div className="flex justify-between gap-2 items-center">
                           <dt className="text-[#94a3b8]">Validation</dt>
                           <dd className="inline-flex items-center gap-1 text-[#166534] font-medium">
-                            {isReadOnly(selected) ? (
+                            {isReadOnly(
+                              selected,
+                              periods.find((p) => p.key === monthKey(selected.periodDate))?.band
+                            ) ? (
                               "Read-only"
                             ) : (
                               <>
@@ -2830,28 +3717,59 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
         )}
           </div>
 
-        <PlanningWorkspaceInsights
-          drivers={driverRows}
-          canEditDrivers={canEditGrid}
-          onDriverSave={onDriverSave}
-          trendPoints={trendPoints}
-          workflowSteps={workflowSteps}
-        />
+        {loading ? (
+          <PlanningInsightsSkeleton />
+        ) : (
+          <PlanningWorkspaceInsights
+            drivers={driverRows}
+            canEditDrivers={canEditGrid}
+            onDriverSave={onDriverSave}
+            trendPoints={trendPoints}
+            workflowSteps={workflowSteps}
+          />
+        )}
           </div>
 
           <div
             className="lg:col-span-3 flex flex-col gap-3 min-h-[480px] lg:sticky lg:top-3"
             style={{ height: "calc(100vh - 6.5rem)" }}
           >
-            <PlanningCollabSidebar
-              className="flex-1 min-h-0"
-              comments={collabComments}
-              tasks={collabTasks}
-              activity={collabActivity}
-              onAddComment={(body) => void onAddCollabComment(body)}
-              commentPlaceholder="Add a comment..."
-            />
-            <PlanningTasksCard tasks={collabTasks} />
+            {collabLoading ? (
+              <>
+                <PlanningCollabSkeleton className="flex-1 min-h-0" />
+                <PlanningTasksCardSkeleton />
+              </>
+            ) : (
+              <>
+                <PlanningCollabSidebar
+                  className="flex-1 min-h-0"
+                  comments={collabComments}
+                  tasks={collabTasks}
+                  activity={collabActivity}
+                  liveCycle={Boolean(budgetCycleId)}
+                  canAssignTasks={Boolean(budgetCycleId) && canAssignTasks}
+                  assignDepartments={assignDepartments}
+                  assignUsers={users}
+                  defaultAssignDepartmentId={budgetDepartmentId}
+                  onAssignTask={onAssignPlanningTask}
+                  onCompleteTask={onCompletePlanningTask}
+                  assignBusy={assignTaskBusy}
+                  onAddComment={(body) => void onAddCollabComment(body)}
+                  commentPlaceholder="Add a comment..."
+                />
+                <PlanningTasksCard
+                  tasks={collabTasks}
+                  liveCycle={Boolean(budgetCycleId)}
+                  canAssignTasks={Boolean(budgetCycleId) && canAssignTasks}
+                  assignDepartments={assignDepartments}
+                  assignUsers={users}
+                  defaultAssignDepartmentId={budgetDepartmentId}
+                  onAssignTask={onAssignPlanningTask}
+                  onCompleteTask={onCompletePlanningTask}
+                  assignBusy={assignTaskBusy}
+                />
+              </>
+            )}
           </div>
         </div>
         </div>

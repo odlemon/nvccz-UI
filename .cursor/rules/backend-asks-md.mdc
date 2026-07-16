@@ -1,0 +1,20 @@
+---
+description: Always write backend API gaps/asks to a design-refs markdown file
+alwaysApply: true
+---
+
+# Backend asks → markdown file (mandatory)
+
+Whenever the frontend needs something from the backend (missing fields, write guards, new endpoints, contract changes, gaps discovered during FE work):
+
+1. **Write or update** a markdown file under `design-refs/` — do not leave the asks only in chat.
+2. **Name it clearly**, e.g. `design-refs/<feature>-backend-asks.md` or `design-refs/<feature>-backend-gaps.md`.
+3. **Include enough for a BE ticket:**
+   - Product rule / why
+   - Exact endpoints + methods
+   - Request/response field names and example JSON
+   - Error codes expected
+   - How to verify with FE
+   - Which FE files already consume the contract (if known)
+4. In chat, **link the file path** and give a short summary; the MD file is the source of truth for BE.
+5. Prefer updating an existing ask doc for the same feature over creating duplicates.

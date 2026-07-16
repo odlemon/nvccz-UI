@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { Paperclip, ThumbsUp } from "lucide-react"
+import { ChevronDown, Paperclip, Plus, ThumbsUp } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import {
@@ -12,6 +12,10 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog"
+import {
+  PlanningAssignTaskDialog,
+  type PlanningAssignDept,
+} from "@/components/fpa/planning/planning-assign-task-dialog"
 
 export type PlanningComment = {
   id: string
@@ -29,7 +33,17 @@ export type PlanningTask = {
   title: string
   assignee: string
   due: string
+  /** Raw ISO due date when available */
+  dueDate?: string
   done?: boolean
+  departmentId?: string
+  departmentName?: string
+  assigneeId?: string
+  status?: string
+  priority?: string
+  description?: string
+  /** Dept plan slice vs ad-hoc planning task */
+  kind?: "owner_slice" | "planning"
 }
 
 export type PlanningActivity = {
@@ -59,6 +73,21 @@ type Props = {
   mode?: "planning" | "compare"
   /** @deprecated Design always shows Tasks tab + Tasks card; kept for call-site compat. */
   hideTasksTab?: boolean
+  liveCycle?: boolean
+  canAssignTasks?: boolean
+  assignDepartments?: PlanningAssignDept[]
+  assignUsers?: import("@/lib/api/users-api").AppUser[]
+  defaultAssignDepartmentId?: string | null
+  onAssignTask?: (body: {
+    title: string
+    assigneeId: string
+    departmentId?: string | null
+    dueDate?: string | null
+    priority?: string | null
+    description?: string | null
+  }) => Promise<void>
+  assignBusy?: boolean
+  onCompleteTask?: (taskId: string) => Promise<void>
   className?: string
 }
 
@@ -270,38 +299,120 @@ function TaskRow({
   task: PlanningTask
   onToggle: () => void
 }) {
+  const [expanded, setExpanded] = useState(false)
+  const statusLabel = String(task.status || (task.done ? "COMPLETED" : "OPEN")).replace(
+    /_/g,
+    " ",
+  )
+
   return (
-    <li className="flex items-start gap-3 py-2.5">
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-label={task.done ? "Mark incomplete" : "Mark complete"}
-        className={cn(
-          "mt-0.5 h-[18px] w-[18px] shrink-0 rounded-full border-2 inline-flex items-center justify-center",
-          task.done
-            ? "border-[#2563eb] bg-[#2563eb]"
-            : "border-[#d0d5dd] bg-white hover:border-[#98a2b3]",
-        )}
-      >
-        {task.done ? (
-          <span className="block h-1.5 w-1.5 rounded-full bg-white" />
-        ) : null}
-      </button>
-      <div className="min-w-0 flex-1">
-        <p
+    <li className="py-2.5">
+      <div className="flex items-start gap-3">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            onToggle()
+          }}
+          aria-label={task.done ? "Mark incomplete" : "Mark complete"}
           className={cn(
-            "text-[13px] font-medium text-[#101828] leading-snug",
-            task.done && "line-through text-[#98a2b3]",
+            "mt-0.5 h-[18px] w-[18px] shrink-0 rounded-full border-2 inline-flex items-center justify-center",
+            task.done
+              ? "border-[#2563eb] bg-[#2563eb]"
+              : "border-[#d0d5dd] bg-white hover:border-[#98a2b3]",
           )}
         >
-          {task.title}
-        </p>
-        <p className="text-[12px] text-[#667085] mt-0.5">{task.assignee}</p>
+          {task.done ? (
+            <span className="block h-1.5 w-1.5 rounded-full bg-white" />
+          ) : null}
+        </button>
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          className="min-w-0 flex-1 text-left rounded-lg -mx-1 px-1 py-0.5 hover:bg-[#f9fafb] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2563eb]/25"
+        >
+          <div className="flex items-start gap-2">
+            <div className="min-w-0 flex-1">
+              <p
+                className={cn(
+                  "text-[13px] font-medium text-[#101828] leading-snug",
+                  task.done && "line-through text-[#98a2b3]",
+                )}
+              >
+                {task.title}
+              </p>
+              <p className="text-[12px] text-[#667085] mt-0.5">{task.assignee}</p>
+              {task.kind === "owner_slice" ? (
+                <span className="inline-flex mt-1 rounded-full bg-[#eff6ff] px-2 py-0.5 text-[10px] font-medium text-[#1d4ed8]">
+                  Dept plan
+                </span>
+              ) : null}
+            </div>
+            <div className="shrink-0 flex items-center gap-1.5 pt-0.5">
+              {task.due ? (
+                <span className="text-[12px] font-medium text-[#f04438]">{task.due}</span>
+              ) : null}
+              <ChevronDown
+                className={cn(
+                  "w-4 h-4 text-[#98a2b3] transition-transform",
+                  expanded && "rotate-180",
+                )}
+              />
+            </div>
+          </div>
+        </button>
       </div>
-      {task.due ? (
-        <span className="shrink-0 text-[12px] font-medium text-[#f04438] pt-0.5">
-          {task.due}
-        </span>
+
+      {expanded ? (
+        <div className="ml-[30px] mt-2 rounded-xl border border-[#eaecf0] bg-[#f9fafb] px-3 py-2.5 space-y-2">
+          <dl className="grid grid-cols-[88px_1fr] gap-x-2 gap-y-1.5 text-[12px]">
+            <dt className="text-[#98a2b3]">Status</dt>
+            <dd className="text-[#344054] font-medium capitalize">{statusLabel.toLowerCase()}</dd>
+            {task.priority ? (
+              <>
+                <dt className="text-[#98a2b3]">Priority</dt>
+                <dd className="text-[#344054] font-medium capitalize">
+                  {String(task.priority).toLowerCase()}
+                </dd>
+              </>
+            ) : null}
+            {task.departmentName || task.departmentId ? (
+              <>
+                <dt className="text-[#98a2b3]">Department</dt>
+                <dd className="text-[#344054] font-medium">
+                  {task.departmentName || task.departmentId}
+                </dd>
+              </>
+            ) : null}
+            <dt className="text-[#98a2b3]">Assignee</dt>
+            <dd className="text-[#344054] font-medium">{task.assignee || "Unassigned"}</dd>
+            {task.due || task.dueDate ? (
+              <>
+                <dt className="text-[#98a2b3]">Due</dt>
+                <dd className="text-[#344054] font-medium">{task.due || task.dueDate}</dd>
+              </>
+            ) : null}
+            <dt className="text-[#98a2b3]">Type</dt>
+            <dd className="text-[#344054] font-medium">
+              {task.kind === "owner_slice" ? "Department plan slice" : "Planning task"}
+            </dd>
+          </dl>
+          {task.description ? (
+            <div>
+              <p className="text-[11px] font-medium text-[#98a2b3] mb-0.5">Notes</p>
+              <p className="text-[12px] text-[#475467] leading-relaxed whitespace-pre-wrap">
+                {task.description}
+              </p>
+            </div>
+          ) : null}
+          {task.kind === "owner_slice" && !task.done ? (
+            <p className="text-[11px] text-[#667085]">
+              Complete this via <span className="font-medium">Submit my plan</span>, not the
+              checkbox.
+            </p>
+          ) : null}
+        </div>
       ) : null}
     </li>
   )
@@ -316,15 +427,24 @@ export function PlanningCollabSidebar({
   disabledComment,
   commentPlaceholder = "Add a comment...",
   mode = "planning",
+  liveCycle = false,
   className,
+  canAssignTasks = false,
+  assignDepartments = [],
+  assignUsers = [],
+  defaultAssignDepartmentId,
+  onAssignTask,
+  assignBusy = false,
+  onCompleteTask,
 }: Props) {
   const [tab, setTab] = useState<Tab>("comments")
   const [draft, setDraft] = useState("")
   const [localTasks, setLocalTasks] = useState<PlanningTask[]>(
-    () => (tasks?.length ? tasks : DEMO_PLANNING_TASKS),
+    () => (tasks?.length ? tasks : liveCycle ? [] : DEMO_PLANNING_TASKS),
   )
   const [allCommentsOpen, setAllCommentsOpen] = useState(false)
   const [allTasksOpen, setAllTasksOpen] = useState(false)
+  const [assignOpen, setAssignOpen] = useState(false)
 
   const isCompareMode = mode === "compare"
 
@@ -337,9 +457,11 @@ export function PlanningCollabSidebar({
         ? comments
         : isCompareMode
           ? DEMO_COMPARE_COMMENTS
-          : DEMO_PLANNING_COMMENTS,
+          : liveCycle
+            ? []
+            : DEMO_PLANNING_COMMENTS,
     )
-  }, [comments, isCompareMode])
+  }, [comments, isCompareMode, liveCycle])
 
   // Interactive approvals state
   const [selectedApproval, setSelectedApproval] = useState<PlanningApproval | null>(null)
@@ -355,10 +477,10 @@ export function PlanningCollabSidebar({
   }, [mode])
 
   useEffect(() => {
-    setLocalTasks(tasks?.length ? tasks : DEMO_PLANNING_TASKS)
-  }, [tasks])
+    setLocalTasks(tasks?.length ? tasks : liveCycle ? [] : DEMO_PLANNING_TASKS)
+  }, [tasks, liveCycle])
 
-  const activityRows = activity?.length ? activity : DEMO_PLANNING_ACTIVITY
+  const activityRows = activity?.length ? activity : liveCycle ? [] : DEMO_PLANNING_ACTIVITY
   const approvalRows = approvals ?? []
   const displayTasks = localTasks
   const openTaskCount = displayTasks.filter((t) => !t.done).length
@@ -395,10 +517,21 @@ export function PlanningCollabSidebar({
     toast.success("Comment added")
   }
 
-  const toggleTask = (id: string) => {
-    setLocalTasks((prev) =>
-      prev.map((x) => (x.id === id ? { ...x, done: !x.done } : x)),
-    )
+  const toggleTask = async (id: string) => {
+    const task = localTasks.find((t) => t.id === id)
+    if (!task || task.done) return
+
+    if (task.kind === "owner_slice") {
+      toast.message("Use Submit my plan to complete this department slice task.")
+      return
+    }
+
+    try {
+      if (onCompleteTask) await onCompleteTask(id)
+      setLocalTasks((prev) => prev.map((x) => (x.id === id ? { ...x, done: true } : x)))
+    } catch {
+      // keep local state unchanged on failure
+    }
   }
 
   const handleApprove = () => {
@@ -591,11 +724,27 @@ export function PlanningCollabSidebar({
 
           {tab === "tasks" && (
             <div className="flex flex-col flex-1 min-h-0">
-              <ul className="divide-y divide-[#f2f4f7]">
-                {displayTasks.map((t) => (
-                  <TaskRow key={t.id} task={t} onToggle={() => toggleTask(t.id)} />
-                ))}
-              </ul>
+              {canAssignTasks && onAssignTask ? (
+                <button
+                  type="button"
+                  onClick={() => setAssignOpen(true)}
+                  className="mb-2 inline-flex h-8 items-center justify-center gap-1.5 rounded-full border border-[#d0d5dd] bg-white px-3 text-[12px] font-medium text-[#344054] hover:bg-[#f9fafb]"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Assign task
+                </button>
+              ) : null}
+              {displayTasks.length === 0 ? (
+                <p className="text-[12px] text-[#98a2b3] py-4 text-center">
+                  No tasks yet. Assign one to chase department input.
+                </p>
+              ) : (
+                <ul className="divide-y divide-[#f2f4f7]">
+                  {displayTasks.map((t) => (
+                    <TaskRow key={t.id} task={t} onToggle={() => void toggleTask(t.id)} />
+                  ))}
+                </ul>
+              )}
               <button
                 type="button"
                 onClick={() => setAllTasksOpen(true)}
@@ -715,7 +864,7 @@ export function PlanningCollabSidebar({
           <div className="flex-1 overflow-y-auto px-5 py-2">
             <ul className="divide-y divide-[#f2f4f7]">
               {displayTasks.map((t) => (
-                <TaskRow key={t.id} task={t} onToggle={() => toggleTask(t.id)} />
+                <TaskRow key={t.id} task={t} onToggle={() => void toggleTask(t.id)} />
               ))}
             </ul>
           </div>
@@ -764,6 +913,18 @@ export function PlanningCollabSidebar({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {canAssignTasks && onAssignTask ? (
+        <PlanningAssignTaskDialog
+          open={assignOpen}
+          onOpenChange={setAssignOpen}
+          departments={assignDepartments}
+          users={assignUsers}
+          defaultDepartmentId={defaultAssignDepartmentId}
+          busy={assignBusy}
+          onSubmit={onAssignTask}
+        />
+      ) : null}
     </>
   )
 }
@@ -772,19 +933,60 @@ export function PlanningCollabSidebar({
 export function PlanningTasksCard({
   tasks = [],
   className,
+  liveCycle = false,
+  canAssignTasks = false,
+  assignDepartments = [],
+  assignUsers = [],
+  defaultAssignDepartmentId,
+  onAssignTask,
+  assignBusy = false,
+  onCompleteTask,
 }: {
   tasks?: PlanningTask[]
   viewAllHref?: string
   className?: string
+  liveCycle?: boolean
+  canAssignTasks?: boolean
+  assignDepartments?: PlanningAssignDept[]
+  assignUsers?: import("@/lib/api/users-api").AppUser[]
+  defaultAssignDepartmentId?: string | null
+  onAssignTask?: (body: {
+    title: string
+    assigneeId: string
+    departmentId?: string | null
+    dueDate?: string | null
+    priority?: string | null
+    description?: string | null
+  }) => Promise<void>
+  assignBusy?: boolean
+  onCompleteTask?: (taskId: string) => Promise<void>
 }) {
   const [localTasks, setLocalTasks] = useState(() =>
-    tasks.length ? tasks : DEMO_PLANNING_TASKS,
+    tasks.length ? tasks : liveCycle ? [] : DEMO_PLANNING_TASKS,
   )
   const [allOpen, setAllOpen] = useState(false)
+  const [assignOpen, setAssignOpen] = useState(false)
 
   useEffect(() => {
-    setLocalTasks(tasks.length ? tasks : DEMO_PLANNING_TASKS)
-  }, [tasks])
+    setLocalTasks(tasks.length ? tasks : liveCycle ? [] : DEMO_PLANNING_TASKS)
+  }, [tasks, liveCycle])
+
+  const toggleTask = async (id: string) => {
+    const task = localTasks.find((t) => t.id === id)
+    if (!task || task.done) return
+
+    if (task.kind === "owner_slice") {
+      toast.message("Use Submit my plan to complete this department slice task.")
+      return
+    }
+
+    try {
+      if (onCompleteTask) await onCompleteTask(id)
+      setLocalTasks((prev) => prev.map((x) => (x.id === id ? { ...x, done: true } : x)))
+    } catch {
+      // keep local state unchanged on failure
+    }
+  }
 
   return (
     <>
@@ -794,15 +996,27 @@ export function PlanningTasksCard({
           className,
         )}
       >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-[#eaecf0]">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-[#eaecf0] gap-2">
           <h3 className="text-[14px] font-semibold text-[#101828]">Tasks</h3>
-          <button
-            type="button"
-            onClick={() => setAllOpen(true)}
-            className="text-[13px] font-medium text-[#2563eb] hover:underline"
-          >
-            View all
-          </button>
+          <div className="flex items-center gap-2">
+            {canAssignTasks && onAssignTask ? (
+              <button
+                type="button"
+                onClick={() => setAssignOpen(true)}
+                className="inline-flex h-8 items-center justify-center gap-1.5 rounded-full border border-[#d0d5dd] bg-white px-3 text-[12px] font-medium text-[#344054] hover:bg-[#f9fafb]"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Assign
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => setAllOpen(true)}
+              className="text-[13px] font-medium text-[#2563eb] hover:underline"
+            >
+              View all
+            </button>
+          </div>
         </div>
         <div className="px-4 py-1 max-h-[280px] overflow-auto">
           <ul className="divide-y divide-[#f2f4f7]">
@@ -810,11 +1024,7 @@ export function PlanningTasksCard({
               <TaskRow
                 key={t.id}
                 task={t}
-                onToggle={() => {
-                  setLocalTasks((prev) =>
-                    prev.map((x) => (x.id === t.id ? { ...x, done: !x.done } : x)),
-                  )
-                }}
+                onToggle={() => void toggleTask(t.id)}
               />
             ))}
           </ul>
@@ -834,17 +1044,25 @@ export function PlanningTasksCard({
                 <TaskRow
                   key={t.id}
                   task={t}
-                  onToggle={() => {
-                    setLocalTasks((prev) =>
-                      prev.map((x) => (x.id === t.id ? { ...x, done: !x.done } : x)),
-                    )
-                  }}
+                  onToggle={() => void toggleTask(t.id)}
                 />
               ))}
             </ul>
           </div>
         </DialogContent>
       </Dialog>
+
+      {canAssignTasks && onAssignTask ? (
+        <PlanningAssignTaskDialog
+          open={assignOpen}
+          onOpenChange={setAssignOpen}
+          departments={assignDepartments}
+          users={assignUsers}
+          defaultDepartmentId={defaultAssignDepartmentId}
+          busy={assignBusy}
+          onSubmit={onAssignTask}
+        />
+      ) : null}
     </>
   )
 }

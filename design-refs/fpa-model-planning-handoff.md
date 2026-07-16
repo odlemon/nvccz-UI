@@ -1,9 +1,13 @@
 # Handoff — FP&A Model Planning (FE) + backend API asks
 
 **For:** next coding agent picking up this work  
-**Date:** 2026-07-14  
+**Date:** 2026-07-14 (updated 2026-07-15 with full Planning+Builder SRD)  
 **Repo:** `nvccz-new` (Next.js App Router FE)  
 **Owner context:** Frontend wired Model Planning / Scenarios to live APIs and wrote a backend contract MD for BE to implement.
+
+**Canonical product SRD (Builder + Planning together):**  
+- [`fpa-model-planning-builder-srd.md`](./fpa-model-planning-builder-srd.md) — full Version 1.0  
+- [`fpa-model-planning-builder-frontend.md`](./fpa-model-planning-builder-frontend.md) — **what the frontend must implement**
 
 **How to log in & drive the UI in a browser:** see [`fpa-browser-login-playbook.md`](./fpa-browser-login-playbook.md).
 

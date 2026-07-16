@@ -445,6 +445,10 @@ export interface FpaDriver {
   periodDate?: string | null
   scenarioId?: string | null
   versionId?: string | null
+  /** Prior-year / actual comparison for Driver Assumptions (Stage 3). */
+  priorActual?: number | null
+  priorValue?: number | null
+  priorPeriodLabel?: string | null
   requiresApproval?: boolean
   createdById?: string
   createdAt?: string
@@ -490,6 +494,8 @@ export interface FpaCell {
   cellStatus?: FpaCellStatus
   periodRole?: "ACTUAL" | "FORECAST" | string
   isEditable?: boolean
+  /** When true (e.g. Actual period via cycle cut-over), treat as non-editable. */
+  readOnly?: boolean
   isLocked?: boolean
   formulaId?: string | null
   driverId?: string | null
@@ -522,11 +528,15 @@ export interface FpaGridResponse {
   periods?: FpaGridPeriod[]
   /** FY totals by lineItemId using each item's summaryMethod (SUM/AVG/LAST). */
   fyTotals?: Record<string, number>
+  /** Last Actual month (period start) when loaded with cycleId. */
   actualCutoff?: string | null
+  /** First Forecast month (period start); prefer over FE-derived next month. */
+  forecastStartPeriod?: string | null
   ownerName?: string | null
   ownerAvatarUrl?: string | null
-  /** Present when grid is loaded with cycleId — departments the caller may edit. */
-  assignedDepartmentIds?: string[]
+  /** Present when grid is loaded with cycleId — departments the caller may edit.
+   * `null` / omitted for FP&A full-edit roles → no FE owner lock. */
+  assignedDepartmentIds?: string[] | null
 }
 
 export interface FpaValidationCheckItem {
@@ -889,6 +899,24 @@ export type FpaBudgetCycleUpdateRequest = Partial<Omit<FpaBudgetCycleCreateReque
 
 export type FpaModelPlanningCycleStatus = 'DRAFT' | 'OPEN' | 'CLOSED' | 'ARCHIVED' | string
 
+/** Department slice owner on a Model Planning cycle (create + GET/list). */
+export interface FpaModelPlanningOwnerCreate {
+  departmentId: string
+  assigneeId: string
+  dueDate?: string | null
+}
+
+export interface FpaModelPlanningOwnerAssignment {
+  departmentId: string
+  departmentName?: string | null
+  assigneeId?: string | null
+  assigneeName?: string | null
+  /** Owner task for department-slice submit — required for Submit UI. */
+  taskId?: string | null
+  status?: FpaTaskStatus | string | null
+  dueDate?: string | null
+}
+
 export interface FpaModelPlanningCycle {
   id: string
   /** Backend returns the cycle name as snake_case `cycle_name`. */
@@ -904,6 +932,8 @@ export interface FpaModelPlanningCycle {
   submissionDeadline?: string | null
   approvalWorkflowId?: string | null
   planningOwnerId?: string | null
+  /** Department / assignee scopes for this cycle. */
+  owners?: FpaModelPlanningOwnerAssignment[]
   status: FpaModelPlanningCycleStatus
   createdById?: string | null
   createdAt?: string | null
@@ -923,6 +953,8 @@ export interface FpaModelPlanningCycleCreateRequest {
   submissionDeadline?: string | null
   approvalWorkflowId?: string | null
   planningOwnerId?: string | null
+  /** Optional department budget owners — creates per-dept scopes + tasks. */
+  owners?: FpaModelPlanningOwnerCreate[]
 }
 
 export type FpaModelPlanningCycleUpdateRequest = Partial<FpaModelPlanningCycleCreateRequest>
@@ -935,8 +967,10 @@ export interface FpaModelPlanningCycleSourceModel {
 
 export interface FpaModelPlanningCycleSourceVersion {
   id: string
-  modelId: string
-  label: string
+  modelId?: string
+  /** Display name — some BE payloads use `label`, others `name` (same as FpaVersion). */
+  label?: string | null
+  name?: string | null
   status?: string | null
   isPublished?: boolean | null
   createdAt?: string | null
@@ -961,7 +995,49 @@ export interface FpaModelPlanningCycleWorkspace {
   model: { id: string; name?: string | null; code?: string | null }
   version: { id: string; label?: string | null; status?: string | null }
   scenarios: FpaModelPlanningCycleSourceScenario[]
-  grid: { modelId: string; versionId: string; baseScenarioId?: string | null }
+  /** Top-level cut-over (same as cycle fields; convenience for chrome). */
+  actualsCutoffPeriod?: string | null
+  forecastStartPeriod?: string | null
+  grid: {
+    modelId: string
+    versionId: string
+    baseScenarioId?: string | null
+    cycleId?: string | null
+    actualCutoff?: string | null
+    forecastStartPeriod?: string | null
+  }
+}
+
+/** Model Planning–native owner workspace (do not use budget-cycle owner-workspace). */
+export interface FpaModelPlanningOwnerWorkspace {
+  cycle: {
+    id: string
+    status: FpaModelPlanningCycleStatus | string
+    cycle_name?: string
+    name?: string
+    submissionDeadline?: string | null
+  }
+  owners: FpaModelPlanningOwnerAssignment[]
+  myOwner?: FpaModelPlanningOwnerAssignment | null
+  canSubmit?: boolean
+  unmetRequirements?: Array<{
+    code?: string
+    message: string
+    severity?: "BLOCKING" | "WARNING" | string
+  }>
+  assignedDepartmentIds?: string[] | null
+  readOnly?: boolean
+}
+
+export interface FpaModelPlanningTaskCreateRequest {
+  title: string
+  assigneeId: string
+  departmentId?: string | null
+  dueDate?: string | null
+  priority?: string | null
+  description?: string | null
+  modelId?: string | null
+  versionId?: string | null
 }
 
 export interface FpaModelPlanningCycleListResponse {
@@ -1059,6 +1135,9 @@ export interface FpaCycleTask {
   dueDate?: string | null
   submittedOn?: string | null
   changeNotes?: string | null
+  description?: string | null
+  taskKind?: "OWNER_SLICE" | "PLANNING" | string | null
+  isDeptPlan?: boolean | null
   workflowId?: string | null
   modelId?: string | null
   versionId?: string | null
@@ -1875,6 +1954,8 @@ export const fpaApi = {
       versionId?: string
       scenarioId?: string
       cycleId?: string
+      /** View-by department slice (must be authorised for owners). */
+      departmentId?: string
       page?: number
       pageSize?: number
       lineItemId?: string
@@ -1973,6 +2054,16 @@ export const fpaApi = {
       scenarioId: string
       lineItemId: string
       value: number
+      /** EVEN today; CUSTOM_WEIGHT / PRIOR_YEAR_PATTERN etc. when BE supports (Stage 3). */
+      method?:
+        | 'EVEN'
+        | 'CUSTOM_WEIGHT'
+        | 'PRIOR_YEAR_PATTERN'
+        | 'HISTORICAL_PATTERN'
+        | 'WORKING_DAYS'
+        | 'SEASONAL_PROFILE'
+        | string
+      weights?: number[]
       periodDates?: string[]
       cycleId?: string
     },
@@ -2191,6 +2282,9 @@ export const fpaApi = {
 
   approveTask: (id: string, body?: { comment?: string }) =>
     apiClient.post<ApiResponse<FpaTask>>(`${FPA}/tasks/${id}/approve`, body ?? {}),
+
+  patchTask: (id: string, body: { status: string }) =>
+    apiClient.patch<ApiResponse<FpaTask>>(`${FPA}/tasks/${id}`, body),
 
   reassignTask: (id: string, body: { assigneeId: string; comment?: string }) =>
     apiClient.post<ApiResponse<FpaTask>>(`${FPA}/tasks/${id}/reassign`, body),
@@ -2513,6 +2607,57 @@ export const fpaApi = {
   getModelPlanningCycleWorkspace: (id: string) =>
     apiClient.get<ApiResponse<FpaModelPlanningCycleWorkspace>>(
       `${FPA}/model-planning/cycles/${id}/workspace`,
+    ),
+
+  getModelPlanningOwnerWorkspace: (id: string) =>
+    apiClient.get<ApiResponse<FpaModelPlanningOwnerWorkspace>>(
+      `${FPA}/model-planning/cycles/${id}/owner-workspace`,
+    ),
+
+  assignModelPlanningOwners: (
+    id: string,
+    body: { owners: FpaModelPlanningOwnerCreate[] },
+  ) =>
+    apiClient.put<ApiResponse<FpaModelPlanningCycle>>(
+      `${FPA}/model-planning/cycles/${id}/owners`,
+      body,
+    ),
+
+  listModelPlanningCycleTasks: (
+    id: string,
+    params?: {
+      status?: string
+      departmentId?: string
+      assigneeId?: string
+      priority?: string
+    },
+  ) =>
+    apiClient.get<ApiResponse<FpaCycleTask[]>>(
+      `${FPA}/model-planning/cycles/${id}/tasks${qs(params)}`,
+    ),
+
+  createModelPlanningCycleTask: (id: string, body: FpaModelPlanningTaskCreateRequest) =>
+    apiClient.post<ApiResponse<FpaCycleTask>>(
+      `${FPA}/model-planning/cycles/${id}/tasks`,
+      body,
+    ),
+
+  // —— Model Planning cycle comments + activity (MPC-native) ——
+  listModelPlanningCycleComments: (id: string) =>
+    apiClient.get<ApiResponse<FpaWorkflowComment[]>>(
+      `${FPA}/model-planning/cycles/${id}/comments`,
+    ),
+  postModelPlanningCycleComment: (
+    id: string,
+    body: { body: string },
+  ) =>
+    apiClient.post<ApiResponse<FpaWorkflowComment>>(
+      `${FPA}/model-planning/cycles/${id}/comments`,
+      body,
+    ),
+  listModelPlanningCycleActivity: (id: string) =>
+    apiClient.get<ApiResponse<FpaApprovalEvent[]>>(
+      `${FPA}/model-planning/cycles/${id}/activity`,
     ),
 
   updateModelPlanningCycle: (id: string, body: FpaModelPlanningCycleUpdateRequest) =>
