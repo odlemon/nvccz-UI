@@ -1,33 +1,42 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import {
-  CalendarDays,
+  AlertTriangle,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   Download,
   FileText,
   LayoutList,
+  Loader2,
   MoreHorizontal,
   Plus,
   Search,
-  Send,
-  SlidersHorizontal,
-  StickyNote,
   X,
 } from "lucide-react"
+import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { FrMandateWizard } from "@/components/fundraising/fundraising-create-wizards"
+import { fundraisingApi, toastFrError } from "@/lib/api/fundraising-api"
+import { exportFundraisingCsv } from "@/lib/fundraising/export"
 import {
-  MANDATES,
-  TOTAL_MANDATES,
-  mandateDetailFor,
-  scoreLabel,
-  type MandateRow,
-  type MandateStage,
-} from "./mandates-mock-data"
+  MANDATE_ACTIVATION_FLAGS,
+  fmtDate,
+  mapMandateRow,
+  mapRfpRow,
+} from "@/lib/fundraising/mappers"
+import {
+  emptyRequirementsState,
+  FrDialogShell,
+  FrField,
+  FrRequirementsDialog,
+  FrTableSkeleton,
+  frInputClass,
+  requirementsFromError,
+} from "./fundraising-modals"
+import type { MandateStage } from "./mandates-mock-data"
 
 const CARD =
   "rounded-[12px] border border-[#e2e8f0] bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
@@ -45,30 +54,63 @@ const STAGE_BADGE: Record<MandateStage, string> = {
 
 const STAGE_LABEL: Record<MandateStage, string> = {
   rfp: "RFP",
-  mandate_live: "Mandate Live",
+  mandate_live: "Mandate",
   shortlist: "Shortlist",
   evaluation: "Evaluation",
 }
 
-function scoreTone(score: number) {
-  if (score >= 85) return { border: "border-[#16a34a]", text: "text-[#15803d]", bg: "bg-white" }
-  if (score >= 70) return { border: "border-[#22c55e]", text: "text-[#16a34a]", bg: "bg-white" }
-  if (score >= 55) return { border: "border-[#eab308]", text: "text-[#ca8a04]", bg: "bg-white" }
-  return { border: "border-[#f97316]", text: "text-[#ea580c]", bg: "bg-white" }
+type CombinedRow = ReturnType<typeof mapMandateRow> | ReturnType<typeof mapRfpRow>
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+function readableName(value: unknown) {
+  const name = String(value || "").trim()
+  return name && !UUID_PATTERN.test(name) ? name : ""
 }
 
-function ScoreBadge({ score }: { score: number }) {
-  const tone = scoreTone(score)
+function ownerLabel(row: CombinedRow) {
+  const raw = row.raw
+  const embedded = raw.owner || raw.assignedOwner
   return (
-    <span
-      className={cn(
-        "inline-flex h-7 min-w-[28px] items-center justify-center border px-1 text-[11px] font-semibold tabular-nums",
-        R4,
-        tone.border,
-        tone.text,
-        tone.bg,
-      )}
-    >
+    readableName(raw.ownerName) ||
+    readableName(embedded?.fullName) ||
+    readableName(embedded?.displayName) ||
+    readableName(embedded?.name) ||
+    "Name unavailable"
+  )
+}
+
+function nextStepLabel(row: CombinedRow) {
+  const raw = row.raw
+  const embedded = raw.nextStep
+  return (
+    readableName(raw.nextStepName) ||
+    readableName(embedded?.title) ||
+    readableName(embedded?.label) ||
+    readableName(embedded?.name) ||
+    readableName(row.nextStep) ||
+    "Name unavailable"
+  )
+}
+
+function ScoreBadge({ score }: { score: number | null }) {
+  if (score == null) {
+    return (
+      <span className={cn("inline-flex h-7 min-w-[28px] items-center justify-center border px-1 text-[11px] font-semibold text-[#94a3b8]", R4, "border-[#e2e8f0] bg-white")}>
+        —
+      </span>
+    )
+  }
+  const tone =
+    score >= 85
+      ? { border: "border-[#16a34a]", text: "text-[#15803d]" }
+      : score >= 70
+        ? { border: "border-[#22c55e]", text: "text-[#16a34a]" }
+        : score >= 55
+          ? { border: "border-[#eab308]", text: "text-[#ca8a04]" }
+          : { border: "border-[#f97316]", text: "text-[#ea580c]" }
+  return (
+    <span className={cn("inline-flex h-7 min-w-[28px] items-center justify-center border px-1 text-[11px] font-semibold tabular-nums bg-white", R4, tone.border, tone.text)}>
       {score}
     </span>
   )
@@ -78,10 +120,12 @@ function MandateCheckbox({
   checked,
   onChange,
   label,
+  disabled,
 }: {
   checked: boolean
   onChange: () => void
   label: string
+  disabled?: boolean
 }) {
   return (
     <button
@@ -89,12 +133,13 @@ function MandateCheckbox({
       role="checkbox"
       aria-checked={checked}
       aria-label={label}
+      disabled={disabled}
       onClick={(e) => {
         e.stopPropagation()
         onChange()
       }}
       className={cn(
-        "inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-colors",
+        "inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-colors disabled:opacity-50",
         checked ? "border-[#2563eb] bg-[#2563eb]" : "border-[#cbd5e1] bg-white hover:border-[#94a3b8]",
       )}
     >
@@ -107,25 +152,34 @@ function MandateCheckbox({
   )
 }
 
-function FilterSelect({ label }: { label: string }) {
+function FilterSelect({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string
+  value: string
+  options: string[]
+  onChange: (value: string) => void
+}) {
   return (
-    <button
-      type="button"
+    <label
       className={cn(
         "inline-flex min-w-[118px] flex-col items-stretch border border-[#e2e8f0] bg-white px-3 py-2 text-left hover:bg-[#fafbfc]",
         R6,
       )}
     >
       <span className="text-[10px] font-medium leading-none text-[#64748b]">{label}</span>
-      <span className="mt-1.5 flex items-center justify-between gap-2">
-        <span className="text-xs leading-none text-[#94a3b8]">All</span>
-        <ChevronDown className="h-3.5 w-3.5 shrink-0 text-[#94a3b8]" strokeWidth={2} />
-      </span>
-    </button>
+      <select value={value} onChange={(e) => onChange(e.target.value)} className="mt-1 bg-transparent text-xs text-[#475569] outline-none">
+        <option value="all">All</option>
+        {options.map((option) => <option key={option} value={option}>{option}</option>)}
+      </select>
+    </label>
   )
 }
 
-function OrgLogo({ row, size = "sm" }: { row: MandateRow; size?: "sm" | "lg" }) {
+function OrgLogo({ row, size = "sm" }: { row: CombinedRow; size?: "sm" | "lg" }) {
   const isLg = size === "lg"
   return (
     <span
@@ -141,44 +195,44 @@ function OrgLogo({ row, size = "sm" }: { row: MandateRow; size?: "sm" | "lg" }) 
   )
 }
 
-function DetailSectionHeader({
-  title,
-  action = "View all",
-}: {
-  title: string
-  action?: string
-}) {
+function DetailSectionHeader({ title }: { title: string }) {
   return (
     <div className="flex items-center justify-between px-5 py-3.5">
       <h3 className="text-[13px] font-semibold text-[#0f172a]">{title}</h3>
-      {action ? (
-        <button type="button" className="text-[11px] font-medium text-[#2563eb] hover:underline">
-          {action}
-        </button>
-      ) : null}
     </div>
   )
 }
 
-const CONTACT_AVATARS = [
-  "bg-[#ede9fe] text-[#6d28d9]",
-  "bg-[#dbeafe] text-[#1d4ed8]",
-  "bg-[#dcfce7] text-[#15803d]",
-]
-
-function DetailPanel({ mandate, onClose }: { mandate: MandateRow; onClose: () => void }) {
-  const detail = mandateDetailFor(mandate.id)
-  if (!detail) return null
+function DetailPanel({
+  row,
+  onClose,
+  onActivate,
+  onConvert,
+  onToggleFlag,
+  activating,
+  converting,
+  togglingKey,
+}: {
+  row: CombinedRow
+  onClose: () => void
+  onActivate: () => void
+  onConvert: () => void
+  onToggleFlag: (key: string, value: boolean) => void
+  activating: boolean
+  converting: boolean
+  togglingKey: string | null
+}) {
+  const isRfp = row.kind === "RFP"
 
   return (
     <aside className={cn(CARD, "thin-scroll max-h-[calc(100vh-8rem)] overflow-y-auto")}>
       {/* Header */}
       <div className="border-b border-[#f1f5f9] px-5 pb-4 pt-5">
         <div className="flex items-start gap-3">
-          <OrgLogo row={mandate} size="lg" />
+          <OrgLogo row={row} size="lg" />
           <div className="min-w-0 flex-1">
             <div className="flex items-start justify-between gap-2">
-              <h2 className="text-[15px] font-semibold leading-snug text-[#0f172a]">{mandate.name}</h2>
+              <h2 className="text-[15px] font-semibold leading-snug text-[#0f172a]">{row.name}</h2>
               <button
                 type="button"
                 onClick={onClose}
@@ -191,272 +245,217 @@ function DetailPanel({ mandate, onClose }: { mandate: MandateRow; onClose: () =>
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <p className="mt-1 text-xs text-[#64748b]">
-              {mandate.orgType} • {mandate.detailGeography}
-              {mandate.geographyFlag ? ` ${mandate.geographyFlag}` : ""}
-            </p>
+            <p className="mt-1 text-xs text-[#64748b]">{row.organization}</p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <span
                 className={cn(
-                  "inline-flex items-center gap-1 border border-[#16a34a] bg-white px-2 py-0.5 text-[10px] font-semibold text-[#15803d]",
+                  "inline-flex items-center gap-1 border px-2 py-0.5 text-[10px] font-semibold",
                   R4,
+                  isRfp ? "border-[#2563eb] text-[#1d4ed8]" : "border-[#16a34a] text-[#15803d]",
                 )}
               >
                 <FileText className="h-3 w-3" strokeWidth={2} />
-                RFP
+                {String(row.status).replace(/_/g, " ")}
               </span>
-              <div className="inline-flex items-center gap-1.5">
-                <span className="text-[11px] text-[#94a3b8]">Score</span>
-                <span
-                  className={cn(
-                    "inline-flex min-w-[26px] items-center justify-center bg-[#dcfce7] px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-[#15803d]",
-                    R4,
-                  )}
-                >
-                  {mandate.score}
-                </span>
-                <span
-                  className={cn(
-                    "inline-flex border border-[#16a34a] bg-white px-1.5 py-0.5 text-[10px] font-semibold text-[#15803d]",
-                    R4,
-                  )}
-                >
-                  {scoreLabel(mandate.score)}
-                </span>
-              </div>
+              <ScoreBadge score={row.score} />
             </div>
           </div>
         </div>
 
+        {"complianceBlocked" in row && row.complianceBlocked ? (
+          <div className="mt-3 flex items-start gap-2 rounded-[6px] border border-[#fecaca] bg-[#fef2f2] px-2.5 py-2 text-[11px] text-[#b91c1c]">
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            Compliance hold — activation blocked until KYC / sanctions clear.
+          </div>
+        ) : null}
+
         <div className="mt-4 flex flex-wrap gap-2">
-          <button
-            type="button"
-            className={cn(
-              "inline-flex h-9 items-center justify-center gap-1.5 bg-gradient-to-r from-blue-600 to-cyan-600 px-3.5 text-xs font-medium text-white shadow-sm hover:from-blue-700 hover:to-cyan-700",
-              R6,
-            )}
-          >
-            <CalendarDays className="h-3.5 w-3.5" />
-            Schedule Meeting
-          </button>
-          <button
-            type="button"
-            className={cn(
-              "inline-flex h-9 items-center justify-center gap-1.5 border border-[#e2e8f0] bg-white px-3.5 text-xs font-medium text-[#334155] hover:bg-[#f8fafc]",
-              R6,
-            )}
-          >
-            <FileText className="h-3.5 w-3.5" />
-            Open RFP Doc
-          </button>
-          <button
-            type="button"
-            className={cn(
-              "inline-flex h-9 items-center justify-center gap-1.5 border border-[#e2e8f0] bg-white px-3.5 text-xs font-medium text-[#334155] hover:bg-[#f8fafc]",
-              R6,
-            )}
-          >
-            <Send className="h-3.5 w-3.5" />
-            Send Materials
-          </button>
-        </div>
-
-        <div className="mt-2 flex gap-2">
-          <button
-            type="button"
-            className={cn(
-              "inline-flex h-9 flex-1 items-center justify-center gap-1.5 border border-[#e2e8f0] bg-white text-xs font-medium text-[#334155] hover:bg-[#f8fafc]",
-              R6,
-            )}
-          >
-            <StickyNote className="h-3.5 w-3.5" />
-            Add Note
-            <ChevronDown className="h-3.5 w-3.5 opacity-60" />
-          </button>
-          <button
-            type="button"
-            className={cn(
-              "inline-flex h-9 w-9 shrink-0 items-center justify-center border border-[#e2e8f0] bg-white text-[#64748b] hover:bg-[#f8fafc]",
-              R6,
-            )}
-            aria-label="More note options"
-          >
-            <ChevronDown className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      </div>
-
-      {/* Contact persons */}
-      <div className="border-b border-[#f1f5f9]">
-        <DetailSectionHeader title="Contact Persons" />
-        <ul className="divide-y divide-[#f1f5f9]">
-          {detail.contacts.map((contact, index) => (
-            <li key={contact.id} className="px-5 py-3.5">
-              <div className="flex items-start gap-3">
-                <span
-                  className={cn(
-                    "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold",
-                    CONTACT_AVATARS[index % CONTACT_AVATARS.length],
-                  )}
-                >
-                  {contact.initials}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-semibold text-[#0f172a]">{contact.name}</p>
-                  <p className="mt-0.5 text-[11px] text-[#64748b]">{contact.role}</p>
-                  <p className="mt-1 truncate text-[11px] text-[#94a3b8]">{contact.email}</p>
-                </div>
-                <div className="shrink-0 text-right">
-                  {contact.isPrimary && (
-                    <span
-                      className={cn(
-                        "mb-1 inline-flex bg-[#dcfce7] px-1.5 py-0.5 text-[9px] font-semibold text-[#15803d]",
-                        R4,
-                      )}
-                    >
-                      Primary
-                    </span>
-                  )}
-                  <p className="text-[11px] text-[#64748b] whitespace-nowrap">{contact.phone}</p>
-                </div>
-              </div>
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      {/* Interaction history */}
-      <div className="border-b border-[#f1f5f9]">
-        <DetailSectionHeader title="Interaction History (last 90 days)" action="" />
-        <ol className="relative space-y-4 px-5 pb-2">
-          {detail.interactions.length > 1 && (
-            <span aria-hidden className="absolute bottom-3 left-[27px] top-2 w-px bg-[#e2e8f0]" />
-          )}
-          {detail.interactions.map((item) => (
-            <li key={item.id} className="relative flex gap-3">
-              <span className="relative z-10 mt-1.5 h-2 w-2 shrink-0 rounded-full border-2 border-[#2563eb] bg-white ring-4 ring-white" />
-              <div className="min-w-0 flex-1 pb-1">
-                <p className="text-[11px] text-[#94a3b8]">{item.date}</p>
-                <p className="mt-0.5 text-xs font-semibold text-[#0f172a]">{item.title}</p>
-                {item.detail && (
-                  <p className="mt-1 text-[11px] leading-relaxed text-[#64748b]">{item.detail}</p>
-                )}
-              </div>
-            </li>
-          ))}
-        </ol>
-        <div className="px-5 pb-4">
-          <button type="button" className="text-[11px] font-medium text-[#2563eb] hover:underline">
-            View all history
-          </button>
-        </div>
-      </div>
-
-      {/* Interests */}
-      <div className="border-b border-[#f1f5f9]">
-        <DetailSectionHeader title="Interests" />
-        <div className="flex flex-wrap gap-1.5 px-5 pb-4">
-          {detail.interests.map((tag) => (
-            <span
-              key={tag}
+          {isRfp ? (
+            <button
+              type="button"
+              disabled={row.raw.outcome !== "WON" || converting}
+              onClick={onConvert}
               className={cn(
-                "inline-flex bg-[#f1f5f9] px-2.5 py-1 text-[10px] font-medium text-[#2563eb]",
-                R4,
+                "inline-flex h-9 items-center justify-center gap-1.5 bg-gradient-to-r from-blue-600 to-cyan-600 px-3.5 text-xs font-medium text-white shadow-sm hover:from-blue-700 hover:to-cyan-700 disabled:opacity-50",
+                R6,
               )}
             >
-              {tag}
-            </span>
-          ))}
+              {converting ? "Converting…" : "Convert to Mandate"}
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={row.status === "ACTIVE" || Boolean((row as any).complianceBlocked) || activating}
+              onClick={onActivate}
+              className={cn(
+                "inline-flex h-9 items-center justify-center gap-1.5 bg-gradient-to-r from-blue-600 to-cyan-600 px-3.5 text-xs font-medium text-white shadow-sm hover:from-blue-700 hover:to-cyan-700 disabled:opacity-50",
+                R6,
+              )}
+            >
+              {activating ? "Activating…" : row.status === "ACTIVE" ? "Mandate Active" : "Activate Mandate"}
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Documents shared */}
-      <div className="border-b border-[#f1f5f9]">
-        <DetailSectionHeader title="Documents Shared" />
-        <ul className="divide-y divide-[#f1f5f9]">
-          {detail.documents.map((doc) => (
-            <li key={doc.id} className="flex items-center gap-2.5 px-5 py-3">
-              <FileText className="h-4 w-4 shrink-0 text-[#dc2626]" strokeWidth={1.75} />
-              <p className="min-w-0 flex-1 truncate text-xs font-medium text-[#0f172a]">{doc.name}</p>
-              <p className="shrink-0 text-[10px] text-[#94a3b8] whitespace-nowrap">Shared {doc.sharedOn}</p>
-            </li>
-          ))}
-        </ul>
-      </div>
+      {isRfp ? (
+        <div className="border-b border-[#f1f5f9]">
+          <DetailSectionHeader title="RFP Details" />
+          <dl className="space-y-2 px-5 pb-4 text-[12px]">
+            <div className="flex justify-between gap-2">
+              <dt className="text-[#94a3b8]">Reference</dt>
+              <dd className="font-medium text-[#0f172a]">{row.raw.referenceNumber || "—"}</dd>
+            </div>
+            <div className="flex justify-between gap-2">
+              <dt className="text-[#94a3b8]">Deadline</dt>
+              <dd className="text-[#0f172a]">{row.rfpDueDate}</dd>
+            </div>
+            <div className="flex justify-between gap-2">
+              <dt className="text-[#94a3b8]">Presentation date</dt>
+              <dd className="text-[#0f172a]">{fmtDate(row.raw.presentationDate) || "—"}</dd>
+            </div>
+            <div className="flex justify-between gap-2">
+              <dt className="text-[#94a3b8]">Outcome</dt>
+              <dd className="text-[#0f172a]">{row.raw.outcome || "PENDING"}</dd>
+            </div>
+          </dl>
+        </div>
+      ) : (
+        <div className="border-b border-[#f1f5f9]">
+          <div className="flex items-center justify-between px-5 py-3.5">
+            <h3 className="text-[13px] font-semibold text-[#0f172a]">Activation Checklist</h3>
+            <span className="text-[11px] tabular-nums text-[#64748b]">
+              {(row as any).checklistDone}/{(row as any).checklistTotal}
+            </span>
+          </div>
+          <ul className="space-y-2.5 px-5 pb-4">
+            {MANDATE_ACTIVATION_FLAGS.map((f) => (
+              <li key={f.key} className="flex items-center justify-between gap-2">
+                <span className="text-[12px] text-[#334155]">{f.label}</span>
+                <MandateCheckbox
+                  checked={Boolean(row.raw[f.key])}
+                  disabled={togglingKey === f.key}
+                  onChange={() => onToggleFlag(f.key, !row.raw[f.key])}
+                  label={f.label}
+                />
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
-      {/* Recent emails */}
-      <div className="border-b border-[#f1f5f9]">
-        <DetailSectionHeader title="Recent Emails" />
-        <ul className="divide-y divide-[#f1f5f9]">
-          {detail.emails.map((email) => (
-            <li key={email.id} className="flex items-center gap-3 px-5 py-3">
-              <span className="w-[72px] shrink-0 text-[11px] text-[#94a3b8]">{email.date}</span>
-              <span className="min-w-0 flex-1 truncate text-xs font-medium text-[#0f172a]">{email.subject}</span>
-              <span className="shrink-0 text-[11px] text-[#64748b]">{email.from}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      {/* Meeting timeline */}
       <div>
-        <DetailSectionHeader title="Meeting Timeline" />
-        <ul className="relative space-y-4 px-5 pb-5">
-          {detail.meetings.length > 1 && (
-            <span aria-hidden className="absolute bottom-8 left-[27px] top-2 w-px bg-[#e2e8f0]" />
-          )}
-          {detail.meetings.map((meeting) => (
-            <li key={meeting.id} className="relative flex gap-3">
-              <span className="relative z-10 mt-1.5 h-2 w-2 shrink-0 rounded-full border-2 border-[#cbd5e1] bg-white ring-4 ring-white" />
-              <div className="flex min-w-0 flex-1 items-start justify-between gap-3 pb-1">
-                <div className="min-w-0">
-                  <p className="text-[11px] text-[#94a3b8]">{meeting.date}</p>
-                  <p className="mt-0.5 text-xs font-semibold text-[#0f172a]">{meeting.title}</p>
-                  {meeting.detail && (
-                    <p className="mt-1 text-[11px] text-[#64748b]">{meeting.detail}</p>
-                  )}
-                </div>
-                <span
-                  className={cn(
-                    "shrink-0 px-2 py-0.5 text-[10px] font-medium",
-                    R4,
-                    meeting.status === "Completed" && "bg-[#dcfce7] text-[#15803d]",
-                    meeting.status === "Scheduled" && "bg-[#dbeafe] text-[#1d4ed8]",
-                    meeting.status === "Upcoming" && "border border-[#e2e8f0] bg-[#f8fafc] text-[#64748b]",
-                  )}
-                >
-                  {meeting.status}
-                </span>
-              </div>
-            </li>
-          ))}
-        </ul>
+        <DetailSectionHeader title="Key Facts" />
+        <dl className="space-y-2 px-5 pb-5 text-[12px]">
+          <div className="flex justify-between gap-2">
+            <dt className="text-[#94a3b8]">Mandate size / expected AUM</dt>
+            <dd className="font-medium text-[#0f172a]">{row.mandateSize}</dd>
+          </div>
+          <div className="flex justify-between gap-2">
+            <dt className="text-[#94a3b8]">Asset class</dt>
+            <dd className="text-[#0f172a]">{row.assetClass}</dd>
+          </div>
+          <div className="flex justify-between gap-2">
+            <dt className="text-[#94a3b8]">Geography</dt>
+            <dd className="text-[#0f172a]">{row.geography}</dd>
+          </div>
+          <div className="flex justify-between gap-2">
+            <dt className="text-[#94a3b8]">Owner</dt>
+            <dd className="text-[#0f172a]">{ownerLabel(row)}</dd>
+          </div>
+          <div className="flex justify-between gap-2">
+            <dt className="text-[#94a3b8]">Next step</dt>
+            <dd className="text-right text-[#0f172a]">{nextStepLabel(row)}</dd>
+          </div>
+        </dl>
       </div>
     </aside>
   )
 }
 
-const PAGE_ITEMS: (number | "ellipsis")[] = [1, 2, 3, 4, 5, "ellipsis", 10]
-
 export function FundraisingMandates() {
   const [search, setSearch] = useState("")
-  const [selectedId, setSelectedId] = useState<string>("m1")
+  const [typeFilter, setTypeFilter] = useState("all")
+  const [geographyFilter, setGeographyFilter] = useState("all")
+  const [stageFilter, setStageFilter] = useState("all")
+  const [selectedId, setSelectedId] = useState<string | null>(null)
   const [checked, setChecked] = useState<Set<string>>(new Set())
   const [page, setPage] = useState(1)
   const [createOpen, setCreateOpen] = useState(false)
+  const [rfpOpen, setRfpOpen] = useState(false)
+  const [rfpSubmitting, setRfpSubmitting] = useState(false)
+  const [rfpForm, setRfpForm] = useState({ institutionName: "", deadline: "" })
+  const [requirements, setRequirements] = useState(emptyRequirementsState)
+
+  const [loading, setLoading] = useState(true)
+  const [rawMandates, setRawMandates] = useState<Record<string, any>[]>([])
+  const [rawRfps, setRawRfps] = useState<Record<string, any>[]>([])
+  const [rawInvestors, setRawInvestors] = useState<Record<string, any>[]>([])
+
+  const [activatingId, setActivatingId] = useState<string | null>(null)
+  const [convertingId, setConvertingId] = useState<string | null>(null)
+  const [togglingKey, setTogglingKey] = useState<string | null>(null)
+
+  async function loadData() {
+    setLoading(true)
+    try {
+      const [mandates, rfps, investors] = await Promise.all([
+        fundraisingApi.listMandates(),
+        fundraisingApi.listRfps(),
+        fundraisingApi.listInvestors({ pageSize: 200 }),
+      ])
+      setRawMandates(mandates ?? [])
+      setRawRfps(rfps ?? [])
+      setRawInvestors(investors?.items ?? [])
+    } catch (err) {
+      toastFrError(err, "Could not load mandates")
+      setRawMandates([])
+      setRawRfps([])
+      setRawInvestors([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadData()
+  }, [])
+
+  const investorsById = useMemo(() => {
+    const map: Record<string, any> = {}
+    rawInvestors.forEach((i) => {
+      map[String(i.id)] = i
+    })
+    return map
+  }, [rawInvestors])
+
+  const combined: CombinedRow[] = useMemo(() => {
+    const mandateRows = rawMandates.map((m, i) => mapMandateRow(m, investorsById, i))
+    const rfpRows = rawRfps.map((r, i) => mapRfpRow(r, investorsById, i + mandateRows.length))
+    return [...mandateRows, ...rfpRows]
+  }, [rawMandates, rawRfps, investorsById])
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return MANDATES
-    return MANDATES.filter(
+    return combined.filter(
       (m) =>
-        m.name.toLowerCase().includes(q) ||
-        m.organization.toLowerCase().includes(q) ||
-        m.mandateType.toLowerCase().includes(q),
+        (!q ||
+          m.name.toLowerCase().includes(q) ||
+          m.organization.toLowerCase().includes(q) ||
+          m.mandateType.toLowerCase().includes(q)) &&
+        (typeFilter === "all" || m.mandateType === typeFilter) &&
+        (geographyFilter === "all" || m.geography === geographyFilter) &&
+        (stageFilter === "all" || m.stage === stageFilter),
     )
-  }, [search])
+  }, [combined, search, typeFilter, geographyFilter, stageFilter])
 
-  const selected = filtered.find((m) => m.id === selectedId) ?? filtered[0] ?? null
+  const selected = filtered.find((m) => m.id === selectedId) ?? null
+
+  useEffect(() => {
+    if (!loading && combined.length > 0 && !combined.find((m) => m.id === selectedId)) {
+      setSelectedId(combined[0].id)
+    }
+  }, [loading, combined, selectedId])
 
   const toggleCheck = (id: string) => {
     setChecked((prev) => {
@@ -474,13 +473,96 @@ export function FundraisingMandates() {
 
   const allChecked = checked.size === filtered.length && filtered.length > 0
 
+  async function handleActivate(row: CombinedRow) {
+    setActivatingId(row.id)
+    try {
+      await fundraisingApi.activateMandate(row.raw.id)
+      toast.success("Mandate activated")
+      await loadData()
+    } catch (err) {
+      const state = requirementsFromError(err, "Mandate cannot be activated")
+      if (state.open) setRequirements(state)
+      else toastFrError(err, "Mandate cannot be activated")
+    } finally {
+      setActivatingId(null)
+    }
+  }
+
+  async function handleConvert(row: CombinedRow) {
+    setConvertingId(row.id)
+    try {
+      await fundraisingApi.convertRfpToMandate(row.raw.id)
+      toast.success("RFP converted to mandate")
+      await loadData()
+    } catch (err) {
+      toastFrError(err, "Could not convert RFP to mandate")
+    } finally {
+      setConvertingId(null)
+    }
+  }
+
+  async function handleCreateRfp() {
+    if (!rfpForm.institutionName.trim()) return
+    setRfpSubmitting(true)
+    try {
+      await fundraisingApi.createRfp({
+        institutionName: rfpForm.institutionName.trim(),
+        deadline: rfpForm.deadline || undefined,
+        status: "DRAFT",
+        outcome: "PENDING",
+      })
+      toast.success("RFP created")
+      setRfpOpen(false)
+      setRfpForm({ institutionName: "", deadline: "" })
+      await loadData()
+    } catch (err) {
+      toastFrError(err, "Could not create RFP")
+    } finally {
+      setRfpSubmitting(false)
+    }
+  }
+
+  function handleExport() {
+    exportFundraisingCsv(
+      filtered,
+      [
+        { key: "name", label: "Mandate / RFP" },
+        { key: "kind", label: "Type" },
+        { key: "organization", label: "Organization" },
+        { key: "geography", label: "Geography" },
+        { key: "mandateSize", label: "Size" },
+        { key: "stage", label: "Stage" },
+        { key: "rfpDueDate", label: "Due Date" },
+        { key: "owner", label: "Owner", value: ownerLabel },
+        { key: "nextStep", label: "Next Step", value: nextStepLabel },
+        { key: "score", label: "Score" },
+      ],
+      "fundraising-mandates",
+    )
+  }
+
+  async function handleToggleFlag(row: CombinedRow, key: string, value: boolean) {
+    setTogglingKey(key)
+    try {
+      await fundraisingApi.patchMandate(row.raw.id, { [key]: value })
+      await loadData()
+    } catch (err) {
+      toastFrError(err, "Could not update checklist")
+    } finally {
+      setTogglingKey(null)
+    }
+  }
+
   return (
     <div className="mx-auto max-w-[1680px] p-4 sm:p-5 md:p-6">
       {/* Page header */}
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-semibold tracking-tight text-[#0f172a] sm:text-[28px]">Mandates</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl font-semibold tracking-tight text-[#0f172a] sm:text-[28px]">Mandates</h1>
+          {loading ? <Loader2 className="h-4 w-4 animate-spin text-[#94a3b8]" /> : null}
+        </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button type="button" variant="outline" className="rounded-full h-10 px-6 gap-2 shadow-sm">
+          <Button type="button" variant="outline" className="rounded-full h-10 px-6 gap-2 shadow-sm" onClick={handleExport}>
             <Download className="h-4 w-4" />
             Export
           </Button>
@@ -492,6 +574,10 @@ export function FundraisingMandates() {
           >
             <Plus className="h-4 w-4" />
             Add Mandate
+          </Button>
+          <Button type="button" variant="outline" className="rounded-full h-10 px-5 shadow-sm" onClick={() => setRfpOpen(true)}>
+            <Plus className="h-4 w-4" />
+            Add RFP
           </Button>
           <Button
             type="button"
@@ -529,7 +615,7 @@ export function FundraisingMandates() {
                   R4,
                 )}
               >
-                {TOTAL_MANDATES}
+                {combined.length}
               </span>
             </button>
             <button
@@ -560,38 +646,12 @@ export function FundraisingMandates() {
               />
             </div>
 
-            <FilterSelect label="Mandate Type" />
-            <FilterSelect label="Geography" />
-            <FilterSelect label="Asset Class" />
-            <FilterSelect label="Stage" />
-            <FilterSelect label="Status" />
+            <FilterSelect label="Mandate Type" value={typeFilter} options={Array.from(new Set(combined.map((row) => row.mandateType))).filter(Boolean)} onChange={setTypeFilter} />
+            <FilterSelect label="Geography" value={geographyFilter} options={Array.from(new Set(combined.map((row) => row.geography))).filter(Boolean)} onChange={setGeographyFilter} />
+            <FilterSelect label="Stage" value={stageFilter} options={Array.from(new Set(combined.map((row) => row.stage))).filter(Boolean)} onChange={setStageFilter} />
 
-            <button
-              type="button"
-              className={cn(
-                "inline-flex h-[46px] items-center gap-1.5 border border-[#2563eb] bg-white px-3 text-xs font-medium text-[#2563eb] hover:bg-[#eff6ff]",
-                R6,
-              )}
-            >
-              <SlidersHorizontal className="h-3.5 w-3.5" />
-              More Filters
-              <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[#2563eb] px-1 text-[9px] font-semibold text-white">
-                2
-              </span>
-            </button>
-
-            <button type="button" className="px-1 text-xs font-medium text-[#64748b] hover:text-[#334155]">
+            <button type="button" onClick={() => { setSearch(""); setTypeFilter("all"); setGeographyFilter("all"); setStageFilter("all") }} className="rounded-full px-2 py-1 text-xs font-medium text-[#64748b] hover:bg-[#f1f5f9] hover:text-[#334155]">
               Clear
-            </button>
-
-            <button
-              type="button"
-              className={cn(
-                "inline-flex h-9 items-center border border-[#2563eb] bg-white px-3 text-xs font-medium text-[#2563eb] hover:bg-[#eff6ff]",
-                R6,
-              )}
-            >
-              Save View
             </button>
           </div>
 
@@ -607,25 +667,22 @@ export function FundraisingMandates() {
                     Mandate
                   </th>
                   <th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-[0.04em] text-[#64748b]">
-                    Mandate Type
+                    Type
                   </th>
                   <th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-[0.04em] text-[#64748b]">
                     Organization
                   </th>
                   <th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-[0.04em] text-[#64748b]">
-                    Asset Class
-                  </th>
-                  <th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-[0.04em] text-[#64748b]">
                     Geography
                   </th>
                   <th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-[0.04em] text-[#64748b]">
-                    Mandate Size
+                    Size
                   </th>
                   <th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-[0.04em] text-[#64748b]">
                     Stage
                   </th>
                   <th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-[0.04em] text-[#64748b]">
-                    RFP Due Date
+                    Due Date
                   </th>
                   <th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-[0.04em] text-[#64748b]">
                     Next Step
@@ -636,67 +693,76 @@ export function FundraisingMandates() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((row) => {
-                  const isSelected = row.id === selectedId
-                  return (
-                    <tr
-                      key={row.id}
-                      onClick={() => setSelectedId(row.id)}
-                      className={cn(
-                        "cursor-pointer border-b border-[#f1f5f9] transition-colors",
-                        isSelected ? "bg-[#f8fafc]" : "hover:bg-[#fafbfc]",
-                      )}
-                    >
-                      <td className="px-4 py-2.5">
-                        <MandateCheckbox
-                          checked={checked.has(row.id)}
-                          onChange={() => toggleCheck(row.id)}
-                          label={`Select ${row.name}`}
-                        />
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <div className="flex min-w-[200px] items-center gap-2.5">
-                          <OrgLogo row={row} />
-                          <span className="text-[13px] font-semibold leading-snug text-[#1d4ed8] hover:underline">
-                            {row.name}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-2.5 text-[13px] text-[#334155]">{row.mandateType}</td>
-                      <td className="whitespace-nowrap px-3 py-2.5 text-[13px] text-[#334155]">{row.organization}</td>
-                      <td className="whitespace-nowrap px-3 py-2.5 text-[13px] text-[#334155]">{row.assetClass}</td>
-                      <td className="whitespace-nowrap px-3 py-2.5 text-[13px] text-[#334155]">{row.geography}</td>
-                      <td className="whitespace-nowrap px-3 py-2.5 text-[13px] font-medium tabular-nums text-[#0f172a]">
-                        {row.mandateSize}
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-2.5">
-                        <span
-                          className={cn(
-                            "inline-flex px-2 py-0.5 text-[11px] font-medium",
-                            R4,
-                            STAGE_BADGE[row.stage],
-                          )}
-                        >
-                          {STAGE_LABEL[row.stage]}
-                        </span>
-                      </td>
-                      <td
+                {loading ? (
+                  <FrTableSkeleton columns={10} rows={7} />
+                ) : filtered.length === 0 ? (
+                  <tr>
+                    <td colSpan={10} className="px-4 py-10 text-center text-[13px] text-[#94a3b8]">
+                      {combined.length === 0 ? "No mandates or RFPs recorded yet." : "No mandates match your search."}
+                    </td>
+                  </tr>
+                ) : (
+                  filtered.map((row) => {
+                    const isSelected = row.id === selectedId
+                    return (
+                      <tr
+                        key={row.id}
+                        onClick={() => setSelectedId(row.id)}
                         className={cn(
-                          "whitespace-nowrap px-3 py-2.5 text-[13px] tabular-nums",
-                          row.rfpDueDate === "—" ? "text-[#94a3b8]" : "text-[#334155]",
+                          "cursor-pointer border-b border-[#f1f5f9] transition-colors",
+                          isSelected ? "bg-[#f8fafc]" : "hover:bg-[#fafbfc]",
                         )}
                       >
-                        {row.rfpDueDate}
-                      </td>
-                      <td className="max-w-[150px] truncate whitespace-nowrap px-3 py-2.5 text-[13px] text-[#334155]">
-                        {row.nextStep}
-                      </td>
-                      <td className="px-3 py-2.5 text-center">
-                        <ScoreBadge score={row.score} />
-                      </td>
-                    </tr>
-                  )
-                })}
+                        <td className="px-4 py-2.5">
+                          <MandateCheckbox
+                            checked={checked.has(row.id)}
+                            onChange={() => toggleCheck(row.id)}
+                            label={`Select ${row.name}`}
+                          />
+                        </td>
+                        <td className="px-3 py-2.5">
+                          <div className="flex min-w-[200px] items-center gap-2.5">
+                            <OrgLogo row={row} />
+                            <span className="text-[13px] font-semibold leading-snug text-[#1d4ed8] hover:underline">
+                              {row.name}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2.5 text-[13px] text-[#334155]">{row.mandateType}</td>
+                        <td className="whitespace-nowrap px-3 py-2.5 text-[13px] text-[#334155]">{row.organization}</td>
+                        <td className="whitespace-nowrap px-3 py-2.5 text-[13px] text-[#334155]">{row.geography}</td>
+                        <td className="whitespace-nowrap px-3 py-2.5 text-[13px] font-medium tabular-nums text-[#0f172a]">
+                          {row.mandateSize}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2.5">
+                          <span
+                            className={cn(
+                              "inline-flex px-2 py-0.5 text-[11px] font-medium",
+                              R4,
+                              STAGE_BADGE[row.stage],
+                            )}
+                          >
+                            {STAGE_LABEL[row.stage]}
+                          </span>
+                        </td>
+                        <td
+                          className={cn(
+                            "whitespace-nowrap px-3 py-2.5 text-[13px] tabular-nums",
+                            row.rfpDueDate === "—" ? "text-[#94a3b8]" : "text-[#334155]",
+                          )}
+                        >
+                          {row.rfpDueDate}
+                        </td>
+                        <td className="max-w-[170px] truncate whitespace-nowrap px-3 py-2.5 text-[13px] text-[#334155]">
+                          {nextStepLabel(row)}
+                        </td>
+                        <td className="px-3 py-2.5 text-center">
+                          <ScoreBadge score={row.score} />
+                        </td>
+                      </tr>
+                    )
+                  })
+                )}
               </tbody>
             </table>
           </div>
@@ -704,7 +770,7 @@ export function FundraisingMandates() {
           {/* Pagination */}
           <div className="flex flex-col gap-3 border-t border-[#e2e8f0] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-xs text-[#64748b]">
-              Showing 1 to {filtered.length} of {TOTAL_MANDATES} mandates
+              Showing {filtered.length === 0 ? 0 : 1} to {filtered.length} of {combined.length} mandates &amp; RFPs
             </p>
             <div className="flex items-center gap-1">
               <button
@@ -719,28 +785,9 @@ export function FundraisingMandates() {
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
-              {PAGE_ITEMS.map((item, idx) =>
-                item === "ellipsis" ? (
-                  <span key={`e-${idx}`} className="px-1 text-xs text-[#94a3b8]">
-                    …
-                  </span>
-                ) : (
-                  <button
-                    key={item}
-                    type="button"
-                    onClick={() => setPage(item)}
-                    className={cn(
-                      "inline-flex h-8 min-w-8 items-center justify-center px-2 text-xs font-medium",
-                      R6,
-                      page === item
-                        ? "border border-[#2563eb] bg-[#eff6ff] text-[#2563eb]"
-                        : "border border-[#e2e8f0] bg-white text-[#64748b] hover:bg-[#f8fafc]",
-                    )}
-                  >
-                    {item}
-                  </button>
-                ),
-              )}
+              <span className="inline-flex h-8 min-w-8 items-center justify-center px-2 text-xs font-medium text-[#2563eb]">
+                {page}
+              </span>
               <button
                 type="button"
                 onClick={() => setPage((p) => p + 1)}
@@ -758,11 +805,72 @@ export function FundraisingMandates() {
 
         {selected && (
           <div className="min-w-0 xl:sticky xl:top-4 xl:min-w-[420px]">
-            <DetailPanel mandate={selected} onClose={() => setSelectedId("")} />
+            <DetailPanel
+              row={selected}
+              onClose={() => setSelectedId(null)}
+              onActivate={() => handleActivate(selected)}
+              onConvert={() => handleConvert(selected)}
+              onToggleFlag={(key, value) => handleToggleFlag(selected, key, value)}
+              activating={activatingId === selected.id}
+              converting={convertingId === selected.id}
+              togglingKey={togglingKey}
+            />
           </div>
         )}
       </div>
-      <FrMandateWizard open={createOpen} onOpenChange={setCreateOpen} />
+      <FrMandateWizard open={createOpen} onOpenChange={setCreateOpen} onCreated={loadData} />
+      <FrDialogShell
+        open={rfpOpen}
+        onOpenChange={(open) => {
+          if (rfpSubmitting) return
+          setRfpOpen(open)
+          if (!open) setRfpForm({ institutionName: "", deadline: "" })
+        }}
+        title="Add RFP"
+        description="Capture the institution and submission deadline."
+        size="md"
+        footer={
+          <>
+            <Button type="button" variant="outline" className="h-9 rounded-full px-4" disabled={rfpSubmitting} onClick={() => setRfpOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="gradient-info"
+              className="h-9 rounded-full px-5 text-xs font-semibold shadow-sm"
+              disabled={!rfpForm.institutionName.trim() || rfpSubmitting}
+              onClick={handleCreateRfp}
+            >
+              {rfpSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {rfpSubmitting ? "Creating…" : "Create RFP"}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <FrField label="Institution name">
+            <input
+              className={frInputClass}
+              value={rfpForm.institutionName}
+              onChange={(event) => setRfpForm((form) => ({ ...form, institutionName: event.target.value }))}
+              placeholder="Institution or RFP name"
+              autoFocus
+            />
+          </FrField>
+          <FrField label="Submission deadline">
+            <input
+              type="date"
+              className={frInputClass}
+              value={rfpForm.deadline}
+              onChange={(event) => setRfpForm((form) => ({ ...form, deadline: event.target.value }))}
+            />
+          </FrField>
+        </div>
+      </FrDialogShell>
+      <FrRequirementsDialog
+        state={requirements}
+        onOpenChange={(open) => setRequirements((current) => ({ ...current, open }))}
+      />
     </div>
   )
 }

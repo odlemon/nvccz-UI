@@ -1,14 +1,23 @@
 "use client"
 
-import { useMemo, useState } from "react"
-import { Calendar, FileBarChart, Play, Settings } from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
+import { Calendar, FileBarChart, Loader2, Play, Settings } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { fundraisingApi, toastFrError } from "@/lib/api/fundraising-api"
+import { formatCell, rowColumns, toRowsArray } from "@/lib/fundraising/mappers"
+import { downloadCsvPayload, exportFundraisingCsv } from "@/lib/fundraising/export"
+import {
   FR_REPORTS,
   categoryClass,
-  reportColumns,
   type FrReport,
   type ReportSchedule,
 } from "./reports-mock-data"
@@ -27,27 +36,45 @@ const SCHEDULE_OPTIONS: ReportSchedule[] = ["Daily", "Weekly", "Monthly", "On de
 
 export function FundraisingReports() {
   const [reports] = useState(FR_REPORTS)
+  const [campaigns, setCampaigns] = useState<Record<string, any>[]>([])
+  const [campaignsLoading, setCampaignsLoading] = useState(true)
+  const [campaignId, setCampaignId] = useState("")
+
   const [configureOpen, setConfigureOpen] = useState(false)
   const [resultsOpen, setResultsOpen] = useState(false)
   const [selected, setSelected] = useState<FrReport | null>(null)
+  const [running, setRunning] = useState(false)
+  const [resultsByReport, setResultsByReport] = useState<Record<string, Record<string, any>[]>>({})
+  const [lastRunAt, setLastRunAt] = useState<Record<string, string>>({})
   const [form, setForm] = useState({
     schedule: "Weekly" as ReportSchedule,
     recipients: "fundraising@nvccz.co.zw",
-    format: "XLSX",
+    format: "CSV",
     dateRange: "Last 30 days",
   })
 
-  const resultColumns = useMemo(
-    () => (selected ? reportColumns(selected.sampleRows) : []),
-    [selected],
-  )
+  useEffect(() => {
+    setCampaignsLoading(true)
+    fundraisingApi
+      .listCampaigns()
+      .then((list) => {
+        setCampaigns(list ?? [])
+        const active = list?.find((c: any) => String(c.status).toUpperCase() === "ACTIVE") ?? list?.[0]
+        if (active) setCampaignId(String(active.id))
+      })
+      .catch((err) => toastFrError(err, "Could not load campaigns"))
+      .finally(() => setCampaignsLoading(false))
+  }, [])
+
+  const resultRows = selected ? resultsByReport[selected.id] ?? [] : []
+  const resultColumns = useMemo(() => rowColumns(resultRows).slice(0, 8), [resultRows])
 
   function openConfigure(report: FrReport) {
     setSelected(report)
     setForm({
       schedule: report.schedule,
       recipients: "fundraising@nvccz.co.zw",
-      format: "XLSX",
+      format: "CSV",
       dateRange: "Last 30 days",
     })
     setConfigureOpen(true)
@@ -58,10 +85,39 @@ export function FundraisingReports() {
     setResultsOpen(true)
   }
 
-  function runReport() {
+  async function runReport() {
     if (!selected) return
-    setConfigureOpen(false)
-    toast.success(`"${selected.name}" queued — mock run started`)
+    if (selected.requiresCampaign && !campaignId) {
+      toast.error("Select a campaign to run this report")
+      return
+    }
+    setRunning(true)
+    try {
+      const data = await fundraisingApi.getReport(
+        selected.reportKey,
+        campaignId ? { campaignId } : undefined,
+      )
+      const rows = toRowsArray(data)
+      const fileName = `${selected.reportKey}-export`
+      if (
+        typeof data === "string" ||
+        (data && typeof data === "object" && "csv" in data)
+      ) {
+        downloadCsvPayload(data, fileName)
+      } else {
+        const columns = rowColumns(rows).map((key) => ({ key, label: key }))
+        exportFundraisingCsv(rows, columns, fileName)
+      }
+      setResultsByReport((prev) => ({ ...prev, [selected.id]: rows }))
+      setLastRunAt((prev) => ({ ...prev, [selected.id]: new Date().toLocaleString() }))
+      setConfigureOpen(false)
+      setResultsOpen(true)
+      toast.success(`"${selected.name}" ran successfully and downloaded as CSV`)
+    } catch (err) {
+      toastFrError(err, "Report run failed")
+    } finally {
+      setRunning(false)
+    }
   }
 
   return (
@@ -73,6 +129,22 @@ export function FundraisingReports() {
             Fundraising progress, conversion and concentration reports
           </p>
         </div>
+        <Select
+          value={campaignId}
+          onValueChange={setCampaignId}
+          disabled={campaignsLoading || campaigns.length === 0}
+        >
+          <SelectTrigger className="h-9 w-[220px] rounded-full border-[#e2e8f0] bg-white text-xs font-medium">
+            <SelectValue placeholder="Select campaign" />
+          </SelectTrigger>
+          <SelectContent>
+            {campaigns.map((c) => (
+              <SelectItem key={c.id} value={String(c.id)}>
+                {c.name} {c.status ? `(${c.status})` : ""}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -104,12 +176,18 @@ export function FundraisingReports() {
               </div>
               <div className="flex items-center justify-between gap-2">
                 <dt className="text-[#94a3b8]">Last run</dt>
-                <dd className="text-[#64748b]">{report.lastRun}</dd>
+                <dd className="text-[#64748b]">{lastRunAt[report.id] ?? "Not run yet"}</dd>
               </div>
               <div className="flex items-center justify-between gap-2">
                 <dt className="text-[#94a3b8]">Owner</dt>
                 <dd className="text-[#64748b]">{report.owner}</dd>
               </div>
+              {report.requiresCampaign ? (
+                <div className="flex items-center justify-between gap-2">
+                  <dt className="text-[#94a3b8]">Requires</dt>
+                  <dd className="text-[#64748b]">Campaign selection</dd>
+                </div>
+              ) : null}
             </dl>
             <div className="mt-4 flex flex-wrap gap-2">
               <Button
@@ -134,17 +212,27 @@ export function FundraisingReports() {
         open={configureOpen}
         onOpenChange={setConfigureOpen}
         title={selected ? `Configure — ${selected.name}` : "Configure report"}
-        description="Schedule, recipients and output format"
+        description="Schedule and recipients aren't persisted yet. Running executes immediately and downloads CSV."
         size="md"
         footer={
           <FrFormFooter
             onCancel={() => setConfigureOpen(false)}
             onSubmit={runReport}
-            submitLabel="Run now"
+            submitLabel={running ? "Running…" : "Run now"}
+            submitDisabled={running}
           />
         }
       >
         <div className="space-y-3">
+          {selected?.requiresCampaign ? (
+            <div className="rounded-[6px] border border-[#f1f5f9] bg-[#fafafa] px-3 py-2 text-[11px] text-[#64748b]">
+              This report runs against{" "}
+              <span className="font-medium text-[#0f172a]">
+                {campaigns.find((c) => String(c.id) === campaignId)?.name ?? "no campaign selected"}
+              </span>
+              . Change the campaign selector at the top of the page to switch.
+            </div>
+          ) : null}
           <FrField label="Schedule">
             <select
               className={frSelectClass}
@@ -173,9 +261,7 @@ export function FundraisingReports() {
               value={form.format}
               onChange={(e) => setForm((p) => ({ ...p, format: e.target.value }))}
             >
-              <option value="XLSX">Excel (.xlsx)</option>
-              <option value="PDF">PDF</option>
-              <option value="CSV">CSV</option>
+              <option value="CSV">CSV (.csv) — available format</option>
             </select>
           </FrField>
           <FrField label="Date range">
@@ -197,7 +283,7 @@ export function FundraisingReports() {
         open={resultsOpen}
         onOpenChange={setResultsOpen}
         title={selected ? `Last run — ${selected.name}` : "Last run results"}
-        description={selected?.lastRun}
+        description={selected ? lastRunAt[selected.id] ?? "Not run yet this session" : undefined}
         size="xl"
         footer={
           <Button
@@ -213,7 +299,11 @@ export function FundraisingReports() {
           </Button>
         }
       >
-        {selected && selected.sampleRows.length > 0 ? (
+        {running ? (
+          <div className="flex items-center justify-center gap-2 py-10 text-[12px] text-[#94a3b8]">
+            <Loader2 className="h-4 w-4 animate-spin" /> Running report…
+          </div>
+        ) : resultRows.length > 0 ? (
           <div className="overflow-x-auto rounded-[6px] border border-[#f1f5f9]">
             <table className="w-full min-w-[480px] text-left">
               <thead>
@@ -226,11 +316,11 @@ export function FundraisingReports() {
                 </tr>
               </thead>
               <tbody>
-                {selected.sampleRows.map((row, i) => (
+                {resultRows.map((row, i) => (
                   <tr key={i} className="border-b border-[#f1f5f9] last:border-0">
                     {resultColumns.map((col) => (
                       <td key={col} className="px-3 py-2 text-[11px] text-[#0f172a]">
-                        {row[col] ?? "—"}
+                        {formatCell(row[col])}
                       </td>
                     ))}
                   </tr>
@@ -238,8 +328,14 @@ export function FundraisingReports() {
               </tbody>
             </table>
           </div>
+        ) : selected && lastRunAt[selected.id] ? (
+          <p className="py-8 text-center text-[12px] text-[#64748b]">
+            Report completed successfully. The CSV was downloaded; this run returned no preview rows.
+          </p>
         ) : (
-          <p className="py-8 text-center text-[12px] text-[#94a3b8]">No sample data available.</p>
+          <p className="py-8 text-center text-[12px] text-[#94a3b8]">
+            Not run yet this session — click &quot;Configure &amp; run&quot;.
+          </p>
         )}
       </FrDialogShell>
     </div>

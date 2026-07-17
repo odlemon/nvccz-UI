@@ -249,5 +249,6 @@ class ApiClient {
 // Create singleton instance
 export const apiClient = new ApiClient()
 
-// Export types
-export { ApiResponse, ApiError }
+// Export public response shape and runtime error class.
+export type { ApiResponse }
+export { ApiError }
