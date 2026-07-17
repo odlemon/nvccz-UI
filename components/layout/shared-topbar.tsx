@@ -38,9 +38,10 @@ import { toast } from "sonner"
 interface SharedTopbarProps {
   onModuleSelect: (module: string) => void
   currentModule: string
+  moduleActions?: React.ReactNode
 }
 
-export function SharedTopbar({ onModuleSelect, currentModule }: SharedTopbarProps) {
+export function SharedTopbar({ onModuleSelect, currentModule, moduleActions }: SharedTopbarProps) {
   const [showAppSwitcher, setShowAppSwitcher] = useState(false)
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const dispatch = useAppDispatch()
@@ -100,6 +101,7 @@ export function SharedTopbar({ onModuleSelect, currentModule }: SharedTopbarProp
 
           {/* Right Section - Actions and Profile */}
           <div className="flex items-center gap-3">
+            {moduleActions}
 
             {/* App Switcher with Active Module - Hidden for applicants */}
             {!isApplicant && (

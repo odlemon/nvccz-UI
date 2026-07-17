@@ -1,272 +1,59 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
-import { PageHeader } from '@/components/investments-v2/page-header'
-import { PortfoliosSubNav } from '@/components/investments-v2/portfolios-subnav'
-import { cn } from '@/lib/utils'
-import { Filter, Download, ChevronDown, ChevronUp, Loader2, Folder, FolderOpen } from 'lucide-react'
-import { useAppDispatch, useAppSelector } from '@/lib/store'
-import { fetchPortfolios, fetchPortfolioHoldings, setOpsSelectedFundId } from '@/lib/store/slices/investmentOpsSlice'
-import { effectiveHoldingValue, type Holding } from '@/lib/api/investments-api'
+import { useMemo, useState } from 'react'
+import { ArrowDownUp, Check, ChevronDown, ChevronLeft, ChevronRight, Folder, FolderOpen, Search, SlidersHorizontal, X } from 'lucide-react'
 
-type SortKey = 'ticker' | 'marketValue' | 'unrealizedPnl'
-const PAGE_SIZE = 12
-
-function Spinner() {
-  return <Loader2 className="w-4 h-4 animate-spin" style={{ color: 'var(--muted-foreground)' }} />
-}
+type Position = { id: number; portfolio: string; ticker: string; name: string; type: 'Holding' | 'Cash'; sector: string; currency: string; quantity: number; cost: number; price: number; value: number; pnl: number; weight: number; date: string }
+const portfolios = ['Equity World', 'Multi Asset', 'Fixed Income', 'Asia Select']
+const positions: Position[] = [
+  { id: 1, portfolio: 'Equity World', ticker: 'AAPL', name: 'Apple Inc.', type: 'Holding', sector: 'Technology', currency: 'USD', quantity: 1440, cost: 170, price: 189.54, value: 272937.6, pnl: 28137.6, weight: 18.4, date: '12 Jan 2024' },
+  { id: 2, portfolio: 'Equity World', ticker: 'MSFT', name: 'Microsoft Corp.', type: 'Holding', sector: 'Technology', currency: 'USD', quantity: 780, cost: 367.23, price: 421.66, value: 328894.8, pnl: 42455.4, weight: 22.2, date: '03 Feb 2024' },
+  { id: 3, portfolio: 'Equity World', ticker: 'GOOGL', name: 'Alphabet Inc. Class A', type: 'Holding', sector: 'Communication', currency: 'USD', quantity: 393, cost: 2441.79, price: 2520.43, value: 990528.99, pnl: 30901.52, weight: 31.6, date: '18 Mar 2024' },
+  { id: 4, portfolio: 'Equity World', ticker: 'USD', name: 'United States Dollar Cash', type: 'Cash', sector: 'Cash', currency: 'USD', quantity: 2150000, cost: 1, price: 1, value: 2150000, pnl: 0, weight: 17.8, date: '01 Jan 2024' },
+  { id: 5, portfolio: 'Equity World', ticker: 'NESN', name: 'Nestlé S.A.', type: 'Holding', sector: 'Consumer Staples', currency: 'CHF', quantity: 1800, cost: 91.4, price: 93.24, value: 167832, pnl: 3312, weight: 5.7, date: '29 Apr 2024' },
+  { id: 6, portfolio: 'Equity World', ticker: 'SHEL', name: 'Shell PLC', type: 'Holding', sector: 'Energy', currency: 'GBP', quantity: 4100, cost: 25.86, price: 27.12, value: 111192, pnl: 5166, weight: 4.3, date: '15 May 2024' },
+  { id: 7, portfolio: 'Multi Asset', ticker: 'DLTA', name: 'Delta Corporation', type: 'Holding', sector: 'Consumer Staples', currency: 'USD', quantity: 220000, cost: 1.12, price: 1.2845, value: 282590, pnl: 36190, weight: 24.1, date: '04 Feb 2025' },
+  { id: 8, portfolio: 'Multi Asset', ticker: 'TB30', name: 'Government Treasury Bond 2030', type: 'Holding', sector: 'Sovereign', currency: 'USD', quantity: 5000, cost: 98.1, price: 96.425, value: 482125, pnl: -8375, weight: 41.2, date: '20 Aug 2025' },
+  { id: 9, portfolio: 'Multi Asset', ticker: 'USD', name: 'United States Dollar Cash', type: 'Cash', sector: 'Cash', currency: 'USD', quantity: 405000, cost: 1, price: 1, value: 405000, pnl: 0, weight: 34.7, date: '01 Jan 2025' },
+  { id: 10, portfolio: 'Fixed Income', ticker: 'CBZ28', name: 'CBZ Holdings Note 2028', type: 'Holding', sector: 'Financials', currency: 'USD', quantity: 8000, cost: 100, price: 101.14, value: 809120, pnl: 9120, weight: 68.2, date: '11 Jun 2025' },
+  { id: 11, portfolio: 'Fixed Income', ticker: 'USD', name: 'United States Dollar Cash', type: 'Cash', sector: 'Cash', currency: 'USD', quantity: 377200, cost: 1, price: 1, value: 377200, pnl: 0, weight: 31.8, date: '01 Jan 2025' },
+  { id: 12, portfolio: 'Asia Select', ticker: '7203', name: 'Toyota Motor Corp.', type: 'Holding', sector: 'Industrials', currency: 'JPY', quantity: 12400, cost: 2650, price: 2814, value: 34893600, pnl: 2033600, weight: 72.1, date: '08 Mar 2025' },
+  { id: 13, portfolio: 'Asia Select', ticker: 'JPY', name: 'Japanese Yen Cash', type: 'Cash', sector: 'Cash', currency: 'JPY', quantity: 13500000, cost: 1, price: 1, value: 13500000, pnl: 0, weight: 27.9, date: '01 Jan 2025' },
+]
+const card = 'rounded-[24px] border border-white/[0.06] bg-[linear-gradient(135deg,#172333_0%,#101a29_58%,#0b1420_100%)] shadow-[0_20px_60px_rgba(0,0,0,.2)]'
+const pill = 'inline-flex h-9 items-center justify-center gap-2 rounded-full border border-white/10 px-4 text-[11px] font-medium transition hover:border-white/20 hover:bg-white/[0.06]'
+const money = (value: number, currency = 'USD') => new Intl.NumberFormat('en-US', { style: 'currency', currency, maximumFractionDigits: 0 }).format(value)
 
 export default function PositionsPage() {
-  const dispatch = useAppDispatch()
-  const { portfolios, portfoliosLoading, selectedFundId, portfolioHoldings, portfolioHoldingsLoading } = useAppSelector(
-    (s) => s.investmentOps
-  )
-  const [sortKey, setSortKey] = useState<SortKey>('marketValue')
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+  const [portfolio, setPortfolio] = useState(portfolios[0])
+  const [type, setType] = useState('All positions')
+  const [currency, setCurrency] = useState('All currencies')
+  const [search, setSearch] = useState('')
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [currencyOpen, setCurrencyOpen] = useState(false)
+  const [sort, setSort] = useState<'value' | 'ticker'>('value')
   const [page, setPage] = useState(1)
-
-  useEffect(() => {
-    dispatch(fetchPortfolios())
-  }, [dispatch])
-
-  useEffect(() => {
-    if (selectedFundId) dispatch(fetchPortfolioHoldings(selectedFundId))
-  }, [dispatch, selectedFundId])
-
-  useEffect(() => {
-    setPage(1)
-  }, [selectedFundId])
-
-  const sorted = useMemo(() => {
-    return [...portfolioHoldings].sort((a, b) => {
-      const dir = sortDir === 'asc' ? 1 : -1
-      if (sortKey === 'ticker') return dir * (a.security?.symbol ?? '').localeCompare(b.security?.symbol ?? '')
-      if (sortKey === 'marketValue') return dir * (effectiveHoldingValue(a) - effectiveHoldingValue(b))
-      return dir * ((a.unrealizedPnl ?? 0) - (b.unrealizedPnl ?? 0))
-    })
-  }, [portfolioHoldings, sortKey, sortDir])
-
-  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE))
-  const pageRows = sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
-
-  const handleSort = (key: SortKey) => {
-    if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
-    else {
-      setSortKey(key)
-      setSortDir('desc')
-    }
-  }
-
-  const totalMktValue = portfolioHoldings.reduce((s, h) => s + effectiveHoldingValue(h), 0)
-  const totalUnrealPnl = portfolioHoldings.reduce((s, h) => s + (h.unrealizedPnl ?? 0), 0)
-
-  const SortIcon = ({ col }: { col: SortKey }) => {
-    if (sortKey !== col) return <ChevronDown className="w-2.5 h-2.5 opacity-30" />
-    return sortDir === 'desc' ? (
-      <ChevronDown className="w-2.5 h-2.5" style={{ color: '#3b82f6' }} />
-    ) : (
-      <ChevronUp className="w-2.5 h-2.5" style={{ color: '#3b82f6' }} />
-    )
-  }
-
-  return (
-    <div className="flex flex-col h-full overflow-hidden">
-      <PageHeader title="Positions" />
-      <PortfoliosSubNav />
-
-      <div className="flex-1 overflow-y-auto px-5 pb-5 pt-4 space-y-4">
-        {/* Fund tabs */}
-        <div className="flex items-center gap-2 flex-wrap">
-          {portfoliosLoading ? (
-            <Spinner />
-          ) : portfolios.length === 0 ? (
-            <span className="text-[12px]" style={{ color: 'var(--muted-foreground)' }}>No funds available</span>
-          ) : (
-            portfolios.map((fund) => (
-              <button
-                key={fund.id}
-                onClick={() => dispatch(setOpsSelectedFundId(fund.id))}
-                className={cn('folder-tab', selectedFundId === fund.id && 'active')}
-              >
-                {selectedFundId === fund.id ? (
-                  <FolderOpen className="w-3.5 h-3.5 flex-shrink-0" />
-                ) : (
-                  <Folder className="w-3.5 h-3.5 flex-shrink-0" />
-                )}
-                {fund.name}
-              </button>
-            ))
-          )}
-        </div>
-
-        {/* Stat strip */}
-        <div className="grid grid-cols-4 gap-3">
-          {[
-            { label: 'Total Market Value', value: `${(totalMktValue / 1000).toFixed(1)}k`, color: 'var(--foreground)' },
-            {
-              label: 'Total Unrealised P&L',
-              value: `${totalUnrealPnl >= 0 ? '+' : ''}${totalUnrealPnl.toFixed(2)}`,
-              color: totalUnrealPnl >= 0 ? '#10b981' : '#ef4444',
-            },
-            { label: 'Open Positions', value: portfolioHoldings.length, color: 'var(--foreground)' },
-          ].map((s) => (
-            <div key={s.label} className="arcus-card px-4 py-2.5">
-              <div className="text-[10px] uppercase tracking-wider mb-0.5" style={{ color: 'var(--muted-foreground)' }}>
-                {s.label}
-              </div>
-              <div className="text-lg font-semibold font-mono" style={{ color: s.color }}>
-                {s.value}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="flex items-center justify-end gap-2">
-          <button
-            className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded"
-            style={{ color: 'var(--muted-foreground)', background: 'var(--muted)', border: '1px solid var(--border)' }}
-          >
-            <Filter className="w-3 h-3" /> Filter
-          </button>
-          <button
-            className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded"
-            style={{ color: 'var(--muted-foreground)', background: 'var(--muted)', border: '1px solid var(--border)' }}
-          >
-            <Download className="w-3 h-3" /> Export
-          </button>
-        </div>
-
-        {/* Positions table card */}
-        <div className="arcus-card">
-          <div className="arcus-card-header">
-            <span className="text-[13px] font-semibold" style={{ color: 'var(--foreground)' }}>
-              Portfolio Positions
-            </span>
-            {portfolioHoldingsLoading && <Spinner />}
-          </div>
-          <div className="overflow-x-auto">
-            {portfolioHoldingsLoading && portfolioHoldings.length === 0 ? (
-              <div className="flex items-center justify-center py-10">
-                <Spinner />
-              </div>
-            ) : pageRows.length === 0 ? (
-              <div className="py-10 text-center text-[12px]" style={{ color: 'var(--muted-foreground)' }}>
-                No holdings for this fund.
-              </div>
-            ) : (
-              <table className="arcus-table">
-                <thead>
-                  <tr>
-                    <th>
-                      <button className="flex items-center gap-1" onClick={() => handleSort('ticker')}>
-                        Ticker <SortIcon col="ticker" />
-                      </button>
-                    </th>
-                    <th>Name</th>
-                    <th>Exchange</th>
-                    <th>CCY</th>
-                    <th className="text-right">Quantity</th>
-                    <th className="text-right">Avg Cost</th>
-                    <th className="text-right">Mkt Price</th>
-                    <th className="text-right">
-                      <button className="flex items-center gap-1 ml-auto" onClick={() => handleSort('marketValue')}>
-                        Mkt Value <SortIcon col="marketValue" />
-                      </button>
-                    </th>
-                    <th className="text-right">
-                      <button className="flex items-center gap-1 ml-auto" onClick={() => handleSort('unrealizedPnl')}>
-                        Unrealised P&L <SortIcon col="unrealizedPnl" />
-                      </button>
-                    </th>
-                    <th>Sector</th>
-                    <th>Weight</th>
-                    <th>Open Date</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pageRows.map((h: Holding) => (
-                    <tr key={h.id} className="cursor-pointer">
-                      <td className="font-mono font-semibold" style={{ color: '#3b82f6' }}>
-                        {h.security?.symbol ?? '—'}
-                      </td>
-                      <td style={{ color: 'var(--foreground)' }}>{h.security?.name ?? '—'}</td>
-                      <td style={{ color: 'var(--muted-foreground)' }}>{h.security?.exchangeCode ?? '—'}</td>
-                      <td className="font-mono" style={{ color: 'var(--muted-foreground)' }}>
-                        {h.wacCurrencyCode}
-                      </td>
-                      <td className="text-right font-mono" style={{ color: 'var(--foreground)' }}>
-                        {h.quantity.toLocaleString()}
-                      </td>
-                      <td className="text-right font-mono" style={{ color: 'var(--foreground)' }}>
-                        {h.wac.toFixed(4)}
-                      </td>
-                      <td className="text-right font-mono" style={{ color: 'var(--foreground)' }}>
-                        {h.currentPrice != null ? h.currentPrice.toFixed(4) : '—'}
-                      </td>
-                      <td className="text-right font-mono" style={{ color: 'var(--foreground)' }}>
-                        {h.marketValue != null ? h.marketValue.toLocaleString() : '—'}
-                      </td>
-                      <td
-                        className="text-right font-mono"
-                        style={{ color: h.unrealizedPnl == null ? 'var(--muted-foreground)' : h.unrealizedPnl >= 0 ? '#10b981' : '#ef4444' }}
-                      >
-                        {h.unrealizedPnl != null ? `${h.unrealizedPnl >= 0 ? '+' : ''}${h.unrealizedPnl.toLocaleString()}` : '—'}
-                      </td>
-                      {/* Fields not carried by the holdings endpoint — honest placeholder, not fabricated */}
-                      <td style={{ color: 'var(--muted-foreground)' }}>—</td>
-                      <td style={{ color: 'var(--muted-foreground)' }}>—</td>
-                      <td style={{ color: 'var(--muted-foreground)' }}>—</td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr style={{ background: 'var(--muted)', borderTop: '1px solid var(--border)' }}>
-                    <td colSpan={7} className="text-[11px] font-medium px-3 py-2" style={{ color: 'var(--muted-foreground)' }}>
-                      Total ({sorted.length} positions)
-                    </td>
-                    <td className="text-right font-mono font-semibold px-3 py-2" style={{ color: 'var(--foreground)' }}>
-                      {totalMktValue.toLocaleString()}
-                    </td>
-                    <td
-                      className="text-right font-mono font-semibold px-3 py-2"
-                      style={{ color: totalUnrealPnl >= 0 ? '#10b981' : '#ef4444' }}
-                    >
-                      {totalUnrealPnl >= 0 ? '+' : ''}
-                      {totalUnrealPnl.toLocaleString()}
-                    </td>
-                    <td colSpan={3} className="px-3 py-2" />
-                  </tr>
-                </tfoot>
-              </table>
-            )}
-          </div>
-
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between px-4 py-2.5" style={{ borderTop: '1px solid var(--border)' }}>
-              <span className="text-[11px]" style={{ color: 'var(--muted-foreground)' }}>
-                Showing {pageRows.length} out of {sorted.length} results
-              </span>
-              <div className="flex items-center gap-1">
-                <button className="pg-btn" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}>
-                  ‹
-                </button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-                  <button key={p} onClick={() => setPage(p)} className={cn('pg-btn', page === p && 'active')}>
-                    {p}
-                  </button>
-                ))}
-                <button
-                  className="pg-btn"
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={page >= totalPages}
-                >
-                  ›
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  )
+  const [selected, setSelected] = useState<Position | null>(null)
+  const filtered = useMemo(() => positions.filter((row) => row.portfolio === portfolio).filter((row) => type === 'All positions' || row.type === type).filter((row) => currency === 'All currencies' || row.currency === currency).filter((row) => !search || `${row.ticker} ${row.name} ${row.sector}`.toLowerCase().includes(search.toLowerCase())).sort((a, b) => sort === 'value' ? b.value - a.value : a.ticker.localeCompare(b.ticker)), [currency, portfolio, search, sort, type])
+  const allRows = positions.filter((row) => row.portfolio === portfolio)
+  const totalValue = allRows.reduce((sum, row) => sum + row.value, 0)
+  const totalPnl = allRows.reduce((sum, row) => sum + row.pnl, 0)
+  const cashValue = allRows.filter((row) => row.type === 'Cash').reduce((sum, row) => sum + row.value, 0)
+  const totalPages = Math.max(1, Math.ceil(filtered.length / 5))
+  const rows = filtered.slice((page - 1) * 5, page * 5)
+  return <main className="min-h-full bg-[#05090f] p-3 text-[#edf3fa] sm:p-5"><div className="mx-auto max-w-[1600px] space-y-4">
+    <header className="px-1"><p className="text-[10px] uppercase tracking-[.24em] text-[#65758b]">Portfolio market</p><h1 className="mt-1 text-xl font-semibold">Positions</h1><p className="mt-1 text-[11px] text-[#77869a]">Holdings, cash and valuation context by portfolio.</p></header>
+    <nav className="flex gap-2 overflow-x-auto pb-1">{portfolios.map((item) => <button key={item} onClick={() => { setPortfolio(item); setPage(1); setSelected(null) }} className={`${pill} h-10 shrink-0 ${portfolio === item ? 'border-[#2f87fa]/60 bg-[#2f87fa]/15 text-white' : 'text-[#8997a9]'}`}>{portfolio === item ? <FolderOpen className="h-3.5 w-3.5 text-[#5d9df3]" /> : <Folder className="h-3.5 w-3.5" />}{item}</button>)}</nav>
+    <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{[['Total market value', money(totalValue), 'text-white'], ['Unrealised P&L', `${totalPnl >= 0 ? '+' : ''}${money(totalPnl)}`, totalPnl >= 0 ? 'text-emerald-300' : 'text-rose-300'], ['Cash balance', money(cashValue), 'text-[#70adff]'], ['Open positions', allRows.length, 'text-white']].map(([label, value, tone]) => <div key={label} className={`${card} px-5 py-4`}><p className="text-[9px] uppercase tracking-[.16em] text-[#718096]">{label}</p><p className={`mt-2 font-mono text-xl font-semibold ${tone}`}>{value}</p></div>)}</section>
+    <section className={`${card} overflow-visible`}><div className="flex flex-col gap-3 border-b border-white/[0.07] p-4 xl:flex-row xl:items-center xl:justify-between"><div><p className="text-[11px] font-semibold">{portfolio}</p><p className="mt-1 text-[9px] text-[#6f7e92]">Base currency USD · Valuation as of 17 Jul 2026, 13:45</p></div><div className="flex flex-wrap gap-2">
+      <label className="flex h-9 min-w-[210px] flex-1 items-center gap-2 rounded-full border border-white/10 bg-[#0b1420] px-4 text-[#7c8a9e]"><Search className="h-3.5 w-3.5" /><input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} placeholder="Search holdings" className="w-full bg-transparent text-[11px] text-white outline-none" /></label>
+      <div className="relative"><button onClick={() => setCurrencyOpen((v) => !v)} className={`${pill} text-[#aeb8c7]`}>{currency}<ChevronDown className="h-3 w-3" /></button>{currencyOpen && <div className="absolute right-0 z-30 mt-2 w-40 rounded-2xl border border-white/10 bg-[#111b29] p-2 shadow-2xl">{['All currencies', 'USD', 'CHF', 'GBP', 'JPY'].map((item) => <button key={item} onClick={() => { setCurrency(item); setPage(1); setCurrencyOpen(false) }} className={`flex w-full items-center justify-between rounded-full px-3 py-2 text-left text-[10px] ${currency === item ? 'bg-[#2f87fa] text-white' : 'text-[#9aa8ba] hover:bg-white/[0.06]'}`}>{item}{currency === item && <Check className="h-3 w-3" />}</button>)}</div>}</div>
+      <div className="relative"><button onClick={() => setFilterOpen((v) => !v)} className={`${pill} text-[#aeb8c7]`}><SlidersHorizontal className="h-3.5 w-3.5" />{type}<ChevronDown className="h-3 w-3" /></button>{filterOpen && <div className="absolute right-0 z-30 mt-2 w-44 rounded-2xl border border-white/10 bg-[#111b29] p-2 shadow-2xl">{['All positions', 'Holding', 'Cash'].map((item) => <button key={item} onClick={() => { setType(item); setPage(1); setFilterOpen(false) }} className={`flex w-full items-center justify-between rounded-full px-3 py-2 text-left text-[10px] ${type === item ? 'bg-[#2f87fa] text-white' : 'text-[#9aa8ba] hover:bg-white/[0.06]'}`}>{item}{type === item && <Check className="h-3 w-3" />}</button>)}</div>}</div>
+      <button onClick={() => setSort((value) => value === 'value' ? 'ticker' : 'value')} className={`${pill} text-[#aeb8c7]`}><ArrowDownUp className="h-3.5 w-3.5" />{sort === 'value' ? 'Market value' : 'Ticker'}</button>
+    </div></div>
+    <div className="overflow-x-auto"><table className="w-full min-w-[1150px] text-left text-[10px]"><thead className="text-[#6f7e92]"><tr>{['Position', 'Type', 'Sector', 'Currency', 'Quantity', 'Average cost', 'Market price', 'Market value', 'Unrealised P&L', 'Weight', 'Open date'].map((head) => <th key={head} className={`border-b border-white/[0.06] px-4 py-3 font-medium ${['Quantity', 'Average cost', 'Market price', 'Market value', 'Unrealised P&L', 'Weight'].includes(head) ? 'text-right' : ''}`}>{head}</th>)}</tr></thead><tbody>{rows.map((row) => <tr key={row.id} onClick={() => setSelected(row)} className={`cursor-pointer border-b border-white/[0.045] transition hover:bg-white/[0.035] ${selected?.id === row.id ? 'bg-[#2f87fa]/10' : ''}`}><td className="px-4 py-3"><p className="font-semibold text-white">{row.ticker}</p><p className="mt-1 text-[9px] text-[#78879a]">{row.name}</p></td><td className="px-4 py-3"><span className={`rounded-full px-2.5 py-1 text-[9px] ${row.type === 'Cash' ? 'bg-cyan-400/10 text-cyan-300' : 'bg-[#2f87fa]/15 text-[#70adff]'}`}>{row.type}</span></td><td className="px-4 py-3 text-[#a5b0bf]">{row.sector}</td><td className="px-4 py-3 font-mono text-[#a5b0bf]">{row.currency}</td><td className="px-4 py-3 text-right font-mono">{row.quantity.toLocaleString()}</td><td className="px-4 py-3 text-right font-mono text-[#a5b0bf]">{row.cost.toFixed(2)}</td><td className="px-4 py-3 text-right font-mono">{row.price.toFixed(2)}</td><td className="px-4 py-3 text-right font-mono font-semibold">{row.value.toLocaleString()}</td><td className={`px-4 py-3 text-right font-mono ${row.pnl >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>{row.pnl >= 0 ? '+' : ''}{row.pnl.toLocaleString()}</td><td className="px-4 py-3 text-right font-mono">{row.weight.toFixed(1)}%</td><td className="px-4 py-3 font-mono text-[#7d8b9e]">{row.date}</td></tr>)}</tbody><tfoot><tr className="bg-black/10"><td colSpan={7} className="px-4 py-3 text-[9px] uppercase tracking-wider text-[#718096]">Portfolio total · {allRows.length} positions</td><td className="px-4 py-3 text-right font-mono font-semibold">{totalValue.toLocaleString()}</td><td className={`px-4 py-3 text-right font-mono font-semibold ${totalPnl >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>{totalPnl >= 0 ? '+' : ''}{totalPnl.toLocaleString()}</td><td colSpan={2} /></tr></tfoot></table></div>
+    <footer className="flex items-center justify-between px-4 py-3 text-[10px] text-[#718096]"><span>Showing {rows.length} of {filtered.length} positions</span><div className="flex items-center gap-2"><button disabled={page === 1} onClick={() => setPage((p) => p - 1)} className={`${pill} h-8 w-8 px-0 disabled:opacity-30`}><ChevronLeft className="h-3.5 w-3.5" /></button><span>{page} / {totalPages}</span><button disabled={page === totalPages} onClick={() => setPage((p) => p + 1)} className={`${pill} h-8 w-8 px-0 disabled:opacity-30`}><ChevronRight className="h-3.5 w-3.5" /></button></div></footer></section>
+  </div>
+  {selected && <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" onMouseDown={() => setSelected(null)}><aside onMouseDown={(e) => e.stopPropagation()} className="absolute right-0 top-0 h-full w-full max-w-lg overflow-y-auto border-l border-white/10 bg-[linear-gradient(145deg,#172333,#0b1420_70%)] p-6 shadow-2xl"><div className="flex items-start justify-between"><div><p className="text-[9px] uppercase tracking-[.2em] text-[#64758b]">Position detail</p><h2 className="mt-2 text-lg font-semibold">{selected.name}</h2><p className="mt-1 font-mono text-[10px] text-[#718096]">{portfolio} · {selected.ticker}</p></div><button onClick={() => setSelected(null)} className={`${pill} h-9 w-9 px-0`}><X className="h-4 w-4" /></button></div><div className="mt-6 grid grid-cols-2 gap-3">{[['Market value', money(selected.value)], ['Unrealised P&L', `${selected.pnl >= 0 ? '+' : ''}${money(selected.pnl)}`], ['Portfolio weight', `${selected.weight.toFixed(1)}%`], ['Position type', selected.type]].map(([label, value]) => <div key={label} className="rounded-[20px] border border-white/[0.07] bg-black/10 p-4"><p className="text-[9px] uppercase tracking-wider text-[#66768b]">{label}</p><p className="mt-2 font-mono text-sm">{value}</p></div>)}</div><section className="mt-5 rounded-[24px] border border-white/[0.07] bg-black/10 p-5"><h3 className="text-[11px] font-semibold">Valuation detail</h3><dl className="mt-4 grid grid-cols-2 gap-5">{[['Quantity', selected.quantity.toLocaleString()], ['Average cost', selected.cost.toFixed(4)], ['Current price', selected.price.toFixed(4)], ['Currency', selected.currency], ['Sector', selected.sector], ['Open date', selected.date], ['Pricing source', selected.type === 'Cash' ? 'Unit price' : 'Approved market close'], ['Last valued', '17 Jul 2026 · 13:45']].map(([label, value]) => <div key={label}><dt className="text-[9px] uppercase tracking-wider text-[#66768b]">{label}</dt><dd className="mt-1 text-[11px] text-[#c8d0db]">{value}</dd></div>)}</dl></section></aside></div>}
+  </main>
 }

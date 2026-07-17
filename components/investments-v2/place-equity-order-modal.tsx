@@ -1,750 +1,268 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import {
-  X,
-  ChevronDown,
-  ArrowRight,
-  TrendingUp,
-  HelpCircle,
-  Check,
-  TrendingUp as TrendUpIcon,
-} from 'lucide-react'
-import {
-  ResponsiveContainer,
-  YAxis,
-  XAxis,
-  Tooltip,
-  Area,
-  AreaChart,
-  ReferenceLine,
-} from 'recharts'
-import { format } from 'date-fns'
-import { StatusBadge } from '@/components/arcus/status-badge'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
+import { ArrowDownRight, ArrowRight, ArrowUpRight, CalendarDays, CheckCircle2, CircleHelp, TrendingDown, TrendingUp } from 'lucide-react'
+import { Modal, SelectField } from '@/components/investments-v2/orders-ui'
 import { cn } from '@/lib/utils'
-
-// ── Types ──────────────────────────────────────────────────────────────────
-interface OptionItem { id: string; label: string }
-
-interface ChartPoint { date: number; price: number }
-
-interface MarketStats {
-  bid: number
-  ask: number
-  dayLow: number
-  dayHigh: number
-  volume: number
-  avgVol30d: number
-}
-
-interface HoldingSnapshot {
-  shares: number
-  avgCost: number
-  marketValue: number
-  unrealizedPnl: number
-  weightPct: number
-}
-
-interface FeeBreakdown {
-  fees: number
-  taxes: number
-  settlementAmount: number
-}
-
-interface CompliancePreview {
-  outcome: 'PASSED' | 'BREACH' | 'WARNING' | string
-  message: string
-}
 
 export interface PlaceEquityOrderModalProps {
   open: boolean
   onClose: () => void
-
-  side: 'BUY' | 'SELL'
-  onSideChange: (side: 'BUY' | 'SELL') => void
-
-  fundOptions: OptionItem[]
-  fundId: string
-  fundName: string | null
-  onFundChange: (id: string) => void
-
-  instrumentOptions: OptionItem[]
-  instrumentId: string
-  onInstrumentChange: (id: string) => void
-
-  orderType: 'MARKET' | 'LIMIT'
-  onOrderTypeChange: (t: 'MARKET' | 'LIMIT') => void
-
-  quantity: string
-  onQuantityChange: (v: string) => void
-  limitPrice: string
-  onLimitPriceChange: (v: string) => void
-
-  // Security header — real where available
-  securityName: string | null
-  securityTicker: string | null
-  currency: string
-  currentPrice: number | null
-  changeAbs: number | null
-  changePct: number | null
-  marketStats: MarketStats | null
-  chartData: ChartPoint[]
-
-  // Holding + impact — real, computed by the caller
-  existingHolding: HoldingSnapshot | null
-  afterShares: number
-  afterAvgCost: number
-  afterMarketValue: number
-  afterUnrealizedPnl: number
-  afterWeightPct: number | null
-  hasOrderInputs: boolean
-  orderQty: number
-  orderValue: number
-
-  // Preview / compliance — only present once a real preview has been run
-  feePreview: FeeBreakdown | null
-  compliance: CompliancePreview | null
-  previewLoading: boolean
-  submitting: boolean
-
-  // DOM node the theme-scoped Popover portals should mount under
-  container?: HTMLElement | null
-
-  onReviewOrder: () => void
-  onSubmitOrder: () => void
+  onComplete?: () => void
 }
 
-function fmt(n: number, dp = 2) {
-  return n.toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp })
+type Side = 'BUY' | 'SELL'
+type ChartPeriod = '1D' | '1W' | '1M' | '3M' | '1Y'
+
+const portfolios = ['Equity World', 'Arcus Balanced Fund', 'Growth Equity Fund', 'Pension Preservation']
+const instruments = [
+  { value: 'DELTA', label: 'Delta Corporation Limited (DLTA.ZW)', price: 322.5 },
+  { value: 'INNSCOR', label: 'Innscor Africa Limited (INN.ZW)', price: 721.2 },
+  { value: 'ECO', label: 'Econet Wireless Zimbabwe (ECO.ZW)', price: 298.1 },
+]
+
+const chartSeries: Record<ChartPeriod, { points: number[]; labels: string[]; change: number; volume: string; averageVolume: string }> = {
+  '1D': { points: [316.8, 320.2, 318.9, 321.7, 320.8, 322.2, 320.6, 321.4, 319.8, 317.2, 320.3, 319.7, 321.3, 320.8, 322.1, 323.8, 323.1, 324.8, 324.1, 324.7, 323.3, 324.4, 323.5, 324.9, 322.2, 323.4, 322.5], labels: ['09:00', '11:00', '13:00', '15:00'], change: 5.5, volume: '1.24M', averageVolume: '1.18M' },
+  '1W': { points: [307.4, 309.8, 308.1, 312.6, 310.9, 314.2, 316.8, 315.1, 318.7, 317.3, 321.2, 319.6, 322.5], labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'], change: 15.1, volume: '6.82M', averageVolume: '1.36M' },
+  '1M': { points: [334.8, 330.1, 332.6, 327.9, 329.3, 325.8, 322.1, 324.5, 319.4, 316.7, 320.8, 318.6, 322.5], labels: ['16 Jun', '23 Jun', '30 Jun', '07 Jul', '16 Jul'], change: -12.3, volume: '28.6M', averageVolume: '1.30M' },
+  '3M': { points: [281.2, 286.8, 292.4, 288.9, 298.1, 304.6, 301.7, 310.4, 316.2, 313.8, 320.1, 318.5, 322.5], labels: ['Apr', 'May', 'Jun', 'Jul'], change: 41.3, volume: '79.4M', averageVolume: '1.22M' },
+  '1Y': { points: [246.5, 253.8, 248.2, 264.4, 276.1, 271.8, 286.7, 295.4, 302.8, 298.5, 311.6, 306.9, 322.5], labels: ['Jul 25', 'Oct 25', 'Jan 26', 'Apr 26', 'Jul 26'], change: 76, volume: '311.8M', averageVolume: '1.25M' },
 }
 
-function fmtVol(n: number) {
-  return `${(n / 1_000_000).toFixed(2)}M`
+const fieldClass = 'equity-order-field h-9 w-full rounded-full px-3 text-[10px] outline-none transition'
+const panelClass = 'equity-order-panel rounded-xl'
+const averageCost = 295.12
+const currentShares = 50000
+const currentWeight = 4.2
+const availableCash = 42_458_320.45
+const portfolioScale = 2_285_000
+
+function Label({ children, help = false }: { children: React.ReactNode; help?: boolean }) {
+  return <span className="equity-order-label mb-1.5 flex items-center gap-1 text-[9px]">{children}{help && <CircleHelp className="h-3 w-3" />}</span>
 }
 
-// Illustrative fee-component split (Brokerage / Exchange Fee / STT) — the
-// order-preview API only returns aggregate fees+taxes, not this breakdown,
-// so these rates are estimates for display purposes only.
-const ESTIMATED_BROKERAGE_RATE = 0.0015
-const ESTIMATED_EXCHANGE_RATE = 0.000375
-const ESTIMATED_STT_RATE = 0.002
-
-const RANGE_OPTIONS = ['1D', '1W', '1M', '3M', '1Y', 'ALL'] as const
-type RangeKey = (typeof RANGE_OPTIONS)[number]
-const RANGE_MS: Record<Exclude<RangeKey, 'ALL'>, number> = {
-  '1D': 24 * 60 * 60 * 1000,
-  '1W': 7 * 24 * 60 * 60 * 1000,
-  '1M': 30 * 24 * 60 * 60 * 1000,
-  '3M': 90 * 24 * 60 * 60 * 1000,
-  '1Y': 365 * 24 * 60 * 60 * 1000,
+function Money({ value }: { value: number }) {
+  return <>{value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ZWL</>
 }
 
-function ChartTooltip({ active, payload }: any) {
-  if (!active || !payload?.length) return null
-  const p = payload[0].payload as ChartPoint
-  return (
-    <div className="bg-[#1a2540] border border-white/10 rounded px-2 py-1 text-[10px] text-white">
-      <div className="text-[#6B7A95]">{format(new Date(p.date), 'MMM d, yyyy HH:mm')}</div>
-      <div className="font-mono font-semibold">{p.price != null ? fmt(p.price, 4) : '—'}</div>
-    </div>
-  )
+function SignedMoney({ value }: { value: number }) {
+  return <>{value >= 0 ? '+' : '−'}{Math.abs(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ZWL</>
 }
 
-export function PlaceEquityOrderModal({
-  open,
-  onClose,
-  side,
-  onSideChange,
-  fundOptions,
-  fundId,
-  fundName,
-  onFundChange,
-  instrumentOptions,
-  instrumentId,
-  onInstrumentChange,
-  orderType,
-  onOrderTypeChange,
-  quantity,
-  onQuantityChange,
-  limitPrice,
-  onLimitPriceChange,
-  securityName,
-  securityTicker,
-  currency,
-  currentPrice,
-  changeAbs,
-  changePct,
-  marketStats,
-  chartData,
-  existingHolding,
-  afterShares,
-  afterAvgCost,
-  afterMarketValue,
-  afterUnrealizedPnl,
-  afterWeightPct,
-  hasOrderInputs,
-  orderQty,
-  orderValue,
-  feePreview,
-  compliance,
-  previewLoading,
-  submitting,
-  container,
-  onReviewOrder,
-  onSubmitOrder,
-}: PlaceEquityOrderModalProps) {
-  const [dontShow, setDontShow] = useState(false)
-  const [range, setRange] = useState<RangeKey>('1M')
+export function PlaceEquityOrderModal({ open, onClose, onComplete }: PlaceEquityOrderModalProps) {
+  const [side, setSide] = useState<Side>('BUY')
+  const [portfolio, setPortfolio] = useState('Equity World')
+  const [instrumentCode, setInstrumentCode] = useState('DELTA')
+  const [orderType, setOrderType] = useState('MARKET')
+  const [quantity, setQuantity] = useState('10000')
+  const [limitPrice, setLimitPrice] = useState('322.50')
+  const [timeInForce, setTimeInForce] = useState('Day')
+  const [validity, setValidity] = useState('2026-07-21')
+  const [chartPeriod, setChartPeriod] = useState<ChartPeriod>('1D')
+  const [skipConfirmation, setSkipConfirmation] = useState(false)
+  const [reviewed, setReviewed] = useState(false)
 
-  const latestTs = chartData.length ? chartData[chartData.length - 1].date : null
-  const filteredChartData = useMemo(() => {
-    if (!latestTs || range === 'ALL') return chartData
-    const cutoff = latestTs - RANGE_MS[range]
-    const sliced = chartData.filter((d) => d.date >= cutoff)
-    return sliced.length > 1 ? sliced : chartData
-  }, [chartData, range, latestTs])
+  const instrument = instruments.find((item) => item.value === instrumentCode) ?? instruments[0]
+  const chart = chartSeries[chartPeriod]
+  const shares = Math.max(0, Number(quantity) || 0)
+  const executionPrice = orderType === 'MARKET' ? instrument.price : Math.max(0, Number(limitPrice) || 0)
+  const orderValue = shares * executionPrice
+  const brokerage = orderValue * 0.0015
+  const exchangeFee = orderValue * 0.0004
+  const sellTax = side === 'SELL' ? orderValue * 0.01 : 0
+  const fees = brokerage + exchangeFee + sellTax
+  const consideration = side === 'BUY' ? orderValue + fees : orderValue - fees
+  const exceedsHolding = side === 'SELL' && shares > currentShares
+  const projectedShares = side === 'BUY' ? currentShares + shares : Math.max(0, currentShares - shares)
+  const currentValue = currentShares * instrument.price
+  const projectedValue = projectedShares * instrument.price
+  const currentCostBasis = currentShares * averageCost
+  const projectedCostBasis = side === 'BUY' ? currentCostBasis + consideration : projectedShares * averageCost
+  const projectedAverageCost = projectedShares ? projectedCostBasis / projectedShares : 0
+  const currentProfit = currentValue - currentCostBasis
+  const projectedProfit = projectedValue - projectedCostBasis
+  const currentProfitPercent = currentCostBasis ? currentProfit / currentCostBasis * 100 : 0
+  const projectedProfitPercent = projectedCostBasis ? projectedProfit / projectedCostBasis * 100 : 0
+  const projectedWeight = Math.max(0, currentWeight + (side === 'BUY' ? 1 : -1) * orderValue / portfolioScale)
+  const hasCash = side === 'SELL' || consideration <= availableCash
+  const isValid = shares > 0 && executionPrice > 0 && hasCash && !exceedsHolding
+  const settlementDate = validity ? new Date(`${validity}T00:00:00`).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
 
-  const tickFormatter = (ts: number) =>
-    range === '1D' ? format(new Date(ts), 'HH:mm') : format(new Date(ts), 'MMM d')
+  const feeRows = useMemo(() => [
+    ['Brokerage (0.15%)', brokerage],
+    ['Exchange Fee (0.04%)', exchangeFee],
+    ...(side === 'SELL' ? [['Sell Tax (1.00%)', sellTax] as const] : []),
+  ] as const, [brokerage, exchangeFee, sellTax, side])
 
-  const estBrokerage = orderValue * ESTIMATED_BROKERAGE_RATE
-  const estExchangeFee = orderValue * ESTIMATED_EXCHANGE_RATE
-  const estStt = orderValue * ESTIMATED_STT_RATE
-  const estTotalFees = estBrokerage + estExchangeFee + estStt
-  const totalConsideration = feePreview
-    ? feePreview.settlementAmount
-    : hasOrderInputs
-    ? side === 'BUY'
-      ? orderValue + estTotalFees
-      : orderValue - estTotalFees
-    : null
+  const chartGeometry = useMemo(() => {
+    const min = Math.min(...chart.points)
+    const max = Math.max(...chart.points)
+    const range = Math.max(max - min, 1)
+    const coordinates = chart.points.map((point, index) => {
+      const x = index / (chart.points.length - 1) * 430
+      const y = 20 + (max - point) / range * 92
+      return [x, y] as const
+    })
+    const line = coordinates.map(([x, y], index) => `${index ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`).join(' ')
+    return { line, area: `${line} L430 128 L0 128 Z`, min, max }
+  }, [chart])
 
-  if (!open) return null
+  const close = () => {
+    setReviewed(false)
+    onClose()
+  }
 
-  const positive = (changeAbs ?? 0) >= 0
-  const complianceColor = compliance?.outcome === 'PASSED' ? '#10B981' : compliance?.outcome === 'BREACH' ? '#EF4444' : '#F59E0B'
+  const placeOrder = () => {
+    if (!isValid) return
+    onComplete?.()
+    close()
+  }
+
+  const setOrderSide = (value: Side) => {
+    setSide(value)
+    setReviewed(false)
+  }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-
-      {/* Modal */}
-      <div
-        className="relative w-full max-w-[1100px] max-h-[94vh] overflow-y-auto rounded-xl border border-white/[0.08] shadow-2xl"
-        style={{ background: '#0F1729' }}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-          <span className="text-white text-[15px] font-semibold">Place {side === 'BUY' ? 'Buy' : 'Sell'} Equity Order</span>
-          <button
-            onClick={onClose}
-            className="w-7 h-7 flex items-center justify-center rounded-full text-[#6B7A95] hover:text-white hover:bg-white/10 transition-colors"
-          >
-            <X className="w-4 h-4" />
+    <Modal
+      open={open}
+      onClose={close}
+      title="Place Equity Order"
+      width="max-w-[980px]"
+      footer={
+        <div className="equity-order-footer flex w-full flex-wrap items-center justify-end gap-2">
+          <label className="equity-order-footer-label mr-auto flex items-center gap-2 text-[9px]">
+            <input type="checkbox" checked={skipConfirmation} onChange={(event) => setSkipConfirmation(event.target.checked)} className="h-4 w-4 rounded accent-blue-600" />
+            Don&apos;t show confirmation again
+          </label>
+          <button type="button" onClick={close} className="equity-order-button equity-order-button-secondary h-9 rounded-full px-5 text-[10px] font-medium">Cancel</button>
+          <button type="button" disabled={!isValid} onClick={() => setReviewed(true)} className="equity-order-button equity-order-button-review h-9 rounded-full px-5 text-[10px] font-medium disabled:cursor-not-allowed disabled:opacity-40">
+            {reviewed ? 'Order reviewed' : 'Review Order'}
+          </button>
+          <button type="button" disabled={!isValid} onClick={placeOrder} className={cn('equity-order-button flex h-9 items-center gap-2 rounded-full px-5 text-[10px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40', side === 'BUY' ? 'equity-order-button-buy' : 'equity-order-button-sell')}>
+            Place {side === 'BUY' ? 'Buy' : 'Sell'} Order <ArrowRight className="h-3.5 w-3.5" />
           </button>
         </div>
-
-        <div className="p-5 space-y-4">
-          {/* Security Header Card */}
-          {securityTicker && (
-            <div className="rounded-xl p-4" style={{ background: '#111C30', border: '1px solid rgba(255,255,255,0.06)' }}>
-              <div className="flex gap-6">
-                <div className="flex-1 min-w-0">
-                  <div className="text-white text-[14px] font-semibold">
-                    {securityName} ({securityTicker})
-                  </div>
-                  <div className="flex items-center gap-3 mt-1.5">
-                    <span className="text-[24px] font-mono font-bold text-white">
-                      {currency} {currentPrice != null ? fmt(currentPrice, 4) : '—'}
-                    </span>
-                    {changeAbs != null && (
-                      <span className={`flex items-center gap-1 text-[13px] font-mono ${positive ? 'text-[#10B981]' : 'text-[#EF4444]'}`}>
-                        <TrendingUp className={`w-3.5 h-3.5 ${positive ? '' : 'rotate-180'}`} />
-                        {positive ? '+' : ''}{fmt(changeAbs, 4)} ({changePct != null ? `${positive ? '+' : ''}${changePct.toFixed(2)}%` : '—'})
-                      </span>
-                    )}
-                  </div>
-
-                  {marketStats && (
-                    <div className="grid grid-cols-2 gap-x-8 gap-y-1.5 mt-3">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[11px] text-[#6B7A95] w-14">Bid</span>
-                        <span className="text-[12px] font-mono text-[#C8D3E8]">{fmt(marketStats.bid, 4)}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[11px] text-[#6B7A95] w-14">Ask</span>
-                        <span className="text-[12px] font-mono text-[#C8D3E8]">{fmt(marketStats.ask, 4)}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[11px] text-[#6B7A95] w-14">Day Low</span>
-                        <span className="text-[12px] font-mono text-[#C8D3E8]">{fmt(marketStats.dayLow, 4)}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[11px] text-[#6B7A95] w-14">Day High</span>
-                        <span className="text-[12px] font-mono text-[#C8D3E8]">{fmt(marketStats.dayHigh, 4)}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[11px] text-[#6B7A95] w-14">Volume</span>
-                        <span className="text-[12px] font-mono text-[#C8D3E8]">{fmtVol(marketStats.volume)}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[11px] text-[#6B7A95] w-14">Avg. Vol (30D)</span>
-                        <span className="text-[12px] font-mono text-[#C8D3E8]">{fmtVol(marketStats.avgVol30d)}</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Chart */}
-                <div className="w-[420px] flex-shrink-0">
-                  <div className="flex items-center justify-between mb-1">
-                    <div className="text-[10px] text-[#6B7A95] uppercase tracking-wider">Price History</div>
-                    <div className="flex items-center gap-0.5 rounded-full p-0.5" style={{ background: '#0B1220', border: '1px solid rgba(255,255,255,0.06)' }}>
-                      {RANGE_OPTIONS.map((r) => (
-                        <button
-                          key={r}
-                          onClick={() => setRange(r)}
-                          className="px-1.5 py-0.5 rounded-full text-[9px] font-semibold transition-colors"
-                          style={{
-                            background: range === r ? '#2563EB' : 'transparent',
-                            color: range === r ? '#fff' : '#6B7A95',
-                          }}
-                        >
-                          {r}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  {filteredChartData.length > 1 ? (
-                    <div className="relative">
-                      <ResponsiveContainer width="100%" height={140}>
-                        <AreaChart data={filteredChartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-                          <defs>
-                            <linearGradient id="peqGreenGrad" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor={positive ? '#10B981' : '#EF4444'} stopOpacity={0.35} />
-                              <stop offset="100%" stopColor={positive ? '#10B981' : '#EF4444'} stopOpacity={0.02} />
-                            </linearGradient>
-                          </defs>
-                          <YAxis hide domain={['dataMin', 'dataMax']} />
-                          <XAxis
-                            dataKey="date"
-                            type="number"
-                            domain={['dataMin', 'dataMax']}
-                            tickFormatter={tickFormatter}
-                            tick={{ fill: '#6B7A95', fontSize: 9 }}
-                            tickLine={false}
-                            axisLine={false}
-                            interval="preserveStartEnd"
-                          />
-                          <Tooltip content={<ChartTooltip />} />
-                          <Area
-                            type="monotone"
-                            dataKey="price"
-                            stroke={positive ? '#10B981' : '#EF4444'}
-                            strokeWidth={1.5}
-                            fill="url(#peqGreenGrad)"
-                            dot={false}
-                            activeDot={{ r: 3, fill: positive ? '#10B981' : '#EF4444' }}
-                          />
-                          {currentPrice != null && (
-                            <ReferenceLine y={currentPrice} stroke={positive ? '#10B981' : '#EF4444'} strokeWidth={1} strokeOpacity={0.4} />
-                          )}
-                        </AreaChart>
-                      </ResponsiveContainer>
-                    </div>
-                  ) : (
-                    <div className="h-[140px] flex items-center justify-center text-[11px] text-[#6B7A95]">No price history for this range</div>
-                  )}
-                </div>
+      }
+    >
+      <div className="equity-order-ticket">
+        <section className={cn(panelClass, 'equity-order-market mb-2.5 grid overflow-hidden lg:grid-cols-[1.02fr_1.18fr]')}>
+          <div className="p-4">
+            <p className="equity-order-title text-[11px] font-semibold">{instrument.label.split(' (')[0]} ({instrumentCode})</p>
+            <div className="mt-2.5 grid grid-cols-[1fr_auto_auto] items-center gap-5">
+              <div>
+                <p className="equity-order-price font-mono text-xl font-semibold">ZWL {instrument.price.toFixed(4)}</p>
+                <p className={cn('mt-1 flex items-center gap-1.5 text-[10px] font-medium', chart.change >= 0 ? 'equity-order-positive' : 'equity-order-negative')}>
+                  {chart.change >= 0 ? '+' : '−'}{Math.abs(chart.change).toFixed(4)} ({chart.change >= 0 ? '+' : '−'}{Math.abs(chart.change / (instrument.price - chart.change) * 100).toFixed(2)}%)
+                  {chart.change >= 0 ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}
+                </p>
               </div>
+              <div><p className="equity-order-label text-[8px]">Bid</p><p className="equity-order-value mt-1 font-mono text-[9px]">322.1000</p></div>
+              <div><p className="equity-order-label text-[8px]">Ask</p><p className="equity-order-value mt-1 font-mono text-[9px]">323.0000</p></div>
             </div>
-          )}
-
-          {/* Buy / Sell Toggle */}
-          <div className="grid grid-cols-2 rounded-lg overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
-            <button
-              onClick={() => onSideChange('BUY')}
-              className="py-2.5 text-[13px] font-semibold transition-colors"
-              style={{ background: side === 'BUY' ? '#2563EB' : 'transparent', color: side === 'BUY' ? '#fff' : '#94a3b8' }}
-            >
-              Buy
-            </button>
-            <button
-              onClick={() => onSideChange('SELL')}
-              className="py-2.5 text-[13px] font-semibold transition-colors"
-              style={{ background: side === 'SELL' ? '#EF4444' : 'transparent', color: side === 'SELL' ? '#fff' : '#94a3b8', borderLeft: '1px solid rgba(255,255,255,0.08)' }}
-            >
-              Sell
-            </button>
-          </div>
-
-          {/* Two-column body */}
-          <div className="grid grid-cols-[1fr_380px] gap-4">
-            {/* LEFT: Order Details */}
-            <div className="space-y-4">
-              <div className="text-white text-[13px] font-semibold">Order Details</div>
-
-              <FormField label="Portfolio">
-                <SearchableSelect value={fundId} onChange={onFundChange} options={fundOptions} placeholder="Select fund…" container={container} />
-              </FormField>
-
-              <FormField label="Instrument">
-                <SearchableSelect value={instrumentId} onChange={onInstrumentChange} options={instrumentOptions} placeholder="Select instrument…" container={container} />
-              </FormField>
-
-              <FormField label="Order Type">
-                <div className="grid grid-cols-2 gap-1.5">
-                  {(['MARKET', 'LIMIT'] as const).map((t) => (
-                    <button
-                      key={t}
-                      onClick={() => onOrderTypeChange(t)}
-                      className="py-1.5 rounded-full text-[11px] font-medium transition-colors"
-                      style={{
-                        background: orderType === t ? '#2563EB' : '#111C30',
-                        color: orderType === t ? '#fff' : '#94a3b8',
-                        border: orderType === t ? 'none' : '1px solid rgba(255,255,255,0.08)',
-                      }}
-                    >
-                      {t === 'MARKET' ? 'Market' : 'Limit'}
-                    </button>
-                  ))}
-                </div>
-              </FormField>
-
-              <FormField label="Quantity" hint="Lot size: 1 • Min: 1">
-                <div className="relative">
-                  <Input
-                    type="number"
-                    value={quantity}
-                    onChange={(e) => onQuantityChange(e.target.value)}
-                    placeholder="0"
-                    className="h-9 pr-16 text-[12px] font-mono text-white bg-[#111C30] border-white/10 focus-visible:ring-blue-500/30"
-                  />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-medium pointer-events-none" style={{ color: '#6B7A95' }}>Shares</span>
-                </div>
-              </FormField>
-
-              <FormField label={`Price (${currency})`}>
-                {orderType === 'MARKET' ? (
-                  <Input
-                    type="text"
-                    value="Market"
-                    readOnly
-                    disabled
-                    className="h-9 text-[12px] font-mono bg-[#111C30] border-white/10 text-[#6B7A95] disabled:opacity-100"
-                  />
-                ) : (
-                  <Input
-                    type="number"
-                    value={limitPrice}
-                    onChange={(e) => onLimitPriceChange(e.target.value)}
-                    placeholder="0.00"
-                    className="h-9 text-[12px] font-mono text-white bg-[#111C30] border-white/10 focus-visible:ring-blue-500/30"
-                  />
-                )}
-                {orderType === 'MARKET' && (
-                  <p className="text-[10px] mt-1" style={{ color: '#6B7A95' }}>Market order will execute at best available price</p>
-                )}
-              </FormField>
-
-              {/* Estimated Fees — illustrative Brokerage/Exchange/STT split */}
-              {hasOrderInputs && (
-                <div className="rounded-xl p-4 space-y-1.5" style={{ background: '#111C30', border: '1px solid rgba(255,255,255,0.06)' }}>
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <span className="text-[12px] font-semibold text-white">Estimated Fees</span>
-                    <HelpCircle className="w-3 h-3" style={{ color: '#6B7A95' }} />
-                  </div>
-                  <FeeRow label={`Brokerage (${(ESTIMATED_BROKERAGE_RATE * 100).toFixed(2)}%)`} value={`${fmt(estBrokerage)} ${currency}`} />
-                  <FeeRow label="Exchange Fee" value={`${fmt(estExchangeFee)} ${currency}`} />
-                  <FeeRow label={`STT (${(ESTIMATED_STT_RATE * 100).toFixed(2)}%)`} value={`${fmt(estStt)} ${currency}`} />
-                  <div className="flex items-center justify-between pt-2 mt-1" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                    <span className="text-[12px] font-semibold text-white">Total Estimated Fees</span>
-                    <span className="text-[12px] font-mono font-semibold text-white">{fmt(estTotalFees)} {currency}</span>
-                  </div>
-                </div>
-              )}
-
-              {/* Real compliance banner (no fabricated cash balance) */}
-              {compliance && (
-                <div
-                  className="flex items-center gap-3 rounded-xl px-4 py-3"
-                  style={{ background: `${complianceColor}14`, border: `1px solid ${complianceColor}40` }}
-                >
-                  <StatusBadge status={compliance.outcome === 'PASSED' ? 'passed' : compliance.outcome === 'BREACH' ? 'breach' : 'warning'} />
-                  <div className="text-[11px]" style={{ color: '#C8D3E8' }}>{compliance.message}</div>
-                </div>
-              )}
-            </div>
-
-            {/* RIGHT: Holding / Impact / Summary */}
-            <div className="space-y-4">
-              {/* Existing Holding */}
-              <div className="rounded-xl p-4" style={{ background: '#111C30', border: '1px solid rgba(255,255,255,0.06)' }}>
-                <div className="flex items-center justify-between mb-3">
-                  <div className="text-[12px] font-semibold text-white">Existing Holding</div>
-                  {fundName && <div className="text-[10px] font-medium truncate max-w-[180px]" style={{ color: '#6B7A95' }}>{fundName}</div>}
-                </div>
-                {existingHolding ? (
-                  <>
-                    <div className="grid grid-cols-3 gap-3">
-                      <HoldingCell label="Current Shares" value={fmt(existingHolding.shares, 0)} />
-                      <HoldingCell label={`Avg. Cost (${currency})`} value={existingHolding.avgCost.toFixed(4)} />
-                      <HoldingCell label="Current Market Value" value={`${fmt(existingHolding.marketValue)} ${currency}`} small />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3 mt-3">
-                      <div>
-                        <div className="text-[10px] mb-1" style={{ color: '#6B7A95' }}>Unrealised P/L</div>
-                        <div className="text-[13px] font-mono font-semibold" style={{ color: existingHolding.unrealizedPnl >= 0 ? '#10B981' : '#EF4444' }}>
-                          {existingHolding.unrealizedPnl >= 0 ? '+' : ''}{fmt(existingHolding.unrealizedPnl)} {currency}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-[10px] mb-1" style={{ color: '#6B7A95' }}>Portfolio Weight</div>
-                        <div className="text-[15px] font-mono font-semibold text-white">{existingHolding.weightPct.toFixed(2)}%</div>
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <div className="text-[11px]" style={{ color: '#6B7A95' }}>
-                    {fundId ? 'No existing position in this instrument.' : 'Select a portfolio and instrument to see your existing position.'}
-                  </div>
-                )}
-              </div>
-
-              {/* Impact of This Order */}
-              {hasOrderInputs && (
-                <div className="rounded-xl p-4" style={{ background: '#111C30', border: '1px solid rgba(255,255,255,0.06)' }}>
-                  <div className="text-[12px] font-semibold text-white mb-3">
-                    Impact of This Order ({side === 'BUY' ? 'Buy' : 'Sell'} {fmt(orderQty, 0)} Shares)
-                  </div>
-                  <table className="w-full text-[11px]">
-                    <thead>
-                      <tr>
-                        <th className="text-left font-normal pb-2" style={{ color: '#6B7A95' }}>&nbsp;</th>
-                        <th className="text-right font-normal pb-2" style={{ color: '#6B7A95' }}>BEFORE (Current)</th>
-                        <th className="text-right font-normal pb-2" style={{ color: '#6B7A95' }}>AFTER (Projected)</th>
-                      </tr>
-                    </thead>
-                    <tbody className="font-mono">
-                      <ImpactRow label="Shares Held" before={fmt(existingHolding?.shares ?? 0, 0)} after={fmt(afterShares, 0)} />
-                      <ImpactRow label={`Avg. Cost (${currency})`} before={(existingHolding?.avgCost ?? 0).toFixed(4)} after={afterAvgCost.toFixed(4)} />
-                      <ImpactRow label={`Market Value (${currency})`} before={fmt(existingHolding?.marketValue ?? 0, 0)} after={fmt(afterMarketValue, 0)} />
-                      <tr>
-                        <td className="py-1" style={{ color: '#94a3b8' }}>Unrealised P/L ({currency})</td>
-                        <td className="text-right py-1" style={{ color: (existingHolding?.unrealizedPnl ?? 0) >= 0 ? '#10B981' : '#EF4444' }}>
-                          {(existingHolding?.unrealizedPnl ?? 0) >= 0 ? '+' : ''}{fmt(existingHolding?.unrealizedPnl ?? 0, 0)}
-                        </td>
-                        <td className="text-right py-1 font-semibold" style={{ color: afterUnrealizedPnl >= 0 ? '#10B981' : '#EF4444' }}>
-                          {afterUnrealizedPnl >= 0 ? '+' : ''}{fmt(afterUnrealizedPnl, 0)}
-                        </td>
-                      </tr>
-                      <ImpactRow
-                        label="Portfolio Weight"
-                        before={`${(existingHolding?.weightPct ?? 0).toFixed(2)}%`}
-                        after={afterWeightPct != null ? `${afterWeightPct.toFixed(2)}%` : '—'}
-                      />
-                    </tbody>
-                  </table>
-                  {afterWeightPct == null && (
-                    <div className="text-[10px] mt-2" style={{ color: '#6B7A95' }}>Run Review Order to see the projected portfolio weight after this order.</div>
-                  )}
-                  {afterWeightPct != null && (
-                    <div className="mt-3 flex items-start gap-2 rounded-lg px-3 py-2.5" style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)' }}>
-                      <TrendUpIcon className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#F59E0B' }} />
-                      <p className="text-[11px]" style={{ color: '#C8D3E8' }}>
-                        This order will change your exposure to {securityName ?? 'this instrument'} from{' '}
-                        <span className="font-semibold" style={{ color: '#F59E0B' }}>{(existingHolding?.weightPct ?? 0).toFixed(2)}%</span>{' '}
-                        to <span className="font-semibold" style={{ color: '#F59E0B' }}>{afterWeightPct.toFixed(2)}%</span> of your portfolio.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Order Summary */}
-              <div className="rounded-xl p-4" style={{ background: '#111C30', border: '1px solid rgba(255,255,255,0.06)' }}>
-                <div className="text-[12px] font-semibold text-white mb-3">Order Summary</div>
-                <div className="space-y-2 text-[11px]">
-                  <SummaryRow label={`Order Value (${fmt(orderQty, 0)} Shares)`} value={hasOrderInputs ? `${fmt(orderValue)} ${currency}` : '—'} />
-                  <SummaryRow label="Estimated Fees" value={hasOrderInputs ? `${fmt(estTotalFees)} ${currency}` : '—'} />
-                  <div className="pt-2 mt-1" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                    <div className="flex items-center justify-between">
-                      <span className="text-[12px] font-semibold text-white">Total Consideration</span>
-                      <span className="text-[13px] font-mono font-bold" style={{ color: '#60A5FA' }}>
-                        {totalConsideration != null ? `${fmt(totalConsideration)} ${currency}` : '—'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
+            <div className="mt-5 grid grid-cols-4 gap-3">
+              {[
+                ['Volume', chart.volume],
+                ['Avg. Vol (30D)', chart.averageVolume],
+                [chartPeriod === '1D' ? 'Day Low' : `${chartPeriod} Low`, chartGeometry.min.toFixed(4)],
+                [chartPeriod === '1D' ? 'Day High' : `${chartPeriod} High`, chartGeometry.max.toFixed(4)],
+              ].map(([label, value]) => <div key={label}><p className="equity-order-label text-[8px]">{label}</p><p className="equity-order-value mt-1 font-mono text-[9px]">{value}</p></div>)}
             </div>
           </div>
-        </div>
+          <div className="equity-order-chart relative min-h-40 border-t p-3 pt-4 lg:border-l lg:border-t-0">
+            <select aria-label="Chart period" value={chartPeriod} onChange={(event) => setChartPeriod(event.target.value as ChartPeriod)} className="equity-order-period absolute left-3 top-3 z-10 h-7 rounded-full px-2.5 text-[8px] font-medium outline-none">
+              {(Object.keys(chartSeries) as ChartPeriod[]).map((period) => <option key={period}>{period}</option>)}
+            </select>
+            <svg viewBox="0 0 480 140" className="mt-2 h-32 w-full" preserveAspectRatio="none" aria-label={`${chartPeriod} price chart`}>
+              <defs><linearGradient id="equity-order-chart-fill" x1="0" y1="0" x2="0" y2="1"><stop className="equity-order-chart-fill-start" offset="0" /><stop className="equity-order-chart-fill-end" offset="1" /></linearGradient></defs>
+              {[32, 64, 96].map((y) => <line className="equity-order-chart-grid" key={y} x1="0" y1={y} x2="430" y2={y} />)}
+              <path d={chartGeometry.area} fill="url(#equity-order-chart-fill)" />
+              <path className={cn('equity-order-chart-line', chart.change < 0 && 'is-negative')} d={chartGeometry.line} fill="none" />
+              <text className="equity-order-chart-axis" x="440" y="24">{chartGeometry.max.toFixed(2)}</text>
+              <text className="equity-order-chart-axis" x="440" y="68">{((chartGeometry.max + chartGeometry.min) / 2).toFixed(2)}</text>
+              <text className="equity-order-chart-axis" x="440" y="112">{chartGeometry.min.toFixed(2)}</text>
+            </svg>
+            <div className="equity-order-chart-labels absolute bottom-2 left-3 right-12 flex justify-between text-[8px]">{chart.labels.map((label) => <span key={label}>{label}</span>)}</div>
+          </div>
+        </section>
 
-        {/* Footer */}
-        <div className="flex items-center gap-3 px-6 py-4" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-          <label className="flex items-center gap-2 cursor-pointer mr-auto">
-            <div
-              className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0"
-              style={{ background: dontShow ? '#2563EB' : 'transparent', border: dontShow ? '1px solid #2563EB' : '1px solid rgba(255,255,255,0.2)' }}
-              onClick={() => setDontShow((p) => !p)}
-            >
-              {dontShow && <span className="text-white text-[8px] font-bold">✓</span>}
+        <div className="grid gap-2.5 lg:grid-cols-[.91fr_1.14fr]">
+          <section className={cn(panelClass, 'p-3')}>
+            <div className="equity-order-segment grid grid-cols-2 gap-1 rounded-full p-1">
+              {(['BUY', 'SELL'] as const).map((value) => <button key={value} type="button" onClick={() => setOrderSide(value)} className={cn('h-8 rounded-full text-[9px] font-semibold transition', side === value ? value === 'BUY' ? 'equity-order-tab-buy text-white' : 'equity-order-tab-sell text-white' : 'equity-order-tab-idle')}>{value === 'BUY' ? 'Buy' : 'Sell'}</button>)}
             </div>
-            <span className="text-[11px]" style={{ color: '#6B7A95' }}>Don&apos;t show confirmation again</span>
-          </label>
+            <h3 className="equity-order-heading mt-3 text-[10px] font-semibold">Order Details</h3>
+            <div className="mt-2.5 space-y-2.5">
+              <div><Label help>Portfolio</Label><SelectField value={portfolio} onChange={setPortfolio}>{portfolios.map((item) => <option key={item}>{item}</option>)}</SelectField></div>
+              <div><Label help>Instrument</Label><SelectField value={instrumentCode} onChange={(value) => { setInstrumentCode(value); setLimitPrice(String(instruments.find((item) => item.value === value)?.price ?? 0)); setReviewed(false) }}>{instruments.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</SelectField></div>
+              <div><Label help>Order Type</Label><div className="equity-order-segment grid grid-cols-4 gap-1 rounded-full p-1">{['MARKET', 'LIMIT', 'STOP', 'STOP LIMIT'].map((value) => <button key={value} type="button" onClick={() => { setOrderType(value); setReviewed(false) }} className={cn('h-7 rounded-full text-[8px] font-medium transition', orderType === value ? 'equity-order-tab-buy text-white' : 'equity-order-tab-idle')}>{value === 'STOP LIMIT' ? 'Stop Limit' : value[0] + value.slice(1).toLowerCase()}</button>)}</div></div>
+              <div><Label help>Quantity</Label><div className="relative"><input type="number" min="1" max={side === 'SELL' ? currentShares : undefined} step="1" value={quantity} onChange={(event) => { setQuantity(event.target.value); setReviewed(false) }} className={cn(fieldClass, 'pr-14')} /><span className="equity-order-label absolute right-3 top-2.5 text-[8px]">Shares</span></div><p className={cn('mt-1 text-[8px]', exceedsHolding ? 'equity-order-negative' : 'equity-order-muted')}>{exceedsHolding ? `Maximum sell quantity is ${currentShares.toLocaleString()} shares` : `Lot size: 1 · Min: 1${side === 'SELL' ? ` · Available: ${currentShares.toLocaleString()}` : ''}`}</p></div>
+              <div><Label help>Price (ZWL)</Label><input type="number" min="0" value={orderType === 'MARKET' ? instrument.price : limitPrice} disabled={orderType === 'MARKET'} onChange={(event) => { setLimitPrice(event.target.value); setReviewed(false) }} className={fieldClass} /><p className="equity-order-muted mt-1 text-[8px]">{orderType === 'MARKET' ? 'Market order will execute at best available price' : 'Enter your execution price'}</p></div>
+              <div><Label help>Time in Force</Label><SelectField value={timeInForce} onChange={(value) => { setTimeInForce(value); setReviewed(false) }}><option>Day</option><option>Good Till Cancelled</option><option>Fill or Kill</option></SelectField></div>
+              <div><Label help>Validity</Label><div className="relative"><input type="date" value={validity} onChange={(event) => { setValidity(event.target.value); setReviewed(false) }} className={cn(fieldClass, 'pr-10')} /><CalendarDays className="equity-order-muted pointer-events-none absolute right-3 top-2.5 h-3.5 w-3.5" /></div></div>
+            </div>
+            <div className="equity-order-fees mt-3 space-y-1.5 border-t pt-3 text-[8px]">
+              {feeRows.map(([label, value]) => <div key={label} className="flex justify-between"><span className="equity-order-label">{label}</span><span className="font-mono"><Money value={value} /></span></div>)}
+              <div className="equity-order-fee-total flex justify-between border-t pt-2 text-[9px] font-semibold"><span>Total Estimated Fees</span><span className="font-mono"><Money value={fees} /></span></div>
+            </div>
+            <div className={cn('equity-order-status mt-3 flex items-center gap-3 rounded-xl border p-3', isValid ? 'is-valid' : 'is-invalid')}>
+              <CheckCircle2 className="h-4 w-4 shrink-0" />
+              <div>
+                <p className="text-[9px] font-medium">{side === 'BUY' ? (hasCash ? 'Sufficient cash available' : 'Insufficient available cash') : (exceedsHolding ? 'Insufficient shares available' : 'Sufficient shares available')}</p>
+                <p className="mt-1 text-[8px] opacity-75">{side === 'BUY' ? <>Available Cash: <Money value={availableCash} /></> : <>Available Shares: {currentShares.toLocaleString()}</>}</p>
+              </div>
+            </div>
+          </section>
 
-          <Button
-            onClick={onClose}
-            variant="outline"
-            size="pill"
-            className="bg-transparent text-white border-white/15 hover:bg-white/5"
-          >
-            Cancel
-          </Button>
+          <div className="space-y-2.5">
+            <section className={cn(panelClass, 'p-4')}>
+              <h3 className="equity-order-heading text-[10px] font-semibold">Existing Holding</h3>
+              <div className="equity-order-holding-top mt-3 grid grid-cols-1 sm:grid-cols-3">
+                {[['Current Shares', currentShares.toLocaleString()], ['Avg. Cost (ZWL)', averageCost.toFixed(4)], ['Current Market Value', `${currentValue.toLocaleString(undefined, { minimumFractionDigits: 2 })} ZWL`]].map(([label, value]) => <div key={label} className="equity-order-metric"><p className="equity-order-label text-[8px]">{label}</p><p className="equity-order-value mt-1.5 font-mono text-[10px]">{value}</p></div>)}
+              </div>
+              <div className="equity-order-holding-bottom mt-3 grid grid-cols-1 border-t pt-3 sm:grid-cols-2">
+                <div className="equity-order-metric"><p className="equity-order-label text-[8px]">Unrealised P/L</p><p className="equity-order-positive mt-1.5 font-mono text-[10px]"><SignedMoney value={currentProfit} /><span className="block text-[8px]">(+{currentProfitPercent.toFixed(2)}%)</span></p></div>
+                <div className="equity-order-metric"><p className="equity-order-label text-[8px]">Portfolio Weight</p><p className="equity-order-value mt-1.5 font-mono text-[10px]">{currentWeight.toFixed(2)}%</p></div>
+              </div>
+            </section>
 
-          <Button
-            onClick={onReviewOrder}
-            disabled={previewLoading}
-            variant="outline"
-            size="pill"
-            className="bg-transparent text-[#60A5FA] border-[#2563EB] hover:bg-[#2563EB]/10"
-          >
-            {previewLoading ? 'Checking…' : 'Review Order'}
-          </Button>
+            <section className={cn(panelClass, 'p-4')}>
+              <h3 className="equity-order-heading text-[10px] font-semibold">Impact of This Order ({side === 'BUY' ? 'Buy' : 'Sell'} {shares.toLocaleString()} Shares)</h3>
+              <div className="equity-order-impact mt-3 grid grid-cols-[1.12fr_1fr_1fr] text-[8px]">
+                <div />
+                <p className="equity-order-label pb-1.5 text-center text-[7px]">BEFORE (Current)</p>
+                <p className="equity-order-label pb-1.5 text-center text-[7px]">AFTER (Projected)</p>
+                {[
+                  ['Shares Held', currentShares.toLocaleString(), projectedShares.toLocaleString()],
+                  ['Avg. Cost (ZWL)', averageCost.toFixed(4), projectedAverageCost.toFixed(4)],
+                  ['Market Value (ZWL)', currentValue.toLocaleString(undefined, { minimumFractionDigits: 2 }), projectedValue.toLocaleString(undefined, { minimumFractionDigits: 2 })],
+                  ['Unrealised P/L', `${currentProfit >= 0 ? '+' : '−'}${Math.abs(currentProfit).toLocaleString(undefined, { minimumFractionDigits: 2 })}\n(${currentProfitPercent >= 0 ? '+' : '−'}${Math.abs(currentProfitPercent).toFixed(2)}%)`, `${projectedProfit >= 0 ? '+' : '−'}${Math.abs(projectedProfit).toLocaleString(undefined, { minimumFractionDigits: 2 })}\n(${projectedProfitPercent >= 0 ? '+' : '−'}${Math.abs(projectedProfitPercent).toFixed(2)}%)`],
+                  ['Portfolio Weight', `${currentWeight.toFixed(2)}%`, `${projectedWeight.toFixed(2)}%`],
+                ].flatMap(([label, before, after]) => [
+                  <p key={`${label}-label`} className="equity-order-impact-label py-1.5">{label}</p>,
+                  <p key={`${label}-before`} className={cn('equity-order-impact-value whitespace-pre-line py-1.5 text-center font-mono', label === 'Unrealised P/L' && 'equity-order-positive')}>{before}</p>,
+                  <p key={`${label}-after`} className={cn('equity-order-impact-value whitespace-pre-line py-1.5 text-center font-mono', label === 'Unrealised P/L' && 'equity-order-positive')}>{after}</p>,
+                ])}
+              </div>
+              <div className="equity-order-callout mt-2.5 flex items-start gap-3 rounded-xl border p-3">
+                {side === 'BUY' ? <TrendingUp className="mt-0.5 h-4 w-4 shrink-0" /> : <TrendingDown className="mt-0.5 h-4 w-4 shrink-0" />}
+                <p className="text-[8px] leading-4">This order will {side === 'BUY' ? 'increase' : 'decrease'} your exposure to {instrument.label.split(' (')[0]} from <b>{currentWeight.toFixed(2)}%</b> to <b>{projectedWeight.toFixed(2)}%</b> of your portfolio.</p>
+              </div>
+            </section>
 
-          <Button
-            onClick={onSubmitOrder}
-            disabled={submitting}
-            size="pill"
-            className={cn('text-white gap-2', side === 'BUY' ? 'bg-[#2563EB] hover:bg-[#1d4ed8]' : 'bg-[#EF4444] hover:bg-[#dc2626]')}
-          >
-            {submitting ? 'Placing…' : `Place ${side === 'BUY' ? 'Buy' : 'Sell'} Order`}
-            <ArrowRight className="w-3.5 h-3.5" />
-          </Button>
+            <section className={cn(panelClass, 'p-4')}>
+              <h3 className="equity-order-heading text-[10px] font-semibold">Order Summary</h3>
+              <div className="mt-3 space-y-2 text-[8px]">
+                <div className="flex justify-between gap-4"><span className="equity-order-label">Order Value ({shares.toLocaleString()} Shares)</span><span className="font-mono"><Money value={orderValue} /></span></div>
+                <div className="flex justify-between gap-4"><span className="equity-order-label">Estimated Fees</span><span className="font-mono"><Money value={fees} /></span></div>
+                <div className="equity-order-summary-total flex justify-between gap-4 border-t pt-2 text-[9px] font-semibold"><span>{side === 'BUY' ? 'Total Consideration' : 'Net Proceeds'}</span><span className="equity-order-accent font-mono"><Money value={consideration} /></span></div>
+                <div className="flex justify-between gap-4"><span className="equity-order-label">Settlement Date</span><span className="equity-order-accent">{settlementDate} (T+2)</span></div>
+              </div>
+            </section>
+            {reviewed && <div className="equity-order-reviewed rounded-xl border px-4 py-3 text-[9px]">Order reviewed. Confirm the summary and place the {side.toLowerCase()} order when ready.</div>}
+          </div>
         </div>
       </div>
-    </div>
-  )
-}
-
-// ── Small helper components ────────────────────────────────────────────────
-function FormField({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <div className="flex items-center gap-1 mb-1.5">
-        <span className="text-[10px] uppercase tracking-wider font-medium" style={{ color: '#6B7A95' }}>{label}</span>
-      </div>
-      {children}
-      {hint && <p className="text-[10px] mt-1" style={{ color: '#6B7A95' }}>{hint}</p>}
-    </div>
-  )
-}
-
-function SearchableSelect({
-  value,
-  onChange,
-  options,
-  placeholder,
-  container,
-}: {
-  value: string
-  onChange: (v: string) => void
-  options: OptionItem[]
-  placeholder?: string
-  container?: HTMLElement | null
-}) {
-  const [open, setOpen] = useState(false)
-  const selected = options.find((o) => o.id === value)
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          className={cn(
-            'w-full justify-between h-9 px-3 text-[12px] font-normal bg-[#111C30] border-white/10 hover:bg-[#111C30] hover:border-white/20',
-            selected ? 'text-white' : 'text-[#6B7A95]'
-          )}
-        >
-          <span className="truncate">{selected ? selected.label : placeholder}</span>
-          <ChevronDown className="w-3.5 h-3.5 opacity-60 flex-shrink-0" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent
-        container={container}
-        align="start"
-        className="p-0 bg-[#111C30] border-white/10"
-        style={{ width: 'var(--radix-popover-trigger-width)' }}
-      >
-        <Command className="bg-transparent">
-          <CommandInput placeholder="Search…" className="text-[12px] text-white" />
-          <CommandList>
-            <CommandEmpty className="text-[11px] py-4 text-center" style={{ color: '#6B7A95' }}>No results found.</CommandEmpty>
-            <CommandGroup>
-              {options.map((o) => (
-                <CommandItem
-                  key={o.id}
-                  value={o.label}
-                  onSelect={() => {
-                    onChange(o.id)
-                    setOpen(false)
-                  }}
-                  className="text-[12px] text-white data-[selected=true]:bg-white/10 data-[selected=true]:text-white"
-                >
-                  <Check className={cn('mr-2 h-3.5 w-3.5', value === o.id ? 'opacity-100' : 'opacity-0')} />
-                  {o.label}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
-  )
-}
-
-function FeeRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between">
-      <span className="text-[11px]" style={{ color: '#94a3b8' }}>{label}</span>
-      <span className="text-[11px] font-mono" style={{ color: '#C8D3E8' }}>{value}</span>
-    </div>
-  )
-}
-
-function HoldingCell({ label, value, small }: { label: string; value: string; small?: boolean }) {
-  return (
-    <div>
-      <div className="text-[10px] mb-0.5" style={{ color: '#6B7A95' }}>{label}</div>
-      <div className={`font-mono font-semibold text-white ${small ? 'text-[11px]' : 'text-[14px]'}`}>{value}</div>
-    </div>
-  )
-}
-
-function ImpactRow({ label, before, after }: { label: string; before: string; after: string }) {
-  return (
-    <tr>
-      <td className="py-1" style={{ color: '#94a3b8' }}>{label}</td>
-      <td className="text-right py-1 text-white">{before}</td>
-      <td className="text-right py-1 font-semibold text-white">{after}</td>
-    </tr>
-  )
-}
-
-function SummaryRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between">
-      <span style={{ color: '#6B7A95' }}>{label}</span>
-      <span className="font-mono text-white">{value}</span>
-    </div>
+    </Modal>
   )
 }

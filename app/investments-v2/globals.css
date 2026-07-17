@@ -104,23 +104,23 @@
 
   /* Base */
   --background: #f4f6fa;
-  --foreground: #1a2233;
+  --foreground: #0f172a;
   --card: #ffffff;
-  --card-foreground: #1a2233;
+  --card-foreground: #0f172a;
   --popover: #ffffff;
-  --popover-foreground: #1a2233;
+  --popover-foreground: #0f172a;
   --primary: #2563eb;
   --primary-foreground: #ffffff;
   --secondary: #eef1f6;
-  --secondary-foreground: #47536b;
+  --secondary-foreground: #475569;
   --muted: #eef1f6;
   --muted-foreground: #64748b;
   --accent: #dbeafe;
   --accent-foreground: #1e3a8a;
   --destructive: #dc2626;
   --destructive-foreground: #ffffff;
-  --border: rgba(15, 23, 42, 0.08);
-  --input: rgba(15, 23, 42, 0.10);
+  --border: #e2e8f0;
+  --input: #cbd5e1;
   --ring: #2563eb;
   --radius: 0.5rem;
 
@@ -133,14 +133,20 @@
 
   /* Sidebar */
   --sidebar: #ffffff;
-  --sidebar-foreground: #47536b;
+  --sidebar-foreground: #475569;
   --sidebar-primary: #2563eb;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #eef1f6;
-  --sidebar-accent-foreground: #1a2233;
-  --sidebar-border: rgba(15, 23, 42, 0.06);
+  --sidebar-accent-foreground: #0f172a;
+  --sidebar-border: #e2e8f0;
   --sidebar-ring: #2563eb;
 }
+
+/*
+ * Prototype compatibility is consolidated below. Keeping it in one layer is
+ * important: broad substring rules can otherwise make hover-only utilities
+ * look selected before interaction.
+ */
 
 @layer base {
   .investments-terminal * {
@@ -735,4 +741,917 @@
 .investments-terminal.light aside button:hover {
   background: rgba(37,99,235,0.06) !important;
   color: #475569 !important;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Investments V2 light-surface compatibility
+
+   The V2 prototype contains recurring dark-only utility values. These rules
+   translate only those known surface/text roles inside this module. Accent
+   fills are explicitly protected below so blue, purple and status treatments
+   retain their contrast.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.investments-terminal.light {
+  --iv2-page: #f4f6fa;
+  --iv2-surface: #ffffff;
+  --iv2-surface-subtle: #f8fafc;
+  --iv2-surface-hover: #f1f5f9;
+  --iv2-divider: #e2e8f0;
+  --iv2-divider-strong: #cbd5e1;
+  --iv2-text: #0f172a;
+  --iv2-text-secondary: #475569;
+  --iv2-text-tertiary: #64748b;
+  --iv2-chart-track: #e2e8f0;
+  --iv2-chart-outline: #ffffff;
+  --iv2-chart-center: #e8eef7;
+  --iv2-chart-dark: #1e3a5f;
+  --iv2-chart-dark-2: #334e68;
+  --iv2-allocation-dark: #1e3a5f;
+  --iv2-allocation-track: rgba(226, 232, 240, 0.38);
+  --iv2-chart-highlight: #0f2742;
+  --iv2-chart-marker: #0f172a;
+  min-height: 100vh;
+  background: var(--iv2-page);
+}
+
+.investments-terminal.light main {
+  background-color: var(--iv2-page);
+}
+
+.investments-terminal.dark {
+  --iv2-chart-track: rgba(148, 163, 184, 0.17);
+  --iv2-chart-outline: #111c2a;
+  --iv2-chart-center: #132033;
+  --iv2-chart-dark: #02070c;
+  --iv2-chart-dark-2: #03090f;
+  --iv2-allocation-dark: #09080d;
+  --iv2-allocation-track: rgba(255, 255, 255, 0.23);
+  --iv2-chart-highlight: #ffffff;
+  --iv2-chart-marker: #000000;
+}
+
+/* Page and card surfaces (known prototype palette only). */
+.investments-terminal.light [class*="bg-[#05090f]"] {
+  background-color: var(--iv2-page) !important;
+}
+
+.investments-terminal.light [class*="bg-[#070d17]"],
+.investments-terminal.light [class*="bg-[#080e18]"],
+.investments-terminal.light [class*="bg-[#080e19]"],
+.investments-terminal.light [class*="bg-[#08111d]"],
+.investments-terminal.light [class*="bg-[#090f1b]"],
+.investments-terminal.light [class*="bg-[#09111d]"],
+.investments-terminal.light [class*="bg-[#09111e]"],
+.investments-terminal.light [class*="bg-[#0a121d]"],
+.investments-terminal.light [class*="bg-[#0a1220]"],
+.investments-terminal.light [class*="bg-[#0b1320]"],
+.investments-terminal.light [class*="bg-[#0b1322]"],
+.investments-terminal.light [class*="bg-[#0b1420]"],
+.investments-terminal.light [class*="bg-[#0b1421]"],
+.investments-terminal.light [class*="bg-[#0e1724]"],
+.investments-terminal.light [class*="bg-[#0d1727]"],
+.investments-terminal.light [class*="bg-[#101927]"],
+.investments-terminal.light [class*="bg-[#111a28]"],
+.investments-terminal.light [class*="bg-[#111b29]"],
+.investments-terminal.light [class*="bg-[#14161e]"],
+.investments-terminal.light [class*="bg-[#172231]"],
+.investments-terminal.light [class*="bg-[#192536]"] {
+  background-color: var(--iv2-surface-subtle) !important;
+  background-image: none !important;
+}
+
+.investments-terminal.light [class~="bg-[#17263a]"] {
+  background-color: #dbeafe !important;
+}
+
+.investments-terminal.light [class~="bg-[#344155]"] {
+  background-color: #cbd5e1 !important;
+}
+
+.investments-terminal.light [class*="from-[#101b30]"],
+.investments-terminal.light [class*="from-[#172231]"],
+.investments-terminal.light [class*="from-[#172333]"],
+.investments-terminal.light [class*="bg-[linear-gradient(112deg,#172231"],
+.investments-terminal.light [class*="bg-[linear-gradient(120deg,#182434"],
+.investments-terminal.light [class*="bg-[linear-gradient(125deg,#162231"],
+.investments-terminal.light [class*="bg-[linear-gradient(135deg,#142030"],
+.investments-terminal.light [class*="bg-[linear-gradient(135deg,#172333"],
+.investments-terminal.light [class*="bg-[linear-gradient(145deg,#142030"],
+.investments-terminal.light [class*="bg-[linear-gradient(145deg,#172333"] {
+  background: var(--iv2-surface) !important;
+}
+
+.investments-terminal.light [class~="bg-black"],
+.investments-terminal.light [class*="bg-black/10"],
+.investments-terminal.light [class*="bg-black/15"],
+.investments-terminal.light [class*="bg-black/20"] {
+  background-color: var(--iv2-surface-subtle) !important;
+}
+
+.investments-terminal.light [class~="bg-black/45"],
+.investments-terminal.light [class~="bg-black/60"],
+.investments-terminal.light [class~="bg-black/70"],
+.investments-terminal.light [class~="bg-black/75"] {
+  background-color: rgba(71, 85, 105, 0.34) !important;
+}
+
+.investments-terminal.light [class~="bg-white/[0.025]"],
+.investments-terminal.light [class~="bg-white/[.025]"],
+.investments-terminal.light [class~="bg-white/[0.03]"],
+.investments-terminal.light [class~="bg-white/[.03]"],
+.investments-terminal.light [class~="bg-white/[0.035]"],
+.investments-terminal.light [class~="bg-white/[.035]"],
+.investments-terminal.light [class~="bg-white/[0.04]"],
+.investments-terminal.light [class~="bg-white/[.04]"],
+.investments-terminal.light [class~="bg-white/[0.05]"],
+.investments-terminal.light [class~="bg-white/[.05]"],
+.investments-terminal.light [class~="bg-white/[0.06]"],
+.investments-terminal.light [class~="bg-white/[.06]"],
+.investments-terminal.light [class~="bg-white/[0.07]"],
+.investments-terminal.light [class~="bg-white/[.07]"],
+.investments-terminal.light [class~="bg-white/10"] {
+  background-color: var(--iv2-surface-subtle) !important;
+}
+
+.investments-terminal.light [class~="hover:bg-white/[0.025]"]:hover,
+.investments-terminal.light [class~="hover:bg-white/[.025]"]:hover,
+.investments-terminal.light [class~="hover:bg-white/[0.03]"]:hover,
+.investments-terminal.light [class~="hover:bg-white/[.03]"]:hover,
+.investments-terminal.light [class~="hover:bg-white/[0.035]"]:hover,
+.investments-terminal.light [class~="hover:bg-white/[.035]"]:hover,
+.investments-terminal.light [class~="hover:bg-white/[0.04]"]:hover,
+.investments-terminal.light [class~="hover:bg-white/[.04]"]:hover,
+.investments-terminal.light [class~="hover:bg-white/[0.05]"]:hover,
+.investments-terminal.light [class~="hover:bg-white/[.05]"]:hover,
+.investments-terminal.light [class~="hover:bg-white/[0.06]"]:hover,
+.investments-terminal.light [class~="hover:bg-white/[.06]"]:hover,
+.investments-terminal.light [class~="hover:bg-white/[0.07]"]:hover,
+.investments-terminal.light [class~="hover:bg-white/[.07]"]:hover,
+.investments-terminal.light [class~="hover:bg-white/[0.08]"]:hover,
+.investments-terminal.light [class~="hover:bg-white/[.08]"]:hover,
+.investments-terminal.light [class~="hover:bg-white/5"]:hover,
+.investments-terminal.light [class~="hover:bg-white/10"]:hover,
+.investments-terminal.light [class~="focus-visible:bg-white/[0.08]"]:focus-visible {
+  background-color: var(--iv2-surface-hover) !important;
+}
+
+/* Dividers, table lines and controls never inherit the prototype's navy/black. */
+.investments-terminal.light [class*="border-[#233043]"],
+.investments-terminal.light [class*="border-[#243044]"],
+.investments-terminal.light [class*="border-[#2a3547]"],
+.investments-terminal.light [class*="border-[#303742]"],
+.investments-terminal.light [class*="border-[#334155]"],
+.investments-terminal.light [class*="border-[#334054]"],
+.investments-terminal.light [class*="border-[#334156]"],
+.investments-terminal.light [class*="border-[#344054]"],
+.investments-terminal.light [class*="border-[#354257]"],
+.investments-terminal.light [class*="border-[#455268]"],
+.investments-terminal.light [class*="border-[#46566d]"],
+.investments-terminal.light [class*="border-[#52627a]"],
+.investments-terminal.light [class*="border-[#52637a]"],
+.investments-terminal.light table,
+.investments-terminal.light table th,
+.investments-terminal.light table td,
+.investments-terminal.light table tr {
+  border-color: var(--iv2-divider) !important;
+}
+
+.investments-terminal.light :is([class^="border-white"], [class*=" border-white"]),
+.investments-terminal.light :is([class^="divide-white"], [class*=" divide-white"]) > :not([hidden]) ~ :not([hidden]) {
+  border-color: var(--iv2-divider) !important;
+}
+
+.investments-terminal.light [class~="hover:border-white/15"]:hover,
+.investments-terminal.light [class~="hover:border-white/20"]:hover {
+  border-color: var(--iv2-divider-strong) !important;
+}
+
+.investments-terminal.light > div > div > aside {
+  border-right: 1px solid var(--iv2-divider);
+}
+
+.investments-terminal.light table thead,
+.investments-terminal.light [class*="[&_th]"] {
+  color: var(--iv2-text-tertiary);
+}
+
+.investments-terminal.light table tbody {
+  color: var(--iv2-text);
+}
+
+.investments-terminal.light table tbody tr:hover {
+  background-color: rgba(37, 99, 235, 0.055) !important;
+}
+
+/* Recurring prototype typography roles. */
+.investments-terminal.light [class~="text-white"] {
+  color: var(--iv2-text) !important;
+}
+
+.investments-terminal.light [class*="text-slate-100"],
+.investments-terminal.light [class*="text-slate-200"],
+.investments-terminal.light [class*="text-[#eef2f8]"],
+.investments-terminal.light [class*="text-[#edf3fa]"],
+.investments-terminal.light [class*="text-[#f2f5fa]"],
+.investments-terminal.light [class*="text-[#e2e7ef]"],
+.investments-terminal.light [class*="text-[#e2e8f0]"],
+.investments-terminal.light [class*="text-[#e3e8f0]"],
+.investments-terminal.light [class*="text-[#dce2eb]"],
+.investments-terminal.light [class*="text-[#dce3ec]"],
+.investments-terminal.light [class*="text-[#dce4ee]"],
+.investments-terminal.light [class*="text-[#d5dce7]"],
+.investments-terminal.light [class*="text-[#d3dae4]"],
+.investments-terminal.light [class*="text-[#d4dbe5]"],
+.investments-terminal.light [class*="text-[#d6dde7]"],
+.investments-terminal.light [class*="text-[#c2cad7]"],
+.investments-terminal.light [class*="text-[#c4ccd7]"],
+.investments-terminal.light [class*="text-[#c5cfdb]"],
+.investments-terminal.light [class*="text-[#c6d0dc]"],
+.investments-terminal.light [class*="text-[#c8d0dc]"],
+.investments-terminal.light [class*="text-[#cad2df]"],
+.investments-terminal.light [class*="text-[#bdc7d5]"],
+.investments-terminal.light [class*="text-[#b8c3d2]"],
+.investments-terminal.light [class*="text-[#aeb8c7]"],
+.investments-terminal.light [class*="text-[#a9b5c5]"],
+.investments-terminal.light [class*="text-[#f0f3f8]"],
+.investments-terminal.light [class*="text-[#e4eaf2]"],
+.investments-terminal.light [class*="text-[#e1e8f0]"],
+.investments-terminal.light [class*="text-[#e1e6ee]"],
+.investments-terminal.light [class*="text-[#e0e6ef]"],
+.investments-terminal.light [class*="text-[#dfe5ed]"],
+.investments-terminal.light [class*="text-[#dbe5f2]"],
+.investments-terminal.light [class*="text-[#dbe4ee]"],
+.investments-terminal.light [class*="text-[#d9e1eb]"],
+.investments-terminal.light [class*="text-[#d8e0eb]"],
+.investments-terminal.light [class*="text-[#d6deea]"],
+.investments-terminal.light [class*="text-[#d4dce7]"],
+.investments-terminal.light [class*="text-[#c4cedb]"],
+.investments-terminal.light [class*="text-[#c3ccd8]"] {
+  color: var(--iv2-text) !important;
+}
+
+.investments-terminal.light [class*="text-slate-400"],
+.investments-terminal.light [class*="text-[#91a0b5]"],
+.investments-terminal.light [class*="text-[#9ca9ba]"],
+.investments-terminal.light [class*="text-[#8997a9]"],
+.investments-terminal.light [class*="text-[#8896a9]"],
+.investments-terminal.light [class*="text-[#8795a8]"],
+.investments-terminal.light [class*="text-[#8793a5]"],
+.investments-terminal.light [class*="text-[#8391a4]"],
+.investments-terminal.light [class*="text-[#8291a5]"],
+.investments-terminal.light [class*="text-[#8090a4]"],
+.investments-terminal.light [class*="text-[#7d8ca0]"],
+.investments-terminal.light [class*="text-[#7c8a9e]"],
+.investments-terminal.light [class*="text-[#78879b]"],
+.investments-terminal.light [class*="text-[#77869a]"],
+.investments-terminal.light [class*="text-[#778397]"],
+.investments-terminal.light [class*="text-[#76859a]"],
+.investments-terminal.light [class*="text-[#738095]"],
+.investments-terminal.light [class*="text-[#718096]"],
+.investments-terminal.light [class*="text-[#718095]"],
+.investments-terminal.light [class*="text-[#6f7e92]"],
+.investments-terminal.light [class*="text-[#aeb9c7]"],
+.investments-terminal.light [class*="text-[#aab6c5]"],
+.investments-terminal.light [class*="text-[#a9b6c7]"],
+.investments-terminal.light [class*="text-[#a9b5c4]"],
+.investments-terminal.light [class*="text-[#a4afbd]"],
+.investments-terminal.light [class*="text-[#9eabbc]"],
+.investments-terminal.light [class*="text-[#9ba8b8]"],
+.investments-terminal.light [class*="text-[#9aa8ba]"],
+.investments-terminal.light [class*="text-[#96a3b4]"],
+.investments-terminal.light [class*="text-[#94a3b8]"],
+.investments-terminal.light [class*="text-[#8f9caf]"],
+.investments-terminal.light [class*="text-[#8e9bad]"],
+.investments-terminal.light [class*="text-[#8d9aae]"],
+.investments-terminal.light [class*="text-[#8c9aab]"],
+.investments-terminal.light [class*="text-[#8b99ad]"],
+.investments-terminal.light [class*="text-[#8492a5]"],
+.investments-terminal.light [class*="text-[#8290a4]"],
+.investments-terminal.light [class*="text-[#8090a5]"],
+.investments-terminal.light [class*="text-[#7f8da1]"],
+.investments-terminal.light [class*="text-[#7d8b9e]"],
+.investments-terminal.light [class*="text-[#7890ad]"],
+.investments-terminal.light [class*="text-[#738399]"],
+.investments-terminal.light [class*="text-[#728197]"],
+.investments-terminal.light [class*="text-[#717987]"],
+.investments-terminal.light [class*="text-[#65748a]"] {
+  color: var(--iv2-text-secondary) !important;
+}
+
+.investments-terminal.light [class*="text-slate-500"],
+.investments-terminal.light [class*="text-slate-600"],
+.investments-terminal.light [class*="text-[#68788d]"],
+.investments-terminal.light [class*="text-[#66758a]"],
+.investments-terminal.light [class*="text-[#65758b]"],
+.investments-terminal.light [class*="text-[#64758b]"],
+.investments-terminal.light [class*="text-[#64748b]"],
+.investments-terminal.light [class*="text-[#647389]"],
+.investments-terminal.light [class*="text-[#627086]"],
+.investments-terminal.light [class*="text-[#5f6e82]"],
+.investments-terminal.light [class*="text-[#526176]"],
+.investments-terminal.light [class*="text-[#4f5e72]"] {
+  color: var(--iv2-text-tertiary) !important;
+}
+
+/*
+ * Exhaustive fallback for arbitrary neutral text. These match only base class
+ * tokens (start-of-attribute or whitespace-prefixed), never hover:/focus:
+ * variants, so idle controls cannot accidentally appear selected.
+ */
+.investments-terminal.light :is(
+  [class^="text-[#f"], [class*=" text-[#f"],
+  [class^="text-[#e"], [class*=" text-[#e"],
+  [class^="text-[#d"], [class*=" text-[#d"],
+  [class^="text-[#c"], [class*=" text-[#c"]
+) {
+  color: var(--iv2-text) !important;
+}
+
+.investments-terminal.light :is(
+  [class^="text-[#b"], [class*=" text-[#b"],
+  [class^="text-[#a"], [class*=" text-[#a"],
+  [class^="text-[#9"], [class*=" text-[#9"],
+  [class^="text-[#8"], [class*=" text-[#8"],
+  [class^="text-[#7"], [class*=" text-[#7"]
+) {
+  color: var(--iv2-text-secondary) !important;
+}
+
+.investments-terminal.light :is(
+  [class^="text-[#6"], [class*=" text-[#6"],
+  [class^="text-[#5"], [class*=" text-[#5"],
+  [class^="text-[#4"], [class*=" text-[#4"]
+) {
+  color: var(--iv2-text-tertiary) !important;
+}
+
+/*
+ * Tailwind's dark-prototype slate and status shades are too pale on white.
+ * Keep their semantic hue while moving them to accessible light-mode values.
+ */
+.investments-terminal.light [class*="text-slate-300"],
+.investments-terminal.light [class*="text-slate-400"] {
+  color: var(--iv2-text-secondary) !important;
+}
+
+.investments-terminal.light [class*="text-blue-200"],
+.investments-terminal.light [class*="text-blue-300"],
+.investments-terminal.light [class*="text-blue-400"],
+.investments-terminal.light [class*="text-[#5d9df3]"],
+.investments-terminal.light [class*="text-[#66a5fa]"],
+.investments-terminal.light [class*="text-[#68a9ff]"],
+.investments-terminal.light [class*="text-[#69a9ff]"],
+.investments-terminal.light [class*="text-[#70adff]"],
+.investments-terminal.light [class*="text-[#73aef6]"],
+.investments-terminal.light [class*="text-[#7bb5ff]"],
+.investments-terminal.light [class*="text-[#7eb1ef]"],
+.investments-terminal.light [class*="text-[#89a7ca]"],
+.investments-terminal.light [class*="text-[#8ebcff]"] {
+  color: #1d4ed8 !important;
+}
+
+.investments-terminal.light [class*="text-emerald-300"],
+.investments-terminal.light [class*="text-[#65cf55]"] {
+  color: #047857 !important;
+}
+
+.investments-terminal.light [class*="text-amber-300"] {
+  color: #b45309 !important;
+}
+
+.investments-terminal.light [class*="text-red-300"] {
+  color: #b91c1c !important;
+}
+
+.investments-terminal.light [class*="text-rose-300"] {
+  color: #be123c !important;
+}
+
+.investments-terminal.light [class*="text-violet-300"] {
+  color: #6d28d9 !important;
+}
+
+.investments-terminal.light [class*="text-fuchsia-300"] {
+  color: #a21caf !important;
+}
+
+.investments-terminal.light [class*="text-cyan-300"],
+.investments-terminal.light [class*="text-sky-300"] {
+  color: #0e7490 !important;
+}
+
+.investments-terminal.light [class*="text-orange-300"] {
+  color: #c2410c !important;
+}
+
+.investments-terminal.light [class*="text-purple-300"] {
+  color: #6d28d9 !important;
+}
+
+.investments-terminal.light [class~="hover:text-white"]:hover {
+  color: var(--iv2-text) !important;
+}
+
+/* Inputs, native selects, custom dropdowns and modal/panel surfaces. */
+.investments-terminal.light input,
+.investments-terminal.light textarea,
+.investments-terminal.light select {
+  color: var(--iv2-text);
+}
+
+.investments-terminal.light input::placeholder,
+.investments-terminal.light textarea::placeholder {
+  color: var(--iv2-text-tertiary) !important;
+  opacity: 1;
+}
+
+.investments-terminal.light [role="dialog"],
+.investments-terminal.light [role="listbox"],
+.investments-terminal.light aside[class*="absolute"],
+.investments-terminal.light aside[class*="fixed"] {
+  color: var(--iv2-text);
+}
+
+.investments-terminal.light [role="dialog"],
+.investments-terminal.light .iv2-modal-surface {
+  border-color: var(--iv2-divider) !important;
+  background: var(--iv2-surface) !important;
+  color: var(--iv2-text);
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.14) !important;
+}
+
+/* Keep primary/status/accent contrast after the legacy text-white mapping. */
+.investments-terminal.light [class*="bg-blue-"][class*="text-white"],
+.investments-terminal.light [class*="bg-[#2f87fa]"][class*="text-white"],
+.investments-terminal.light [class*="bg-[#2d8cf4]"][class*="text-white"],
+.investments-terminal.light [class*="bg-[#258cf4]"][class*="text-white"],
+.investments-terminal.light [class*="bg-[#238cf4]"][class*="text-white"],
+.investments-terminal.light [class*="bg-[#8b76d2]"][class*="text-white"],
+.investments-terminal.light [class*="bg-[#3b82f6]"][class*="text-white"],
+.investments-terminal.light [class*="bg-destructive"][class*="text-white"],
+.investments-terminal.light [class*="bg-emerald-"][class*="text-white"],
+.investments-terminal.light [class*="bg-red-"][class*="text-white"],
+.investments-terminal.light [class*="bg-rose-"][class*="text-white"],
+.investments-terminal.light [class*="bg-amber-"][class*="text-white"],
+.investments-terminal.light [class*="bg-violet-"][class*="text-white"],
+.investments-terminal.light [class*="bg-fuchsia-"][class*="text-white"],
+.investments-terminal.light [class*="bg-purple-"][class*="text-white"],
+.investments-terminal.light [class*="#9d82e9"] [class*="text-white"],
+.investments-terminal.light [class*="#9d82e9"][class*="text-white"],
+.investments-terminal.light [class*="bg-blue-"] [class*="text-white"],
+.investments-terminal.light [class*="bg-emerald-"] [class*="text-white"],
+.investments-terminal.light [class*="bg-red-"] [class*="text-white"],
+.investments-terminal.light [class*="bg-rose-"] [class*="text-white"],
+.investments-terminal.light [class*="bg-violet-"] [class*="text-white"],
+.investments-terminal.light [class*="bg-purple-"] [class*="text-white"] {
+  color: #ffffff !important;
+}
+
+/* Translucent blue selections use blue text; white is reserved for solid CTAs. */
+.investments-terminal.light [class*="bg-[#2f87fa]/10"][class*="text-white"],
+.investments-terminal.light [class*="bg-[#2f87fa]/15"][class*="text-white"] {
+  color: #1d4ed8 !important;
+}
+
+/* Status badges use light semantic fills instead of dark terminal chips. */
+.investments-terminal.light [class*="bg-[#183722]"],
+.investments-terminal.light [class*="bg-emerald-400/10"],
+.investments-terminal.light [class*="bg-emerald-500/10"],
+.investments-terminal.light [class*="bg-green-400/10"],
+.investments-terminal.light [class*="bg-green-500/10"] {
+  background-color: #dcfce7 !important;
+  border-color: #86efac !important;
+  color: #166534 !important;
+}
+
+.investments-terminal.light [class*="bg-amber-400/10"],
+.investments-terminal.light [class*="bg-amber-400/15"],
+.investments-terminal.light [class*="bg-amber-500/10"],
+.investments-terminal.light [class*="bg-yellow-400/10"],
+.investments-terminal.light [class*="bg-yellow-500/10"],
+.investments-terminal.light [class*="bg-orange-400/10"] {
+  background-color: #fef3c7 !important;
+  border-color: #fcd34d !important;
+  color: #92400e !important;
+}
+
+.investments-terminal.light [class*="bg-red-400/10"],
+.investments-terminal.light [class*="bg-red-500/10"],
+.investments-terminal.light [class*="bg-rose-400/10"],
+.investments-terminal.light [class*="bg-rose-500/10"],
+.investments-terminal.light [class*="bg-rose-500/20"] {
+  background-color: #fee2e2 !important;
+  border-color: #fca5a5 !important;
+  color: #991b1b !important;
+}
+
+.investments-terminal.light [class*="bg-blue-400/10"],
+.investments-terminal.light [class*="bg-blue-500/10"],
+.investments-terminal.light [class*="bg-cyan-400/10"],
+.investments-terminal.light [class*="bg-sky-400/10"] {
+  background-color: #dbeafe !important;
+  border-color: #93c5fd !important;
+  color: #1e40af !important;
+}
+
+.investments-terminal.light [class*="bg-violet-400/10"],
+.investments-terminal.light [class*="bg-purple-400/10"],
+.investments-terminal.light [class*="bg-fuchsia-400/10"] {
+  background-color: #ede9fe !important;
+  border-color: #c4b5fd !important;
+  color: #5b21b6 !important;
+}
+
+.investments-terminal.light [class*="bg-slate-400/10"],
+.investments-terminal.light [class*="bg-white/[0.04]"][class*="text-slate"] {
+  background-color: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+  color: #475569 !important;
+}
+
+.investments-terminal.light .badge-green {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.investments-terminal.light .badge-yellow {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.investments-terminal.light .badge-red {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.investments-terminal.light .badge-blue {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.investments-terminal.light .badge-gray {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+/*
+ * Opacity inventory: enabled disclosure/sort affordances should remain clear.
+ * Hidden selection marks, invisible file inputs, chart tooltips, and every
+ * disabled:* opacity variant remain intentionally untouched.
+ */
+.investments-terminal.light [class~="opacity-30"]:not(:disabled),
+.investments-terminal.light [class~="opacity-50"]:not(:disabled) {
+  opacity: 0.72;
+}
+
+/* SVG/chart compatibility for hardcoded prototype strokes. */
+.investments-terminal.light svg [stroke="rgba(148,163,184,.17)"],
+.investments-terminal.light svg [stroke="rgba(255,255,255,.23)"] {
+  stroke: var(--iv2-chart-track) !important;
+}
+
+.investments-terminal.light svg [stroke="#111c2a"] {
+  stroke: var(--iv2-chart-outline) !important;
+}
+
+.investments-terminal.light svg [fill="#132033"] {
+  fill: var(--iv2-chart-center) !important;
+}
+
+/* Arcus controls are pills in both themes. */
+.investments-terminal .btn-white,
+.investments-terminal .btn-outline,
+.investments-terminal .btn-blue {
+  border-radius: 9999px;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Place equity order ticket
+   Dedicated semantic palette keeps the reference's navy density while giving
+   this ticket a deliberately designed light mode.
+   ══════════════════════════════════════════════════════════════════════════ */
+.investments-terminal.dark .equity-order-ticket,
+.investments-terminal.dark .equity-order-footer {
+  --eo-surface: #0d1928;
+  --eo-surface-soft: #08131f;
+  --eo-control: #0a1421;
+  --eo-border: rgba(255, 255, 255, 0.075);
+  --eo-border-strong: rgba(255, 255, 255, 0.13);
+  --eo-text: #e7edf5;
+  --eo-label: #758499;
+  --eo-muted: #64748b;
+  --eo-blue: #4b9cff;
+  --eo-green: #21c77a;
+  --eo-red: #fb7185;
+  --eo-amber: #e8c95b;
+  --eo-grid: rgba(148, 163, 184, 0.11);
+  --eo-fill: rgba(16, 185, 129, 0.28);
+  --eo-shadow: 0 14px 35px rgba(0, 0, 0, 0.18);
+}
+
+.investments-terminal.light .equity-order-ticket,
+.investments-terminal.light .equity-order-footer {
+  --eo-surface: #ffffff;
+  --eo-surface-soft: #f4f6fa;
+  --eo-control: #f8fafc;
+  --eo-border: #dbe3ee;
+  --eo-border-strong: #cbd5e1;
+  --eo-text: #0f172a;
+  --eo-label: #475569;
+  --eo-muted: #64748b;
+  --eo-blue: #2563eb;
+  --eo-green: #047857;
+  --eo-red: #be123c;
+  --eo-amber: #a16207;
+  --eo-grid: rgba(100, 116, 139, 0.16);
+  --eo-fill: rgba(5, 150, 105, 0.16);
+  --eo-shadow: 0 7px 24px rgba(15, 23, 42, 0.07);
+}
+
+.investments-terminal .equity-order-ticket {
+  color: var(--eo-text);
+}
+
+.investments-terminal .equity-order-panel {
+  border: 1px solid var(--eo-border);
+  background: var(--eo-surface);
+  box-shadow: var(--eo-shadow);
+}
+
+.investments-terminal .equity-order-title,
+.investments-terminal .equity-order-heading,
+.investments-terminal .equity-order-price,
+.investments-terminal .equity-order-value,
+.investments-terminal .equity-order-fee-total,
+.investments-terminal .equity-order-summary-total {
+  color: var(--eo-text);
+}
+
+.investments-terminal .equity-order-label {
+  color: var(--eo-label);
+}
+
+.investments-terminal .equity-order-muted,
+.investments-terminal .equity-order-chart-labels,
+.investments-terminal .equity-order-footer-label {
+  color: var(--eo-muted);
+}
+
+.investments-terminal .equity-order-positive { color: var(--eo-green) !important; }
+.investments-terminal .equity-order-negative { color: var(--eo-red) !important; }
+.investments-terminal .equity-order-accent { color: var(--eo-blue) !important; }
+
+.investments-terminal .equity-order-chart,
+.investments-terminal .equity-order-fees,
+.investments-terminal .equity-order-fee-total,
+.investments-terminal .equity-order-holding-bottom,
+.investments-terminal .equity-order-summary-total {
+  border-color: var(--eo-border);
+}
+
+.investments-terminal .equity-order-field,
+.investments-terminal .equity-order-ticket [aria-haspopup="listbox"] {
+  border: 1px solid var(--eo-border-strong) !important;
+  background: var(--eo-control) !important;
+  color: var(--eo-text) !important;
+}
+
+.investments-terminal .equity-order-field:focus,
+.investments-terminal .equity-order-ticket [aria-haspopup="listbox"]:focus {
+  border-color: rgba(37, 99, 235, 0.6) !important;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}
+
+.investments-terminal .equity-order-field:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.investments-terminal .equity-order-ticket [role="listbox"] {
+  border-color: var(--eo-border-strong) !important;
+  background: var(--eo-surface) !important;
+  color: var(--eo-text) !important;
+  box-shadow: var(--eo-shadow) !important;
+}
+
+.investments-terminal .equity-order-ticket [role="option"] {
+  color: var(--eo-label) !important;
+}
+
+.investments-terminal .equity-order-ticket [role="option"]:hover,
+.investments-terminal .equity-order-ticket [role="option"][aria-selected="true"] {
+  background: rgba(37, 99, 235, 0.1) !important;
+  color: var(--eo-blue) !important;
+}
+
+.investments-terminal .equity-order-segment {
+  border: 1px solid var(--eo-border);
+  background: var(--eo-surface-soft);
+}
+
+.investments-terminal .equity-order-tab-idle {
+  color: var(--eo-label);
+}
+
+.investments-terminal .equity-order-tab-idle:hover {
+  background: rgba(59, 130, 246, 0.08);
+  color: var(--eo-text);
+}
+
+.investments-terminal .equity-order-tab-buy,
+.investments-terminal .equity-order-button-buy {
+  background: #1674ea;
+}
+
+.investments-terminal .equity-order-tab-buy:hover,
+.investments-terminal .equity-order-button-buy:hover {
+  background: #0f65d4;
+}
+
+.investments-terminal .equity-order-tab-sell,
+.investments-terminal .equity-order-button-sell {
+  background: #e11d48;
+}
+
+.investments-terminal .equity-order-tab-sell:hover,
+.investments-terminal .equity-order-button-sell:hover {
+  background: #be123c;
+}
+
+.investments-terminal .equity-order-period {
+  border: 1px solid var(--eo-border-strong);
+  background: var(--eo-control);
+  color: var(--eo-label);
+}
+
+.investments-terminal .equity-order-chart-grid {
+  stroke: var(--eo-grid);
+  stroke-width: 1;
+}
+
+.investments-terminal .equity-order-chart-line {
+  stroke: #10b981;
+  stroke-width: 1.8;
+  vector-effect: non-scaling-stroke;
+}
+
+.investments-terminal .equity-order-chart-line.is-negative {
+  stroke: #f43f5e;
+}
+
+.investments-terminal .equity-order-chart-fill-start {
+  stop-color: var(--eo-fill);
+  stop-opacity: 1;
+}
+
+.investments-terminal .equity-order-chart-fill-end {
+  stop-color: var(--eo-fill);
+  stop-opacity: 0;
+}
+
+.investments-terminal .equity-order-chart-axis {
+  fill: var(--eo-label);
+  font-size: 8px;
+  font-family: var(--font-mono);
+}
+
+.investments-terminal .equity-order-holding-top .equity-order-metric + .equity-order-metric,
+.investments-terminal .equity-order-holding-bottom .equity-order-metric + .equity-order-metric {
+  border-left: 1px solid var(--eo-border);
+  padding-left: 18px;
+}
+
+.investments-terminal .equity-order-holding-top .equity-order-metric:not(:last-child),
+.investments-terminal .equity-order-holding-bottom .equity-order-metric:not(:last-child) {
+  padding-right: 18px;
+}
+
+.investments-terminal .equity-order-impact-label,
+.investments-terminal .equity-order-impact-value {
+  border-top: 1px solid var(--eo-border);
+}
+
+.investments-terminal .equity-order-impact-value {
+  border-left: 1px solid var(--eo-border);
+  color: var(--eo-text);
+}
+
+.investments-terminal .equity-order-callout {
+  border-color: rgba(234, 179, 8, 0.2);
+  background: rgba(234, 179, 8, 0.075);
+  color: var(--eo-label);
+}
+
+.investments-terminal .equity-order-callout svg,
+.investments-terminal .equity-order-callout b {
+  color: var(--eo-amber);
+}
+
+.investments-terminal.light .equity-order-callout {
+  border-color: #fde68a;
+  background: #fffbeb;
+}
+
+.investments-terminal .equity-order-status.is-valid {
+  border-color: rgba(16, 185, 129, 0.23);
+  background: rgba(16, 185, 129, 0.09);
+  color: var(--eo-green);
+}
+
+.investments-terminal .equity-order-status.is-invalid {
+  border-color: rgba(244, 63, 94, 0.24);
+  background: rgba(244, 63, 94, 0.09);
+  color: var(--eo-red);
+}
+
+.investments-terminal.light .equity-order-status.is-valid {
+  border-color: #a7f3d0;
+  background: #ecfdf5;
+}
+
+.investments-terminal.light .equity-order-status.is-invalid {
+  border-color: #fecdd3;
+  background: #fff1f2;
+}
+
+.investments-terminal .equity-order-reviewed {
+  border-color: rgba(59, 130, 246, 0.24);
+  background: rgba(59, 130, 246, 0.09);
+  color: var(--eo-blue);
+}
+
+.investments-terminal.light .equity-order-reviewed {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+.investments-terminal .equity-order-button {
+  transition: background-color 150ms, border-color 150ms, color 150ms, opacity 150ms;
+}
+
+.investments-terminal .equity-order-button-secondary {
+  border: 1px solid var(--eo-border-strong);
+  background: transparent;
+  color: var(--eo-text);
+}
+
+.investments-terminal .equity-order-button-secondary:hover {
+  background: var(--eo-surface-soft);
+}
+
+.investments-terminal .equity-order-button-review {
+  border: 1px solid rgba(59, 130, 246, 0.46);
+  background: transparent;
+  color: var(--eo-blue);
+}
+
+.investments-terminal .equity-order-button-review:hover {
+  background: rgba(59, 130, 246, 0.09);
+}
+
+.investments-terminal.light .fixed:has(.equity-order-ticket) > button[aria-label="Close modal"] {
+  background: rgba(71, 85, 105, 0.34) !important;
+  backdrop-filter: blur(5px);
+}
+
+.investments-terminal.light .fixed:has(.equity-order-ticket) > div {
+  border-color: #dbe3ee !important;
+  background: #f4f6fa !important;
+  color: #0f172a;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.18);
+}
+
+.investments-terminal.light .fixed:has(.equity-order-ticket) > div > div:first-child,
+.investments-terminal.light .fixed:has(.equity-order-ticket) > div > div:last-child {
+  border-color: #dbe3ee !important;
+  background: #ffffff;
+}
+
+@media (max-width: 639px) {
+  .investments-terminal .equity-order-holding-top .equity-order-metric + .equity-order-metric,
+  .investments-terminal .equity-order-holding-bottom .equity-order-metric + .equity-order-metric {
+    border-left: 0;
+    border-top: 1px solid var(--eo-border);
+    padding-left: 0;
+    padding-top: 10px;
+  }
+
+  .investments-terminal .equity-order-holding-top,
+  .investments-terminal .equity-order-holding-bottom {
+    gap: 10px;
+  }
+
+  .investments-terminal .equity-order-footer-label {
+    flex-basis: 100%;
+    margin-bottom: 4px;
+  }
+
+  .investments-terminal .equity-order-footer {
+    justify-content: stretch;
+  }
+
+  .investments-terminal .equity-order-footer .equity-order-button {
+    flex: 1 1 auto;
+  }
 }

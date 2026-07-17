@@ -1,501 +1,535 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useMemo, useState } from 'react'
+import { Check, ChevronDown, Folder, Plus, X } from 'lucide-react'
 import { PageHeader } from '@/components/investments-v2/page-header'
-import { PortfoliosSubNav } from '@/components/investments-v2/portfolios-subnav'
-import { cn } from '@/lib/utils'
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Cell, PieChart, Pie } from 'recharts'
-import { Folder, FolderOpen, ChevronDown, ChevronUp, Loader2, RefreshCw } from 'lucide-react'
-import { useAppDispatch, useAppSelector } from '@/lib/store'
-import {
-  fetchPortfolios,
-  fetchPortfolioOverview,
-  fetchPortfolioHoldings,
-  fetchPortfolioTransactions,
-  fetchPortfolioExposure,
-  fetchDashboardCurrencyExposure,
-  recalculatePortfolio,
-  setOpsSelectedFundId,
-} from '@/lib/store/slices/investmentOpsSlice'
-import { effectiveHoldingValue, type Holding } from '@/lib/api/investments-api'
 
-const DOT_COLORS = ['#f59e0b', '#3b82f6', '#6366f1', '#10b981', '#e879f9', '#f97316']
+const portfolioTabs = ['Equity World', 'New Portfolio', 'Multi Asset', 'Fixed Income', 'Asia Select']
 
-function fmt(n: number) {
-  return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+const portfolioMetrics: Record<string, { total: string; cash: string; securityPct: string; cashPct: string }> = {
+  'Equity World': { total: '9,346,467.46', cash: '2,150,000.00', securityPct: '81.46%', cashPct: '17.78%' },
+  'New Portfolio': { total: '4,108,220.14', cash: '920,000.00', securityPct: '74.20%', cashPct: '24.65%' },
+  'Multi Asset': { total: '12,884,903.80', cash: '3,110,450.00', securityPct: '72.35%', cashPct: '25.81%' },
+  'Fixed Income': { total: '7,629,190.32', cash: '1,240,000.00', securityPct: '82.74%', cashPct: '16.41%' },
+  'Asia Select': { total: '6,917,448.65', cash: '1,850,000.00', securityPct: '72.11%', cashPct: '26.83%' },
 }
 
-function Spinner() {
-  return <Loader2 className="w-4 h-4 animate-spin" style={{ color: 'var(--muted-foreground)' }} />
-}
+const countries = [
+  { label: 'US', value: 52, color: 'var(--iv2-chart-highlight)' },
+  { label: 'UK', value: 17, color: '#2f87fa' },
+  { label: 'FR', value: 9, color: '#9b82df' },
+  { label: 'GB', value: 12, color: '#79b0f7' },
+  { label: 'CH', value: 17, color: '#dcecff' },
+  { label: 'CA', value: 9, color: '#87909d' },
+]
 
-// ── Country rings chart ────────────────────────────────────────────
-interface Ring { r: number; pct: number; color: string }
-function CountryRings({ rings }: { rings: Ring[] }) {
-  const cx = 70, cy = 70
+const sectors = [
+  { label: 'Cry', value: 72 },
+  { label: 'Ind', value: 42 },
+  { label: 'Cmm', value: 42 },
+  { label: 'Min', value: 26 },
+  { label: 'Tch', value: 87 },
+  { label: 'Cns', value: 13 },
+  { label: 'Mtr', value: 21 },
+  { label: 'Fin', value: 16 },
+]
+
+const currencies = [
+  { label: 'EUR', value: 52, visual: 43, color: '#2f7ff0' },
+  { label: 'JPY', value: 17, visual: 27, color: '#86baf8' },
+  { label: 'CHF', value: 9, visual: 18, color: '#8c73cf' },
+  { label: 'USD', value: 12, visual: 12, color: '#deecfb' },
+]
+
+const initialOrders = [
+  { transaction: 'USD Cash', type: 'C', reference: 'USD Currency', quantity: '2,100,100', cost: '-2,100,100', price: '1.0000', value: '245,893,449', fx: '1.0000', nav: '2,100,100' },
+  { transaction: 'Alphabet INC–CL A', type: 'A', reference: 'Google US Equity', quantity: '393', cost: '-1,000,904', price: '2,441.7900', value: '959,623', fx: '1.0000', nav: '959,623' },
+  { transaction: 'Apple Inc', type: 'A', reference: 'AAPL US Equity', quantity: '1,440', cost: '-244,800', price: '189.5400', value: '272,938', fx: '1.0000', nav: '272,938' },
+  { transaction: 'Microsoft Corp', type: 'A', reference: 'MSFT US Equity', quantity: '780', cost: '-286,440', price: '421.6600', value: '328,895', fx: '1.0000', nav: '328,895' },
+]
+type OrderRow = (typeof initialOrders)[number]
+
+function Coin() {
   return (
-    <svg width="140" height="140" viewBox="0 0 140 140">
-      {rings.map((ring, i) => {
-        const circ = 2 * Math.PI * ring.r
-        const dash = (ring.pct / 100) * circ
-        return (
-          <g key={i}>
-            <circle cx={cx} cy={cy} r={ring.r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={9} />
-            <circle cx={cx} cy={cy} r={ring.r} fill="none" stroke={ring.color} strokeWidth={9}
-              strokeDasharray={`${dash} ${circ}`} strokeLinecap="round"
-              transform={`rotate(-90 ${cx} ${cy})`} />
-          </g>
-        )
-      })}
-    </svg>
+    <span className="inline-flex h-[12px] w-[12px] shrink-0 items-center justify-center rounded-full bg-[#ffd51e] text-[7px] font-bold text-white">
+      $
+    </span>
   )
 }
 
-// ── Collapsible accordion row for holdings ────────────────────────
-function HoldingsAccordion({ label, holdings, total, pct, dot }: {
-  label: string
-  holdings: Holding[]
-  total: number
-  pct: string
-  dot: string
+function CountryRings({
+  active,
+  onActive,
+}: {
+  active: string
+  onActive: (value: string) => void
 }) {
-  const [expanded, setExpanded] = useState(false)
+  const rings = countries.map((item, index) => ({
+    ...item,
+    radius: 68 - index * 10,
+    rotate: -90 + index * 26,
+  }))
 
   return (
-    <>
-      <tr className="cursor-pointer hover:bg-[rgba(139,92,246,0.08)]" onClick={() => setExpanded(!expanded)}>
-        <td style={{ color: 'var(--foreground)' }} className="font-medium">
-          <div className="flex items-center gap-2">
-            {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-            {label}
+    <div className="relative shrink-0">
+      <svg viewBox="0 0 160 160" className="h-[165px] w-[165px] sm:h-[180px] sm:w-[180px]">
+        {rings.map((ring) => {
+          const circumference = 2 * Math.PI * ring.radius
+          const dash = circumference * (ring.value / 100)
+          const isActive = active === ring.label
+          return (
+            <g
+              key={ring.label}
+              transform={`rotate(${ring.rotate} 80 80)`}
+              onMouseEnter={() => onActive(ring.label)}
+              onFocus={() => onActive(ring.label)}
+              tabIndex={0}
+              role="button"
+              aria-label={`${ring.label} ${ring.value}%`}
+              className="cursor-pointer outline-none"
+            >
+              <circle cx="80" cy="80" r={ring.radius} fill="none" stroke="var(--iv2-chart-track)" strokeWidth="6" />
+              <circle
+                cx="80"
+                cy="80"
+                r={ring.radius}
+                fill="none"
+                stroke={ring.color}
+                strokeWidth={isActive ? 9 : 6}
+                strokeDasharray={`${dash} ${circumference - dash}`}
+                strokeLinecap="round"
+                className="transition-all duration-200"
+                style={{ filter: isActive ? 'drop-shadow(0 0 5px rgba(255,255,255,.35))' : 'none' }}
+              />
+            </g>
+          )
+        })}
+      </svg>
+    </div>
+  )
+}
+
+function CurrencyDonut({
+  active,
+  onActive,
+}: {
+  active: string
+  onActive: (value: string) => void
+}) {
+  let startAngle = 0
+  const polar = (radius: number, angle: number, offsetX: number, offsetY: number) => {
+    const radians = ((angle - 90) * Math.PI) / 180
+    return {
+      x: 70 + radius * Math.cos(radians) + offsetX,
+      y: 70 + radius * Math.sin(radians) + offsetY,
+    }
+  }
+
+  const segmentPath = (start: number, end: number, explode: number) => {
+    const middle = (start + end) / 2
+    const middleRadians = ((middle - 90) * Math.PI) / 180
+    const offsetX = Math.cos(middleRadians) * explode
+    const offsetY = Math.sin(middleRadians) * explode
+    const outerStart = polar(54, start, offsetX, offsetY)
+    const outerEnd = polar(54, end, offsetX, offsetY)
+    const innerEnd = polar(14, end, offsetX, offsetY)
+    const innerStart = polar(14, start, offsetX, offsetY)
+    const largeArc = end - start > 180 ? 1 : 0
+
+    return [
+      `M ${outerStart.x} ${outerStart.y}`,
+      `A 54 54 0 ${largeArc} 1 ${outerEnd.x} ${outerEnd.y}`,
+      `L ${innerEnd.x} ${innerEnd.y}`,
+      `A 14 14 0 ${largeArc} 0 ${innerStart.x} ${innerStart.y}`,
+      'Z',
+    ].join(' ')
+  }
+
+  return (
+    <div className="relative shrink-0">
+      <svg viewBox="0 0 140 140" className="h-[150px] w-[150px] overflow-visible sm:h-[170px] sm:w-[170px]">
+        {currencies.map((item) => {
+          const sweep = item.visual * 3.6
+          const segmentStart = startAngle + 2.2
+          const segmentEnd = startAngle + sweep - 2.2
+          startAngle += sweep
+          const isActive = active === item.label
+
+          return (
+            <path
+              key={item.label}
+              d={segmentPath(segmentStart, segmentEnd, isActive ? 7 : 4)}
+              fill={item.color}
+              stroke="var(--iv2-chart-outline)"
+              strokeWidth="4"
+              strokeLinejoin="round"
+              strokeLinecap="round"
+              onMouseEnter={() => onActive(item.label)}
+              onFocus={() => onActive(item.label)}
+              tabIndex={0}
+              role="button"
+              aria-label={`${item.label} ${item.value}%`}
+              className="cursor-pointer outline-none transition-all duration-200"
+              style={{
+                filter: isActive ? 'drop-shadow(0 8px 12px rgba(18,60,115,.38)) brightness(1.06)' : 'none',
+              }}
+            />
+          )
+        })}
+        <circle cx="70" cy="70" r="12" fill="var(--iv2-chart-center)" />
+      </svg>
+    </div>
+  )
+}
+
+function NewPositionDialog({
+  open,
+  onClose,
+  onAdd,
+}: {
+  open: boolean
+  onClose: () => void
+  onAdd: (order: OrderRow) => void
+}) {
+  const [instrument, setInstrument] = useState('')
+  const [quantity, setQuantity] = useState('')
+  if (!open) return null
+
+  const submit = () => {
+    if (!instrument.trim() || !quantity.trim()) return
+    onAdd({
+      transaction: instrument.trim(),
+      type: 'A',
+      reference: `${instrument.trim()} Equity`,
+      quantity,
+      cost: '-0.00',
+      price: '0.0000',
+      value: '0.00',
+      fx: '1.0000',
+      nav: '0.00',
+    })
+    setInstrument('')
+    setQuantity('')
+    onClose()
+  }
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onMouseDown={onClose}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="new-position-title"
+        onMouseDown={(event) => event.stopPropagation()}
+        className="w-full max-w-md rounded-[24px] border border-white/10 bg-[#111b29] p-5 shadow-[0_28px_90px_rgba(0,0,0,.6)]"
+      >
+        <div className="mb-5 flex items-center justify-between">
+          <div>
+            <h2 id="new-position-title" className="text-base font-semibold text-white">New Position</h2>
+            <p className="mt-1 text-[11px] text-[#76859a]">Add a local position to this design preview.</p>
           </div>
-        </td>
-        <td>
-          <span className="inline-flex items-center gap-1.5 font-mono text-[12px]" style={{ color: 'var(--foreground)' }}>
-            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: dot }} />
-            {fmt(total)}
-          </span>
-        </td>
-        <td className="font-mono font-semibold" style={{ color: 'var(--foreground)' }}>{pct}</td>
-        <td className="font-mono" style={{ color: 'var(--muted-foreground)' }}>—</td>
-        <td className="font-mono" style={{ color: 'var(--muted-foreground)' }}>—</td>
-        <td style={{ color: 'var(--foreground)', fontWeight: 600 }}>{holdings.length}</td>
-        <td className="font-mono font-semibold" style={{ color: 'var(--foreground)' }}>{fmt(total)}</td>
-        <td className="font-mono font-semibold" style={{ color: 'var(--foreground)' }}>0.00</td>
-        <td style={{ color: 'var(--muted-foreground)' }}>—</td>
-      </tr>
-      {expanded && holdings.map((h) => (
-        <tr key={h.id} style={{ background: 'rgba(59,130,246,0.05)' }}>
-          <td style={{ color: 'var(--muted-foreground)', paddingLeft: '2.5rem' }} className="text-[11px]">
-            <div className="flex flex-col leading-tight">
-              <span style={{ color: 'var(--foreground)' }}>{h.security?.symbol ?? h.securityId.slice(0, 8)}</span>
-              {h.security?.name && <span className="text-[10px] opacity-70">{h.security.name}</span>}
-            </div>
-          </td>
-          <td className="font-mono text-[11px] font-semibold" style={{ color: 'var(--foreground)' }}>
-            {fmt(effectiveHoldingValue(h))}
-          </td>
-          <td className="font-mono text-[11px]" style={{ color: 'var(--muted-foreground)' }}>—</td>
-          <td className="font-mono text-[11px]" style={{ color: 'var(--muted-foreground)' }}>—</td>
-          <td className="font-mono text-[11px]" style={{ color: 'var(--muted-foreground)' }}>—</td>
-          <td className="font-mono text-[11px] font-semibold" style={{ color: 'var(--foreground)' }}>
-            {h.quantity.toLocaleString()}
-          </td>
-          <td className="font-mono text-[11px] font-semibold" style={{ color: 'var(--foreground)' }}>
-            {fmt(effectiveHoldingValue(h))}
-          </td>
-          <td className="font-mono text-[11px]" style={{ color: h.unrealizedPnl && h.unrealizedPnl >= 0 ? '#10b981' : '#f43f5e' }}>
-            {h.unrealizedPnl != null ? fmt(h.unrealizedPnl) : '—'}
-          </td>
-          <td className="text-[11px]" style={{ color: 'var(--muted-foreground)' }}>
-            {h.lastValuationAt ? new Date(h.lastValuationAt).toLocaleDateString() : '—'}
-          </td>
-        </tr>
-      ))}
-    </>
+          <button type="button" onClick={onClose} className="rounded-full p-2 text-[#8391a4] transition hover:bg-white/10 hover:text-white">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="space-y-4">
+          <label className="block">
+            <span className="mb-1.5 block text-[11px] text-[#8b99ad]">Instrument</span>
+            <input
+              value={instrument}
+              onChange={(event) => setInstrument(event.target.value)}
+              placeholder="e.g. Tesla Inc"
+              className="h-10 w-full rounded-full border border-white/10 bg-[#0b1320] px-4 text-xs text-white outline-none transition placeholder:text-[#4f5e72] focus:border-[#2f87fa] focus:ring-2 focus:ring-[#2f87fa]/25"
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1.5 block text-[11px] text-[#8b99ad]">Quantity</span>
+            <input
+              value={quantity}
+              onChange={(event) => setQuantity(event.target.value)}
+              inputMode="numeric"
+              placeholder="0"
+              className="h-10 w-full rounded-full border border-white/10 bg-[#0b1320] px-4 text-xs text-white outline-none transition placeholder:text-[#4f5e72] focus:border-[#2f87fa] focus:ring-2 focus:ring-[#2f87fa]/25"
+            />
+          </label>
+        </div>
+        <div className="mt-6 flex justify-end gap-2">
+          <button type="button" onClick={onClose} className="h-9 rounded-full border border-white/10 px-5 text-xs text-[#a4afbd] transition hover:bg-white/[0.06] hover:text-white">Cancel</button>
+          <button type="button" onClick={submit} className="h-9 rounded-full bg-white px-5 text-xs font-semibold text-[#111722] transition hover:bg-[#edf2f8]">Add Position</button>
+        </div>
+      </div>
+    </div>
   )
 }
 
 export default function PortfoliosPage() {
-  const dispatch = useAppDispatch()
-  const {
-    portfolios, portfoliosLoading,
-    selectedFundId,
-    portfolioOverview, portfolioOverviewLoading,
-    portfolioHoldings, portfolioHoldingsLoading,
-    portfolioTransactions, portfolioTransactionsLoading,
-    portfolioExposure,
-    dashboardCurrencyExposure,
-    portfolioRecalculating,
-  } = useAppSelector(s => s.investmentOps)
-  const [activePage, setActivePage] = useState(1)
+  const [activePortfolio, setActivePortfolio] = useState(portfolioTabs[0])
+  const [activeCountry, setActiveCountry] = useState(countries[0].label)
+  const [activeSector, setActiveSector] = useState('Tch')
+  const [activeCurrency, setActiveCurrency] = useState(currencies[0].label)
+  const [expanded, setExpanded] = useState(true)
+  const [recalculated, setRecalculated] = useState(false)
+  const [positionDialogOpen, setPositionDialogOpen] = useState(false)
+  const [orders, setOrders] = useState(initialOrders)
+  const [selectedOrder, setSelectedOrder] = useState(initialOrders[0].transaction)
+  const metrics = portfolioMetrics[activePortfolio]
 
-  useEffect(() => {
-    dispatch(fetchPortfolios())
-  }, [dispatch])
+  const activeSectorValue = useMemo(
+    () => sectors.find((item) => item.label === activeSector)?.value ?? 0,
+    [activeSector],
+  )
 
-  useEffect(() => {
-    if (!selectedFundId) return
-    dispatch(fetchPortfolioOverview(selectedFundId))
-    dispatch(fetchPortfolioHoldings(selectedFundId))
-    dispatch(fetchPortfolioTransactions(selectedFundId))
-    dispatch(fetchPortfolioExposure(selectedFundId))
-    dispatch(fetchDashboardCurrencyExposure(selectedFundId))
-  }, [dispatch, selectedFundId])
-
-  const handleRecalculate = async () => {
-    if (!selectedFundId) return
-    await dispatch(recalculatePortfolio(selectedFundId))
-    dispatch(fetchPortfolioOverview(selectedFundId))
-    dispatch(fetchPortfolioHoldings(selectedFundId))
-    dispatch(fetchPortfolioExposure(selectedFundId))
+  const recalculate = () => {
+    setRecalculated(true)
+    window.setTimeout(() => setRecalculated(false), 1800)
   }
 
-  // Group holdings by exchange (unchanged logic, real data source now)
-  const groupedHoldings = useMemo(() => {
-    if (!portfolioHoldings.length) return []
-    const groups: Record<string, Holding[]> = {}
-    let grandTotal = 0
-    for (const h of portfolioHoldings) {
-      const key = h.security?.exchangeCode ?? 'Cash'
-      if (!groups[key]) groups[key] = []
-      groups[key].push(h)
-      grandTotal += effectiveHoldingValue(h)
-    }
-    return Object.entries(groups).map(([label, items], i) => {
-      const total = items.reduce((s, h) => s + effectiveHoldingValue(h), 0)
-      return {
-        label,
-        holdings: items,
-        total,
-        pct: grandTotal > 0 ? ((total / grandTotal) * 100).toFixed(2) + '%' : '0.00%',
-        dot: DOT_COLORS[i % DOT_COLORS.length],
-      }
-    })
-  }, [portfolioHoldings])
-
-  // Country/exchange rings — now real, from getPortfolioExposure().byExchange
-  const countryRings = useMemo(() => {
-    if (!portfolioExposure?.byExchange.length) return []
-    const radii = [68, 58, 48, 38, 28, 18]
-    return portfolioExposure.byExchange
-      .slice(0, 6)
-      .map((e, i) => ({ label: e.key, pct: Math.round(e.pct), color: DOT_COLORS[i % DOT_COLORS.length], r: radii[i] }))
-  }, [portfolioExposure])
-
-  // Sector bars — still a client-derived proxy (no sector-exposure endpoint provided yet)
-  const sectorBars = useMemo(() => {
-    const totals: Record<string, number> = {}
-    let grand = 0
-    for (const h of portfolioHoldings) {
-      const key = h.security?.exchangeCode ?? 'Other'
-      const val = effectiveHoldingValue(h)
-      totals[key] = (totals[key] ?? 0) + val
-      grand += val
-    }
-    const bars = Object.entries(totals)
-      .map(([name, val]) => ({ name: name.slice(0, 3), value: grand > 0 ? (val / grand) * 100 : 0 }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 8)
-    const maxVal = Math.max(...bars.map(b => b.value))
-    return bars.map(b => ({ ...b, highlight: b.value === maxVal }))
-  }, [portfolioHoldings])
-
-  // Currency pie — real, from getDashboardCurrencyExposure(fundId)
-  const currencyPie = useMemo(() => {
-    if (!dashboardCurrencyExposure.length) return []
-    const grand = dashboardCurrencyExposure.reduce((s, e) => s + e.value, 0)
-    const colors = ['#4F7FEA', '#93B4F5', '#9B7FD6', '#D9E0F5']
-    return dashboardCurrencyExposure
-      .slice()
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 4)
-      .map((e, i) => ({ name: e.currency, value: grand > 0 ? Math.round((e.value / grand) * 100) : 0, color: colors[i] }))
-  }, [dashboardCurrencyExposure])
-
   return (
-    <div className="flex flex-col h-full w-full">
+    <div className="flex min-h-full w-full flex-col bg-[#05090f] text-[#eef2f8]">
       <PageHeader title="Portfolios" />
-      <PortfoliosSubNav />
 
-      {/* ── Fund folder tabs ── */}
-      <div className="flex items-center gap-2.5 px-5 pt-4 pb-4 flex-shrink-0 overflow-x-auto">
-        {portfoliosLoading ? (
-          <Spinner />
-        ) : portfolios.length === 0 ? (
-          <span className="text-[12px]" style={{ color: 'var(--muted-foreground)' }}>No funds available</span>
-        ) : (
-          portfolios.map((fund) => (
+      <div className="flex shrink-0 items-center gap-2 overflow-x-auto px-3 pb-4 pt-4 sm:px-5">
+        {portfolioTabs.map((portfolio) => (
+          <button
+            key={portfolio}
+            type="button"
+            onClick={() => setActivePortfolio(portfolio)}
+            className={`inline-flex h-8 shrink-0 items-center gap-2 rounded-full px-4 text-[11px] font-medium transition ${
+              activePortfolio === portfolio
+                ? 'bg-[#2d8cf4] text-white shadow-[0_8px_24px_rgba(45,140,244,.25)]'
+                : 'border border-white/[0.04] bg-[#172231] text-[#e1e6ee] hover:bg-[#223149]'
+            }`}
+          >
+            <Folder className="h-3.5 w-3.5" fill="currentColor" />
+            {portfolio}
+          </button>
+        ))}
+      </div>
+
+      <main className="flex-1 space-y-4 overflow-y-auto px-3 pb-6 sm:px-5">
+        <section className="overflow-hidden rounded-[24px] border border-white/[0.025] bg-[linear-gradient(112deg,#172231_0%,#101a29_55%,#0c1522_100%)] shadow-[0_22px_70px_rgba(0,0,0,.18)]">
+          <header className="flex min-h-[55px] flex-wrap items-center justify-between gap-3 px-5 py-3">
+            <div className="flex items-center gap-2 text-[12px] font-medium text-[#f0f3f8]">
+              <Folder className="h-3.5 w-3.5" fill="currentColor" />
+              {activePortfolio}
+            </div>
             <button
-              key={fund.id}
-              onClick={() => dispatch(setOpsSelectedFundId(fund.id))}
-              className={cn('folder-tab', selectedFundId === fund.id && 'active')}
+              type="button"
+              onClick={recalculate}
+              className="inline-flex h-8 min-w-[96px] items-center justify-center gap-1.5 rounded-full bg-white px-4 text-[11px] font-semibold text-[#111722] transition hover:bg-[#edf2f8]"
             >
-              {selectedFundId === fund.id
-                ? <FolderOpen className="w-3.5 h-3.5 flex-shrink-0" />
-                : <Folder className="w-3.5 h-3.5 flex-shrink-0" />}
-              {fund.name}
+              {recalculated && <Check className="h-3.5 w-3.5" />}
+              {recalculated ? 'Updated' : 'Recalculate'}
             </button>
-          ))
-        )}
-      </div>
+          </header>
 
-      <div className="flex-1 overflow-y-auto px-5 pb-5 space-y-3">
-
-        {!portfolioOverview ? (
-          <div className="py-8 text-center text-[12px]" style={{ color: 'var(--muted-foreground)' }}>
-            {portfolioOverviewLoading ? 'Loading…' : 'Select a fund to view holdings'}
-          </div>
-        ) : (
-          <>
-            {/* ── Portfolio composition card ── */}
-            <div className="arcus-card">
-              <div className="arcus-card-header">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Folder className="w-4 h-4" style={{ color: 'var(--muted-foreground)' }} />
-                  <span className="text-[13px] font-semibold" style={{ color: 'var(--foreground)' }}>{portfolioOverview.name}</span>
-                  <span className="text-[11px] ml-2" style={{ color: 'var(--muted-foreground)' }}>
-                    NAV <span className="font-mono" style={{ color: '#3b82f6' }}>
-                      {fmt(portfolioOverview.nav)} {portfolioOverview.baseCurrency}
-                    </span>
-                  </span>
-                  <span className="text-[11px]" style={{ color: 'var(--muted-foreground)' }}>
-                    P&L <span className="font-mono" style={{ color: portfolioOverview.pnl >= 0 ? '#10b981' : '#f43f5e' }}>
-                      {portfolioOverview.pnl >= 0 ? '+' : ''}{fmt(portfolioOverview.pnl)} {portfolioOverview.baseCurrency}
-                    </span>
-                  </span>
-                  <span className="text-[11px]" style={{ color: 'var(--muted-foreground)' }}>
-                    Manager <span style={{ color: 'var(--foreground)' }}>{portfolioOverview.portfolioManager}</span>
-                  </span>
-                  {portfolioHoldingsLoading && <Spinner />}
-                </div>
-                <button onClick={handleRecalculate} disabled={portfolioRecalculating} className="btn-white text-[12px] py-1 px-4 flex items-center gap-1.5 disabled:opacity-60">
-                  <RefreshCw className={cn('w-3 h-3', portfolioRecalculating && 'animate-spin')} />
-                  Recalculate
-                </button>
-              </div>
-
-              {/* Composition table with collapsible accordions */}
-              <div className="overflow-x-auto">
-                {portfolioHoldingsLoading ? (
-                  <div className="flex items-center justify-center py-8"><Spinner /></div>
-                ) : groupedHoldings.length === 0 ? (
-                  <div className="py-8 text-center text-[12px]" style={{ color: 'var(--muted-foreground)' }}>
-                    No holdings data
-                  </div>
-                ) : (
-                  <table className="arcus-table">
-                    <thead>
-                      <tr>
-                        <th>Included</th>
-                        <th>Total</th>
-                        <th>In%</th>
-                        <th>Interest</th>
-                        <th>Dividend</th>
-                        <th>Positions</th>
-                        <th>Exposure</th>
-                        <th>Margin</th>
-                        <th>Valuedate</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {groupedHoldings.map((group) => (
-                        <HoldingsAccordion
-                          key={group.label}
-                          label={group.label}
-                          holdings={group.holdings}
-                          total={group.total}
-                          pct={group.pct}
-                          dot={group.dot}
-                        />
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-
-              {/* ── 3 inline charts ── */}
-              {!portfolioHoldingsLoading && portfolioHoldings.length > 0 && (
-                <div
-                  className="grid grid-cols-3 gap-0"
-                  style={{
-                    borderTop: '1px solid var(--border)',
-                    background:
-                      'radial-gradient(circle at 15% 30%, rgba(99,102,241,0.10), transparent 60%), radial-gradient(circle at 85% 70%, rgba(139,92,246,0.08), transparent 55%)',
-                  }}
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[850px] border-collapse">
+              <thead className="bg-white/[0.035] text-left text-[9px] text-[#738095]">
+                <tr>
+                  <th className="px-5 py-2.5 font-normal">Included</th>
+                  <th className="px-4 py-2.5 font-normal">Total</th>
+                  <th className="px-4 py-2.5 font-normal">In%</th>
+                  <th className="px-4 py-2.5 font-normal">Interest</th>
+                  <th className="px-4 py-2.5 font-normal">Dividend</th>
+                  <th className="px-4 py-2.5 font-normal">Positions</th>
+                  <th className="px-4 py-2.5 font-normal">Exposure</th>
+                  <th className="px-4 py-2.5 font-normal">Margin</th>
+                  <th className="px-5 py-2.5 font-normal">Valuedate</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  onClick={() => setExpanded((current) => !current)}
+                  className="cursor-pointer bg-[#8b76d2] text-white transition hover:bg-[#957fe0]"
                 >
-                  {/* Country/exchange rings — real */}
-                  <div className="flex gap-4 p-4 items-center" style={{ borderRight: '1px solid var(--border)' }}>
-                    {countryRings.length > 0 ? (
-                      <>
-                        <CountryRings rings={countryRings} />
-                        <div className="space-y-1.5">
-                          {countryRings.map(r => (
-                            <div key={r.label} className="flex items-center gap-1.5">
-                              <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: r.color }} />
-                              <span className="text-[11px]" style={{ color: 'var(--muted-foreground)' }}>
-                                {r.label}({r.pct}%)
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </>
-                    ) : (
-                      <div className="text-[11px]" style={{ color: 'var(--muted-foreground)' }}>No data</div>
-                    )}
-                  </div>
+                  <td className="px-5 py-4 text-[11px]">
+                    <span className="inline-flex items-center gap-2">
+                      <ChevronDown className={`h-3 w-3 transition ${expanded ? '' : '-rotate-90'}`} />
+                      Securities
+                    </span>
+                  </td>
+                  <td className="px-4 py-4 text-[11px]"><span className="inline-flex items-center gap-1.5"><Coin />{metrics.total}</span></td>
+                  <td className="px-4 py-4 text-[11px]">{metrics.securityPct}</td>
+                  <td className="px-4 py-4 text-[11px]">0.00</td>
+                  <td className="px-4 py-4 text-[11px]">0.00</td>
+                  <td className="px-4 py-4 text-[11px]">11</td>
+                  <td className="px-4 py-4 text-[11px]">{metrics.total}</td>
+                  <td className="px-4 py-4 text-[11px]">0.00</td>
+                  <td className="px-5 py-4 text-[11px]">24 Apr, 20</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
-                  {/* Sector bars — still derived (no sector-exposure endpoint yet) */}
-                  <div className="p-4 flex flex-col" style={{ borderRight: '1px solid var(--border)' }}>
-                    {sectorBars.length > 0 ? (
-                      <>
-                        <div className="flex-1">
-                          <ResponsiveContainer width="100%" height={130}>
-                            <BarChart data={sectorBars} margin={{ top: 4, right: 4, left: -28, bottom: 0 }} barCategoryGap="20%">
-                              <XAxis dataKey="name" tick={{ fill: 'var(--muted-foreground)', fontSize: 10 }} axisLine={false} tickLine={false} />
-                              <YAxis hide />
-                              <Tooltip
-                                contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 11 }}
-                                cursor={false}
-                              />
-                              <Bar dataKey="value" radius={[4, 4, 4, 4]} maxBarSize={24}>
-                                {sectorBars.map((e, i) => (
-                                  <Cell key={i} fill={e.highlight ? '#3b82f6' : '#1e2d45'} />
-                                ))}
-                              </Bar>
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </div>
-                        {sectorBars[0] && (
-                          <div className="flex justify-center mt-1">
-                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-full"
-                              style={{ background: 'var(--card)', color: 'var(--foreground)' }}>
-                              <span className="w-2 h-2 rounded-full" style={{ background: '#3b82f6' }} />
-                              {sectorBars[0].value.toFixed(0)}%
-                            </span>
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      <div className="text-[11px]" style={{ color: 'var(--muted-foreground)' }}>No data</div>
-                    )}
-                  </div>
-
-                  {/* Currency pie — real */}
-                  <div className="p-4 flex items-center gap-4">
-                    {currencyPie.length > 0 ? (
-                      <>
-                        <ResponsiveContainer width={110} height={110}>
-                          <PieChart>
-                            <Pie data={currencyPie} cx="50%" cy="50%" outerRadius={52} paddingAngle={1} dataKey="value" strokeWidth={0}>
-                              {currencyPie.map((e, i) => <Cell key={i} fill={e.color} />)}
-                            </Pie>
-                          </PieChart>
-                        </ResponsiveContainer>
-                        <div className="space-y-1.5">
-                          {currencyPie.map(c => (
-                            <div key={c.name} className="flex items-center gap-1.5">
-                              <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: c.color }} />
-                              <span className="text-[11px]" style={{ color: 'var(--muted-foreground)' }}>
-                                {c.name}({c.value}%)
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </>
-                    ) : (
-                      <div className="text-[11px]" style={{ color: 'var(--muted-foreground)' }}>No data</div>
-                    )}
-                  </div>
+          {expanded && (
+            <div className="grid min-h-[245px] grid-cols-1 border-b border-[#243044] bg-[radial-gradient(circle_at_50%_30%,rgba(34,84,145,.17),transparent_62%)] lg:grid-cols-3">
+              <div className="flex min-h-[220px] items-center justify-start gap-2 border-b border-[#243044] px-3 py-4 sm:gap-3 sm:px-5 lg:border-b-0 lg:border-r">
+                <CountryRings active={activeCountry} onActive={setActiveCountry} />
+                <div className="space-y-1.5">
+                  {countries.map((country) => (
+                    <button
+                      key={country.label}
+                      type="button"
+                      onMouseEnter={() => setActiveCountry(country.label)}
+                      onClick={() => setActiveCountry(country.label)}
+                      className={`flex w-full items-center gap-1.5 rounded-full px-2 py-1 text-[9px] transition ${
+                        activeCountry === country.label ? 'bg-white/10 text-white' : 'text-[#8492a5] hover:text-white'
+                      }`}
+                    >
+                      <span className="h-2 w-2 rounded-full" style={{ background: country.color }} />
+                      {country.label}({country.value}%)
+                    </button>
+                  ))}
                 </div>
-              )}
-            </div>
+              </div>
 
-            {/* ── Recent Transactions ── */}
-            <div className="arcus-card">
-              <div className="arcus-card-header">
-                <span className="text-[13px] font-semibold" style={{ color: 'var(--foreground)' }}>
-                  Recent Transactions{portfolioTransactions.length ? ` (${portfolioTransactions.length})` : ''}
-                </span>
+              <div className="flex min-h-[220px] items-end justify-center gap-3 border-b border-[#243044] px-5 pb-6 pt-10 lg:border-b-0 lg:border-r">
+                {sectors.map((sector) => {
+                  const active = activeSector === sector.label
+                  return (
+                    <button
+                      key={sector.label}
+                      type="button"
+                      onMouseEnter={() => setActiveSector(sector.label)}
+                      onFocus={() => setActiveSector(sector.label)}
+                      onClick={() => setActiveSector(sector.label)}
+                      className="group relative flex h-[165px] flex-1 flex-col items-center justify-end gap-2 outline-none"
+                    >
+                      <span
+                        className="absolute z-10 rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-[#10151d] shadow-lg transition"
+                        style={{ bottom: `${Math.min(activeSectorValue + 16, 92)}%`, opacity: active ? 1 : 0, transform: active ? 'translateY(0)' : 'translateY(5px)' }}
+                      >
+                        <span className="absolute -left-1 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-[var(--iv2-chart-marker)]" />
+                        {sector.value}%
+                      </span>
+                      <span
+                        className="w-full max-w-[18px] rounded-t-md border border-white/[0.06] transition-all duration-200"
+                        style={{
+                          height: `${sector.value}%`,
+                          background: active ? '#2f8af4' : '#1d2b3e',
+                          boxShadow: active ? '0 12px 26px rgba(47,138,244,.25)' : 'none',
+                          transform: active ? 'translateY(-4px)' : 'none',
+                        }}
+                      />
+                      <span className={`text-[9px] transition ${active ? 'text-white' : 'text-[#65748a]'}`}>{sector.label}</span>
+                    </button>
+                  )
+                })}
               </div>
-              <div className="overflow-x-auto">
-                {portfolioTransactionsLoading ? (
-                  <div className="flex items-center justify-center py-8"><Spinner /></div>
-                ) : portfolioTransactions.length === 0 ? (
-                  <div className="py-8 text-center text-[12px]" style={{ color: 'var(--muted-foreground)' }}>No transactions available</div>
-                ) : (
-                  <table className="arcus-table">
-                    <thead>
-                      <tr>
-                        <th>Trade Ref</th>
-                        <th>Symbol</th>
-                        <th>Type</th>
-                        <th className="text-right">Quantity</th>
-                        <th className="text-right">Price</th>
-                        <th>Status</th>
-                        <th>Trade Date</th>
-                        <th className="text-right">Realized P&amp;L</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {portfolioTransactions.slice((activePage - 1) * 10, activePage * 10).map((txn) => (
-                        <tr key={txn.id}>
-                          <td className="font-mono text-[12px]" style={{ color: 'var(--foreground)' }}>{txn.tradeRef}</td>
-                          <td className="font-mono text-[12px] font-semibold" style={{ color: 'var(--foreground)' }}>{txn.symbol}</td>
-                          <td>
-                            <span className={cn(
-                              'text-[11px] px-2 py-0.5 rounded-full font-medium',
-                              txn.type === 'PURCHASE' ? 'bg-[#10b98114] text-[#10b981]' : 'bg-[#f43f5e14] text-[#f43f5e]'
-                            )}>
-                              {txn.type === 'PURCHASE' ? 'BUY' : 'SELL'}
-                            </span>
-                          </td>
-                          <td className="text-right font-mono" style={{ color: 'var(--foreground)' }}>
-                            {txn.quantity.toLocaleString()}
-                          </td>
-                          <td className="text-right font-mono" style={{ color: 'var(--foreground)' }}>
-                            {txn.price.toFixed(4)}
-                          </td>
-                          <td>
-                            <span className={cn(
-                              'text-[11px] px-2 py-0.5 rounded-full font-medium',
-                              txn.status === 'SETTLED' ? 'bg-[#10b98114] text-[#10b981]' :
-                              txn.status === 'SETTLEMENT_FAILED' ? 'bg-[#f43f5e14] text-[#f43f5e]' :
-                              'bg-[#64748b14] text-[#64748b]'
-                            )}>
-                              {txn.status}
-                            </span>
-                          </td>
-                          <td style={{ color: 'var(--muted-foreground)' }}>{new Date(txn.tradeDate).toLocaleDateString()}</td>
-                          <td className="text-right font-mono" style={{ color: txn.realizedPnl != null && txn.realizedPnl >= 0 ? '#10b981' : txn.realizedPnl != null ? '#f43f5e' : 'var(--muted-foreground)' }}>
-                            {txn.realizedPnl != null ? fmt(txn.realizedPnl) : '—'}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-              {portfolioTransactions.length > 10 && (
-                <div className="flex items-center justify-between px-4 py-2.5" style={{ borderTop: '1px solid var(--border)' }}>
-                  <span className="text-[11px]" style={{ color: 'var(--muted-foreground)' }}>
-                    Showing {Math.min(10, portfolioTransactions.length - (activePage - 1) * 10)} out of {portfolioTransactions.length} results
-                  </span>
-                  <div className="flex items-center gap-1">
-                    <button className="pg-btn" onClick={() => setActivePage(p => Math.max(1, p - 1))}>‹</button>
-                    {Array.from({ length: Math.ceil(portfolioTransactions.length / 10) }, (_, i) => i + 1).map(p => (
-                      <button key={p} onClick={() => setActivePage(p)} className={cn('pg-btn', activePage === p && 'active')}>
-                        {p}
-                      </button>
-                    ))}
-                    <button className="pg-btn" onClick={() => setActivePage(p => Math.min(Math.ceil(portfolioTransactions.length / 10), p + 1))}>›</button>
-                  </div>
+
+              <div className="flex min-h-[220px] items-center justify-center gap-3 p-4">
+                <CurrencyDonut active={activeCurrency} onActive={setActiveCurrency} />
+                <div className="space-y-2">
+                  {currencies.map((currency) => (
+                    <button
+                      key={currency.label}
+                      type="button"
+                      onMouseEnter={() => setActiveCurrency(currency.label)}
+                      onClick={() => setActiveCurrency(currency.label)}
+                      className={`flex w-full items-center gap-1.5 rounded-full px-2 py-1 text-[9px] transition ${
+                        activeCurrency === currency.label ? 'bg-white/10 text-white' : 'text-[#8492a5] hover:text-white'
+                      }`}
+                    >
+                      <span className="h-2 w-2 rounded-full" style={{ background: currency.color }} />
+                      {currency.label}({currency.value}%)
+                    </button>
+                  ))}
                 </div>
-              )}
+              </div>
             </div>
-          </>
-        )}
-      </div>
+          )}
+
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[850px] border-collapse">
+              <tbody>
+                <tr className="border-b border-[#243044] transition hover:bg-white/[0.025]">
+                  <td className="w-[12%] px-5 py-4 text-[11px]">Cash</td>
+                  <td className="w-[15%] px-4 py-4 text-[11px]"><span className="inline-flex items-center gap-1.5"><Coin />{metrics.cash}</span></td>
+                  <td className="w-[10%] px-4 py-4 text-[11px]">{metrics.cashPct}</td>
+                  <td className="w-[10%] px-4 py-4 text-[11px]">0.00</td>
+                  <td className="w-[10%] px-4 py-4 text-[11px]">0.00</td>
+                  <td className="w-[10%] px-4 py-4 text-[11px]">11</td>
+                  <td className="w-[13%] px-4 py-4 text-[11px]">0.00</td>
+                  <td className="w-[10%] px-4 py-4 text-[11px]">0.00</td>
+                  <td className="w-[10%] px-5 py-4 text-[11px]">24 Apr, 20</td>
+                </tr>
+                <tr className="transition hover:bg-white/[0.025]">
+                  <td className="px-5 py-4 text-[11px]">Archive</td>
+                  <td className="px-4 py-4 text-[11px]"><span className="inline-flex items-center gap-1.5"><Coin />0.00</span></td>
+                  <td className="px-4 py-4 text-[11px]">0.00%</td>
+                  <td className="px-4 py-4 text-[11px]">0.00</td>
+                  <td className="px-4 py-4 text-[11px]">0.00</td>
+                  <td className="px-4 py-4 text-[11px]">1</td>
+                  <td className="px-4 py-4 text-[11px]">0.00</td>
+                  <td className="px-4 py-4 text-[11px]">0.00</td>
+                  <td className="px-5 py-4 text-[11px]">24 Apr, 20</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section className="overflow-hidden rounded-[24px] border border-white/[0.025] bg-[linear-gradient(112deg,#172231_0%,#101a29_55%,#0c1522_100%)]">
+          <header className="flex min-h-[54px] items-center justify-between gap-3 px-5 py-3">
+            <h2 className="text-[14px] font-medium text-white">Orders({orders.length + 26})</h2>
+            <button
+              type="button"
+              onClick={() => setPositionDialogOpen(true)}
+              className="inline-flex h-8 items-center gap-1.5 rounded-full bg-white px-4 text-[11px] font-semibold text-[#111722] transition hover:bg-[#edf2f8]"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              New Position
+            </button>
+          </header>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[900px] border-collapse">
+              <thead className="bg-white/[0.035] text-left text-[9px] text-[#738095]">
+                <tr>
+                  <th className="px-5 py-2.5 font-normal">Transactions</th>
+                  <th className="px-4 py-2.5 font-normal">Type</th>
+                  <th className="px-4 py-2.5 font-normal">Reference</th>
+                  <th className="px-4 py-2.5 font-normal">Quantity</th>
+                  <th className="px-4 py-2.5 font-normal">Cost</th>
+                  <th className="px-4 py-2.5 font-normal">Price</th>
+                  <th className="px-4 py-2.5 font-normal">Value</th>
+                  <th className="px-4 py-2.5 font-normal">FXRate</th>
+                  <th className="px-5 py-2.5 font-normal">NAV</th>
+                </tr>
+              </thead>
+              <tbody>
+                {orders.map((order) => (
+                  <tr
+                    key={`${order.transaction}-${order.quantity}`}
+                    onClick={() => setSelectedOrder(order.transaction)}
+                    className={`cursor-pointer border-b border-[#243044] transition last:border-b-0 hover:bg-[#2f87fa]/[0.08] ${
+                      selectedOrder === order.transaction ? 'bg-[#2f87fa]/[0.1]' : ''
+                    }`}
+                  >
+                    <td className="px-5 py-4 text-[11px] text-[#e0e6ef]">{order.transaction}</td>
+                    <td className="px-4 py-4 text-[11px] text-[#c3ccd8]">{order.type}</td>
+                    <td className="px-4 py-4 text-[11px] text-[#c3ccd8]">{order.reference}</td>
+                    <td className="px-4 py-4 text-[11px] text-[#c3ccd8]">{order.quantity}</td>
+                    <td className="px-4 py-4 text-[11px] text-[#c3ccd8]">{order.cost}</td>
+                    <td className="px-4 py-4 text-[11px] text-[#c3ccd8]">{order.price}</td>
+                    <td className="px-4 py-4 text-[11px] text-[#dfe5ed]"><span className="inline-flex items-center gap-1.5"><Coin />{order.value}</span></td>
+                    <td className="px-4 py-4 text-[11px] text-[#c3ccd8]">{order.fx}</td>
+                    <td className="px-5 py-4 text-[11px] text-[#c3ccd8]">{order.nav}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+
+      <NewPositionDialog
+        open={positionDialogOpen}
+        onClose={() => setPositionDialogOpen(false)}
+        onAdd={(order) => {
+          setOrders((current) => [order, ...current])
+          setSelectedOrder(order.transaction)
+        }}
+      />
     </div>
   )
 }

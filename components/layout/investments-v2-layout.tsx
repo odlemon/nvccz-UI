@@ -7,6 +7,7 @@ import { SharedTopbar } from "./shared-topbar"
 import { InvestmentsV2Sidebar } from "./investments-v2-sidebar"
 import { MODULE_CONFIG, getModuleByPath } from "@/lib/config/modules"
 import { InvestmentsThemeProvider } from "@/components/investments-v2/theme-provider"
+import { ThemeToggle } from "@/components/investments-v2/theme-toggle"
 import "@/app/investments-v2/globals.css"
 
 interface InvestmentsV2LayoutProps {
@@ -38,7 +39,11 @@ export function InvestmentsV2Layout({ children }: InvestmentsV2LayoutProps) {
   return (
     <InvestmentsThemeProvider>
       <div className="min-h-screen bg-background">
-        <SharedTopbar onModuleSelect={handleModuleSelect} currentModule={currentModule} />
+        <SharedTopbar
+          onModuleSelect={handleModuleSelect}
+          currentModule={currentModule}
+          moduleActions={<ThemeToggle />}
+        />
 
         <div className="flex" style={{ height: 'calc(100vh - 80px)' }}>
           <InvestmentsV2Sidebar />

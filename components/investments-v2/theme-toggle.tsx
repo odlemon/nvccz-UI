@@ -8,13 +8,16 @@ export function ThemeToggle() {
 
   return (
     <button
+      type="button"
       onClick={toggleTheme}
-      className="flex items-center justify-center w-9 h-9 rounded-lg transition-all hover:opacity-80"
+      className="flex h-9 w-9 items-center justify-center rounded-full border border-border transition-all hover:bg-accent hover:text-accent-foreground"
       style={{
         background: 'var(--secondary)',
         color: 'var(--muted-foreground)',
       }}
       title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+      aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+      aria-pressed={theme === 'light'}
     >
       {theme === 'dark' ? (
         <Sun className="w-4 h-4" />

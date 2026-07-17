@@ -25,7 +25,7 @@ An FP&A screen must show server-backed values for its selected model, version, s
 Common envelope:
 
 ```json
-{ "success": true, "data": {}, "message": null }
+{ "success": true, "data": {}, "message": null }so
 ```
 
 Common errors: `401`, `403`, `404`, `409 INVALID_STATUS`, and structured `400` validation errors. Empty data should be `200` with null/empty fields, not `500`.

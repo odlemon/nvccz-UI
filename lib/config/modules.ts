@@ -379,7 +379,7 @@ export const MODULE_CONFIG: ModuleConfig[] = [
     ],
   },
 
-  // investments — Arcus Investment Operations terminal (9-module IA)
+  // investments — Arcus Investment Operations terminal
   {
     id: "investments",
     name: "Investments",
@@ -418,10 +418,9 @@ export const MODULE_CONFIG: ModuleConfig[] = [
           { id: "investments-orders-compliance", name: "Compliance",    path: "/investments-v2/orders/compliance", icon: CiCircleCheck,  description: "Pre/post-trade compliance" },
           { id: "investments-orders-simulation", name: "Simulation",    path: "/investments-v2/orders/simulation", icon: CiViewTimeline, description: "Order simulation" },
           { id: "investments-orders-models",     name: "Models",        path: "/investments-v2/orders/models",     icon: CiGrid41,       description: "Trading models" },
-          { id: "investments-orders-setup",      name: "Setup",         path: "/investments-v2/orders/setup",      icon: CiSettings,     description: "Broker, custodian, and signing key configuration" },
+          { id: "investments-orders-setup",      name: "Setup",         path: "/investments-v2/orders/setup",      icon: CiSettings,     description: "Order configuration and investment administration" },
         ],
       },
-      // Deferred to a later phase — nav preview only, single "coming soon" placeholder page per group.
       {
         id: "investments-reconciliation",
         title: "Reconciliation",
@@ -444,6 +443,7 @@ export const MODULE_CONFIG: ModuleConfig[] = [
           { id: "investments-valuation-pnl",   name: "P&L Runs",         path: "/investments-v2/valuation", icon: CiGrid41, description: "P&L calculation runs" },
           { id: "investments-valuation-price", name: "Price Validation", path: "/investments-v2/valuation", icon: CiGrid41, description: "Price validation runs" },
           { id: "investments-valuation-fx",    name: "FX Conversion",    path: "/investments-v2/valuation", icon: CiGrid41, description: "FX conversion runs" },
+          { id: "investments-valuation-exceptions", name: "Valuation Exceptions", path: "/investments-v2/valuation", icon: CiGrid41, description: "Valuation exceptions" },
         ],
       },
       {
@@ -454,7 +454,11 @@ export const MODULE_CONFIG: ModuleConfig[] = [
         items: [
           { id: "investments-reporting-portfolio", name: "Portfolio Reports", path: "/investments-v2/reporting", icon: CiGrid41, description: "Portfolio reports" },
           { id: "investments-reporting-pnl",       name: "P&L Reports",       path: "/investments-v2/reporting", icon: CiGrid41, description: "P&L reports" },
+          { id: "investments-reporting-allocation", name: "Allocation Reports", path: "/investments-v2/reporting", icon: CiGrid41, description: "Asset allocation reports" },
+          { id: "investments-reporting-compliance", name: "Compliance Reports", path: "/investments-v2/reporting", icon: CiGrid41, description: "Compliance reports" },
           { id: "investments-reporting-trade",     name: "Trade Reports",     path: "/investments-v2/reporting", icon: CiGrid41, description: "Trade reports" },
+          { id: "investments-reporting-reconciliation", name: "Reconciliation Reports", path: "/investments-v2/reporting", icon: CiGrid41, description: "Reconciliation reports" },
+          { id: "investments-reporting-investor", name: "Investor Reports", path: "/investments-v2/reporting", icon: CiGrid41, description: "Investor reports" },
         ],
       },
       {
@@ -463,8 +467,11 @@ export const MODULE_CONFIG: ModuleConfig[] = [
         icon: FileText,
         path: "/investments-v2/documentation",
         items: [
-          { id: "investments-documentation-register", name: "Document Register", path: "/investments-v2/documentation", icon: CiGrid41, description: "Document register" },
-          { id: "investments-documentation-upload",   name: "Upload",            path: "/investments-v2/documentation", icon: CiGrid41, description: "Upload documents" },
+          { id: "investments-documentation-broker-confirmations", name: "Broker Confirmations", path: "/investments-v2/documentation", icon: CiGrid41, description: "Broker confirmation documents" },
+          { id: "investments-documentation-custodian-statements", name: "Custodian Statements", path: "/investments-v2/documentation", icon: CiGrid41, description: "Custodian statement documents" },
+          { id: "investments-documentation-approvals", name: "Approvals", path: "/investments-v2/documentation", icon: CiGrid41, description: "Investment and compliance approval documents" },
+          { id: "investments-documentation-mandates", name: "Mandates", path: "/investments-v2/documentation", icon: CiGrid41, description: "Investment mandate documents" },
+          { id: "investments-documentation-audit", name: "Audit Documents", path: "/investments-v2/documentation", icon: CiGrid41, description: "Audit documents" },
         ],
       },
       {
@@ -473,16 +480,12 @@ export const MODULE_CONFIG: ModuleConfig[] = [
         icon: Calculator,
         path: "/investments-v2/accounting",
         items: [
-          { id: "investments-accounting-events",   name: "Events",   path: "/investments-v2/accounting", icon: CiGrid41, description: "Accounting events" },
+          { id: "investments-accounting-events", name: "Accounting Events", path: "/investments-v2/accounting", icon: CiGrid41, description: "Accounting events" },
           { id: "investments-accounting-journals", name: "Journals", path: "/investments-v2/accounting", icon: CiGrid41, description: "GL journals" },
+          { id: "investments-accounting-posting-statuses", name: "Posting Statuses", path: "/investments-v2/accounting", icon: CiGrid41, description: "Accounting posting statuses" },
+          { id: "investments-accounting-reversals", name: "Reversals", path: "/investments-v2/accounting", icon: CiGrid41, description: "Journal reversals" },
+          { id: "investments-accounting-ledger-exports", name: "Ledger Exports", path: "/investments-v2/accounting", icon: CiGrid41, description: "Ledger exports" },
         ],
-      },
-      {
-        id: "investments-setup",
-        title: "Setup",
-        icon: Settings,
-        path: "/investments-v2/setup",
-        items: [],
       },
     ],
   },

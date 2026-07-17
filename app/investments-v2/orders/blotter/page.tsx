@@ -1,431 +1,57 @@
 'use client'
 
-import { Fragment, useEffect, useMemo, useState } from 'react'
-import { Topbar } from '@/components/arcus/topbar'
-import { StatusBadge } from '@/components/arcus/status-badge'
-import { OrdersSubNav } from '@/components/investments-v2/orders-subnav'
-import { cn } from '@/lib/utils'
-import { Plus, Download, ChevronDown, ChevronRight } from 'lucide-react'
-import { useAppDispatch, useAppSelector } from '@/lib/store'
-import {
-  fetchPortfolios,
-  fetchOpsTrades,
-  executeTrade,
-  fetchTradeRoutingHops,
-  confirmRoutingHop,
-  retryRoutingHop,
-  cancelRoutingHop,
-} from '@/lib/store/slices/investmentOpsSlice'
-import { investmentOpsApi } from '@/lib/api/investment-ops-api'
-import type { RoutingHop } from '@/lib/api/investments-api'
-import { useSortedPaginated } from '@/components/investments-v2/ui/use-sorted-paginated'
-import { SortableTh } from '@/components/investments-v2/ui/sortable-th'
-import { TablePagination } from '@/components/investments-v2/ui/table-pagination'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { DatePicker } from '@/components/ui/date-picker'
-import { useThemeContainer } from '@/components/investments-v2/ui/use-theme-container'
-import { exportRowsToCsv } from '@/components/investments-v2/ui/export-csv'
-import { ConfirmDialog } from '@/components/investments-v2/ui/confirm-dialog'
+import { useMemo, useState } from 'react'
+import { Check, FileCheck, Plus, Search } from 'lucide-react'
 import { NewEquityOrderModal } from '@/components/investments-v2/new-equity-order-modal'
+import { buttonClass, inputClass, Metric, OrdersCard, OrdersPage, Pill, SelectField, tableClass, tableWrapClass } from '@/components/investments-v2/orders-ui'
+import { cn } from '@/lib/utils'
 
-type TradeSortKey = 'tradeRef' | 'ticker' | 'side' | 'quantity' | 'netConsideration' | 'executedAt'
-
-function settlementBadgeStatus(s: string) {
-  if (s === 'SETTLED') return 'settled'
-  if (s === 'SETTLEMENT_FAILED') return 'failed'
-  return s.toLowerCase().replace(/_/g, ' ')
-}
-function accountingBadgeStatus(s: string) {
-  return s === 'POSTED' ? 'posted' : 'not posted'
-}
-function confirmationBadgeStatus(s: string) {
-  if (s === 'CONFIRMED') return 'confirmed'
-  if (s === 'DISPATCHED') return 'pending'
-  return s.toLowerCase().replace(/_/g, ' ')
-}
-
-function hopBadgeStatus(s: string) {
-  if (s === 'CONFIRMED') return 'confirmed'
-  if (s === 'DISPATCHED') return 'pending'
-  if (s === 'FAILED') return 'failed'
-  if (s === 'RETRYING') return 'review'
-  return s.toLowerCase().replace(/_/g, ' ')
-}
-
-function hopActions(status: string): Array<{ key: 'confirm' | 'retry' | 'cancel'; label: string }> {
-  const actions: Array<{ key: 'confirm' | 'retry' | 'cancel'; label: string }> = []
-  if (status === 'DISPATCHED') actions.push({ key: 'confirm', label: 'Confirm' })
-  if (status === 'FAILED' || status === 'RETRYING') actions.push({ key: 'retry', label: 'Retry' })
-  if (status !== 'CONFIRMED') actions.push({ key: 'cancel', label: 'Cancel' })
-  return actions
-}
+const initialTrades = [
+  { id: 'TRD-260717-019', order: 'ORD-260717-040', portfolio: 'Growth Equity Fund', ticker: 'INNSCOR', name: 'Innscor Africa Ltd', side: 'SELL', qty: 8400, price: 721.2, gross: 6058080, fees: 22718, taxes: 12116, net: 6023246, broker: 'IH Securities', custodian: 'CBZ Custody', tradeDate: '17 Jul 2026', valueDate: '21 Jul 2026', status: 'Executed', settlement: 'Pending', accounting: 'Unposted', confirmation: 'Awaiting' },
+  { id: 'TRD-260717-018', order: 'ORD-260717-041', portfolio: 'Arcus Balanced Fund', ticker: 'DELTA', name: 'Delta Corporation Ltd', side: 'BUY', qty: 5000, price: 840, gross: 4200000, fees: 15750, taxes: 8400, net: 4224150, broker: 'Imara Securities', custodian: 'Stanbic Custody', tradeDate: '17 Jul 2026', valueDate: '21 Jul 2026', status: 'Partial', settlement: 'Unmatched', accounting: 'Pending match', confirmation: 'Awaiting' },
+  { id: 'TRD-260716-017', order: 'ORD-260716-038', portfolio: 'Arcus Balanced Fund', ticker: 'ECO', name: 'Econet Wireless Zimbabwe', side: 'BUY', qty: 17000, price: 298.1, gross: 5067700, fees: 19004, taxes: 10135, net: 5096839, broker: 'Imara Securities', custodian: 'Stanbic Custody', tradeDate: '16 Jul 2026', valueDate: '18 Jul 2026', status: 'Executed', settlement: 'Settled', accounting: 'Posted', confirmation: 'Confirmed' },
+  { id: 'TRD-260716-016', order: 'ORD-260716-035', portfolio: 'Pension Preservation', ticker: 'OKZIM', name: 'OK Zimbabwe Ltd', side: 'SELL', qty: 45000, price: 81.4, gross: 3663000, fees: 13736, taxes: 7326, net: 3641938, broker: 'Morgan & Co', custodian: 'CBZ Custody', tradeDate: '16 Jul 2026', valueDate: '18 Jul 2026', status: 'Pending', settlement: 'Not started', accounting: 'Not ready', confirmation: 'Draft' },
+]
 
 export default function TradeBlotterPage() {
-  const dispatch = useAppDispatch()
-  const {
-    portfolios,
-    opsTrades,
-    opsTradesLoading,
-    tradeActionLoadingById,
-    hopActionLoadingById,
-    tradeRoutingHopsLoadingById,
-  } = useAppSelector((s) => s.investmentOps)
-  const { ref: rootRef, container: themeContainer } = useThemeContainer()
-
-  const [showNewOrder, setShowNewOrder] = useState(false)
-  const [expandedTradeId, setExpandedTradeId] = useState<string | null>(null)
-  const [settlementErrorById, setSettlementErrorById] = useState<Record<string, string>>({})
-  const [settlementDownloadingById, setSettlementDownloadingById] = useState<Record<string, boolean>>({})
-
-  const [searchText, setSearchText] = useState('')
-  const [sideFilter, setSideFilter] = useState('All')
-  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined)
-  const [dateTo, setDateTo] = useState<Date | undefined>(undefined)
-
-  const [executeConfirm, setExecuteConfirm] = useState<{ id: string; tradeRef: string } | null>(null)
-  const [cancelHopConfirm, setCancelHopConfirm] = useState<{ tradeId: string; hopId: string; target: string } | null>(null)
-
-  useEffect(() => {
-    dispatch(fetchPortfolios())
-    dispatch(fetchOpsTrades())
-  }, [dispatch])
-
-  const fundName = (fundId: string) => portfolios.find((f) => f.id === fundId)?.name ?? '—'
-
-  const filteredTrades = useMemo(() => {
-    const q = searchText.trim().toLowerCase()
-    return opsTrades.filter((t) => {
-      if (sideFilter !== 'All' && t.side !== sideFilter) return false
-      if (t.executedAt) {
-        const executed = new Date(t.executedAt)
-        if (dateFrom && executed < dateFrom) return false
-        if (dateTo && executed > new Date(dateTo.getTime() + 24 * 60 * 60 * 1000 - 1)) return false
-      }
-      if (q) {
-        const haystack = [t.tradeRef, t.security?.symbol ?? '', t.security?.name ?? ''].join(' ').toLowerCase()
-        if (!haystack.includes(q)) return false
-      }
-      return true
-    })
-  }, [opsTrades, searchText, sideFilter, dateFrom, dateTo])
-
-  const getTradeSortValue = (t: (typeof opsTrades)[number], key: TradeSortKey) => {
-    if (key === 'ticker') return t.security?.symbol ?? ''
-    if (key === 'executedAt') return t.executedAt ? new Date(t.executedAt).getTime() : 0
-    return t[key] as string | number
-  }
-  const {
-    pageRows: tradeRows,
-    sortKey: tradeSortKey,
-    sortDir: tradeSortDir,
-    toggleSort: toggleTradeSort,
-    page: tradePage,
-    setPage: setTradePage,
-    totalPages: tradeTotalPages,
-    totalRows: tradeTotalRows,
-  } = useSortedPaginated<(typeof opsTrades)[number], TradeSortKey>(filteredTrades, getTradeSortValue, 'executedAt', 15)
-
-  const toggleTrade = (id: string) => {
-    if (expandedTradeId === id) {
-      setExpandedTradeId(null)
-      return
-    }
-    setExpandedTradeId(id)
-    dispatch(fetchTradeRoutingHops(id))
-  }
-
-  const handleHopAction = (key: 'confirm' | 'retry' | 'cancel', tradeId: string, hopId: string) => {
-    if (key === 'confirm') dispatch(confirmRoutingHop({ tradeId, hopId }))
-    if (key === 'retry') dispatch(retryRoutingHop({ tradeId, hopId }))
-    if (key === 'cancel') dispatch(cancelRoutingHop({ tradeId, hopId }))
-  }
-
-  const handleDownloadSettlement = async (tradeId: string, tradeRef: string) => {
-    setSettlementErrorById((p) => ({ ...p, [tradeId]: '' }))
-    setSettlementDownloadingById((p) => ({ ...p, [tradeId]: true }))
-    try {
-      const blob = await investmentOpsApi.getSettlementDocument(tradeId)
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `${tradeRef}-settlement.pdf`
-      a.click()
-      URL.revokeObjectURL(url)
-    } catch (err: any) {
-      setSettlementErrorById((p) => ({ ...p, [tradeId]: err?.message || 'Failed to download settlement document' }))
-    } finally {
-      setSettlementDownloadingById((p) => ({ ...p, [tradeId]: false }))
-    }
-  }
-
-  const handleExport = () => {
-    exportRowsToCsv(
-      `blotter-${new Date().toISOString().slice(0, 10)}.csv`,
-      ['Trade ID', 'Portfolio', 'Ticker', 'Side', 'Qty', 'Exec Price', 'Gross', 'Fees', 'Net', 'Trade Date'],
-      filteredTrades.map((t) => [
-        t.tradeRef,
-        fundName(t.fundId),
-        t.security?.symbol ?? '',
-        t.side,
-        t.quantity,
-        t.executionPrice,
-        t.grossConsideration,
-        t.fees,
-        t.netConsideration,
-        t.executedAt ? new Date(t.executedAt).toLocaleDateString() : '',
-      ])
-    )
+  const [trades, setTrades] = useState(initialTrades)
+  const [status, setStatus] = useState('All')
+  const [query, setQuery] = useState('')
+  const [selected, setSelected] = useState<(typeof trades)[number] | null>(null)
+  const [showOrder, setShowOrder] = useState(false)
+  const visible = useMemo(() => trades.filter((trade) => (status === 'All' || trade.status === status) && `${trade.id} ${trade.order} ${trade.ticker} ${trade.portfolio}`.toLowerCase().includes(query.toLowerCase())), [trades, status, query])
+  const money = (value: number) => value.toLocaleString('en-US', { minimumFractionDigits: 2 })
+  const updateSelected = (patch: Partial<(typeof trades)[number]>) => {
+    if (!selected) return
+    const updated = { ...selected, ...patch }
+    setSelected(updated)
+    setTrades((items) => items.map((item) => item.id === updated.id ? updated : item))
   }
 
   return (
-    <div ref={rootRef} className="flex flex-col h-full overflow-hidden">
-      <Topbar title="Trade Blotter" subtitle="Executed & Pending Trades" showPeriod={false} />
+    <OrdersPage title="Trade Blotter" description="Executed and pending trades, confirmations and local settlement workflow."
+      actions={<button className={cn(buttonClass, 'border-blue-500/40 bg-blue-600 text-white')} onClick={() => setShowOrder(true)}><Plus className="h-3.5 w-3.5" /> New order</button>}>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4"><Metric label="Gross traded" value="19.19m" detail="ZWL · today" /><Metric label="Executed" value="3" tone="text-emerald-300" /><Metric label="Pending" value="1" tone="text-amber-300" /><Metric label="Unmatched" value="1" tone="text-red-300" /></div>
+      <OrdersCard title="Trades" eyebrow="Settlement workspace" actions={<div className="flex gap-2"><div className="relative"><Search className="absolute left-3 top-3 h-3 w-3 text-slate-500" /><input className={cn(inputClass, 'w-56 pl-8')} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search trade or ticker" /></div><SelectField className="w-36" value={status} onChange={setStatus}><option>All</option><option>Executed</option><option>Partial</option><option>Pending</option></SelectField></div>}>
+        <div className={tableWrapClass}><table className={tableClass}>
+          <thead><tr><th>Trade / order</th><th>Portfolio</th><th>Instrument</th><th>Side</th><th className="text-right">Quantity</th><th className="text-right">Exec price</th><th className="text-right">Gross</th><th className="text-right">Fees</th><th className="text-right">Taxes</th><th className="text-right">Net</th><th>Broker</th><th>Custodian</th><th>Trade date</th><th>Value date</th><th>Status</th><th>Settlement</th><th>Accounting</th><th>Confirmation</th></tr></thead>
+          <tbody>{visible.map((trade) => <tr key={trade.id} className="cursor-pointer" onClick={() => setSelected(trade)}>
+            <td><div className="font-mono text-blue-300">{trade.id}</div><div className="text-[9px] text-slate-600">{trade.order}</div></td><td>{trade.portfolio}</td><td><b>{trade.ticker}</b><span className="ml-2 text-slate-500">{trade.name}</span></td><td className={trade.side === 'BUY' ? 'text-emerald-300' : 'text-red-300'}>{trade.side}</td><td className="text-right font-mono">{trade.qty.toLocaleString()}</td><td className="text-right font-mono">{trade.price.toFixed(2)}</td><td className="text-right font-mono">{money(trade.gross)}</td><td className="text-right font-mono">{money(trade.fees)}</td><td className="text-right font-mono">{money(trade.taxes)}</td><td className="text-right font-mono">{money(trade.net)}</td><td>{trade.broker}</td><td>{trade.custodian}</td><td>{trade.tradeDate}</td><td>{trade.valueDate}</td><td><Pill tone={trade.status === 'Executed' ? 'green' : 'amber'}>{trade.status}</Pill></td><td><Pill tone={trade.settlement === 'Settled' ? 'green' : trade.settlement === 'Unmatched' ? 'red' : 'amber'}>{trade.settlement}</Pill></td><td><Pill tone={trade.accounting === 'Posted' ? 'green' : 'slate'}>{trade.accounting}</Pill></td><td><Pill tone={trade.confirmation === 'Confirmed' ? 'green' : 'slate'}>{trade.confirmation}</Pill></td>
+          </tr>)}</tbody>
+        </table></div>
+      </OrdersCard>
 
-      <OrdersSubNav />
-
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <div className="text-xs text-[#6B7A95]">{opsTradesLoading ? 'Loading…' : `${filteredTrades.length} of ${opsTrades.length} trades`}</div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="pill" onClick={handleExport}>
-              <Download className="w-3 h-3" /> Export
-            </Button>
-            <Button variant="default" size="pill" onClick={() => setShowNewOrder(true)}>
-              <Plus className="w-3 h-3" /> New Order
-            </Button>
-          </div>
+      {selected && <div className="fixed inset-y-0 right-0 z-40 w-full max-w-lg overflow-y-auto border-l border-white/10 bg-[#09111e] p-5 shadow-2xl">
+        <div className="flex justify-between"><div><div className="text-[9px] uppercase tracking-widest text-blue-400">Trade detail</div><h2 className="mt-1 font-mono text-base">{selected.id}</h2></div><button className={buttonClass} onClick={() => setSelected(null)}>Close</button></div>
+        <div className="mt-5 rounded-[22px] border border-white/[0.07] bg-gradient-to-br from-[#101b30] to-[#080e18] p-4"><div className="flex items-center justify-between"><div><b className="text-lg">{selected.ticker}</b><p className="text-[10px] text-slate-500">{selected.name}</p></div><Pill tone={selected.side === 'BUY' ? 'green' : 'red'}>{selected.side} {selected.qty.toLocaleString()}</Pill></div><div className="mt-4 grid grid-cols-3 gap-3 text-[10px]"><div><span className="text-slate-600">Gross</span><p className="mt-1 font-mono">{money(selected.gross)}</p></div><div><span className="text-slate-600">Fees + tax</span><p className="mt-1 font-mono">{money(selected.fees + selected.taxes)}</p></div><div><span className="text-slate-600">Net</span><p className="mt-1 font-mono">{money(selected.net)}</p></div></div></div>
+        <h3 className="mt-6 text-[11px] font-semibold">Settlement & confirmation</h3>
+        <div className="mt-3 space-y-3">
+          <div className="rounded-[18px] border border-white/[0.07] p-4"><div className="flex items-center justify-between"><div><p className="text-[11px] font-medium">Broker confirmation</p><p className="mt-1 text-[9px] text-slate-500">Match price, quantity and broker reference.</p></div><Pill tone={selected.confirmation === 'Confirmed' ? 'green' : 'amber'}>{selected.confirmation}</Pill></div><button disabled={selected.confirmation === 'Confirmed'} className={cn(buttonClass, 'mt-3 w-full')} onClick={() => updateSelected({ confirmation: 'Confirmed' })}><FileCheck className="h-3.5 w-3.5" /> Confirm trade</button></div>
+          <div className="rounded-[18px] border border-white/[0.07] p-4"><div className="flex items-center justify-between"><div><p className="text-[11px] font-medium">Custodian settlement</p><p className="mt-1 text-[9px] text-slate-500">{selected.custodian} · {selected.valueDate}</p></div><Pill tone={selected.settlement === 'Settled' ? 'green' : 'amber'}>{selected.settlement}</Pill></div><button disabled={selected.settlement === 'Settled'} className={cn(buttonClass, 'mt-3 w-full border-emerald-400/30 text-emerald-300')} onClick={() => updateSelected({ settlement: 'Settled' })}><Check className="h-3.5 w-3.5" /> Mark settled</button></div>
+          <div className="rounded-[18px] border border-white/[0.07] p-4"><div className="flex items-center justify-between"><div><p className="text-[11px] font-medium">Accounting posting</p><p className="mt-1 text-[9px] text-slate-500">Create the local trade-date accounting marker.</p></div><Pill tone={selected.accounting === 'Posted' ? 'green' : 'slate'}>{selected.accounting}</Pill></div><button disabled={selected.accounting === 'Posted'} className={cn(buttonClass, 'mt-3 w-full border-blue-400/30 text-blue-300')} onClick={() => updateSelected({ accounting: 'Posted' })}><Check className="h-3.5 w-3.5" /> Mark posted</button></div>
         </div>
-
-        {/* Filter bar */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <Input
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            placeholder="Search trade ID or ticker…"
-            className="w-64"
-          />
-          <Select value={sideFilter} onValueChange={setSideFilter}>
-            <SelectTrigger className="w-32 rounded-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent container={themeContainer}>
-              <SelectItem value="All">All Sides</SelectItem>
-              <SelectItem value="BUY">BUY</SelectItem>
-              <SelectItem value="SELL">SELL</SelectItem>
-            </SelectContent>
-          </Select>
-          <DatePicker value={dateFrom} onChange={setDateFrom} placeholder="From date" className="w-40" allowFutureDates container={themeContainer} />
-          <DatePicker value={dateTo} onChange={setDateTo} placeholder="To date" className="w-40" allowFutureDates container={themeContainer} />
-        </div>
-
-        {/* Blotter table */}
-        <div className="bg-[#0D1526] border border-white/[0.06] rounded-md overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="arcus-table">
-              <thead>
-                <tr>
-                  <th />
-                  <SortableTh col="tradeRef" label="Trade ID" sortKey={tradeSortKey} sortDir={tradeSortDir} onSort={toggleTradeSort} />
-                  <th>Portfolio</th>
-                  <SortableTh col="ticker" label="Ticker" sortKey={tradeSortKey} sortDir={tradeSortDir} onSort={toggleTradeSort} />
-                  <th>Instrument</th>
-                  <SortableTh col="side" label="Side" sortKey={tradeSortKey} sortDir={tradeSortDir} onSort={toggleTradeSort} />
-                  <SortableTh col="quantity" label="Qty" sortKey={tradeSortKey} sortDir={tradeSortDir} onSort={toggleTradeSort} align="right" />
-                  <th className="text-right">Exec Price</th>
-                  <th className="text-right">Gross</th>
-                  <th className="text-right">Fees</th>
-                  <SortableTh col="netConsideration" label="Net" sortKey={tradeSortKey} sortDir={tradeSortDir} onSort={toggleTradeSort} align="right" />
-                  <th>Broker</th>
-                  <th>Custodian</th>
-                  <SortableTh col="executedAt" label="Trade Date" sortKey={tradeSortKey} sortDir={tradeSortDir} onSort={toggleTradeSort} />
-                  <th>Val Date</th>
-                  <th>Settlement</th>
-                  <th>Accounting</th>
-                  <th>Confirmation</th>
-                </tr>
-              </thead>
-              <tbody>
-                {tradeRows.map((t) => {
-                  const isExpanded = expandedTradeId === t.id
-                  const hopsLoading = !!tradeRoutingHopsLoadingById[t.id]
-                  const settlementError = settlementErrorById[t.id]
-                  const settlementDownloading = !!settlementDownloadingById[t.id]
-                  return (
-                    <Fragment key={t.id}>
-                      <tr className={cn('cursor-pointer', isExpanded && 'bg-[#3b82f614]')} onClick={() => toggleTrade(t.id)}>
-                        <td className="w-6">
-                          {isExpanded ? (
-                            <ChevronDown className="w-3.5 h-3.5 text-[#6B7A95]" />
-                          ) : (
-                            <ChevronRight className="w-3.5 h-3.5 text-[#6B7A95]" />
-                          )}
-                        </td>
-                        <td className="text-[#60A5FA] font-mono text-[11px]">{t.tradeRef}</td>
-                        <td className="text-[#A8B4C8]">{fundName(t.fundId)}</td>
-                        <td className="text-[#C8D3E8] font-mono font-semibold">{t.security?.symbol ?? '—'}</td>
-                        <td className="text-[#A8B4C8]">{t.security?.name ?? '—'}</td>
-                        <td>
-                          <span className={cn('text-xs font-bold', t.side === 'BUY' ? 'text-[#10B981]' : 'text-[#EF4444]')}>
-                            {t.side}
-                          </span>
-                        </td>
-                        <td className="text-right font-mono">{Number(t.quantity).toLocaleString()}</td>
-                        <td className="text-right font-mono">{Number(t.executionPrice).toFixed(2)}</td>
-                        <td className="text-right font-mono">{t.grossConsideration.toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
-                        <td className="text-right font-mono text-[#F59E0B]">{Number(t.fees)}</td>
-                        <td className="text-right font-mono">{t.netConsideration.toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
-                        <td className="text-[#A8B4C8]">{t.brokerProfileId ?? '—'}</td>
-                        <td className="text-[#6B7A95]">{t.custodianProfileId ?? '—'}</td>
-                        <td className="text-[#6B7A95]">{t.executedAt ? new Date(t.executedAt).toLocaleDateString() : '—'}</td>
-                        <td className="text-[#6B7A95]">{t.valueDate ? new Date(t.valueDate).toLocaleDateString() : '—'}</td>
-                        <td><StatusBadge status={settlementBadgeStatus(t.settlementStatus)} /></td>
-                        <td><StatusBadge status={accountingBadgeStatus(t.accountingStatus)} /></td>
-                        <td><StatusBadge status={confirmationBadgeStatus(t.confirmationStatus)} /></td>
-                      </tr>
-                      {isExpanded && (
-                        <tr>
-                          <td colSpan={18} className="p-0">
-                            <div className="px-6 py-3 space-y-3" style={{ background: 'rgba(59,130,246,0.04)', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                              <div className="flex items-center gap-2">
-                                {t.status === 'DRAFT' && (
-                                  <Button
-                                    size="sm"
-                                    variant="default"
-                                    className="rounded-full"
-                                    disabled={!!tradeActionLoadingById[t.id]}
-                                    onClick={(e) => { e.stopPropagation(); setExecuteConfirm({ id: t.id, tradeRef: t.tradeRef }) }}
-                                  >
-                                    Execute Trade
-                                  </Button>
-                                )}
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="rounded-full"
-                                  disabled={settlementDownloading}
-                                  onClick={(e) => { e.stopPropagation(); handleDownloadSettlement(t.id, t.tradeRef) }}
-                                >
-                                  <Download className="w-3 h-3" /> {settlementDownloading ? 'Downloading…' : 'Download Settlement Document'}
-                                </Button>
-                                {settlementError && <span className="text-[11px] text-[#EF4444]">{settlementError}</span>}
-                              </div>
-
-                              <table className="arcus-table">
-                                <thead>
-                                  <tr>
-                                    <th>Target</th>
-                                    <th>Status</th>
-                                    <th className="text-right">Attempts</th>
-                                    <th>External Ref</th>
-                                    <th>Last Error</th>
-                                    <th>Dispatched At</th>
-                                    <th>Confirmed At</th>
-                                    <th>Actions</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {t.routingHops.map((hop: RoutingHop) => (
-                                    <tr key={hop.id}>
-                                      <td className="text-[#A8B4C8]">{hop.target}</td>
-                                      <td><StatusBadge status={hopBadgeStatus(hop.status)} /></td>
-                                      <td className="text-right font-mono">{hop.attemptCount}</td>
-                                      <td className="text-[#6B7A95] font-mono text-[11px]">{hop.externalRef ?? '—'}</td>
-                                      <td className="text-[#EF4444] text-[11px]">{hop.lastError ?? '—'}</td>
-                                      <td className="text-[#6B7A95] text-[11px]">{hop.dispatchedAt ? new Date(hop.dispatchedAt).toLocaleString() : '—'}</td>
-                                      <td className="text-[#6B7A95] text-[11px]">{hop.confirmedAt ? new Date(hop.confirmedAt).toLocaleString() : '—'}</td>
-                                      <td>
-                                        <div className="flex items-center gap-1.5">
-                                          {hopActions(hop.status).map((a) => (
-                                            <Button
-                                              key={a.key}
-                                              size="sm"
-                                              variant="outline"
-                                              className={cn('rounded-full', a.key === 'cancel' && 'text-destructive border-destructive/30 hover:bg-destructive/10')}
-                                              disabled={!!hopActionLoadingById[hop.id]}
-                                              onClick={(e) => {
-                                                e.stopPropagation()
-                                                if (a.key === 'cancel') setCancelHopConfirm({ tradeId: t.id, hopId: hop.id, target: hop.target })
-                                                else handleHopAction(a.key, t.id, hop.id)
-                                              }}
-                                            >
-                                              {a.label}
-                                            </Button>
-                                          ))}
-                                        </div>
-                                      </td>
-                                    </tr>
-                                  ))}
-                                  {hopsLoading && t.routingHops.length === 0 && (
-                                    <tr>
-                                      <td colSpan={8} className="text-center py-4 text-[11px]" style={{ color: '#64748b' }}>Loading routing hops…</td>
-                                    </tr>
-                                  )}
-                                  {!hopsLoading && t.routingHops.length === 0 && (
-                                    <tr>
-                                      <td colSpan={8} className="text-center py-4 text-[11px]" style={{ color: '#64748b' }}>No routing hops for this trade.</td>
-                                    </tr>
-                                  )}
-                                </tbody>
-                              </table>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </Fragment>
-                  )
-                })}
-                {filteredTrades.length === 0 && !opsTradesLoading && (
-                  <tr>
-                    <td colSpan={18} className="text-center py-8 text-[12px]" style={{ color: '#64748b' }}>No trades match the current filters.</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-          <TablePagination page={tradePage} totalPages={tradeTotalPages} onPageChange={setTradePage} rowsShown={tradeRows.length} totalRows={tradeTotalRows} />
-        </div>
-      </div>
-
-      <NewEquityOrderModal
-        open={showNewOrder}
-        onClose={() => setShowNewOrder(false)}
-        container={themeContainer}
-        onOrderCreated={() => dispatch(fetchOpsTrades())}
-      />
-
-      {executeConfirm && (
-        <ConfirmDialog
-          open={!!executeConfirm}
-          onOpenChange={(o) => !o && setExecuteConfirm(null)}
-          title={`Execute Trade ${executeConfirm.tradeRef}`}
-          description="This will execute the trade and route it for settlement. This action cannot be undone."
-          confirmLabel="Execute Trade"
-          onConfirm={() => {
-            const d = executeConfirm
-            setExecuteConfirm(null)
-            if (d) dispatch(executeTrade(d.id))
-          }}
-          container={themeContainer}
-        />
-      )}
-
-      {cancelHopConfirm && (
-        <ConfirmDialog
-          open={!!cancelHopConfirm}
-          onOpenChange={(o) => !o && setCancelHopConfirm(null)}
-          title={`Cancel Routing Hop — ${cancelHopConfirm.target}`}
-          description="This will cancel this routing hop. This action cannot be undone."
-          confirmLabel="Cancel Hop"
-          onConfirm={() => {
-            const d = cancelHopConfirm
-            setCancelHopConfirm(null)
-            if (d) handleHopAction('cancel', d.tradeId, d.hopId)
-          }}
-          container={themeContainer}
-        />
-      )}
-    </div>
+      </div>}
+      <NewEquityOrderModal open={showOrder} onClose={() => setShowOrder(false)} onOrderCreated={() => setShowOrder(false)} />
+    </OrdersPage>
   )
 }

@@ -1,270 +1,81 @@
 'use client'
 
-import { Fragment, useEffect, useMemo, useState } from 'react'
-import { Topbar } from '@/components/arcus/topbar'
-import { StatusBadge } from '@/components/arcus/status-badge'
-import { OrdersSubNav } from '@/components/investments-v2/orders-subnav'
-import { Download, X } from 'lucide-react'
-import { useAppDispatch, useAppSelector } from '@/lib/store'
-import { fetchPortfolios, fetchModelPortfolios, createModelPortfolio, fetchModelPortfolioDrift } from '@/lib/store/slices/investmentOpsSlice'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { useThemeContainer } from '@/components/investments-v2/ui/use-theme-container'
-import { exportRowsToCsv } from '@/components/investments-v2/ui/export-csv'
+import { useMemo, useState } from 'react'
+import { Edit3, Plus, Search } from 'lucide-react'
+import { buttonClass, Field, inputClass, Metric, Modal, OrdersCard, OrdersPage, Pill, SelectField, tableClass, tableWrapClass } from '@/components/investments-v2/orders-ui'
+import { cn } from '@/lib/utils'
 
-const NEW_MODEL_EMPTY = {
-  name: '',
-  allocationType: 'ASSET_CLASS',
-  allocationKey: 'EQUITY',
-  targetWeightPct: '',
-}
+type Allocation = { dimension: 'Asset class' | 'Security' | 'Sector' | 'Currency'; asset: string; target: number; live: number }
+type Model = { id: number; name: string; strategy: string; risk: string; mandate: string; portfolio: string; allocations: Allocation[]; updated: string }
+const seed: Model[] = [
+  { id: 1, name: 'Balanced ZSE Core', strategy: 'Moderate growth', risk: 'Moderate', mandate: 'Balanced Fund Mandate 2026', portfolio: 'Arcus Balanced Fund', updated: '17 Jul 2026', allocations: [
+    { dimension: 'Asset class', asset: 'Listed equity', target: 70, live: 72.4 }, { dimension: 'Asset class', asset: 'Cash', target: 10, live: 11.5 },
+    { dimension: 'Security', asset: 'DELTA', target: 18, live: 21.4 }, { dimension: 'Security', asset: 'INNSCOR', target: 16, live: 13.2 }, { dimension: 'Security', asset: 'ECO', target: 14, live: 14.6 }, { dimension: 'Security', asset: 'CBZ', target: 12, live: 9.8 },
+    { dimension: 'Sector', asset: 'Consumer Staples', target: 28, live: 31.6 }, { dimension: 'Sector', asset: 'Financials', target: 18, live: 15.2 },
+    { dimension: 'Currency', asset: 'ZWL', target: 80, live: 78.2 }, { dimension: 'Currency', asset: 'USD', target: 20, live: 21.8 },
+  ] },
+  { id: 2, name: 'ZSE Growth Leaders', strategy: 'High growth', risk: 'Aggressive', mandate: 'Growth Equity Mandate', portfolio: 'Growth Equity Fund', updated: '16 Jul 2026', allocations: [
+    { dimension: 'Asset class', asset: 'Listed equity', target: 90, live: 92.1 }, { dimension: 'Security', asset: 'INNSCOR', target: 25, live: 28.1 }, { dimension: 'Security', asset: 'DELTA', target: 20, live: 18.4 }, { dimension: 'Sector', asset: 'Consumer Staples', target: 40, live: 44.2 }, { dimension: 'Currency', asset: 'ZWL', target: 85, live: 87.3 },
+  ] },
+]
 
-export default function ModelPortfoliosPage() {
-  const dispatch = useAppDispatch()
-  const {
-    portfolios,
-    modelPortfolios,
-    modelPortfoliosLoading,
-    modelPortfolioCreating,
-    modelPortfolioDriftById,
-    modelPortfolioDriftLoadingById,
-  } = useAppSelector((s) => s.investmentOps)
-  const { ref: rootRef, container: themeContainer } = useThemeContainer()
-  const [showNewModel, setShowNewModel] = useState(false)
-  const [form, setForm] = useState(NEW_MODEL_EMPTY)
-  const [formError, setFormError] = useState('')
-  const [driftFundByModelId, setDriftFundByModelId] = useState<Record<string, string>>({})
-  const [expandedModelId, setExpandedModelId] = useState<string | null>(null)
-  const [searchText, setSearchText] = useState('')
-
-  useEffect(() => {
-    dispatch(fetchPortfolios())
-    dispatch(fetchModelPortfolios())
-  }, [dispatch])
-
-  const field = (key: keyof typeof form, value: string) => setForm((p) => ({ ...p, [key]: value }))
-
-  const filteredModels = useMemo(() => {
-    const q = searchText.trim().toLowerCase()
-    if (!q) return modelPortfolios
-    return modelPortfolios.filter((m) => m.name.toLowerCase().includes(q))
-  }, [modelPortfolios, searchText])
-
-  const handleCreate = async () => {
-    setFormError('')
-    if (!form.name || !form.targetWeightPct) {
-      setFormError('Name and Target Weight % are required.')
-      return
+export default function ModelsPage() {
+  const [models, setModels] = useState(seed)
+  const [activeId, setActiveId] = useState(1)
+  const [query, setQuery] = useState('')
+  const [editing, setEditing] = useState<Model | null | undefined>()
+  const [name, setName] = useState('')
+  const [strategy, setStrategy] = useState('Moderate growth')
+  const [risk, setRisk] = useState('Moderate')
+  const [mandate, setMandate] = useState('Balanced Fund Mandate 2026')
+  const [portfolio, setPortfolio] = useState('Arcus Balanced Fund')
+  const [targets, setTargets] = useState('DELTA 20, INNSCOR 20, ECO 15, CBZ 15, Cash 10')
+  const model = models.find((item) => item.id === activeId) || models[0]
+  const visible = useMemo(() => models.filter((item) => `${item.name} ${item.portfolio}`.toLowerCase().includes(query.toLowerCase())), [models, query])
+  const open = (item: Model | null) => {
+    setEditing(item)
+    setName(item?.name || '')
+    setStrategy(item?.strategy || 'Moderate growth')
+    setRisk(item?.risk || 'Moderate')
+    setMandate(item?.mandate || 'Balanced Fund Mandate 2026')
+    setPortfolio(item?.portfolio || 'Arcus Balanced Fund')
+    setTargets(item ? item.allocations.map((allocation) => `${allocation.asset} ${allocation.target}`).join(', ') : 'DELTA 20, INNSCOR 20, ECO 15, CBZ 15, Cash 10')
+  }
+  const save = () => {
+    if (!name.trim()) return
+    const allocations = targets.split(',').map((entry, index) => {
+      const parts = entry.trim().split(/\s+/)
+      const weight = Number(parts.pop()) || 0
+      return { dimension: (editing?.allocations[index]?.dimension ?? 'Security') as Allocation['dimension'], asset: parts.join(' ') || `Sleeve ${index + 1}`, target: weight, live: editing?.allocations[index]?.live ?? 8 + index * 2.7 }
+    })
+    if (editing) setModels((items) => items.map((item) => item.id === editing.id ? { ...item, name, strategy, risk, mandate, portfolio, allocations, updated: 'Just now' } : item))
+    else {
+      const created = { id: Date.now(), name, strategy, risk, mandate, portfolio, allocations, updated: 'Just now' }
+      setModels((items) => [...items, created])
+      setActiveId(created.id)
     }
-    try {
-      await dispatch(
-        createModelPortfolio({
-          name: form.name,
-          allocations: [
-            { allocationType: form.allocationType, allocationKey: form.allocationKey, targetWeightPct: Number(form.targetWeightPct) },
-          ],
-        })
-      ).unwrap()
-      setForm(NEW_MODEL_EMPTY)
-      setShowNewModel(false)
-    } catch (err: any) {
-      setFormError(err?.message || 'Failed to create model portfolio')
-    }
+    setEditing(undefined)
   }
-
-  const handleCheckDrift = (modelId: string) => {
-    const fundId = driftFundByModelId[modelId]
-    if (!fundId) return
-    dispatch(fetchModelPortfolioDrift({ modelId, fundId }))
-    setExpandedModelId(modelId)
-  }
-
-  const handleExport = () => {
-    exportRowsToCsv(
-      `model-portfolios-${new Date().toISOString().slice(0, 10)}.csv`,
-      ['Name', 'Strategy', 'Base Currency', 'Allocations', 'Status'],
-      filteredModels.map((m) => [
-        m.name,
-        m.strategyCode ?? '',
-        m.baseCurrencyCode,
-        m.allocations.map((a) => `${a.allocationKey}: ${a.targetWeightPct}%`).join('; '),
-        m.isActive ? 'active' : 'inactive',
-      ])
-    )
-  }
+  const maxDrift = Math.max(...model.allocations.map((allocation) => Math.abs(allocation.live - allocation.target)))
 
   return (
-    <div ref={rootRef} className="flex flex-col h-full overflow-hidden">
-      <Topbar title="Orders" />
-
-      <OrdersSubNav />
-
-      <div className="flex-1 overflow-y-auto p-5 space-y-4">
-        <div className="arcus-card">
-          <div className="flex items-center justify-between px-4 py-3 flex-wrap gap-2" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-            <span className="text-white text-[13px] font-semibold">Model Portfolios</span>
-            <div className="flex items-center gap-2">
-              <Input value={searchText} onChange={(e) => setSearchText(e.target.value)} placeholder="Search model name…" className="w-56" />
-              <Button variant="outline" size="pill" onClick={handleExport}>
-                <Download className="w-3 h-3" /> Export
-              </Button>
-              <Button variant="default" size="pill" onClick={() => setShowNewModel(true)}>+ New Model</Button>
-            </div>
-          </div>
-
-          {showNewModel && (
-            <div className="p-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[12px] font-semibold" style={{ color: '#e2e8f0' }}>New Model Portfolio</span>
-                <button onClick={() => setShowNewModel(false)} className="text-[#64748b] hover:text-[#ef4444]">
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-              <div className="grid grid-cols-4 gap-3">
-                <div>
-                  <label className="text-[10px] text-[#64748b] uppercase tracking-wider block mb-1">Name *</label>
-                  <Input
-                    value={form.name}
-                    onChange={(e) => field('name', e.target.value)}
-                    placeholder="e.g. Balanced ZSE"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] text-[#64748b] uppercase tracking-wider block mb-1">Allocation Type</label>
-                  <Input
-                    value={form.allocationType}
-                    onChange={(e) => field('allocationType', e.target.value)}
-                    className="font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] text-[#64748b] uppercase tracking-wider block mb-1">Allocation Key</label>
-                  <Input
-                    value={form.allocationKey}
-                    onChange={(e) => field('allocationKey', e.target.value)}
-                    className="font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] text-[#64748b] uppercase tracking-wider block mb-1">Target Weight % *</label>
-                  <Input
-                    type="number"
-                    value={form.targetWeightPct}
-                    onChange={(e) => field('targetWeightPct', e.target.value)}
-                    placeholder="0"
-                    className="font-mono"
-                  />
-                </div>
-              </div>
-              {formError && <div className="text-[11px] text-[#EF4444] mt-2">{formError}</div>}
-              <div className="flex items-center justify-end gap-2 mt-3">
-                <Button variant="outline" size="pill" onClick={() => setShowNewModel(false)}>Cancel</Button>
-                <Button variant="default" size="pill" onClick={handleCreate} disabled={modelPortfolioCreating}>
-                  {modelPortfolioCreating ? 'Saving…' : 'Save Model'}
-                </Button>
-              </div>
-            </div>
-          )}
-
-          <div className="overflow-x-auto">
-            <table className="arcus-table">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Strategy</th>
-                  <th>Base Currency</th>
-                  <th>Allocations</th>
-                  <th>Status</th>
-                  <th>Check Drift</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredModels.map((m) => {
-                  const isExpanded = expandedModelId === m.id
-                  const drift = modelPortfolioDriftById[m.id]
-                  const driftLoading = !!modelPortfolioDriftLoadingById[m.id]
-                  return (
-                    <Fragment key={m.id}>
-                      <tr>
-                        <td className="text-[#c8d3e8] font-medium">{m.name}</td>
-                        <td className="text-[#64748b]">{m.strategyCode ?? '—'}</td>
-                        <td className="font-mono" style={{ color: '#94a3b8' }}>{m.baseCurrencyCode}</td>
-                        <td className="text-[#94a3b8] text-[11px]">
-                          {m.allocations.length === 0
-                            ? '—'
-                            : m.allocations.map((a) => `${a.allocationKey}: ${a.targetWeightPct}%`).join(', ')}
-                        </td>
-                        <td><StatusBadge status={m.isActive ? 'active' : 'inactive'} /></td>
-                        <td>
-                          <div className="flex items-center gap-1.5">
-                            <Select value={driftFundByModelId[m.id] ?? ''} onValueChange={(v) => setDriftFundByModelId((p) => ({ ...p, [m.id]: v }))}>
-                              <SelectTrigger className="w-32 rounded-full">
-                                <SelectValue placeholder="Fund…" />
-                              </SelectTrigger>
-                              <SelectContent container={themeContainer}>
-                                {portfolios.map((f) => (
-                                  <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="rounded-full"
-                              onClick={() => handleCheckDrift(m.id)}
-                              disabled={!driftFundByModelId[m.id] || driftLoading}
-                            >
-                              {driftLoading ? 'Checking…' : 'Check Drift'}
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                      {isExpanded && drift && (
-                        <tr>
-                          <td colSpan={6} className="p-0">
-                            <div className="px-6 py-3" style={{ background: 'rgba(59,130,246,0.04)', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                              <table className="arcus-table">
-                                <thead>
-                                  <tr>
-                                    <th>Key</th>
-                                    <th className="text-right">Target %</th>
-                                    <th className="text-right">Live %</th>
-                                    <th className="text-right">Drift %</th>
-                                    <th>Rebalance Action</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {drift.drift.map((d, i) => (
-                                    <tr key={d.key + i}>
-                                      <td className="text-[#c8d3e8]">{d.key}</td>
-                                      <td className="text-right font-mono">{d.targetWeightPct}%</td>
-                                      <td className="text-right font-mono">{d.liveWeightPct}%</td>
-                                      <td className="text-right font-mono" style={{ color: d.driftPct === 0 ? '#94a3b8' : '#f59e0b' }}>
-                                        {d.driftPct > 0 ? '+' : ''}{d.driftPct}%
-                                      </td>
-                                      <td className="text-[#64748b]">{d.rebalanceAction}</td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </Fragment>
-                  )
-                })}
-                {filteredModels.length === 0 && !modelPortfoliosLoading && (
-                  <tr>
-                    <td colSpan={6} className="text-center py-8 text-[12px]" style={{ color: '#64748b' }}>No model portfolios match the current filters.</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+    <OrdersPage title="Model portfolios" description="Compare live portfolios to target weights and turn drift into rebalance recommendations." actions={<button className={cn(buttonClass, 'bg-blue-600 text-white')} onClick={() => open(null)}><Plus className="h-3.5 w-3.5" /> New model</button>}>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4"><Metric label="Active models" value={String(models.length)} /><Metric label="Linked portfolios" value={String(new Set(models.map((item) => item.portfolio)).size)} tone="text-blue-300" /><Metric label="Largest drift" value={`${maxDrift.toFixed(1)}%`} tone="text-amber-300" /><Metric label="Recommendations" value={String(model.allocations.filter((item) => Math.abs(item.live - item.target) >= 1).length)} tone="text-violet-300" /></div>
+      <div className="grid gap-4 xl:grid-cols-[320px_1fr]">
+        <OrdersCard title="Models" eyebrow="Local workspace" actions={<div className="relative mr-3"><Search className="absolute left-3 top-3 h-3 w-3 text-slate-500" /><input className={cn(inputClass, 'w-36 pl-8')} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search" /></div>}>
+          <div className="space-y-2 p-3">{visible.map((item) => <button key={item.id} onClick={() => setActiveId(item.id)} className={cn('w-full rounded-full border p-3 text-left transition', item.id === activeId ? 'border-blue-400/40 bg-blue-500/10' : 'border-white/[0.06] bg-[#070d17] hover:border-blue-400/25')}><div className="flex justify-between gap-2"><span className="text-[11px] font-semibold">{item.name}</span><Pill tone="green">Active</Pill></div><p className="mt-2 text-[9px] text-slate-500">{item.strategy} · {item.portfolio}</p></button>)}</div>
+        </OrdersCard>
+        <div className="space-y-4">
+          <OrdersCard title={model.name} eyebrow={`${model.portfolio} · updated ${model.updated}`} actions={<button className={buttonClass} onClick={() => open(model)}><Edit3 className="h-3.5 w-3.5" /> Edit targets</button>}>
+            <div className="grid gap-3 border-b border-white/[0.06] p-4 sm:grid-cols-3"><div className="rounded-[16px] bg-black/15 p-3"><p className="text-[9px] uppercase text-slate-600">Risk category</p><p className="mt-1 text-[11px]">{model.risk}</p></div><div className="rounded-[16px] bg-black/15 p-3"><p className="text-[9px] uppercase text-slate-600">Client mandate</p><p className="mt-1 text-[11px]">{model.mandate}</p></div><div className="rounded-[16px] bg-black/15 p-3"><p className="text-[9px] uppercase text-slate-600">Strategy</p><p className="mt-1 text-[11px]">{model.strategy}</p></div></div>
+            <div className={tableWrapClass}><table className={tableClass}><thead><tr><th>Target dimension</th><th>Instrument / sleeve</th><th className="text-right">Target weight</th><th className="text-right">Live weight</th><th className="text-right">Drift</th><th>Drift status</th><th>Recommendation</th></tr></thead><tbody>{model.allocations.map((allocation) => { const drift = allocation.live - allocation.target; const action = allocation.dimension !== 'Security' ? 'Review allocation' : Math.abs(drift) < 1 ? 'Hold' : drift > 0 ? `Sell ${(drift * 1.72).toFixed(1)}m ZWL` : `Buy ${(-drift * 1.72).toFixed(1)}m ZWL`; return <tr key={`${allocation.dimension}-${allocation.asset}`}><td><Pill tone="blue">{allocation.dimension}</Pill></td><td className="font-semibold">{allocation.asset}</td><td className="text-right font-mono">{allocation.target.toFixed(1)}%</td><td className="text-right font-mono">{allocation.live.toFixed(1)}%</td><td className={cn('text-right font-mono', Math.abs(drift) >= 2 ? 'text-amber-300' : 'text-slate-400')}>{drift > 0 ? '+' : ''}{drift.toFixed(1)}%</td><td><Pill tone={Math.abs(drift) >= 3 ? 'red' : Math.abs(drift) >= 1 ? 'amber' : 'green'}>{Math.abs(drift) >= 3 ? 'Outside band' : Math.abs(drift) >= 1 ? 'Watch' : 'On target'}</Pill></td><td>{action}</td></tr> })}</tbody></table></div>
+          </OrdersCard>
+          <OrdersCard title="Rebalance recommendations" eyebrow="Security-level draft actions · no execution"><div className="grid gap-3 p-4 md:grid-cols-3">{model.allocations.filter((item) => item.dimension === 'Security' && Math.abs(item.live - item.target) >= 1).map((item) => { const buy = item.live < item.target; return <div key={item.asset} className="rounded-[18px] border border-white/[0.07] bg-black/15 p-3"><div className="flex justify-between"><b>{item.asset}</b><Pill tone={buy ? 'green' : 'red'}>{buy ? 'BUY' : 'SELL'}</Pill></div><p className="mt-3 font-mono text-sm">{(Math.abs(item.live - item.target) * 1.72).toFixed(1)}m ZWL</p><p className="mt-1 text-[9px] text-slate-500">Move {item.live.toFixed(1)}% → {item.target.toFixed(1)}%</p></div> })}</div></OrdersCard>
         </div>
       </div>
-    </div>
+      <Modal open={editing !== undefined} onClose={() => setEditing(undefined)} title={editing ? 'Edit model targets' : 'Create model portfolio'} subtitle="Changes remain in this local prototype." footer={<><button className={buttonClass} onClick={() => setEditing(undefined)}>Cancel</button><button disabled={!name.trim()} className={cn(buttonClass, 'bg-blue-600 text-white')} onClick={save}>Save model</button></>}>
+        <div className="grid gap-4 sm:grid-cols-2"><Field label="Model name *"><input className={inputClass} value={name} onChange={(event) => setName(event.target.value)} /></Field><Field label="Strategy"><SelectField value={strategy} onChange={setStrategy}><option>Moderate growth</option><option>High growth</option><option>Capital preservation</option></SelectField></Field><Field label="Risk category"><SelectField value={risk} onChange={setRisk}><option>Conservative</option><option>Moderate</option><option>Aggressive</option></SelectField></Field><Field label="Client mandate"><SelectField value={mandate} onChange={setMandate}><option>Balanced Fund Mandate 2026</option><option>Growth Equity Mandate</option><option>Pension Preservation Mandate</option></SelectField></Field><Field label="Linked portfolio"><SelectField value={portfolio} onChange={setPortfolio}><option>Arcus Balanced Fund</option><option>Growth Equity Fund</option><option>Pension Preservation</option></SelectField></Field><Field label="Security target weights" hint="Comma separated instrument and percentage"><input className={inputClass} value={targets} onChange={(event) => setTargets(event.target.value)} /></Field></div>
+      </Modal>
+    </OrdersPage>
   )
 }

@@ -1,238 +1,66 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { PageHeader } from '@/components/investments-v2/page-header'
-import { PortfoliosSubNav } from '@/components/investments-v2/portfolios-subnav'
-import { StatusBadge } from '@/components/arcus/status-badge'
-import { cn } from '@/lib/utils'
-import { Search, Loader2, ChevronDown } from 'lucide-react'
-import { useAppDispatch, useAppSelector } from '@/lib/store'
-import { fetchInstrumentTypes, fetchInstruments } from '@/lib/store/slices/investmentOpsSlice'
+import { FormEvent, useMemo, useState } from 'react'
+import { ArrowDownUp, Check, ChevronDown, ChevronLeft, ChevronRight, Plus, Search, ShieldAlert, X } from 'lucide-react'
 
-const EXCHANGES = ['All', 'ZSE', 'VFEX', 'SECZIM', 'NASDAQ', 'NYSE'] as const
-const PAGE_SIZE = 12
-
-function Spinner() {
-  return <Loader2 className="w-4 h-4 animate-spin" style={{ color: 'var(--muted-foreground)' }} />
+type Instrument = {
+  id: number; symbol: string; name: string; isin: string; sedol: string; type: string; category: string; sector: string
+  market: string; currency: string; price: number; status: 'Active' | 'Inactive'; restriction: 'None' | 'Restricted' | 'Suspended'
+  issuer: string; country: string; source: string; createdBy: string; updated: string; coupon?: number; maturity?: string; faceValue?: number
 }
 
+const seed: Instrument[] = [
+  { id: 1, symbol: 'DLTA', name: 'Delta Corporation Limited', isin: 'ZW0009011215', sedol: '6269914', type: 'Equity', category: 'Listed equity', sector: 'Consumer Staples', market: 'ZSE', currency: 'USD', price: 1.2845, status: 'Active', restriction: 'None', issuer: 'Delta Corporation', country: 'Zimbabwe', source: 'Vendor API', createdBy: 'T. Moyo', updated: '17 Jul 2026 · 13:35' },
+  { id: 2, symbol: 'INN', name: 'Innscor Africa Limited', isin: 'ZW0009012072', sedol: 'BMG6WN3', type: 'Equity', category: 'Listed equity', sector: 'Consumer Staples', market: 'VFEX', currency: 'USD', price: .472, status: 'Active', restriction: 'None', issuer: 'Innscor Africa', country: 'Zimbabwe', source: 'Vendor API', createdBy: 'T. Moyo', updated: '17 Jul 2026 · 13:34' },
+  { id: 3, symbol: 'TB30', name: 'Government Treasury Bond 2030', isin: 'ZW000TB20308', sedol: '—', type: 'Fixed income', category: 'Sovereign bond', sector: 'Sovereign', market: 'OTC', currency: 'USD', price: 96.425, status: 'Active', restriction: 'Restricted', issuer: 'Government of Zimbabwe', country: 'Zimbabwe', source: 'Manual control', createdBy: 'R. Dube', updated: '17 Jul 2026 · 12:46', coupon: 8.5, maturity: '30 Jun 2030', faceValue: 100 },
+  { id: 4, symbol: 'CBZ28', name: 'CBZ Holdings Note 2028', isin: 'ZW000CBZ2801', sedol: '—', type: 'Fixed income', category: 'Corporate bond', sector: 'Financials', market: 'OTC', currency: 'USD', price: 101.14, status: 'Active', restriction: 'None', issuer: 'CBZ Holdings', country: 'Zimbabwe', source: 'Manual control', createdBy: 'R. Dube', updated: '16 Jul 2026 · 17:10', coupon: 10.25, maturity: '15 Sep 2028', faceValue: 100 },
+  { id: 5, symbol: 'AEF', name: 'Arcus Africa Equity Fund', isin: 'MU0000AEF001', sedol: 'BNT4XZ2', type: 'Fund', category: 'Collective investment', sector: 'Multi-sector', market: 'Internal', currency: 'USD', price: 124.73, status: 'Active', restriction: 'Restricted', issuer: 'Arcus Asset Management', country: 'Mauritius', source: 'Fund administrator', createdBy: 'S. Ncube', updated: '17 Jul 2026 · 11:05' },
+  { id: 6, symbol: 'PAD', name: 'Padenga Holdings Limited', isin: 'ZW0009012106', sedol: 'BMGH7K9', type: 'Equity', category: 'Listed equity', sector: 'Consumer Discretionary', market: 'VFEX', currency: 'USD', price: .181, status: 'Inactive', restriction: 'Suspended', issuer: 'Padenga Holdings', country: 'Zimbabwe', source: 'Vendor API', createdBy: 'T. Moyo', updated: '17 Jul 2026 · 10:52' },
+  { id: 7, symbol: 'MSFT', name: 'Microsoft Corporation', isin: 'US5949181045', sedol: '2588173', type: 'Equity', category: 'Listed equity', sector: 'Technology', market: 'NASDAQ', currency: 'USD', price: 512.44, status: 'Active', restriction: 'None', issuer: 'Microsoft Corporation', country: 'United States', source: 'Vendor API', createdBy: 'System import', updated: '14 Jul 2026 · 20:00' },
+]
+
+const card = 'rounded-[24px] border border-white/[0.06] bg-[linear-gradient(135deg,#172333_0%,#101a29_58%,#0b1420_100%)] shadow-[0_20px_60px_rgba(0,0,0,.2)]'
+const pill = 'inline-flex h-9 items-center justify-center gap-2 rounded-full border border-white/10 px-4 text-[11px] font-medium transition hover:border-white/20 hover:bg-white/[0.06]'
+const input = 'h-10 w-full rounded-full border border-white/10 bg-[#0a121d] px-4 text-[11px] outline-none focus:border-[#2f87fa]'
+const PAGE_SIZE = 5
+
 export default function InstrumentsPage() {
-  const dispatch = useAppDispatch()
-  const router = useRouter()
-  const { instruments, instrumentsLoading, instrumentsTotal, instrumentTypes } = useAppSelector((s) => s.investmentOps)
-
-  const [exchange, setExchange] = useState<(typeof EXCHANGES)[number]>('All')
-  const [type, setType] = useState<string>('All')
+  const [items, setItems] = useState(seed)
+  const [category, setCategory] = useState('All')
+  const [status, setStatus] = useState('All statuses')
   const [search, setSearch] = useState('')
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [sortAsc, setSortAsc] = useState(true)
   const [page, setPage] = useState(1)
+  const [selected, setSelected] = useState<Instrument | null>(null)
+  const [createOpen, setCreateOpen] = useState(false)
 
-  useEffect(() => {
-    dispatch(fetchInstrumentTypes())
-  }, [dispatch])
+  const filtered = useMemo(() => items
+    .filter((row) => category === 'All' || row.type === category)
+    .filter((row) => status === 'All statuses' || row.status === status || row.restriction === status)
+    .filter((row) => `${row.symbol} ${row.name} ${row.isin} ${row.sector}`.toLowerCase().includes(search.toLowerCase()))
+    .sort((a, b) => (sortAsc ? 1 : -1) * a.symbol.localeCompare(b.symbol)), [category, items, search, sortAsc, status])
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const rows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  const addInstrument = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const data = new FormData(event.currentTarget)
+    const symbol = String(data.get('symbol')).toUpperCase()
+    setItems((current) => [{ id: Date.now(), symbol, name: String(data.get('name')), isin: String(data.get('isin') || 'Pending'), sedol: 'Pending', type: String(data.get('type')), category: 'New registration', sector: String(data.get('sector')), market: String(data.get('market')), currency: 'USD', price: 0, status: 'Inactive', restriction: 'Restricted', issuer: String(data.get('name')), country: 'Zimbabwe', source: 'Manual registration', createdBy: 'Current user', updated: 'Just now' }, ...current])
+    setCreateOpen(false); setPage(1)
+  }
 
-  useEffect(() => {
-    dispatch(
-      fetchInstruments({
-        exchange: exchange === 'All' ? undefined : exchange,
-        type: type === 'All' ? undefined : type,
-        status: 'APPROVED',
-        page,
-        pageSize: PAGE_SIZE,
-      })
-    )
-  }, [dispatch, exchange, type, page])
-
-  useEffect(() => {
-    setPage(1)
-  }, [exchange, type])
-
-  const filtered = search.trim()
-    ? instruments.filter(
-        (i) =>
-          i.ticker.toLowerCase().includes(search.toLowerCase()) ||
-          i.fullName.toLowerCase().includes(search.toLowerCase()) ||
-          i.instrumentCode.toLowerCase().includes(search.toLowerCase())
-      )
-    : instruments
-
-  const totalPages = Math.max(1, Math.ceil(instrumentsTotal / PAGE_SIZE))
-  const uniqueExchanges = new Set(instruments.map((i) => i.exchangeCode)).size
-  const uniqueCurrencies = new Set(instruments.map((i) => i.listingCurrencyCode)).size
-
-  return (
-    <div className="flex flex-col h-full overflow-hidden">
-      <PageHeader title="Instruments" />
-      <PortfoliosSubNav />
-
-      <div className="flex-1 overflow-y-auto px-5 pb-5 pt-4 space-y-4">
-        {/* Stat strip */}
-        <div className="grid grid-cols-4 gap-3">
-          {[
-            { label: 'Total Instruments', value: instrumentsTotal },
-            { label: 'On This Page', value: instruments.length },
-            { label: 'Exchanges Covered', value: uniqueExchanges },
-            { label: 'Currencies Covered', value: uniqueCurrencies },
-          ].map((s) => (
-            <div key={s.label} className="arcus-card px-4 py-2.5">
-              <div className="text-[10px] uppercase tracking-wider mb-0.5" style={{ color: 'var(--muted-foreground)' }}>
-                {s.label}
-              </div>
-              <div className="text-lg font-semibold font-mono" style={{ color: 'var(--foreground)' }}>
-                {s.value}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Exchange + type filters + search */}
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              {EXCHANGES.map((ex) => (
-                <button key={ex} onClick={() => setExchange(ex)} className={cn('cat-pill', exchange === ex && 'active')}>
-                  {ex}
-                </button>
-              ))}
-            </div>
-            <div className="relative inline-flex">
-              <select
-                value={type}
-                onChange={(e) => setType(e.target.value)}
-                className="sort-pill text-[11px] appearance-none pr-5 cursor-pointer"
-                style={{ background: 'transparent' }}
-              >
-                <option value="All">All Types</option>
-                {instrumentTypes.map((t) => (
-                  <option key={t.id} value={t.typeCode}>
-                    {t.displayName}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3" />
-            </div>
-          </div>
-          <div
-            className="flex items-center gap-1.5 rounded px-2.5 py-1.5"
-            style={{ background: 'var(--muted)', border: '1px solid var(--border)' }}
-          >
-            <Search className="w-3.5 h-3.5" style={{ color: 'var(--muted-foreground)' }} />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Filter this page..."
-              className="bg-transparent text-xs outline-none w-44"
-              style={{ color: 'var(--foreground)' }}
-            />
-          </div>
-        </div>
-
-        {/* Instruments table card */}
-        <div className="arcus-card">
-          <div className="arcus-card-header">
-            <span className="text-[13px] font-semibold" style={{ color: 'var(--foreground)' }}>
-              Instrument Master
-            </span>
-            {instrumentsLoading && <Spinner />}
-          </div>
-          <div className="overflow-x-auto">
-            {instrumentsLoading && instruments.length === 0 ? (
-              <div className="flex items-center justify-center py-10">
-                <Spinner />
-              </div>
-            ) : filtered.length === 0 ? (
-              <div className="py-10 text-center text-[12px]" style={{ color: 'var(--muted-foreground)' }}>
-                No instruments found{search ? ` matching "${search}"` : ''}.
-              </div>
-            ) : (
-              <table className="arcus-table">
-                <thead>
-                  <tr>
-                    <th>Code</th>
-                    <th>Ticker</th>
-                    <th>Full Name</th>
-                    <th>Exchange</th>
-                    <th>Type</th>
-                    <th>Sector</th>
-                    <th>Industry</th>
-                    <th>Currency</th>
-                    <th>Valuation Method</th>
-                    <th>Status</th>
-                    <th />
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((inst) => (
-                    <tr
-                      key={inst.id}
-                      className={cn('cursor-pointer', !inst.listedEquitySecurityId && 'cursor-default')}
-                      onClick={() =>
-                        inst.listedEquitySecurityId &&
-                        router.push(`/investments-v2/portfolios/prices?securityId=${inst.listedEquitySecurityId}`)
-                      }
-                    >
-                      <td className="font-mono text-[11px]" style={{ color: 'var(--muted-foreground)' }}>
-                        {inst.instrumentCode}
-                      </td>
-                      <td className="font-mono font-semibold" style={{ color: '#3b82f6' }}>
-                        {inst.ticker}
-                      </td>
-                      <td style={{ color: 'var(--foreground)' }}>{inst.fullName}</td>
-                      <td style={{ color: 'var(--muted-foreground)' }}>{inst.exchangeCode}</td>
-                      <td style={{ color: 'var(--muted-foreground)' }}>{inst.instrumentTypeCode}</td>
-                      <td style={{ color: 'var(--muted-foreground)' }}>{inst.sector ?? '—'}</td>
-                      <td style={{ color: 'var(--muted-foreground)' }}>{inst.industry ?? '—'}</td>
-                      <td className="font-mono" style={{ color: 'var(--muted-foreground)' }}>
-                        {inst.listingCurrencyCode}
-                      </td>
-                      <td style={{ color: 'var(--muted-foreground)' }}>{inst.valuationMethod}</td>
-                      <td>
-                        <StatusBadge status={inst.status.toLowerCase()} />
-                      </td>
-                      <td>
-                        {inst.listedEquitySecurityId && (
-                          <span className="text-[10px] hover:underline" style={{ color: '#3b82f6' }}>
-                            View Prices
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-
-          {/* Server-side pagination */}
-          {totalPages > 1 && (
-            <div
-              className="flex items-center justify-between px-4 py-2.5"
-              style={{ borderTop: '1px solid var(--border)' }}
-            >
-              <span className="text-[11px]" style={{ color: 'var(--muted-foreground)' }}>
-                Page {page} of {totalPages} · {instrumentsTotal} instruments
-              </span>
-              <div className="flex items-center gap-1">
-                <button className="pg-btn" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}>
-                  ‹
-                </button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-                  <button key={p} onClick={() => setPage(p)} className={cn('pg-btn', page === p && 'active')}>
-                    {p}
-                  </button>
-                ))}
-                <button
-                  className="pg-btn"
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={page >= totalPages}
-                >
-                  ›
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+  return <main className="min-h-full bg-[#05090f] p-3 text-[#edf3fa] sm:p-5">
+    <div className="mx-auto max-w-[1600px] space-y-4">
+      <header className="flex flex-col gap-4 px-1 lg:flex-row lg:items-end lg:justify-between"><div><p className="text-[10px] uppercase tracking-[.24em] text-[#65758b]">Portfolio market</p><h1 className="mt-1 text-xl font-semibold">Instrument registry</h1><p className="mt-1 text-[11px] text-[#77869a]">Central security master and trading controls.</p></div><button onClick={() => setCreateOpen(true)} className={`${pill} border-[#2f87fa] bg-[#2f87fa] text-white`}><Plus className="h-3.5 w-3.5" />Create instrument</button></header>
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{[['Registered', items.length, 'text-white'], ['Active', items.filter((r) => r.status === 'Active').length, 'text-emerald-300'], ['Restricted', items.filter((r) => r.restriction !== 'None').length, 'text-amber-300'], ['Markets', new Set(items.map((r) => r.market)).size, 'text-[#70adff]']].map(([label, value, tone]) => <div key={label} className={`${card} px-5 py-4`}><p className="text-[9px] uppercase tracking-[.16em] text-[#718096]">{label}</p><p className={`mt-2 font-mono text-xl font-semibold ${tone}`}>{value}</p></div>)}</section>
+      <section className={`${card} overflow-visible`}>
+        <div className="border-b border-white/[0.07] p-4"><div className="flex gap-1.5 overflow-x-auto pb-3">{['All', 'Equity', 'Fixed income', 'Fund'].map((item) => <button key={item} onClick={() => { setCategory(item); setPage(1) }} className={`${pill} h-8 shrink-0 px-3 ${category === item ? 'border-[#2f87fa]/60 bg-[#2f87fa]/15 text-white' : 'text-[#8997a9]'}`}>{item}</button>)}</div><div className="flex flex-wrap justify-between gap-2"><label className="flex h-9 min-w-[220px] flex-1 items-center gap-2 rounded-full border border-white/10 bg-[#0b1420] px-4 text-[#7c8a9e] lg:max-w-sm"><Search className="h-3.5 w-3.5" /><input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} placeholder="Search symbol, name or identifier" className="w-full bg-transparent text-[11px] text-white outline-none" /></label><div className="flex gap-2"><div className="relative"><button onClick={() => setFilterOpen((v) => !v)} className={`${pill} text-[#aeb8c7]`}>{status}<ChevronDown className="h-3 w-3" /></button>{filterOpen && <div className="absolute right-0 z-30 mt-2 w-44 rounded-2xl border border-white/10 bg-[#111b29] p-2 shadow-2xl">{['All statuses', 'Active', 'Inactive', 'Restricted', 'Suspended'].map((item) => <button key={item} onClick={() => { setStatus(item); setPage(1); setFilterOpen(false) }} className={`flex w-full items-center justify-between rounded-full px-3 py-2 text-left text-[10px] ${status === item ? 'bg-[#2f87fa] text-white' : 'text-[#9aa8ba] hover:bg-white/[0.06]'}`}>{item}{status === item && <Check className="h-3 w-3" />}</button>)}</div>}</div><button onClick={() => setSortAsc((v) => !v)} className={`${pill} text-[#aeb8c7]`}><ArrowDownUp className="h-3.5 w-3.5" />Symbol {sortAsc ? 'A–Z' : 'Z–A'}</button></div></div></div>
+        <div className="overflow-x-auto"><table className="w-full min-w-[1160px] text-left text-[10px]"><thead className="text-[#6f7e92]"><tr>{['Instrument', 'Identifiers', 'Classification', 'Market', 'Currency', 'Latest price', 'State', 'Restriction', 'Updated'].map((head) => <th key={head} className="border-b border-white/[0.06] px-4 py-3 font-medium">{head}</th>)}</tr></thead><tbody>{rows.map((row) => <tr key={row.id} onClick={() => setSelected(row)} className={`cursor-pointer border-b border-white/[0.045] transition hover:bg-white/[0.035] ${selected?.id === row.id ? 'bg-[#2f87fa]/10' : ''}`}><td className="px-4 py-3"><p className="font-semibold text-white">{row.symbol}</p><p className="mt-1 text-[9px] text-[#78879a]">{row.name}</p></td><td className="px-4 py-3 font-mono text-[#8c9aab]"><p>{row.isin}</p><p className="mt-1 text-[9px]">{row.sedol}</p></td><td className="px-4 py-3"><p>{row.type}</p><p className="mt-1 text-[9px] text-[#78879a]">{row.sector}</p></td><td className="px-4 py-3">{row.market}</td><td className="px-4 py-3 font-mono">{row.currency}</td><td className="px-4 py-3 font-mono font-semibold">{row.price.toFixed(4)}</td><td className="px-4 py-3"><span className={`rounded-full px-2.5 py-1 text-[9px] ${row.status === 'Active' ? 'bg-emerald-400/10 text-emerald-300' : 'bg-slate-400/10 text-slate-300'}`}>{row.status}</span></td><td className="px-4 py-3"><span className={`rounded-full px-2.5 py-1 text-[9px] ${row.restriction === 'None' ? 'bg-white/[.06] text-[#9aa8ba]' : row.restriction === 'Suspended' ? 'bg-rose-400/10 text-rose-300' : 'bg-amber-400/10 text-amber-300'}`}>{row.restriction}</span></td><td className="px-4 py-3 font-mono text-[#7d8b9e]">{row.updated}</td></tr>)}</tbody></table></div>
+        <footer className="flex items-center justify-between px-4 py-3 text-[10px] text-[#718096]"><span>Showing {rows.length} of {filtered.length} instruments</span><div className="flex items-center gap-2"><button disabled={page === 1} onClick={() => setPage((p) => p - 1)} className={`${pill} h-8 w-8 px-0 disabled:opacity-30`}><ChevronLeft className="h-3.5 w-3.5" /></button><span>{page} / {totalPages}</span><button disabled={page === totalPages} onClick={() => setPage((p) => p + 1)} className={`${pill} h-8 w-8 px-0 disabled:opacity-30`}><ChevronRight className="h-3.5 w-3.5" /></button></div></footer>
+      </section>
     </div>
-  )
+    {selected && <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" onMouseDown={() => setSelected(null)}><aside onMouseDown={(e) => e.stopPropagation()} className="absolute right-0 top-0 h-full w-full max-w-xl overflow-y-auto border-l border-white/10 bg-[linear-gradient(145deg,#172333,#0b1420_70%)] p-6 shadow-2xl"><div className="flex items-start justify-between"><div><p className="text-[9px] uppercase tracking-[.2em] text-[#64758b]">Security master</p><h2 className="mt-2 text-lg font-semibold">{selected.name}</h2><p className="mt-1 font-mono text-[10px] text-[#718096]">{selected.symbol} · {selected.market}</p></div><button onClick={() => setSelected(null)} className={`${pill} h-9 w-9 px-0`}><X className="h-4 w-4" /></button></div>{[['Identifiers', [['ISIN', selected.isin], ['SEDOL', selected.sedol], ['Symbol', selected.symbol], ['Market', selected.market]]], ['Classification', [['Asset type', selected.type], ['Category', selected.category], ['Sector', selected.sector], ['Country', selected.country]]], ['Pricing', [['Currency', selected.currency], ['Latest price', selected.price.toFixed(4)], ['Price source', selected.source], ['Issuer', selected.issuer]]], ...(selected.type === 'Fixed income' ? [['Fixed-income terms', [['Coupon', `${selected.coupon}%`], ['Maturity', selected.maturity!], ['Face value', String(selected.faceValue)], ['Quote basis', 'Percentage of par']]]] : []), ['Control & audit', [['Status', selected.status], ['Restriction', selected.restriction], ['Created by', selected.createdBy], ['Last updated', selected.updated]]]].map(([title, fields]) => <section key={String(title)} className="mt-4 rounded-[24px] border border-white/[0.07] bg-black/10 p-5"><h3 className="text-[11px] font-semibold">{String(title)}</h3><dl className="mt-4 grid grid-cols-2 gap-5">{(fields as string[][]).map(([label, value]) => <div key={label}><dt className="text-[9px] uppercase tracking-wider text-[#66768b]">{label}</dt><dd className="mt-1 text-[11px] text-[#c8d0db]">{value}</dd></div>)}</dl></section>)}</aside></div>}
+    {createOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onMouseDown={() => setCreateOpen(false)}><form onSubmit={addInstrument} onMouseDown={(e) => e.stopPropagation()} className={`${card} w-full max-w-lg p-6`}><div className="flex items-center justify-between"><div><p className="text-[9px] uppercase tracking-[.2em] text-[#68788d]">Local prototype</p><h2 className="mt-1 text-lg font-semibold">Create instrument</h2></div><button type="button" onClick={() => setCreateOpen(false)} className={`${pill} h-9 w-9 px-0`}><X className="h-4 w-4" /></button></div><div className="mt-6 grid gap-4 sm:grid-cols-2">{[['symbol', 'Symbol'], ['name', 'Instrument name'], ['isin', 'ISIN'], ['type', 'Asset type'], ['sector', 'Sector'], ['market', 'Market']].map(([name, label]) => <label key={name}><span className="mb-2 block text-[10px] text-[#8795a8]">{label}</span><input name={name} required={name !== 'isin'} className={input} /></label>)}</div><p className="mt-4 flex gap-2 text-[9px] text-amber-200/70"><ShieldAlert className="h-3 w-3" />New records start inactive and restricted pending review.</p><div className="mt-6 flex justify-end gap-2"><button type="button" onClick={() => setCreateOpen(false)} className={`${pill} text-[#aab5c4]`}>Cancel</button><button className={`${pill} border-[#2f87fa] bg-[#2f87fa] text-white`}>Create locally</button></div></form></div>}
+  </main>
 }

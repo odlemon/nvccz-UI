@@ -1,250 +1,54 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
-import { PageHeader } from '@/components/investments-v2/page-header'
-import { PortfoliosSubNav } from '@/components/investments-v2/portfolios-subnav'
-import { StatusBadge } from '@/components/arcus/status-badge'
-import { cn } from '@/lib/utils'
-import { Filter, Download, Search, Loader2, Folder, FolderOpen } from 'lucide-react'
-import { useAppDispatch, useAppSelector } from '@/lib/store'
-import { fetchPortfolios, fetchPortfolioTransactions, setOpsSelectedFundId } from '@/lib/store/slices/investmentOpsSlice'
-import { Button } from '@/components/ui/button'
-import { DatePicker } from '@/components/ui/date-picker'
-import { useThemeContainer } from '@/components/investments-v2/ui/use-theme-container'
-import { exportRowsToCsv } from '@/components/investments-v2/ui/export-csv'
-import { useSortedPaginated } from '@/components/investments-v2/ui/use-sorted-paginated'
-import { SortableTh } from '@/components/investments-v2/ui/sortable-th'
-import { TablePagination } from '@/components/investments-v2/ui/table-pagination'
+import { useMemo, useState } from 'react'
+import { ArrowDownUp, Check, ChevronDown, ChevronLeft, ChevronRight, Folder, FolderOpen, Link2, Search, SlidersHorizontal, X } from 'lucide-react'
 
-const TXN_TYPES = ['All', 'PURCHASE', 'SALE'] as const
-
-type TxnSortKey = 'tradeRef' | 'symbol' | 'quantity' | 'price' | 'tradeDate' | 'realizedPnl'
-
-function Spinner() {
-  return <Loader2 className="w-4 h-4 animate-spin" style={{ color: 'var(--muted-foreground)' }} />
-}
+type TxnType = 'Purchase' | 'Sale' | 'Dividend' | 'Interest' | 'Corporate Action' | 'Fee' | 'Manual Adjustment'
+type Transaction = { id: number; portfolio: string; ref: string; date: string; type: TxnType; instrument: string; description: string; quantity: number | null; price: number | null; amount: number; currency: string; status: 'Posted' | 'Pending' | 'Reversed'; tradeRef: string; valuationRef: string; journalRef: string; documentRef: string }
+const portfolios = ['Equity World', 'Multi Asset', 'Fixed Income', 'Asia Select']
+const transactions: Transaction[] = [
+  { id: 1, portfolio: 'Equity World', ref: 'TXN-260717-041', date: '17 Jul 2026 · 12:48', type: 'Purchase', instrument: 'MSFT', description: 'Microsoft Corporation', quantity: 120, price: 512.44, amount: -61492.8, currency: 'USD', status: 'Posted', tradeRef: 'TRD-892104', valuationRef: 'VAL-260717-114', journalRef: 'JE-260717-092', documentRef: 'CN-MSFT-0717.pdf' },
+  { id: 2, portfolio: 'Equity World', ref: 'TXN-260717-038', date: '17 Jul 2026 · 11:32', type: 'Dividend', instrument: 'AAPL', description: 'Apple Inc. quarterly dividend', quantity: 1440, price: .25, amount: 360, currency: 'USD', status: 'Posted', tradeRef: 'CA-2026-AAPL-Q2', valuationRef: 'VAL-260717-108', journalRef: 'JE-260717-086', documentRef: 'DIV-AAPL-Q2.pdf' },
+  { id: 3, portfolio: 'Multi Asset', ref: 'TXN-260717-031', date: '17 Jul 2026 · 10:14', type: 'Sale', instrument: 'DLTA', description: 'Delta Corporation Limited', quantity: 10000, price: 1.2845, amount: 12845, currency: 'USD', status: 'Pending', tradeRef: 'TRD-891968', valuationRef: 'VAL-PENDING', journalRef: 'JE-PENDING', documentRef: 'CN-DLTA-0717.pdf' },
+  { id: 4, portfolio: 'Fixed Income', ref: 'TXN-260716-117', date: '16 Jul 2026 · 16:05', type: 'Interest', instrument: 'CBZ28', description: 'CBZ Note coupon receipt', quantity: 8000, price: null, amount: 41000, currency: 'USD', status: 'Posted', tradeRef: 'CPN-CBZ28-07', valuationRef: 'VAL-260716-339', journalRef: 'JE-260716-271', documentRef: 'CPN-CBZ28.pdf' },
+  { id: 5, portfolio: 'Equity World', ref: 'TXN-260716-102', date: '16 Jul 2026 · 14:22', type: 'Fee', instrument: 'USD', description: 'Custody and settlement fees', quantity: null, price: null, amount: -242.5, currency: 'USD', status: 'Posted', tradeRef: 'FEE-CUST-0716', valuationRef: 'VAL-260716-301', journalRef: 'JE-260716-245', documentRef: 'INV-CUST-716.pdf' },
+  { id: 6, portfolio: 'Multi Asset', ref: 'TXN-260716-089', date: '16 Jul 2026 · 13:10', type: 'Corporate Action', instrument: 'ECO', description: 'Share consolidation 10:1', quantity: 45000, price: null, amount: 0, currency: 'ZWG', status: 'Posted', tradeRef: 'CA-ECO-2026-04', valuationRef: 'VAL-260716-288', journalRef: 'JE-260716-230', documentRef: 'CA-ECO-NOTICE.pdf' },
+  { id: 7, portfolio: 'Asia Select', ref: 'TXN-260715-076', date: '15 Jul 2026 · 09:41', type: 'Purchase', instrument: '7203', description: 'Toyota Motor Corporation', quantity: 1200, price: 2814, amount: -3376800, currency: 'JPY', status: 'Posted', tradeRef: 'TRD-890774', valuationRef: 'VAL-260715-210', journalRef: 'JE-260715-182', documentRef: 'CN-7203-0715.pdf' },
+  { id: 8, portfolio: 'Fixed Income', ref: 'TXN-260714-055', date: '14 Jul 2026 · 15:51', type: 'Manual Adjustment', instrument: 'USD', description: 'Cash reconciliation adjustment', quantity: null, price: null, amount: 175.25, currency: 'USD', status: 'Reversed', tradeRef: 'ADJ-260714-11', valuationRef: 'VAL-260714-198', journalRef: 'JE-260714-164', documentRef: 'RECON-1407.xlsx' },
+  { id: 9, portfolio: 'Equity World', ref: 'TXN-260714-044', date: '14 Jul 2026 · 12:24', type: 'Sale', instrument: 'SHEL', description: 'Shell PLC', quantity: 500, price: 27.12, amount: 13560, currency: 'GBP', status: 'Posted', tradeRef: 'TRD-890112', valuationRef: 'VAL-260714-162', journalRef: 'JE-260714-130', documentRef: 'CN-SHEL-0714.pdf' },
+]
+const types = ['All', 'Purchase', 'Sale', 'Dividend', 'Interest', 'Corporate Action', 'Fee', 'Manual Adjustment']
+const card = 'rounded-[24px] border border-white/[0.06] bg-[linear-gradient(135deg,#172333_0%,#101a29_58%,#0b1420_100%)] shadow-[0_20px_60px_rgba(0,0,0,.2)]'
+const pill = 'inline-flex h-9 items-center justify-center gap-2 rounded-full border border-white/10 px-4 text-[11px] font-medium transition hover:border-white/20 hover:bg-white/[0.06]'
+const typeTone: Record<TxnType, string> = { Purchase: 'bg-emerald-400/10 text-emerald-300', Sale: 'bg-rose-400/10 text-rose-300', Dividend: 'bg-violet-400/10 text-violet-300', Interest: 'bg-sky-400/10 text-sky-300', 'Corporate Action': 'bg-amber-400/10 text-amber-300', Fee: 'bg-orange-400/10 text-orange-300', 'Manual Adjustment': 'bg-fuchsia-400/10 text-fuchsia-300' }
 
 export default function TransactionsPage() {
-  const dispatch = useAppDispatch()
-  const { portfolios, portfoliosLoading, selectedFundId, portfolioTransactions, portfolioTransactionsLoading } =
-    useAppSelector((s) => s.investmentOps)
-  const { ref: rootRef, container: themeContainer } = useThemeContainer()
-
-  const [typeFilter, setTypeFilter] = useState<(typeof TXN_TYPES)[number]>('All')
+  const [portfolio, setPortfolio] = useState(portfolios[0])
+  const [type, setType] = useState('All')
+  const [status, setStatus] = useState('All statuses')
   const [search, setSearch] = useState('')
-  const [showFilters, setShowFilters] = useState(false)
-  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined)
-  const [dateTo, setDateTo] = useState<Date | undefined>(undefined)
-
-  useEffect(() => {
-    dispatch(fetchPortfolios())
-  }, [dispatch])
-
-  useEffect(() => {
-    if (selectedFundId) dispatch(fetchPortfolioTransactions(selectedFundId))
-  }, [dispatch, selectedFundId])
-
-  const filtered = useMemo(() => {
-    return portfolioTransactions.filter((t) => {
-      const matchType = typeFilter === 'All' || t.type === typeFilter
-      const matchSearch =
-        !search ||
-        t.symbol.toLowerCase().includes(search.toLowerCase()) ||
-        t.tradeRef.toLowerCase().includes(search.toLowerCase())
-      const tradeDate = new Date(t.tradeDate)
-      const matchFrom = !dateFrom || tradeDate >= dateFrom
-      const matchTo = !dateTo || tradeDate <= new Date(dateTo.getTime() + 24 * 60 * 60 * 1000 - 1)
-      return matchType && matchSearch && matchFrom && matchTo
-    })
-  }, [portfolioTransactions, typeFilter, search, dateFrom, dateTo])
-
-  const getTxnSortValue = (t: (typeof portfolioTransactions)[number], key: TxnSortKey) => {
-    if (key === 'tradeDate') return new Date(t.tradeDate).getTime()
-    if (key === 'realizedPnl') return t.realizedPnl ?? 0
-    return t[key]
-  }
-  const {
-    pageRows,
-    sortKey,
-    sortDir,
-    toggleSort,
-    page,
-    setPage,
-    totalPages,
-    totalRows,
-  } = useSortedPaginated<(typeof portfolioTransactions)[number], TxnSortKey>(filtered, getTxnSortValue, 'tradeDate', 12)
-
-  const handleExport = () => {
-    exportRowsToCsv(
-      `transactions-${new Date().toISOString().slice(0, 10)}.csv`,
-      ['Trade Ref', 'Symbol', 'Type', 'Quantity', 'Price', 'Status', 'Trade Date', 'Journal Entry', 'Realized P&L'],
-      filtered.map((txn) => [
-        txn.tradeRef,
-        txn.symbol,
-        txn.type === 'PURCHASE' ? 'BUY' : 'SELL',
-        txn.quantity,
-        txn.price,
-        txn.status,
-        new Date(txn.tradeDate).toLocaleString(),
-        txn.journalEntryId ? new Date(txn.tradeDate).toLocaleString() : '',
-        txn.realizedPnl ?? '',
-      ])
-    )
-  }
-
-  return (
-    <div ref={rootRef} className="flex flex-col h-full overflow-hidden">
-      <PageHeader title="Transactions" />
-      <PortfoliosSubNav />
-
-      <div className="flex-1 overflow-y-auto px-5 pb-5 pt-4 space-y-4">
-        {/* Fund tabs */}
-        <div className="flex items-center gap-2 flex-wrap">
-          {portfoliosLoading ? (
-            <Spinner />
-          ) : portfolios.length === 0 ? (
-            <span className="text-[12px]" style={{ color: 'var(--muted-foreground)' }}>No funds available</span>
-          ) : (
-            portfolios.map((fund) => (
-              <button
-                key={fund.id}
-                onClick={() => dispatch(setOpsSelectedFundId(fund.id))}
-                className={cn('folder-tab', selectedFundId === fund.id && 'active')}
-              >
-                {selectedFundId === fund.id ? (
-                  <FolderOpen className="w-3.5 h-3.5 flex-shrink-0" />
-                ) : (
-                  <Folder className="w-3.5 h-3.5 flex-shrink-0" />
-                )}
-                {fund.name}
-              </button>
-            ))
-          )}
-        </div>
-
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {TXN_TYPES.map((t) => (
-              <button key={t} onClick={() => setTypeFilter(t)} className={cn('cat-pill', typeFilter === t && 'active')}>
-                {t === 'All' ? 'All' : t === 'PURCHASE' ? 'Buy' : 'Sell'}
-              </button>
-            ))}
-          </div>
-          <div className="flex items-center gap-2">
-            <div
-              className="flex items-center gap-1.5 rounded-full px-2.5 py-1.5"
-              style={{ background: 'var(--muted)', border: '1px solid var(--border)' }}
-            >
-              <Search className="w-3.5 h-3.5" style={{ color: 'var(--muted-foreground)' }} />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search symbol or trade ref..."
-                className="bg-transparent text-xs outline-none w-40"
-                style={{ color: 'var(--foreground)' }}
-              />
-            </div>
-            <Button variant="outline" size="pill" onClick={() => setShowFilters((v) => !v)}>
-              <Filter className="w-3 h-3" /> Filter
-            </Button>
-            <Button variant="outline" size="pill" onClick={handleExport}>
-              <Download className="w-3 h-3" /> Export
-            </Button>
-          </div>
-        </div>
-
-        {showFilters && (
-          <div className="flex items-center gap-2 flex-wrap arcus-card px-4 py-3">
-            <span className="text-[11px]" style={{ color: 'var(--muted-foreground)' }}>Trade date range:</span>
-            <DatePicker value={dateFrom} onChange={setDateFrom} placeholder="From date" className="w-40" allowFutureDates container={themeContainer} />
-            <DatePicker value={dateTo} onChange={setDateTo} placeholder="To date" className="w-40" allowFutureDates container={themeContainer} />
-            {(dateFrom || dateTo) && (
-              <Button variant="ghost" size="sm" onClick={() => { setDateFrom(undefined); setDateTo(undefined) }}>
-                Clear
-              </Button>
-            )}
-          </div>
-        )}
-
-        <div className="arcus-card">
-          <div className="arcus-card-header">
-            <span className="text-[13px] font-semibold" style={{ color: 'var(--foreground)' }}>
-              Transactions
-            </span>
-            {portfolioTransactionsLoading && <Spinner />}
-          </div>
-          <div className="overflow-x-auto">
-            {portfolioTransactionsLoading && portfolioTransactions.length === 0 ? (
-              <div className="flex items-center justify-center py-10">
-                <Spinner />
-              </div>
-            ) : pageRows.length === 0 ? (
-              <div className="py-10 text-center text-[12px]" style={{ color: 'var(--muted-foreground)' }}>
-                No transactions found{search ? ` matching "${search}"` : ''}.
-              </div>
-            ) : (
-              <table className="arcus-table">
-                <thead>
-                  <tr>
-                    <SortableTh col="tradeRef" label="Trade Ref" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
-                    <SortableTh col="symbol" label="Symbol" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
-                    <th>Type</th>
-                    <SortableTh col="quantity" label="Quantity" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} align="right" />
-                    <SortableTh col="price" label="Price" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} align="right" />
-                    <th>Status</th>
-                    <SortableTh col="tradeDate" label="Trade Date" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
-                    <th>Journal Entry</th>
-                    <SortableTh col="realizedPnl" label="Realized P&L" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} align="right" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {pageRows.map((txn) => (
-                    <tr key={txn.id} className="cursor-pointer">
-                      <td className="font-mono text-[11px]" style={{ color: '#3b82f6' }}>
-                        {txn.tradeRef}
-                      </td>
-                      <td className="font-mono font-semibold" style={{ color: 'var(--foreground)' }}>
-                        {txn.symbol}
-                      </td>
-                      <td>
-                        <span
-                          className="text-xs font-semibold"
-                          style={{ color: txn.type === 'PURCHASE' ? '#10b981' : '#ef4444' }}
-                        >
-                          {txn.type === 'PURCHASE' ? 'BUY' : 'SELL'}
-                        </span>
-                      </td>
-                      <td className="text-right font-mono" style={{ color: 'var(--foreground)' }}>
-                        {txn.quantity.toLocaleString()}
-                      </td>
-                      <td className="text-right font-mono" style={{ color: 'var(--foreground)' }}>
-                        {txn.price.toFixed(4)}
-                      </td>
-                      <td>
-                        <StatusBadge status={txn.status.toLowerCase().replace(/_/g, ' ')} />
-                      </td>
-                      <td className="font-mono text-[11px]" style={{ color: 'var(--muted-foreground)' }}>
-                        {new Date(txn.tradeDate).toLocaleString()}
-                      </td>
-                      <td className="font-mono text-[11px]" style={{ color: txn.journalEntryId ? '#10b981' : 'var(--muted-foreground)' }}>
-                        {txn.journalEntryId ? new Date(txn.tradeDate).toLocaleString() : '—'}
-                      </td>
-                      <td
-                        className="text-right font-mono"
-                        style={{ color: txn.realizedPnl == null ? 'var(--muted-foreground)' : txn.realizedPnl >= 0 ? '#10b981' : '#ef4444' }}
-                      >
-                        {txn.realizedPnl != null ? `${txn.realizedPnl >= 0 ? '+' : ''}${txn.realizedPnl.toLocaleString()}` : '—'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-
-          <TablePagination page={page} totalPages={totalPages} onPageChange={setPage} rowsShown={pageRows.length} totalRows={totalRows} />
-        </div>
-      </div>
-    </div>
-  )
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [sort, setSort] = useState<'date' | 'amount'>('date')
+  const [page, setPage] = useState(1)
+  const [selected, setSelected] = useState<Transaction | null>(null)
+  const [notice, setNotice] = useState('')
+  const rows = useMemo(() => transactions.filter((row) => row.portfolio === portfolio).filter((row) => type === 'All' || row.type === type).filter((row) => status === 'All statuses' || row.status === status).filter((row) => !search || `${row.ref} ${row.instrument} ${row.description} ${row.tradeRef}`.toLowerCase().includes(search.toLowerCase())).sort((a, b) => sort === 'date' ? a.id - b.id : Math.abs(b.amount) - Math.abs(a.amount)), [portfolio, search, sort, status, type])
+  const totalPages = Math.max(1, Math.ceil(rows.length / 5))
+  const pageRows = rows.slice((page - 1) * 5, page * 5)
+  const portfolioRows = transactions.filter((row) => row.portfolio === portfolio)
+  const purchases = portfolioRows.filter((row) => row.type === 'Purchase').reduce((sum, row) => sum + Math.abs(row.amount), 0)
+  const sales = portfolioRows.filter((row) => row.type === 'Sale').reduce((sum, row) => sum + row.amount, 0)
+  const income = portfolioRows.filter((row) => row.type === 'Dividend' || row.type === 'Interest').reduce((sum, row) => sum + row.amount, 0)
+  const flash = (value: string) => { setNotice(`${value} opened locally`); window.setTimeout(() => setNotice(''), 1600) }
+  return <main className="min-h-full bg-[#05090f] p-3 text-[#edf3fa] sm:p-5"><div className="mx-auto max-w-[1600px] space-y-4">
+    <header className="px-1"><p className="text-[10px] uppercase tracking-[.24em] text-[#65758b]">Portfolio market</p><h1 className="mt-1 text-xl font-semibold">Transactions</h1><p className="mt-1 text-[11px] text-[#77869a]">Portfolio activity with linked trade, valuation and accounting records.</p></header>
+    <nav className="flex gap-2 overflow-x-auto pb-1">{portfolios.map((item) => <button key={item} onClick={() => { setPortfolio(item); setPage(1); setSelected(null) }} className={`${pill} h-10 shrink-0 ${portfolio === item ? 'border-[#2f87fa]/60 bg-[#2f87fa]/15 text-white' : 'text-[#8997a9]'}`}>{portfolio === item ? <FolderOpen className="h-3.5 w-3.5 text-[#5d9df3]" /> : <Folder className="h-3.5 w-3.5" />}{item}</button>)}</nav>
+    <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{[['Transactions', portfolioRows.length], ['Purchases', `$${purchases.toLocaleString()}`], ['Sales', `$${sales.toLocaleString()}`], ['Income received', `$${income.toLocaleString()}`]].map(([label, value]) => <div key={label} className={`${card} px-5 py-4`}><p className="text-[9px] uppercase tracking-[.16em] text-[#718096]">{label}</p><p className="mt-2 font-mono text-xl font-semibold">{value}</p></div>)}</section>
+    <section className={`${card} overflow-visible`}><div className="border-b border-white/[0.07] p-4"><div className="flex gap-1.5 overflow-x-auto pb-2">{types.map((item) => <button key={item} onClick={() => { setType(item); setPage(1) }} className={`${pill} h-8 shrink-0 px-3 ${type === item ? 'border-[#2f87fa]/60 bg-[#2f87fa]/15 text-white' : 'text-[#8997a9]'}`}>{item}</button>)}</div><div className="mt-2 flex flex-wrap items-center justify-between gap-3"><div><p className="text-[11px] font-semibold">{portfolio} activity</p><p className="mt-1 text-[9px] text-[#6f7e92]">Settlement and accounting status shown at record level.</p></div><div className="flex flex-wrap gap-2"><label className="flex h-9 min-w-[220px] flex-1 items-center gap-2 rounded-full border border-white/10 bg-[#0b1420] px-4 text-[#7c8a9e]"><Search className="h-3.5 w-3.5" /><input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} placeholder="Search reference or instrument" className="w-full bg-transparent text-[11px] text-white outline-none" /></label><button onClick={() => { setSort((value) => value === 'date' ? 'amount' : 'date'); setPage(1) }} className={`${pill} text-[#aeb8c7]`}><ArrowDownUp className="h-3.5 w-3.5" />{sort === 'date' ? 'Newest first' : 'Largest amount'}</button><div className="relative"><button onClick={() => setFilterOpen((v) => !v)} className={`${pill} text-[#aeb8c7]`}><SlidersHorizontal className="h-3.5 w-3.5" />{status}<ChevronDown className="h-3 w-3" /></button>{filterOpen && <div className="absolute right-0 z-30 mt-2 w-44 rounded-2xl border border-white/10 bg-[#111b29] p-2 shadow-2xl">{['All statuses', 'Posted', 'Pending', 'Reversed'].map((item) => <button key={item} onClick={() => { setStatus(item); setPage(1); setFilterOpen(false) }} className={`flex w-full items-center justify-between rounded-full px-3 py-2 text-left text-[10px] ${status === item ? 'bg-[#2f87fa] text-white' : 'text-[#9aa8ba] hover:bg-white/[0.06]'}`}>{item}{status === item && <Check className="h-3 w-3" />}</button>)}</div>}</div></div></div></div>
+    <div className="overflow-x-auto"><table className="w-full min-w-[1150px] text-left text-[10px]"><thead className="text-[#6f7e92]"><tr>{['Transaction', 'Date', 'Type', 'Instrument', 'Quantity', 'Price', 'Net amount', 'Currency', 'Status', 'Linked records'].map((head) => <th key={head} className={`border-b border-white/[0.06] px-4 py-3 font-medium ${['Quantity', 'Price', 'Net amount'].includes(head) ? 'text-right' : ''}`}>{head}</th>)}</tr></thead><tbody>{pageRows.map((row) => <tr key={row.id} onClick={() => setSelected(row)} className={`cursor-pointer border-b border-white/[0.045] transition hover:bg-white/[0.035] ${selected?.id === row.id ? 'bg-[#2f87fa]/10' : ''}`}><td className="px-4 py-3 font-mono text-[#70adff]">{row.ref}</td><td className="px-4 py-3 font-mono text-[#7d8b9e]">{row.date}</td><td className="px-4 py-3"><span className={`whitespace-nowrap rounded-full px-2.5 py-1 text-[9px] ${typeTone[row.type]}`}>{row.type}</span></td><td className="px-4 py-3"><p className="font-semibold text-white">{row.instrument}</p><p className="mt-1 text-[9px] text-[#78879a]">{row.description}</p></td><td className="px-4 py-3 text-right font-mono">{row.quantity?.toLocaleString() ?? '—'}</td><td className="px-4 py-3 text-right font-mono text-[#a6b1c0]">{row.price?.toFixed(4) ?? '—'}</td><td className={`px-4 py-3 text-right font-mono font-semibold ${row.amount >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>{row.amount >= 0 ? '+' : ''}{row.amount.toLocaleString()}</td><td className="px-4 py-3 font-mono">{row.currency}</td><td className="px-4 py-3"><span className={`rounded-full px-2.5 py-1 text-[9px] ${row.status === 'Posted' ? 'bg-emerald-400/10 text-emerald-300' : row.status === 'Pending' ? 'bg-amber-400/10 text-amber-300' : 'bg-rose-400/10 text-rose-300'}`}>{row.status}</span></td><td className="px-4 py-3"><button onClick={(e) => { e.stopPropagation(); setSelected(row) }} className={`${pill} h-7 px-3 text-[#8ebcff]`}><Link2 className="h-3 w-3" />View 4</button></td></tr>)}</tbody></table></div>
+    <footer className="flex items-center justify-between px-4 py-3 text-[10px] text-[#718096]"><span>Showing {pageRows.length} of {rows.length} transactions</span><div className="flex items-center gap-2"><button disabled={page === 1} onClick={() => setPage((p) => p - 1)} className={`${pill} h-8 w-8 px-0 disabled:opacity-30`}><ChevronLeft className="h-3.5 w-3.5" /></button><span>{page} / {totalPages}</span><button disabled={page === totalPages} onClick={() => setPage((p) => p + 1)} className={`${pill} h-8 w-8 px-0 disabled:opacity-30`}><ChevronRight className="h-3.5 w-3.5" /></button></div></footer></section>
+  </div>
+  {notice && <div className="fixed bottom-5 right-5 z-[80] rounded-full border border-white/10 bg-[#172333] px-4 py-2 text-[11px] shadow-2xl"><Check className="mr-2 inline h-3.5 w-3.5 text-emerald-300" />{notice}</div>}
+  {selected && <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" onMouseDown={() => setSelected(null)}><aside onMouseDown={(e) => e.stopPropagation()} className="absolute right-0 top-0 h-full w-full max-w-xl overflow-y-auto border-l border-white/10 bg-[linear-gradient(145deg,#172333,#0b1420_70%)] p-6 shadow-2xl"><div className="flex items-start justify-between"><div><p className="text-[9px] uppercase tracking-[.2em] text-[#64758b]">Linked record</p><h2 className="mt-2 text-lg font-semibold">{selected.ref}</h2><p className="mt-1 text-[10px] text-[#718096]">{selected.description}</p></div><button onClick={() => setSelected(null)} className={`${pill} h-9 w-9 px-0`}><X className="h-4 w-4" /></button></div><div className="mt-6 grid grid-cols-2 gap-3">{[['Net amount', `${selected.amount >= 0 ? '+' : ''}${selected.amount.toLocaleString()} ${selected.currency}`], ['Status', selected.status], ['Transaction type', selected.type], ['Effective date', selected.date]].map(([label, value]) => <div key={label} className="rounded-[20px] border border-white/[0.07] bg-black/10 p-4"><p className="text-[9px] uppercase tracking-wider text-[#66768b]">{label}</p><p className="mt-2 text-[11px]">{value}</p></div>)}</div><div className="mt-5 space-y-3">{[['Trade record', selected.tradeRef, 'Execution, broker and settlement instructions'], ['Valuation record', selected.valuationRef, 'Position valuation generated from this activity'], ['Accounting record', selected.journalRef, 'General ledger journal and posting state'], ['Document reference', selected.documentRef, 'Source advice, confirmation or supporting file']].map(([label, value, note]) => <button key={label} onClick={() => flash(label)} className="flex w-full items-center justify-between rounded-[20px] border border-white/[0.07] bg-black/10 p-4 text-left transition hover:border-[#2f87fa]/30 hover:bg-[#2f87fa]/[0.06]"><div><p className="text-[9px] uppercase tracking-wider text-[#67778c]">{label}</p><p className="mt-1 font-mono text-[11px] text-[#8ebcff]">{value}</p><p className="mt-1 text-[9px] text-[#68778a]">{note}</p></div><Link2 className="h-4 w-4 text-[#5d7798]" /></button>)}</div></aside></div>}
+  </main>
 }

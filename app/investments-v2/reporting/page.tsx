@@ -2,10 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { format } from 'date-fns'
-import { PageHeader } from '@/components/investments-v2/page-header'
 import { StatusBadge } from '@/components/arcus/status-badge'
 import { cn } from '@/lib/utils'
-import { Check, ChevronsUpDown, Download, FileText, Plus, X } from 'lucide-react'
+import { Check, ChevronsUpDown, Download, FileText, Loader2, Plus, Search, X } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '@/lib/store'
 import { fetchPortfolios, fetchReportTemplates, fetchReports, generateReport } from '@/lib/store/slices/investmentOpsSlice'
 import { investmentOpsApi } from '@/lib/api/investment-ops-api'
@@ -227,274 +226,242 @@ export default function ReportingPage() {
     }
   }
 
+  const completedReports = reportRuns.filter((run) => run.status.toUpperCase() === 'COMPLETED').length
+  const processingReports = reportRuns.filter((run) => run.status.toUpperCase() === 'PROCESSING').length
+
   return (
-    <div ref={rootRef} className="flex flex-col h-full w-full">
-      <PageHeader title="Reporting" />
-
-      <div className="flex items-center gap-4 px-4 pt-3 pb-0 border-b flex-shrink-0 overflow-x-auto" style={{ borderColor: 'var(--border)' }}>
-        {scopeTabs.map(t => (
-          <button key={t} onClick={() => setActiveTab(t)}
-            className={cn('text-xs pb-2 border-b-2 whitespace-nowrap', activeTab === t ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground')}>
-            {t}
-          </button>
-        ))}
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {/* Report templates */}
-        <div className="grid grid-cols-6 gap-3">
-          {visibleTemplates.map(tmpl => (
-            <button
-              key={tmpl.code}
-              onClick={() => handlePickTemplate(tmpl.code)}
-              className="bg-card border border-border rounded-md p-3 text-left hover:border-primary/40 transition-colors"
-            >
-              <div className="w-8 h-8 rounded bg-accent flex items-center justify-center mb-2">
-                <FileText className="w-4 h-4 text-accent-foreground" />
-              </div>
-              <div className="text-[11px] font-semibold text-foreground leading-tight">{tmpl.name}</div>
-              <div className="text-[10px] text-muted-foreground mt-0.5 leading-tight">{tmpl.description}</div>
-            </button>
-          ))}
-          {visibleTemplates.length === 0 && !reportTemplatesLoading && (
-            <div className="col-span-6 text-center py-6 text-[12px] text-muted-foreground">No report templates available.</div>
-          )}
-        </div>
-
-        {/* Report library */}
-        <div className="bg-card border border-border rounded-md overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-2.5 border-b border-border">
-            <div className="text-xs font-semibold text-foreground">Report Library</div>
-            <Button variant="default" size="pill" onClick={() => setShowGenerate(true)}>
-              <Plus className="w-3 h-3" /> Generate Report
-            </Button>
-          </div>
-
-          {showGenerate && (
-            <div className="p-4 border-b border-border">
-              <div className="flex items-center justify-between mb-3">
-                <div className="text-[12px] font-semibold text-foreground">Generate Report</div>
-                <button onClick={() => setShowGenerate(false)} className="text-muted-foreground hover:text-destructive">
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="text-[10px] text-muted-foreground uppercase tracking-wider block mb-1">Report Type</label>
-                  <Popover open={reportTypeComboOpen} onOpenChange={setReportTypeComboOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        aria-expanded={reportTypeComboOpen}
-                        className="w-full justify-between rounded-full font-normal"
-                      >
-                        <span className="truncate">{selectedTemplate?.name ?? 'Select report type…'}</span>
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[260px] p-0" align="start" container={themeContainer}>
-                      <Command>
-                        <CommandInput placeholder="Search report type…" />
-                        <CommandList>
-                          <CommandEmpty>No report types found.</CommandEmpty>
-                          <CommandGroup>
-                            {reportTemplates.map((t) => (
-                              <CommandItem
-                                key={t.code}
-                                value={t.name}
-                                onSelect={() => {
-                                  handleReportTypeChange(t.code)
-                                  setReportTypeComboOpen(false)
-                                }}
-                              >
-                                <Check className={cn('mr-2 h-4 w-4', form.reportType === t.code ? 'opacity-100' : 'opacity-0')} />
-                                {t.name}
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-                <div>
-                  <label className="text-[10px] text-muted-foreground uppercase tracking-wider block mb-1">Format</label>
-                  <Select value={form.format} onValueChange={(v) => setForm((p) => ({ ...p, format: v }))}>
-                    <SelectTrigger className="w-full rounded-full bg-muted border-input text-foreground">
-                      <SelectValue placeholder="Select format…" />
-                    </SelectTrigger>
-                    <SelectContent container={themeContainer}>
-                      {(selectedTemplate?.supportedFormats ?? []).map((f) => (
-                        <SelectItem key={f} value={f}>{f}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                {selectedTemplate?.requiresFundId && (
-                  <div>
-                    <label className="text-[10px] text-muted-foreground uppercase tracking-wider block mb-1">Fund</label>
-                    <Input value={fundName(selectedFundId) ?? '—'} disabled readOnly className="bg-muted border-input text-foreground" />
-                  </div>
-                )}
-                {selectedTemplate?.requiresClientId && (
-                  <div>
-                    <label className="text-[10px] text-muted-foreground uppercase tracking-wider block mb-1">Client ID</label>
-                    <Input
-                      value={form.clientId}
-                      onChange={(e) => setForm((p) => ({ ...p, clientId: e.target.value }))}
-                      placeholder="Client mandate ID"
-                      className="font-mono bg-muted border-input text-foreground"
-                    />
-                  </div>
-                )}
-                {paramFields.includes('periodStart') && (
-                  <div>
-                    <label className="text-[10px] text-muted-foreground uppercase tracking-wider block mb-1">Period Start</label>
-                    <DatePicker value={form.periodStart} onChange={(d) => setForm((p) => ({ ...p, periodStart: d }))} className="w-full" container={themeContainer} />
-                  </div>
-                )}
-                {paramFields.includes('periodEnd') && (
-                  <div>
-                    <label className="text-[10px] text-muted-foreground uppercase tracking-wider block mb-1">Period End</label>
-                    <DatePicker value={form.periodEnd} onChange={(d) => setForm((p) => ({ ...p, periodEnd: d }))} className="w-full" container={themeContainer} />
-                  </div>
-                )}
-                {paramFields.includes('valuationDate') && (
-                  <div>
-                    <label className="text-[10px] text-muted-foreground uppercase tracking-wider block mb-1">Valuation Date</label>
-                    <DatePicker value={form.valuationDate} onChange={(d) => setForm((p) => ({ ...p, valuationDate: d }))} className="w-full" container={themeContainer} />
-                  </div>
-                )}
-                {paramFields.includes('benchmarkName') && (
-                  <div>
-                    <label className="text-[10px] text-muted-foreground uppercase tracking-wider block mb-1">Benchmark Name</label>
-                    <Input
-                      value={form.benchmarkName}
-                      onChange={(e) => setForm((p) => ({ ...p, benchmarkName: e.target.value }))}
-                      placeholder="e.g. ZSE Industrial Index"
-                      className="bg-muted border-input text-foreground"
-                    />
-                  </div>
-                )}
-                {paramFields.includes('assetManagerName') && (
-                  <div>
-                    <label className="text-[10px] text-muted-foreground uppercase tracking-wider block mb-1">Asset Manager Name</label>
-                    <Input
-                      value={form.assetManagerName}
-                      onChange={(e) => setForm((p) => ({ ...p, assetManagerName: e.target.value }))}
-                      placeholder="e.g. Arcus Asset Management"
-                      className="bg-muted border-input text-foreground"
-                    />
-                  </div>
-                )}
-                {paramFields.length === 0 && !selectedTemplate?.requiresFundId && !selectedTemplate?.requiresClientId && (
-                  <div className="col-span-3 text-[11px] text-muted-foreground">
-                    This report type takes no additional parameters.
-                  </div>
-                )}
-              </div>
-              {formError && <div className="text-[11px] text-destructive mt-2">{formError}</div>}
-              <div className="flex items-center justify-end gap-2 mt-3">
-                <Button variant="outline" size="pill" onClick={() => setShowGenerate(false)}>Cancel</Button>
-                <Button variant="default" size="pill" onClick={handleGenerate} disabled={reportGenerating}>
-                  {reportGenerating ? 'Generating…' : 'Generate'}
-                </Button>
-              </div>
+    <div ref={rootRef} className="min-h-full bg-background p-3 text-foreground dark:bg-[#05090f] sm:p-5">
+      <div className="mx-auto max-w-[1600px] space-y-4">
+        <section className="rounded-[24px] border border-border bg-[linear-gradient(120deg,var(--card),var(--secondary)_58%,var(--background))] p-5 shadow-[0_24px_80px_rgba(0,0,0,.18)]">
+          <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+            <div>
+              <p className="text-[10px] uppercase tracking-[.2em] text-muted-foreground">Portfolio intelligence</p>
+              <h1 className="mt-1 text-lg font-semibold">Investment reporting</h1>
+              <p className="mt-1 max-w-xl text-[11px] text-muted-foreground">Generate governed investment reports and manage completed output across every available reporting scope.</p>
             </div>
-          )}
-
-          {/* Report Library filters */}
-          <div className="flex items-center gap-2 flex-wrap p-4 border-b border-border">
-            <Input
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              placeholder="Search by type, fund/client, or requester…"
-              className="w-64 bg-muted border-input text-foreground"
-            />
-            <Popover open={tableScopeComboOpen} onOpenChange={setTableScopeComboOpen}>
-              <PopoverTrigger asChild>
-                <Button variant="outline" role="combobox" aria-expanded={tableScopeComboOpen} className="w-40 justify-between rounded-full font-normal">
-                  <span className="truncate">{tableScopeFilter}</span>
-                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-40 p-0" align="start" container={themeContainer}>
-                <Command>
-                  <CommandInput placeholder="Search scope…" />
-                  <CommandList>
-                    <CommandEmpty>No scopes found.</CommandEmpty>
-                    <CommandGroup>
-                      {scopeTabs.map((t) => (
-                        <CommandItem
-                          key={t}
-                          value={t}
-                          onSelect={() => {
-                            setTableScopeFilter(t)
-                            setTableScopeComboOpen(false)
-                          }}
-                        >
-                          <Check className={cn('mr-2 h-4 w-4', tableScopeFilter === t ? 'opacity-100' : 'opacity-0')} />
-                          {t}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
-            <DatePicker value={dateFrom} onChange={setDateFrom} placeholder="From date" className="w-40" allowFutureDates container={themeContainer} />
-            <DatePicker value={dateTo} onChange={setDateTo} placeholder="To date" className="w-40" allowFutureDates container={themeContainer} />
-          </div>
-
-          <table className="arcus-table">
-            <thead>
-              <tr>
-                <SortableTh col="type" label="Type" sortKey={runSortKey} sortDir={runSortDir} onSort={toggleRunSort} />
-                <th>Format</th>
-                <th>Scope</th>
-                <th>Requested By</th>
-                <SortableTh col="createdAt" label="Created At" sortKey={runSortKey} sortDir={runSortDir} onSort={toggleRunSort} />
-                <SortableTh col="status" label="Status" sortKey={runSortKey} sortDir={runSortDir} onSort={toggleRunSort} />
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {runRows.map(r => (
-                <tr key={r.id}>
-                  <td>
-                    <span className="text-[10px] bg-accent text-accent-foreground px-2 py-0.5 rounded">{r.reportTypeName}</span>
-                  </td>
-                  <td className="text-muted-foreground">{r.format}</td>
-                  <td className="text-muted-foreground">{r.fundName ?? r.clientName ?? 'Firm-wide'}</td>
-                  <td className="text-muted-foreground">{r.requestedBy?.name ?? '—'}</td>
-                  <td className="text-muted-foreground">{new Date(r.createdAt).toLocaleString()}</td>
-                  <td><StatusBadge status={r.status === 'COMPLETED' ? 'completed' : r.status.toLowerCase()} /></td>
-                  <td>
-                    {r.downloadAvailable && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="rounded-full"
-                        disabled={!!downloadingById[r.id]}
-                        onClick={() => handleDownload(r)}
-                      >
-                        <Download className="w-3 h-3" /> {downloadingById[r.id] ? 'Downloading…' : 'Download'}
-                      </Button>
-                    )}
-                  </td>
-                </tr>
+            <div className="flex flex-wrap items-stretch gap-2">
+              {[
+                ['Available templates', reportTemplates.length],
+                ['Generated reports', reportRuns.length],
+                ['Completed', completedReports],
+                ['Processing', processingReports],
+              ].map(([label, value]) => (
+                <div key={label} className="min-w-[112px] rounded-2xl border border-border bg-background/60 px-4 py-3">
+                  <p className="text-[9px] text-muted-foreground">{label}</p>
+                  <p className="mt-1 text-[15px] font-semibold">{reportTemplatesLoading || reportRunsLoading ? '—' : value}</p>
+                </div>
               ))}
-              {filteredRuns.length === 0 && !reportRunsLoading && (
+              <Button className="h-10 self-center rounded-full px-6 text-[11px] shadow-sm" onClick={() => setShowGenerate(true)}>
+                <Plus className="h-4 w-4" /> Generate Report
+              </Button>
+            </div>
+          </div>
+          <div className="mt-5 flex flex-wrap gap-1 rounded-full border border-border bg-background/60 p-1">
+            {scopeTabs.map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setActiveTab(tab)}
+                className={cn(
+                  'rounded-full px-4 py-2 text-[10px] font-medium transition',
+                  activeTab === tab ? 'bg-foreground text-background shadow-sm' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                )}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section>
+          <div className="mb-3">
+            <h2 className="text-[12px] font-semibold">Template library</h2>
+            <p className="text-[9px] text-muted-foreground">Choose a live API template to prefill a new report request.</p>
+          </div>
+          {reportTemplatesLoading ? (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {Array.from({ length: 4 }, (_, index) => (
+                <div key={index} className="h-40 animate-pulse rounded-[18px] border border-border bg-card" />
+              ))}
+            </div>
+          ) : visibleTemplates.length > 0 ? (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {visibleTemplates.map((template) => (
+                <button
+                  key={template.code}
+                  type="button"
+                  onClick={() => handlePickTemplate(template.code)}
+                  className="group flex min-h-40 flex-col rounded-[18px] border border-border bg-[linear-gradient(145deg,var(--card),var(--secondary))] p-4 text-left transition hover:-translate-y-0.5 hover:border-primary/45 hover:shadow-lg"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="rounded-2xl bg-accent p-2.5 text-accent-foreground"><FileText className="h-4 w-4" /></span>
+                    <span className="rounded-full border border-border bg-background/50 px-2.5 py-1 text-[9px] text-muted-foreground">{template.scopeType}</span>
+                  </div>
+                  <p className="mt-4 text-[11px] font-semibold leading-snug">{template.name}</p>
+                  <p className="mt-1 line-clamp-2 text-[9px] leading-relaxed text-muted-foreground">{template.description}</p>
+                  <div className="mt-auto flex items-end justify-between gap-3 pt-4">
+                    <div className="flex flex-wrap gap-1">
+                      {template.supportedFormats.map((reportFormat) => <span key={reportFormat} className="rounded-full bg-muted px-2 py-1 text-[8px] font-medium text-muted-foreground">{reportFormat}</span>)}
+                    </div>
+                    <span className="text-[9px] font-medium text-primary">{template.hasDocxTemplate ? 'Template ready' : 'Available'}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-[18px] border border-dashed border-border bg-card/50 px-5 py-10 text-center text-[11px] text-muted-foreground">No report templates are available for this scope.</div>
+          )}
+        </section>
+
+        <section className="min-w-0 overflow-hidden rounded-[24px] border border-border bg-[linear-gradient(135deg,var(--card),var(--secondary))]">
+          <div className="flex flex-col gap-3 border-b border-border p-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <h2 className="text-[12px] font-semibold">Report Library</h2>
+              <p className="text-[9px] text-muted-foreground">{filteredRuns.length} matching reports · generated files remain available when the API marks them ready</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex h-9 min-w-[220px] items-center gap-2 rounded-full border border-input bg-muted px-3">
+                <Search className="h-3.5 w-3.5 text-muted-foreground" />
+                <input
+                  value={searchText}
+                  onChange={(event) => setSearchText(event.target.value)}
+                  placeholder="Search reports"
+                  className="min-w-0 flex-1 bg-transparent text-[10px] outline-none placeholder:text-muted-foreground"
+                />
+              </div>
+              <Popover open={tableScopeComboOpen} onOpenChange={setTableScopeComboOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" role="combobox" aria-expanded={tableScopeComboOpen} className="h-9 w-36 justify-between rounded-full bg-muted text-[10px] font-normal">
+                    <span className="truncate">{tableScopeFilter}</span>
+                    <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-40 p-0" align="start" container={themeContainer}>
+                  <Command>
+                    <CommandInput placeholder="Search scope…" />
+                    <CommandList>
+                      <CommandEmpty>No scopes found.</CommandEmpty>
+                      <CommandGroup>
+                        {scopeTabs.map((tab) => (
+                          <CommandItem key={tab} value={tab} onSelect={() => { setTableScopeFilter(tab); setTableScopeComboOpen(false) }}>
+                            <Check className={cn('mr-2 h-4 w-4', tableScopeFilter === tab ? 'opacity-100' : 'opacity-0')} />{tab}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+              <DatePicker value={dateFrom} onChange={setDateFrom} placeholder="From date" className="h-9 w-36 bg-muted text-[10px]" allowFutureDates container={themeContainer} />
+              <DatePicker value={dateTo} onChange={setDateTo} placeholder="To date" className="h-9 w-36 bg-muted text-[10px]" allowFutureDates container={themeContainer} />
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="terminal-table w-full min-w-[940px] text-left">
+              <thead className="bg-background/45 uppercase tracking-wider">
                 <tr>
-                  <td colSpan={7} className="text-center py-8 text-[12px] text-muted-foreground">No reports generated yet.</td>
+                  <SortableTh col="type" label="Type" sortKey={runSortKey} sortDir={runSortDir} onSort={toggleRunSort} />
+                  <th>Format</th>
+                  <th>Scope</th>
+                  <th>Requested By</th>
+                  <SortableTh col="createdAt" label="Created At" sortKey={runSortKey} sortDir={runSortDir} onSort={toggleRunSort} />
+                  <SortableTh col="status" label="Status" sortKey={runSortKey} sortDir={runSortDir} onSort={toggleRunSort} />
+                  <th>Action</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {reportRunsLoading ? (
+                  <tr><td colSpan={7} className="py-10 text-center text-muted-foreground"><Loader2 className="mr-2 inline h-4 w-4 animate-spin" />Loading report library…</td></tr>
+                ) : runRows.length > 0 ? runRows.map((run) => (
+                  <tr key={run.id}>
+                    <td><div><p className="max-w-[230px] truncate font-medium">{run.reportTypeName}</p><p className="mt-0.5 font-mono text-[9px] text-primary">{run.id}</p></div></td>
+                    <td><span className="rounded-full bg-muted px-2 py-1 text-[9px] font-medium text-muted-foreground">{run.format}</span></td>
+                    <td className="text-muted-foreground">{run.fundName ?? run.clientName ?? 'Firm-wide'}</td>
+                    <td className="text-muted-foreground">{run.requestedBy?.name ?? '—'}</td>
+                    <td className="whitespace-nowrap text-muted-foreground">{new Date(run.createdAt).toLocaleString()}</td>
+                    <td><StatusBadge status={run.status === 'COMPLETED' ? 'completed' : run.status.toLowerCase()} className="rounded-full" /></td>
+                    <td>
+                      {run.downloadAvailable ? (
+                        <Button variant="outline" size="sm" className="h-8 rounded-full px-3 text-[9px]" disabled={!!downloadingById[run.id]} onClick={() => handleDownload(run)}>
+                          {downloadingById[run.id] ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
+                          {downloadingById[run.id] ? 'Downloading…' : 'Download'}
+                        </Button>
+                      ) : <span className="text-[9px] text-muted-foreground">Not available</span>}
+                    </td>
+                  </tr>
+                )) : (
+                  <tr><td colSpan={7} className="py-10 text-center text-[11px] text-muted-foreground">No reports match the current scope and filters.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
           <TablePagination page={runPage} totalPages={runTotalPages} onPageChange={setRunPage} rowsShown={runRows.length} totalRows={runTotalRows} />
-        </div>
+        </section>
       </div>
+
+      {showGenerate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3 backdrop-blur-sm sm:p-5" onMouseDown={() => setShowGenerate(false)}>
+          <section className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-[24px] border border-border bg-card shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>
+            <div className="flex items-start justify-between border-b border-border p-5">
+              <div>
+                <p className="text-[10px] uppercase tracking-[.18em] text-muted-foreground">New output request</p>
+                <h2 className="mt-1 text-sm font-semibold">Generate Report</h2>
+                <p className="mt-1 text-[10px] text-muted-foreground">Choose a live template and provide its required generation parameters.</p>
+              </div>
+              <button type="button" aria-label="Close generate report" onClick={() => setShowGenerate(false)} className="rounded-full p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground"><X className="h-4 w-4" /></button>
+            </div>
+            <div className="grid gap-4 p-5 sm:grid-cols-2 xl:grid-cols-3">
+              <div>
+                <label className="mb-1.5 block text-[9px] uppercase tracking-wider text-muted-foreground">Report Type</label>
+                <Popover open={reportTypeComboOpen} onOpenChange={setReportTypeComboOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" role="combobox" aria-expanded={reportTypeComboOpen} className="w-full justify-between rounded-full bg-muted text-[10px] font-normal">
+                      <span className="truncate">{selectedTemplate?.name ?? 'Select report type…'}</span><ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[280px] p-0" align="start" container={themeContainer}>
+                    <Command>
+                      <CommandInput placeholder="Search report type…" />
+                      <CommandList>
+                        <CommandEmpty>No report types found.</CommandEmpty>
+                        <CommandGroup>
+                          {reportTemplates.map((template) => (
+                            <CommandItem key={template.code} value={template.name} onSelect={() => { handleReportTypeChange(template.code); setReportTypeComboOpen(false) }}>
+                              <Check className={cn('mr-2 h-4 w-4', form.reportType === template.code ? 'opacity-100' : 'opacity-0')} />{template.name}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div>
+                <label className="mb-1.5 block text-[9px] uppercase tracking-wider text-muted-foreground">Format</label>
+                <Select value={form.format} onValueChange={(value) => setForm((previous) => ({ ...previous, format: value }))}>
+                  <SelectTrigger className="w-full rounded-full border-input bg-muted text-[10px] text-foreground"><SelectValue placeholder="Select format…" /></SelectTrigger>
+                  <SelectContent container={themeContainer}>{(selectedTemplate?.supportedFormats ?? []).map((reportFormat) => <SelectItem key={reportFormat} value={reportFormat}>{reportFormat}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              {selectedTemplate?.requiresFundId && <div><label className="mb-1.5 block text-[9px] uppercase tracking-wider text-muted-foreground">Fund</label><Input value={fundName(selectedFundId) ?? '—'} disabled readOnly className="rounded-full border-input bg-muted text-[10px] text-foreground" /></div>}
+              {selectedTemplate?.requiresClientId && <div><label className="mb-1.5 block text-[9px] uppercase tracking-wider text-muted-foreground">Client ID</label><Input value={form.clientId} onChange={(event) => setForm((previous) => ({ ...previous, clientId: event.target.value }))} placeholder="Client mandate ID" className="rounded-full border-input bg-muted font-mono text-[10px] text-foreground" /></div>}
+              {paramFields.includes('periodStart') && <div><label className="mb-1.5 block text-[9px] uppercase tracking-wider text-muted-foreground">Period Start</label><DatePicker value={form.periodStart} onChange={(date) => setForm((previous) => ({ ...previous, periodStart: date }))} className="w-full bg-muted text-[10px]" container={themeContainer} /></div>}
+              {paramFields.includes('periodEnd') && <div><label className="mb-1.5 block text-[9px] uppercase tracking-wider text-muted-foreground">Period End</label><DatePicker value={form.periodEnd} onChange={(date) => setForm((previous) => ({ ...previous, periodEnd: date }))} className="w-full bg-muted text-[10px]" container={themeContainer} /></div>}
+              {paramFields.includes('valuationDate') && <div><label className="mb-1.5 block text-[9px] uppercase tracking-wider text-muted-foreground">Valuation Date</label><DatePicker value={form.valuationDate} onChange={(date) => setForm((previous) => ({ ...previous, valuationDate: date }))} className="w-full bg-muted text-[10px]" container={themeContainer} /></div>}
+              {paramFields.includes('benchmarkName') && <div><label className="mb-1.5 block text-[9px] uppercase tracking-wider text-muted-foreground">Benchmark Name</label><Input value={form.benchmarkName} onChange={(event) => setForm((previous) => ({ ...previous, benchmarkName: event.target.value }))} placeholder="e.g. ZSE Industrial Index" className="rounded-full border-input bg-muted text-[10px] text-foreground" /></div>}
+              {paramFields.includes('assetManagerName') && <div><label className="mb-1.5 block text-[9px] uppercase tracking-wider text-muted-foreground">Asset Manager Name</label><Input value={form.assetManagerName} onChange={(event) => setForm((previous) => ({ ...previous, assetManagerName: event.target.value }))} placeholder="e.g. Arcus Asset Management" className="rounded-full border-input bg-muted text-[10px] text-foreground" /></div>}
+              {paramFields.length === 0 && !selectedTemplate?.requiresFundId && !selectedTemplate?.requiresClientId && <div className="rounded-2xl bg-muted p-4 text-[10px] text-muted-foreground sm:col-span-2 xl:col-span-3">This report type takes no additional parameters.</div>}
+            </div>
+            {formError && <div className="mx-5 mb-4 rounded-2xl border border-destructive/20 bg-destructive/10 p-3 text-[10px] text-destructive">{formError}</div>}
+            <div className="flex justify-end gap-2 border-t border-border p-4">
+              <Button variant="outline" className="rounded-full px-5 text-[10px]" onClick={() => setShowGenerate(false)}>Cancel</Button>
+              <Button className="rounded-full px-6 text-[10px]" onClick={handleGenerate} disabled={reportGenerating}>
+                {reportGenerating && <Loader2 className="h-3.5 w-3.5 animate-spin" />}{reportGenerating ? 'Generating…' : 'Generate Report'}
+              </Button>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   )
 }

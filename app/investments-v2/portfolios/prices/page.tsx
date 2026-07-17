@@ -1,596 +1,82 @@
 'use client'
 
-import { Fragment, useEffect, useMemo, useState } from 'react'
-import { useSearchParams, useRouter } from 'next/navigation'
-import { PageHeader } from '@/components/investments-v2/page-header'
-import { PortfoliosSubNav } from '@/components/investments-v2/portfolios-subnav'
-import { SecurityFormDialog } from '@/components/investments-v2/security-form-dialog'
-import { StatusBadge } from '@/components/arcus/status-badge'
-import { cn } from '@/lib/utils'
-import { RefreshCw, Search, Plus, ChevronDown, ChevronRight, Loader2, Filter, Download } from 'lucide-react'
-import { useAppDispatch, useAppSelector } from '@/lib/store'
-import { fetchSecurities, fetchLatestPrices, fetchSecurityPriceHistory } from '@/lib/store/slices/investmentsSlice'
-import { fetchIngestBatches, fetchIngestBatchDetail } from '@/lib/store/slices/investmentOpsSlice'
-import { priceChange, type Security } from '@/lib/api/investments-api'
-import { useRolePermissions } from '@/lib/hooks/useRolePermissions'
-import { Button } from '@/components/ui/button'
-import { DatePicker } from '@/components/ui/date-picker'
-import { useThemeContainer } from '@/components/investments-v2/ui/use-theme-container'
-import { exportRowsToCsv } from '@/components/investments-v2/ui/export-csv'
+import { FormEvent, useMemo, useState } from 'react'
+import { Check, ChevronDown, ChevronLeft, ChevronRight, FileUp, Plus, Search, ShieldAlert, X } from 'lucide-react'
 
-const EXCHANGES = ['All', 'ZSE', 'VFEX', 'SECZIM', 'NASDAQ', 'NYSE'] as const
-const PAGE_SIZE = 12
-const VIEWS = ['prices', 'batches'] as const
-
-function Spinner() {
-  return <Loader2 className="w-4 h-4 animate-spin" style={{ color: 'var(--muted-foreground)' }} />
+type Status = 'Pending' | 'Validated' | 'Approved' | 'Rejected' | 'Stale' | 'Estimated'
+type Source = 'API Confirmed' | 'Manual Override' | 'Vendor Feed' | 'File Upload'
+type PriceDate = 'Today' | 'Previous business day' | 'Older'
+type ValidationIssue = 'Deviation' | 'Source conflict' | 'Four-eye review' | 'Stale price'
+type Price = { id: number; ticker: string; name: string; market: string; currency: string; price: number; previous: number; source: Source; status: Status; time: string; priceDate: PriceDate; issue?: ValidationIssue; flag?: string }
+const initial: Price[] = [
+  { id: 1, ticker: 'DLTA', name: 'Delta Corporation', market: 'ZSE', currency: 'USD', price: 1.2845, previous: 1.261, source: 'API Confirmed', status: 'Approved', time: '17 Jul · 13:35', priceDate: 'Today' },
+  { id: 2, ticker: 'INN', name: 'Innscor Africa', market: 'VFEX', currency: 'USD', price: .472, previous: .465, source: 'Vendor Feed', status: 'Validated', time: '17 Jul · 13:34', priceDate: 'Today' },
+  { id: 3, ticker: 'ECO', name: 'Econet Wireless', market: 'ZSE', currency: 'ZWG', price: 4.8812, previous: 4.512, source: 'Vendor Feed', status: 'Pending', time: '17 Jul · 13:30', priceDate: 'Today', issue: 'Deviation', flag: '8.18% movement exceeds the 5% tolerance.' },
+  { id: 4, ticker: 'TB30', name: 'Government Treasury Bond 2030', market: 'OTC', currency: 'USD', price: 96.425, previous: 98.1, source: 'Manual Override', status: 'Pending', time: '17 Jul · 12:46', priceDate: 'Today', issue: 'Four-eye review', flag: 'Manual price requires independent approval.' },
+  { id: 5, ticker: 'AEF', name: 'Arcus Africa Equity Fund', market: 'Internal', currency: 'USD', price: 124.73, previous: 124.68, source: 'File Upload', status: 'Approved', time: '17 Jul · 11:05', priceDate: 'Today' },
+  { id: 6, ticker: 'PAD', name: 'Padenga Holdings', market: 'VFEX', currency: 'USD', price: .181, previous: .193, source: 'API Confirmed', status: 'Rejected', time: '17 Jul · 10:52', priceDate: 'Today', issue: 'Source conflict', flag: 'API price conflicts with the suspended instrument state.' },
+  { id: 7, ticker: 'CBZ28', name: 'CBZ Holdings Note 2028', market: 'OTC', currency: 'USD', price: 101.14, previous: 101.14, source: 'Manual Override', status: 'Estimated', time: '16 Jul · 17:10', priceDate: 'Previous business day' },
+  { id: 8, ticker: 'MSFT', name: 'Microsoft Corporation', market: 'NASDAQ', currency: 'USD', price: 512.44, previous: 510.12, source: 'API Confirmed', status: 'Stale', time: '14 Jul · 20:00', priceDate: 'Older', issue: 'Stale price', flag: 'Price age exceeds market stale threshold.' },
+]
+const statuses: Status[] = ['Pending', 'Validated', 'Approved', 'Rejected', 'Stale', 'Estimated']
+const tones: Record<Status, string> = { Pending: 'bg-amber-400/10 text-amber-300', Validated: 'bg-sky-400/10 text-sky-300', Approved: 'bg-emerald-400/10 text-emerald-300', Rejected: 'bg-rose-400/10 text-rose-300', Stale: 'bg-orange-400/10 text-orange-300', Estimated: 'bg-violet-400/10 text-violet-300' }
+const card = 'rounded-[24px] border border-white/[0.06] bg-[linear-gradient(135deg,#172333_0%,#101a29_58%,#0b1420_100%)] shadow-[0_20px_60px_rgba(0,0,0,.2)]'
+const pill = 'inline-flex h-9 items-center justify-center gap-2 rounded-full border border-white/10 px-4 text-[11px] font-medium transition hover:border-white/20 hover:bg-white/[0.06]'
+const input = 'h-10 w-full rounded-full border border-white/10 bg-[#0a121d] px-4 text-[11px] outline-none focus:border-[#2f87fa]'
+function Badge({ value }: { value: Status | Source }) {
+  const sourceTone = value === 'API Confirmed' ? 'bg-cyan-400/10 text-cyan-300' : value === 'Manual Override' ? 'bg-fuchsia-400/10 text-fuchsia-300' : 'bg-white/[0.07] text-[#aeb9c8]'
+  return <span className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-[9px] font-semibold ${statuses.includes(value as Status) ? tones[value as Status] : sourceTone}`}>{value}</span>
 }
 
 export default function PricesPage() {
-  const dispatch = useAppDispatch()
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const focusedSecurityId = searchParams.get('securityId')
-
-  const { securities, securitiesLoading, latestPrices, pricesLoading, priceHistoryCache, priceHistoryLoadingIds } =
-    useAppSelector((s) => s.investments)
-  const { ingestBatches, ingestBatchesLoading, ingestBatchDetail, ingestBatchDetailLoading } = useAppSelector(
-    (s) => s.investmentOps
-  )
-  const { hasSubModuleAccess } = useRolePermissions()
-  const isAdmin = hasSubModuleAccess('investments', 'investments-portfolios-prices')
-
-  const [view, setView] = useState<(typeof VIEWS)[number]>('prices')
-  const [exchange, setExchange] = useState<(typeof EXCHANGES)[number]>('All')
-  const [search, setSearch] = useState('')
+  const [prices, setPrices] = useState(initial)
+  const [view, setView] = useState<'latest' | 'ingest' | 'queue'>('latest')
+  const [status, setStatus] = useState('All statuses')
+  const [market, setMarket] = useState('All markets')
+  const [source, setSource] = useState('All sources')
+  const [date, setDate] = useState('All dates')
+  const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
-  const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [expandedBatchId, setExpandedBatchId] = useState<string | null>(null)
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [showFilters, setShowFilters] = useState(false)
-  const [pricedFrom, setPricedFrom] = useState<Date | undefined>(undefined)
-  const [pricedTo, setPricedTo] = useState<Date | undefined>(undefined)
-  const { ref: rootRef, container: themeContainer } = useThemeContainer()
-
-  useEffect(() => {
-    dispatch(fetchSecurities())
-    dispatch(fetchLatestPrices())
-  }, [dispatch])
-
-  useEffect(() => {
-    if (view === 'batches') dispatch(fetchIngestBatches())
-  }, [dispatch, view])
-
-  const toggleBatch = (id: string) => {
-    if (expandedBatchId === id) {
-      setExpandedBatchId(null)
-      return
-    }
-    setExpandedBatchId(id)
-    dispatch(fetchIngestBatchDetail(id))
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [marketOpen, setMarketOpen] = useState(false)
+  const [sourceOpen, setSourceOpen] = useState(false)
+  const [dateOpen, setDateOpen] = useState(false)
+  const [manualOpen, setManualOpen] = useState(false)
+  const [uploadOpen, setUploadOpen] = useState(false)
+  const [notice, setNotice] = useState('')
+  const filtered = useMemo(() => prices.filter((row) => (view === 'latest' || Boolean(row.issue) || ['Pending', 'Validated', 'Stale'].includes(row.status)) && (status === 'All statuses' || row.status === status) && (market === 'All markets' || row.market === market) && (source === 'All sources' || row.source === source) && (date === 'All dates' || row.priceDate === date) && `${row.ticker} ${row.name}`.toLowerCase().includes(query.toLowerCase())), [date, market, prices, query, source, status, view])
+  const totalPages = Math.max(1, Math.ceil(filtered.length / 6))
+  const rows = filtered.slice((page - 1) * 6, page * 6)
+  const pending = prices.filter((row) => row.status === 'Pending').length
+  const queueCount = prices.filter((row) => row.issue || ['Pending', 'Validated', 'Stale'].includes(row.status)).length
+  const flash = (message: string) => { setNotice(message); window.setTimeout(() => setNotice(''), 1800) }
+  const decide = (id: number, value: 'Approved' | 'Rejected') => { setPrices((current) => current.map((row) => row.id === id ? { ...row, status: value, issue: undefined, flag: undefined } : row)); flash(`Price ${value.toLowerCase()} locally`) }
+  const addManual = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault(); const data = new FormData(event.currentTarget); const ticker = String(data.get('ticker')).toUpperCase(); const value = Number(data.get('price'))
+    setPrices((current) => [{ id: Date.now(), ticker, name: `${ticker} manual price`, market: String(data.get('market')), currency: 'USD', price: value, previous: value, source: 'Manual Override', status: 'Pending', time: 'Just now', priceDate: 'Today', issue: 'Four-eye review', flag: 'Manual price requires independent approval.' }, ...current])
+    setManualOpen(false); setView('queue'); setPage(1)
   }
-
-  // Auto-expand the security passed via ?securityId= (e.g. linked from Instruments)
-  useEffect(() => {
-    if (focusedSecurityId) {
-      setExpandedId(focusedSecurityId)
-      dispatch(fetchSecurityPriceHistory(focusedSecurityId))
-    }
-  }, [dispatch, focusedSecurityId])
-
-  useEffect(() => {
-    setPage(1)
-  }, [exchange, search])
-
-  const toggleExpand = (sec: Security) => {
-    if (expandedId === sec.id) {
-      setExpandedId(null)
-      if (focusedSecurityId) router.push('/investments-v2/portfolios/prices')
-      return
-    }
-    setExpandedId(sec.id)
-    if (!priceHistoryCache[sec.id]) dispatch(fetchSecurityPriceHistory(sec.id))
-  }
-
-  const rows = useMemo(() => {
-    return securities
-      .filter((s) => exchange === 'All' || s.exchangeCode === exchange)
-      .map((sec) => {
-        const tick = latestPrices[sec.symbol] ?? latestPrices[sec.id]
-        const change = priceChange(tick)
-        return { security: sec, tick, change }
-      })
-  }, [securities, latestPrices, exchange])
-
-  const filteredRows = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    return rows.filter((r) => {
-      if (q && !r.security.symbol.toLowerCase().includes(q) && !r.security.name.toLowerCase().includes(q)) return false
-      if (pricedFrom || pricedTo) {
-        if (!r.tick) return false
-        const pricedAt = new Date(r.tick.pricedAt)
-        if (pricedFrom && pricedAt < pricedFrom) return false
-        if (pricedTo && pricedAt > new Date(pricedTo.getTime() + 24 * 60 * 60 * 1000 - 1)) return false
-      }
-      return true
-    })
-  }, [rows, search, pricedFrom, pricedTo])
-
-  const handleExport = () => {
-    exportRowsToCsv(
-      `prices-${new Date().toISOString().slice(0, 10)}.csv`,
-      ['Ticker', 'Name', 'Exchange', 'Currency', 'Prev Close', 'Price', 'Change', 'Change %', 'Priced At'],
-      filteredRows.map(({ security: sec, tick, change }) => [
-        sec.symbol,
-        sec.name,
-        sec.exchangeCode,
-        sec.listingCurrencyCode,
-        change.prevClose ?? '',
-        change.price ?? '',
-        change.abs ?? '',
-        change.pct ?? '',
-        tick ? new Date(tick.pricedAt).toLocaleString() : '',
-      ])
-    )
-  }
-
-  const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE))
-  const pageRows = filteredRows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
-
-  const pricedCount = rows.filter((r) => r.tick).length
-  const liveCount = rows.filter((r) => r.tick?.tickFrequency === 'LIVE').length
-  const staleCount = rows.filter((r) => {
-    if (!r.tick) return false
-    const ageMs = Date.now() - new Date(r.tick.pricedAt).getTime()
-    return ageMs > 1000 * 60 * 60 * 24 * 2 // >2 days old
-  }).length
-  const lastBatchAt = rows.reduce<string | null>((latest, r) => {
-    if (!r.tick) return latest
-    if (!latest || new Date(r.tick.pricedAt) > new Date(latest)) return r.tick.pricedAt
-    return latest
-  }, null)
-
-  return (
-    <div ref={rootRef} className="flex flex-col h-full overflow-hidden">
-      <PageHeader
-        title="Prices"
-        actions={
-          isAdmin ? (
-            <button
-              onClick={() => setDialogOpen(true)}
-              className="flex items-center gap-1.5 text-white text-xs font-medium px-3 py-1.5 rounded-full"
-              style={{ background: '#2563eb' }}
-            >
-              <Plus className="w-3.5 h-3.5" /> New Security
-            </button>
-          ) : undefined
-        }
-      />
-      <PortfoliosSubNav />
-
-      <div className="flex-1 overflow-y-auto px-5 pb-5 pt-4 space-y-4">
-        {/* View toggle */}
-        <div className="flex items-center gap-1.5">
-          <button onClick={() => setView('prices')} className={cn('cat-pill', view === 'prices' && 'active')}>
-            Latest Prices
-          </button>
-          <button onClick={() => setView('batches')} className={cn('cat-pill', view === 'batches' && 'active')}>
-            Ingest Batches
-          </button>
-        </div>
-
-        {view === 'batches' ? (
-          <div className="arcus-card">
-            <div className="arcus-card-header">
-              <span className="text-[13px] font-semibold" style={{ color: 'var(--foreground)' }}>
-                Ingest Batches
-              </span>
-              {ingestBatchesLoading && <Spinner />}
-            </div>
-            <div className="overflow-x-auto">
-              {ingestBatchesLoading && ingestBatches.length === 0 ? (
-                <div className="flex items-center justify-center py-10">
-                  <Spinner />
-                </div>
-              ) : ingestBatches.length === 0 ? (
-                <div className="py-10 text-center text-[12px]" style={{ color: 'var(--muted-foreground)' }}>
-                  No ingest batches available.
-                </div>
-              ) : (
-                <table className="arcus-table">
-                  <thead>
-                    <tr>
-                      <th />
-                      <th>Source Type</th>
-                      <th>Source Code</th>
-                      <th>As Of</th>
-                      <th className="text-right">Records</th>
-                      <th>Status</th>
-                      <th>Source Status</th>
-                      <th>Created At</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {ingestBatches.map((batch) => {
-                      const isExpanded = expandedBatchId === batch.id
-                      return (
-                        <Fragment key={batch.id}>
-                          <tr className={cn('cursor-pointer', isExpanded && 'bg-[#3b82f614]')} onClick={() => toggleBatch(batch.id)}>
-                            <td className="w-6">
-                              {isExpanded ? (
-                                <ChevronDown className="w-3.5 h-3.5" style={{ color: 'var(--muted-foreground)' }} />
-                              ) : (
-                                <ChevronRight className="w-3.5 h-3.5" style={{ color: 'var(--muted-foreground)' }} />
-                              )}
-                            </td>
-                            <td style={{ color: 'var(--foreground)' }}>{batch.sourceType}</td>
-                            <td className="font-mono font-semibold" style={{ color: '#3b82f6' }}>
-                              {batch.sourceCode}
-                            </td>
-                            <td style={{ color: 'var(--muted-foreground)' }}>{new Date(batch.asOfDate).toLocaleDateString()}</td>
-                            <td className="text-right font-mono" style={{ color: 'var(--foreground)' }}>
-                              {batch.recordCount.toLocaleString()}
-                            </td>
-                            <td>
-                              <StatusBadge status={batch.status === 'COMPLETED' ? 'active' : 'pending'} />
-                            </td>
-                            <td>
-                              <StatusBadge status={batch.sourceStatus === 'OK' ? 'active' : 'stale'} />
-                            </td>
-                            <td className="font-mono text-[11px]" style={{ color: 'var(--muted-foreground)' }}>
-                              {new Date(batch.createdAt).toLocaleString()}
-                            </td>
-                          </tr>
-                          {isExpanded && (
-                            <tr>
-                              <td colSpan={8} className="p-0">
-                                <div
-                                  className="px-6 py-3 space-y-2"
-                                  style={{ background: 'rgba(59,130,246,0.04)', borderTop: '1px solid var(--border)' }}
-                                >
-                                  {ingestBatchDetailLoading ? (
-                                    <div className="flex items-center justify-center py-4">
-                                      <Spinner />
-                                    </div>
-                                  ) : ingestBatchDetail?.batch.id !== batch.id ? (
-                                    <div className="py-3 text-center text-[11px]" style={{ color: 'var(--muted-foreground)' }}>
-                                      Loading batch detail…
-                                    </div>
-                                  ) : (
-                                    <>
-                                      <div className="flex items-center gap-4 text-[11px]">
-                                        <span style={{ color: 'var(--muted-foreground)' }}>
-                                          Checksum:{' '}
-                                          <span style={{ color: ingestBatchDetail.checksumValid ? '#10b981' : '#ef4444' }}>
-                                            {ingestBatchDetail.checksumValid ? 'Valid' : 'Mismatch'}
-                                          </span>
-                                        </span>
-                                        <span className="font-mono truncate" style={{ color: 'var(--muted-foreground)', maxWidth: 320 }}>
-                                          {batch.sha256Checksum}
-                                        </span>
-                                      </div>
-                                      <table className="arcus-table">
-                                        <thead>
-                                          <tr>
-                                            <th>Symbol</th>
-                                            <th className="text-right">Price</th>
-                                            <th className="text-right">Prev Close</th>
-                                            <th className="text-right">Deviation %</th>
-                                            <th>Validation</th>
-                                          </tr>
-                                        </thead>
-                                        <tbody>
-                                          {ingestBatchDetail.batch.priceTicks.map((tick) => (
-                                            <tr key={tick.id}>
-                                              <td className="font-mono font-semibold" style={{ color: '#3b82f6' }}>
-                                                {tick.security.symbol}
-                                              </td>
-                                              <td className="text-right font-mono" style={{ color: 'var(--foreground)' }}>
-                                                {Number(tick.price).toFixed(4)}
-                                              </td>
-                                              <td className="text-right font-mono" style={{ color: 'var(--muted-foreground)' }}>
-                                                {tick.previousClose != null ? Number(tick.previousClose).toFixed(4) : '—'}
-                                              </td>
-                                              <td className="text-right font-mono" style={{ color: 'var(--muted-foreground)' }}>
-                                                {tick.deviationPct != null ? `${(Number(tick.deviationPct) * 100).toFixed(2)}%` : '—'}
-                                              </td>
-                                              <td>
-                                                <StatusBadge status={tick.validationStatus} />
-                                              </td>
-                                            </tr>
-                                          ))}
-                                        </tbody>
-                                      </table>
-                                    </>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                          )}
-                        </Fragment>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          </div>
-        ) : (
-          <>
-        {/* Status strip */}
-        <div className="grid grid-cols-4 gap-3">
-          {[
-            { label: 'Total Instruments Priced', value: pricedCount, color: 'var(--foreground)' },
-            { label: 'Live Ticks', value: liveCount, color: '#10b981' },
-            { label: 'Stale (>2 days)', value: staleCount, color: staleCount > 0 ? '#f59e0b' : '#10b981' },
-            {
-              label: 'Last Batch',
-              value: lastBatchAt ? new Date(lastBatchAt).toLocaleString() : '—',
-              color: '#3b82f6',
-            },
-          ].map((s) => (
-            <div key={s.label} className="arcus-card px-4 py-2.5">
-              <div className="text-[10px] uppercase tracking-wider mb-0.5" style={{ color: 'var(--muted-foreground)' }}>
-                {s.label}
-              </div>
-              <div className="text-lg font-semibold font-mono" style={{ color: s.color }}>
-                {s.value}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Exchange filter + search + refresh */}
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {EXCHANGES.map((ex) => (
-              <button key={ex} onClick={() => setExchange(ex)} className={cn('cat-pill', exchange === ex && 'active')}>
-                {ex}
-              </button>
-            ))}
-          </div>
-          <div className="flex items-center gap-2">
-            <div
-              className="flex items-center gap-1.5 rounded-full px-2.5 py-1.5"
-              style={{ background: 'var(--muted)', border: '1px solid var(--border)' }}
-            >
-              <Search className="w-3.5 h-3.5" style={{ color: 'var(--muted-foreground)' }} />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Filter by symbol or name..."
-                className="bg-transparent text-xs outline-none w-44"
-                style={{ color: 'var(--foreground)' }}
-              />
-            </div>
-            <Button variant="outline" size="pill" onClick={() => setShowFilters((v) => !v)}>
-              <Filter className="w-3 h-3" /> Filter
-            </Button>
-            <Button variant="outline" size="pill" onClick={handleExport}>
-              <Download className="w-3 h-3" /> Export
-            </Button>
-            <button
-              onClick={() => dispatch(fetchLatestPrices())}
-              disabled={pricesLoading}
-              className="flex items-center gap-1.5 text-white text-xs font-medium px-3 py-1.5 rounded-full"
-              style={{ background: '#2563eb' }}
-            >
-              <RefreshCw className={cn('w-3 h-3', pricesLoading && 'animate-spin')} />
-              {pricesLoading ? 'Fetching...' : 'Refresh Prices'}
-            </button>
-          </div>
-        </div>
-
-        {showFilters && (
-          <div className="flex items-center gap-2 flex-wrap arcus-card px-4 py-3">
-            <span className="text-[11px]" style={{ color: 'var(--muted-foreground)' }}>Priced date range:</span>
-            <DatePicker value={pricedFrom} onChange={setPricedFrom} placeholder="From date" className="w-40" allowFutureDates container={themeContainer} />
-            <DatePicker value={pricedTo} onChange={setPricedTo} placeholder="To date" className="w-40" allowFutureDates container={themeContainer} />
-            {(pricedFrom || pricedTo) && (
-              <Button variant="ghost" size="sm" onClick={() => { setPricedFrom(undefined); setPricedTo(undefined) }}>
-                Clear
-              </Button>
-            )}
-          </div>
-        )}
-
-        {/* Latest prices — collapsible accordion table */}
-        <div className="arcus-card">
-          <div className="arcus-card-header">
-            <span className="text-[13px] font-semibold" style={{ color: 'var(--foreground)' }}>
-              Latest Market Prices
-            </span>
-            {(securitiesLoading || pricesLoading) && <Spinner />}
-          </div>
-          <div className="overflow-x-auto">
-            {securitiesLoading && securities.length === 0 ? (
-              <div className="flex items-center justify-center py-10">
-                <Spinner />
-              </div>
-            ) : pageRows.length === 0 ? (
-              <div className="py-10 text-center text-[12px]" style={{ color: 'var(--muted-foreground)' }}>
-                No securities found{search ? ` matching "${search}"` : ''}.
-              </div>
-            ) : (
-              <table className="arcus-table">
-                <thead>
-                  <tr>
-                    <th />
-                    <th>Ticker</th>
-                    <th>Name / Exchange</th>
-                    <th>CCY</th>
-                    <th className="text-right">Prev Close</th>
-                    <th className="text-right">Current Price</th>
-                    <th className="text-right">Change</th>
-                    <th className="text-right">Change %</th>
-                    <th>Validation</th>
-                    <th>Source</th>
-                    <th>Priced At</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pageRows.map(({ security: sec, tick, change }) => {
-                    const isExpanded = expandedId === sec.id
-                    const history = priceHistoryCache[sec.id] ?? []
-                    const historyLoading = !!priceHistoryLoadingIds[sec.id]
-                    return (
-                      <Fragment key={sec.id}>
-                        <tr
-                          className={cn('cursor-pointer', isExpanded && 'bg-[#3b82f614]')}
-                          onClick={() => toggleExpand(sec)}
-                        >
-                          <td className="w-6">
-                            {isExpanded ? (
-                              <ChevronDown className="w-3.5 h-3.5" style={{ color: 'var(--muted-foreground)' }} />
-                            ) : (
-                              <ChevronRight className="w-3.5 h-3.5" style={{ color: 'var(--muted-foreground)' }} />
-                            )}
-                          </td>
-                          <td className="font-mono font-semibold" style={{ color: '#3b82f6' }}>
-                            {sec.symbol}
-                          </td>
-                          <td>
-                            <div className="flex flex-col leading-tight">
-                              <span style={{ color: 'var(--foreground)' }}>{sec.name}</span>
-                              <span className="text-[10px]" style={{ color: 'var(--muted-foreground)' }}>
-                                {sec.exchangeCode}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="font-mono" style={{ color: 'var(--muted-foreground)' }}>
-                            {sec.listingCurrencyCode}
-                          </td>
-                          <td className="text-right font-mono" style={{ color: 'var(--muted-foreground)' }}>
-                            {change.prevClose != null ? change.prevClose.toFixed(4) : '—'}
-                          </td>
-                          <td className="text-right font-mono font-semibold" style={{ color: 'var(--foreground)' }}>
-                            {change.price != null ? change.price.toFixed(4) : '—'}
-                          </td>
-                          <td
-                            className="text-right font-mono"
-                            style={{
-                              color: change.abs == null ? 'var(--muted-foreground)' : change.abs >= 0 ? '#10b981' : '#ef4444',
-                            }}
-                          >
-                            {change.abs != null ? `${change.abs >= 0 ? '+' : ''}${change.abs.toFixed(4)}` : '—'}
-                          </td>
-                          <td
-                            className="text-right font-mono"
-                            style={{
-                              color: change.pct == null ? 'var(--muted-foreground)' : change.pct >= 0 ? '#10b981' : '#ef4444',
-                            }}
-                          >
-                            {change.pct != null ? `${change.pct >= 0 ? '+' : ''}${change.pct.toFixed(2)}%` : '—'}
-                          </td>
-                          <td>{tick ? <StatusBadge status={tick.validationStatus} /> : '—'}</td>
-                          <td>{tick ? <StatusBadge status={tick.sourceStatus === 'OK' ? 'active' : 'stale'} /> : '—'}</td>
-                          <td className="font-mono text-[11px]" style={{ color: 'var(--muted-foreground)' }}>
-                            {tick ? new Date(tick.pricedAt).toLocaleString() : '—'}
-                          </td>
-                        </tr>
-                        {isExpanded && (
-                          <tr key={`${sec.id}-history`}>
-                            <td colSpan={11} className="p-0">
-                              <div
-                                className="px-6 py-3"
-                                style={{ background: 'rgba(59,130,246,0.04)', borderTop: '1px solid var(--border)' }}
-                              >
-                                {historyLoading ? (
-                                  <div className="flex items-center justify-center py-4">
-                                    <Spinner />
-                                  </div>
-                                ) : history.length === 0 ? (
-                                  <div className="py-3 text-center text-[11px]" style={{ color: 'var(--muted-foreground)' }}>
-                                    No price history available for {sec.symbol}.
-                                  </div>
-                                ) : (
-                                  <table className="arcus-table">
-                                    <thead>
-                                      <tr>
-                                        <th>Priced At</th>
-                                        <th>Price Type</th>
-                                        <th className="text-right">Price</th>
-                                        <th className="text-right">Prev Close</th>
-                                        <th className="text-right">Deviation %</th>
-                                        <th>Frequency</th>
-                                        <th>Validation</th>
-                                        <th>Source</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      {history.map((h) => (
-                                        <tr key={h.id}>
-                                          <td className="font-mono text-[11px]" style={{ color: 'var(--foreground)' }}>
-                                            {new Date(h.pricedAt).toLocaleString()}
-                                          </td>
-                                          <td style={{ color: 'var(--muted-foreground)' }}>{h.priceType}</td>
-                                          <td className="text-right font-mono font-semibold" style={{ color: 'var(--foreground)' }}>
-                                            {Number(h.price).toFixed(4)}
-                                          </td>
-                                          <td className="text-right font-mono" style={{ color: 'var(--muted-foreground)' }}>
-                                            {h.previousClose != null ? Number(h.previousClose).toFixed(4) : '—'}
-                                          </td>
-                                          <td className="text-right font-mono" style={{ color: 'var(--muted-foreground)' }}>
-                                            {h.deviationPct != null ? `${Number(h.deviationPct).toFixed(2)}%` : '—'}
-                                          </td>
-                                          <td style={{ color: 'var(--muted-foreground)' }}>{h.tickFrequency}</td>
-                                          <td>
-                                            <StatusBadge status={h.validationStatus} />
-                                          </td>
-                                          <td>
-                                            <StatusBadge status={h.sourceStatus === 'OK' ? 'active' : 'stale'} />
-                                          </td>
-                                        </tr>
-                                      ))}
-                                    </tbody>
-                                  </table>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        )}
-                      </Fragment>
-                    )
-                  })}
-                </tbody>
-              </table>
-            )}
-          </div>
-
-          {/* Pagination */}
-          {filteredRows.length > PAGE_SIZE && (
-            <div
-              className="flex items-center justify-between px-4 py-2.5"
-              style={{ borderTop: '1px solid var(--border)' }}
-            >
-              <span className="text-[11px]" style={{ color: 'var(--muted-foreground)' }}>
-                Showing {pageRows.length} out of {filteredRows.length} results
-              </span>
-              <div className="flex items-center gap-1">
-                <button className="pg-btn" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}>
-                  ‹
-                </button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-                  <button key={p} onClick={() => setPage(p)} className={cn('pg-btn', page === p && 'active')}>
-                    {p}
-                  </button>
-                ))}
-                <button
-                  className="pg-btn"
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={page >= totalPages}
-                >
-                  ›
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-          </>
-        )}
-      </div>
-
-      <SecurityFormDialog open={dialogOpen} onOpenChange={setDialogOpen} editTarget={null} onSaved={() => dispatch(fetchSecurities())} />
-    </div>
-  )
+  return <main className="min-h-full bg-[#05090f] p-3 text-[#edf3fa] sm:p-5"><div className="mx-auto max-w-[1600px] space-y-4">
+    <header className="flex flex-col gap-4 px-1 xl:flex-row xl:items-end xl:justify-between"><div><p className="text-[10px] uppercase tracking-[.24em] text-[#65758b]">Portfolio market</p><h1 className="mt-1 text-xl font-semibold">Price control centre</h1><p className="mt-1 text-[11px] text-[#77869a]">Review latest market data, exceptions and approval state.</p></div><div className="flex flex-wrap gap-2"><button onClick={() => setUploadOpen(true)} className={`${pill} text-[#b7c1cf]`}><FileUp className="h-3.5 w-3.5" />Upload prices</button><button onClick={() => setManualOpen(true)} className={`${pill} border-[#2f87fa] bg-[#2f87fa] text-white`}><Plus className="h-3.5 w-3.5" />Manual entry</button></div></header>
+    <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{[['Priced instruments', prices.length, 'text-white'], ['Awaiting review', pending, 'text-amber-300'], ['Approved today', prices.filter((r) => r.status === 'Approved').length, 'text-emerald-300'], ['Data exceptions', prices.filter((r) => r.flag).length, 'text-rose-300']].map(([label, value, tone]) => <div key={label} className={`${card} px-5 py-4`}><p className="text-[9px] uppercase tracking-[.16em] text-[#718096]">{label}</p><p className={`mt-2 font-mono text-xl font-semibold ${tone}`}>{value}</p></div>)}</section>
+    <section className={`${card} overflow-visible`}><div className="flex flex-col gap-3 border-b border-white/[0.07] p-4 xl:flex-row xl:items-center xl:justify-between"><div className="flex gap-1.5 overflow-x-auto"><button onClick={() => { setView('latest'); setPage(1) }} className={`${pill} h-8 shrink-0 ${view === 'latest' ? 'border-[#2f87fa]/60 bg-[#2f87fa]/15 text-white' : 'text-[#8896a9]'}`}>Latest prices</button><button onClick={() => { setView('ingest'); setPage(1) }} className={`${pill} h-8 shrink-0 ${view === 'ingest' ? 'border-[#2f87fa]/60 bg-[#2f87fa]/15 text-white' : 'text-[#8896a9]'}`}>Ingest & manual</button><button onClick={() => { setView('queue'); setPage(1) }} className={`${pill} h-8 shrink-0 ${view === 'queue' ? 'border-[#2f87fa]/60 bg-[#2f87fa]/15 text-white' : 'text-[#8896a9]'}`}>Validation queue <span className="rounded-full bg-amber-400/15 px-1.5 text-amber-300">{queueCount}</span></button></div>{view !== 'ingest' && <div className="flex flex-wrap gap-2">
+      <label className="flex h-9 min-w-[190px] flex-1 items-center gap-2 rounded-full border border-white/10 bg-[#0b1420] px-4 text-[#7c8a9e]"><Search className="h-3.5 w-3.5" /><input value={query} onChange={(e) => { setQuery(e.target.value); setPage(1) }} placeholder="Search instrument" className="w-full bg-transparent text-[11px] text-white outline-none" /></label>
+      <div className="relative"><button onClick={() => setSourceOpen((v) => !v)} className={`${pill} text-[#aeb8c7]`}>{source}<ChevronDown className="h-3 w-3" /></button>{sourceOpen && <div className="absolute right-0 z-30 mt-2 w-44 rounded-2xl border border-white/10 bg-[#111b29] p-2 shadow-2xl">{['All sources', 'API Confirmed', 'Manual Override', 'Vendor Feed', 'File Upload'].map((item) => <button key={item} onClick={() => { setSource(item); setPage(1); setSourceOpen(false) }} className={`flex w-full items-center justify-between rounded-full px-3 py-2 text-left text-[10px] ${source === item ? 'bg-[#2f87fa] text-white' : 'text-[#9aa8ba] hover:bg-white/[0.06]'}`}>{item}{source === item && <Check className="h-3 w-3" />}</button>)}</div>}</div>
+      <div className="relative"><button onClick={() => setDateOpen((v) => !v)} className={`${pill} text-[#aeb8c7]`}>{date}<ChevronDown className="h-3 w-3" /></button>{dateOpen && <div className="absolute right-0 z-30 mt-2 w-48 rounded-2xl border border-white/10 bg-[#111b29] p-2 shadow-2xl">{['All dates', 'Today', 'Previous business day', 'Older'].map((item) => <button key={item} onClick={() => { setDate(item); setPage(1); setDateOpen(false) }} className={`flex w-full items-center justify-between rounded-full px-3 py-2 text-left text-[10px] ${date === item ? 'bg-[#2f87fa] text-white' : 'text-[#9aa8ba] hover:bg-white/[0.06]'}`}>{item}{date === item && <Check className="h-3 w-3" />}</button>)}</div>}</div>
+      <div className="relative"><button onClick={() => setMarketOpen((v) => !v)} className={`${pill} text-[#aeb8c7]`}>{market}<ChevronDown className="h-3 w-3" /></button>{marketOpen && <div className="absolute right-0 z-30 mt-2 w-40 rounded-2xl border border-white/10 bg-[#111b29] p-2 shadow-2xl">{['All markets', 'ZSE', 'VFEX', 'OTC', 'Internal', 'NASDAQ'].map((item) => <button key={item} onClick={() => { setMarket(item); setPage(1); setMarketOpen(false) }} className={`flex w-full items-center justify-between rounded-full px-3 py-2 text-left text-[10px] ${market === item ? 'bg-[#2f87fa] text-white' : 'text-[#9aa8ba] hover:bg-white/[0.06]'}`}>{item}{market === item && <Check className="h-3 w-3" />}</button>)}</div>}</div>
+      <div className="relative"><button onClick={() => setFilterOpen((v) => !v)} className={`${pill} text-[#aeb8c7]`}>{status}<ChevronDown className="h-3 w-3" /></button>{filterOpen && <div className="absolute right-0 z-30 mt-2 w-44 rounded-2xl border border-white/10 bg-[#111b29] p-2 shadow-2xl">{['All statuses', ...statuses].map((item) => <button key={item} onClick={() => { setStatus(item); setPage(1); setFilterOpen(false) }} className={`flex w-full items-center justify-between rounded-full px-3 py-2 text-left text-[10px] ${status === item ? 'bg-[#2f87fa] text-white' : 'text-[#9aa8ba] hover:bg-white/[0.06]'}`}>{item}{status === item && <Check className="h-3 w-3" />}</button>)}</div>}</div>
+    </div>}</div>
+    {view === 'ingest' ? <div className="grid gap-4 p-4 lg:grid-cols-[1fr_1fr_1.25fr]">
+      <button onClick={() => setUploadOpen(true)} className="group min-h-44 rounded-full border border-dashed border-[#2f87fa]/35 bg-[#2f87fa]/[0.04] p-5 text-left transition hover:border-[#2f87fa]/60 hover:bg-[#2f87fa]/[0.08]"><FileUp className="h-6 w-6 text-[#66a5fa]" /><p className="mt-5 text-sm font-semibold">Upload market prices</p><p className="mt-2 text-[10px] leading-5 text-[#7d8ca0]">Stage CSV or XLSX prices, map columns and send rows through local validation.</p><span className="mt-4 inline-flex rounded-full bg-[#2f87fa]/15 px-3 py-1.5 text-[9px] text-[#8ebcff] group-hover:bg-[#2f87fa]/25">Choose demo file</span></button>
+      <button onClick={() => setManualOpen(true)} className="group min-h-44 rounded-full border border-white/[0.07] bg-black/10 p-5 text-left transition hover:border-[#2f87fa]/35 hover:bg-[#2f87fa]/[0.05]"><Plus className="h-6 w-6 text-[#66a5fa]" /><p className="mt-5 text-sm font-semibold">Enter a manual price</p><p className="mt-2 text-[10px] leading-5 text-[#7d8ca0]">Create a controlled override with mandatory independent review before approval.</p><span className="mt-4 inline-flex rounded-full bg-fuchsia-400/10 px-3 py-1.5 text-[9px] text-fuchsia-300 group-hover:bg-fuchsia-400/15">Create override</span></button>
+      <div className="rounded-[24px] border border-white/[0.07] bg-black/10 p-5"><div className="flex items-center justify-between"><div><p className="text-[9px] uppercase tracking-[.16em] text-[#718096]">Recent ingest</p><h3 className="mt-1 text-sm font-semibold">Batch activity</h3></div><button onClick={() => setView('queue')} className={`${pill} h-8 px-3 text-[#8ebcff]`}>Review queue</button></div><div className="mt-4 space-y-2">{[['ZSE-close-1707.csv', '24 rows · 2 exceptions', 'Validated'], ['VFEX-live-1330.csv', '11 rows · 1 pending', 'Pending'], ['fund-nav-1707.xlsx', '6 rows · no exceptions', 'Approved']].map(([name, detail, state]) => <button key={name} onClick={() => { setView('queue'); setQuery(name.split('-')[0]) }} className="flex w-full items-center justify-between rounded-full border border-white/[0.06] px-3 py-3 text-left transition hover:bg-white/[0.04]"><div><p className="font-mono text-[10px] text-[#c4cedb]">{name}</p><p className="mt-1 text-[9px] text-[#6e7d91]">{detail}</p></div><Badge value={state as Status} /></button>)}</div></div>
+    </div> : <>
+      <div className="overflow-x-auto"><table className="w-full min-w-[1120px] text-left text-[10px]"><thead className="text-[#6f7e92]"><tr>{['Instrument', 'Market', 'Current', 'Previous', 'Change', 'Source', 'Status', 'Priced at', view === 'queue' ? 'Review action' : 'Control note'].map((head) => <th key={head} className="border-b border-white/[0.06] px-4 py-3 font-medium">{head}</th>)}</tr></thead><tbody>{rows.map((row) => { const change = ((row.price - row.previous) / row.previous) * 100; return <tr key={row.id} className="border-b border-white/[0.045] transition hover:bg-white/[0.035]"><td className="px-4 py-3"><p className="font-semibold text-white">{row.ticker}</p><p className="mt-1 text-[9px] text-[#78879a]">{row.name}</p></td><td className="px-4 py-3 text-[#aab4c2]">{row.market} · {row.currency}</td><td className="px-4 py-3 font-mono font-semibold">{row.price.toFixed(4)}</td><td className="px-4 py-3 font-mono text-[#8794a7]">{row.previous.toFixed(4)}</td><td className={`px-4 py-3 font-mono ${change >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>{change >= 0 ? '+' : ''}{change.toFixed(2)}%</td><td className="px-4 py-3"><Badge value={row.source} /></td><td className="px-4 py-3"><Badge value={row.status} /></td><td className="px-4 py-3 font-mono text-[#7d8b9e]">{row.time}</td><td className="max-w-[290px] px-4 py-3">{view === 'queue' && ['Pending', 'Validated'].includes(row.status) ? <div><p className="mb-1 text-[9px] font-semibold uppercase tracking-wider text-amber-300">{row.issue || 'Ready for approval'}</p><p className="mb-2 flex items-start gap-1.5 text-[9px] text-amber-200/80"><ShieldAlert className="mt-0.5 h-3 w-3 shrink-0" />{row.flag || 'Validated and ready for approval.'}</p><div className="flex gap-1.5"><button onClick={() => decide(row.id, 'Approved')} className={`${pill} h-7 border-emerald-400/30 px-3 text-emerald-300`}>Four-eye approve</button><button onClick={() => decide(row.id, 'Rejected')} className={`${pill} h-7 border-rose-400/30 px-3 text-rose-300`}>Reject</button></div></div> : <div><p className="text-[9px] font-semibold text-[#9eabc0]">{row.issue || 'No exception'}</p><p className="mt-1 text-[9px] text-[#78879a]">{row.flag || 'No control exceptions'}</p></div>}</td></tr> })}</tbody></table></div>
+      <footer className="flex items-center justify-between px-4 py-3 text-[10px] text-[#718096]"><span>Showing {rows.length} of {filtered.length} prices</span><div className="flex items-center gap-2"><button disabled={page === 1} onClick={() => setPage((p) => p - 1)} className={`${pill} h-8 w-8 px-0 disabled:opacity-30`}><ChevronLeft className="h-3.5 w-3.5" /></button><span>{page} / {totalPages}</span><button disabled={page === totalPages} onClick={() => setPage((p) => p + 1)} className={`${pill} h-8 w-8 px-0 disabled:opacity-30`}><ChevronRight className="h-3.5 w-3.5" /></button></div></footer>
+    </>}</section>
+  </div>
+  {notice && <div className="fixed bottom-5 right-5 z-[80] rounded-full border border-white/10 bg-[#172333] px-4 py-2 text-[11px] shadow-2xl"><Check className="mr-2 inline h-3.5 w-3.5 text-emerald-300" />{notice}</div>}
+  {manualOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onMouseDown={() => setManualOpen(false)}><form onSubmit={addManual} onMouseDown={(e) => e.stopPropagation()} className={`${card} w-full max-w-md p-6`}><div className="flex items-center justify-between"><h2 className="text-lg font-semibold">Enter manual price</h2><button type="button" onClick={() => setManualOpen(false)} className={`${pill} h-9 w-9 px-0`}><X className="h-4 w-4" /></button></div><div className="mt-6 space-y-4">{[['ticker', 'Ticker'], ['price', 'Price'], ['market', 'Market']].map(([name, label]) => <label key={name}><span className="mb-2 block text-[10px] text-[#8795a8]">{label}</span><input name={name} required className={input} /></label>)}</div><div className="mt-6 flex justify-end gap-2"><button type="button" onClick={() => setManualOpen(false)} className={`${pill}`}>Cancel</button><button className={`${pill} border-[#2f87fa] bg-[#2f87fa] text-white`}>Submit for review</button></div></form></div>}
+  {uploadOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onMouseDown={() => setUploadOpen(false)}><div onMouseDown={(e) => e.stopPropagation()} className={`${card} w-full max-w-lg p-6`}><div className="flex items-center justify-between"><h2 className="text-lg font-semibold">Upload price file</h2><button onClick={() => setUploadOpen(false)} className={`${pill} h-9 w-9 px-0`}><X className="h-4 w-4" /></button></div><button onClick={() => { setUploadOpen(false); flash('Demo file staged for validation') }} className="mt-6 flex h-44 w-full flex-col items-center justify-center rounded-full border border-dashed border-[#2f87fa]/40 bg-[#2f87fa]/[0.05] text-[#8291a5] transition hover:bg-[#2f87fa]/10"><FileUp className="mb-3 h-7 w-7 text-[#5d9df3]" /><span className="text-[11px]">Select CSV or XLSX price file</span><span className="mt-1 text-[9px] text-[#5f6e82]">Local prototype — no file is transmitted</span></button></div></div>}
+  </main>
 }

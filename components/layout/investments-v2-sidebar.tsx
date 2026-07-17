@@ -14,6 +14,8 @@ import {
   Scale,
   TrendingUp,
   BarChart2,
+  FileText,
+  Calculator,
   ChevronDown,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -34,6 +36,7 @@ const navItems = [
       { label: 'Prices', href: '/investments-v2/portfolios/prices' },
       { label: 'Positions', href: '/investments-v2/portfolios/positions' },
       { label: 'Transactions', href: '/investments-v2/portfolios/transactions' },
+      { label: 'Folder Setup', href: '/investments-v2/portfolios/folder-setup' },
       { label: 'Setup', href: '/investments-v2/portfolios/setup' },
     ],
   },
@@ -48,6 +51,7 @@ const navItems = [
       { label: 'Compliance', href: '/investments-v2/orders/compliance' },
       { label: 'Simulation', href: '/investments-v2/orders/simulation' },
       { label: 'Models', href: '/investments-v2/orders/models' },
+      { label: 'Setup', href: '/investments-v2/orders/setup' },
     ],
   },
   {
@@ -64,7 +68,17 @@ const navItems = [
     label: 'Reporting',
     icon: BarChart2,
     href: '/investments-v2/reporting',
-  }
+  },
+  {
+    label: 'Documentation',
+    icon: FileText,
+    href: '/investments-v2/documentation',
+  },
+  {
+    label: 'Accounting',
+    icon: Calculator,
+    href: '/investments-v2/accounting',
+  },
 ]
 
 export function InvestmentsV2Sidebar() {
@@ -142,7 +156,7 @@ export function InvestmentsV2Sidebar() {
     } else {
       return isActive
         ? { color: '#2563eb', background: 'rgba(37,99,235,0.08)' }
-        : { color: '#64748b' }
+        : { color: '#475569' }
     }
   }
 
@@ -150,12 +164,12 @@ export function InvestmentsV2Sidebar() {
     if (theme === 'dark') {
       return isActive ? { color: '#3b82f6', fontWeight: 500 } : { color: '#64748b' }
     } else {
-      return isActive ? { color: '#2563eb', fontWeight: 500 } : { color: '#64748b' }
+      return isActive ? { color: '#2563eb', fontWeight: 500 } : { color: '#475569' }
     }
   }
 
   const userCardBg = theme === 'dark' ? '#14161e' : '#f8fafc'
-  const userCardBorder = theme === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'
+  const userCardBorder = theme === 'dark' ? 'rgba(255,255,255,0.06)' : '#e2e8f0'
 
   return (
     <aside className="w-[210px] flex-shrink-0 flex flex-col overflow-hidden" style={sidebarStyles}>
@@ -187,7 +201,7 @@ export function InvestmentsV2Sidebar() {
             <div key={item.label}>
               <button
                 onClick={() => toggleExpand(item.label)}
-                className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-[13px] font-medium transition-colors"
+                className="w-full flex items-center justify-between px-3 py-2 rounded-full text-[13px] font-medium transition-colors"
                 style={navItemStyles(isActive)}
               >
                 <div className="flex items-center gap-2.5">
@@ -238,7 +252,7 @@ export function InvestmentsV2Sidebar() {
               </div>
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-[13px] font-semibold leading-tight truncate" style={{ color: theme === 'dark' ? '#e2e8f0' : '#1a2233' }}>
+              <div className="text-[13px] font-semibold leading-tight truncate" style={{ color: theme === 'dark' ? '#e2e8f0' : '#0f172a' }}>
                 {getUserName()}
               </div>
               <div className="text-[11px] truncate" style={{ color: '#64748b' }}>
