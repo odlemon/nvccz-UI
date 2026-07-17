@@ -1,26 +1,24 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import {
   CheckCircle2,
   Clock,
   Download,
   FileSignature,
+  Loader2,
   PenLine,
   Plus,
   Stamp,
+  UploadCloud,
 } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import {
-  FR_AGREEMENTS,
-  sigStatusClass,
-  type AgreementType,
-  type FrAgreement,
-  type SigStatus,
-} from "./agreements-mock-data"
+import { Skeleton } from "@/components/ui/skeleton"
+import { fundraisingApi, toastFrError } from "@/lib/api/fundraising-api"
+import { exportFundraisingCsv } from "@/lib/fundraising/export"
+import { mapAgreementRow } from "@/lib/fundraising/mappers"
 import {
   FrDialogShell,
   FrField,
@@ -34,6 +32,42 @@ import { FrSimpleWizard, ReviewList } from "./fundraising-create-wizards"
 const CARD =
   "rounded-[6px] border border-[#e2e8f0] bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
 
+type FrAgreement = ReturnType<typeof mapAgreementRow>
+
+const DOCUMENT_TYPES = [
+  "NDA",
+  "TERM_SHEET",
+  "SUBSCRIPTION_AGREEMENT",
+  "LPA",
+  "SIDE_LETTER",
+  "CO_INVESTMENT_AGREEMENT",
+  "IMA",
+  "MANDATE",
+  "FEE_SCHEDULE",
+  "INVESTMENT_GUIDELINES",
+]
+
+function sigStatusClass(s: string) {
+  const u = s.toUpperCase()
+  if (u === "COMPLETED") return "bg-[#dcfce7] text-[#15803d]"
+  if (u === "SENT" || u === "PARTIALLY SIGNED" || u === "PARTIALLY_SIGNED") return "bg-[#dbeafe] text-[#1d4ed8]"
+  if (u === "EXPIRED" || u === "VOIDED" || u === "VOID") return "bg-[#fee2e2] text-[#dc2626]"
+  return "bg-[#f1f5f9] text-[#64748b]"
+}
+
+function typeBadge(type: string) {
+  const map: Record<string, string> = {
+    NDA: "bg-[#e0e7ff] text-[#3730a3]",
+    Subscription: "bg-[#dcfce7] text-[#166534]",
+    LPA: "bg-[#fce7f3] text-[#9d174d]",
+    "Side Letter": "bg-[#ffedd5] text-[#c2410c]",
+    IMA: "bg-[#dbeafe] text-[#1d4ed8]",
+    "Term Sheet": "bg-[#fef3c7] text-[#b45309]",
+    "Fee Schedule": "bg-[#f1f5f9] text-[#475569]",
+  }
+  return map[type] ?? "bg-[#f1f5f9] text-[#64748b]"
+}
+
 const SIG_INK = ["#1e3a5f", "#0f766e", "#7c2d12", "#1d4ed8", "#4c1d95"] as const
 
 function signatureStyle(name: string) {
@@ -42,7 +76,6 @@ function signatureStyle(name: string) {
   return SIG_INK[h]
 }
 
-/** Decorative cursive signature block for mock e-sign UI */
 function SignatureMark({
   name,
   signed,
@@ -78,14 +111,6 @@ function SignatureMark({
             <CheckCircle2 className="h-3 w-3" />
             Signed{signedAt ? ` · ${signedAt}` : ""}
           </p>
-          <svg
-            className="pointer-events-none absolute -right-1 -top-1 h-10 w-10 opacity-[0.12]"
-            viewBox="0 0 40 40"
-            aria-hidden
-          >
-            <circle cx="20" cy="20" r="14" fill="none" stroke={ink} strokeWidth="2" />
-            <path d="M12 21l5 5 11-12" fill="none" stroke={ink} strokeWidth="2.5" />
-          </svg>
         </>
       ) : (
         <>
@@ -101,38 +126,33 @@ function SignatureMark({
   )
 }
 
-function typeBadge(type: AgreementType) {
-  const map: Record<string, string> = {
-    NDA: "bg-[#e0e7ff] text-[#3730a3]",
-    Subscription: "bg-[#dcfce7] text-[#166534]",
-    LPA: "bg-[#fce7f3] text-[#9d174d]",
-    "Side Letter": "bg-[#ffedd5] text-[#c2410c]",
-    IMA: "bg-[#dbeafe] text-[#1d4ed8]",
-    "Term Sheet": "bg-[#fef3c7] text-[#b45309]",
-    "Fee Schedule": "bg-[#f1f5f9] text-[#475569]",
-  }
-  return map[type] ?? "bg-[#f1f5f9] text-[#64748b]"
-}
-
 export function FundraisingAgreements() {
+  const [loading, setLoading] = useState(true)
+  const [rawAgreements, setRawAgreements] = useState<Record<string, any>[]>([])
   const [tab, setTab] = useState<"agreements" | "signatures">("agreements")
-  const [items, setItems] = useState(FR_AGREEMENTS)
-  const [selectedId, setSelectedId] = useState(FR_AGREEMENTS[0].id)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
   const [sendOpen, setSendOpen] = useState(false)
   const [sigsOpen, setSigsOpen] = useState(false)
-  const [form, setForm] = useState({
-    name: "NMBZ Holdings — Subscription Agreement",
-    type: "Subscription" as AgreementType,
-    investor: "NMBZ Holdings Limited",
-    campaign: "ZGF II",
-  })
-  const [sigForm, setSigForm] = useState({
-    signatory: "Tendai Mawoyo",
-    role: "Investor signatory",
-  })
+  const [submitting, setSubmitting] = useState(false)
+  const [uploadingVersion, setUploadingVersion] = useState(false)
+  const [signingId, setSigningId] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const selected = items.find((a) => a.id === selectedId) ?? items[0]
+  const [loadingRefs, setLoadingRefs] = useState(false)
+  const [investors, setInvestors] = useState<Record<string, any>[]>([])
+  const [campaigns, setCampaigns] = useState<Record<string, any>[]>([])
+
+  const [form, setForm] = useState({
+    documentType: DOCUMENT_TYPES[0],
+    title: "",
+    investorId: "",
+    campaignId: "",
+  })
+  const [sigForm, setSigForm] = useState({ fullName: "", email: "", role: "", sequenceOrder: "1", expiresAt: "" })
+
+  const items = useMemo(() => rawAgreements.map(mapAgreementRow), [rawAgreements])
+  const selected = items.find((a) => a.id === selectedId) ?? null
 
   const signatureQueue = useMemo(
     () => items.filter((a) => a.status === "Sent" || a.status === "Partially Signed"),
@@ -141,68 +161,152 @@ export function FundraisingAgreements() {
 
   const list = tab === "agreements" ? items : signatureQueue
   const completedCount = items.filter((a) => a.status === "Completed").length
-  const pendingSigs = items.reduce(
-    (n, a) => n + a.signatories.filter((s) => s.status === "Pending").length,
-    0,
-  )
+  const pendingSigs = items.reduce((n, a) => n + a.signatories.filter((s) => s.status === "Pending").length, 0)
 
-  function createAgreement() {
-    if (!form.name.trim()) return
-    const ag: FrAgreement = {
-      id: `ag-${Date.now()}`,
-      name: form.name.trim(),
-      type: form.type,
-      investor: form.investor,
-      campaign: form.campaign,
-      version: "v1",
-      status: "Draft",
-      signatories: [],
-      sentDate: null,
-      expiry: null,
-      owner: "You",
+  async function loadAgreements() {
+    setLoading(true)
+    try {
+      const res = await fundraisingApi.listAgreements()
+      setRawAgreements(res ?? [])
+    } catch (err) {
+      toastFrError(err, "Could not load agreements")
+      setRawAgreements([])
+    } finally {
+      setLoading(false)
     }
-    setItems((p) => [ag, ...p])
-    setSelectedId(ag.id)
-    setCreateOpen(false)
-    setForm({
-      name: "NMBZ Holdings — Subscription Agreement",
-      type: "Subscription",
-      investor: "NMBZ Holdings Limited",
-      campaign: "ZGF II",
-    })
-    toast.success("Agreement created")
   }
 
-  function sendForSignature() {
-    if (!sigForm.signatory.trim() || !selected) return
-    setItems((prev) =>
-      prev.map((a) => {
-        if (a.id !== selected.id) return a
-        return {
-          ...a,
-          status: "Sent" as SigStatus,
-          sentDate: "15 Jul 2026",
-          expiry: "29 Jul 2026",
-          signatories: [
-            ...a.signatories,
-            {
-              id: `s-${Date.now()}`,
-              name: sigForm.signatory.trim(),
-              role: sigForm.role,
-              status: "Pending" as const,
-              signedAt: null,
-            },
-          ],
-        }
-      }),
+  useEffect(() => {
+    loadAgreements()
+  }, [])
+
+  useEffect(() => {
+    if (!createOpen) return
+    setLoadingRefs(true)
+    Promise.allSettled([
+      fundraisingApi.listInvestors({ pageSize: 100 }),
+      fundraisingApi.listCampaigns(),
+    ])
+      .then(([invRes, campRes]) => {
+        setInvestors(invRes.status === "fulfilled" ? invRes.value.items ?? [] : [])
+        setCampaigns(campRes.status === "fulfilled" ? campRes.value ?? [] : [])
+      })
+      .finally(() => setLoadingRefs(false))
+  }, [createOpen])
+
+  function resetForm() {
+    setForm({ documentType: DOCUMENT_TYPES[0], title: "", investorId: "", campaignId: "" })
+  }
+
+  async function submitCreate() {
+    if (!form.title.trim()) return
+    setSubmitting(true)
+    try {
+      const created = await fundraisingApi.createAgreement({
+        documentType: form.documentType,
+        title: form.title.trim(),
+        investorId: form.investorId || undefined,
+        campaignId: form.campaignId || undefined,
+      })
+      toast.success("Agreement created")
+      resetForm()
+      setCreateOpen(false)
+      await loadAgreements()
+      if (created?.id) setSelectedId(String(created.id))
+    } catch (err) {
+      toastFrError(err, "Could not create agreement")
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  async function submitSignatory() {
+    if (!selected || !sigForm.fullName.trim()) return
+    setSubmitting(true)
+    try {
+      await fundraisingApi.addSignatory(selected.id, {
+        fullName: sigForm.fullName.trim(),
+        email: sigForm.email.trim() || undefined,
+        role: sigForm.role.trim() || undefined,
+        sequenceOrder: Number(sigForm.sequenceOrder) || 1,
+        expiresAt: sigForm.expiresAt ? new Date(sigForm.expiresAt).toISOString() : undefined,
+      })
+      toast.success("Signature request sent")
+      setSigForm({ fullName: "", email: "", role: "", sequenceOrder: "1", expiresAt: "" })
+      setSendOpen(false)
+      await loadAgreements()
+    } catch (err) {
+      toastFrError(err, "Could not send signature request")
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  async function markSigned(signatoryId: string) {
+    if (!selected) return
+    setSigningId(signatoryId)
+    try {
+      await fundraisingApi.signSignatory(selected.id, signatoryId, {
+        certificateRef: `manual-ack-${new Date().toISOString()}`,
+      })
+      toast.success("Marked as signed")
+      await loadAgreements()
+    } catch (err) {
+      toastFrError(err, "Could not mark as signed")
+    } finally {
+      setSigningId(null)
+    }
+  }
+
+  async function handleVersionFile(file: File | null) {
+    if (!file || !selected) return
+    setUploadingVersion(true)
+    try {
+      await fundraisingApi.uploadAgreementVersion(selected.id, file)
+      toast.success("New version uploaded", { description: "Pending signatures on the prior version are invalidated." })
+      await loadAgreements()
+    } catch (err) {
+      toastFrError(err, "Could not upload version")
+    } finally {
+      setUploadingVersion(false)
+    }
+  }
+
+  function handleExport() {
+    exportFundraisingCsv(
+      items,
+      [
+        { key: "name", label: "Agreement" },
+        { key: "type", label: "Type" },
+        { key: "investor", label: "Investor" },
+        { key: "campaign", label: "Campaign" },
+        { key: "version", label: "Version" },
+        { key: "status", label: "Status" },
+        { key: "owner", label: "Owner" },
+        { key: "sentDate", label: "Sent date" },
+        { key: "expiry", label: "Expiry" },
+        {
+          key: "signatories",
+          label: "Signatories",
+          value: (agreement) =>
+            agreement.signatories.map((signatory) => `${signatory.name} (${signatory.status})`).join("; "),
+        },
+      ],
+      "fundraising-agreements",
     )
-    setSendOpen(false)
-    setSigForm({ signatory: "Tendai Mawoyo", role: "Investor signatory" })
-    toast.success("Signature request sent")
   }
 
   return (
     <div className="h-full overflow-y-auto bg-[#f8fafc] p-4 md:p-6">
+      <input
+        ref={fileInputRef}
+        type="file"
+        className="sr-only"
+        onChange={(e) => {
+          handleVersionFile(e.target.files?.[0] ?? null)
+          e.target.value = ""
+        }}
+      />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-bold text-[#0f172a] md:text-[22px]">Agreements & Signatures</h1>
@@ -211,10 +315,15 @@ export function FundraisingAgreements() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" className="h-9 rounded-full px-4" onClick={() => toast.success("Export started")}>
+          <Button variant="outline" className="h-9 rounded-full px-4" onClick={handleExport}>
             <Download className="h-4 w-4" /> Export
           </Button>
-          <Button variant="outline" className="h-9 rounded-full px-4" onClick={() => setSendOpen(true)}>
+          <Button
+            variant="outline"
+            className="h-9 rounded-full px-4"
+            disabled={!selected}
+            onClick={() => setSendOpen(true)}
+          >
             <PenLine className="h-4 w-4" /> Send for Signature
           </Button>
           <Button
@@ -250,222 +359,279 @@ export function FundraisingAgreements() {
         Guardrail: uploading a new agreement version invalidates outstanding signature requests for that document.
       </div>
 
-      <div className="mt-5 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
-        <div className={cn(CARD, "overflow-hidden")}>
-          <div className="flex items-center gap-4 border-b border-[#f1f5f9] px-3 pt-3">
-            <button
-              type="button"
-              onClick={() => setTab("agreements")}
-              className={cn(
-                "border-b-2 pb-2.5 text-[12px] font-medium",
-                tab === "agreements"
-                  ? "border-transparent bg-gradient-to-r from-blue-600 to-cyan-600 bg-[length:100%_2px] bg-bottom bg-no-repeat text-[#2563eb]"
-                  : "border-transparent text-[#94a3b8]",
-              )}
-            >
-              Agreements ({items.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setTab("signatures")}
-              className={cn(
-                "border-b-2 pb-2.5 text-[12px] font-medium",
-                tab === "signatures"
-                  ? "border-transparent bg-gradient-to-r from-blue-600 to-cyan-600 bg-[length:100%_2px] bg-bottom bg-no-repeat text-[#2563eb]"
-                  : "border-transparent text-[#94a3b8]",
-              )}
-            >
-              Signature requests ({signatureQueue.length})
-            </button>
+      {loading ? (
+        <div className="mt-5 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
+          <div className={cn(CARD, "space-y-4 p-4")}>
+            {Array.from({ length: 5 }).map((_, index) => (
+              <div key={index} className="flex items-center gap-3 border-b border-[#f1f5f9] pb-4 last:border-0">
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-1/2" />
+                  <Skeleton className="h-3 w-3/4" />
+                </div>
+                <Skeleton className="h-2 w-28 rounded-full" />
+              </div>
+            ))}
           </div>
-          <div className="divide-y divide-[#f1f5f9]">
-            {list.map((a) => {
-              const signed = a.signatories.filter((s) => s.status === "Signed").length
-              const total = a.signatories.length
-              const pct = total ? Math.round((signed / total) * 100) : 0
-              return (
-                <button
-                  key={a.id}
-                  type="button"
-                  onClick={() => setSelectedId(a.id)}
-                  className={cn(
-                    "flex w-full flex-col gap-2 px-4 py-3.5 text-left transition-colors sm:flex-row sm:items-center sm:justify-between",
-                    selectedId === a.id ? "bg-[#eff6ff]" : "hover:bg-[#f8fafc]",
-                  )}
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="truncate text-[13px] font-semibold text-[#0f172a]">{a.name}</p>
-                      <span className={cn("rounded-[4px] px-1.5 py-0.5 text-[10px] font-semibold", typeBadge(a.type))}>
-                        {a.type}
-                      </span>
-                      <span className={cn("rounded-[4px] px-1.5 py-0.5 text-[10px] font-semibold", sigStatusClass(a.status))}>
-                        {a.status}
-                      </span>
-                    </div>
-                    <p className="mt-0.5 text-[11px] text-[#64748b]">
-                      {a.investor} · {a.campaign} · {a.version}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3 sm:w-[160px]">
-                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#e2e8f0]">
-                      <div
-                        className="h-full rounded-full bg-gradient-to-r from-blue-600 to-cyan-600"
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                    <span className="text-[11px] tabular-nums text-[#64748b]">
-                      {total ? `${signed}/${total}` : "—"}
-                    </span>
-                  </div>
-                </button>
-              )
-            })}
+          <div className={cn(CARD, "space-y-4 p-4")}>
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-20 w-full rounded-[8px]" />
+            <Skeleton className="h-20 w-full rounded-[8px]" />
           </div>
         </div>
-
-        {selected ? (
-          <aside className={cn(CARD, "overflow-hidden")}>
-            <div className="border-b border-[#f1f5f9] bg-gradient-to-r from-[#eff6ff] to-[#ecfeff] px-4 py-3.5">
-              <div className="flex items-start gap-2">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-blue-600 shadow-sm">
-                  <FileSignature className="h-4 w-4" />
-                </span>
-                <div className="min-w-0">
-                  <h2 className="text-[13px] font-semibold text-[#0f172a]">{selected.name}</h2>
-                  <p className="text-[11px] text-[#64748b]">
-                    {selected.type} · {selected.version} · Owner {selected.owner}
-                  </p>
-                </div>
-              </div>
-              <p className="mt-2 text-[12px] text-[#334155]">{selected.investor}</p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                <span className={cn("rounded-[4px] px-1.5 py-0.5 text-[10px] font-semibold", sigStatusClass(selected.status))}>
-                  {selected.status}
-                </span>
-                {selected.sentDate ? (
-                  <span className="text-[10px] text-[#64748b]">Sent {selected.sentDate}</span>
-                ) : null}
-                {selected.expiry ? (
-                  <span className="text-[10px] text-[#b45309]">Expires {selected.expiry}</span>
-                ) : null}
-              </div>
+      ) : items.length === 0 ? (
+        <div className="mt-5 rounded-[10px] border border-[#e2e8f0] bg-white p-10 text-center text-[13px] text-[#94a3b8]">
+          No agreements yet. Create one to start an e-sign packet.
+        </div>
+      ) : (
+        <div className="mt-5 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
+          <div className={cn(CARD, "overflow-hidden")}>
+            <div className="flex items-center gap-4 border-b border-[#f1f5f9] px-3 pt-3">
+              <button
+                type="button"
+                onClick={() => setTab("agreements")}
+                className={cn(
+                  "rounded-full border-b-2 px-3 pb-2.5 pt-1 text-[12px] font-medium",
+                  tab === "agreements"
+                    ? "border-transparent bg-gradient-to-r from-blue-600 to-cyan-600 bg-[length:100%_2px] bg-bottom bg-no-repeat text-[#2563eb]"
+                    : "border-transparent text-[#94a3b8]",
+                )}
+              >
+                Agreements ({items.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setTab("signatures")}
+                className={cn(
+                  "rounded-full border-b-2 px-3 pb-2.5 pt-1 text-[12px] font-medium",
+                  tab === "signatures"
+                    ? "border-transparent bg-gradient-to-r from-blue-600 to-cyan-600 bg-[length:100%_2px] bg-bottom bg-no-repeat text-[#2563eb]"
+                    : "border-transparent text-[#94a3b8]",
+                )}
+              >
+                Signature requests ({signatureQueue.length})
+              </button>
             </div>
-
-            <div className="space-y-3 p-4">
-              <div className="flex items-center justify-between">
-                <p className="text-[11px] font-semibold text-[#0f172a]">Signature pad</p>
-                <button
-                  type="button"
-                  className="text-[11px] font-medium text-[#2563eb] hover:underline"
-                  onClick={() => setSigsOpen(true)}
-                >
-                  View history
-                </button>
-              </div>
-
-              {selected.signatories.length === 0 ? (
-                <div className="rounded-[8px] border border-dashed border-[#cbd5e1] bg-[#f8fafc] px-4 py-8 text-center">
-                  <PenLine className="mx-auto h-6 w-6 text-[#94a3b8]" />
-                  <p className="mt-2 text-[12px] text-[#64748b]">No signatories yet</p>
-                  <Button
-                    variant="gradient-info"
-                    className="mt-3 rounded-full h-8 px-4 text-[11px]"
-                    onClick={() => setSendOpen(true)}
-                  >
-                    Add signatory
-                  </Button>
-                </div>
-              ) : (
-                <ul className="space-y-3">
-                  {selected.signatories.map((s) => (
-                    <li key={s.id}>
-                      <div className="mb-1.5 flex items-center justify-between gap-2">
-                        <div>
-                          <p className="text-[12px] font-medium text-[#0f172a]">{s.name}</p>
-                          <p className="text-[10px] text-[#94a3b8]">{s.role}</p>
+            {list.length === 0 ? (
+              <p className="px-4 py-12 text-center text-[12px] text-[#94a3b8]">
+                No {tab === "agreements" ? "agreements" : "open signature requests"} to show.
+              </p>
+            ) : (
+              <div className="divide-y divide-[#f1f5f9]">
+                {list.map((a) => {
+                  const signed = a.signatories.filter((s) => s.status === "Signed").length
+                  const total = a.signatories.length
+                  const pct = total ? Math.round((signed / total) * 100) : 0
+                  return (
+                    <button
+                      key={a.id}
+                      type="button"
+                      onClick={() => setSelectedId(a.id)}
+                      className={cn(
+                        "flex w-full flex-col gap-2 rounded-full px-4 py-3.5 text-left transition-colors sm:flex-row sm:items-center sm:justify-between",
+                        selectedId === a.id ? "bg-[#eff6ff]" : "hover:bg-[#f8fafc]",
+                      )}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="truncate text-[13px] font-semibold text-[#0f172a]">{a.name}</p>
+                          <span className={cn("rounded-[4px] px-1.5 py-0.5 text-[10px] font-semibold", typeBadge(a.type))}>
+                            {a.type}
+                          </span>
+                          <span className={cn("rounded-[4px] px-1.5 py-0.5 text-[10px] font-semibold", sigStatusClass(a.status))}>
+                            {a.status}
+                          </span>
                         </div>
+                        <p className="mt-0.5 text-[11px] text-[#64748b]">
+                          {a.investor} · {a.campaign} · {a.version}
+                        </p>
                       </div>
-                      <SignatureMark
-                        name={s.name}
-                        signed={s.status === "Signed"}
-                        signedAt={s.signedAt}
-                      />
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </aside>
-        ) : null}
-      </div>
+                      <div className="flex items-center gap-3 sm:w-[160px]">
+                        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#e2e8f0]">
+                          <div
+                            className="h-full rounded-full bg-gradient-to-r from-blue-600 to-cyan-600"
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                        <span className="text-[11px] tabular-nums text-[#64748b]">
+                          {total ? `${signed}/${total}` : "—"}
+                        </span>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          {selected ? (
+            <aside className={cn(CARD, "overflow-hidden")}>
+              <div className="border-b border-[#f1f5f9] bg-gradient-to-r from-[#eff6ff] to-[#ecfeff] px-4 py-3.5">
+                <div className="flex items-start gap-2">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-blue-600 shadow-sm">
+                    <FileSignature className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0">
+                    <h2 className="text-[13px] font-semibold text-[#0f172a]">{selected.name}</h2>
+                    <p className="text-[11px] text-[#64748b]">
+                      {selected.type} · {selected.version} · Owner {selected.owner}
+                    </p>
+                  </div>
+                </div>
+                <p className="mt-2 text-[12px] text-[#334155]">{selected.investor}</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <span className={cn("rounded-[4px] px-1.5 py-0.5 text-[10px] font-semibold", sigStatusClass(selected.status))}>
+                    {selected.status}
+                  </span>
+                  {selected.sentDate ? (
+                    <span className="text-[10px] text-[#64748b]">Sent {selected.sentDate}</span>
+                  ) : null}
+                  {selected.expiry ? (
+                    <span className="text-[10px] text-[#b45309]">Expires {selected.expiry}</span>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="space-y-3 p-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-[11px] font-semibold text-[#0f172a]">Signature pad</p>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium text-[#2563eb] hover:bg-[#eff6ff]"
+                      disabled={uploadingVersion}
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      {uploadingVersion ? <Loader2 className="h-3 w-3 animate-spin" /> : <UploadCloud className="h-3 w-3" />}
+                      New version
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded-full px-2 py-1 text-[11px] font-medium text-[#2563eb] hover:bg-[#eff6ff]"
+                      onClick={() => setSigsOpen(true)}
+                    >
+                      View history
+                    </button>
+                  </div>
+                </div>
+
+                {selected.signatories.length === 0 ? (
+                  <div className="rounded-[8px] border border-dashed border-[#cbd5e1] bg-[#f8fafc] px-4 py-8 text-center">
+                    <PenLine className="mx-auto h-6 w-6 text-[#94a3b8]" />
+                    <p className="mt-2 text-[12px] text-[#64748b]">No signatories yet</p>
+                    <Button
+                      variant="gradient-info"
+                      className="mt-3 rounded-full h-8 px-4 text-[11px]"
+                      onClick={() => setSendOpen(true)}
+                    >
+                      Add signatory
+                    </Button>
+                  </div>
+                ) : (
+                  <ul className="space-y-3">
+                    {selected.signatories.map((s) => (
+                      <li key={s.id}>
+                        <div className="mb-1.5 flex items-center justify-between gap-2">
+                          <div>
+                            <p className="text-[12px] font-medium text-[#0f172a]">{s.name}</p>
+                            <p className="text-[10px] text-[#94a3b8]">{s.role}</p>
+                          </div>
+                          {s.status === "Pending" ? (
+                            <button
+                              type="button"
+                              disabled={signingId === s.id}
+                              onClick={() => markSigned(s.id)}
+                              className="rounded-full border border-[#e2e8f0] px-2.5 py-1 text-[10px] font-medium text-[#2563eb] hover:bg-[#eff6ff] disabled:opacity-50"
+                            >
+                              {signingId === s.id ? "Signing…" : "Mark signed"}
+                            </button>
+                          ) : null}
+                        </div>
+                        <SignatureMark name={s.name} signed={s.status === "Signed"} signedAt={s.signedAt} />
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </aside>
+          ) : null}
+        </div>
+      )}
 
       <FrSimpleWizard
         open={createOpen}
-        onOpenChange={setCreateOpen}
+        onOpenChange={(v) => {
+          setCreateOpen(v)
+          if (!v) resetForm()
+        }}
         title="New Agreement"
         steps={[
           { id: "identity", short: "1", label: "Agreement" },
           { id: "parties", short: "2", label: "Parties" },
           { id: "review", short: "3", label: "Review" },
         ]}
-        submitLabel="Create agreement"
-        validateStep={(step) =>
-          step === "identity" && !form.name.trim() ? ["Agreement name is required"] : []
-        }
-        onSubmit={createAgreement}
+        submitLabel={submitting ? "Creating…" : "Create agreement"}
+        validateStep={(step) => (step === "identity" && !form.title.trim() ? ["Title is required"] : [])}
+        onFinish={submitCreate}
       >
         {(step) =>
           step === "identity" ? (
             <div className="space-y-3">
-              <FrField label="Name">
+              <FrField label="Title">
                 <input
                   className={frInputClass}
-                  value={form.name}
-                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                  value={form.title}
+                  onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+                  placeholder="e.g. Subscription — NPF"
                 />
               </FrField>
-              <FrField label="Type">
+              <FrField label="Document type">
                 <select
                   className={frSelectClass}
-                  value={form.type}
-                  onChange={(e) => setForm((f) => ({ ...f, type: e.target.value as AgreementType }))}
+                  value={form.documentType}
+                  onChange={(e) => setForm((f) => ({ ...f, documentType: e.target.value }))}
                 >
-                  {["NDA", "Term Sheet", "Subscription", "LPA", "Side Letter", "IMA", "Fee Schedule"].map(
-                    (t) => (
-                      <option key={t}>{t}</option>
-                    ),
-                  )}
+                  {DOCUMENT_TYPES.map((t) => (
+                    <option key={t} value={t}>{t.replace(/_/g, " ")}</option>
+                  ))}
                 </select>
               </FrField>
             </div>
           ) : step === "parties" ? (
             <div className="space-y-3">
-              <FrField label="Investor">
-                <Input
-                  className="h-9 rounded-[6px] text-[12px]"
-                  value={form.investor}
-                  onChange={(e) => setForm((f) => ({ ...f, investor: e.target.value }))}
-                />
-              </FrField>
-              <FrField label="Campaign">
+              <FrField label="Investor (optional)">
                 <select
                   className={frSelectClass}
-                  value={form.campaign}
-                  onChange={(e) => setForm((f) => ({ ...f, campaign: e.target.value }))}
+                  value={form.investorId}
+                  disabled={loadingRefs}
+                  onChange={(e) => setForm((f) => ({ ...f, investorId: e.target.value }))}
                 >
-                  <option>ZGF II</option>
-                  <option>Institutional Mandates FY25</option>
+                  <option value="">{loadingRefs ? "Loading investors…" : "None"}</option>
+                  {investors.map((i) => (
+                    <option key={i.id} value={i.id}>{i.legalName || i.name}</option>
+                  ))}
+                </select>
+              </FrField>
+              <FrField label="Campaign (optional)">
+                <select
+                  className={frSelectClass}
+                  value={form.campaignId}
+                  disabled={loadingRefs}
+                  onChange={(e) => setForm((f) => ({ ...f, campaignId: e.target.value }))}
+                >
+                  <option value="">{loadingRefs ? "Loading campaigns…" : "None"}</option>
+                  {campaigns.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
                 </select>
               </FrField>
             </div>
           ) : (
             <ReviewList
               items={[
-                { label: "Agreement", value: form.name },
-                { label: "Type", value: form.type },
-                { label: "Investor", value: form.investor },
-                { label: "Campaign", value: form.campaign },
+                { label: "Title", value: form.title || "—" },
+                { label: "Type", value: form.documentType.replace(/_/g, " ") },
+                { label: "Investor", value: investors.find((i) => String(i.id) === form.investorId)?.legalName || "Not linked" },
+                { label: "Campaign", value: campaigns.find((c) => String(c.id) === form.campaignId)?.name || "Not linked" },
               ]}
             />
           )
@@ -481,9 +647,9 @@ export function FundraisingAgreements() {
         footer={
           <FrFormFooter
             onCancel={() => setSendOpen(false)}
-            onSubmit={sendForSignature}
-            submitLabel="Send request"
-            submitDisabled={!sigForm.signatory.trim()}
+            onSubmit={submitSignatory}
+            submitLabel={submitting ? "Sending…" : "Send request"}
+            submitDisabled={!sigForm.fullName.trim() || submitting}
           />
         }
       >
@@ -492,25 +658,31 @@ export function FundraisingAgreements() {
             <FrField label="Signatory name">
               <input
                 className={frInputClass}
-                value={sigForm.signatory}
-                onChange={(e) => setSigForm((f) => ({ ...f, signatory: e.target.value }))}
+                value={sigForm.fullName}
+                onChange={(e) => setSigForm((f) => ({ ...f, fullName: e.target.value }))}
               />
             </FrField>
-            <FrField label="Role">
-              <select
-                className={frSelectClass}
-                value={sigForm.role}
-                onChange={(e) => setSigForm((f) => ({ ...f, role: e.target.value }))}
-              >
-                <option>Investor signatory</option>
-                <option>Fund signatory</option>
-                <option>Witness</option>
-              </select>
+            <FrField label="Email">
+              <input
+                className={frInputClass}
+                value={sigForm.email}
+                onChange={(e) => setSigForm((f) => ({ ...f, email: e.target.value }))}
+                placeholder="name@example.com"
+              />
             </FrField>
+            <div className="grid grid-cols-2 gap-3">
+              <FrField label="Signing order">
+                <input type="number" min={1} className={frInputClass} value={sigForm.sequenceOrder} onChange={(e) => setSigForm((f) => ({ ...f, sequenceOrder: e.target.value }))} />
+              </FrField>
+              <FrField label="Expires">
+                <input type="date" className={frInputClass} value={sigForm.expiresAt} onChange={(e) => setSigForm((f) => ({ ...f, expiresAt: e.target.value }))} />
+              </FrField>
+            </div>
+            <p className="text-[9px] text-[#94a3b8]">Provider certificate, decline flow and signed-copy download are pending backend e-sign integration.</p>
           </div>
           <div>
             <p className="mb-2 text-[11px] font-medium text-[#64748b]">Signature preview</p>
-            <SignatureMark name={sigForm.signatory || "Signatory"} signed={false} />
+            <SignatureMark name={sigForm.fullName || "Signatory"} signed={false} />
           </div>
         </div>
       </FrDialogShell>

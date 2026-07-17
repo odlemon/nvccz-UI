@@ -1,10 +1,11 @@
 "use client"
 
 import { useMemo, useState, type ReactNode } from "react"
-import { Check, ChevronLeft, ChevronRight, Search } from "lucide-react"
+import { AlertTriangle, Check, ChevronLeft, ChevronRight, Loader2, Search, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   Dialog,
   DialogContent,
@@ -12,6 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { getFrError } from "@/lib/api/fundraising-api"
 
 export type FrDialogSize = "md" | "lg" | "xl" | "2xl" | "3xl"
 
@@ -131,6 +133,142 @@ export const frInputClass =
 
 export const frSelectClass =
   "h-9 w-full rounded-[6px] border border-[#e2e8f0] bg-white px-3 text-[12px] text-[#0f172a] outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20"
+
+export function FrTableSkeleton({
+  columns,
+  rows = 6,
+}: {
+  columns: number
+  rows?: number
+}) {
+  return (
+    <>
+      {Array.from({ length: rows }).map((_, row) => (
+        <tr key={row} className="border-b border-[#f1f5f9]">
+          {Array.from({ length: columns }).map((__, column) => (
+            <td key={column} className="px-4 py-3">
+              <Skeleton
+                className={cn(
+                  "h-3 bg-[#e2e8f0]",
+                  column === columns - 1 ? "ml-auto w-14 rounded-full" : "w-full max-w-[120px]",
+                )}
+              />
+            </td>
+          ))}
+        </tr>
+      ))}
+    </>
+  )
+}
+
+export function FrConfirmDialog({
+  open,
+  onOpenChange,
+  title,
+  description,
+  confirmLabel = "Confirm",
+  loading = false,
+  destructive = false,
+  onConfirm,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  title: string
+  description?: string
+  confirmLabel?: string
+  loading?: boolean
+  destructive?: boolean
+  onConfirm: () => void | Promise<void>
+}) {
+  return (
+    <FrDialogShell
+      open={open}
+      onOpenChange={onOpenChange}
+      title={title}
+      description={description}
+      size="md"
+      footer={
+        <>
+          <Button type="button" variant="outline" className="h-9 rounded-full px-4" disabled={loading} onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            variant={destructive ? "destructive" : "gradient-info"}
+            className="h-9 rounded-full px-5"
+            disabled={loading}
+            onClick={onConfirm}
+          >
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            {confirmLabel}
+          </Button>
+        </>
+      }
+    >
+      <p className="text-[12px] text-[#475569]">{description || "This action cannot be undone."}</p>
+    </FrDialogShell>
+  )
+}
+
+export function FrPromptDialog({
+  open,
+  onOpenChange,
+  title,
+  description,
+  label,
+  value,
+  onValueChange,
+  placeholder,
+  multiline = false,
+  required = false,
+  submitLabel = "Save",
+  loading = false,
+  onSubmit,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  title: string
+  description?: string
+  label: string
+  value: string
+  onValueChange: (value: string) => void
+  placeholder?: string
+  multiline?: boolean
+  required?: boolean
+  submitLabel?: string
+  loading?: boolean
+  onSubmit: () => void | Promise<void>
+}) {
+  const disabled = loading || (required && !value.trim())
+  return (
+    <FrDialogShell
+      open={open}
+      onOpenChange={onOpenChange}
+      title={title}
+      description={description}
+      size="md"
+      footer={
+        <>
+          <Button type="button" variant="outline" className="h-9 rounded-full px-4" disabled={loading} onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button type="button" variant="gradient-info" className={frPrimaryBtnSm} disabled={disabled} onClick={onSubmit}>
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            {submitLabel}
+          </Button>
+        </>
+      }
+    >
+      <FrField label={label}>
+        {multiline ? (
+          <textarea className={`${frInputClass} h-24 py-2`} value={value} onChange={(event) => onValueChange(event.target.value)} placeholder={placeholder} />
+        ) : (
+          <Input className={frInputClass} value={value} onChange={(event) => onValueChange(event.target.value)} placeholder={placeholder} />
+        )}
+      </FrField>
+    </FrDialogShell>
+  )
+}
 
 export type FrWizardStep = {
   id: string
@@ -328,6 +466,122 @@ export function FrWizardShell({
               </Button>
             )}
           </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/**
+ * Reusable "requirements not met" dialog for guardrail failures:
+ * STAGE_GATE_FAILED, ACTIVATION_REQUIREMENTS_UNMET, COMPLIANCE_BLOCKED, etc.
+ * Renders the server's unmetRequirements as a checklist instead of a fleeting toast.
+ */
+export type FrRequirementsState = {
+  open: boolean
+  title: string
+  description?: string
+  code?: string
+  requirements: string[]
+}
+
+export const emptyRequirementsState: FrRequirementsState = {
+  open: false,
+  title: "",
+  description: "",
+  code: undefined,
+  requirements: [],
+}
+
+const REQUIREMENT_TITLES: Record<string, string> = {
+  STAGE_GATE_FAILED: "Stage gate requirements not met",
+  ACTIVATION_REQUIREMENTS_UNMET: "Campaign cannot be activated yet",
+  MANDATE_ACTIVATION_FAILED: "Mandate cannot be activated yet",
+  COMPLIANCE_BLOCKED: "Blocked by compliance",
+  CAMPAIGN_NOT_ACTIVE: "Campaign must be active first",
+  VALIDATION_ERROR: "Please review the following",
+}
+
+/**
+ * Build a FrRequirementsState from an API error. Returns an `open: true` state when the error
+ * carries a structured checklist (unmetRequirements / unmet); otherwise returns a closed state so
+ * callers can fall back to a toast.
+ */
+export function requirementsFromError(
+  err: unknown,
+  fallbackTitle = "Requirements not met",
+): FrRequirementsState {
+  const body = getFrError(err)
+  const requirements = body.unmetRequirements?.length
+    ? body.unmetRequirements
+    : body.unmet?.length
+      ? body.unmet
+      : []
+  return {
+    open: requirements.length > 0,
+    title: (body.code && REQUIREMENT_TITLES[body.code]) || body.message || fallbackTitle,
+    description: requirements.length ? body.message : undefined,
+    code: body.code,
+    requirements,
+  }
+}
+
+export function FrRequirementsDialog({
+  state,
+  onOpenChange,
+}: {
+  state: FrRequirementsState
+  onOpenChange: (open: boolean) => void
+}) {
+  return (
+    <Dialog open={state.open} onOpenChange={onOpenChange}>
+      <DialogContent
+        className={cn(
+          SIZE_CLASS.md,
+          "gap-0 overflow-hidden rounded-[12px] border border-[#e2e8f0] p-0 shadow-lg",
+        )}
+      >
+        <DialogHeader className="border-b border-[#f1f5f9] px-5 pb-3 pt-5 text-left sm:px-6">
+          <DialogTitle className="flex items-center gap-2 text-base font-semibold text-[#0f172a]">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#fef3c7] text-[#b45309]">
+              <AlertTriangle className="h-4 w-4" />
+            </span>
+            {state.title}
+          </DialogTitle>
+          {state.description ? (
+            <DialogDescription className="text-xs text-[#64748b]">
+              {state.description}
+            </DialogDescription>
+          ) : null}
+        </DialogHeader>
+        <div className="max-h-[min(70vh,560px)] overflow-y-auto px-5 py-5 sm:px-6">
+          {state.requirements.length === 0 ? (
+            <p className="text-[12px] text-[#64748b]">No further details were provided.</p>
+          ) : (
+            <ul className="space-y-2">
+              {state.requirements.map((req, i) => (
+                <li
+                  key={`${req}-${i}`}
+                  className="flex items-start gap-2.5 rounded-md border border-[#fde68a] bg-[#fffbeb] px-3 py-2.5"
+                >
+                  <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-[#f59e0b] text-[#b45309]">
+                    <X className="h-2.5 w-2.5" strokeWidth={3} />
+                  </span>
+                  <span className="text-[12px] text-[#78350f]">{req}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center justify-end gap-2 border-t border-[#f1f5f9] bg-[#fafafa] px-5 py-3">
+          <Button
+            type="button"
+            variant="gradient-info"
+            className={frPrimaryBtnSm}
+            onClick={() => onOpenChange(false)}
+          >
+            Got it
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

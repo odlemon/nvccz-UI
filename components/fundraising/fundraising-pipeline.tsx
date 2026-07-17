@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import {
   CalendarDays,
   CheckCircle2,
@@ -41,16 +41,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { fundraisingApi, asNumber, toastFrError } from "@/lib/api/fundraising-api"
+import { exportFundraisingCsv } from "@/lib/fundraising/export"
+import { mapOpportunityRow, moneyLabel } from "@/lib/fundraising/mappers"
+import { FrTableSkeleton } from "@/components/fundraising/fundraising-modals"
+import { stageChipClass } from "./dashboard-mock-data"
 import {
-  ACTIVITY_BY_FILTER,
-  CAPITAL_BY_FILTER,
-  KPIS_BY_FILTER,
-  STAGES_BY_FILTER,
-  TOP_OPPORTUNITIES,
-  TOTAL_PIPELINE_BY_FILTER,
-  UPCOMING_BY_FILTER,
   type ActivityItem,
   type PipelineFilter,
+  type PipelineKpi,
   type PipelineStage,
   type UpcomingItem,
 } from "./pipeline-mock-data"
@@ -58,6 +57,15 @@ import { FundraisingPipelineBoard } from "./fundraising-pipeline-board"
 
 type PipelineViewMode = "overview" | "board"
 const CARD = "rounded-[12px] border border-[#e2e8f0] bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+const STAGE_COLORS = ["#2563eb", "#0284c7", "#0ea5e9", "#16a34a", "#7c3aed", "#8b5cf6"]
+
+const CAMPAIGN_TYPE_BY_FILTER: Record<PipelineFilter, string | undefined> = {
+  all: undefined,
+  vc: "VC_FUNDRAISE",
+  pe: "PE_FUNDRAISE",
+  am: "INSTITUTIONAL_MANDATE",
+}
 
 const FILTERS: { id: PipelineFilter; label: string }[] = [
   { id: "all", label: "All" },
@@ -65,15 +73,6 @@ const FILTERS: { id: PipelineFilter; label: string }[] = [
   { id: "pe", label: "PE Fund" },
   { id: "am", label: "Asset Management" },
 ]
-
-const STAGE_TONE: Record<string, string> = {
-  blue: "bg-[#3b82f6] text-white",
-  navy: "bg-[#1e3a8a] text-white",
-  sky: "bg-[#bae6fd] text-[#0c4a6e]",
-  green: "bg-[#22c55e] text-white",
-  vivid: "bg-[#2563eb] text-white",
-  purple: "bg-[#8b5cf6] text-white",
-}
 
 function probabilityColor(value: number) {
   if (value >= 70) return "#16a34a"
@@ -91,6 +90,47 @@ const AVATAR_TONES = [
   "bg-[#e0e7ff] text-[#4338ca]",
   "bg-[#fce7f3] text-[#be185d]",
 ]
+
+function oppInitials(name: string) {
+  return (
+    name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((w) => w[0]?.toUpperCase() ?? "")
+      .join("") || "?"
+  )
+}
+
+function safePersonName(value: unknown, fallback = "Name unavailable") {
+  const name = typeof value === "string" ? value.trim() : ""
+  return name && !UUID_PATTERN.test(name) ? name : fallback
+}
+
+function embeddedPersonName(raw: Record<string, any>, key: "owner" | "user", mapped?: string) {
+  const person = raw[key] || (key === "owner" ? raw.assignedOwner : raw.actor)
+  const embedded =
+    person && typeof person === "object"
+      ? person.fullName ||
+        person.displayName ||
+        person.name ||
+        [person.firstName, person.lastName].filter(Boolean).join(" ")
+      : undefined
+  return safePersonName(
+    embedded ||
+      raw[`${key}Name`] ||
+      (key === "user" ? raw.actorName : raw.assignedOwnerName) ||
+      mapped,
+  )
+}
+
+function rowsFromAnalytics(value: unknown): Record<string, any>[] {
+  if (Array.isArray(value)) return value
+  if (!value || typeof value !== "object") return []
+  const record = value as Record<string, any>
+  const rows = record.stages || record.items || record.data || record.funnel
+  return Array.isArray(rows) ? rows : []
+}
 
 /** Solid icon tiles matching the Upcoming Meetings design. */
 const MEETING_ICON_TILE: Record<string, string> = {
@@ -348,13 +388,221 @@ export function FundraisingPipeline() {
   const [oppsOpen, setOppsOpen] = useState(false)
   const [createOppOpen, setCreateOppOpen] = useState(false)
 
-  const kpis = KPIS_BY_FILTER[filter]
-  const stages = STAGES_BY_FILTER[filter]
-  const totalPipeline = TOTAL_PIPELINE_BY_FILTER[filter]
-  const meetings = UPCOMING_BY_FILTER[filter]
-  const activity = ACTIVITY_BY_FILTER[filter]
+  const [loading, setLoading] = useState(true)
+  const [dashboard, setDashboard] = useState<Record<string, any> | null>(null)
+  const [rawOpportunities, setRawOpportunities] = useState<Record<string, any>[]>([])
+  const [funnelAnalytics, setFunnelAnalytics] = useState<unknown>(null)
+  const [rawMeetings, setRawMeetings] = useState<Record<string, any>[]>([])
+  const [rawCommitments, setRawCommitments] = useState<Record<string, any>[]>([])
+  const [rawActivity, setRawActivity] = useState<Record<string, any>[]>([])
+  const [loadedAt, setLoadedAt] = useState<Date | null>(null)
 
-  const capitalRaw = CAPITAL_BY_FILTER[filter]
+  async function loadOverview() {
+    setLoading(true)
+    try {
+      const campaignType = CAMPAIGN_TYPE_BY_FILTER[filter]
+      const [dash, opps, funnel, meetings, commitments, audit] = await Promise.all([
+        fundraisingApi.getDashboard(campaignType ? { campaignType } : undefined),
+        fundraisingApi.listOpportunities(campaignType ? { campaignType } : undefined),
+        fundraisingApi.getAnalyticsFunnel(),
+        fundraisingApi.listMeetings({ pageSize: 100 }),
+        fundraisingApi.listCommitments(),
+        fundraisingApi.listAuditLogs({ limit: 100 }),
+      ])
+      setDashboard(dash)
+      setRawOpportunities(opps ?? [])
+      setFunnelAnalytics(funnel)
+      setRawMeetings(meetings ?? [])
+      setRawCommitments(commitments ?? [])
+      setRawActivity(audit ?? [])
+      setLoadedAt(new Date())
+    } catch (err) {
+      toastFrError(err, "Could not load pipeline overview")
+      setDashboard(null)
+      setRawOpportunities([])
+      setFunnelAnalytics(null)
+      setRawMeetings([])
+      setRawCommitments([])
+      setRawActivity([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (viewMode === "overview") loadOverview()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewMode, filter])
+
+  const opportunities = useMemo(() => rawOpportunities.map(mapOpportunityRow), [rawOpportunities])
+  const opportunityIds = useMemo(
+    () => new Set(rawOpportunities.map((row) => String(row.id))),
+    [rawOpportunities],
+  )
+  const campaignIds = useMemo(
+    () => new Set(rawOpportunities.map((row) => String(row.campaignId || "")).filter(Boolean)),
+    [rawOpportunities],
+  )
+
+  const isInCurrentScope = (row: Record<string, any>) => {
+    if (filter === "all") return true
+    const opportunityId = String(row.opportunityId || row.opportunity?.id || "")
+    const campaignId = String(row.campaignId || row.campaign?.id || "")
+    return opportunityIds.has(opportunityId) || campaignIds.has(campaignId)
+  }
+
+  const kpis: PipelineKpi[] = useMemo(() => {
+    const targetTotal = asNumber(dashboard?.targetTotal)
+    const signedTotal = asNumber(dashboard?.signedTotal)
+    const fundedTotal = asNumber(dashboard?.fundedTotal)
+    const weightedPipeline = asNumber(dashboard?.weightedPipeline)
+    const coverageRatio = asNumber(dashboard?.coverageRatio)
+    const softCircleTotal = rawOpportunities.reduce((s, o) => s + asNumber(o.softCircleAmount), 0)
+    const pct = (v: number) => (targetTotal > 0 ? Math.min(100, Math.round((v / targetTotal) * 100)) : 0)
+
+    return [
+      { id: "target", label: "Target Raise", value: moneyLabel(targetTotal), meta: "Dashboard target", pct: 100, icon: "target", accent: "#7c3aed", bar: "#8b5cf6" },
+      { id: "soft", label: "Soft Circles", value: moneyLabel(softCircleTotal), meta: `${pct(softCircleTotal)}% of target`, pct: pct(softCircleTotal), icon: "users", accent: "#2563eb", bar: "#3b82f6" },
+      { id: "signed", label: "Signed", value: moneyLabel(signedTotal), meta: `${pct(signedTotal)}% of target`, pct: pct(signedTotal), icon: "shield", accent: "#0ea5e9", bar: "#38bdf8" },
+      { id: "funded", label: "Funded", value: moneyLabel(fundedTotal), meta: `${pct(fundedTotal)}% of target`, pct: pct(fundedTotal), icon: "handshake", accent: "#16a34a", bar: "#22c55e" },
+      { id: "weighted", label: "Weighted Pipeline", value: moneyLabel(weightedPipeline), meta: "Probability-adjusted", pct: pct(weightedPipeline), icon: "coins", accent: "#65a30d", bar: "#84cc16" },
+      { id: "coverage", label: "Coverage Ratio", value: coverageRatio ? `${coverageRatio.toFixed(2)}×` : "—", meta: "vs target", pct: Math.min(100, Math.round(coverageRatio * 50)), icon: "pie", accent: "#7c3aed", bar: "#a78bfa" },
+    ]
+  }, [dashboard, rawOpportunities])
+
+  const stages: PipelineStage[] = useMemo(() => {
+    const analyticRows = rowsFromAnalytics(funnelAnalytics).filter((row) => {
+      if (filter === "all") return true
+      const campaignId = String(row.campaignId || row.campaign?.id || "")
+      return campaignIds.has(campaignId)
+    })
+    const sourceRows: Array<{ name: string; count: number; amount: number }> =
+      analyticRows.length > 0
+        ? analyticRows.map((row) => ({
+            name: String(row.stageName || row.name || row.stageCode || row.code || "Unspecified"),
+            count: asNumber(row.count ?? row.opportunityCount),
+            amount: asNumber(row.amount ?? row.totalAmount ?? row.pipelineAmount),
+          }))
+        : Array.from(
+            rawOpportunities.reduce((map, row) => {
+              const name = String(row.stage?.name || row.stageName || row.stageCode || "Unspecified")
+              const current = map.get(name) || { name, count: 0, amount: 0 }
+              current.count += 1
+              current.amount += asNumber(
+                row.proposedAmount ?? row.indicativeAmount ?? row.softCircleAmount ?? row.expectedAum,
+              )
+              map.set(name, current)
+              return map
+            }, new Map<string, { name: string; count: number; amount: number }>())
+              .values(),
+          )
+    const totalCount = sourceRows.reduce((sum, row) => sum + row.count, 0)
+    return sourceRows.map((row, index) => ({
+      name: row.name,
+      count: row.count,
+      amount: moneyLabel(row.amount),
+      amountNum: row.amount,
+      pct: totalCount > 0 ? Math.round((row.count / totalCount) * 100) : 0,
+      color: STAGE_COLORS[index % STAGE_COLORS.length],
+    }))
+  }, [funnelAnalytics, filter, campaignIds, rawOpportunities])
+
+  const totalPipeline = useMemo(
+    () => moneyLabel(stages.reduce((sum, stage) => sum + stage.amountNum, 0)),
+    [stages],
+  )
+
+  const meetings: UpcomingItem[] = useMemo(
+    () =>
+      rawMeetings
+        .filter(isInCurrentScope)
+        .filter((row) => String(row.status || "").toUpperCase() === "SCHEDULED")
+        .sort(
+          (a, b) =>
+            new Date(a.scheduledStart || 0).getTime() - new Date(b.scheduledStart || 0).getTime(),
+        )
+        .map((row, index) => {
+          const start = row.scheduledStart ? new Date(row.scheduledStart) : null
+          const validStart = start && !Number.isNaN(start.getTime()) ? start : null
+          const type = String(row.meetingType || "").toUpperCase()
+          return {
+            id: String(row.id),
+            title: row.title || "Meeting",
+            subtitle:
+              row.investor?.legalName ||
+              row.investor?.name ||
+              row.investorName ||
+              row.location ||
+              "Fundraising meeting",
+            date: validStart ? validStart.toLocaleDateString() : "Date unavailable",
+            time: validStart
+              ? validStart.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+              : "—",
+            tone: (["purple", "green", "indigo", "blue", "amber", "sky"] as const)[index % 6],
+            kind: type === "PHONE" ? "call" : type === "IN_PERSON" ? "people" : "meeting",
+            location: row.location,
+            owner: embeddedPersonName(row, "owner"),
+            notes: row.agenda || row.description || row.notes,
+            status: row.status,
+          }
+        }),
+    [rawMeetings, filter, opportunityIds, campaignIds],
+  )
+
+  const activity: ActivityItem[] = useMemo(
+    () =>
+      rawActivity.filter(isInCurrentScope).map((row, index) => {
+        const at = row.createdAt || row.timestamp || row.occurredAt
+        const action = row.summary || row.action || "Updated"
+        const object = row.objectName || row.objectType || "fundraising record"
+        return {
+          id: String(row.id ?? index),
+          parts: [{ text: `${action} ${object}` }],
+          actor: embeddedPersonName(row, "user"),
+          when: at ? new Date(at).toLocaleString() : "Time unavailable",
+          tone: (["blue", "green", "purple", "sky", "amber"] as const)[index % 5],
+          detail: typeof row.details === "string" ? row.details : undefined,
+        }
+      }),
+    [rawActivity, filter, opportunityIds, campaignIds],
+  )
+
+  const capitalRaw = useMemo(() => {
+    const events = new Map<string, { month: string; at: number; committed: number; funded: number }>()
+    rawCommitments.filter(isInCurrentScope).forEach((row) => {
+      const amount = asNumber(row.commitmentAmount ?? row.amount)
+      const fundedAmount = asNumber(row.fundedAmount ?? row.amountFunded)
+      const signedAt = row.signedAt || row.commitmentDate
+      const fundedAt = row.fundedAt || row.fundingDate || row.fullyFundedAt
+      const add = (dateValue: unknown, key: "committed" | "funded", value: number) => {
+        if (!dateValue || value <= 0) return
+        const date = new Date(String(dateValue))
+        if (Number.isNaN(date.getTime())) return
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`
+        const current = events.get(monthKey) || {
+          month: date.toLocaleDateString(undefined, { month: "short", year: "2-digit" }),
+          at: new Date(date.getFullYear(), date.getMonth(), 1).getTime(),
+          committed: 0,
+          funded: 0,
+        }
+        current[key] += value / 1_000_000
+        events.set(monthKey, current)
+      }
+      add(signedAt, "committed", amount)
+      add(fundedAt, "funded", fundedAmount)
+    })
+    let committed = 0
+    let funded = 0
+    const target = asNumber(dashboard?.targetTotal) / 1_000_000
+    return Array.from(events.values())
+      .sort((a, b) => a.at - b.at)
+      .map((row) => {
+        committed += row.committed
+        funded += row.funded
+        return { month: row.month, committed, funded, target }
+      })
+  }, [rawCommitments, dashboard, filter, opportunityIds, campaignIds])
+
   const capitalSeries = useMemo(() => {
     if (chartMode === "cumulative") return capitalRaw
     return capitalRaw.map((row, i) => {
@@ -368,12 +616,36 @@ export function FundraisingPipeline() {
   }, [capitalRaw, chartMode])
 
   const lastPoint = capitalSeries[capitalSeries.length - 1]
-  const yMax = Math.max(...capitalSeries.map((r) => r.target)) || 60
+  const yMax = Math.max(
+    1,
+    ...capitalSeries.flatMap((row) => [row.target, row.committed, row.funded]),
+  )
 
-  const opportunities = useMemo(() => {
-    if (filter === "all") return TOP_OPPORTUNITIES
-    return TOP_OPPORTUNITIES.filter((o) => o.fundType === filter)
-  }, [filter])
+  function exportPipeline() {
+    exportFundraisingCsv(
+      opportunities.map((row) => ({
+        investor: row.investor,
+        campaign: row.campaign,
+        stage: row.stage,
+        proposedTicket: row.proposed !== "—" ? row.proposed : row.indicative,
+        probability: `${row.probability}%`,
+        owner: embeddedPersonName(row.raw, "owner", row.owner),
+        nextStep: row.nextAction,
+        daysInStage: row.ageDays,
+      })),
+      [
+        { key: "investor", label: "Investor" },
+        { key: "campaign", label: "Campaign" },
+        { key: "stage", label: "Stage" },
+        { key: "proposedTicket", label: "Proposed Ticket" },
+        { key: "probability", label: "Probability" },
+        { key: "owner", label: "Owner" },
+        { key: "nextStep", label: "Next Step" },
+        { key: "daysInStage", label: "Days in Stage" },
+      ],
+      "fundraising-pipeline",
+    )
+  }
 
   return (
     <div className="p-4 sm:p-5 md:p-6 space-y-4 sm:space-y-5 max-w-[1600px] mx-auto">
@@ -410,6 +682,7 @@ export function FundraisingPipeline() {
               type="button"
               variant="outline"
               className="rounded-full h-10 px-6 flex-1 sm:flex-none gap-2 shadow-sm"
+              onClick={exportPipeline}
             >
               <Download className="w-4 h-4" />
               Export
@@ -451,17 +724,14 @@ export function FundraisingPipeline() {
           {viewMode === "overview" && (
             <p className="text-xs text-[#94a3b8] flex items-center gap-1.5 sm:justify-end">
               <CalendarDays className="w-3.5 h-3.5" />
-              As at 20 May 2025
+              {loadedAt ? `Loaded ${loadedAt.toLocaleString()}` : "Loading live data…"}
             </p>
           )}
         </div>
       </div>
 
       {viewMode === "board" ? (
-        <FundraisingPipelineBoard
-          filter={filter}
-          onAddOpportunity={() => setCreateOppOpen(true)}
-        />
+        <FundraisingPipelineBoard />
       ) : (
         <>
       {/* KPI strip */}
@@ -496,11 +766,15 @@ export function FundraisingPipeline() {
         <section className={cn(CARD, "lg:col-span-5 xl:col-span-3 p-4")}>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-semibold text-[#0f172a]">Pipeline by Stage</h2>
-            <button type="button" className="text-[#cbd5e1]" aria-label="More">
+            <button type="button" className="rounded-full p-1 text-[#cbd5e1]" aria-label="More">
               <MoreHorizontal className="w-4 h-4" />
             </button>
           </div>
-          <PipelineFunnel stages={stages} />
+          {stages.length > 0 ? (
+            <PipelineFunnel stages={stages} />
+          ) : (
+            <p className="py-12 text-center text-sm text-[#94a3b8]">No pipeline stage data.</p>
+          )}
           <div className="mt-3 pt-3 border-t border-[#f1f5f9] flex items-center justify-between text-xs">
             <span className="text-[#94a3b8]">Total Pipeline</span>
             <span className="font-semibold text-[#0f172a] tabular-nums">{totalPipeline}</span>
@@ -519,7 +793,7 @@ export function FundraisingPipeline() {
               </span>
             </div>
             <select
-              className="h-8 shrink-0 rounded-lg border border-[#e2e8f0] bg-white pl-3 pr-7 text-xs text-[#475569] outline-none shadow-sm appearance-none bg-[length:12px] bg-[right_0.55rem_center] bg-no-repeat"
+              className="h-8 shrink-0 rounded-full border border-[#e2e8f0] bg-white pl-3 pr-7 text-xs text-[#475569] outline-none shadow-sm appearance-none bg-[length:12px] bg-[right_0.55rem_center] bg-no-repeat"
               style={{
                 backgroundImage:
                   "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E\")",
@@ -553,8 +827,13 @@ export function FundraisingPipeline() {
           </div>
 
           <div className="h-[240px] sm:h-[300px] mt-1">
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={capitalSeries} margin={{ top: 18, right: 78, left: 4, bottom: 4 }}>
+            {capitalSeries.length === 0 ? (
+              <div className="flex h-full items-center justify-center text-center text-sm text-[#94a3b8]">
+                No dated commitment or funding series is available.
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={capitalSeries} margin={{ top: 18, right: 78, left: 4, bottom: 4 }}>
                 <defs>
                   <linearGradient id="committedFill" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.22} />
@@ -622,8 +901,8 @@ export function FundraisingPipeline() {
                       if (index !== capitalSeries.length - 1 || x == null || y == null) return null
                       return (
                         <ChartEndLabel
-                          x={x}
-                          y={y}
+                          x={Number(x)}
+                          y={Number(y)}
                           value={`US$${Number(lastPoint.target).toFixed(1)}M`}
                           color="#8b5cf6"
                           dy={0}
@@ -645,8 +924,8 @@ export function FundraisingPipeline() {
                     if (index !== capitalSeries.length - 1) return null
                     return (
                       <ChartEndLabel
-                        x={x}
-                        y={y}
+                        x={x == null ? undefined : Number(x)}
+                        y={y == null ? undefined : Number(y)}
                         value={`US$${lastPoint.committed.toFixed(1)}M`}
                         color="#2563eb"
                         dy={-12}
@@ -667,8 +946,8 @@ export function FundraisingPipeline() {
                     if (index !== capitalSeries.length - 1) return null
                     return (
                       <ChartEndLabel
-                        x={x}
-                        y={y}
+                        x={x == null ? undefined : Number(x)}
+                        y={y == null ? undefined : Number(y)}
                         value={`US$${lastPoint.funded.toFixed(1)}M`}
                         color="#16a34a"
                         dy={14}
@@ -676,8 +955,9 @@ export function FundraisingPipeline() {
                     )
                   }}
                 />
-              </ComposedChart>
-            </ResponsiveContainer>
+                </ComposedChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </section>
 
@@ -687,17 +967,21 @@ export function FundraisingPipeline() {
             <button
               type="button"
               onClick={() => setMeetingsOpen(true)}
-              className="text-xs font-medium text-[#2563eb] hover:underline"
+              className="rounded-full px-2 py-1 text-xs font-medium text-[#2563eb] hover:underline"
             >
               View all
             </button>
           </div>
           <ul className="divide-y divide-[#eeeeee]">
-            {meetings.slice(0, 5).map((item) => (
-              <li key={item.id}>
-                <MeetingRow item={item} />
-              </li>
-            ))}
+            {meetings.length === 0 ? (
+              <li className="py-10 text-center text-sm text-[#94a3b8]">No upcoming meetings.</li>
+            ) : (
+              meetings.slice(0, 5).map((item) => (
+                <li key={item.id}>
+                  <MeetingRow item={item} />
+                </li>
+              ))
+            )}
           </ul>
         </section>
       </div>
@@ -723,10 +1007,12 @@ export function FundraisingPipeline() {
                 </tr>
               </thead>
               <tbody>
-                {opportunities.length === 0 ? (
+                {loading ? (
+                  <FrTableSkeleton columns={8} rows={6} />
+                ) : opportunities.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="px-4 py-10 text-center text-sm text-[#94a3b8]">
-                      No opportunities for this filter.
+                      No opportunities yet.
                     </td>
                   </tr>
                 ) : (
@@ -740,24 +1026,24 @@ export function FundraisingPipeline() {
                               AVATAR_TONES[idx % AVATAR_TONES.length],
                             )}
                           >
-                            {row.initials}
+                            {oppInitials(row.investor)}
                           </div>
                           <span className="text-sm font-medium text-[#0f172a]">{row.investor}</span>
                         </div>
                       </td>
-                      <td className="px-2.5 py-3 text-xs text-[#64748b]">{row.type}</td>
+                      <td className="px-2.5 py-3 text-xs text-[#64748b]">{row.campaign}</td>
                       <td className="px-2.5 py-3">
                         <span
                           className={cn(
                             "inline-flex rounded-md px-2 py-0.5 text-[11px] font-medium whitespace-nowrap",
-                            STAGE_TONE[row.stageTone],
+                            stageChipClass(row.stage),
                           )}
                         >
                           {row.stage}
                         </span>
                       </td>
                       <td className="px-2.5 py-3 text-sm font-medium text-[#0f172a] tabular-nums whitespace-nowrap">
-                        {row.ticket}
+                        {row.proposed !== "—" ? row.proposed : row.indicative}
                       </td>
                       <td className="px-2.5 py-3">
                         <ProbText value={row.probability} />
@@ -770,16 +1056,17 @@ export function FundraisingPipeline() {
                               AVATAR_TONES[(idx + 2) % AVATAR_TONES.length],
                             )}
                           >
-                            {row.ownerInitials}
+                            {oppInitials(embeddedPersonName(row.raw, "owner", row.owner))}
                           </div>
-                          <span className="text-xs text-[#475569] whitespace-nowrap">{row.owner}</span>
+                          <span className="text-xs text-[#475569] whitespace-nowrap">
+                            {embeddedPersonName(row.raw, "owner", row.owner)}
+                          </span>
                         </div>
                       </td>
                       <td className="px-2.5 py-3">
-                        <p className="text-xs font-medium text-[#334155] whitespace-nowrap">{row.nextStep}</p>
-                        <p className="text-[11px] text-[#94a3b8] mt-0.5 whitespace-nowrap">{row.nextDate}</p>
+                        <p className="text-xs font-medium text-[#334155] whitespace-nowrap">{row.nextAction}</p>
                       </td>
-                      <td className="px-4 py-3 text-xs text-[#64748b] whitespace-nowrap">{row.lastContact}</td>
+                      <td className="px-4 py-3 text-xs text-[#64748b] whitespace-nowrap">{row.ageDays}d in stage</td>
                     </tr>
                   ))
                 )}
@@ -793,7 +1080,7 @@ export function FundraisingPipeline() {
             <button
               type="button"
               onClick={() => setOppsOpen(true)}
-              className="text-xs font-medium text-[#2563eb] hover:underline text-left sm:text-right"
+              className="rounded-full px-2 py-1 text-left text-xs font-medium text-[#2563eb] hover:underline sm:text-right"
             >
               View all opportunities →
             </button>
@@ -806,7 +1093,7 @@ export function FundraisingPipeline() {
             <button
               type="button"
               onClick={() => setActivityOpen(true)}
-              className="text-xs font-medium text-[#2563eb] hover:underline"
+              className="rounded-full px-2 py-1 text-xs font-medium text-[#2563eb] hover:underline"
             >
               View all
             </button>
@@ -828,11 +1115,14 @@ export function FundraisingPipeline() {
           </DialogHeader>
           <div className="max-h-[min(70vh,560px)] overflow-y-auto px-5">
             <ul className="divide-y divide-[#eeeeee] pb-2">
-              {meetings.map((item) => (
-                <li key={item.id} className="py-1">
-                  <MeetingRow item={item} dense />
-                  {(item.owner || item.notes || item.status || item.location) && (
-                    <div className="ml-12 mb-3 rounded-lg bg-[#f8fafc] border border-[#f1f5f9] px-3 py-2 space-y-1">
+              {meetings.length === 0 ? (
+                <li className="py-10 text-center text-sm text-[#94a3b8]">No upcoming meetings.</li>
+              ) : (
+                meetings.map((item) => (
+                  <li key={item.id} className="py-1">
+                    <MeetingRow item={item} dense />
+                    {(item.owner || item.notes || item.status || item.location) && (
+                      <div className="ml-12 mb-3 rounded-lg bg-[#f8fafc] border border-[#f1f5f9] px-3 py-2 space-y-1">
                       {item.status && (
                         <p className="text-[11px] text-[#64748b]">
                           Status: <span className="font-medium text-[#334155]">{item.status}</span>
@@ -849,10 +1139,11 @@ export function FundraisingPipeline() {
                         </p>
                       )}
                       {item.notes && <p className="text-[11px] text-[#475569] leading-relaxed">{item.notes}</p>}
-                    </div>
-                  )}
-                </li>
-              ))}
+                      </div>
+                    )}
+                  </li>
+                ))
+              )}
             </ul>
           </div>
         </DialogContent>
@@ -881,7 +1172,7 @@ export function FundraisingPipeline() {
               Investor Opportunities
             </DialogTitle>
             <DialogDescription className="text-xs text-[#64748b]">
-              {opportunities.length} opportunities for the current filter
+              {opportunities.length} opportunities loaded
             </DialogDescription>
           </DialogHeader>
           <div className="max-h-[min(70vh,560px)] overflow-y-auto">
@@ -890,31 +1181,31 @@ export function FundraisingPipeline() {
                 <div key={row.id} className="px-5 py-4 hover:bg-[#fafbfc]">
                   <div className="flex items-start gap-3">
                     <div className="w-9 h-9 rounded-full bg-[#eef2ff] text-[#4f46e5] text-[11px] font-semibold flex items-center justify-center shrink-0">
-                      {row.initials}
+                      {oppInitials(row.investor)}
                     </div>
                     <div className="min-w-0 flex-1 space-y-2">
                       <div className="flex flex-wrap items-center gap-2 justify-between">
                         <p className="text-sm font-semibold text-[#0f172a]">{row.investor}</p>
-                        <span className="text-sm font-medium text-[#0f172a] tabular-nums">{row.ticket}</span>
+                        <span className="text-sm font-medium text-[#0f172a] tabular-nums">
+                          {row.proposed !== "—" ? row.proposed : row.indicative}
+                        </span>
                       </div>
                       <div className="flex flex-wrap items-center gap-2 text-xs text-[#64748b]">
-                        <span>{row.type}</span>
+                        <span>{row.campaign}</span>
                         <span
                           className={cn(
                             "inline-flex rounded-md px-2 py-0.5 text-[11px] font-medium",
-                            STAGE_TONE[row.stageTone],
+                            stageChipClass(row.stage),
                           )}
                         >
                           {row.stage}
                         </span>
-                        <span>Owner: {row.owner}</span>
+                        <span>Owner: {embeddedPersonName(row.raw, "owner", row.owner)}</span>
                       </div>
                       <div className="flex flex-wrap items-center gap-4">
                         <ProbText value={row.probability} />
-                        <p className="text-xs text-[#475569]">
-                          Next: {row.nextStep} · {row.nextDate}
-                        </p>
-                        <p className="text-xs text-[#94a3b8]">Last contact {row.lastContact}</p>
+                        <p className="text-xs text-[#475569]">Next: {row.nextAction}</p>
+                        <p className="text-xs text-[#94a3b8]">{row.ageDays}d in stage</p>
                       </div>
                     </div>
                   </div>
@@ -927,7 +1218,7 @@ export function FundraisingPipeline() {
         </>
       )}
 
-      <FrOpportunityWizard open={createOppOpen} onOpenChange={setCreateOppOpen} />
+      <FrOpportunityWizard open={createOppOpen} onOpenChange={setCreateOppOpen} onCreated={loadOverview} />
     </div>
   )
 }

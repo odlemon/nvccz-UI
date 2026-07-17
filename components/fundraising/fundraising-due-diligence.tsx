@@ -1,29 +1,20 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import {
-  Ban,
   CalendarDays,
   Download,
   FilePenLine,
-  Files,
   Gavel,
   Info,
-  Leaf,
+  Loader2,
   Paperclip,
   Plus,
-  Scale,
-  Send,
-  Shield,
-  TrendingUp,
   Users,
-  BarChart3,
-  DollarSign,
 } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import {
   Select,
   SelectContent,
@@ -31,90 +22,56 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { fundraisingApi, toastFrError } from "@/lib/api/fundraising-api"
+import { downloadCsvPayload, exportFundraisingCsv } from "@/lib/fundraising/export"
+import { mapDdqCaseToInvestorCard, mapDdqItemToMatrixRow } from "@/lib/fundraising/mappers"
 import {
-  DD_AS_AT,
-  DD_CATEGORY_ORDER,
-  DD_INVESTORS,
-  DD_KPIS,
-  DD_MATRIX_ROWS,
-  DD_REQUESTS,
-  DD_STATUS_LEGEND,
-  DD_THREAD_SEED,
-  OPEN_REQUEST_COUNT,
-  RESOLVED_REQUEST_COUNT,
-  type DdDocStatus,
-  type DdInvestor,
-  type DdKpi,
-  type DdMatrixCategory,
-  type DdMatrixRow,
-  type DdPriority,
-  type DdRequest,
-  type DdThreadMessage,
-} from "./due-diligence-mock-data"
-import {
+  FrDialogShell,
   FrField,
-  FrViewAllDialog,
+  FrTableSkeleton,
   frInputClass,
   frSelectClass,
 } from "./fundraising-modals"
-import { FrSimpleWizard, ReviewList } from "./fundraising-create-wizards"
 
 const CARD =
   "rounded-[6px] border border-[#e2e8f0] bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
 
-const KPI_ICONS = {
-  users: Users,
-  "file-pen": FilePenLine,
-  ban: Ban,
-  "trending-up": TrendingUp,
-  files: Files,
-  calendar: CalendarDays,
-} as const
+type DdInvestorCard = ReturnType<typeof mapDdqCaseToInvestorCard>
+type DdMatrixRow = ReturnType<typeof mapDdqItemToMatrixRow>
 
-const CATEGORY_META: Record<
-  DdMatrixCategory,
-  { icon: typeof Gavel; color: string; bg: string }
-> = {
-  Legal: { icon: Gavel, color: "#7c3aed", bg: "#ede9fe" },
-  "Fund Terms": { icon: Scale, color: "#2563eb", bg: "#dbeafe" },
-  Team: { icon: Users, color: "#16a34a", bg: "#dcfce7" },
-  "Track Record": { icon: BarChart3, color: "#ea580c", bg: "#ffedd5" },
-  Compliance: { icon: Shield, color: "#2563eb", bg: "#dbeafe" },
-  ESG: { icon: Leaf, color: "#16a34a", bg: "#dcfce7" },
-  Financials: { icon: DollarSign, color: "#2563eb", bg: "#dbeafe" },
-}
+type EvidenceMeta = { fileName: string; url: string }
 
-const TREND_TONE: Record<NonNullable<DdKpi["trend"]>["tone"], string> = {
-  amber: "text-[#d97706]",
-  red: "text-[#dc2626]",
-  green: "text-[#16a34a]",
-  purple: "text-[#7c3aed]",
-}
-
-function statusStyle(status: DdDocStatus) {
-  switch (status) {
-    case "Reviewed":
-      return { wrap: "bg-[#dcfce7] text-[#15803d]", dot: "bg-[#16a34a]" }
-    case "Uploaded":
-      return { wrap: "bg-[#dbeafe] text-[#1d4ed8]", dot: "bg-[#2563eb]" }
-    case "Requested":
-      return { wrap: "bg-[#ede9fe] text-[#6d28d9]", dot: "bg-[#7c3aed]" }
-    case "Follow-up":
-      return { wrap: "bg-[#ffedd5] text-[#c2410c]", dot: "bg-[#ea580c]" }
-    default:
-      return { wrap: "bg-[#f1f5f9] text-[#475569]", dot: "bg-[#64748b]" }
+function evidenceMeta(value: Record<string, any> | null | undefined, fallbackName = ""): EvidenceMeta {
+  const direct = value?._uploadedEvidence || value?.evidence || value?.uploadedEvidence || value
+  const evidence = Array.isArray(direct) ? direct[direct.length - 1] : direct
+  const nested = evidence?.evidence || evidence?.item?.evidence || evidence
+  const url =
+    nested?.url ||
+    nested?.downloadUrl ||
+    nested?.fileUrl ||
+    evidence?.url ||
+    evidence?.downloadUrl ||
+    evidence?.fileUrl ||
+    ""
+  return {
+    fileName:
+      nested?.fileName ||
+      nested?.filename ||
+      nested?.name ||
+      evidence?.fileName ||
+      evidence?.filename ||
+      fallbackName ||
+      (url ? "Evidence file" : ""),
+    url,
   }
 }
 
-function priorityStyle(priority: DdPriority) {
-  switch (priority) {
-    case "High":
-      return "bg-[#fee2e2] text-[#dc2626]"
-    case "Medium":
-      return "bg-[#ffedd5] text-[#c2410c]"
-    default:
-      return "bg-[#dcfce7] text-[#15803d]"
-  }
+function statusStyle(status: string) {
+  const u = status.toUpperCase()
+  if (u === "REVIEWED" || u === "COMPLETED") return { wrap: "bg-[#dcfce7] text-[#15803d]", dot: "bg-[#16a34a]" }
+  if (u === "UPLOADED") return { wrap: "bg-[#dbeafe] text-[#1d4ed8]", dot: "bg-[#2563eb]" }
+  if (u === "FOLLOW-UP" || u === "FOLLOW_UP") return { wrap: "bg-[#ffedd5] text-[#c2410c]", dot: "bg-[#ea580c]" }
+  return { wrap: "bg-[#ede9fe] text-[#6d28d9]", dot: "bg-[#7c3aed]" }
 }
 
 function completionTone(pct: number) {
@@ -123,7 +80,7 @@ function completionTone(pct: number) {
   return "text-[#ea580c]"
 }
 
-function StatusPill({ status }: { status: DdDocStatus }) {
+function StatusPill({ status }: { status: string }) {
   const style = statusStyle(status)
   return (
     <span
@@ -138,41 +95,12 @@ function StatusPill({ status }: { status: DdDocStatus }) {
   )
 }
 
-function KpiCard({ kpi }: { kpi: DdKpi }) {
-  const Icon = KPI_ICONS[kpi.icon]
-  return (
-    <div className={cn(CARD, "flex flex-col p-3.5")}>
-      <div className="flex items-start justify-between gap-2">
-        <span
-          className="flex h-8 w-8 items-center justify-center rounded-full"
-          style={{ backgroundColor: kpi.iconBg, color: kpi.iconColor }}
-        >
-          <Icon className="h-4 w-4" strokeWidth={1.75} />
-        </span>
-      </div>
-      <p className="mt-2.5 text-[11px] font-medium leading-snug text-[#64748b]">
-        {kpi.label}
-      </p>
-      <p className="mt-1.5 text-[22px] font-bold leading-none tabular-nums text-[#0f172a]">
-        {kpi.value}
-      </p>
-      {kpi.trend ? (
-        <p className={cn("mt-2 text-[10px] font-medium", TREND_TONE[kpi.trend.tone])}>
-          ↑ {kpi.trend.text}
-        </p>
-      ) : (
-        <p className="mt-2 text-[10px] text-transparent">—</p>
-      )}
-    </div>
-  )
-}
-
 function InvestorCard({
   investor,
   selected,
   onSelect,
 }: {
-  investor: DdInvestor
+  investor: DdInvestorCard
   selected: boolean
   onSelect: () => void
 }) {
@@ -182,9 +110,7 @@ function InvestorCard({
       onClick={onSelect}
       className={cn(
         "w-full rounded-[6px] border p-3 text-left transition-colors",
-        selected
-          ? "border-[#c4b5fd] bg-[#f5f3ff]"
-          : "border-[#e2e8f0] bg-white hover:bg-[#f8fafc]",
+        selected ? "border-[#c4b5fd] bg-[#f5f3ff]" : "border-[#e2e8f0] bg-white hover:bg-[#f8fafc]",
       )}
     >
       <div className="flex items-start gap-2.5">
@@ -197,49 +123,30 @@ function InvestorCard({
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
-              <p className="truncate text-[12px] font-semibold text-[#0f172a]">
-                {investor.name}
-              </p>
+              <p className="truncate text-[12px] font-semibold text-[#0f172a]">{investor.name}</p>
               <p className="mt-0.5 text-[10px] text-[#94a3b8]">Lead: {investor.lead}</p>
             </div>
-            <span
-              className={cn(
-                "shrink-0 text-[12px] font-bold tabular-nums",
-                completionTone(investor.completion),
-              )}
-            >
+            <span className={cn("shrink-0 text-[12px] font-bold tabular-nums", completionTone(investor.completion))}>
               {investor.completion}%
             </span>
           </div>
           <div className="mt-2 h-1 w-full overflow-hidden rounded-[2px] bg-[#f1f5f9]">
-            <div
-              className="h-full rounded-[2px] bg-[#16a34a]"
-              style={{ width: `${investor.completion}%` }}
-            />
+            <div className="h-full rounded-[2px] bg-[#16a34a]" style={{ width: `${investor.completion}%` }} />
           </div>
           <div className="mt-2.5 grid grid-cols-3 gap-1 border-t border-[#f1f5f9] pt-2">
             <div>
               <p className="text-[9px] uppercase tracking-wide text-[#94a3b8]">Open</p>
-              <p className="text-[12px] font-semibold tabular-nums text-[#0f172a]">
-                {investor.open}
-              </p>
+              <p className="text-[12px] font-semibold tabular-nums text-[#0f172a]">{investor.open}</p>
             </div>
             <div>
               <p className="text-[9px] uppercase tracking-wide text-[#94a3b8]">Overdue</p>
-              <p
-                className={cn(
-                  "text-[12px] font-semibold tabular-nums",
-                  investor.overdue > 0 ? "text-[#dc2626]" : "text-[#0f172a]",
-                )}
-              >
+              <p className={cn("text-[12px] font-semibold tabular-nums", investor.overdue > 0 ? "text-[#dc2626]" : "text-[#0f172a]")}>
                 {investor.overdue}
               </p>
             </div>
             <div>
               <p className="text-[9px] uppercase tracking-wide text-[#94a3b8]">Days in DD</p>
-              <p className="text-[12px] font-semibold tabular-nums text-[#0f172a]">
-                {investor.daysInDd}
-              </p>
+              <p className="text-[12px] font-semibold tabular-nums text-[#0f172a]">{investor.daysInDd}</p>
             </div>
           </div>
         </div>
@@ -248,536 +155,522 @@ function InvestorCard({
   )
 }
 
-function MatrixTable({
-  investorId,
-  investorName,
-}: {
-  investorId: string
-  investorName: string
-}) {
-  const grouped = useMemo(() => {
-    return DD_CATEGORY_ORDER.map((category) => ({
-      category,
-      rows: DD_MATRIX_ROWS.filter((r) => r.category === category),
-    })).filter((g) => g.rows.length > 0)
+export function FundraisingDueDiligence() {
+  const [loading, setLoading] = useState(true)
+  const [rawCases, setRawCases] = useState<Record<string, any>[]>([])
+  const [templates, setTemplates] = useState<Record<string, any>[]>([])
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [loadingDetail, setLoadingDetail] = useState(false)
+  const [addCaseOpen, setAddCaseOpen] = useState(false)
+  const [creatingCase, setCreatingCase] = useState(false)
+  const [exporting, setExporting] = useState<"report" | "matrix" | null>(null)
+  const [uploadingItemId, setUploadingItemId] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const pendingItemRef = useRef<string | null>(null)
+
+  const [loadingRefs, setLoadingRefs] = useState(false)
+  const [investors, setInvestors] = useState<Record<string, any>[]>([])
+  const [campaigns, setCampaigns] = useState<Record<string, any>[]>([])
+
+  const [caseForm, setCaseForm] = useState({ investorId: "", campaignId: "", templateId: "", title: "" })
+
+  const investorCards = useMemo(() => rawCases.map(mapDdqCaseToInvestorCard), [rawCases])
+  const selected = investorCards.find((c) => c.id === selectedId) ?? null
+  const selectedCase = rawCases.find((c) => String(c.id) === selectedId) ?? null
+
+  const matrixGrouped = useMemo(() => {
+    const items = Array.isArray(selectedCase?.items) ? selectedCase.items : []
+    const rows: DdMatrixRow[] = items.map(mapDdqItemToMatrixRow)
+    const byCategory = new Map<string, DdMatrixRow[]>()
+    rows.forEach((r) => {
+      const arr = byCategory.get(r.category) ?? []
+      arr.push(r)
+      byCategory.set(r.category, arr)
+    })
+    return Array.from(byCategory.entries()).map(([category, items]) => ({ category, items }))
+  }, [selectedCase])
+
+  async function loadCases() {
+    setLoading(true)
+    try {
+      const [caseRes, tplRes] = await Promise.allSettled([
+        fundraisingApi.listDdqCases(),
+        fundraisingApi.listDdqTemplates(),
+      ])
+      setRawCases(caseRes.status === "fulfilled" ? caseRes.value ?? [] : [])
+      setTemplates(tplRes.status === "fulfilled" ? tplRes.value ?? [] : [])
+      if (caseRes.status === "rejected") toastFrError(caseRes.reason, "Could not load DDQ cases")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadCases()
   }, [])
 
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[640px] border-collapse text-left">
-        <thead>
-          <tr className="border-b border-[#f1f5f9] bg-[#fafafa]">
-            <th className="px-3 py-2 text-[11px] font-semibold text-[#94a3b8]">Category</th>
-            <th className="px-3 py-2 text-[11px] font-semibold text-[#94a3b8]">Document</th>
-            <th className="px-3 py-2 text-[11px] font-semibold text-[#94a3b8]">
-              Status ({investorName})
-            </th>
-            <th className="px-3 py-2 text-[11px] font-semibold text-[#94a3b8]">Last Updated</th>
-            <th className="px-3 py-2 text-[11px] font-semibold text-[#94a3b8]">Owner</th>
-          </tr>
-        </thead>
-        <tbody>
-          {grouped.map(({ category, rows }) =>
-            rows.map((row, index) => (
-              <MatrixRow
-                key={row.id}
-                row={row}
-                investorId={investorId}
-                showCategory={index === 0}
-                categoryRowSpan={rows.length}
-              />
-            )),
-          )}
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
-function MatrixRow({
-  row,
-  investorId,
-  showCategory,
-  categoryRowSpan,
-}: {
-  row: DdMatrixRow
-  investorId: string
-  showCategory: boolean
-  categoryRowSpan: number
-}) {
-  const meta = CATEGORY_META[row.category]
-  const Icon = meta.icon
-  const status = row.statusByInvestor[investorId] ?? "Requested"
-
-  return (
-    <tr className="border-b border-[#f1f5f9] last:border-b-0 hover:bg-[#f8fafc]">
-      {showCategory ? (
-        <td
-          rowSpan={categoryRowSpan}
-          className="align-top border-r border-[#f1f5f9] px-3 py-2.5"
-        >
-          <div className="flex items-center gap-2">
-            <span
-              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[4px]"
-              style={{ backgroundColor: meta.bg, color: meta.color }}
-            >
-              <Icon className="h-3.5 w-3.5" strokeWidth={1.75} />
-            </span>
-            <span className="text-[11px] font-semibold text-[#0f172a]">{row.category}</span>
-          </div>
-        </td>
-      ) : null}
-      <td className="whitespace-nowrap px-3 py-2 text-[12px] text-[#0f172a]">{row.document}</td>
-      <td className="px-3 py-2">
-        <StatusPill status={status} />
-      </td>
-      <td className="whitespace-nowrap px-3 py-2 text-[11px] text-[#64748b]">
-        {row.lastUpdated}
-      </td>
-      <td className="whitespace-nowrap px-3 py-2 text-[11px] text-[#64748b]">{row.owner}</td>
-    </tr>
-  )
-}
-
-function RequestItem({ request }: { request: DdRequest }) {
-  return (
-    <div className="flex items-start gap-2.5 border-b border-[#f1f5f9] px-3 py-2.5 last:border-b-0">
-      <span
-        className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-[4px] text-[9px] font-bold text-white"
-        style={{ backgroundColor: request.logoBg }}
-      >
-        {request.logoLabel}
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="text-[12px] font-medium leading-snug text-[#0f172a]">{request.title}</p>
-        <p className="mt-0.5 text-[10px] text-[#94a3b8]">{request.investorName}</p>
-        <div className="mt-1.5 flex flex-wrap items-center gap-2">
-          <span
-            className={cn(
-              "rounded-[4px] px-1.5 py-0.5 text-[10px] font-semibold",
-              priorityStyle(request.priority),
-            )}
-          >
-            {request.priority}
-          </span>
-          <span className="text-[10px] text-[#94a3b8]">Due: {request.dueDate}</span>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function ThreadBubble({ message }: { message: DdThreadMessage }) {
-  const isRight = message.side === "right"
-  return (
-    <div className={cn("flex gap-2", isRight ? "flex-row-reverse" : "flex-row")}>
-      <span className="relative shrink-0">
-        <span
-          className="flex h-7 w-7 items-center justify-center rounded-full text-[9px] font-bold text-white"
-          style={{ backgroundColor: message.avatarBg }}
-        >
-          {message.initials}
-        </span>
-        {message.online ? (
-          <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full border border-white bg-[#22c55e]" />
-        ) : null}
-      </span>
-      <div className={cn("min-w-0 max-w-[85%]", isRight ? "items-end" : "items-start")}>
-        <div
-          className={cn(
-            "flex items-baseline gap-2",
-            isRight ? "flex-row-reverse" : "flex-row",
-          )}
-        >
-          <span className="text-[11px] font-semibold text-[#0f172a]">{message.author}</span>
-          <span className="text-[9px] text-[#94a3b8]">{message.timestamp}</span>
-        </div>
-        <div
-          className={cn(
-            "mt-1 rounded-[6px] px-2.5 py-2 text-[11px] leading-relaxed",
-            isRight
-              ? "bg-[#ede9fe] text-[#312e81]"
-              : "bg-[#f1f5f9] text-[#0f172a]",
-          )}
-        >
-          {message.body}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-export function FundraisingDueDiligence() {
-  const [selectedId, setSelectedId] = useState(DD_INVESTORS[0].id)
-  const [qaTab, setQaTab] = useState<"open" | "resolved">("open")
-  const [qaInvestorFilter, setQaInvestorFilter] = useState("all")
-  const [thread, setThread] = useState<DdThreadMessage[]>(DD_THREAD_SEED)
-  const [reply, setReply] = useState("")
-  const [archivedOpen, setArchivedOpen] = useState(false)
-  const [allRequestsOpen, setAllRequestsOpen] = useState(false)
-  const [addDocOpen, setAddDocOpen] = useState(false)
-  const [docName, setDocName] = useState("ZGF II signed side letter")
-
-  const selected =
-    DD_INVESTORS.find((i) => i.id === selectedId) ?? DD_INVESTORS[0]
-
-  const filteredRequests = useMemo(() => {
-    return DD_REQUESTS.filter((r) => {
-      if (qaTab === "open" && r.resolved) return false
-      if (qaTab === "resolved" && !r.resolved) return false
-      if (qaInvestorFilter !== "all" && r.investorId !== qaInvestorFilter) return false
-      return true
-    })
-  }, [qaTab, qaInvestorFilter])
-
-  function sendReply() {
-    const text = reply.trim()
-    if (!text) return
-    const now = new Date()
-    const stamp = `${now.getDate()} ${now.toLocaleString("en-GB", { month: "short" })} ${now.getFullYear()}, ${now
-      .toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
-      .replace(",", "")}`
-    setThread((prev) => [
-      ...prev,
-      {
-        id: `local-${Date.now()}`,
-        author: "You",
-        initials: "YO",
-        avatarBg: "#7c3aed",
-        online: true,
-        timestamp: stamp,
-        body: text,
-        side: "right",
-      },
+  useEffect(() => {
+    if (!addCaseOpen) return
+    setLoadingRefs(true)
+    Promise.allSettled([
+      fundraisingApi.listInvestors({ pageSize: 100 }),
+      fundraisingApi.listCampaigns(),
     ])
-    setReply("")
+      .then(([invRes, campRes]) => {
+        setInvestors(invRes.status === "fulfilled" ? invRes.value.items ?? [] : [])
+        setCampaigns(campRes.status === "fulfilled" ? campRes.value ?? [] : [])
+      })
+      .finally(() => setLoadingRefs(false))
+  }, [addCaseOpen])
+
+  async function selectCase(id: string) {
+    setSelectedId(id)
+    const existing = rawCases.find((c) => String(c.id) === id)
+    if (existing?.items) return
+    setLoadingDetail(true)
+    try {
+      const detail = await fundraisingApi.getDdqCase(id)
+      setRawCases((prev) => prev.map((c) => (String(c.id) === id ? { ...c, ...detail } : c)))
+    } catch (err) {
+      toastFrError(err, "Could not load case detail")
+    } finally {
+      setLoadingDetail(false)
+    }
+  }
+
+  function triggerEvidenceUpload(itemId: string) {
+    pendingItemRef.current = itemId
+    fileInputRef.current?.click()
+  }
+
+  async function handleEvidenceFile(file: File | null) {
+    const itemId = pendingItemRef.current
+    pendingItemRef.current = null
+    if (!file || !itemId || !selectedId) return
+    setUploadingItemId(itemId)
+    try {
+      const uploaded = await fundraisingApi.uploadDdqEvidence(selectedId, itemId, file)
+      const uploadedEvidence = evidenceMeta(uploaded, file.name)
+      toast.success("Evidence uploaded")
+      const detail = await fundraisingApi.getDdqCase(selectedId)
+      const currentItems = Array.isArray(selectedCase?.items) ? selectedCase.items : []
+      const detailItems = Array.isArray(detail?.items) ? detail.items : currentItems
+      const items = detailItems.map((item: Record<string, any>) =>
+        String(item.id) === itemId ? { ...item, _uploadedEvidence: uploadedEvidence } : item,
+      )
+      setRawCases((prev) =>
+        prev.map((c) =>
+          String(c.id) === selectedId
+            ? { ...c, ...detail, items }
+            : c,
+        ),
+      )
+    } catch (err) {
+      toastFrError(err, "Could not upload evidence")
+    } finally {
+      setUploadingItemId(null)
+    }
+  }
+
+  async function updateCaseStatus(status: string) {
+    if (!selectedId) return
+    try {
+      const detail = await fundraisingApi.patchDdqCase(selectedId, { status })
+      setRawCases((prev) => prev.map((c) => (String(c.id) === selectedId ? { ...c, ...detail } : c)))
+      toast.success("DDQ status updated")
+    } catch (err) {
+      toastFrError(err, "Could not update DDQ status")
+    }
+  }
+
+  const totalOpen = investorCards.reduce((s, c) => s + c.open, 0)
+  const totalOverdue = investorCards.reduce((s, c) => s + c.overdue, 0)
+  const avgCompletion = investorCards.length
+    ? Math.round(investorCards.reduce((s, c) => s + c.completion, 0) / investorCards.length)
+    : 0
+
+  function loadedMatrixRows() {
+    return rawCases.flatMap((ddqCase) =>
+      (Array.isArray(ddqCase.items) ? ddqCase.items : []).map((item: Record<string, any>) => ({
+        caseId: String(ddqCase.id),
+        caseTitle: ddqCase.title || ddqCase.investor?.legalName || ddqCase.investorName || "DDQ case",
+        ...mapDdqItemToMatrixRow(item),
+      })),
+    )
+  }
+
+  function exportLoadedRows(kind: "report" | "matrix") {
+    if (kind === "report") {
+      const rows = selectedId ? investorCards.filter((card) => card.id === selectedId) : investorCards
+      exportFundraisingCsv(
+        rows,
+        [
+          { key: "name", label: "Investor / Case" },
+          { key: "lead", label: "Lead" },
+          { key: "completion", label: "Completion %" },
+          { key: "open", label: "Open Items" },
+          { key: "overdue", label: "Overdue Items" },
+          { key: "daysInDd", label: "Days in DD" },
+        ],
+        selectedId ? `ddq-report-${selectedId}` : "ddq-overview",
+      )
+      return
+    }
+    const rows = selectedId
+      ? loadedMatrixRows().filter((row) => row.caseId === selectedId)
+      : loadedMatrixRows()
+    exportFundraisingCsv(
+      rows,
+      [
+        { key: "caseTitle", label: "Case" },
+        { key: "category", label: "Category" },
+        { key: "document", label: "Item" },
+        { key: "status", label: "Status" },
+        { key: "lastUpdated", label: "Last Updated" },
+        { key: "owner", label: "Owner" },
+      ],
+      selectedId ? `ddq-matrix-${selectedId}` : "ddq-matrix",
+    )
+  }
+
+  async function handleExport(kind: "report" | "matrix") {
+    setExporting(kind)
+    try {
+      if (selectedId) {
+        try {
+          const payload = await fundraisingApi.exportDdqCase(selectedId)
+          downloadCsvPayload(payload, `ddq-${kind}-${selectedId}`)
+        } catch {
+          exportLoadedRows(kind)
+          toast.info("Server export unavailable; exported the loaded data instead")
+        }
+      } else {
+        exportLoadedRows(kind)
+      }
+    } catch (err) {
+      toastFrError(err, `Could not export DDQ ${kind}`)
+    } finally {
+      setExporting(null)
+    }
   }
 
   return (
     <div className="h-full overflow-y-auto bg-[#f8fafc] p-4 md:p-6">
-      {/* Header */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        className="sr-only"
+        onChange={(e) => {
+          handleEvidenceFile(e.target.files?.[0] ?? null)
+          e.target.value = ""
+        }}
+      />
+
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <h1 className="text-xl font-bold tracking-tight text-[#0f172a] md:text-[22px]">
           Due Diligence
         </h1>
         <div className="flex flex-wrap items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 text-[12px] text-[#64748b]">
-            <CalendarDays className="h-3.5 w-3.5" />
-            As at {DD_AS_AT}
-          </span>
-          <Button
-            variant="outline"
-            className="h-9 rounded-full px-4 shadow-sm"
-            onClick={() => toast.success("Export started")}
-          >
-            <Download className="h-4 w-4" />
-            Export Report
+          <Button variant="outline" className="h-9 rounded-full px-4 shadow-sm" disabled={exporting !== null} onClick={() => handleExport("report")}>
+            {exporting === "report" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            {exporting === "report" ? "Exporting…" : "Export Report"}
           </Button>
           <Button
             variant="gradient-info" className="rounded-full h-9 px-5 shadow-sm font-semibold text-xs gap-2"
-            onClick={() => setAddDocOpen(true)}
+            onClick={() => setAddCaseOpen(true)}
           >
             <Plus className="h-4 w-4" />
-            Add Document
+            New DDQ Case
           </Button>
         </div>
       </div>
 
-      {/* KPIs */}
-      <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-        {DD_KPIS.map((kpi) => (
-          <KpiCard key={kpi.id} kpi={kpi} />
+      <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+        {loading
+          ? Array.from({ length: 5 }).map((_, index) => (
+              <div key={index} className={cn(CARD, "h-[112px] animate-pulse bg-[#f1f5f9]")} />
+            ))
+          : [
+          { label: "Active Investors in DD", value: investorCards.length, icon: Users, color: "#2563eb", bg: "#dbeafe" },
+          { label: "Open Items", value: totalOpen, icon: FilePenLine, color: "#d97706", bg: "#fef3c7" },
+          { label: "Overdue Items", value: totalOverdue, icon: FilePenLine, color: "#dc2626", bg: "#fee2e2" },
+          { label: "Avg. Completion", value: `${avgCompletion}%`, icon: Gavel, color: "#16a34a", bg: "#dcfce7" },
+          { label: "DDQ Templates", value: templates.length, icon: CalendarDays, color: "#7c3aed", bg: "#ede9fe" },
+        ].map((kpi) => (
+          <div key={kpi.label} className={cn(CARD, "flex flex-col p-3.5")}>
+            <span
+              className="flex h-8 w-8 items-center justify-center rounded-full"
+              style={{ backgroundColor: kpi.bg, color: kpi.color }}
+            >
+              <kpi.icon className="h-4 w-4" strokeWidth={1.75} />
+            </span>
+            <p className="mt-2.5 text-[11px] font-medium leading-snug text-[#64748b]">{kpi.label}</p>
+            <p className="mt-1.5 text-[22px] font-bold leading-none tabular-nums text-[#0f172a]">{kpi.value}</p>
+          </div>
         ))}
       </div>
 
-      {/* Body */}
-      <div className="mt-5 grid grid-cols-1 gap-4 xl:grid-cols-[260px_minmax(0,1fr)_300px]">
-        {/* Left investors */}
-        <aside className={cn(CARD, "flex flex-col overflow-hidden")}>
-          <div className="flex items-center gap-2 border-b border-[#f1f5f9] px-3 py-3">
-            <h2 className="text-[13px] font-semibold text-[#0f172a]">Active Investors in DD</h2>
-            <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-[4px] bg-[#f1f5f9] px-1.5 text-[11px] font-semibold text-[#64748b]">
-              {DD_INVESTORS.length}
-            </span>
-          </div>
-          <div className="flex flex-col gap-2 p-2.5">
-            {DD_INVESTORS.map((inv) => (
-              <InvestorCard
-                key={inv.id}
-                investor={inv}
-                selected={selected.id === inv.id}
-                onSelect={() => setSelectedId(inv.id)}
-              />
+      {loading ? (
+        <div className="mt-5 grid grid-cols-1 gap-4 xl:grid-cols-[260px_minmax(0,1fr)]">
+          <aside className={cn(CARD, "space-y-2 p-3")}>
+            {Array.from({ length: 4 }).map((_, index) => (
+              <div key={index} className="h-[96px] animate-pulse rounded-[6px] bg-[#f1f5f9]" />
             ))}
-          </div>
-          <div className="mt-auto border-t border-[#f1f5f9] px-3 py-2.5">
-            <button
-              type="button"
-              onClick={() => setArchivedOpen(true)}
-              className="text-[11px] font-medium text-[#2563eb] hover:underline"
-            >
-              View archived investors (2) &gt;
-            </button>
-          </div>
-        </aside>
-
-        {/* Center matrix */}
-        <section className={cn(CARD, "flex min-w-0 flex-col overflow-hidden")}>
-          <div className="flex flex-col gap-2 border-b border-[#f1f5f9] px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-1.5">
-              <h2 className="text-[13px] font-semibold text-[#0f172a]">Due Diligence Matrix</h2>
-              <button
-                type="button"
-                className="text-[#94a3b8] hover:text-[#64748b]"
-                title="Document status by category for the selected investor"
-              >
-                <Info className="h-3.5 w-3.5" />
-              </button>
+          </aside>
+          <section className={cn(CARD, "overflow-hidden")}>
+            <div className="h-14 animate-pulse border-b border-[#f1f5f9] bg-[#f8fafc]" />
+            <table className="w-full">
+              <tbody><FrTableSkeleton columns={5} rows={7} /></tbody>
+            </table>
+          </section>
+        </div>
+      ) : investorCards.length === 0 ? (
+        <div className="mt-5 rounded-[10px] border border-[#e2e8f0] bg-white p-10 text-center text-[13px] text-[#94a3b8]">
+          No DDQ cases yet. Create one to start tracking due diligence for an investor.
+        </div>
+      ) : (
+        <div className="mt-5 grid grid-cols-1 gap-4 xl:grid-cols-[260px_minmax(0,1fr)]">
+          <aside className={cn(CARD, "flex flex-col overflow-hidden")}>
+            <div className="flex items-center gap-2 border-b border-[#f1f5f9] px-3 py-3">
+              <h2 className="text-[13px] font-semibold text-[#0f172a]">Active Investors in DD</h2>
+              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-[4px] bg-[#f1f5f9] px-1.5 text-[11px] font-semibold text-[#64748b]">
+                {investorCards.length}
+              </span>
             </div>
-            <div className="flex items-center gap-2">
-              <Select value={selectedId} onValueChange={setSelectedId}>
-                <SelectTrigger className="h-8 w-full rounded-[6px] border-[#e2e8f0] text-[12px] sm:w-[200px]">
-                  <SelectValue placeholder="View by Investor" />
-                </SelectTrigger>
-                <SelectContent>
-                  {DD_INVESTORS.map((inv) => (
-                    <SelectItem key={inv.id} value={inv.id}>
-                      {inv.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                className="h-8 w-8 shrink-0 rounded-full border-[#e2e8f0]"
-                onClick={() => toast.success("Matrix export started")}
-              >
-                <Download className="h-3.5 w-3.5 text-[#64748b]" />
-                <span className="sr-only">Export matrix</span>
-              </Button>
-            </div>
-          </div>
-
-          <MatrixTable investorId={selected.id} investorName={selected.name} />
-
-          <div className="mt-auto flex flex-col gap-2 border-t border-[#f1f5f9] px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-wrap items-center gap-3">
-              {DD_STATUS_LEGEND.map((status) => {
-                const style = statusStyle(status)
-                return (
-                  <span
-                    key={status}
-                    className="inline-flex items-center gap-1.5 text-[10px] text-[#64748b]"
-                  >
-                    <span className={cn("h-1.5 w-1.5 rounded-full", style.dot)} />
-                    {status}
-                  </span>
-                )
-              })}
-            </div>
-            <button
-              type="button"
-              onClick={() => toast.success("Matrix export started")}
-              className="inline-flex items-center gap-1 text-[11px] font-medium text-[#2563eb] hover:underline"
-            >
-              <Download className="h-3 w-3" />
-              Export Matrix
-            </button>
-          </div>
-        </section>
-
-        {/* Right Q&A + thread */}
-        <aside className="flex flex-col gap-4">
-          <div className={cn(CARD, "flex flex-col overflow-hidden")}>
-            <div className="border-b border-[#f1f5f9] px-3 pt-3">
-              <h2 className="text-[13px] font-semibold text-[#0f172a]">Q&A / Requests</h2>
-              <div className="mt-2 flex items-center gap-4">
-                <button
-                  type="button"
-                  onClick={() => setQaTab("open")}
-                  className={cn(
-                    "border-b-2 pb-2 text-[12px] font-medium transition-colors",
-                    qaTab === "open"
-                      ? "border-transparent bg-gradient-to-r from-blue-600 to-cyan-600 bg-[length:100%_2px] bg-bottom bg-no-repeat text-[#2563eb]"
-                      : "border-transparent text-[#94a3b8] hover:text-[#64748b]",
-                  )}
-                >
-                  Open ({OPEN_REQUEST_COUNT})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setQaTab("resolved")}
-                  className={cn(
-                    "border-b-2 pb-2 text-[12px] font-medium transition-colors",
-                    qaTab === "resolved"
-                      ? "border-transparent bg-gradient-to-r from-blue-600 to-cyan-600 bg-[length:100%_2px] bg-bottom bg-no-repeat text-[#2563eb]"
-                      : "border-transparent text-[#94a3b8] hover:text-[#64748b]",
-                  )}
-                >
-                  Resolved ({RESOLVED_REQUEST_COUNT})
-                </button>
-              </div>
-            </div>
-            <div className="border-b border-[#f1f5f9] px-3 py-2">
-              <Select value={qaInvestorFilter} onValueChange={setQaInvestorFilter}>
-                <SelectTrigger className="h-8 w-full rounded-[6px] border-[#e2e8f0] text-[12px]">
-                  <SelectValue placeholder="All Investors" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Investors</SelectItem>
-                  {DD_INVESTORS.map((inv) => (
-                    <SelectItem key={inv.id} value={inv.id}>
-                      {inv.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="max-h-[280px] overflow-y-auto">
-              {filteredRequests.length === 0 ? (
-                <p className="px-3 py-6 text-center text-[12px] text-[#94a3b8]">
-                  No requests in this view.
-                </p>
-              ) : (
-                filteredRequests.map((req) => <RequestItem key={req.id} request={req} />)
-              )}
-            </div>
-            <div className="border-t border-[#f1f5f9] px-3 py-2.5">
-              <button
-                type="button"
-                onClick={() => setAllRequestsOpen(true)}
-                className="text-[11px] font-medium text-[#2563eb] hover:underline"
-              >
-                View all open requests &gt;
-              </button>
-            </div>
-          </div>
-
-          <div className={cn(CARD, "flex flex-col overflow-hidden")}>
-            <div className="border-b border-[#f1f5f9] px-3 py-3">
-              <h2 className="text-[13px] font-semibold text-[#0f172a]">Recent Q&A Thread</h2>
-            </div>
-            <div className="flex max-h-[300px] flex-col gap-3 overflow-y-auto px-3 py-3">
-              {thread.map((msg) => (
-                <ThreadBubble key={msg.id} message={msg} />
+            <div className="flex flex-col gap-2 p-2.5">
+              {investorCards.map((inv) => (
+                <InvestorCard key={inv.id} investor={inv} selected={selected?.id === inv.id} onSelect={() => selectCase(inv.id)} />
               ))}
             </div>
-            <div className="border-t border-[#f1f5f9] p-2.5">
+          </aside>
+
+          <section className={cn(CARD, "flex min-w-0 flex-col overflow-hidden")}>
+            <div className="flex flex-col gap-2 border-b border-[#f1f5f9] px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-1.5">
+                <h2 className="text-[13px] font-semibold text-[#0f172a]">Due Diligence Matrix</h2>
                 <button
                   type="button"
-                  onClick={() => toast.message("Attachments coming soon")}
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[#94a3b8] hover:bg-[#f1f5f9] hover:text-[#64748b]"
+                  className="rounded-full p-1 text-[#94a3b8] hover:bg-[#f1f5f9] hover:text-[#64748b]"
+                  title="Item status by category for the selected case"
                 >
-                  <Paperclip className="h-4 w-4" />
-                  <span className="sr-only">Attach</span>
+                  <Info className="h-3.5 w-3.5" />
                 </button>
-                <Input
-                  value={reply}
-                  onChange={(e) => setReply(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault()
-                      sendReply()
-                    }
-                  }}
-                  placeholder="Type your reply..."
-                  className="h-8 rounded-[6px] border-[#e2e8f0] text-[12px] shadow-none"
-                />
+              </div>
+              <div className="flex items-center gap-2">
+                <Select value={selectedId ?? ""} onValueChange={selectCase}>
+                  <SelectTrigger className="h-8 w-full rounded-full border-[#e2e8f0] text-[12px] sm:w-[220px]">
+                    <SelectValue placeholder="Select a case" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {investorCards.map((inv) => (
+                      <SelectItem key={inv.id} value={inv.id}>{inv.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <Button
                   type="button"
+                  variant="outline"
                   size="icon"
-                  variant="gradient-info" className="rounded-full h-8 w-8 shrink-0 p-0 shadow-sm"
-                  onClick={sendReply}
-                  disabled={!reply.trim()}
+                  className="h-8 w-8 shrink-0 rounded-full border-[#e2e8f0]"
+                  disabled={exporting !== null}
+                  onClick={() => handleExport("matrix")}
                 >
-                  <Send className="h-3.5 w-3.5" />
-                  <span className="sr-only">Send</span>
+                  {exporting === "matrix" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5 text-[#64748b]" />}
+                  <span className="sr-only">Export matrix</span>
                 </Button>
               </div>
             </div>
-          </div>
-        </aside>
-      </div>
 
-      <FrViewAllDialog
-        open={archivedOpen}
-        onOpenChange={setArchivedOpen}
-        title="Archived investors"
-        description="Investors no longer active in due diligence"
-        rows={[
-          {
-            id: "arch-1",
-            title: "Midlands Provident Fund",
-            subtitle: "Archived 02 Apr 2025 · Lead: Tendai Banda",
-            meta: "Completion 100% · Closed without commitment",
-            badge: "Archived",
-          },
-          {
-            id: "arch-2",
-            title: "Sable Capital Partners",
-            subtitle: "Archived 18 Mar 2025 · Lead: Farai Ncube",
-            meta: "Completion 92% · Moved to another vehicle",
-            badge: "Archived",
-          },
-        ]}
-      />
+            {!selected ? (
+              <p className="px-4 py-16 text-center text-[12px] text-[#94a3b8]">
+                Select a case to view its due diligence matrix.
+              </p>
+            ) : loadingDetail ? (
+              <table className="w-full"><tbody><FrTableSkeleton columns={5} rows={7} /></tbody></table>
+            ) : matrixGrouped.length === 0 ? (
+              <p className="px-4 py-16 text-center text-[12px] text-[#94a3b8]">
+                No items on this case yet.
+              </p>
+            ) : (
+              <>
+              <div className="grid gap-2 border-b border-[#f1f5f9] bg-[#fafafa] px-3 py-3 sm:grid-cols-4">
+                <div><p className="text-[9px] text-[#94a3b8]">Investor / case</p><p className="text-[11px] font-medium text-[#0f172a]">{selected.name}</p></div>
+                <div><p className="text-[9px] text-[#94a3b8]">Owner</p><p className="text-[11px] font-medium text-[#0f172a]">{selected.lead}</p></div>
+                <div><p className="text-[9px] text-[#94a3b8]">Progress</p><p className="text-[11px] font-medium text-[#0f172a]">{selected.completion}%</p></div>
+                <select className="h-8 rounded-full border border-[#e2e8f0] bg-white px-3 text-[10px]" value={String(selectedCase?.status || "NOT_STARTED")} onChange={(e) => updateCaseStatus(e.target.value)}>
+                  <option value="NOT_STARTED">Not started</option>
+                  <option value="IN_PROGRESS">In progress</option>
+                  <option value="INTERNAL_REVIEW">Internal review</option>
+                  <option value="APPROVED">Approved</option>
+                  <option value="SUBMITTED">Submitted</option>
+                  <option value="COMPLETED">Completed</option>
+                </select>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[640px] border-collapse text-left">
+                  <thead>
+                    <tr className="border-b border-[#f1f5f9] bg-[#fafafa]">
+                      <th className="px-3 py-2 text-[11px] font-semibold text-[#94a3b8]">Category</th>
+                      <th className="px-3 py-2 text-[11px] font-semibold text-[#94a3b8]">Item</th>
+                      <th className="px-3 py-2 text-[11px] font-semibold text-[#94a3b8]">Status ({selected.name})</th>
+                      <th className="px-3 py-2 text-[11px] font-semibold text-[#94a3b8]">Last Updated</th>
+                      <th className="px-3 py-2 text-[11px] font-semibold text-[#94a3b8]">Evidence</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {matrixGrouped.map(({ category, items }) =>
+                      items.map((row, index) => (
+                        <tr key={row.id} className="border-b border-[#f1f5f9] last:border-b-0 hover:bg-[#f8fafc]">
+                          {index === 0 ? (
+                            <td rowSpan={items.length} className="align-top border-r border-[#f1f5f9] px-3 py-2.5">
+                              <span className="text-[11px] font-semibold text-[#0f172a]">{category}</span>
+                            </td>
+                          ) : null}
+                          <td className="px-3 py-2 text-[12px] text-[#0f172a]">{row.document}</td>
+                          <td className="px-3 py-2"><StatusPill status={row.status} /></td>
+                          <td className="whitespace-nowrap px-3 py-2 text-[11px] text-[#64748b]">{row.lastUpdated}</td>
+                          <td className="px-3 py-2">
+                            {(() => {
+                              const evidence = evidenceMeta(row.raw)
+                              return evidence.fileName ? (
+                                evidence.url ? (
+                                  <a
+                                    href={evidence.url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="mb-1 block max-w-[180px] truncate text-[10px] font-medium text-[#2563eb] hover:underline"
+                                    title={evidence.fileName}
+                                  >
+                                    {evidence.fileName}
+                                  </a>
+                                ) : (
+                                  <span className="mb-1 block max-w-[180px] truncate text-[10px] text-[#475569]" title={evidence.fileName}>
+                                    {evidence.fileName}
+                                  </span>
+                                )
+                              ) : null
+                            })()}
+                            <button
+                              type="button"
+                              disabled={uploadingItemId === row.id}
+                              onClick={() => triggerEvidenceUpload(row.id)}
+                              className="inline-flex items-center gap-1 rounded-full border border-[#e2e8f0] px-2 py-1 text-[10px] font-medium text-[#64748b] hover:bg-[#f1f5f9] disabled:opacity-50"
+                            >
+                              {uploadingItemId === row.id ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Paperclip className="h-3 w-3" />
+                              )}
+                              Upload
+                            </button>
+                          </td>
+                        </tr>
+                      )),
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              </>
+            )}
+          </section>
+        </div>
+      )}
 
-      <FrViewAllDialog
-        open={allRequestsOpen}
-        onOpenChange={setAllRequestsOpen}
-        title="All open requests"
-        description={`${DD_REQUESTS.filter((r) => !r.resolved).length} open Q&A / document requests`}
-        size="xl"
-        rows={DD_REQUESTS.filter((r) => !r.resolved).map((r) => ({
-          id: r.id,
-          title: r.title,
-          subtitle: r.investorName,
-          meta: `Due ${r.dueDate}`,
-          badge: r.priority,
-          badgeClass:
-            r.priority === "High"
-              ? "bg-[#fee2e2] text-[#dc2626]"
-              : r.priority === "Medium"
-                ? "bg-[#ffedd5] text-[#c2410c]"
-                : "bg-[#dcfce7] text-[#15803d]",
-        }))}
-      />
-
-      <FrSimpleWizard
-        open={addDocOpen}
-        onOpenChange={setAddDocOpen}
-        title="Add Document"
-        steps={[{ id: "document", short: "1", label: "Document" }, { id: "category", short: "2", label: "Category" }, { id: "review", short: "3", label: "Review" }]}
-        submitLabel="Add document"
-        validateStep={(step) => step === "document" && !docName.trim() ? ["Document name is required"] : []}
-        onSubmit={() => {
-          toast.success(`Document “${docName.trim()}” added`)
-          setDocName("ZGF II signed side letter")
+      <FrDialogShell
+        open={addCaseOpen}
+        onOpenChange={(v) => {
+          setAddCaseOpen(v)
+          if (!v) setCaseForm({ investorId: "", campaignId: "", templateId: "", title: "" })
         }}
+        title="New DDQ Case"
+        description="Start a due diligence questionnaire case for an investor"
+        size="lg"
+        footer={
+          <>
+            <Button type="button" variant="outline" className="h-9 rounded-full px-4" onClick={() => setAddCaseOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="gradient-info"
+              className="rounded-full h-9 px-5 shadow-sm font-semibold text-xs gap-2"
+              disabled={!caseForm.investorId || !caseForm.title.trim() || creatingCase}
+              onClick={async () => {
+                setCreatingCase(true)
+                try {
+                  const created = await fundraisingApi.createDdqCase({
+                    investorId: caseForm.investorId,
+                    campaignId: caseForm.campaignId || undefined,
+                    templateId: caseForm.templateId || undefined,
+                    title: caseForm.title.trim(),
+                  })
+                  toast.success("DDQ case created")
+                  setAddCaseOpen(false)
+                  setCaseForm({ investorId: "", campaignId: "", templateId: "", title: "" })
+                  await loadCases()
+                  if (created?.id) selectCase(String(created.id))
+                } catch (err) {
+                  toastFrError(err, "Could not create DDQ case")
+                } finally {
+                  setCreatingCase(false)
+                }
+              }}
+            >
+              {creatingCase ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {creatingCase ? "Creating…" : "Create case"}
+            </Button>
+          </>
+        }
       >
-        {(step) => step === "document" ? <FrField label="Document name">
+        <div className="space-y-3">
+          <FrField label="Investor">
+            <select
+              className={frSelectClass}
+              value={caseForm.investorId}
+              disabled={loadingRefs}
+              onChange={(e) => setCaseForm((f) => ({ ...f, investorId: e.target.value }))}
+            >
+              <option value="">{loadingRefs ? "Loading investors…" : "Select investor"}</option>
+              {investors.map((i) => (
+                <option key={i.id} value={i.id}>{i.legalName || i.name}</option>
+              ))}
+            </select>
+          </FrField>
+          <FrField label="Case title">
             <input
               className={frInputClass}
-              value={docName}
-              onChange={(e) => setDocName(e.target.value)}
-              placeholder="e.g. Side Letter signed copy"
+              value={caseForm.title}
+              onChange={(e) => setCaseForm((f) => ({ ...f, title: e.target.value }))}
+              placeholder="e.g. Fund IV DDQ — National Pension Fund"
             />
-          </FrField> : step === "category" ? <FrField label="Category">
-            <select className={frSelectClass} defaultValue="Legal">
-              <option>Legal</option>
-              <option>Compliance</option>
-              <option>Financials</option>
-              <option>ESG</option>
+          </FrField>
+          <FrField label="Campaign (optional)">
+            <select
+              className={frSelectClass}
+              value={caseForm.campaignId}
+              disabled={loadingRefs}
+              onChange={(e) => setCaseForm((f) => ({ ...f, campaignId: e.target.value }))}
+            >
+              <option value="">None</option>
+              {campaigns.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
             </select>
-          </FrField> : <ReviewList items={[
-            { label: "Document", value: docName },
-            { label: "For", value: selected.name },
-            { label: "Category", value: "Legal" },
-          ]} />}
-      </FrSimpleWizard>
+          </FrField>
+          <FrField label="Template (optional)">
+            <select
+              className={frSelectClass}
+              value={caseForm.templateId}
+              onChange={(e) => setCaseForm((f) => ({ ...f, templateId: e.target.value }))}
+            >
+              <option value="">{templates.length === 0 ? "No templates available" : "None"}</option>
+              {templates.map((t) => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
+            </select>
+          </FrField>
+        </div>
+      </FrDialogShell>
     </div>
   )
 }
