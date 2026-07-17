@@ -22,9 +22,12 @@ import {
 import { errorMessage, logFpaGap } from "@/lib/fpa/fpa-api-gaps"
 import {
   emptyCompareSkeleton,
+  isEnrichedCompareResult,
+  isLegacyPairCompareResult,
   mapCompareResultToRows,
   type CompareMetricRow,
 } from "@/lib/fpa/scenario-compare"
+import { resolveScenarioCopy } from "@/lib/fpa/scenario-copy"
 import {
   Dialog,
   DialogContent,
@@ -59,12 +62,35 @@ function getToneStyle(name: string) {
   return TONE_COLORS.generic
 }
 
-function scenarioInherits(name: string): string {
-  const n = name.toLowerCase()
-  if (n.includes("copy")) return "Base Case"
-  if (n.includes("upside") || n.includes("expansion") || n.includes("fundraising")) return "Base Case"
-  if (n.includes("downside") || n.includes("fx") || n.includes("hiring") || n.includes("cost")) return "Base Case"
-  return "None (Root)"
+const SCENARIO_TYPES = [
+  { value: "UPSIDE", label: "Best / Upside" },
+  { value: "DOWNSIDE", label: "Downside" },
+  { value: "WHAT_IF", label: "What-if" },
+  { value: "CUSTOM", label: "Custom" },
+  { value: "BASE", label: "Base" },
+] as const
+
+type SeedMode = "copy_base" | "empty"
+
+/** Honest inheritance label — only claim a parent when the API says so. */
+function scenarioInheritsLabel(s: FpaScenario, list: FpaScenario[]): string {
+  const parentId = s.parentScenarioId || s.inheritsFromScenarioId
+  if (parentId) {
+    const parent = list.find((x) => x.id === parentId)
+    return parent?.name || s.parentScenarioName || "Parent scenario"
+  }
+  if (s.parentScenarioName) return s.parentScenarioName
+  if (s.scenarioType === "BASE" || /^base\b/i.test(s.name)) return "None (root)"
+  return "Not linked"
+}
+
+function findBaseScenario(list: FpaScenario[]): FpaScenario | null {
+  return (
+    list.find((s) => s.scenarioType === "BASE") ||
+    list.find((s) => /^base\b/i.test(s.name)) ||
+    list[0] ||
+    null
+  )
 }
 
 type WaterfallBar = {
@@ -108,6 +134,10 @@ export function FpaScenarioComparison() {
 
   const [list, setList] = useState<FpaScenario[]>([])
   const [loading, setLoading] = useState(true)
+  const [compareLoading, setCompareLoading] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  /** When BE only returns left/right pair compare (not enriched metrics[]). */
+  const [compareLegacyPair, setCompareLegacyPair] = useState(false)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [anchorId, setAnchorId] = useState<string | null>(null)
   const [tableRows, setTableRows] = useState<CompareMetricRow[]>([])
@@ -120,6 +150,13 @@ export function FpaScenarioComparison() {
   const [waterfallBars, setWaterfallBars] = useState<WaterfallBar[]>([])
   const [isWaterfallModalOpen, setIsWaterfallModalOpen] = useState(false)
   const [tempWaterfallBars, setTempWaterfallBars] = useState<WaterfallBar[]>([])
+  const [createOpen, setCreateOpen] = useState(false)
+  const [creating, setCreating] = useState(false)
+  const [createName, setCreateName] = useState("")
+  const [createType, setCreateType] = useState<string>("UPSIDE")
+  const [createDescription, setCreateDescription] = useState("")
+  const [seedMode, setSeedMode] = useState<SeedMode>("copy_base")
+  const [busyScenarioId, setBusyScenarioId] = useState<string | null>(null)
 
   useEffect(() => {
     const mid = searchParams.get("modelId")
@@ -131,27 +168,44 @@ export function FpaScenarioComparison() {
   }, [searchParams, dispatch])
 
   useEffect(() => {
-    if (!selectedModelId) {
-      void dispatch(bootstrapFpaSelection({}))
+    if (!selectedModelId || models.length === 0) {
+      void dispatch(bootstrapFpaSelection(selectedModelId || undefined))
     }
-  }, [dispatch, selectedModelId])
+  }, [dispatch, selectedModelId, models.length])
+
+  const selectedModel = useMemo(
+    () => models.find((m) => m.id === selectedModelId) || null,
+    [models, selectedModelId],
+  )
 
   const effectiveVersionId =
-    selectedVersionId || models.find((m) => m.id === selectedModelId)?.defaultVersionId || null
+    selectedVersionId || selectedModel?.defaultVersionId || null
 
   const load = useCallback(async () => {
     if (!selectedModelId) {
       setLoading(false)
       setList([])
+      setLoadError(null)
       return
     }
     setLoading(true)
+    setLoadError(null)
     try {
-      const res = await fpaApi.listScenarios(selectedModelId)
-      if (!res.success) throw new Error(res.message || "Scenarios failed")
-      const data = res.data?.length
-        ? res.data
-        : scenarios.filter((s) => !s.modelId || s.modelId === selectedModelId)
+      // Prefer nested REST; fall back to query list.
+      let data: FpaScenario[] = []
+      const nested = await fpaApi.listModelScenarios(selectedModelId)
+      if (nested.success && nested.data?.length) {
+        data = nested.data
+      } else {
+        const res = await fpaApi.listScenarios(selectedModelId)
+        if (!res.success) throw new Error(res.message || "Scenarios failed")
+        data = res.data || []
+      }
+      // Hide archived unless BE already filtered them out.
+      data = data.filter((s) => !/archiv/i.test(s.status || ""))
+      if (!data.length) {
+        data = scenarios.filter((s) => !s.modelId || s.modelId === selectedModelId)
+      }
       setList(data)
       setSelectedIds((prev) => {
         const valid = prev.filter((id) => data.some((s) => s.id === id))
@@ -160,15 +214,20 @@ export function FpaScenarioComparison() {
       })
       setAnchorId((prev) => {
         if (prev && data.some((s) => s.id === prev)) return prev
-        const base = data.find((s) => /base/i.test(s.name) || s.scenarioType === "BASE")
+        const base = findBaseScenario(data)
         return base?.id || selectedScenarioId || data[0]?.id || null
       })
+      if (!selectedVersionId && selectedModel?.defaultVersionId) {
+        dispatch(setSelectedVersionId(selectedModel.defaultVersionId))
+      }
     } catch (err) {
+      const msg = errorMessage(err)
+      setLoadError(msg)
       logFpaGap({
         category: "broken",
-        path: "/v1/fpa/scenarios",
+        path: `/v1/fpa/models/${selectedModelId}/scenarios`,
         method: "GET",
-        message: errorMessage(err),
+        message: msg,
         impact: "Scenarios tab empty",
         response: err,
       })
@@ -176,7 +235,14 @@ export function FpaScenarioComparison() {
     } finally {
       setLoading(false)
     }
-  }, [selectedModelId, scenarios, selectedScenarioId])
+  }, [
+    selectedModelId,
+    scenarios,
+    selectedScenarioId,
+    selectedVersionId,
+    selectedModel?.defaultVersionId,
+    dispatch,
+  ])
 
   useEffect(() => {
     void load()
@@ -189,8 +255,10 @@ export function FpaScenarioComparison() {
       setAssumptionMatrix([])
       setSensitivityRows([])
       setWaterfallBars([])
+      setCompareLegacyPair(false)
       return
     }
+    setCompareLoading(true)
     try {
       const others = liveIds.filter((id) => id !== anchorId)
       const res = await fpaApi.compareScenarios(anchorId, {
@@ -206,7 +274,12 @@ export function FpaScenarioComparison() {
       })
       if (!res.success || !res.data) throw new Error(res.message || "Compare failed")
       const data = res.data
-      setTableRows(mapCompareResultToRows(data, liveIds, anchorId, others[0]))
+      const enriched = isEnrichedCompareResult(data)
+      const legacy = isLegacyPairCompareResult(data)
+      setCompareLegacyPair(legacy)
+      // Legacy pair compare only fills anchor + first other — still map for UX.
+      const mapIds = enriched ? liveIds : legacy ? ([anchorId, others[0]].filter(Boolean) as string[]) : liveIds
+      setTableRows(mapCompareResultToRows(data, mapIds, anchorId, others[0]))
       setSensitivityRows(Array.isArray(data.sensitivity) ? data.sensitivity : [])
       setWaterfallBars(waterfallFromApi(data.waterfall))
       setAssumptionMatrix(
@@ -240,10 +313,14 @@ export function FpaScenarioComparison() {
         impact: "Scenarios compare matrix empty",
         response: err,
       })
+      setCompareLegacyPair(false)
       setTableRows(emptyCompareSkeleton(list.filter((s) => liveIds.includes(s.id))))
       setAssumptionMatrix([])
       setSensitivityRows([])
       setWaterfallBars([])
+      toast.error("Compare failed", { description: errorMessage(err) })
+    } finally {
+      setCompareLoading(false)
     }
   }, [selectedModelId, effectiveVersionId, anchorId, selectedIds, list])
 
@@ -261,25 +338,133 @@ export function FpaScenarioComparison() {
     })
   }
 
+  const openCreateModal = () => {
+    if (!selectedModelId) {
+      toast.error("Select a model first")
+      return
+    }
+    setCreateName("")
+    setCreateType("UPSIDE")
+    setCreateDescription("")
+    setSeedMode("copy_base")
+    setCreateOpen(true)
+  }
+
+  const submitCreateScenario = async () => {
+    if (!selectedModelId) {
+      toast.error("Select a model first")
+      return
+    }
+    const name = createName.trim()
+    if (!name) {
+      toast.error("Enter a scenario name")
+      return
+    }
+    setCreating(true)
+    const base = findBaseScenario(list)
+    try {
+      if (seedMode === "copy_base") {
+        if (!base) {
+          toast.error("No Base scenario to copy from — create an empty scenario instead")
+          setSeedMode("empty")
+          setCreating(false)
+          return
+        }
+        if (!effectiveVersionId) {
+          toast.error("Model has no default version — cannot seed from Base")
+          setCreating(false)
+          return
+        }
+        try {
+          const res = await fpaApi.copyScenario(base.id, {
+            versionId: effectiveVersionId,
+            name,
+            scenarioType: createType,
+            description: createDescription.trim() || undefined,
+            inheritFromSource: true,
+          })
+          if (!res.success || !res.data) {
+            throw new Error(res.message || "Copy from Base failed")
+          }
+          const copied = await resolveScenarioCopy(res.data)
+          toast.success(`Created “${copied.scenario.name}” from Base`, {
+            description: `${copied.cellsCopied ?? 0} cells · ${copied.driversCopied ?? 0} drivers`,
+          })
+          setCreateOpen(false)
+          await load()
+          if (copied.scenario.id) {
+            setSelectedIds((prev) => [...new Set([...prev, copied.scenario.id])])
+          }
+          return
+        } catch (copyErr) {
+          logFpaGap({
+            category: "broken",
+            path: `/v1/fpa/scenarios/${base.id}/copy`,
+            method: "POST",
+            message: errorMessage(copyErr),
+            impact: "Seed scenario from Base failed — not creating empty shell",
+            response: copyErr,
+          })
+          toast.error("Copy from Base failed", {
+            description:
+              errorMessage(copyErr) ||
+              "Backend copy timed out or errored. Switch to “Empty scenario” if you still want a shell — see Stage 4 backend asks.",
+          })
+          return
+        }
+      }
+
+      const res = await fpaApi.createScenario({
+        modelId: selectedModelId,
+        name,
+        scenarioType: createType,
+        description: createDescription.trim() || undefined,
+        inheritFromScenarioId: base?.id,
+        versionId: effectiveVersionId || undefined,
+      })
+      if (!res.success || !res.data) throw new Error(res.message || "Create failed")
+      toast.success(`Created scenario “${res.data.name}”`, {
+        description: "Empty scenario — open worksheet to enter overrides.",
+      })
+      setCreateOpen(false)
+      await load()
+      if (res.data.id) setSelectedIds((prev) => [...new Set([...prev, res.data!.id])])
+    } catch (err) {
+      logFpaGap({
+        category: "broken",
+        path: "/v1/fpa/scenarios",
+        method: "POST",
+        message: errorMessage(err),
+        impact: "Create scenario failed",
+        response: err,
+      })
+      toast.error("Could not create scenario", { description: errorMessage(err) })
+    } finally {
+      setCreating(false)
+    }
+  }
+
   const duplicateScenario = async (sId: string) => {
     const target = list.find((s) => s.id === sId)
     if (!target || !effectiveVersionId) {
       toast.error("Select a model version before duplicating")
       return
     }
+    setBusyScenarioId(sId)
     try {
       const res = await fpaApi.copyScenario(sId, {
         versionId: effectiveVersionId,
         name: `${target.name} Copy`,
         scenarioType: target.scenarioType || "CUSTOM",
+        inheritFromSource: true,
       })
       if (!res.success || !res.data) throw new Error(res.message || "Copy failed")
-      const created = res.data.scenario
+      const copied = await resolveScenarioCopy(res.data)
       toast.success(`Duplicated “${target.name}”`, {
-        description: `${res.data.cellsCopied ?? 0} cells · ${res.data.driversCopied ?? 0} drivers`,
+        description: `${copied.cellsCopied ?? 0} cells · ${copied.driversCopied ?? 0} drivers`,
       })
       await load()
-      if (created?.id) setSelectedIds((prev) => [...prev, created.id])
+      if (copied.scenario.id) setSelectedIds((prev) => [...prev, copied.scenario.id])
     } catch (err) {
       logFpaGap({
         category: "broken",
@@ -289,13 +474,18 @@ export function FpaScenarioComparison() {
         impact: "Duplicate scenario failed",
         response: err,
       })
-      toast.error("Could not duplicate scenario")
+      toast.error("Could not duplicate scenario", {
+        description: errorMessage(err),
+      })
+    } finally {
+      setBusyScenarioId(null)
     }
   }
 
   const promoteScenario = async (sId: string) => {
     const target = list.find((s) => s.id === sId)
     if (!target) return
+    setBusyScenarioId(sId)
     try {
       const res = await fpaApi.promoteScenario(sId, {
         versionId: effectiveVersionId || undefined,
@@ -314,37 +504,39 @@ export function FpaScenarioComparison() {
         impact: "Promote scenario failed",
         response: err,
       })
-      toast.error("Could not promote scenario")
+      toast.error("Could not promote scenario", { description: errorMessage(err) })
+    } finally {
+      setBusyScenarioId(null)
     }
   }
 
-  const createScenario = async () => {
-    if (!selectedModelId) {
-      toast.error("Select a model first")
+  const archiveScenario = async (sId: string) => {
+    const target = list.find((s) => s.id === sId)
+    if (!target) return
+    if (target.scenarioType === "BASE" || /^base\b/i.test(target.name)) {
+      toast.error("Base scenario cannot be archived")
       return
     }
-    const name = window.prompt("New scenario name")
-    if (!name?.trim()) return
+    setBusyScenarioId(sId)
     try {
-      const res = await fpaApi.createScenario({
-        modelId: selectedModelId,
-        name: name.trim(),
-        scenarioType: "WHAT_IF",
-      })
-      if (!res.success || !res.data) throw new Error(res.message || "Create failed")
-      toast.success(`Created scenario “${res.data.name}”`)
+      const res = await fpaApi.archiveScenario(sId)
+      if (!res.success) throw new Error(res.message || "Archive failed")
+      toast.success(`Archived “${target.name}”`)
+      setSelectedIds((prev) => prev.filter((id) => id !== sId))
+      if (anchorId === sId) setAnchorId(null)
       await load()
-      if (res.data.id) setSelectedIds((prev) => [...prev, res.data!.id])
     } catch (err) {
       logFpaGap({
         category: "broken",
-        path: "/v1/fpa/scenarios",
+        path: `/v1/fpa/scenarios/${sId}/archive`,
         method: "POST",
         message: errorMessage(err),
-        impact: "Create scenario failed",
+        impact: "Archive scenario failed",
         response: err,
       })
-      toast.error("Could not create scenario")
+      toast.error("Could not archive scenario", { description: errorMessage(err) })
+    } finally {
+      setBusyScenarioId(null)
     }
   }
 
@@ -394,12 +586,38 @@ export function FpaScenarioComparison() {
         <div className="px-4 sm:px-5 pt-4 pb-3 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-[18px] font-semibold text-[#101828]">Scenarios</h1>
-            <p className="text-[12px] text-[#667085] mt-0.5">SRD §16 · Compare strategic cases before promoting to forecast</p>
+            <p className="text-[12px] text-[#667085] mt-0.5">
+              Stage 4 · Create Best / Downside from Base, compare metrics, promote forecast (SRD §38–40)
+            </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="flex items-center gap-1.5 text-[11px] text-[#667085]">
+              Model
+              <select
+                className="h-9 rounded-full border border-[#d0d5dd] bg-white px-3 text-xs font-semibold text-[#101828]"
+                value={selectedModelId || ""}
+                onChange={(e) => {
+                  const id = e.target.value || null
+                  dispatch(setSelectedModelId(id))
+                  if (id) {
+                    const m = models.find((x) => x.id === id)
+                    if (m?.defaultVersionId) dispatch(setSelectedVersionId(m.defaultVersionId))
+                    if (m?.defaultScenarioId) dispatch(setSelectedScenarioId(m.defaultScenarioId))
+                  }
+                }}
+              >
+                <option value="">Select model…</option>
+                {models.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
+                ))}
+              </select>
+            </label>
             <Button
               variant="outline"
               className="rounded-full h-9 px-4 text-xs"
+              disabled={!list.length}
               onClick={() => {
                 setSelectedIds(list.map((s) => s.id))
                 toast.message(`${list.length} scenarios selected for comparison`)
@@ -407,7 +625,12 @@ export function FpaScenarioComparison() {
             >
               Select All
             </Button>
-            <Button variant="gradient-info" className="rounded-full h-9 px-4 text-xs shadow-sm" onClick={() => void createScenario()}>
+            <Button
+              variant="gradient-info"
+              className="rounded-full h-9 px-4 text-xs shadow-sm"
+              onClick={openCreateModal}
+              disabled={!selectedModelId}
+            >
               <Plus className="size-3.5" />
               New Scenario
             </Button>
@@ -418,8 +641,20 @@ export function FpaScenarioComparison() {
       <div className="p-4 sm:p-5 space-y-4 w-full flex-1">
         {!selectedModelId ? (
           <p className="text-sm text-[#667085]">
-            Select a model in the global header to load live scenario data.
+            Select a model above (or open this page from a planning worksheet) to load live scenarios.
           </p>
+        ) : null}
+        {loadError ? (
+          <div className="rounded-xl border border-[#fecdca] bg-[#fef3f2] px-4 py-3 text-[12px] text-[#b42318]">
+            Could not load scenarios: {loadError}
+          </div>
+        ) : null}
+        {compareLegacyPair ? (
+          <div className="rounded-xl border border-[#fedf89] bg-[#fffaeb] px-4 py-3 text-[12px] text-[#b54708]">
+            Compare is on the <strong>legacy pair</strong> API (anchor vs first other only). Multi-column
+            metrics, assumptions, waterfall, and sensitivity need the enriched Stage 4 contract — see{" "}
+            <code className="text-[11px]">design-refs/fpa-model-planning-stage4-backend-asks.md</code>.
+          </div>
         ) : null}
         {(selectedModelId || list.length > 0) && !loading ? (
           <>
@@ -427,12 +662,29 @@ export function FpaScenarioComparison() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <h3 className="text-[14px] font-semibold text-[#101828]">Available Planning Scenarios</h3>
-                <span className="text-[11px] text-[#667085]">{selectedIds.length} selected · {list.length} total</span>
+                <span className="text-[11px] text-[#667085] inline-flex items-center gap-2">
+                  {compareLoading ? (
+                    <span className="inline-flex items-center gap-1 text-[#667085]">
+                      <Loader2 className="size-3 animate-spin" /> Comparing…
+                    </span>
+                  ) : null}
+                  {selectedIds.length} selected · {list.length} total
+                </span>
               </div>
+              {!list.length ? (
+                <div className="rounded-xl border border-dashed border-[#d0d5dd] bg-white px-4 py-10 text-center text-[13px] text-[#667085]">
+                  No scenarios on this model yet. Create Best / Downside from Base to start Stage 4.
+                </div>
+              ) : null}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 {list.map((s) => {
                   const on = selectedIds.includes(s.id)
                   const tone = getToneStyle(s.name)
+                  const busy = busyScenarioId === s.id
+                  const worksheetHref =
+                    selectedModelId && effectiveVersionId
+                      ? `/forecasting/models/${encodeURIComponent(selectedModelId)}/worksheet?versionId=${encodeURIComponent(effectiveVersionId)}&scenarioId=${encodeURIComponent(s.id)}`
+                      : null
                   return (
                     <div
                       key={s.id}
@@ -456,28 +708,52 @@ export function FpaScenarioComparison() {
                           </span>
                         </div>
                         <p className="text-[10px] text-[#667085] mt-1.5">
-                          Inherits: <span className="font-semibold">{scenarioInherits(s.name)}</span>
+                          Inherits: <span className="font-semibold">{scenarioInheritsLabel(s, list)}</span>
                         </p>
+                        {s.status ? (
+                          <p className="text-[10px] text-[#98a2b3] mt-0.5">Status: {s.status}</p>
+                        ) : null}
                       </div>
 
                       {/* Card actions */}
-                      <div className="flex items-center justify-between border-t border-[#f2f4f7] pt-2.5 mt-4" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-between gap-2 border-t border-[#f2f4f7] pt-2.5 mt-4" onClick={(e) => e.stopPropagation()}>
                         <button
                           type="button"
+                          disabled={busy}
                           onClick={() => void duplicateScenario(s.id)}
-                          className="text-[10.5px] font-semibold text-[#2563eb] hover:underline inline-flex items-center gap-0.5"
+                          className="text-[10.5px] font-semibold text-[#2563eb] hover:underline inline-flex items-center gap-0.5 disabled:opacity-50"
                         >
-                          <Copy className="w-2.5 h-2.5" /> Duplicate
+                          {busy ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <Copy className="w-2.5 h-2.5" />}{" "}
+                          Duplicate
                         </button>
-                        {!s.name.includes("Forecast") && (
+                        {worksheetHref ? (
+                          <a
+                            href={worksheetHref}
+                            className="text-[10.5px] font-semibold text-[#667085] hover:underline"
+                          >
+                            Open plan
+                          </a>
+                        ) : null}
+                        {!/forecast/i.test(s.name) && s.scenarioType !== "FORECAST" ? (
                           <button
                             type="button"
+                            disabled={busy}
                             onClick={() => void promoteScenario(s.id)}
-                            className="text-[10.5px] font-semibold text-[#2563eb] hover:underline inline-flex items-center gap-0.5"
+                            className="text-[10.5px] font-semibold text-[#2563eb] hover:underline inline-flex items-center gap-0.5 disabled:opacity-50"
                           >
                             <ArrowUpRight className="w-2.5 h-2.5" /> Promote
                           </button>
-                        )}
+                        ) : null}
+                        {s.scenarioType !== "BASE" && !/^base\b/i.test(s.name) ? (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => void archiveScenario(s.id)}
+                            className="text-[10.5px] font-semibold text-[#b42318] hover:underline disabled:opacity-50"
+                          >
+                            Archive
+                          </button>
+                        ) : null}
                       </div>
                     </div>
                   )
@@ -606,12 +882,17 @@ export function FpaScenarioComparison() {
                 <div className="flex items-center justify-between mb-4">
                   <div>
                     <h3 className="text-[14px] font-semibold text-[#101828]">Waterfall Bridge Variance</h3>
-                    <p className="text-[11px] text-[#667085] mt-0.5">Budget 2026 → Upside Case</p>
+                    <p className="text-[11px] text-[#667085] mt-0.5">
+                      {list.find((x) => x.id === anchorId)?.name || "Anchor"} →{" "}
+                      {list.find((x) => x.id === selectedIds.find((id) => id !== anchorId))?.name ||
+                        "Comparison"}
+                    </p>
                   </div>
                   <button
                     type="button"
                     onClick={openWaterfallConfig}
-                    className="h-7 inline-flex items-center gap-1 rounded-md border border-[#d0d5dd] px-2.5 text-[11px] font-medium text-[#344054] hover:bg-[#f9fafb]"
+                    disabled={!waterfallBars.length}
+                    className="h-7 inline-flex items-center gap-1 rounded-full border border-[#d0d5dd] px-2.5 text-[11px] font-medium text-[#344054] hover:bg-[#f9fafb] disabled:opacity-40"
                   >
                     <Sliders className="w-3 h-3 text-[#475467]" />
                     Configure
@@ -696,6 +977,17 @@ export function FpaScenarioComparison() {
                           </tr>
                         )
                       })}
+                      {!assumptionMatrix.length ? (
+                        <tr>
+                          <td
+                            colSpan={Math.max(1, selectedIds.length) + 1}
+                            className="py-8 text-center text-[12px] text-[#94a3b8]"
+                          >
+                            Assumptions appear when compare returns `assumptions[]` (enriched Stage 4
+                            contract).
+                          </td>
+                        </tr>
+                      ) : null}
                     </tbody>
                   </table>
                 </div>
@@ -758,6 +1050,106 @@ export function FpaScenarioComparison() {
           </div>
         ) : null}
       </div>
+
+      {/* Create / seed scenario */}
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-[16px] font-semibold text-[#101828]">
+              New planning scenario
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <label className="text-[12px] font-medium text-[#344054]">Name</label>
+              <input
+                className="h-10 w-full rounded-lg border border-[#d0d5dd] px-3 text-sm text-[#101828]"
+                placeholder="e.g. Downside Case"
+                value={createName}
+                onChange={(e) => setCreateName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[12px] font-medium text-[#344054]">Type</label>
+              <select
+                className="h-10 w-full rounded-lg border border-[#d0d5dd] px-3 text-sm font-medium text-[#101828] bg-white"
+                value={createType}
+                onChange={(e) => setCreateType(e.target.value)}
+              >
+                {SCENARIO_TYPES.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[12px] font-medium text-[#344054]">Description (optional)</label>
+              <textarea
+                className="min-h-[72px] w-full rounded-lg border border-[#d0d5dd] px-3 py-2 text-sm text-[#101828]"
+                placeholder="What diverges from Base?"
+                value={createDescription}
+                onChange={(e) => setCreateDescription(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <p className="text-[12px] font-medium text-[#344054]">Seed</p>
+              <label className="flex items-start gap-2 rounded-lg border border-[#eaecf0] p-3 cursor-pointer hover:bg-[#f9fafb]">
+                <input
+                  type="radio"
+                  className="mt-1"
+                  checked={seedMode === "copy_base"}
+                  onChange={() => setSeedMode("copy_base")}
+                />
+                <span className="text-[12px] text-[#344054]">
+                  <span className="font-semibold">Copy from Base</span>
+                  <span className="block text-[#667085] mt-0.5">
+                    Preferred (SRD §38) — inherit cells/drivers, then override on the worksheet.
+                    {findBaseScenario(list)
+                      ? ` Source: ${findBaseScenario(list)!.name}.`
+                      : " No Base scenario found yet."}
+                  </span>
+                </span>
+              </label>
+              <label className="flex items-start gap-2 rounded-lg border border-[#eaecf0] p-3 cursor-pointer hover:bg-[#f9fafb]">
+                <input
+                  type="radio"
+                  className="mt-1"
+                  checked={seedMode === "empty"}
+                  onChange={() => setSeedMode("empty")}
+                />
+                <span className="text-[12px] text-[#344054]">
+                  <span className="font-semibold">Empty shell</span>
+                  <span className="block text-[#667085] mt-0.5">
+                    Creates metadata only (no cell copy). Use if Base copy is unavailable.
+                  </span>
+                </span>
+              </label>
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-full h-9 px-4"
+              onClick={() => setCreateOpen(false)}
+              disabled={creating}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="gradient-info"
+              className="rounded-full h-9 px-4 shadow-sm"
+              onClick={() => void submitCreateScenario()}
+              disabled={creating}
+            >
+              {creating ? <Loader2 className="size-3.5 animate-spin" /> : null}
+              Create
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Waterfall Bridge configuration dialog */}
       <Dialog open={isWaterfallModalOpen} onOpenChange={setIsWaterfallModalOpen}>

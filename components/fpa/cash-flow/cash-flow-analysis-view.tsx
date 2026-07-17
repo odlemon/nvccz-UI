@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 import {
-  AlertTriangle,
   Check,
   ChevronDown,
   Download,
@@ -16,7 +15,6 @@ import {
 } from "lucide-react"
 import {
   Bar,
-  BarChart,
   CartesianGrid,
   Cell,
   ComposedChart,
@@ -30,39 +28,15 @@ import {
 import { cn } from "@/lib/utils"
 import { KpiSparkline } from "@/components/fpa/kpi-sparkline"
 import { Button } from "@/components/ui/button"
-import {
-  mockCashDrivers,
-  mockCashKpis,
-  mockCashMonthly,
-  mockCashRunwayScenarios,
-  mockCashStatementRows,
-} from "@/components/fpa/mock-data"
+import type { FpaDomainScope, FpaDriver } from "@/lib/api/fpa-api"
 
 const R = "rounded-lg"
-const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug"] as const
-const MONTH_LABELS: Record<(typeof MONTHS)[number], string> = {
-  jan: "Jan",
-  feb: "Feb",
-  mar: "Mar",
-  apr: "Apr",
-  may: "May",
-  jun: "Jun",
-  jul: "Jul",
-  aug: "Aug",
-}
 
 export type CashStatementRow = {
   id: string
   line: string
   type: "inflow" | "outflow" | "total"
-  jan: number
-  feb: number
-  mar: number
-  apr: number
-  may: number
-  jun: number
-  jul: number
-  aug: number
+  values: Record<string, number | null>
 }
 
 export type CashKpi = {
@@ -80,20 +54,11 @@ export type CashDetail = {
   amount: string
   type: string
   ytd: string
-  vsBudget: string
-  narrative: string
   drivers: Array<{ label: string; value: string }>
 }
 
-const VERSION_SCALE: Record<string, number> = {
-  Working: 1,
-  Locked: 0.99,
-  Published: 0.97,
-}
-
-const MIN_CASH_THRESHOLD = 15
-
-function fmtM(n: number, signed = false): string {
+function fmtM(n: number | null | undefined, signed = false): string {
+  if (n == null) return "—"
   const abs = Math.abs(n).toFixed(1)
   if (signed && n < 0) return `($${abs}M)`
   if (signed && n > 0) return `+$${abs}M`
@@ -133,7 +98,7 @@ function FilterSelect({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className={`h-10 min-w-[118px] inline-flex items-center ${R} border border-[#d0d5dd] bg-white pl-2.5 pr-7 text-left hover:bg-[#f9fafb]`}
+        className="h-10 min-w-[118px] inline-flex items-center rounded-full border border-[#d0d5dd] bg-white pl-2.5 pr-7 text-left hover:bg-[#f9fafb]"
       >
         <span className="flex flex-col justify-center min-w-0 py-1">
           <span className="text-[9px] font-medium uppercase tracking-wide text-[#98a2b3] leading-none">{label}</span>
@@ -188,78 +153,103 @@ function CashKpiCard({ kpi, onClick }: { kpi: CashKpi; onClick?: () => void }) {
   )
 }
 
-export function detailForLine(row: CashStatementRow, monthKey: (typeof MONTHS)[number], period: string): CashDetail {
-  const val = row[monthKey]
-  const ytd = MONTHS.slice(0, MONTHS.indexOf(monthKey) + 1).reduce((s, m) => s + row[m], 0)
+export function detailForLine(row: CashStatementRow, periodKey: string, periods: string[]): CashDetail {
+  const val = row.values[periodKey]
+  const ytdValues = periods.slice(0, periods.indexOf(periodKey) + 1).map((key) => row.values[key])
+  const ytd = ytdValues.some((value) => value == null) ? null : ytdValues.reduce<number>((sum, value) => sum + (value ?? 0), 0)
   return {
     id: row.id,
     line: row.line,
-    period,
+    period: periodKey,
     amount: fmtM(val, true),
     type: row.type === "inflow" ? "Cash Inflow" : row.type === "outflow" ? "Cash Outflow" : "Balance",
     ytd: fmtM(ytd, true),
-    vsBudget: val >= 0 ? "+2.1% vs Budget" : "-1.4% vs Budget",
-    narrative:
-      row.type === "total"
-        ? `${row.line} for ${period} reflects consolidated treasury position across all entities.`
-        : `${row.line} movement in ${period} driven by operational timing and forecast assumptions.`,
-    drivers: mockCashDrivers.slice(0, 3).map((d) => ({
-      label: d.name,
-      value: d.unit === "days" ? `${d.value} ${d.unit}` : d.unit === "M" ? `$${d.value}M` : String(d.value),
-    })),
+    drivers: [],
   }
-}
-
-export function mapMockCashStatement(): CashStatementRow[] {
-  return mockCashStatementRows.map((r) => ({ ...r }))
-}
-
-export function mapMockCashKpis(): CashKpi[] {
-  return mockCashKpis.map((k) => ({ ...k }))
 }
 
 type CashFlowAnalysisViewProps = {
   loading?: boolean
+  error?: string
   kpis?: CashKpi[]
+  periods?: string[]
   statementRows?: CashStatementRow[]
   periodLabel?: string
   onRefresh?: () => void
+  entities?: Array<{ id: string; name: string }>
+  availablePeriods?: string[]
+  selectedEntityId?: string
+  periodFrom?: string
+  periodTo?: string
+  appliedScope?: FpaDomainScope
+  onEntityChange?: (value: string) => void
+  onPeriodFromChange?: (value: string) => void
+  onPeriodToChange?: (value: string) => void
+  drivers?: FpaDriver[]
+  preview?: { kpis: CashKpi[]; periods: string[]; statementRows: CashStatementRow[] }
+  previewLoading?: boolean
+  previewError?: string
+  onPreview?: (driverCode: string, value: number) => void
+  onResetPreview?: () => void
 }
 
 export function CashFlowAnalysisView({
   loading = false,
-  kpis = mapMockCashKpis(),
-  statementRows = mapMockCashStatement(),
+  error,
+  kpis = [],
+  periods = [],
+  statementRows = [],
   periodLabel = "May 2025",
   onRefresh,
+  entities = [], availablePeriods = [], selectedEntityId = "", periodFrom = "", periodTo = "",
+  appliedScope, onEntityChange, onPeriodFromChange, onPeriodToChange,
+  drivers = [], preview, previewLoading = false, previewError, onPreview, onResetPreview,
 }: CashFlowAnalysisViewProps) {
-  const [entity, setEntity] = useState("All Entities")
-  const [cashView, setCashView] = useState("Operating")
-  const [version, setVersion] = useState("Working")
-  const [period, setPeriod] = useState(periodLabel)
+  const displayedKpis = preview?.kpis ?? kpis
+  const displayedPeriods = preview?.periods ?? periods
+  const displayedRows = preview?.statementRows ?? statementRows
+  const [period, setPeriod] = useState(displayedPeriods[0] || periodLabel)
   const [view, setView] = useState("Statement View")
   const [collectionDays, setCollectionDays] = useState(45)
+  const [driverCode, setDriverCode] = useState("")
   const [detailOpen, setDetailOpen] = useState(true)
   const [selectedDetail, setSelectedDetail] = useState<CashDetail | null>(
-    detailForLine(statementRows[1], "may", periodLabel),
+    displayedRows[0] && displayedPeriods[0] ? detailForLine(displayedRows[0], displayedPeriods[0], displayedPeriods) : null,
   )
   const [infoOpen, setInfoOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+  const selectedEntityName = entities.find((option) => option.id === selectedEntityId)?.name ?? "All Entities"
+  const driverOptions = useMemo(() => drivers.map((driver) => `${driver.name} · ${driver.code}`), [drivers])
 
-  const activeMonth = useMemo((): (typeof MONTHS)[number] => {
-    const map: Record<string, (typeof MONTHS)[number]> = {
-      "Jan 2025": "jan",
-      "Feb 2025": "feb",
-      "Mar 2025": "mar",
-      "Apr 2025": "apr",
-      "May 2025": "may",
-      "Jun 2025": "jun",
-      "Jul 2025": "jul",
-      "Aug 2025": "aug",
+  const activePeriod = displayedPeriods.includes(period) ? period : displayedPeriods[0]
+
+  useEffect(() => {
+    if (displayedPeriods.length === 0) {
+      setSelectedDetail(null)
+      return
     }
-    return map[period] || "may"
-  }, [period])
+    setPeriod((current) => displayedPeriods.includes(current) ? current : displayedPeriods[0])
+    setSelectedDetail((current) => {
+      const row = current ? displayedRows.find((candidate) => candidate.id === current.id) : displayedRows[0]
+      return row ? detailForLine(row, displayedPeriods.includes(period) ? period : displayedPeriods[0], displayedPeriods) : null
+    })
+  }, [displayedPeriods, displayedRows, period])
+
+  useEffect(() => {
+    if (driverCode && !drivers.some((driver) => driver.code === driverCode)) setDriverCode("")
+    if (!driverCode) {
+      const relevant = drivers.find((driver) => {
+        const value = `${driver.code} ${driver.name}`.toLowerCase()
+        return value.includes("collection") && value.includes("day")
+      })
+      if (relevant) {
+        setDriverCode(relevant.code)
+        const value = Number(relevant.value)
+        if (Number.isFinite(value)) setCollectionDays(value)
+      }
+    }
+  }, [drivers, driverCode])
 
   useEffect(() => {
     const onDoc = (e: MouseEvent) => {
@@ -269,71 +259,44 @@ export function CashFlowAnalysisView({
     return () => document.removeEventListener("mousedown", onDoc)
   }, [])
 
-  const versionFactor = VERSION_SCALE[version] ?? 1
-  const collectionFactor = 1 + (45 - collectionDays) * 0.004
-
-  const scaledRows = useMemo(() => {
-    return statementRows.map((r) => {
-      const scaled = { ...r }
-      for (const m of MONTHS) {
-        let v = r[m] * versionFactor
-        if (r.type === "inflow" && r.line.includes("Collection")) v *= collectionFactor
-        scaled[m] = v
-      }
-      return scaled
-    })
-  }, [statementRows, versionFactor, collectionFactor])
-
-  const visibleRows = useMemo(() => {
-    if (cashView === "Operating") {
-      return scaledRows.filter((r) => !r.line.includes("CapEx") && !r.line.includes("Debt"))
-    }
-    if (cashView === "Investing") {
-      return scaledRows.filter((r) => r.line.includes("CapEx") || r.type === "total")
-    }
-    return scaledRows.filter((r) => r.line.includes("Debt") || r.type === "total")
-  }, [scaledRows, cashView])
-
-  const closingCash = scaledRows.find((r) => r.line === "Closing Cash")?.[activeMonth] ?? 38.4
-  const belowThreshold = closingCash < MIN_CASH_THRESHOLD
+  const visibleRows = displayedRows
 
   const monthlyChart = useMemo(() => {
-    return mockCashMonthly.map((d) => ({
-      ...d,
-      inflow: d.inflow * versionFactor * collectionFactor,
-      net: d.net * versionFactor * collectionFactor,
-      closing: d.closing * versionFactor,
-    }))
-  }, [versionFactor, collectionFactor])
+    return displayedPeriods.map((key) => {
+      const inflowValues = displayedRows.filter((row) => row.type === "inflow").map((row) => row.values[key])
+      const outflowValues = displayedRows.filter((row) => row.type === "outflow").map((row) => row.values[key])
+      const inflow = inflowValues.length > 0 && inflowValues.every((value) => value != null) ? inflowValues.reduce<number>((sum, value) => sum + (value ?? 0), 0) : undefined
+      const outflow = outflowValues.length > 0 && outflowValues.every((value) => value != null) ? outflowValues.reduce<number>((sum, value) => sum + (value ?? 0), 0) : undefined
+      const closing = displayedRows.find((row) => /closing cash/i.test(row.line))?.values[key]
+      return { period: key, inflow, outflow, net: inflow == null || outflow == null ? undefined : inflow + outflow, closing }
+    })
+  }, [displayedPeriods, displayedRows])
+  const netCashChart = useMemo(() => monthlyChart.filter((point) => point.inflow != null || point.outflow != null || point.net != null), [monthlyChart])
+  const closingCashChart = useMemo(() => monthlyChart.filter((point) => point.closing != null), [monthlyChart])
 
   const adjustedKpis = useMemo(() => {
-    const runway = Math.max(8, 14.2 * collectionFactor)
-    return kpis.map((k, i) => {
-      if (i === 0) return { ...k, value: fmtM(closingCash) }
-      if (i === 1) return { ...k, value: `${runway.toFixed(1)} mo` }
-      if (i === 2) return { ...k, value: fmtM(monthlyChart.find((d) => d.m === "May")?.net ?? 2.2, true) }
-      return k
-    })
-  }, [kpis, closingCash, collectionFactor, monthlyChart])
+    return displayedKpis
+  }, [displayedKpis])
 
   const resetFilters = () => {
-    setEntity("All Entities")
-    setCashView("Operating")
-    setVersion("Working")
-    setPeriod(periodLabel)
+    setPeriod(displayedPeriods[0] || periodLabel)
+    onEntityChange?.("")
+    onPeriodFromChange?.("")
+    onPeriodToChange?.("")
     setView("Statement View")
     setCollectionDays(45)
+    onResetPreview?.()
     toast.message("Filters reset")
   }
 
-  const pickCell = (row: CashStatementRow, month: (typeof MONTHS)[number]) => {
-    setSelectedDetail(detailForLine(row, month, `${MONTH_LABELS[month]} 2025`))
+  const pickCell = (row: CashStatementRow, periodKey: string) => {
+    setSelectedDetail(detailForLine(row, periodKey, displayedPeriods))
     setDetailOpen(true)
   }
 
   const exportCsv = () => {
-    const header = "Line," + MONTHS.map((m) => MONTH_LABELS[m]).join(",") + "\n"
-    const body = visibleRows.map((r) => `${r.line},${MONTHS.map((m) => r[m].toFixed(1)).join(",")}`).join("\n")
+    const header = "Line," + displayedPeriods.join(",") + "\n"
+    const body = visibleRows.map((r) => `${r.line},${displayedPeriods.map((key) => r.values[key] == null ? "" : r.values[key]?.toFixed(1)).join(",")}`).join("\n")
     const blob = new Blob([header + body], { type: "text/csv" })
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
@@ -343,6 +306,10 @@ export function CashFlowAnalysisView({
     URL.revokeObjectURL(url)
     toast.success("Cash flow export downloaded")
   }
+
+  const hasData = adjustedKpis.length > 0 || displayedPeriods.length > 0 || displayedRows.length > 0
+  if (loading && !hasData) return <div className="min-h-full bg-[#f1f5f9] flex items-center justify-center gap-2 text-sm text-[#64748b]"><Loader2 className="size-5 animate-spin" /> Loading cash flow analysis…</div>
+  if (error && !hasData) return <div className="min-h-full bg-[#f1f5f9] flex items-center justify-center p-8 text-sm text-[#b42318]">{error}</div>
 
   return (
     <div className="min-h-full bg-[#f1f5f9] flex flex-col">
@@ -356,22 +323,23 @@ export function CashFlowAnalysisView({
             </Button>
           </div>
           <div className="mt-3 flex flex-wrap items-end gap-2">
-            <FilterSelect label="Entity" value={entity} options={["All Entities", "North America", "EMEA", "APAC", "LATAM"]} onChange={setEntity} />
-            <FilterSelect label="Cash View" value={cashView} options={["Operating", "Investing", "Financing"]} onChange={setCashView} />
-            <FilterSelect label="Version" value={version} options={["Working", "Locked", "Published"]} onChange={setVersion} />
-            <FilterSelect label="Period" value={period} options={["May 2025", "Apr 2025", "Mar 2025", "Jun 2025", "FY2025"]} onChange={setPeriod} />
+            {entities.length > 0 ? <FilterSelect label="Entity" value={selectedEntityName} options={["All Entities", ...entities.map((option) => option.name)]} onChange={(name) => onEntityChange?.(entities.find((option) => option.name === name)?.id ?? "")} /> : null}
+            {availablePeriods.length > 0 ? <>
+              <FilterSelect label="Period from" value={periodFrom || "All Periods"} options={["All Periods", ...availablePeriods]} onChange={(value) => onPeriodFromChange?.(value === "All Periods" ? "" : value)} />
+              <FilterSelect label="Period to" value={periodTo || "All Periods"} options={["All Periods", ...availablePeriods]} onChange={(value) => onPeriodToChange?.(value === "All Periods" ? "" : value)} />
+            </> : null}
+            {displayedPeriods.length > 0 ? <FilterSelect label="Period" value={activePeriod} options={displayedPeriods} onChange={setPeriod} /> : null}
             <FilterSelect label="View" value={view} options={["Statement View", "Runway View"]} onChange={setView} />
             <button type="button" onClick={resetFilters} className="ml-auto mb-0.5 px-1 text-[12px] font-semibold text-[#1570ef] hover:underline">
               Reset Filters
             </button>
           </div>
+          <p className="mt-2 text-[11px] text-[#667085]">Applied scope: {appliedScope?.entityId ? selectedEntityName : "All entities"} · {appliedScope?.periodFrom || "First period"} → {appliedScope?.periodTo || "Latest period"}</p>
         </div>
 
         <div className="px-4 sm:px-5 pb-4">
-          {loading ? (
-            <div className="flex items-center gap-2 py-8 text-[#64748b]">
-              <Loader2 className="size-5 animate-spin" /> Loading cash flow…
-            </div>
+          {adjustedKpis.length === 0 ? (
+            <p className="py-8 text-sm text-[#64748b]">No cash flow KPIs are available.</p>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
               {adjustedKpis.map((k) => (
@@ -384,37 +352,13 @@ export function CashFlowAnalysisView({
 
       <div className="flex-1 flex min-h-0">
         <div className="flex-1 p-4 sm:p-5 space-y-4 overflow-auto">
-          {belowThreshold ? (
-            <section className={`${R} border border-[#fecdca] bg-[#fef3f2] p-4 flex items-center gap-3`}>
-              <AlertTriangle className="size-5 text-[#b42318] shrink-0" />
-              <div>
-                <p className="text-sm font-semibold text-[#912018]">Below minimum cash threshold</p>
-                <p className="text-xs text-[#b42318] mt-0.5">
-                  Closing cash {fmtM(closingCash)} is below the ${MIN_CASH_THRESHOLD}M policy floor for {period}.
-                </p>
-              </div>
-            </section>
-          ) : null}
-
+          {preview ? <div className="rounded-lg border border-[#bfdbfe] bg-[#eff6ff] px-4 py-3 text-xs font-semibold text-[#1d4ed8]">Preview · not persisted — cards, charts, and tables below use the preview dataset.</div> : null}
+          {loading && hasData ? <p className="text-xs text-[#667085]"><Loader2 className="mr-1 inline size-3 animate-spin" />Refreshing current scope…</p> : null}
+          {error && hasData ? <p className="text-sm text-[#b42318]">{error}</p> : null}
           {view === "Runway View" ? (
             <section className={`${R} border border-[#e4e7ec] bg-white p-4`}>
               <h2 className="text-sm font-semibold text-[#101828] mb-3">Cash Runway by Scenario</h2>
-              <div className="h-[280px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={mockCashRunwayScenarios} layout="vertical" margin={{ top: 8, right: 24, left: 8, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f2f4f7" />
-                    <XAxis type="number" tick={{ fontSize: 10, fill: "#667085" }} unit=" mo" />
-                    <YAxis type="category" dataKey="scenario" tick={{ fontSize: 11, fill: "#344054" }} width={72} />
-                    <Tooltip formatter={(v: number, name: string) => (name === "months" ? `${v} months` : fmtM(v))} contentStyle={{ borderRadius: 8, fontSize: 12 }} />
-                    <Bar
-                      dataKey="months"
-                      fill="#2563eb"
-                      radius={[0, 4, 4, 0]}
-                      onClick={(data) => toast.message(String(data.scenario), { description: `${data.months} months runway · ${fmtM(data.closing)} closing` })}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+              <p className="py-12 text-center text-sm text-[#64748b]">Scenario runway breakdown is not available for this domain view.</p>
             </section>
           ) : (
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
@@ -425,11 +369,13 @@ export function CashFlowAnalysisView({
                     <Info className="size-4" />
                   </button>
                 </div>
-                <div className="h-[240px]">
+                {netCashChart.length === 0 ? (
+                  <p className="py-12 text-center text-sm text-[#64748b]">No monthly cash flow data is available.</p>
+                ) : <div className="h-[240px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart data={monthlyChart} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                    <ComposedChart data={netCashChart} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f2f4f7" />
-                      <XAxis dataKey="m" tick={{ fontSize: 10, fill: "#667085" }} axisLine={false} tickLine={false} />
+                      <XAxis dataKey="period" tick={{ fontSize: 10, fill: "#667085" }} axisLine={false} tickLine={false} />
                       <YAxis tick={{ fontSize: 10, fill: "#667085" }} axisLine={false} tickLine={false} />
                       <Tooltip contentStyle={{ borderRadius: 8, fontSize: 12 }} />
                       <ReferenceLine y={0} stroke="#94a3b8" />
@@ -438,26 +384,26 @@ export function CashFlowAnalysisView({
                       <Line type="monotone" dataKey="net" stroke="#2563eb" strokeWidth={2} dot={{ r: 3 }} name="Net" />
                     </ComposedChart>
                   </ResponsiveContainer>
-                </div>
+                </div>}
               </section>
 
               <section className={`${R} border border-[#e4e7ec] bg-white p-4`}>
                 <div className="flex items-center justify-between mb-3">
                   <h2 className="text-sm font-semibold text-[#101828]">Closing Cash Balance</h2>
-                  <span className="text-xs text-[#667085]">{entity}</span>
                 </div>
-                <div className="h-[240px]">
+                {closingCashChart.length === 0 ? (
+                  <p className="py-12 text-center text-sm text-[#64748b]">No closing cash history is available.</p>
+                ) : <div className="h-[240px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart data={monthlyChart} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                    <ComposedChart data={closingCashChart} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f2f4f7" />
-                      <XAxis dataKey="m" tick={{ fontSize: 10, fill: "#667085" }} axisLine={false} tickLine={false} />
+                      <XAxis dataKey="period" tick={{ fontSize: 10, fill: "#667085" }} axisLine={false} tickLine={false} />
                       <YAxis tick={{ fontSize: 10, fill: "#667085" }} axisLine={false} tickLine={false} domain={["auto", "auto"]} />
                       <Tooltip formatter={(v: number) => fmtM(v)} contentStyle={{ borderRadius: 8, fontSize: 12 }} />
-                      <ReferenceLine y={MIN_CASH_THRESHOLD} stroke="#f04438" strokeDasharray="4 4" label={{ value: "Min $15M", fontSize: 10, fill: "#f04438" }} />
                       <Line type="monotone" dataKey="closing" stroke="#2563eb" strokeWidth={2.5} dot={{ r: 4, fill: "#fff", strokeWidth: 2 }} name="Closing Cash" />
                     </ComposedChart>
                   </ResponsiveContainer>
-                </div>
+                </div>}
               </section>
             </div>
           )}
@@ -474,7 +420,7 @@ export function CashFlowAnalysisView({
                     <button type="button" onClick={exportCsv} className="w-full px-3 py-2 text-left text-xs hover:bg-[#f9fafb] flex items-center gap-2">
                       <Download className="size-3.5" /> Export CSV
                     </button>
-                    <button type="button" onClick={() => { onRefresh?.(); toast.message("Data refreshed") }} className="w-full px-3 py-2 text-left text-xs hover:bg-[#f9fafb] flex items-center gap-2">
+                    <button type="button" onClick={() => onRefresh?.()} className="w-full px-3 py-2 text-left text-xs hover:bg-[#f9fafb] flex items-center gap-2">
                       <RefreshCw className="size-3.5" /> Refresh
                     </button>
                   </div>
@@ -486,30 +432,33 @@ export function CashFlowAnalysisView({
                 <thead>
                   <tr className="border-y border-[#e4e7ec] text-left text-xs text-[#667085] bg-[#f9fafb]">
                     <th className="px-4 py-3 font-medium sticky left-0 bg-[#f9fafb]">Line Item</th>
-                    {MONTHS.map((m) => (
-                      <th key={m} className={cn("px-3 py-3 font-medium text-right", m === activeMonth && "bg-[#eff8ff] text-[#1570ef]")}>
-                        {MONTH_LABELS[m]}
+                    {displayedPeriods.map((key) => (
+                      <th key={key} className={cn("px-3 py-3 font-medium text-right", key === activePeriod && "bg-[#eff8ff] text-[#1570ef]")}>
+                        {key}
                       </th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
+                  {visibleRows.length === 0 ? (
+                    <tr><td colSpan={Math.max(displayedPeriods.length + 1, 2)} className="px-4 py-10 text-center text-sm text-[#64748b]">No cash statement rows are available.</td></tr>
+                  ) : null}
                   {visibleRows.map((row) => (
                     <tr key={row.id} className={cn("border-t border-[#f2f4f7]", row.type === "total" && "bg-[#f9fafb]")}>
                       <td className={cn("px-4 py-3 sticky left-0 bg-white", row.type === "total" && "bg-[#f9fafb] font-semibold")}>
                         {row.line}
                       </td>
-                      {MONTHS.map((m) => (
+                      {displayedPeriods.map((key) => (
                         <td
-                          key={m}
+                          key={key}
                           className={cn(
                             "px-3 py-3 text-right tabular-nums cursor-pointer hover:bg-[#eff8ff]",
-                            cellTone(row[m], row.type),
-                            m === activeMonth && "bg-[#eff8ff]/50",
+                            row.values[key] == null ? "text-[#667085]" : cellTone(row.values[key], row.type),
+                            key === activePeriod && "bg-[#eff8ff]/50",
                           )}
-                          onClick={() => pickCell(row, m)}
+                          onClick={() => pickCell(row, key)}
                         >
-                          {fmtM(row[m], true)}
+                          {fmtM(row.values[key], true)}
                         </td>
                       ))}
                     </tr>
@@ -525,31 +474,24 @@ export function CashFlowAnalysisView({
               <h2 className="text-sm font-semibold text-[#101828]">What-if: Collection Days</h2>
               <span className="text-xs text-[#667085] ml-auto tabular-nums">{collectionDays} days</span>
             </div>
-            <input
-              type="range"
-              min={30}
-              max={60}
-              step={1}
-              value={collectionDays}
-              onChange={(e) => setCollectionDays(Number(e.target.value))}
-              className="w-full accent-[#2563eb]"
-            />
-            <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {mockCashDrivers.map((d) => (
-                <button
-                  key={d.name}
-                  type="button"
-                  onClick={() => toast.message(d.name, { description: d.impact })}
-                  className={`${R} border border-[#e4e7ec] px-3 py-2 text-left hover:border-[#b2ddff] transition-colors`}
-                >
-                  <p className="text-[11px] text-[#667085]">{d.name}</p>
-                  <p className="text-sm font-semibold tabular-nums">
-                    {d.unit === "days" ? `${d.value} days` : d.unit === "M" ? `$${d.value}M` : d.value}
-                  </p>
-                  <p className="text-[10px] text-[#98a2b3] mt-0.5">{d.impact}</p>
-                </button>
-              ))}
-            </div>
+            {drivers.length === 0 ? <p className="text-sm text-[#667085]">No cash driver was returned, so this control is unavailable.</p> : <>
+              <div className="flex flex-wrap items-end gap-2">
+                <FilterSelect label="Driver" value={drivers.find((driver) => driver.code === driverCode) ? `${drivers.find((driver) => driver.code === driverCode)?.name} · ${driverCode}` : "Select driver"} options={["Select driver", ...driverOptions]} onChange={(value) => {
+                  const selected = drivers.find((driver) => `${driver.name} · ${driver.code}` === value)
+                  setDriverCode(selected?.code ?? "")
+                  const numeric = Number(selected?.value)
+                  if (Number.isFinite(numeric)) setCollectionDays(numeric)
+                  onResetPreview?.()
+                }} />
+                <input type="number" step="1" value={collectionDays} onChange={(e) => setCollectionDays(Number(e.target.value))} className="h-10 w-32 rounded-full border border-[#d0d5dd] px-4 text-sm" />
+                <Button className="rounded-full h-10 px-6" disabled={!driverCode || !Number.isFinite(collectionDays) || previewLoading} onClick={() => onPreview?.(driverCode, collectionDays)}>
+                  {previewLoading ? <Loader2 className="size-4 animate-spin" /> : null} Preview
+                </Button>
+                {preview ? <Button variant="outline" className="rounded-full h-10 px-4" onClick={onResetPreview}>Reset to official</Button> : null}
+              </div>
+              {!driverCode ? <p className="mt-3 text-[11px] text-[#667085]">Choose a returned driver; no driver code has been guessed.</p> : null}
+            </>}
+            {previewError ? <p className="mt-3 text-sm text-[#b42318]">{previewError}</p> : null}
           </section>
         </div>
 
@@ -568,9 +510,9 @@ export function CashFlowAnalysisView({
               <div className={`${R} bg-[#f9fafb] border border-[#e4e7ec] p-3`}>
                 <p className="text-xs text-[#667085]">Period Amount</p>
                 <p className="text-2xl font-semibold tabular-nums mt-1 text-[#101828]">{selectedDetail.amount}</p>
-                <p className="text-xs text-[#667085] mt-1">YTD {selectedDetail.ytd} · {selectedDetail.vsBudget}</p>
+                <p className="text-xs text-[#667085] mt-1">YTD {selectedDetail.ytd}</p>
               </div>
-              <div>
+              {selectedDetail.drivers.length > 0 ? <div>
                 <p className="text-xs font-semibold text-[#344054] mb-2">Cash Drivers</p>
                 <ul className="space-y-2">
                   {selectedDetail.drivers.map((d) => (
@@ -580,11 +522,7 @@ export function CashFlowAnalysisView({
                     </li>
                   ))}
                 </ul>
-              </div>
-              <p className="text-sm text-[#475569] leading-relaxed">{selectedDetail.narrative}</p>
-              <Button variant="gradient-info" className="rounded-full h-10 w-full shadow-sm" onClick={() => toast.message("Open in worksheet", { description: "Navigate to Closing Cash line in planning grid" })}>
-                Open in Worksheet
-              </Button>
+              </div> : <p className="text-sm text-[#667085]">Budget variance, drivers, and commentary are not included in this domain response.</p>}
             </div>
           </aside>
         ) : null}
@@ -595,7 +533,7 @@ export function CashFlowAnalysisView({
           <div className={`${R} bg-white max-w-md w-full p-5 shadow-xl`} onClick={(e) => e.stopPropagation()}>
             <h3 className="text-base font-semibold text-[#101828]">Cash Flow Analysis</h3>
             <p className="text-sm text-[#475569] mt-2 leading-relaxed">
-              Track inflows, outflows, and closing cash by month. Switch to Runway View for scenario comparison. Adjust collection days to simulate treasury impact.
+              Track inflows, outflows, and closing cash by period. Sensitivity uses a returned cash driver and activates a clearly labeled, non-persisted preview dataset.
             </p>
             <Button variant="outline" className="rounded-full mt-4" onClick={() => setInfoOpen(false)}>Close</Button>
           </div>

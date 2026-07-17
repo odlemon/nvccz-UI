@@ -1,10 +1,5 @@
 "use client"
 
-/**
- * FP&A Home — hardcoded board matched to SRD mock (vibrant, full-bleed).
- * Interactive filters, View-all dialogs, real avatar photos.
- */
-
 import { useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import {
@@ -30,7 +25,6 @@ import {
   Line,
   Pie,
   PieChart,
-  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -40,6 +34,13 @@ import { toast } from "sonner"
 import { FpaPageHeader } from "./fpa-page-header"
 import { KpiSparkline } from "./kpi-sparkline"
 import { cn } from "@/lib/utils"
+import { useAppDispatch, useAppSelector } from "@/lib/store"
+import {
+  fetchFpaDashboard,
+  setSelectedScenarioId,
+} from "@/lib/store/slices/fpaSlice"
+import { asNumber, formatMoney, type FpaHomeDashboard } from "@/lib/api/fpa-api"
+import { useFpaBootstrap } from "@/lib/hooks/useFpaBootstrap"
 import {
   Dialog,
   DialogContent,
@@ -55,565 +56,45 @@ const BLUE = "#1d4ed8"
 const BLUE_BRIGHT = "#2563eb"
 const TEAL = "#0d9488"
 
-/** Real portrait photos (randomuser.me — stable by seed path) */
-const AVATARS = {
-  jane: "https://randomuser.me/api/portraits/women/44.jpg",
-  wade: "https://randomuser.me/api/portraits/men/32.jpg",
-  devon: "https://randomuser.me/api/portraits/men/75.jpg",
-  esther: "https://randomuser.me/api/portraits/women/68.jpg",
-  cody: "https://randomuser.me/api/portraits/men/22.jpg",
-  priya: "https://randomuser.me/api/portraits/women/65.jpg",
-  daniel: "https://randomuser.me/api/portraits/men/46.jpg",
-  arjun: "https://randomuser.me/api/portraits/men/36.jpg",
-  james: "https://randomuser.me/api/portraits/men/52.jpg",
-  sarah: "https://randomuser.me/api/portraits/women/33.jpg",
-  michael: "https://randomuser.me/api/portraits/men/11.jpg",
+const EMPTY = "—"
+
+function optionalNumber(value: unknown): number | null {
+  return value == null || value === "" ? null : asNumber(value)
 }
 
-const KPIS = [
-  {
-    id: "rev",
-    label: "Revenue Forecast",
-    value: "$125.8M",
-    pct: "4.2%",
-    vs: "vs Apr 2025",
-    up: true,
-    spark: [102, 108, 105, 112, 110, 118, 116, 125.8],
-    dashed: false,
-  },
-  {
-    id: "ebitda",
-    label: "EBITDA",
-    value: "$38.4M",
-    pct: "6.1%",
-    vs: "vs Apr 2025",
-    up: true,
-    spark: [28, 30, 29, 32, 33, 35, 34, 38.4],
-    dashed: false,
-  },
-  {
-    id: "cash",
-    label: "Closing Cash",
-    value: "$42.6M",
-    pct: "2.8%",
-    vs: "vs Apr 2025",
-    up: false,
-    spark: [52, 50, 51, 48, 47, 45, 44, 42.6],
-    dashed: false,
-  },
-  {
-    id: "runway",
-    label: "Cash Runway",
-    value: "14.2 months",
-    pct: "0.4",
-    vs: "vs Apr 2025",
-    up: true,
-    spark: [12.2, 12.8, 12.5, 13.2, 13.0, 13.8, 13.6, 14.2],
-    dashed: false,
-  },
-  {
-    id: "acc",
-    label: "Forecast Accuracy",
-    value: "94.2%",
-    pct: "1.1%",
-    vs: "vs Apr 2025",
-    up: true,
-    spark: [88, 90, 89, 91, 92, 91.5, 93, 94.2],
-    dashed: true,
-  },
-]
-
-const TREND_12M = [
-  { m: "Jun '24", revenue: 72, expenses: 54 },
-  { m: "Jul '24", revenue: 78, expenses: 56 },
-  { m: "Aug '24", revenue: 82, expenses: 58 },
-  { m: "Sep '24", revenue: 88, expenses: 61 },
-  { m: "Oct '24", revenue: 92, expenses: 64 },
-  { m: "Nov '24", revenue: 96, expenses: 67 },
-  { m: "Dec '24", revenue: 102, expenses: 70 },
-  { m: "Jan '25", revenue: 108, expenses: 73 },
-  { m: "Feb '25", revenue: 112, expenses: 76 },
-  { m: "Mar '25", revenue: 118, expenses: 80 },
-  { m: "Apr '25", revenue: 122, expenses: 83 },
-  { m: "May '25", revenue: 125.8, expenses: 86.4 },
-]
-
-const TREND_6M = TREND_12M.slice(-6)
-const TREND_3M = TREND_12M.slice(-3)
-const TREND_YTD = TREND_12M.slice(6)
-
-const SCENARIOS = [
-  {
-    metric: "Revenue",
-    cells: [
-      { label: "Base Case", value: "$125.8M", delta: "▲ 4.2%", up: true },
-      { label: "Upside", value: "$138.3M", delta: "▲ 14.6%", up: true },
-      { label: "Downside", value: "$113.2M", delta: "▼ -6.3%", up: false },
-      { label: "FX Shock", value: "$118.4M", delta: "▼ -2.0%", up: false },
-      { label: "Hiring Freeze", value: "$127.1M", delta: "▲ 5.3%", up: true },
-    ],
-  },
-  {
-    metric: "EBITDA",
-    cells: [
-      { label: "Base Case", value: "$23.6M", delta: "▲ 6.1%", up: true },
-      { label: "Upside", value: "$29.1M", delta: "▲ 18.4%", up: true },
-      { label: "Downside", value: "$17.2M", delta: "▼ -20.5%", up: false },
-      { label: "FX Shock", value: "$19.8M", delta: "▼ -8.4%", up: false },
-      { label: "Hiring Freeze", value: "$26.4M", delta: "▲ 11.9%", up: true },
-    ],
-  },
-  {
-    metric: "Cash Runway",
-    cells: [
-      { label: "Base Case", value: "14.2 months", delta: "▲ 1.1 mo", up: true },
-      { label: "Upside", value: "17.6 months", delta: "▲ 4.5 mo", up: true },
-      { label: "Downside", value: "10.2 months", delta: "▼ -3.9 mo", up: false },
-      { label: "FX Shock", value: "11.8 months", delta: "▼ -1.3 mo", up: false },
-      { label: "Hiring Freeze", value: "15.9 months", delta: "▲ 2.8 mo", up: true },
-    ],
-  },
-]
-
-const SCENARIO_HEADERS = [
-  { name: "Base Case", sub: "(Working)" },
-  { name: "Upside", sub: "(+10% Growth)" },
-  { name: "Downside", sub: "(-10% Growth)" },
-  { name: "FX Shock", sub: "(FX −8%)" },
-  { name: "Hiring Freeze", sub: "(HC flat)" },
-] as const
-
-const WORKFLOW_DONUT = [
-  { name: "Submitted", value: 72, color: "#1D4ED8", pct: "72%", count: "(23 / 32)" },
-  { name: "In Review", value: 18, color: "#D97706", pct: "18%", count: "(6 / 32)" },
-  { name: "Approved", value: 10, color: "#16A34A", pct: "10%", count: "(3 / 32)" },
-]
-
-const OVER_BUDGET_ALL = [
-  {
-    dept: "Marketing",
-    budget: "$8.20M",
-    actual: "$9.45M",
-    variance: "$1.25M (15.2%)",
-    owner: "Jane Cooper",
-    photo: AVATARS.jane,
-    period: "May 2025",
-  },
-  {
-    dept: "Sales",
-    budget: "$12.50M",
-    actual: "$13.68M",
-    variance: "$1.18M (9.4%)",
-    owner: "Wade Warren",
-    photo: AVATARS.wade,
-    period: "May 2025",
-  },
-  {
-    dept: "Product Development",
-    budget: "$15.00M",
-    actual: "$16.72M",
-    variance: "$1.72M (11.5%)",
-    owner: "Devon Lane",
-    photo: AVATARS.devon,
-    period: "May 2025",
-  },
-  {
-    dept: "Customer Success",
-    budget: "$4.80M",
-    actual: "$5.21M",
-    variance: "$0.41M (8.5%)",
-    owner: "Esther Howard",
-    photo: AVATARS.esther,
-    period: "May 2025",
-  },
-  {
-    dept: "IT",
-    budget: "$6.40M",
-    actual: "$6.88M",
-    variance: "$0.48M (7.5%)",
-    owner: "Cody Fisher",
-    photo: AVATARS.cody,
-    period: "May 2025",
-  },
-  {
-    dept: "Finance",
-    budget: "$3.10M",
-    actual: "$3.42M",
-    variance: "$0.32M (10.3%)",
-    owner: "Priya Nair",
-    photo: AVATARS.priya,
-    period: "May 2025",
-  },
-  {
-    dept: "HR",
-    budget: "$2.40M",
-    actual: "$2.61M",
-    variance: "$0.21M (8.8%)",
-    owner: "Sarah Delgado",
-    photo: AVATARS.sarah,
-    period: "May 2025",
-  },
-  {
-    dept: "Marketing",
-    budget: "$7.90M",
-    actual: "$8.40M",
-    variance: "$0.50M (6.3%)",
-    owner: "Jane Cooper",
-    photo: AVATARS.jane,
-    period: "Apr 2025",
-  },
-  {
-    dept: "Sales",
-    budget: "$12.00M",
-    actual: "$12.90M",
-    variance: "$0.90M (7.5%)",
-    owner: "Wade Warren",
-    photo: AVATARS.wade,
-    period: "Apr 2025",
-  },
-  {
-    dept: "IT",
-    budget: "$6.10M",
-    actual: "$6.55M",
-    variance: "$0.45M (7.4%)",
-    owner: "Cody Fisher",
-    photo: AVATARS.cody,
-    period: "Apr 2025",
-  },
-]
-
-const CASH_BY_SCENARIO: Record<
-  string,
-  {
-    value: string
-    unit: string
-    delta: string
-    up: boolean
-    target: number
-    bars: Array<{ m: string; bal: number; tick?: boolean }>
-  }
-> = {
-  "Base Case": {
-    value: "14.2",
-    unit: "months",
-    delta: "1.1 mo",
-    up: true,
-    target: 12,
-    bars: [
-      { m: "May '25", bal: 48, tick: true },
-      { m: "Jun '25", bal: 46 },
-      { m: "Jul '25", bal: 43 },
-      { m: "Aug '25", bal: 40, tick: true },
-      { m: "Sep '25", bal: 37 },
-      { m: "Oct '25", bal: 34 },
-      { m: "Nov '25", bal: 31, tick: true },
-      { m: "Dec '25", bal: 28 },
-      { m: "Jan '26", bal: 24 },
-      { m: "Feb '26", bal: 20, tick: true },
-    ],
-  },
-  "Upside Case": {
-    value: "17.6",
-    unit: "months",
-    delta: "3.4 mo",
-    up: true,
-    target: 12,
-    bars: [
-      { m: "May '25", bal: 56, tick: true },
-      { m: "Jun '25", bal: 54 },
-      { m: "Jul '25", bal: 52 },
-      { m: "Aug '25", bal: 49, tick: true },
-      { m: "Sep '25", bal: 47 },
-      { m: "Oct '25", bal: 44 },
-      { m: "Nov '25", bal: 42, tick: true },
-      { m: "Dec '25", bal: 39 },
-      { m: "Jan '26", bal: 36 },
-      { m: "Feb '26", bal: 34, tick: true },
-    ],
-  },
-  "Downside Case": {
-    value: "10.2",
-    unit: "months",
-    delta: "2.0 mo",
-    up: false,
-    target: 12,
-    bars: [
-      { m: "May '25", bal: 38, tick: true },
-      { m: "Jun '25", bal: 35 },
-      { m: "Jul '25", bal: 31 },
-      { m: "Aug '25", bal: 28, tick: true },
-      { m: "Sep '25", bal: 24 },
-      { m: "Oct '25", bal: 21 },
-      { m: "Nov '25", bal: 18, tick: true },
-      { m: "Dec '25", bal: 15 },
-      { m: "Jan '26", bal: 12 },
-      { m: "Feb '26", bal: 9, tick: true },
-    ],
-  },
-  Upside: {
-    value: "17.6",
-    unit: "months",
-    delta: "3.4 mo",
-    up: true,
-    target: 12,
-    bars: [
-      { m: "May '25", bal: 56, tick: true },
-      { m: "Jun '25", bal: 54 },
-      { m: "Jul '25", bal: 52 },
-      { m: "Aug '25", bal: 49, tick: true },
-      { m: "Sep '25", bal: 47 },
-      { m: "Oct '25", bal: 44 },
-      { m: "Nov '25", bal: 42, tick: true },
-      { m: "Dec '25", bal: 39 },
-      { m: "Jan '26", bal: 36 },
-      { m: "Feb '26", bal: 34, tick: true },
-    ],
-  },
-  Downside: {
-    value: "10.2",
-    unit: "months",
-    delta: "2.0 mo",
-    up: false,
-    target: 12,
-    bars: [
-      { m: "May '25", bal: 38, tick: true },
-      { m: "Jun '25", bal: 35 },
-      { m: "Jul '25", bal: 31 },
-      { m: "Aug '25", bal: 28, tick: true },
-      { m: "Sep '25", bal: 24 },
-      { m: "Oct '25", bal: 21 },
-      { m: "Nov '25", bal: 18, tick: true },
-      { m: "Dec '25", bal: 15 },
-      { m: "Jan '26", bal: 12 },
-      { m: "Feb '26", bal: 9, tick: true },
-    ],
-  },
-  "FX Shock": {
-    value: "11.8",
-    unit: "months",
-    delta: "1.3 mo",
-    up: false,
-    target: 12,
-    bars: [
-      { m: "May '25", bal: 42, tick: true },
-      { m: "Jun '25", bal: 39 },
-      { m: "Jul '25", bal: 36 },
-      { m: "Aug '25", bal: 33, tick: true },
-      { m: "Sep '25", bal: 30 },
-      { m: "Oct '25", bal: 27 },
-      { m: "Nov '25", bal: 24, tick: true },
-      { m: "Dec '25", bal: 21 },
-      { m: "Jan '26", bal: 18 },
-      { m: "Feb '26", bal: 15, tick: true },
-    ],
-  },
-  "Hiring Freeze": {
-    value: "15.9",
-    unit: "months",
-    delta: "2.8 mo",
-    up: true,
-    target: 12,
-    bars: [
-      { m: "May '25", bal: 50, tick: true },
-      { m: "Jun '25", bal: 49 },
-      { m: "Jul '25", bal: 47 },
-      { m: "Aug '25", bal: 46, tick: true },
-      { m: "Sep '25", bal: 44 },
-      { m: "Oct '25", bal: 43 },
-      { m: "Nov '25", bal: 41, tick: true },
-      { m: "Dec '25", bal: 40 },
-      { m: "Jan '26", bal: 38 },
-      { m: "Feb '26", bal: 37, tick: true },
-    ],
-  },
+function formatMetricValue(key: string, value: number, currency = "USD") {
+  if (/runway/i.test(key)) return `${value.toFixed(1)} months`
+  if (/accuracy|percent|margin|rate|pct/i.test(key)) return `${value.toFixed(1)}%`
+  return formatMoney(value, currency)
 }
 
-/** Scenario multipliers for demo KPI / trend dynamics */
-const SCENARIO_FX: Record<
-  string,
-  { rev: number; exp: number; ebitda: number; cash: number; runway: number; acc: number }
-> = {
-  "Base Case": { rev: 1, exp: 1, ebitda: 1, cash: 1, runway: 1, acc: 1 },
-  Upside: { rev: 1.1, exp: 1.04, ebitda: 1.18, cash: 1.12, runway: 1.24, acc: 1.01 },
-  Downside: { rev: 0.9, exp: 0.96, ebitda: 0.78, cash: 0.88, runway: 0.72, acc: 0.97 },
-  "FX Shock": { rev: 0.94, exp: 1.02, ebitda: 0.84, cash: 0.92, runway: 0.83, acc: 0.98 },
-  "Hiring Freeze": { rev: 1.01, exp: 0.93, ebitda: 1.12, cash: 1.06, runway: 1.12, acc: 1.005 },
+function formatDate(value?: string | null) {
+  if (!value) return EMPTY
+  const date = new Date(value)
+  return Number.isNaN(date.getTime())
+    ? value
+    : date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
 }
 
-const VERSION_FX: Record<string, { accAdj: number; label: string }> = {
-  Working: { accAdj: 0, label: "Working draft" },
-  Locked: { accAdj: 0.4, label: "Locked snapshot" },
-  Published: { accAdj: 0.8, label: "Published pack" },
+function formatDateTime(value?: string | null) {
+  if (!value) return EMPTY
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  })
 }
 
-const PERIOD_META: Record<string, { vs: string; trendScale: number }> = {
-  "May 2025": { vs: "vs Apr 2025", trendScale: 1 },
-  "Apr 2025": { vs: "vs Mar 2025", trendScale: 0.97 },
-  "Mar 2025": { vs: "vs Feb 2025", trendScale: 0.94 },
-  FY2025: { vs: "vs FY2024", trendScale: 1.02 },
-  FY2026: { vs: "vs FY2025", trendScale: 1.08 },
+const WORKFLOW_COLORS: Record<string, string> = {
+  submitted: "#1D4ED8",
+  "in review": "#D97706",
+  approved: "#16A34A",
+  completed: "#16A34A",
 }
-
-function fmtMoneyM(n: number) {
-  return `$${n.toFixed(1)}M`
-}
-
-function scaleSpark(values: number[], factor: number) {
-  return values.map((v) => +(v * factor).toFixed(2))
-}
-
-function buildKpis(scenario: string, version: string, period: string) {
-  const fx = SCENARIO_FX[scenario] || SCENARIO_FX["Base Case"]
-  const ver = VERSION_FX[version] || VERSION_FX.Working
-  const per = PERIOD_META[period] || PERIOD_META["May 2025"]
-  const scale = per.trendScale
-
-  const rev = 125.8 * fx.rev * scale
-  const ebitda = 38.4 * fx.ebitda * scale
-  const cash = 42.6 * fx.cash * scale
-  const runway = 14.2 * fx.runway
-  const acc = Math.min(99.5, 94.2 * fx.acc + ver.accAdj)
-
-  const revDelta = (fx.rev - 1) * 100 + 4.2
-  const ebitdaDelta = (fx.ebitda - 1) * 100 + 6.1
-  const cashDelta = (fx.cash - 1) * 100 + 2.8
-  const runwayDelta = (fx.runway - 1) * 10 + 0.4
-  const accDelta = (fx.acc - 1) * 100 + 1.1 + ver.accAdj * 0.2
-
-  return [
-    {
-      id: "rev",
-      label: "Revenue Forecast",
-      value: fmtMoneyM(rev),
-      pct: `${Math.abs(revDelta).toFixed(1)}%`,
-      vs: per.vs,
-      up: revDelta >= 0,
-      spark: scaleSpark(KPIS[0].spark, fx.rev * scale),
-      dashed: false,
-    },
-    {
-      id: "ebitda",
-      label: "EBITDA",
-      value: fmtMoneyM(ebitda),
-      pct: `${Math.abs(ebitdaDelta).toFixed(1)}%`,
-      vs: per.vs,
-      up: ebitdaDelta >= 0,
-      spark: scaleSpark(KPIS[1].spark, fx.ebitda * scale),
-      dashed: false,
-    },
-    {
-      id: "cash",
-      label: "Closing Cash",
-      value: fmtMoneyM(cash),
-      pct: `${Math.abs(cashDelta).toFixed(1)}%`,
-      vs: per.vs,
-      up: cashDelta >= 0,
-      spark: scaleSpark(KPIS[2].spark, fx.cash * scale),
-      dashed: false,
-    },
-    {
-      id: "runway",
-      label: "Cash Runway",
-      value: `${runway.toFixed(1)} months`,
-      pct: Math.abs(runwayDelta).toFixed(1),
-      vs: per.vs,
-      up: runwayDelta >= 0,
-      spark: scaleSpark(KPIS[3].spark, fx.runway),
-      dashed: false,
-    },
-    {
-      id: "acc",
-      label: "Forecast Accuracy",
-      value: `${acc.toFixed(1)}%`,
-      pct: `${Math.abs(accDelta).toFixed(1)}%`,
-      vs: per.vs,
-      up: accDelta >= 0,
-      spark: scaleSpark(KPIS[4].spark, fx.acc),
-      dashed: true,
-    },
-  ]
-}
-
-function scaleTrend(
-  rows: Array<{ m: string; revenue: number; expenses: number }>,
-  scenario: string,
-  period: string,
-) {
-  const fx = SCENARIO_FX[scenario] || SCENARIO_FX["Base Case"]
-  const scale = (PERIOD_META[period] || PERIOD_META["May 2025"]).trendScale
-  return rows.map((r) => ({
-    ...r,
-    revenue: +(r.revenue * fx.rev * scale).toFixed(1),
-    expenses: +(r.expenses * fx.exp * scale).toFixed(1),
-  }))
-}
-
-const ACTIVITY_ALL = [
-  {
-    title: "Marketing budget submitted for review",
-    who: "Jane Cooper",
-    when: "2h ago",
-    detail: "Marketing Q3 budget package submitted to FP&A for cycle review.",
-    icon: "file" as const,
-    iconBg: "bg-[#bfdbfe] text-[#1d4ed8]",
-  },
-  {
-    title: "FY26 Base Case revenue updated",
-    who: "Wade Warren",
-    when: "5h ago",
-    detail: "Base Case revenue drivers refreshed for FY26 planning.",
-    icon: "file" as const,
-    iconBg: "bg-[#bbf7d0] text-[#15803d]",
-  },
-  {
-    title: "New assumption added: Churn Rate",
-    who: "Devon Lane",
-    when: "1d ago",
-    detail: "Added Churn Rate driver assumption to the Base Case pack.",
-    icon: "file" as const,
-    iconBg: "bg-[#ddd6fe] text-[#6d28d9]",
-  },
-  {
-    title: "Sales forecast updated for Q2",
-    who: "Esther Howard",
-    when: "1d ago",
-    detail: "Q2 sales forecast revised with latest pipeline actuals.",
-    icon: "trend" as const,
-    iconBg: "bg-[#fed7aa] text-[#c2410c]",
-  },
-  {
-    title: "Q1 Forecast Accuracy improved to 87.3%",
-    who: "System",
-    when: "2d ago",
-    detail: "Automated accuracy score recalculated after actuals close.",
-    icon: "check" as const,
-    iconBg: "bg-[#bae6fd] text-[#0369a1]",
-  },
-  {
-    title: "Cash runway brief published",
-    who: "Cody Fisher",
-    when: "3d ago",
-    detail: "Treasury published May cash runway brief (14.2 months).",
-    icon: "file" as const,
-    iconBg: "bg-[#fde68a] text-[#a16207]",
-  },
-  {
-    title: "Ops opex returned for revision",
-    who: "James Whitaker",
-    when: "3d ago",
-    detail: "Returned Operations opex — headcount assumptions incomplete.",
-    icon: "file" as const,
-    iconBg: "bg-[#fecaca] text-[#b91c1c]",
-  },
-  {
-    title: "Board pack draft generated",
-    who: "Sarah Delgado",
-    when: "4d ago",
-    detail: "Generated board pack PDF for CFO review.",
-    icon: "check" as const,
-    iconBg: "bg-[#bfdbfe] text-[#1d4ed8]",
-  },
-]
 
 function ActivityIcon({
   kind,
@@ -627,84 +108,22 @@ function ActivityIcon({
   return <FileText className={className} />
 }
 
-const OPEN_TASKS_ALL = [
-  {
-    task: "Review Q2 Marketing Budget",
-    module: "Budgeting",
-    owner: "Jane Cooper",
-    photo: AVATARS.jane,
-    due: "May 23, 2025",
-    priority: "High" as const,
-    status: "In Progress" as const,
-  },
-  {
-    task: "Update Headcount Plan",
-    module: "Workforce",
-    owner: "Cody Fisher",
-    photo: AVATARS.cody,
-    due: "May 26, 2025",
-    priority: "Medium" as const,
-    status: "Not Started" as const,
-  },
-  {
-    task: "Finalize Revenue Forecast Assumptions",
-    module: "Revenue",
-    owner: "Wade Warren",
-    photo: AVATARS.wade,
-    due: "May 28, 2025",
-    priority: "High" as const,
-    status: "In Progress" as const,
-  },
-  {
-    task: "Review Vendor Spend",
-    module: "Expenses",
-    owner: "Esther Howard",
-    photo: AVATARS.esther,
-    due: "May 30, 2025",
-    priority: "Medium" as const,
-    status: "Not Started" as const,
-  },
-  {
-    task: "Prepare Cash Flow Commentary",
-    module: "Cash Flow",
-    owner: "Devon Lane",
-    photo: AVATARS.devon,
-    due: "May 30, 2025",
-    priority: "Low" as const,
-    status: "Not Started" as const,
-  },
-  {
-    task: "Lock Base Case drivers",
-    module: "Drivers",
-    owner: "Michael Chen",
-    photo: AVATARS.michael,
-    due: "Jun 2, 2025",
-    priority: "High" as const,
-    status: "Not Started" as const,
-  },
-  {
-    task: "Approve Engineering budget",
-    module: "Budgeting",
-    owner: "Sarah Delgado",
-    photo: AVATARS.sarah,
-    due: "Jun 3, 2025",
-    priority: "Medium" as const,
-    status: "In Progress" as const,
-  },
-  {
-    task: "Reconcile Sales variance",
-    module: "Variance",
-    owner: "Priya Nair",
-    photo: AVATARS.priya,
-    due: "Jun 5, 2025",
-    priority: "Low" as const,
-    status: "Not Started" as const,
-  },
-]
-
 type ModalKind = "departments" | "activity" | "tasks" | "scenarios" | "workflow" | "cashflow" | null
 
-function Avatar({ src, alt, className }: { src: string; alt: string; className?: string }) {
+function Avatar({ src, alt, className }: { src?: string | null; alt: string; className?: string }) {
+  if (!src) {
+    return (
+      <span
+        className={cn(
+          "rounded-full bg-[#e2e8f0] text-[#475569] inline-flex items-center justify-center font-semibold",
+          className,
+        )}
+        aria-label={alt}
+      >
+        {alt.trim().charAt(0).toUpperCase() || "?"}
+      </span>
+    )
+  }
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
@@ -760,7 +179,7 @@ function SeriesDot({ cx, cy, fill }: { cx?: number; cy?: number; fill: string })
   return <circle cx={cx} cy={cy} r={3.5} fill={fill} stroke="#ffffff" strokeWidth={1.5} />
 }
 
-/** Slightly squared control — matches mock (not pill-smooth) */
+/** Compact Arcus pill filter control. */
 function FilterSelect({
   value,
   options,
@@ -786,7 +205,7 @@ function FilterSelect({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="h-8 inline-flex items-center gap-1.5 rounded-md border border-[#e2e8f0] bg-white px-2.5 text-[11px] font-medium text-[#475569] hover:bg-[#f8fafc]"
+        className="h-8 inline-flex items-center gap-1.5 rounded-full border border-[#e2e8f0] bg-white px-2.5 text-[11px] font-medium text-[#475569] hover:bg-[#f8fafc]"
       >
         {value}
         <ChevronDown className={cn("w-3.5 h-3.5 text-[#94a3b8] transition-transform", open && "rotate-180")} />
@@ -803,7 +222,7 @@ function FilterSelect({
                 toast.message(`Filter: ${opt}`)
               }}
               className={cn(
-                "w-full flex items-center justify-between gap-2 px-3 py-2 text-left text-[12px] hover:bg-[#f8fafc]",
+                "w-full flex items-center justify-between gap-2 rounded-full px-3 py-2 text-left text-[12px] hover:bg-[#f8fafc]",
                 opt === value ? "text-[#2563eb] font-semibold" : "text-[#334155]",
               )}
             >
@@ -838,7 +257,7 @@ function CardMenu({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="text-[#64748b] hover:text-[#64748b] p-1 rounded-md hover:bg-[#f8fafc]"
+        className="text-[#64748b] hover:text-[#64748b] p-1 rounded-full hover:bg-[#f8fafc]"
         aria-label="More"
       >
         <MoreVertical className="w-4 h-4" />
@@ -853,7 +272,7 @@ function CardMenu({
                 it.onClick()
                 setOpen(false)
               }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-left text-[12px] text-[#334155] hover:bg-[#f8fafc]"
+              className="w-full flex items-center gap-2 rounded-full px-3 py-2 text-left text-[12px] text-[#334155] hover:bg-[#f8fafc]"
             >
               {it.icon}
               {it.label}
@@ -865,14 +284,16 @@ function CardMenu({
   )
 }
 
-function PriorityBadge({ level }: { level: "High" | "Medium" | "Low" }) {
+function PriorityBadge({ level }: { level: string }) {
+  const normalized = level.toLowerCase()
   return (
     <span
       className={cn(
         "inline-flex items-center h-5 px-2 rounded-[6px] text-[10px] font-semibold",
-        level === "High" && "bg-[#fecaca] text-[#991b1b]",
-        level === "Medium" && "bg-[#fed7aa] text-[#9a3412]",
-        level === "Low" && "bg-[#bbf7d0] text-[#166534]",
+        normalized === "high" && "bg-[#fecaca] text-[#991b1b]",
+        normalized === "medium" && "bg-[#fed7aa] text-[#9a3412]",
+        normalized === "low" && "bg-[#bbf7d0] text-[#166534]",
+        !["high", "medium", "low"].includes(normalized) && "bg-[#e5e7eb] text-[#4b5563]",
       )}
     >
       {level}
@@ -880,13 +301,15 @@ function PriorityBadge({ level }: { level: "High" | "Medium" | "Low" }) {
   )
 }
 
-function StatusBadge({ status }: { status: "In Progress" | "Not Started" }) {
+function StatusBadge({ status }: { status: string }) {
+  const normalized = status.toLowerCase().replace(/_/g, " ")
   return (
     <span
       className={cn(
         "inline-flex items-center h-5 px-2 rounded-[6px] text-[10px] font-semibold",
-        status === "In Progress" && "bg-[#bfdbfe] text-[#1d4ed8]",
-        status === "Not Started" && "bg-[#e5e7eb] text-[#4b5563]",
+        /progress|review|submitted/.test(normalized) && "bg-[#bfdbfe] text-[#1d4ed8]",
+        /approved|complete|done/.test(normalized) && "bg-[#bbf7d0] text-[#166534]",
+        !/progress|review|submitted|approved|complete|done/.test(normalized) && "bg-[#e5e7eb] text-[#4b5563]",
       )}
     >
       {status}
@@ -895,22 +318,23 @@ function StatusBadge({ status }: { status: "In Progress" | "Not Started" }) {
 }
 
 function ScenarioTable({
+  metrics,
+  scenarios,
   compact,
-  activeScenario,
+  activeScenarioId,
 }: {
+  metrics: NonNullable<NonNullable<FpaHomeDashboard["scenarioCompare"]>["metrics"]>
+  scenarios: NonNullable<NonNullable<FpaHomeDashboard["scenarioCompare"]>["scenarios"]>
   compact?: boolean
-  activeScenario?: string
+  activeScenarioId?: string | null
 }) {
-  const headers = compact
-    ? SCENARIO_HEADERS.filter(
-        (h) =>
-          ["Base Case", "Upside", "Downside"].includes(h.name) ||
-          h.name === activeScenario,
-      )
-    : SCENARIO_HEADERS
+  const headers = compact ? scenarios.slice(0, 3) : scenarios
 
   return (
     <div className="rounded-md border border-[#e2e8f0] overflow-x-auto -mx-0.5">
+      {metrics.length === 0 || headers.length === 0 ? (
+        <p className="py-8 text-center text-[12px] text-[#64748b]">No scenario comparison data.</p>
+      ) : (
       <table className="w-full text-[11px] border-collapse min-w-0">
         <thead>
           <tr className="bg-[#f8fafc]">
@@ -919,64 +343,65 @@ function ScenarioTable({
             </th>
             {headers.map((h) => (
               <th
-                key={h.name}
+                key={h.id}
                 className={cn(
                   "py-2.5 px-1.5 text-center font-semibold text-[#1e293b] border-b border-l border-[#e2e8f0] whitespace-nowrap",
-                  activeScenario === h.name && "bg-[#eff6ff] text-[#1d4ed8]",
+                  activeScenarioId === h.id && "bg-[#eff6ff] text-[#1d4ed8]",
                 )}
               >
                 {h.name}
-                <span className="block text-[9px] font-normal text-[#94a3b8]">{h.sub}</span>
+                {h.scenarioType ? (
+                  <span className="block text-[9px] font-normal text-[#94a3b8]">{h.scenarioType}</span>
+                ) : null}
               </th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {SCENARIOS.map((r, i) => {
-            const cells = compact
-              ? r.cells.filter(
-                  (c) =>
-                    ["Base Case", "Upside", "Downside"].includes(c.label) ||
-                    c.label === activeScenario,
-                )
-              : r.cells
+          {metrics.map((r, i) => {
             return (
-              <tr key={r.metric}>
+              <tr key={r.key}>
                 <td
                   className={cn(
                     "py-3 px-2 font-semibold text-[#1e293b] sticky left-0 bg-white z-[1] whitespace-nowrap",
-                    i < SCENARIOS.length - 1 && "border-b border-[#e2e8f0]",
+                    i < metrics.length - 1 && "border-b border-[#e2e8f0]",
                   )}
                 >
-                  {r.metric}
+                  {r.label}
                 </td>
-                {cells.map((cell) => (
+                {headers.map((header) => {
+                  const cell = r.values.find((value) => value.scenarioId === header.id)
+                  const variance = optionalNumber(cell?.variancePct)
+                  const value = optionalNumber(cell?.value)
+                  return (
                   <td
-                    key={cell.label}
+                    key={header.id}
                     className={cn(
                       "py-3 px-1.5 text-center border-l border-[#e2e8f0]",
-                      i < SCENARIOS.length - 1 && "border-b border-[#e2e8f0]",
-                      activeScenario === cell.label && "bg-[#eff6ff]/70",
+                      i < metrics.length - 1 && "border-b border-[#e2e8f0]",
+                      activeScenarioId === header.id && "bg-[#eff6ff]/70",
                     )}
                   >
                     <p className="font-bold text-[#1e293b] tabular-nums leading-tight whitespace-nowrap">
-                      {cell.value}
+                      {value == null ? EMPTY : formatMetricValue(r.key, value)}
                     </p>
                     <p
                       className={cn(
                         "text-[10px] font-semibold mt-1 leading-none whitespace-nowrap",
-                        cell.up ? "text-[#15803d]" : "text-[#b91c1c]",
+                        variance == null ? "text-[#64748b]" : variance >= 0 ? "text-[#15803d]" : "text-[#b91c1c]",
                       )}
                     >
-                      {cell.delta}
+                      {variance == null ? EMPTY : `${variance >= 0 ? "▲" : "▼"} ${Math.abs(variance).toFixed(1)}%`}
                     </p>
                   </td>
-                ))}
+                  )
+                })}
               </tr>
             )
           })}
         </tbody>
       </table>
+      )}
     </div>
   )
 }
@@ -985,7 +410,15 @@ function DeptTable({
   rows,
   compact,
 }: {
-  rows: typeof OVER_BUDGET_ALL
+  rows: Array<{
+    dept: string
+    budget: string
+    actual: string
+    variance: string
+    owner: string
+    photo?: string | null
+    period: string
+  }>
   compact?: boolean
 }) {
   return (
@@ -1021,6 +454,13 @@ function DeptTable({
           </tr>
         </thead>
         <tbody>
+          {rows.length === 0 ? (
+            <tr>
+              <td colSpan={compact ? 5 : 6} className="py-8 text-center text-[#64748b]">
+                No over-budget departments.
+              </td>
+            </tr>
+          ) : null}
           {rows.map((r, i) => (
             <tr key={`${r.dept}-${r.period}-${i}`} className="bg-white hover:bg-[#fafbfc]">
               <td
@@ -1086,60 +526,291 @@ function DeptTable({
   )
 }
 
+function HomeBoardSkeleton() {
+  const block = "animate-pulse rounded-md bg-[#e2e8f0]"
+  return (
+    <div className="space-y-3" role="status" aria-label="Loading FP&A dashboard">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3">
+        {Array.from({ length: 5 }).map((_, index) => (
+          <div key={index} className={cn(CARD, "p-4 space-y-4")}>
+            <div className={cn(block, "h-3 w-28")} />
+            <div className={cn(block, "h-7 w-32")} />
+            <div className={cn(block, "h-3 w-20")} />
+          </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
+        {["lg:col-span-5", "lg:col-span-4", "lg:col-span-3"].map((span, index) => (
+          <div key={index} className={cn(CARD, span, "p-4 min-h-[280px] space-y-5")}>
+            <div className={cn(block, "h-4 w-40")} />
+            <div className={cn(block, "h-[210px] w-full")} />
+          </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
+        {["lg:col-span-5", "lg:col-span-4", "lg:col-span-3"].map((span, index) => (
+          <div key={index} className={cn(CARD, span, "p-4 min-h-[250px] space-y-4")}>
+            <div className={cn(block, "h-4 w-36")} />
+            <div className={cn(block, "h-10 w-full")} />
+            <div className={cn(block, "h-10 w-full")} />
+            <div className={cn(block, "h-10 w-4/5")} />
+          </div>
+        ))}
+      </div>
+      <div className={cn(CARD, "p-4 space-y-3")}>
+        <div className={cn(block, "h-4 w-24")} />
+        {Array.from({ length: 3 }).map((_, index) => (
+          <div key={index} className={cn(block, "h-10 w-full")} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export function FpaHomeBoard() {
-  const [scenario, setScenario] = useState("Base Case")
-  const [version, setVersion] = useState("Working")
-  const [period, setPeriod] = useState("May 2025")
+  const dispatch = useAppDispatch()
+  const { selectModel } = useFpaBootstrap()
+  const {
+    dashboard,
+    loadingModels,
+    loadingDashboard,
+    error: storeError,
+    selectedModelId,
+    selectedVersionId,
+    selectedScenarioId,
+    models,
+    scenarios,
+    versions,
+    bootstrapped,
+  } = useAppSelector((state) => state.fpa)
   const [trendRange, setTrendRange] = useState("Last 12 Months")
-  const [deptPeriod, setDeptPeriod] = useState("May 2025")
-  const [cashScenario, setCashScenario] = useState("Base Case")
   const [modal, setModal] = useState<ModalKind>(null)
-  const [modalDeptPeriod, setModalDeptPeriod] = useState("May 2025")
+  const [dashboardError, setDashboardError] = useState<string | null>(null)
 
-  const kpis = useMemo(
-    () => buildKpis(scenario, version, period),
-    [scenario, version, period],
-  )
-
-  const trendData = useMemo(() => {
-    let base = TREND_12M
-    if (trendRange === "Last 6 Months") base = TREND_6M
-    else if (trendRange === "Last 3 Months") base = TREND_3M
-    else if (trendRange === "YTD 2025") base = TREND_YTD
-    return scaleTrend(base, scenario, period)
-  }, [trendRange, scenario, period])
-
-  const lastTrend = trendData[trendData.length - 1]
-
-  const deptRows = useMemo(
-    () => OVER_BUDGET_ALL.filter((r) => r.period === deptPeriod).slice(0, 5),
-    [deptPeriod],
-  )
-
-  const modalDeptRows = useMemo(
-    () => OVER_BUDGET_ALL.filter((r) => r.period === modalDeptPeriod),
-    [modalDeptPeriod],
-  )
-
-  const cash = CASH_BY_SCENARIO[cashScenario] || CASH_BY_SCENARIO["Base Case"]
-
-  const versionNote = VERSION_FX[version]?.label || "Working draft"
-
-  const visibleTasks = OPEN_TASKS_ALL.slice(0, 5)
-  const modalTasks = OPEN_TASKS_ALL
-
-  const applyScenario = (s: string) => {
-    setScenario(s)
-    setCashScenario(s)
+  const refreshDashboard = () => {
+    setDashboardError(null)
+    return dispatch(
+      fetchFpaDashboard({
+        modelId: selectedModelId || undefined,
+        versionId: selectedVersionId || undefined,
+        scenarioId: selectedScenarioId || undefined,
+      }),
+    )
+      .unwrap()
+      .catch((reason) => {
+        setDashboardError(typeof reason === "string" ? reason : "Failed to load dashboard")
+      })
   }
 
-  const applyPeriod = (p: string) => {
-    setPeriod(p)
-    if (p === "May 2025" || p === "Apr 2025") setDeptPeriod(p)
+  useEffect(() => {
+    if (!bootstrapped || loadingModels || !selectedModelId) return
+    void refreshDashboard()
+    // The selected IDs are the dashboard query identity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bootstrapped, dispatch, loadingModels, selectedModelId, selectedVersionId, selectedScenarioId])
+
+  const liveDashboard = dashboardError && !dashboard ? null : dashboard
+  const scenario = scenarios.find((item) => item.id === selectedScenarioId)
+  const version = versions.find((item) => item.id === selectedVersionId)
+  const model = models.find((item) => item.id === selectedModelId)
+  const scenarioName = scenario?.name || EMPTY
+  const versionName = version?.name || EMPTY
+  const currency = model?.baseCurrency || liveDashboard?.model?.baseCurrency || "USD"
+
+  const kpis = useMemo(() => {
+    const source = liveDashboard?.kpis
+    const values = [
+      {
+        id: "rev",
+        label: "Revenue Forecast",
+        raw: source?.revenue,
+        delta: source?.revenueDeltaPct,
+        spark: source?.sparklines?.revenue,
+        money: true,
+      },
+      {
+        id: "ebitda",
+        label: "EBITDA",
+        raw: source?.ebitda,
+        delta: source?.ebitdaDeltaPct,
+        spark: source?.sparklines?.ebitda,
+        money: true,
+      },
+      {
+        id: "cash",
+        label: "Closing Cash",
+        raw: source?.closingCash ?? source?.cash,
+        delta: source?.closingCashDeltaPct,
+        spark: source?.sparklines?.closingCash,
+        money: true,
+      },
+      {
+        id: "runway",
+        label: "Cash Runway",
+        raw: source?.runwayMonths,
+        delta: null,
+        spark: source?.sparklines?.runwayMonths,
+        suffix: " months",
+      },
+      {
+        id: "acc",
+        label: "Forecast Accuracy",
+        raw: source?.forecastAccuracy,
+        delta: null,
+        spark: source?.sparklines?.forecastAccuracy,
+        suffix: "%",
+        dashed: true,
+      },
+    ]
+    return values.map((item) => {
+      const value = optionalNumber(item.raw)
+      const delta = optionalNumber(item.delta)
+      return {
+        id: item.id,
+        label: item.label,
+        value: value == null ? EMPTY : item.money ? formatMoney(value, currency) : `${value.toFixed(1)}${item.suffix}`,
+        pct: delta == null ? EMPTY : `${Math.abs(delta).toFixed(1)}%`,
+        vs: delta == null ? "" : "vs prior period",
+        up: delta != null && delta >= 0,
+        spark: (item.spark || []).map((point) => asNumber(point)),
+        dashed: Boolean(item.dashed),
+      }
+    })
+  }, [currency, liveDashboard])
+
+  const trendData = useMemo(() => {
+    const rows = (liveDashboard?.revenueExpenseTrend || []).map((row) => ({
+      m: row.period,
+      revenue:
+        optionalNumber(row.revenue) == null ? null : asNumber(row.revenue) / 1_000_000,
+      expenses:
+        optionalNumber(row.expenses ?? row.expense) == null
+          ? null
+          : asNumber(row.expenses ?? row.expense) / 1_000_000,
+    }))
+    if (trendRange === "Last 6 Months") return rows.slice(-6)
+    if (trendRange === "Last 3 Months") return rows.slice(-3)
+    if (trendRange === "Year to date") {
+      const year = rows.at(-1)?.m.match(/\b(20\d{2})\b/)?.[1]
+      return year ? rows.filter((row) => row.m.includes(year)) : rows
+    }
+    return rows.slice(-12)
+  }, [liveDashboard, trendRange])
+
+  const lastTrend = trendData[trendData.length - 1]
+  const dashboardPeriods = useMemo(
+    () =>
+      Array.from(
+        new Set([
+          ...(liveDashboard?.revenueExpenseTrend || []).map((row) => row.period),
+          ...(liveDashboard?.cashRunway?.byMonth || []).map((row) => row.period),
+        ].filter(Boolean)),
+      ),
+    [liveDashboard],
+  )
+  const dashboardPeriod = dashboardPeriods.at(-1) || EMPTY
+
+  const deptRows = useMemo(
+    () =>
+      (liveDashboard?.overBudgetDepartments || []).map((row) => {
+        const overBy = asNumber(row.overBy)
+        const plan = asNumber(row.plan)
+        return {
+          dept: row.departmentName || row.departmentId || EMPTY,
+          budget: formatMoney(plan, currency),
+          actual: formatMoney(row.actual, currency),
+          variance: `${formatMoney(overBy, currency)}${plan ? ` (${((overBy / plan) * 100).toFixed(1)}%)` : ""}`,
+          owner: row.ownerName || EMPTY,
+          photo: row.ownerAvatarUrl,
+          period: dashboardPeriod,
+        }
+      }),
+    [currency, dashboardPeriod, liveDashboard],
+  )
+  const modalDeptRows = deptRows
+
+  const scenarioCompare = liveDashboard?.scenarioCompare
+  const scenarioMetrics = scenarioCompare?.metrics || []
+  const comparedScenarios = scenarioCompare?.scenarios || []
+
+  const workflow = useMemo(() => {
+    const slices = liveDashboard?.workflowStatusSlices || []
+    const total = slices.reduce((sum, item) => sum + asNumber(item.count), 0)
+    return slices.map((item, index) => {
+      const count = asNumber(item.count)
+      const key = item.status.toLowerCase().replace(/_/g, " ")
+      return {
+        name: item.status.replace(/_/g, " "),
+        value: count,
+        color: WORKFLOW_COLORS[key] || ["#1D4ED8", "#D97706", "#16A34A", "#7C3AED"][index % 4],
+        pct: total ? `${Math.round((count / total) * 100)}%` : EMPTY,
+        count: total ? `(${count} / ${total})` : `(${count})`,
+        complete: key === "approved" || key === "completed",
+      }
+    })
+  }, [liveDashboard])
+  const workflowTotal = workflow.reduce((sum, item) => sum + item.value, 0)
+  const workflowComplete = workflowTotal
+    ? Math.round((workflow.filter((item) => item.complete).reduce((sum, item) => sum + item.value, 0) / workflowTotal) * 100)
+    : null
+
+  const cash = useMemo(() => {
+    const runway = liveDashboard?.cashRunway
+    return {
+      value: runway?.runwayMonths == null ? EMPTY : asNumber(runway.runwayMonths).toFixed(1),
+      unit: runway?.runwayMonths == null ? "" : "months",
+      delta: EMPTY,
+      up: false,
+      bars: (runway?.byMonth || [])
+        .map((row) => ({
+          m: row.period,
+          bal:
+            optionalNumber(row.closingCash ?? row.balance) == null
+              ? null
+              : asNumber(row.closingCash ?? row.balance) / 1_000_000,
+          tick: true,
+        }))
+        .filter((row): row is { m: string; bal: number; tick: boolean } => row.bal != null),
+    }
+  }, [liveDashboard])
+
+  const activities = useMemo(
+    () =>
+      ((liveDashboard?.recentActivity?.length ? liveDashboard.recentActivity : liveDashboard?.activity) || []).map((item) => ({
+        id: item.id || `${item.title}-${item.createdAt}`,
+        title: item.title || EMPTY,
+        who: item.actorName || EMPTY,
+        when: formatDateTime(item.createdAt),
+        detail: item.body || "",
+        icon: (String(item.kind).toLowerCase().includes("complete") ? "check" : "file") as "check" | "file",
+        iconBg: "bg-[#bfdbfe] text-[#1d4ed8]",
+      })),
+    [liveDashboard],
+  )
+
+  const modalTasks = useMemo(
+    () =>
+      (liveDashboard?.openTasks || []).map((item) => ({
+        id: item.id,
+        task: item.title || EMPTY,
+        module: item.module || EMPTY,
+        owner: item.assigneeName || EMPTY,
+        photo: item.assigneeAvatarUrl,
+        due: formatDate(item.dueDate),
+        priority: item.priority || EMPTY,
+        status: item.status || EMPTY,
+      })),
+    [liveDashboard],
+  )
+  const visibleTasks = modalTasks.slice(0, 5)
+  const versionNote = version?.status || versionName
+
+  const applyScenario = (s: string) => {
+    const match = scenarios.find((item) => item.name === s)
+    if (match) dispatch(setSelectedScenarioId(match.id))
   }
 
   const openModal = (kind: ModalKind) => {
-    if (kind === "departments") setModalDeptPeriod(deptPeriod)
     setModal(kind)
   }
 
@@ -1147,16 +818,41 @@ export function FpaHomeBoard() {
     <div className="min-h-full bg-[#f1f5f9]">
       <FpaPageHeader
         title="FP&A Home"
-        demoScenarios
-        scenario={scenario}
-        version={version}
-        period={period}
-        onScenarioChange={applyScenario}
-        onVersionChange={setVersion}
-        onPeriodChange={applyPeriod}
+        liveFilters
+        actions={
+          <FilterSelect
+            value={model?.name || EMPTY}
+            options={models.map((item) => item.name)}
+            onChange={(name) => {
+              const next = models.find((item) => item.name === name)
+              if (next && next.id !== selectedModelId) void selectModel(next.id)
+            }}
+          />
+        }
       />
 
       <div className="w-full max-w-full px-3 sm:px-4 py-3 space-y-3 overflow-x-hidden">
+        {(loadingModels || loadingDashboard) && dashboard ? (
+          <div className={cn(CARD, "px-4 py-3 text-[12px] text-[#475569]")} role="status">
+            Refreshing dashboard…
+          </div>
+        ) : null}
+        {dashboardError || (!dashboard && storeError) ? (
+          <div className={cn(CARD, "px-4 py-3 flex items-center justify-between gap-3 border-[#fecaca]")} role="alert">
+            <p className="text-[12px] text-[#b91c1c]">
+              Dashboard data could not be loaded: {dashboardError || storeError}
+            </p>
+            <button
+              type="button"
+              onClick={() => void refreshDashboard()}
+              className="h-8 rounded-full border border-[#fecaca] px-3 text-[11px] font-semibold text-[#b91c1c] hover:bg-[#fef2f2]"
+            >
+              Retry
+            </button>
+          </div>
+        ) : null}
+        {!dashboard && (loadingModels || loadingDashboard || !bootstrapped) ? <HomeBoardSkeleton /> : (
+        <>
         {/* KPI strip — 5-up only on xl so values + sparklines never collide */}
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3">
           {kpis.map((kpi) => (
@@ -1170,17 +866,23 @@ export function FpaHomeBoard() {
                     {
                       label: "Refresh",
                       icon: <RefreshCw className="w-3.5 h-3.5" />,
-                      onClick: () => toast.success(`${kpi.label} refreshed`),
+                      onClick: () => void refreshDashboard(),
                     },
                     {
                       label: "Export CSV",
                       icon: <Download className="w-3.5 h-3.5" />,
-                      onClick: () => toast.success(`Exported ${kpi.label}`),
+                      onClick: () =>
+                        toast.message("Export from Reports", {
+                          description: "Use the Reports tab to create a server-backed export.",
+                        }),
                     },
                     {
                       label: "Pin to board",
                       icon: <Pin className="w-3.5 h-3.5" />,
-                      onClick: () => toast.message(`Pinned ${kpi.label}`),
+                      onClick: () =>
+                        toast.message("Pinning is not available yet", {
+                          description: `${kpi.label} has not been changed.`,
+                        }),
                     },
                   ]}
                 />
@@ -1194,10 +896,14 @@ export function FpaHomeBoard() {
                     <span
                       className={cn(
                         "font-semibold",
-                        kpi.up ? "text-[#15803d]" : "text-[#b91c1c]",
+                        kpi.pct === EMPTY
+                          ? "text-[#64748b]"
+                          : kpi.up
+                            ? "text-[#15803d]"
+                            : "text-[#b91c1c]",
                       )}
                     >
-                      {kpi.up ? "▲" : "▼"} {kpi.pct}
+                      {kpi.pct === EMPTY ? EMPTY : `${kpi.up ? "▲" : "▼"} ${kpi.pct}`}
                     </span>
                     <span className="text-[#64748b] font-normal"> {kpi.vs}</span>
                   </p>
@@ -1219,6 +925,7 @@ export function FpaHomeBoard() {
                 <button
                   type="button"
                   title="Monthly revenue and total expenses"
+                  className="rounded-full p-1 hover:bg-[#f8fafc]"
                   onClick={() => toast.message("Revenue vs Expense Trend", {
                     description: "Solid blue = Revenue · Dashed teal = Total Expenses",
                   })}
@@ -1229,7 +936,7 @@ export function FpaHomeBoard() {
               <div className="flex items-center gap-1.5 shrink-0">
                 <FilterSelect
                   value={trendRange}
-                  options={["Last 12 Months", "Last 6 Months", "Last 3 Months", "YTD 2025"]}
+                  options={["Last 12 Months", "Last 6 Months", "Last 3 Months", "Year to date"]}
                   onChange={setTrendRange}
                 />
                 <CardMenu
@@ -1237,12 +944,15 @@ export function FpaHomeBoard() {
                     {
                       label: "Export chart",
                       icon: <Download className="w-3.5 h-3.5" />,
-                      onClick: () => toast.success("Trend chart exported"),
+                      onClick: () =>
+                        toast.message("Export from Reports", {
+                          description: "Chart export is not available on the Home dashboard.",
+                        }),
                     },
                     {
                       label: "Refresh",
                       icon: <RefreshCw className="w-3.5 h-3.5" />,
-                      onClick: () => toast.success("Trend refreshed"),
+                      onClick: () => void refreshDashboard(),
                     },
                   ]}
                 />
@@ -1278,6 +988,11 @@ export function FpaHomeBoard() {
             </div>
 
             <div className="flex-1 min-h-[200px] sm:min-h-[240px] px-1 sm:px-2 pb-3 min-w-0 overflow-hidden">
+              {trendData.length === 0 ? (
+                <div className="h-full flex items-center justify-center text-[12px] text-[#64748b]">
+                  No revenue or expense trend data.
+                </div>
+              ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart
                   data={trendData}
@@ -1327,7 +1042,7 @@ export function FpaHomeBoard() {
                         {...props}
                         color={BLUE}
                         lastIndex={trendData.length - 1}
-                        value={lastTrend?.revenue}
+                        value={lastTrend?.revenue ?? undefined}
                       />
                     )}
                   />
@@ -1344,12 +1059,13 @@ export function FpaHomeBoard() {
                         {...props}
                         color={TEAL}
                         lastIndex={trendData.length - 1}
-                        value={lastTrend?.expenses}
+                        value={lastTrend?.expenses ?? undefined}
                       />
                     )}
                   />
                 </ComposedChart>
               </ResponsiveContainer>
+              )}
             </div>
           </section>
 
@@ -1358,9 +1074,13 @@ export function FpaHomeBoard() {
               <h2 className="text-[14px] font-semibold text-[#1e293b]">Scenario Comparison</h2>
               <button
                 type="button"
+                className="rounded-full p-1 hover:bg-[#f8fafc]"
                 onClick={() =>
                   toast.message("Scenario Comparison", {
-                    description: "Base vs Upside (+10%) vs Downside (−10%) for May 2025",
+                    description:
+                      comparedScenarios.length > 0
+                        ? `${comparedScenarios.length} scenarios from the dashboard API`
+                        : "No scenario comparison data returned.",
                   })
                 }
               >
@@ -1368,15 +1088,20 @@ export function FpaHomeBoard() {
               </button>
             </div>
             <div className="px-3 sm:px-4 pb-3 flex-1 flex flex-col min-w-0 overflow-x-auto">
-              <ScenarioTable compact activeScenario={scenario} />
+              <ScenarioTable
+                compact
+                metrics={scenarioMetrics}
+                scenarios={comparedScenarios}
+                activeScenarioId={selectedScenarioId}
+              />
               <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2">
                 <p className="text-[10px] text-[#94a3b8]">
-                  Showing {scenario} · {versionNote} · {period}
+                  Showing {scenarioName} · {versionNote} · {dashboardPeriod}
                 </p>
                 <button
                   type="button"
                   onClick={() => openModal("scenarios")}
-                  className="text-[11px] font-medium text-[#1d4ed8] hover:underline shrink-0"
+                  className="rounded-full px-2 py-1 text-[11px] font-medium text-[#1d4ed8] hover:bg-[#eff6ff] shrink-0"
                 >
                   View all
                 </button>
@@ -1389,9 +1114,13 @@ export function FpaHomeBoard() {
               <h2 className="text-[14px] font-semibold text-[#1f2937]">Budget Workflow Progress</h2>
               <button
                 type="button"
+                className="rounded-full p-1 hover:bg-[#f8fafc]"
                 onClick={() =>
                   toast.message("Workflow Progress", {
-                    description: "Submitted · In Review · Approved across 32 tasks",
+                    description:
+                      workflowTotal > 0
+                        ? `${workflowTotal} workflow items across ${workflow.length} statuses`
+                        : "No workflow status data returned.",
                   })
                 }
               >
@@ -1401,10 +1130,10 @@ export function FpaHomeBoard() {
 
             <div className="px-3 sm:px-4 flex-1 flex flex-col xl:flex-row items-center gap-4 min-h-[160px]">
               <div className="h-[132px] w-[132px] sm:h-[140px] sm:w-[140px] relative shrink-0">
-                <ResponsiveContainer width="100%" height="100%">
+                {workflow.length > 0 ? <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
-                      data={WORKFLOW_DONUT}
+                      data={workflow}
                       dataKey="value"
                       innerRadius={46}
                       outerRadius={66}
@@ -1413,20 +1142,25 @@ export function FpaHomeBoard() {
                       startAngle={90}
                       endAngle={-270}
                     >
-                      {WORKFLOW_DONUT.map((d) => (
+                      {workflow.map((d) => (
                         <Cell key={d.name} fill={d.color} />
                       ))}
                     </Pie>
                   </PieChart>
-                </ResponsiveContainer>
+                </ResponsiveContainer> : null}
                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                  <p className="text-[26px] font-bold text-[#1f2937] leading-none">72%</p>
+                  <p className="text-[26px] font-bold text-[#1f2937] leading-none">
+                    {workflowComplete == null ? EMPTY : `${workflowComplete}%`}
+                  </p>
                   <p className="text-[11px] text-[#4b5563] mt-1">Complete</p>
                 </div>
               </div>
 
               <ul className="w-full space-y-3 min-w-0 flex-1">
-                {WORKFLOW_DONUT.map((d) => (
+                {workflow.length === 0 ? (
+                  <li className="text-center text-[12px] text-[#64748b]">No workflow status data.</li>
+                ) : null}
+                {workflow.map((d) => (
                   <li key={d.name}>
                     <button
                       type="button"
@@ -1434,7 +1168,7 @@ export function FpaHomeBoard() {
                         toast.message(d.name, { description: `${d.pct} ${d.count}` })
                         openModal("workflow")
                       }}
-                      className="w-full grid grid-cols-[auto_1fr_auto] items-center gap-2 text-left hover:opacity-80"
+                      className="w-full rounded-full grid grid-cols-[auto_1fr_auto] items-center gap-2 px-2 py-1 text-left hover:bg-[#f8fafc]"
                     >
                       <i
                         className="h-2.5 w-2.5 rounded-full shrink-0"
@@ -1456,14 +1190,7 @@ export function FpaHomeBoard() {
             <div className="mt-3 border-t border-[#d1d5db] px-4 py-3 flex items-center gap-2">
               <Inbox className="w-4 h-4 text-[#4b5563] shrink-0" />
               <p className="text-[12px] text-[#4b5563]">
-                Next:{" "}
-                <button
-                  type="button"
-                  onClick={() => openModal("workflow")}
-                  className="font-medium text-[#1d4ed8] hover:underline"
-                >
-                  Marketing budget in review
-                </button>
+                {workflow.length ? `${workflowTotal} workflow items tracked` : "No workflow items available."}
               </p>
             </div>
           </section>
@@ -1477,6 +1204,7 @@ export function FpaHomeBoard() {
                 <h2 className="text-[14px] font-semibold text-[#1a202c]">Departments Over Budget</h2>
                 <button
                   type="button"
+                  className="rounded-full p-1 hover:bg-[#f8fafc]"
                   onClick={() =>
                     toast.message("Over Budget", {
                       description: "Departments where actual spend exceeds plan",
@@ -1487,14 +1215,6 @@ export function FpaHomeBoard() {
                 </button>
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
-                <FilterSelect
-                  value={deptPeriod}
-                  options={["May 2025", "Apr 2025"]}
-                  onChange={(p) => {
-                    setDeptPeriod(p)
-                    setPeriod(p)
-                  }}
-                />
                 <CardMenu
                   items={[
                     {
@@ -1513,7 +1233,7 @@ export function FpaHomeBoard() {
             <div className="px-4 pb-3 overflow-x-auto">
               {deptRows.length === 0 ? (
                 <p className="text-[12px] text-[#64748b] py-8 text-center">
-                  No over-budget departments for {deptPeriod}.
+                  No over-budget departments{dashboardPeriod === EMPTY ? "." : ` for ${dashboardPeriod}.`}
                 </p>
               ) : (
                 <DeptTable rows={deptRows} compact />
@@ -1521,7 +1241,7 @@ export function FpaHomeBoard() {
               <button
                 type="button"
                 onClick={() => openModal("departments")}
-                className="text-[12px] font-medium text-[#1d4ed8] hover:underline mt-3 inline-block"
+                className="rounded-full px-3 py-2 text-[12px] font-medium text-[#1d4ed8] hover:bg-[#eff6ff] mt-3 inline-block"
               >
                 View all departments
               </button>
@@ -1534,6 +1254,7 @@ export function FpaHomeBoard() {
                 <h2 className="text-[14px] font-semibold text-[#1a1a1a]">Cash Runway</h2>
                 <button
                   type="button"
+                  className="rounded-full p-1 hover:bg-[#f8fafc]"
                   onClick={() =>
                     toast.message("Cash Runway", {
                       description: "Projected months of cash remaining at current burn rate",
@@ -1544,14 +1265,8 @@ export function FpaHomeBoard() {
                 </button>
               </div>
               <FilterSelect
-                value={cashScenario}
-                options={[
-                  "Base Case",
-                  "Upside",
-                  "Downside",
-                  "FX Shock",
-                  "Hiring Freeze",
-                ]}
+                value={scenarioName}
+                options={scenarios.map((item) => item.name)}
                 onChange={applyScenario}
               />
             </div>
@@ -1568,18 +1283,27 @@ export function FpaHomeBoard() {
                   <span
                     className={cn(
                       "font-semibold",
-                      cash.up ? "text-[#047857]" : "text-[#b91c1c]",
+                      cash.delta === EMPTY
+                        ? "text-[#64748b]"
+                        : cash.up
+                          ? "text-[#047857]"
+                          : "text-[#b91c1c]",
                     )}
                   >
-                    {cash.up ? "▲" : "▼"} {cash.delta}
+                    {cash.delta === EMPTY ? EMPTY : `${cash.up ? "▲" : "▼"} ${cash.delta}`}
                   </span>
-                  <span className="text-[#4b5563]"> {(PERIOD_META[period] || PERIOD_META["May 2025"]).vs}</span>
+                  <span className="text-[#4b5563]"> vs prior period</span>
                 </p>
               </div>
 
               <p className="text-[11px] text-[#4b5563] mt-4 mb-1">Cash Balance ($ in millions)</p>
 
               <div className="flex-1 min-h-[160px] sm:min-h-[180px] min-w-0 overflow-hidden">
+                {cash.bars.length === 0 ? (
+                  <div className="h-full flex items-center justify-center text-[12px] text-[#64748b]">
+                    No cash runway history.
+                  </div>
+                ) : (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={cash.bars} margin={{ top: 18, right: 8, left: 0, bottom: 0 }}>
                     <XAxis
@@ -1605,19 +1329,6 @@ export function FpaHomeBoard() {
                       formatter={(v: number) => [`$${v}M`, "Cash Balance"]}
                       labelFormatter={(l) => String(l)}
                     />
-                    <ReferenceLine
-                      y={cash.target}
-                      stroke="#1d4ed8"
-                      strokeDasharray="5 4"
-                      strokeWidth={2}
-                      label={{
-                        value: "12 Months Target",
-                        position: "insideTopRight",
-                        fill: "#1a1a1a",
-                        fontSize: 10,
-                        fontWeight: 500,
-                      }}
-                    />
                     <Bar
                       dataKey="bal"
                       fill={BLUE_BRIGHT}
@@ -1627,12 +1338,13 @@ export function FpaHomeBoard() {
                     />
                   </BarChart>
                 </ResponsiveContainer>
+                )}
               </div>
 
               <button
                 type="button"
                 onClick={() => openModal("cashflow")}
-                className="text-[13px] font-medium text-[#1d4ed8] hover:underline mt-2 self-start"
+                className="rounded-full px-3 py-2 text-[13px] font-medium text-[#1d4ed8] hover:bg-[#eff6ff] mt-2 self-start"
               >
                 View cash flow
               </button>
@@ -1645,6 +1357,7 @@ export function FpaHomeBoard() {
                 <h2 className="text-[14px] font-semibold text-[#1f2937]">Recent Activity</h2>
                 <button
                   type="button"
+                  className="rounded-full p-1 hover:bg-[#f8fafc]"
                   onClick={() =>
                     toast.message("Recent Activity", {
                       description: "Latest model, forecast, and workflow events",
@@ -1657,7 +1370,7 @@ export function FpaHomeBoard() {
               <button
                 type="button"
                 onClick={() => openModal("activity")}
-                className="text-[12px] font-medium text-[#1d4ed8] hover:underline shrink-0"
+                className="rounded-full px-2 py-1 text-[12px] font-medium text-[#1d4ed8] hover:bg-[#eff6ff] shrink-0"
               >
                 View all
               </button>
@@ -1665,8 +1378,11 @@ export function FpaHomeBoard() {
 
             <div className="mx-4 mb-4 flex-1 rounded-md border border-[#d1d5db] overflow-hidden">
               <ul>
-                {ACTIVITY_ALL.slice(0, 5).map((a, i) => (
-                  <li key={a.title}>
+                {activities.length === 0 ? (
+                  <li className="py-8 text-center text-[12px] text-[#64748b]">No recent activity.</li>
+                ) : null}
+                {activities.slice(0, 5).map((a, i) => (
+                  <li key={a.id}>
                     <button
                       type="button"
                       onClick={() =>
@@ -1675,7 +1391,7 @@ export function FpaHomeBoard() {
                         })
                       }
                       className={cn(
-                        "w-full flex items-start gap-3 px-3 py-3 text-left hover:bg-[#f9fafb] transition-colors",
+                        "w-full rounded-full flex items-start gap-3 px-3 py-3 text-left hover:bg-[#f9fafb] transition-colors",
                         i < 4 && "border-b border-[#f3f4f6]",
                       )}
                     >
@@ -1710,6 +1426,7 @@ export function FpaHomeBoard() {
               <h2 className="text-[14px] font-semibold text-[#1a1c1e]">Open Tasks</h2>
               <button
                 type="button"
+                className="rounded-full p-1 hover:bg-[#f8fafc]"
                 onClick={() =>
                   toast.message("Open Tasks", {
                     description: "Outstanding planning and review tasks for this cycle",
@@ -1782,12 +1499,14 @@ export function FpaHomeBoard() {
             <button
               type="button"
               onClick={() => openModal("tasks")}
-              className="text-[13px] font-medium text-[#1d4ed8] hover:underline mt-3 inline-block"
+              className="rounded-full px-3 py-2 text-[13px] font-medium text-[#1d4ed8] hover:bg-[#eff6ff] mt-3 inline-block"
             >
               View all tasks
             </button>
           </div>
         </section>
+        </>
+        )}
       </div>
 
       {/* View-all dialogs */}
@@ -1803,36 +1522,31 @@ export function FpaHomeBoard() {
               {modal === "cashflow" && "Cash Flow Detail"}
             </DialogTitle>
             <DialogDescription className="text-[12px] text-[#64748b]">
-              {modal === "departments" && `${modalDeptRows.length} departments · ${modalDeptPeriod}`}
-              {modal === "activity" && `${ACTIVITY_ALL.length} events across the planning cycle`}
+              {modal === "departments" && `${modalDeptRows.length} departments · ${dashboardPeriod}`}
+              {modal === "activity" && `${activities.length} events across the planning cycle`}
               {modal === "tasks" && `${modalTasks.length} open tasks`}
               {modal === "scenarios" &&
-                `${scenario} · ${version} · ${period} (all scenarios compared)`}
-              {modal === "workflow" && "32 tasks · 72% complete · Marketing next in review"}
+                `${scenarioName} · ${versionName} · ${dashboardPeriod} (all scenarios compared)`}
+              {modal === "workflow" &&
+                `${workflowTotal} items · ${workflowComplete == null ? EMPTY : `${workflowComplete}% complete`}`}
               {modal === "cashflow" &&
-                `${cashScenario} · ${cash.value} ${cash.unit} runway · May ’25 – Feb ’26`}
+                `${scenarioName} · ${cash.value} ${cash.unit} runway`}
             </DialogDescription>
           </DialogHeader>
 
           <div className="flex-1 min-h-0 overflow-auto px-5 py-4 space-y-3">
             {modal === "departments" && (
-              <>
-                <div className="flex justify-end">
-                  <FilterSelect
-                    value={modalDeptPeriod}
-                    options={["May 2025", "Apr 2025"]}
-                    onChange={setModalDeptPeriod}
-                  />
-                </div>
-                <DeptTable rows={modalDeptRows} />
-              </>
+              <DeptTable rows={modalDeptRows} />
             )}
 
             {modal === "activity" && (
               <div className="rounded-md border border-[#d1d5db] overflow-hidden">
                 <ul>
-                  {ACTIVITY_ALL.map((a, i) => (
-                    <li key={a.title}>
+                  {activities.length === 0 ? (
+                    <li className="py-8 text-center text-[12px] text-[#64748b]">No recent activity.</li>
+                  ) : null}
+                  {activities.map((a, i) => (
+                    <li key={a.id}>
                       <button
                         type="button"
                         onClick={() =>
@@ -1841,8 +1555,8 @@ export function FpaHomeBoard() {
                           })
                         }
                         className={cn(
-                          "w-full flex items-start gap-3 px-3 py-3.5 text-left hover:bg-[#f9fafb]",
-                          i < ACTIVITY_ALL.length - 1 && "border-b border-[#f3f4f6]",
+                          "w-full rounded-full flex items-start gap-3 px-3 py-3.5 text-left hover:bg-[#f9fafb]",
+                          i < activities.length - 1 && "border-b border-[#f3f4f6]",
                         )}
                       >
                         <span
@@ -1914,9 +1628,13 @@ export function FpaHomeBoard() {
 
             {modal === "scenarios" && (
               <>
-                <ScenarioTable activeScenario={scenario} />
+                <ScenarioTable
+                  metrics={scenarioMetrics}
+                  scenarios={comparedScenarios}
+                  activeScenarioId={selectedScenarioId}
+                />
                 <p className="text-[11px] text-[#94a3b8]">
-                  Active: {scenario} · {versionNote} · {period}. Click Export in the card menu to
+                  Active: {scenarioName} · {versionNote} · {dashboardPeriod}. Click Export in the card menu to
                   download.
                 </p>
                 <div className="flex gap-2">
@@ -1933,7 +1651,12 @@ export function FpaHomeBoard() {
             {modal === "workflow" && (
               <div className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {WORKFLOW_DONUT.map((d) => (
+                  {workflow.length === 0 ? (
+                    <p className="sm:col-span-3 py-8 text-center text-[12px] text-[#64748b]">
+                      No workflow status data.
+                    </p>
+                  ) : null}
+                  {workflow.map((d) => (
                     <div
                       key={d.name}
                       className="rounded-md border border-[#e2e8f0] p-3 text-center"
@@ -1948,20 +1671,9 @@ export function FpaHomeBoard() {
                     </div>
                   ))}
                 </div>
-                <div className="rounded-md border border-[#e2e8f0] px-3 py-3 flex items-center gap-2">
-                  <Inbox className="w-4 h-4 text-[#1d4ed8]" />
-                  <div>
-                    <p className="text-[12px] font-semibold text-[#0f172a]">
-                      Next up: Marketing budget in review
-                    </p>
-                    <p className="text-[11px] text-[#64748b]">
-                      Assigned to FP&A · Due May 19, 2025
-                    </p>
-                  </div>
-                </div>
                 <Link
                   href="/forecasting/workflow"
-                  className="h-9 inline-flex items-center rounded-md bg-[#2563eb] px-4 text-[12px] font-medium text-white hover:bg-[#1d4ed8]"
+                  className="h-9 inline-flex items-center rounded-full bg-[#2563eb] px-4 text-[12px] font-medium text-white hover:bg-[#1d4ed8]"
                 >
                   Open Workflow & Approvals
                 </Link>
@@ -1980,26 +1692,24 @@ export function FpaHomeBoard() {
                       <span
                         className={cn(
                           "font-semibold",
-                          cash.up ? "text-[#047857]" : "text-[#b91c1c]",
+                          cash.delta === EMPTY
+                            ? "text-[#64748b]"
+                            : cash.up
+                              ? "text-[#047857]"
+                              : "text-[#b91c1c]",
                         )}
                       >
-                        {cash.up ? "▲" : "▼"} {cash.delta}
+                        {cash.delta === EMPTY ? EMPTY : `${cash.up ? "▲" : "▼"} ${cash.delta}`}
                       </span>
                       <span className="text-[#4b5563]">
                         {" "}
-                        {(PERIOD_META[period] || PERIOD_META["May 2025"]).vs} · {cashScenario}
+                        vs prior period · {scenarioName}
                       </span>
                     </p>
                   </div>
                   <FilterSelect
-                    value={cashScenario}
-                    options={[
-                      "Base Case",
-                      "Upside",
-                      "Downside",
-                      "FX Shock",
-                      "Hiring Freeze",
-                    ]}
+                    value={scenarioName}
+                    options={scenarios.map((item) => item.name)}
                     onChange={applyScenario}
                   />
                 </div>
@@ -2028,17 +1738,6 @@ export function FpaHomeBoard() {
                         contentStyle={{ borderRadius: 6, border: "1px solid #e2e8f0", fontSize: 11 }}
                         formatter={(v: number) => [`$${v}M`, "Cash Balance"]}
                       />
-                      <ReferenceLine
-                        y={cash.target}
-                        stroke="#2563eb"
-                        strokeDasharray="5 4"
-                        label={{
-                          value: "12 Months Target",
-                          position: "insideTopRight",
-                          fill: "#1a1a1a",
-                          fontSize: 10,
-                        }}
-                      />
                       <Bar dataKey="bal" fill={BLUE_BRIGHT} radius={[3, 3, 0, 0]} maxBarSize={32} />
                     </BarChart>
                   </ResponsiveContainer>
@@ -2050,7 +1749,6 @@ export function FpaHomeBoard() {
                       <tr className="bg-[#f8fafc] text-left">
                         <th className="py-2 px-3 font-semibold">Period</th>
                         <th className="py-2 px-3 font-semibold text-right">Cash Balance</th>
-                        <th className="py-2 px-3 font-semibold text-right">vs Target</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -2060,15 +1758,6 @@ export function FpaHomeBoard() {
                           <td className="py-2 px-3 text-right tabular-nums font-semibold">
                             ${b.bal.toFixed(1)}M
                           </td>
-                          <td
-                            className={cn(
-                              "py-2 px-3 text-right tabular-nums font-medium",
-                              b.bal >= cash.target ? "text-[#047857]" : "text-[#b91c1c]",
-                            )}
-                          >
-                            {b.bal >= cash.target ? "+" : ""}
-                            {(b.bal - cash.target).toFixed(1)}M
-                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -2077,7 +1766,7 @@ export function FpaHomeBoard() {
 
                 <Link
                   href="/forecasting/cash-flow"
-                  className="h-9 inline-flex items-center rounded-md bg-[#2563eb] px-4 text-[12px] font-medium text-white hover:bg-[#1d4ed8]"
+                  className="h-9 inline-flex items-center rounded-full bg-[#2563eb] px-4 text-[12px] font-medium text-white hover:bg-[#1d4ed8]"
                 >
                   Open Cash Flow module
                 </Link>

@@ -225,8 +225,12 @@ export function middleware(request: NextRequest) {
       // Only check route permissions if user has roleCode and not already on error page
       if (roleCode && !isErrorRedirect) {
         // Find matching route permission
-        let matchedRoute: { module: string; subModule?: string } | null = null
-        let matchedPath = ''
+        const isFpaWorksheet =
+          /^\/forecasting\/models\/[^/]+\/worksheet(?:\/|$)/.test(pathname)
+        let matchedRoute: { module: string; subModule?: string } | null = isFpaWorksheet
+          ? { module: 'forecasting', subModule: 'fpa-worksheet' }
+          : null
+        let matchedPath = isFpaWorksheet ? pathname : ''
 
         // Find the most specific matching route
         for (const [routePath, permission] of Object.entries(routePermissions)) {

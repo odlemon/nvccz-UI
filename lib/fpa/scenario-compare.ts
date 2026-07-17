@@ -51,6 +51,22 @@ function resolveCanon(codeOrLabel: string) {
   )
 }
 
+/** True when compare payload has enriched multi-scenario metrics[]. */
+export function isEnrichedCompareResult(
+  data: FpaScenarioCompareResult | null | undefined,
+): boolean {
+  return Boolean(data && Array.isArray(data.metrics) && data.metrics.length > 0)
+}
+
+/** True when only legacy left/right rows are present. */
+export function isLegacyPairCompareResult(
+  data: FpaScenarioCompareResult | null | undefined,
+): boolean {
+  if (!data) return false
+  if (isEnrichedCompareResult(data)) return false
+  return Boolean(Array.isArray(data.rows) && data.rows.length > 0)
+}
+
 /** Map enriched or legacy compare payload into UI metric rows. */
 export function mapCompareResultToRows(
   data: FpaScenarioCompareResult,

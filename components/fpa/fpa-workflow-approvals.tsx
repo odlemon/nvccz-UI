@@ -6,6 +6,7 @@ import { Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { FpaExportDownloadModal } from "@/components/fpa/fpa-export-download-modal"
 import { WorkflowPlanningCycleCard } from "@/components/fpa/workflow/workflow-cycle-header"
+import { WorkflowCycleActions } from "@/components/fpa/workflow/workflow-cycle-actions"
 import { WorkflowPageSkeleton } from "@/components/fpa/workflow/workflow-page-skeleton"
 import {
   WorkflowRecentApprovalsCard,
@@ -87,6 +88,7 @@ export function FpaWorkflowApprovals() {
     canAssignTasks,
     canReviewSubmissions,
     canExportBoardPack,
+    canLockVersion,
   } = useFpaPermissions()
 
   const [cycles, setCycles] = useState<FpaBudgetCycle[]>([])
@@ -99,6 +101,8 @@ export function FpaWorkflowApprovals() {
   const [taskSummary, setTaskSummary] = useState<FpaTaskSummary | null>(null)
   const [taskAttachments, setTaskAttachments] = useState<FpaTaskAttachment[]>([])
   const [taskThreadComments, setTaskThreadComments] = useState<FpaWorkflowComment[]>([])
+  const [taskDetailLoading, setTaskDetailLoading] = useState(false)
+  const [taskDetailError, setTaskDetailError] = useState<string | null>(null)
   const [taskThreadDraft, setTaskThreadDraft] = useState("")
   const [taskThreadVisibility, setTaskThreadVisibility] = useState<"ALL" | "INTERNAL">("ALL")
   const [activityVisibility, setActivityVisibility] = useState<"ALL" | "INTERNAL">("ALL")
@@ -119,6 +123,7 @@ export function FpaWorkflowApprovals() {
   const [taskComment, setTaskComment] = useState("")
   const [reassignUserId, setReassignUserId] = useState("")
   const [activityDraft, setActivityDraft] = useState("")
+  const [cycleActionComment, setCycleActionComment] = useState("")
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [boardPackOpen, setBoardPackOpen] = useState(false)
   const [queueModalOpen, setQueueModalOpen] = useState(false)
@@ -276,12 +281,15 @@ export function FpaWorkflowApprovals() {
   }, [taskIdFromUrl])
 
   useEffect(() => {
+    setTaskSummary(null)
+    setTaskAttachments([])
+    setTaskThreadComments([])
+    setTaskDetailError(null)
     if (!selectedId) {
-      setTaskSummary(null)
-      setTaskAttachments([])
-      setTaskThreadComments([])
+      setTaskDetailLoading(false)
       return
     }
+    setTaskDetailLoading(true)
     let cancelled = false
     void (async () => {
       try {
@@ -291,6 +299,10 @@ export function FpaWorkflowApprovals() {
           fpaApi.listTaskComments(selectedId).catch(() => null),
         ])
         if (cancelled) return
+        if (!sumRes?.success || !attRes?.success || !commentsRes?.success) {
+          setTaskDetailError("Task details are currently unavailable. Please try again.")
+          return
+        }
         setTaskSummary(sumRes?.success ? sumRes.data || null : null)
         setTaskAttachments(
           attRes?.success && Array.isArray(attRes.data) ? attRes.data : [],
@@ -300,10 +312,10 @@ export function FpaWorkflowApprovals() {
         )
       } catch {
         if (!cancelled) {
-          setTaskSummary(null)
-          setTaskAttachments([])
-          setTaskThreadComments([])
+          setTaskDetailError("Task details are currently unavailable. Please try again.")
         }
+      } finally {
+        if (!cancelled) setTaskDetailLoading(false)
       }
     })()
     return () => {
@@ -379,7 +391,9 @@ export function FpaWorkflowApprovals() {
       All: allTasks.length,
       "My Tasks": allTasks.filter((t) => myTaskIds.has(t.id) || t.assigneeId === currentUserId)
         .length,
-      "Pending Review": allTasks.filter((t) => isPendingReviewStatus(t.status)).length,
+      "Pending Review": allTasks.filter((t) =>
+        isPendingReviewStatus(t.status, t.taskKind),
+      ).length,
       Returned: allTasks.filter((t) => isReturnedStatus(t.status)).length,
     } satisfies Record<WorkflowTab, number>
   }, [allTasks, myTaskIds, currentUserId])
@@ -389,7 +403,7 @@ export function FpaWorkflowApprovals() {
       const st = normalizeTaskStatus(t.status)
       if (tab === "My Tasks" && !(myTaskIds.has(t.id) || t.assigneeId === currentUserId))
         return false
-      if (tab === "Pending Review" && !isPendingReviewStatus(st)) return false
+      if (tab === "Pending Review" && !isPendingReviewStatus(st, t.taskKind)) return false
       if (tab === "Returned" && !isReturnedStatus(st)) return false
       if (departmentFilter && t.departmentId !== departmentFilter) return false
       if (statusFilter && st !== statusFilter) return false
@@ -449,6 +463,7 @@ export function FpaWorkflowApprovals() {
   }
 
   const st = String(cycle?.status || "").toUpperCase()
+  const cycleReadOnly = st === "LOCKED" || st === "REPORTS" || st === "APPROVED"
   const showBoardPackBtn =
     Boolean(cycle) &&
     canExportBoardPack &&
@@ -462,7 +477,7 @@ export function FpaWorkflowApprovals() {
         onChange={(e) => {
           if (e.target.value) selectCycle(e.target.value)
         }}
-        className="h-8 rounded-lg border border-[#e2e8f0] bg-[#f8fafc] px-2.5 text-[11px] text-[#475569] max-w-full disabled:opacity-60"
+        className="h-8 rounded-full border border-[#e2e8f0] bg-[#f8fafc] px-2.5 text-[11px] text-[#475569] max-w-full disabled:opacity-60"
       >
         <option value="">Select budget cycle…</option>
         {cycles.map((c) => (
@@ -499,6 +514,9 @@ export function FpaWorkflowApprovals() {
       if (!res.success) throw new Error(res.message || `${label} failed`)
       if (res.data) setCycle(res.data)
       toast.success(label)
+      if (["fpa-accept", "cfo-approve", "return", "lock"].includes(key)) {
+        setCycleActionComment("")
+      }
       await loadCycleBoard(cycle.id)
       await dispatch(fetchMyFpaTasks())
     } catch (err) {
@@ -506,6 +524,21 @@ export function FpaWorkflowApprovals() {
     } finally {
       setBusyKey(null)
     }
+  }
+
+  const returnBudget = () => {
+    if (!cycle) return
+    const comment = cycleActionComment.trim()
+    if (!comment) {
+      toast.error("Comment is required to return a budget")
+      return
+    }
+    const isCfoReview = String(cycle.status).toUpperCase() === "PENDING_CFO_REVIEW"
+    void runCycleAction("return", "Budget returned for correction", () =>
+      isCfoReview
+        ? fpaApi.cfoReturnBudget(cycle.id, { comment })
+        : fpaApi.fpaReturnBudget(cycle.id, { comment }),
+    )
   }
 
   const onTaskAct = async (action: "approve" | "return" | "reassign") => {
@@ -657,6 +690,51 @@ export function FpaWorkflowApprovals() {
               </div>
             </div>
 
+            <WorkflowCycleActions
+              cycle={cycle}
+              busyKey={busyKey}
+              comment={cycleActionComment}
+              onComment={setCycleActionComment}
+              canReviewSubmissions={canReviewSubmissions}
+              canApproveBudget={canApproveBudget}
+              canReturnTask={canReturnTask}
+              canLockVersion={canLockVersion}
+              onFpaAccept={() => {
+                if (!cycle) return
+                void runCycleAction("fpa-accept", "Budget accepted for CFO review", () =>
+                  fpaApi.fpaAcceptBudget(
+                    cycle.id,
+                    cycleActionComment.trim()
+                      ? { comment: cycleActionComment.trim() }
+                      : undefined,
+                  ),
+                )
+              }}
+              onCfoApprove={() => {
+                if (!cycle) return
+                void runCycleAction("cfo-approve", "Budget approved", () =>
+                  fpaApi.cfoApproveBudget(
+                    cycle.id,
+                    cycleActionComment.trim()
+                      ? { comment: cycleActionComment.trim() }
+                      : undefined,
+                  ),
+                )
+              }}
+              onReturn={returnBudget}
+              onLock={() => {
+                if (!cycle) return
+                void runCycleAction("lock", "Budget cycle locked", () =>
+                  fpaApi.lockBudgetCycle(
+                    cycle.id,
+                    cycleActionComment.trim()
+                      ? { reason: cycleActionComment.trim() }
+                      : undefined,
+                  ),
+                )
+              }}
+            />
+
             {!cycleId ? (
               <div className="rounded-xl border border-[#e2e8f0] bg-white p-10 text-center text-sm text-[#64748b]">
                 Select a budget cycle to open Workflow & Approvals.
@@ -703,18 +781,15 @@ export function FpaWorkflowApprovals() {
                     />
                     <WorkflowActivityFeed
                       review={review}
+                      events={approvalEvents}
                       comments={cycleComments}
                       commentDraft={activityDraft}
                       onCommentDraft={setActivityDraft}
-                      canComment={
-                        Boolean(cycle) &&
-                        !["LOCKED", "REPORTS"].includes(String(cycle?.status || "").toUpperCase())
-                      }
+                      canComment={Boolean(cycle) && !cycleReadOnly}
                       canPostInternal={canApproveBudget || canReviewSubmissions}
                       visibility={activityVisibility}
                       onVisibility={setActivityVisibility}
                       busy={busyKey === "cycle-comment"}
-                      onViewAll={() => setApprovalsModalOpen(true)}
                       onAddComment={() => {
                         if (!cycleId || !activityDraft.trim()) return
                         void (async () => {
@@ -744,118 +819,154 @@ export function FpaWorkflowApprovals() {
 
                   {/* Right ~25%: Task detail — same height; body scrolls */}
                   <div className="xl:col-span-3 min-w-0 flex flex-col min-h-[420px] xl:min-h-0 xl:h-full overflow-hidden">
-                    <WorkflowTaskDetailPanel
-                      task={selected}
-                      cycleStatus={cycle?.status}
-                      summary={taskSummary}
-                      attachments={taskAttachments}
-                      taskComments={taskThreadComments}
-                      onClose={clearTask}
-                      comment={taskComment}
-                      onComment={setTaskComment}
-                      reassignUserId={reassignUserId}
-                      onReassignUserId={setReassignUserId}
-                      users={users}
-                      busy={Boolean(busyKey?.startsWith("task-"))}
-                      busyAction={
-                        busyKey === "task-approve"
-                          ? "approve"
-                          : busyKey === "task-return"
-                            ? "return"
-                            : busyKey === "task-reassign"
-                              ? "reassign"
-                              : busyKey === "task-comment"
-                                ? "task-comment"
-                                : null
-                      }
-                      canApprove={canApproveBudget || canReviewSubmissions}
-                      canReturn={canReturnTask || canReviewSubmissions}
-                      canReassign={canAssignTasks}
-                      canPostInternal={canApproveBudget || canReviewSubmissions}
-                      worksheetHref={worksheetHref}
-                      onApprove={() => void onTaskAct("approve")}
-                      onReturn={() => void onTaskAct("return")}
-                      onReassign={() => void onTaskAct("reassign")}
-                      taskCommentDraft={taskThreadDraft}
-                      onTaskCommentDraft={setTaskThreadDraft}
-                      taskCommentVisibility={taskThreadVisibility}
-                      onTaskCommentVisibility={setTaskThreadVisibility}
-                      onPostTaskComment={() => {
-                        if (!selected || !taskThreadDraft.trim()) return
-                        void (async () => {
-                          setBusyKey("task-comment")
-                          try {
-                            const res = await fpaApi.postTaskComment(selected.id, {
-                              body: taskThreadDraft.trim(),
-                              visibility:
-                                canApproveBudget || canReviewSubmissions
-                                  ? taskThreadVisibility
-                                  : "ALL",
-                            })
-                            if (!res.success) throw new Error(res.message || "Comment failed")
-                            setTaskThreadDraft("")
-                            const list = await fpaApi.listTaskComments(selected.id)
-                            if (list.success && Array.isArray(list.data)) {
-                              setTaskThreadComments(list.data)
+                    {taskDetailLoading ? (
+                      <aside className="h-full min-h-[420px] rounded-xl border border-[#e2e8f0] bg-white p-5 flex items-center justify-center text-center">
+                        <div>
+                          <Loader2 className="mx-auto h-5 w-5 animate-spin text-[#2563eb]" />
+                          <p className="mt-2 text-[12px] text-[#64748b]">Loading task details…</p>
+                        </div>
+                      </aside>
+                    ) : taskDetailError && selected ? (
+                      <aside className="h-full min-h-[420px] rounded-xl border border-[#e2e8f0] bg-white p-5 flex items-center justify-center text-center">
+                        <div>
+                          <p className="text-[13px] font-medium text-[#475569]">
+                            Task details unavailable
+                          </p>
+                          <p className="mt-1.5 text-[11px] text-[#94a3b8]">
+                            {taskDetailError}
+                          </p>
+                        </div>
+                      </aside>
+                    ) : (
+                      <WorkflowTaskDetailPanel
+                        task={selected}
+                        cycleStatus={cycle?.status}
+                        summary={taskSummary}
+                        attachments={taskAttachments}
+                        taskComments={taskThreadComments}
+                        onClose={clearTask}
+                        comment={taskComment}
+                        onComment={setTaskComment}
+                        reassignUserId={reassignUserId}
+                        onReassignUserId={setReassignUserId}
+                        users={users}
+                        busy={Boolean(busyKey?.startsWith("task-"))}
+                        busyAction={
+                          busyKey === "task-approve"
+                            ? "approve"
+                            : busyKey === "task-return"
+                              ? "return"
+                              : busyKey === "task-reassign"
+                                ? "reassign"
+                                : busyKey === "task-comment"
+                                  ? "task-comment"
+                                  : null
+                        }
+                        canApprove={canApproveBudget || canReviewSubmissions}
+                        canReturn={canReturnTask || canReviewSubmissions}
+                        canReassign={canAssignTasks}
+                        canPostInternal={canApproveBudget || canReviewSubmissions}
+                        worksheetHref={worksheetHref}
+                        onApprove={() => void onTaskAct("approve")}
+                        onReturn={() => void onTaskAct("return")}
+                        onReassign={() => void onTaskAct("reassign")}
+                        taskCommentDraft={taskThreadDraft}
+                        onTaskCommentDraft={setTaskThreadDraft}
+                        taskCommentVisibility={taskThreadVisibility}
+                        onTaskCommentVisibility={setTaskThreadVisibility}
+                        onPostTaskComment={() => {
+                          if (!selected || !taskThreadDraft.trim()) return
+                          void (async () => {
+                            setBusyKey("task-comment")
+                            try {
+                              const res = await fpaApi.postTaskComment(selected.id, {
+                                body: taskThreadDraft.trim(),
+                                visibility:
+                                  canApproveBudget || canReviewSubmissions
+                                    ? taskThreadVisibility
+                                    : "ALL",
+                              })
+                              if (!res.success) throw new Error(res.message || "Comment failed")
+                              setTaskThreadDraft("")
+                              const list = await fpaApi.listTaskComments(selected.id)
+                              if (list.success && Array.isArray(list.data)) {
+                                setTaskThreadComments(list.data)
+                              }
+                              toast.success("Comment posted")
+                            } catch (err) {
+                              toast.error(errorMessage(err, "Could not post comment"))
+                            } finally {
+                              setBusyKey(null)
                             }
-                            toast.success("Comment posted")
-                          } catch (err) {
-                            toast.error(errorMessage(err, "Could not post comment"))
-                          } finally {
-                            setBusyKey(null)
-                          }
-                        })()
-                      }}
-                      onUploadAttachment={(file) => {
-                        if (!selected) return
-                        void (async () => {
-                          setBusyKey("task-attach")
-                          try {
-                            const res = await fpaApi.uploadTaskAttachment(selected.id, file)
-                            if (!res.success) throw new Error(res.message || "Upload failed")
-                            const list = await fpaApi.listTaskAttachments(selected.id)
-                            if (list.success && Array.isArray(list.data)) setTaskAttachments(list.data)
-                            toast.success("Attachment uploaded")
-                          } catch (err) {
-                            toast.error(errorMessage(err, "Upload failed"))
-                          } finally {
-                            setBusyKey(null)
-                          }
-                        })()
-                      }}
-                      onDownloadAttachment={(id, fileName) => {
-                        void (async () => {
-                          try {
-                            const blob = await fpaApi.downloadAttachment(id)
-                            const url = URL.createObjectURL(blob)
-                            const a = document.createElement("a")
-                            a.href = url
-                            a.download = fileName || "attachment"
-                            a.click()
-                            URL.revokeObjectURL(url)
-                          } catch (err) {
-                            toast.error(errorMessage(err, "Download failed"))
-                          }
-                        })()
-                      }}
-                      onDeleteAttachment={(id) => {
-                        if (!selected) return
-                        void (async () => {
-                          setBusyKey("task-attach")
-                          try {
-                            const res = await fpaApi.deleteAttachment(id)
-                            if (!res.success) throw new Error(res.message || "Delete failed")
-                            const list = await fpaApi.listTaskAttachments(selected.id)
-                            if (list.success && Array.isArray(list.data)) setTaskAttachments(list.data)
-                            toast.success("Attachment deleted")
-                          } catch (err) {
-                            toast.error(errorMessage(err, "Delete failed"))
-                          } finally {
-                            setBusyKey(null)
-                          }
-                        })()
-                      }}
-                    />
+                          })()
+                        }}
+                        onUploadAttachment={
+                          cycleReadOnly
+                            ? undefined
+                            : (file) => {
+                                if (!selected) return
+                                void (async () => {
+                                  setBusyKey("task-attach")
+                                  try {
+                                    const res = await fpaApi.uploadTaskAttachment(selected.id, file)
+                                    if (!res.success) {
+                                      throw new Error(res.message || "Upload failed")
+                                    }
+                                    const list = await fpaApi.listTaskAttachments(selected.id)
+                                    if (list.success && Array.isArray(list.data)) {
+                                      setTaskAttachments(list.data)
+                                    }
+                                    toast.success("Attachment uploaded")
+                                  } catch (err) {
+                                    toast.error(errorMessage(err, "Upload failed"))
+                                  } finally {
+                                    setBusyKey(null)
+                                  }
+                                })()
+                              }
+                        }
+                        onDownloadAttachment={(id, fileName) => {
+                          void (async () => {
+                            try {
+                              const blob = await fpaApi.downloadAttachment(id)
+                              const url = URL.createObjectURL(blob)
+                              const a = document.createElement("a")
+                              a.href = url
+                              a.download = fileName || "attachment"
+                              a.click()
+                              URL.revokeObjectURL(url)
+                            } catch (err) {
+                              toast.error(errorMessage(err, "Download failed"))
+                            }
+                          })()
+                        }}
+                        onDeleteAttachment={
+                          cycleReadOnly
+                            ? undefined
+                            : (id) => {
+                                if (!selected) return
+                                void (async () => {
+                                  setBusyKey("task-attach")
+                                  try {
+                                    const res = await fpaApi.deleteAttachment(id)
+                                    if (!res.success) {
+                                      throw new Error(res.message || "Delete failed")
+                                    }
+                                    const list = await fpaApi.listTaskAttachments(selected.id)
+                                    if (list.success && Array.isArray(list.data)) {
+                                      setTaskAttachments(list.data)
+                                    }
+                                    toast.success("Attachment deleted")
+                                  } catch (err) {
+                                    toast.error(errorMessage(err, "Delete failed"))
+                                  } finally {
+                                    setBusyKey(null)
+                                  }
+                                })()
+                              }
+                        }
+                      />
+                    )}
                   </div>
                 </div>
               </>

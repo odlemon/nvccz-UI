@@ -9,7 +9,6 @@ import {
   Expand,
   Loader2,
   Minimize2,
-  Settings2,
   Table2,
 } from "lucide-react"
 import type { FpaLineItem } from "@/lib/api/fpa-api"
@@ -31,7 +30,6 @@ type Props = {
   formulaMessage: string | null
   impact: unknown
   dimensionTags?: string[]
-  modulePath?: string | null
   onValidateFormula: () => void
   onSaveFormula: () => void
   onSelectReference?: (name: string) => void
@@ -44,8 +42,6 @@ type Props = {
     summaryMethod?: string
   }) => void
 }
-
-const DEFAULT_DIMS = ["Time", "Product", "Region", "Customer Segment", "Version"]
 
 const FORMAT_OPTIONS = ["Number", "Currency", "Percent", "Integer"]
 const CURRENCY_OPTIONS = ["USD", "EUR", "GBP", "ZAR"]
@@ -62,7 +58,6 @@ export function BuilderInspector({
   formulaMessage,
   impact,
   dimensionTags,
-  modulePath,
   onValidateFormula,
   onSaveFormula,
   onSelectReference,
@@ -71,8 +66,6 @@ export function BuilderInspector({
   const [tab, setTab] = useState<"properties" | "formula" | "references">("properties")
   const [usedInOpen, setUsedInOpen] = useState(false)
   const [formulaExpanded, setFormulaExpanded] = useState(false)
-  const [dimTipOpen, setDimTipOpen] = useState(false)
-
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
   const [format, setFormat] = useState("Number")
@@ -89,7 +82,7 @@ export function BuilderInspector({
     if (!selected) return
     setTab("properties")
     setName(selected.name)
-    setDescription(selected.description || demoDescription(selected))
+    setDescription(selected.description || "")
     setFormat(selected.format || "Number")
     setCurrency(selected.currency || selected.currencyCode || "USD")
     setDecimals(String(selected.displayScale ?? selected.decimalPlaces ?? 0))
@@ -99,20 +92,19 @@ export function BuilderInspector({
   }, [selected?.id])
 
   const kind = selected ? lineItemKind(selected) : "INPUT"
-  const dims = dimensionTags?.length ? dimensionTags : DEFAULT_DIMS
-  const path = modulePath || "Revenue Planning / Units & Pricing"
+  const dims = dimensionTags || []
 
-  const refs = useMemo(() => parseFormulaRefs(expression, path), [expression, path])
+  const refs = useMemo(() => parseFormulaRefs(expression), [expression])
   const impactObj = impact as {
     precedents?: Array<{ code?: string; name?: string; module?: string }>
-    dependents?: Array<{ code?: string; name?: string }>
-    usedIn?: Array<{ code?: string; name?: string }>
+    dependents?: Array<{ code?: string; name?: string; module?: string }>
+    usedIn?: Array<{ code?: string; name?: string; module?: string }>
   } | null
   const usedInApi = impactObj?.usedIn || impactObj?.dependents || []
-  const usedIn =
-    usedInApi.length > 0
-      ? usedInApi.map((u) => ({ name: u.name || u.code || "—", path }))
-      : demoUsedIn(selected?.name)
+  const usedIn = usedInApi.map((u) => ({
+    name: u.name || u.code || "—",
+    path: u.module || "—",
+  }))
 
   if (!selected) {
     return (
@@ -234,34 +226,20 @@ export function BuilderInspector({
                 </Field>
 
                 <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <p className="text-[11px] font-medium text-[#64748b]">Dimensionality</p>
-                    <div className="relative">
-                      <button
-                        type="button"
-                        className="p-1 rounded-md text-[#94a3b8] hover:text-[#64748b] hover:bg-[#f8fafc]"
-                        aria-label="Dimensionality settings"
-                        onClick={() => setDimTipOpen((v) => !v)}
-                      >
-                        <Settings2 className="w-3.5 h-3.5" />
-                      </button>
-                      {dimTipOpen ? (
-                        <div className="absolute right-0 top-7 z-20 w-52 rounded-[8px] border border-[#e2e8f0] bg-white p-2.5 text-[11px] text-[#475569] shadow-lg">
-                          Dimensions applied to this line item. Backend dimension APIs will manage
-                          membership; for now tags reflect the model catalog.
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
+                  <p className="mb-1.5 text-[11px] font-medium text-[#64748b]">Dimensionality</p>
                   <div className="flex flex-wrap gap-1.5">
-                    {dims.map((t) => (
-                      <span
-                        key={t}
-                        className="inline-flex items-center rounded-full bg-[#f1f5f9] px-2.5 py-1 text-[11px] font-medium text-[#475569]"
-                      >
-                        {t}
-                      </span>
-                    ))}
+                    {dims.length ? (
+                      dims.map((t) => (
+                        <span
+                          key={t}
+                          className="inline-flex items-center rounded-full bg-[#f1f5f9] px-2.5 py-1 text-[11px] font-medium text-[#475569]"
+                        >
+                          {t}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-[11px] text-[#94a3b8]">No dimensions assigned.</span>
+                    )}
                   </div>
                 </div>
 
@@ -309,7 +287,7 @@ export function BuilderInspector({
                 type="button"
                 disabled={!canEdit || busy}
                 onClick={onSaveFormula}
-                className="mt-2.5 h-8 w-full rounded-[6px] bg-[#2563eb] text-[12px] font-medium text-white hover:bg-[#1d4ed8] disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
+                className="mt-2.5 h-8 w-full rounded-full bg-[#2563eb] text-[12px] font-medium text-white hover:bg-[#1d4ed8] disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
               >
                 {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
                 Save Formula
@@ -545,7 +523,7 @@ function FormulaEditorBox({
           type="button"
           disabled={!canEdit || busy}
           onClick={onValidate}
-          className="inline-flex h-7 items-center gap-1 rounded-[6px] bg-[#2563eb] px-2.5 text-[11px] font-medium text-white hover:bg-[#1d4ed8] disabled:opacity-50"
+          className="inline-flex h-7 items-center gap-1 rounded-full bg-[#2563eb] px-2.5 text-[11px] font-medium text-white hover:bg-[#1d4ed8] disabled:opacity-50"
         >
           {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
           Validate
@@ -629,7 +607,7 @@ function FormulaExpandModal({
           <div className="mt-3 flex justify-end gap-2">
             <button
               type="button"
-              className="h-8 rounded-[6px] border border-[#e2e8f0] px-3 text-[12px] font-medium text-[#475569]"
+              className="h-8 rounded-full border border-[#e2e8f0] px-3 text-[12px] font-medium text-[#475569]"
               onClick={onClose}
             >
               Close
@@ -641,7 +619,7 @@ function FormulaExpandModal({
                 onSave()
                 onClose()
               }}
-              className="h-8 rounded-[6px] bg-[#2563eb] px-3 text-[12px] font-medium text-white disabled:opacity-50"
+              className="h-8 rounded-full bg-[#2563eb] px-3 text-[12px] font-medium text-white disabled:opacity-50"
             >
               Save Formula
             </button>
@@ -671,32 +649,8 @@ function HighlightedFormula({ text }: { text: string }) {
   )
 }
 
-function parseFormulaRefs(expression: string, path: string): RefRow[] {
+function parseFormulaRefs(expression: string): RefRow[] {
   const matches = expression.match(/\[([^\]]+)\]/g) || []
   const names = [...new Set(matches.map((m) => m.slice(1, -1)))]
-  return names.map((name) => ({ name, path }))
-}
-
-function demoDescription(li: FpaLineItem): string {
-  const n = li.name.toLowerCase()
-  if (n.includes("revenue") && !n.includes("net")) {
-    return "Total revenue before discounts and adjustments."
-  }
-  if (n.includes("units")) return "Volume driver for revenue calculations."
-  if (n.includes("price")) return "Average selling price per unit."
-  if (n.includes("cogs")) return "Cost of goods sold for the period."
-  if (n.includes("margin")) return "Gross margin as a percentage of revenue."
-  return li.code ? `${li.name} (${li.code})` : li.name
-}
-
-function demoUsedIn(name?: string): RefRow[] {
-  if (!name) return []
-  const n = name.toLowerCase()
-  if (n.includes("revenue") || n.includes("units") || n.includes("price")) {
-    return [
-      { name: "Net Revenue", path: "Revenue Planning / Revenue Summary" },
-      { name: "Gross Profit", path: "Revenue Planning / Gross Profit Analysis" },
-    ]
-  }
-  return [{ name: "Income Statement", path: "Financial Statements" }]
+  return names.map((name) => ({ name, path: "—" }))
 }

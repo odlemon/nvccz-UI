@@ -1,102 +1,223 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import {
   CashFlowAnalysisView,
-  mapMockCashKpis,
-  mapMockCashStatement,
   type CashKpi,
   type CashStatementRow,
 } from "@/components/fpa/cash-flow/cash-flow-analysis-view"
-import { fpaApi, type FpaLineItem } from "@/lib/api/fpa-api"
+import {
+  fpaApi,
+  asNumber,
+  type FpaDomainAvailableFilters,
+  type FpaDomainScope,
+  type FpaDomainView,
+  type FpaDriver,
+} from "@/lib/api/fpa-api"
 import { useAppSelector } from "@/lib/store"
-import { errorMessage, logFpaGap } from "@/lib/fpa/fpa-api-gaps"
 
-function lineItemsToStatement(items: FpaLineItem[]): CashStatementRow[] | null {
-  if (!items.length) return null
-  const months = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug"] as const
-  return items.map((li, i) => {
-    const base = 5 + i * 3
-    const row: CashStatementRow = {
-      id: li.id,
-      line: li.name,
-      type: /cash|closing|opening/i.test(li.name) ? "total" : /pay|supplier|capex|debt|out/i.test(li.name) ? "outflow" : "inflow",
-      jan: 0,
-      feb: 0,
-      mar: 0,
-      apr: 0,
-      may: 0,
-      jun: 0,
-      jul: 0,
-      aug: 0,
-    }
-    months.forEach((m, mi) => {
-      row[m] = row.type === "outflow" ? -(base + mi * 0.2) : base + mi * 0.3
-    })
-    return row
+const optionalNumber = (value: unknown): number | null => {
+  if (value == null || value === "") return null
+  const parsed = asNumber(value, Number.NaN)
+  return Number.isFinite(parsed) ? parsed : null
+}
+const toMillions = (value: unknown) => {
+  const parsed = optionalNumber(value)
+  return parsed == null ? null : parsed / 1_000_000
+}
+const records = (value: unknown): Record<string, unknown>[] =>
+  Array.isArray(value) ? value.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object") : []
+const text = (value: unknown, fallback = "") => typeof value === "string" ? value : fallback
+const invalidPeriodRange = (periods: string[], from: string, to: string) =>
+  Boolean(from && to && periods.includes(from) && periods.includes(to) && periods.indexOf(from) > periods.indexOf(to))
+const normalizeFilters = (value: unknown): FpaDomainAvailableFilters => {
+  const raw = value && typeof value === "object" ? value as Record<string, unknown> : {}
+  return {
+    entities: records(raw.entities).map((entity) => ({ id: text(entity.id), name: text(entity.name) })).filter((entity) => entity.id && entity.name),
+    periods: Array.isArray(raw.periods) ? [...new Set(raw.periods.filter((period): period is string => typeof period === "string" && Boolean(period)))] : [],
+  }
+}
+const scopeMatches = (scope: FpaDomainScope | undefined, expected: Required<FpaDomainScope>) => Boolean(scope
+  && (scope.modelId ?? "") === expected.modelId && (scope.versionId ?? "") === expected.versionId
+  && (scope.scenarioId ?? "") === expected.scenarioId && (scope.entityId ?? "") === expected.entityId
+  && (scope.periodFrom ?? "") === expected.periodFrom && (scope.periodTo ?? "") === expected.periodTo)
+const fmtMillions = (value: number | null | undefined) => {
+  const millions = toMillions(value)
+  return millions == null ? "—" : `$${millions.toFixed(1)}M`
+}
+
+function rowType(value: unknown): CashStatementRow["type"] | null {
+  const normalized = text(value).toUpperCase().replace(/[\s-]+/g, "_")
+  if (normalized === "INFLOW" || normalized === "CASH_INFLOW") return "inflow"
+  if (normalized === "OUTFLOW" || normalized === "CASH_OUTFLOW") return "outflow"
+  if (normalized === "TOTAL" || normalized === "BALANCE") return "total"
+  return null
+}
+
+function mapDomain(data: FpaDomainView) {
+  const raw = data as unknown as Record<string, unknown>
+  const source = raw.kpis && typeof raw.kpis === "object" ? raw.kpis as Record<string, unknown> : undefined
+  const periods = Array.isArray(raw.periods)
+    ? [...new Set(raw.periods.filter((period): period is string => typeof period === "string" && Boolean(period)))]
+    : []
+  const closingCash = optionalNumber(source?.closingCash ?? source?.closingBalance)
+  const netCashFlow = optionalNumber(source?.netCashFlow ?? source?.netFlow)
+  const runwayMonths = optionalNumber(source?.runwayMonths ?? source?.runway)
+  const statementRows: CashStatementRow[] = records(raw.rows).flatMap((row, index) => {
+    const type = rowType(row.rowType ?? row.type)
+    if (!type) return []
+    const valuesSource = row.values && typeof row.values === "object" ? row.values as Record<string, unknown> : {}
+    const values = Object.fromEntries(periods.map((period) => {
+      const parsed = toMillions(valuesSource[period])
+      if (parsed == null || type === "total") return [period, parsed]
+      return [period, type === "outflow" ? -Math.abs(parsed) : Math.abs(parsed)]
+    }))
+    return [{
+      id: text(row.id ?? row.code, `cash-row-${index}`),
+      line: text(row.label ?? row.name, "Unlabelled cash row"),
+      type,
+      values,
+    }]
   })
+  return {
+    kpis: source ? [
+      { label: "Closing Cash", value: fmtMillions(closingCash) },
+      { label: "Net Cash Flow", value: netCashFlow == null ? "—" : `${netCashFlow < 0 ? "-" : "+"}$${Math.abs(netCashFlow / 1_000_000).toFixed(1)}M`, up: netCashFlow == null ? undefined : netCashFlow >= 0 },
+      { label: "Runway", value: runwayMonths == null ? "—" : `${runwayMonths.toFixed(1)} mo` },
+    ] satisfies CashKpi[] : [],
+    periods,
+    statementRows,
+  }
 }
 
 export function FpaCashFlow() {
-  const { selectedModelId } = useAppSelector((s) => s.fpa)
-  const [loading, setLoading] = useState(true)
-  const [statementRows, setStatementRows] = useState<CashStatementRow[]>(mapMockCashStatement())
-  const [kpis, setKpis] = useState<CashKpi[]>(mapMockCashKpis())
+  const { selectedModelId, selectedVersionId, selectedScenarioId } = useAppSelector((s) => s.fpa)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string>()
+  const [periods, setPeriods] = useState<string[]>([])
+  const [statementRows, setStatementRows] = useState<CashStatementRow[]>([])
+  const [kpis, setKpis] = useState<CashKpi[]>([])
+  const [filters, setFilters] = useState<FpaDomainAvailableFilters>({})
+  const [scope, setScope] = useState<FpaDomainScope>()
+  const [entityId, setEntityId] = useState("")
+  const [periodFrom, setPeriodFrom] = useState("")
+  const [periodTo, setPeriodTo] = useState("")
+  const [drivers, setDrivers] = useState<FpaDriver[]>([])
+  const [preview, setPreview] = useState<ReturnType<typeof mapDomain>>()
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const [previewError, setPreviewError] = useState<string>()
+  const requestId = useRef(0)
+  const previewRequestId = useRef(0)
+  const periodsRef = useRef<string[]>([])
+  const scopeContextRef = useRef("")
+  const loadedScopeRef = useRef("")
+
+  const clearData = useCallback(() => {
+    previewRequestId.current += 1
+    setPeriods([]); setStatementRows([]); setKpis([])
+    setPreview(undefined); setPreviewError(undefined); setPreviewLoading(false)
+  }, [])
 
   const load = useCallback(async () => {
+    const currentRequest = ++requestId.current
+    const contextKey = `${selectedModelId}|${selectedVersionId}|${selectedScenarioId}`
+    const contextChanged = scopeContextRef.current !== contextKey
+    if (contextChanged) {
+      scopeContextRef.current = contextKey
+      setEntityId(""); setPeriodFrom(""); setPeriodTo(""); setFilters({}); setDrivers([])
+      periodsRef.current = []
+    }
+    const requestEntityId = contextChanged ? "" : entityId
+    const requestPeriodFrom = contextChanged ? "" : periodFrom
+    const requestPeriodTo = contextChanged ? "" : periodTo
+    const requestedScope = {
+      modelId: selectedModelId || "", versionId: selectedVersionId || "", scenarioId: selectedScenarioId || "",
+      entityId: requestEntityId, periodFrom: requestPeriodFrom, periodTo: requestPeriodTo,
+    }
+    const requestScopeKey = JSON.stringify(requestedScope)
+    const scopeChanged = loadedScopeRef.current !== requestScopeKey
     if (!selectedModelId) {
       setLoading(false)
-      setStatementRows(mapMockCashStatement())
-      setKpis(mapMockCashKpis())
+      setError(undefined)
+      clearData(); setFilters({}); setScope(undefined); setDrivers([])
       return
     }
-    setLoading(true)
-    try {
-      const res = await fpaApi.getDomainView("cash", selectedModelId)
-      if (!res.success || !res.data) throw new Error(res.message || "Domain view failed")
-
-      const mapped = lineItemsToStatement(res.data.lineItems || [])
-      if (mapped?.length) {
-        setStatementRows(mapped)
-        const closing = mapped.find((r) => /closing/i.test(r.line))
-        setKpis(
-          mapMockCashKpis().map((k, i) =>
-            i === 0 && closing ? { ...k, value: `$${closing.may.toFixed(1)}M` } : k,
-          ),
-        )
-      } else {
-        logFpaGap({
-          category: "missing",
-          path: "/v1/fpa/domain/cash",
-          method: "GET",
-          message: "No cash statement rows — monthly series not in payload",
-          impact: "Cash Flow tab uses design demo data",
-        })
-        setStatementRows(mapMockCashStatement())
-        setKpis(mapMockCashKpis())
-      }
-    } catch (err) {
-      logFpaGap({
-        category: "broken",
-        path: "/v1/fpa/domain/cash",
-        method: "GET",
-        message: errorMessage(err),
-        impact: "Cash Flow tab shows demo data",
-        response: err,
-      })
-      setStatementRows(mapMockCashStatement())
-      setKpis(mapMockCashKpis())
-    } finally {
-      setLoading(false)
+    if (invalidPeriodRange(periodsRef.current, requestPeriodFrom, requestPeriodTo)) {
+      setLoading(false); setError("INVALID_PERIOD_RANGE: The start period must not be after the end period."); clearData(); return
     }
-  }, [selectedModelId])
+    setLoading(true)
+    setError(undefined)
+    if (scopeChanged) clearData()
+    else {
+      previewRequestId.current += 1
+      setPreview(undefined); setPreviewError(undefined); setPreviewLoading(false)
+    }
+    try {
+      const res = await fpaApi.getDomainView("cash", {
+        modelId: selectedModelId,
+        versionId: selectedVersionId || undefined,
+        scenarioId: selectedScenarioId || undefined,
+        entityId: requestEntityId || undefined,
+        periodFrom: requestPeriodFrom || undefined,
+        periodTo: requestPeriodTo || undefined,
+      })
+      if (!res.success || !res.data) throw new Error(res.message || "Domain view failed")
+      if (currentRequest !== requestId.current) return
+      if (!scopeMatches(res.data.scope, requestedScope)) throw new Error("Response scope did not match the requested cash-flow filters.")
+      const mapped = mapDomain(res.data)
+      setKpis(mapped.kpis); setPeriods(mapped.periods); setStatementRows(mapped.statementRows)
+      const availableFilters = normalizeFilters(res.data.availableFilters)
+      setFilters(availableFilters); periodsRef.current = availableFilters.periods ?? []
+      setScope(res.data.scope); setDrivers(Array.isArray(res.data.drivers) ? res.data.drivers : [])
+      loadedScopeRef.current = requestScopeKey
+    } catch (err) {
+      if (currentRequest !== requestId.current) return
+      setError(err instanceof Error ? err.message : "Unable to load cash flow analysis.")
+      if (scopeChanged) clearData()
+    } finally {
+      if (currentRequest === requestId.current) setLoading(false)
+    }
+  }, [selectedModelId, selectedVersionId, selectedScenarioId, entityId, periodFrom, periodTo, clearData])
 
   useEffect(() => {
     void load()
   }, [load])
 
-  const memoRows = useMemo(() => statementRows, [statementRows])
-  const memoKpis = useMemo(() => kpis, [kpis])
+  useEffect(() => {
+    if (entityId && !(filters.entities ?? []).some((option) => option.id === entityId)) setEntityId("")
+    if (periodFrom && !(filters.periods ?? []).includes(periodFrom)) setPeriodFrom("")
+    if (periodTo && !(filters.periods ?? []).includes(periodTo)) setPeriodTo("")
+  }, [filters, entityId, periodFrom, periodTo])
+
+  const runSensitivity = useCallback(async (driverCode: string, value: number) => {
+    if (!selectedModelId || !selectedVersionId || !selectedScenarioId) {
+      setPreviewError("Select a model, version, and scenario before previewing sensitivity."); return
+    }
+    if (invalidPeriodRange(periodsRef.current, periodFrom, periodTo)) {
+      setPreviewError("INVALID_PERIOD_RANGE: The start period must not be after the end period."); return
+    }
+    const currentRequest = ++previewRequestId.current
+    setPreviewLoading(true); setPreviewError(undefined); setPreview(undefined)
+    try {
+      const res = await fpaApi.previewDomainSensitivity("cash", {
+        modelId: selectedModelId, versionId: selectedVersionId, scenarioId: selectedScenarioId,
+        entityId: entityId || undefined, periodFrom: periodFrom || undefined, periodTo: periodTo || undefined,
+        overrides: [{ driverCode, value }],
+      })
+      if (!res.success || !res.data) throw new Error(res.message || "Sensitivity preview failed")
+      if (currentRequest !== previewRequestId.current) return
+      if (!scopeMatches(res.data.scope, {
+        modelId: selectedModelId, versionId: selectedVersionId, scenarioId: selectedScenarioId,
+        entityId, periodFrom, periodTo,
+      })) throw new Error("Sensitivity scope did not match the requested cash-flow filters.")
+      setPreview(mapDomain(res.data.preview))
+    } catch (err) {
+      if (currentRequest !== previewRequestId.current) return
+      setPreviewError(err instanceof Error ? err.message : "Unable to preview sensitivity.")
+    } finally {
+      if (currentRequest === previewRequestId.current) setPreviewLoading(false)
+    }
+  }, [selectedModelId, selectedVersionId, selectedScenarioId, entityId, periodFrom, periodTo])
 
   if (!selectedModelId) {
     return (
@@ -109,8 +230,25 @@ export function FpaCashFlow() {
   return (
     <CashFlowAnalysisView
       loading={loading}
-      kpis={memoKpis}
-      statementRows={memoRows}
+      error={error}
+      kpis={kpis}
+      periods={periods}
+      statementRows={statementRows}
+      entities={filters.entities ?? []}
+      availablePeriods={filters.periods ?? []}
+      selectedEntityId={entityId}
+      periodFrom={periodFrom}
+      periodTo={periodTo}
+      appliedScope={scope}
+      onEntityChange={setEntityId}
+      onPeriodFromChange={setPeriodFrom}
+      onPeriodToChange={setPeriodTo}
+      drivers={drivers}
+      preview={preview}
+      previewLoading={previewLoading}
+      previewError={previewError}
+      onPreview={runSensitivity}
+      onResetPreview={() => { setPreview(undefined); setPreviewError(undefined) }}
       onRefresh={() => void load()}
     />
   )

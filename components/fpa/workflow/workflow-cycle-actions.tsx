@@ -100,7 +100,7 @@ export function WorkflowCycleActions({
               type="button"
               disabled={!!busyKey}
               onClick={onFpaAccept}
-              className="h-9 rounded-lg bg-[#2563eb] px-4 text-xs font-medium text-white disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
+              className="h-9 rounded-full bg-[#2563eb] px-4 text-xs font-medium text-white disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
             >
               {busy("fpa-accept") ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
               Accept for CFO review
@@ -111,7 +111,7 @@ export function WorkflowCycleActions({
               type="button"
               disabled={!!busyKey}
               onClick={onCfoApprove}
-              className="h-9 rounded-lg bg-[#16a34a] px-4 text-xs font-medium text-white disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
+              className="h-9 rounded-full bg-[#16a34a] px-4 text-xs font-medium text-white disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
             >
               {busy("cfo-approve") ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
               Approve budget
@@ -123,7 +123,7 @@ export function WorkflowCycleActions({
               disabled={!!busyKey || !comment.trim()}
               title={!comment.trim() ? "Add a comment to return" : "Return for correction"}
               onClick={onReturn}
-              className="h-9 rounded-lg border border-[#dc2626] px-4 text-xs font-medium text-[#dc2626] disabled:opacity-50 disabled:cursor-not-allowed"
+              className="h-9 rounded-full border border-[#dc2626] px-4 text-xs font-medium text-[#dc2626] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {busy("return") ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin inline mr-1" />
@@ -136,7 +136,7 @@ export function WorkflowCycleActions({
               type="button"
               disabled={!!busyKey}
               onClick={onLock}
-              className="h-9 rounded-lg bg-[#0f172a] px-4 text-xs font-medium text-white disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
+              className="h-9 rounded-full bg-[#0f172a] px-4 text-xs font-medium text-white disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
             >
               {busy("lock") ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
               Lock budget version

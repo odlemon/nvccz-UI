@@ -32,6 +32,13 @@ import { FpaPageHeader } from "./fpa-page-header"
 import { FpaExportDownloadModal } from "@/components/fpa/fpa-export-download-modal"
 import { boardPackPayloadToCsv, extractFpaExportId } from "@/lib/fpa/download-export"
 import {
+  computeSpreadAmounts,
+  projectCopyForward,
+  projectGrowth,
+  projectSpreadCells,
+  softReconcileCells,
+} from "@/lib/fpa/optimistic-cell-tools"
+import {
   asNumber,
   fpaApi,
   formatMoney,
@@ -49,7 +56,6 @@ import { usersApi, type AppUser } from "@/lib/api/users-api"
 import { useAppDispatch, useAppSelector } from "@/lib/store"
 import {
   bootstrapFpaSelection,
-  fetchFpaDashboard,
   setSelectedScenarioId,
   setSelectedVersionId,
 } from "@/lib/store/slices/fpaSlice"
@@ -108,6 +114,18 @@ type DisplayMode = "monthly" | "quarterly"
 type ViewMode = "amounts" | "thousands" | "pct_change"
 type PeriodCol = { key: string; iso: string; label: string; band: "ACTUAL" | "FORECAST" }
 type AggCol = { key: string; label: string; periodKeys: string[] }
+type ActiveCycleDetail = FpaBudgetCycle & {
+  submittedAt?: string | null
+  submittedById?: string | null
+}
+type MpcLifecycleAction =
+  | "submit"
+  | "review-accept"
+  | "review-return"
+  | "cfo-approve"
+  | "cfo-return"
+  | "lock"
+  | "reopen"
 
 /** Shared ~8px radius across the planning worksheet (matches workspace chrome). */
 const R = "rounded-lg"
@@ -171,6 +189,33 @@ function formatRelativeWhen(iso?: string | null): string {
     day: "numeric",
     timeZone: "UTC",
   })
+}
+
+function apiErrorCode(err: unknown): string {
+  const row = err as {
+    code?: string
+    response?: { code?: string; data?: { code?: string } }
+  }
+  return String(row?.response?.data?.code || row?.response?.code || row?.code || "").toUpperCase()
+}
+
+function apiErrorBlockers(err: unknown): string[] {
+  const row = err as {
+    response?: {
+      data?: {
+        blockers?: unknown[]
+        data?: { blockers?: unknown[] }
+      }
+    }
+  }
+  const raw = row?.response?.data?.data?.blockers || row?.response?.data?.blockers || []
+  return raw
+    .map((item) => {
+      if (typeof item === "string") return item
+      const blocker = item as { message?: string; code?: string }
+      return blocker.message || blocker.code || ""
+    })
+    .filter(Boolean)
 }
 
 function monthKey(iso: string) {
@@ -330,12 +375,22 @@ function cellStateMeta(state: CellState) {
   }
 }
 
-export function FpaWorksheet({ modelId }: { modelId: string }) {
+export type FpaWorksheetProps = {
+  modelId: string
+  workspaceKind?: "model-planning" | "budget"
+  cycleId?: string | null
+}
+
+export function FpaWorksheet({
+  modelId,
+  workspaceKind = "model-planning",
+  cycleId: scopedCycleId,
+}: FpaWorksheetProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
   const dispatch = useAppDispatch()
-  const budgetCycleId = searchParams.get("cycleId")
+  const budgetCycleId = scopedCycleId || searchParams.get("cycleId")
   const budgetTaskId = searchParams.get("taskId")
   const budgetDepartmentId = searchParams.get("departmentId")
   const budgetCycleName = searchParams.get("cycleName")
@@ -343,17 +398,30 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
   const budgetDueDate = searchParams.get("dueDate")
   const queryVersionId = searchParams.get("versionId")
   const queryScenarioId = searchParams.get("scenarioId")
+  const isLegacyBudgetCycle = workspaceKind === "budget"
   const workspaceView: PlanningWorkspaceView =
     searchParams.get("view") === "compare" ? "compare" : "planning"
-  const inBudgetContext = Boolean(budgetCycleId)
-  const { selectedScenarioId, selectedVersionId, tasks, dashboard, models, versions, scenarios } =
+  const inBudgetContext = workspaceKind === "budget"
+  const { selectedScenarioId, selectedVersionId, tasks, models, versions, scenarios } =
     useAppSelector((s) => s.fpa)
-  const { canEditGrid, canEditAllDepartments, canSubmitTask, canAssignTasks, canExportBoardPack, isAdmin } =
-    useFpaPermissions()
+  const {
+    canEditGrid,
+    canEditAllDepartments,
+    canSubmitTask,
+    canAssignTasks,
+    canReviewSubmissions,
+    canApproveBudget,
+    canReturnTask,
+    canLockVersion,
+    canExportBoardPack,
+    canConfigureDrivers,
+    isAdmin,
+  } = useFpaPermissions()
   const currentUserId = useSelector((s: { auth: AuthState }) => s.auth.userDetails?.id || null)
   const [planningDrivers, setPlanningDrivers] = useState<FpaDriver[]>([])
   const [planningCycles, setPlanningCycles] = useState<PlanningCycleOption[]>([])
-  const [activeCycleDetail, setActiveCycleDetail] = useState<FpaBudgetCycle | null>(null)
+  const [activeCycleDetail, setActiveCycleDetail] = useState<ActiveCycleDetail | null>(null)
+  const [cycleReloadKey, setCycleReloadKey] = useState(0)
   const [collabComments, setCollabComments] = useState<PlanningComment[]>([])
   const [collabTasks, setCollabTasks] = useState<PlanningTask[]>([])
   const [collabActivity, setCollabActivity] = useState<PlanningActivity[]>([])
@@ -361,11 +429,13 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
   const [collabLoading, setCollabLoading] = useState(false)
   const [assignTaskBusy, setAssignTaskBusy] = useState(false)
   const [completeTaskBusyId, setCompleteTaskBusyId] = useState<string | null>(null)
+  const [taskActionBusyId, setTaskActionBusyId] = useState<string | null>(null)
   const [compareScenarioIds, setCompareScenarioIds] = useState<string[]>([])
   const [compareKpis, setCompareKpis] = useState<PlanningKpi[]>([])
   const [planningSummary, setPlanningSummary] = useState<FpaPlanningSummary | null>(null)
 
   const [loading, setLoading] = useState(true)
+  const [gridError, setGridError] = useState<string | null>(null)
   const [model, setModel] = useState<FpaModel | null>(null)
   const [users, setUsers] = useState<AppUser[]>([])
   const [lineItems, setLineItems] = useState<FpaLineItem[]>([])
@@ -395,6 +465,15 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
   const [commentOpen, setCommentOpen] = useState(false)
   const [growthOpen, setGrowthOpen] = useState(false)
   const [growthRate, setGrowthRate] = useState("5")
+  const [growthMode, setGrowthMode] = useState<"COMPOUND" | "FLAT">("COMPOUND")
+  const [lifecycleAction, setLifecycleAction] = useState<MpcLifecycleAction | null>(null)
+  const [lifecycleComment, setLifecycleComment] = useState("")
+  const [lifecycleOwnerKey, setLifecycleOwnerKey] = useState("")
+  const [spreadOpen, setSpreadOpen] = useState(false)
+  const [spreadMethod, setSpreadMethod] = useState<
+    "EVEN" | "CUSTOM_WEIGHT" | "PRIOR_YEAR_PATTERN" | "HISTORICAL_PATTERN"
+  >("EVEN")
+  const [spreadWeights, setSpreadWeights] = useState("")
   const [bulkOpen, setBulkOpen] = useState(false)
   const [columnsMenuOpen, setColumnsMenuOpen] = useState(false)
   const [gridMoreOpen, setGridMoreOpen] = useState(false)
@@ -588,84 +667,82 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
   }, [inBudgetContext, myOwnerTaskId, boundTaskId, cycleOwners])
 
   const planningKpis = useMemo((): PlanningKpi[] => {
-    if (planningSummary?.kpis?.length) {
-      return planningSummary.kpis.map((k) => ({
-        label: k.label,
-        value: k.displayValue || (k.unit === "PERCENT"
-          ? `${asNumber(k.value).toFixed(1)}%`
-          : k.unit === "MONTHS"
-            ? formatCashRunway(asNumber(k.value))
-            : formatMoney(k.value) || "—"),
-        delta:
-          k.deltaPct != null
-            ? `${k.up === false ? "▼" : "▲"} ${Math.abs(asNumber(k.deltaPct)).toFixed(1)}%${k.deltaLabel ? ` ${k.deltaLabel}` : ""}`
-            : undefined,
-        deltaTone: k.up === false ? "down" : k.up ? "up" : "neutral",
-        spark: k.sparkline,
-        sparkColor: "#2563eb",
-      }))
+    const s = planningSummary
+    if (s) {
+      const arrayKpis = Array.isArray(s.kpis) ? s.kpis : null
+      if (arrayKpis?.length) {
+        return arrayKpis.map((k) => ({
+          label: k.label,
+          value: k.displayValue || (k.unit === "PERCENT"
+            ? `${asNumber(k.value).toFixed(1)}%`
+            : k.unit === "MONTHS"
+              ? formatCashRunway(asNumber(k.value))
+              : formatMoney(k.value) || "—"),
+          delta:
+            k.deltaPct != null
+              ? `${k.up === false ? "▼" : "▲"} ${Math.abs(asNumber(k.deltaPct)).toFixed(1)}%${k.deltaLabel ? ` ${k.deltaLabel}` : ""}`
+              : undefined,
+          deltaTone: k.up === false ? "down" : k.up ? "up" : "neutral",
+          spark: k.sparkline,
+          sparkColor: "#2563eb",
+        }))
+      }
+      const bag =
+        s.kpis && !Array.isArray(s.kpis)
+          ? s.kpis
+          : null
+      const revenue = s.revenue ?? bag?.revenue
+      const grossMargin = s.grossMargin ?? bag?.grossMargin
+      const grossMarginPct = s.grossMarginPct ?? bag?.grossMarginPct
+      const ebitda = s.ebitda ?? bag?.ebitda
+      if (
+        revenue != null ||
+        grossMargin != null ||
+        ebitda != null ||
+        s.variance?.amount != null
+      ) {
+        const varPct = s.variance?.pct
+        return [
+          {
+            label: "Revenue",
+            value: revenue != null ? formatMoney(revenue) || String(revenue) : "—",
+            sparkColor: "#2563eb",
+          },
+          {
+            label: "Gross Margin",
+            value:
+              grossMargin != null
+                ? formatMoney(grossMargin) || String(grossMargin)
+                : grossMarginPct != null
+                  ? `${asNumber(grossMarginPct).toFixed(1)}%`
+                  : "—",
+            sparkColor: "#7c3aed",
+          },
+          {
+            label: "EBITDA",
+            value: ebitda != null ? formatMoney(ebitda) || String(ebitda) : "—",
+            sparkColor: "#0d9488",
+          },
+          {
+            label: "Variance",
+            value:
+              s.variance?.amount != null
+                ? formatMoney(s.variance.amount) || String(s.variance.amount)
+                : "—",
+            delta:
+              varPct != null
+                ? `${varPct < 0 ? "▼" : "▲"} ${Math.abs(varPct).toFixed(1)}%${
+                    s.variance?.label ? ` ${s.variance.label}` : ""
+                  }`
+                : undefined,
+            deltaTone: varPct == null ? "neutral" : varPct < 0 ? "down" : "up",
+            sparkColor: "#16a34a",
+          },
+        ]
+      }
     }
-    const k = dashboard?.kpis as
-      | {
-          revenue?: number
-          ebitda?: number
-          runwayMonths?: number
-          opex?: number
-          varianceToPlan?: number
-          sparklines?: {
-            revenue?: number[]
-            ebitda?: number[]
-            runwayMonths?: number[]
-            closingCash?: number[]
-          }
-        }
-      | undefined
-    if (!k) {
-      return [
-        { label: "Revenue", value: "—" },
-        { label: "Opex", value: "—" },
-        { label: "EBITDA", value: "—" },
-        { label: "Cash Runway", value: "—" },
-        { label: "Variance to Plan", value: "—" },
-      ]
-    }
-    const runway = asNumber(k.runwayMonths)
-    const opex =
-      k.opex != null
-        ? k.opex
-        : Math.max(0, asNumber(k.revenue) - asNumber(k.ebitda))
-    return [
-      {
-        label: "Revenue",
-        value: formatMoney(k.revenue) || "—",
-        spark: k.sparklines?.revenue,
-        sparkColor: "#2563eb",
-      },
-      {
-        label: "Opex",
-        value: formatMoney(opex) || "—",
-        spark: k.sparklines?.closingCash,
-        sparkColor: "#7c3aed",
-      },
-      {
-        label: "EBITDA",
-        value: formatMoney(k.ebitda) || "—",
-        spark: k.sparklines?.ebitda,
-        sparkColor: "#0d9488",
-      },
-      {
-        label: "Cash Runway",
-        value: formatCashRunway(runway),
-        spark: k.sparklines?.runwayMonths,
-        sparkColor: "#2563eb",
-      },
-      {
-        label: "Variance to Plan",
-        value: k.varianceToPlan != null ? formatMoney(k.varianceToPlan) : "—",
-        sparkColor: "#16a34a",
-      },
-    ]
-  }, [planningSummary, dashboard?.kpis])
+    return []
+  }, [planningSummary])
 
   const driverRows = useMemo((): PlanningDriverRow[] => {
     return planningDrivers.map((d) => {
@@ -682,16 +759,24 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
         value: d.value,
         unit: d.unit,
         prior: Number.isFinite(prior as number) ? (prior as number) : null,
+        priorPeriodLabel: d.priorPeriodLabel || null,
       }
     })
   }, [planningDrivers])
 
   const trendPoints = useMemo((): PlanningTrendPoint[] => {
-    if (planningSummary?.trend?.length) {
-      return planningSummary.trend.map((t) => ({
+    const trend = planningSummary?.trend
+    if (Array.isArray(trend) && trend.length) {
+      return trend.map((t) => ({
         label: t.label || t.period,
         revenueActual: t.actual ?? undefined,
         revenuePlan: t.plan ?? undefined,
+      }))
+    }
+    if (trend && !Array.isArray(trend) && Array.isArray(trend.periods) && trend.periods.length) {
+      return trend.periods.map((p, i) => ({
+        label: /^\d{4}-\d{2}/.test(p) ? monthLabel(p) : p,
+        revenuePlan: trend.revenue?.[i],
       }))
     }
     if (!lineItems.length || !cells.length || !gridPeriods.length) return []
@@ -973,17 +1058,12 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
   }, [versions, model?.versions, modelId])
 
   useEffect(() => {
-    void dispatch(
-      fetchFpaDashboard({
-        modelId,
-        versionId: selectedVersionId || undefined,
-      }),
-    )
     void fpaApi
       .listDrivers({
         modelId,
         versionId: selectedVersionId || undefined,
         scenarioId: selectedScenarioId || undefined,
+        cycleId: budgetCycleId || undefined,
       })
       .then((res) => {
         if (res.success) setPlanningDrivers(res.data || [])
@@ -1000,6 +1080,7 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
       .getPlanningSummary(modelId, {
         versionId: selectedVersionId,
         scenarioId: selectedScenarioId,
+        cycleId: budgetCycleId || undefined,
       })
       .then((res) => {
         if (cancelled) return
@@ -1012,7 +1093,7 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
               path: `/v1/fpa/models/${modelId}/planning-summary`,
               method: "GET",
               message: res.message || "Planning summary unavailable",
-              impact: "KPI strip falls back to home dashboard",
+              impact: "Planning KPI strip remains empty",
             })
           }
         }
@@ -1025,28 +1106,23 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
           path: `/v1/fpa/models/${modelId}/planning-summary`,
           method: "GET",
           message: errorMessage(err),
-          impact: "KPI strip falls back to home dashboard",
+          impact: "Planning KPI strip remains empty",
           response: err,
         })
       })
     return () => {
       cancelled = true
     }
-  }, [modelId, selectedVersionId, selectedScenarioId, dispatch])
+  }, [modelId, selectedVersionId, selectedScenarioId, budgetCycleId])
 
   const reloadPlanningShell = useCallback(() => {
     void dispatch(bootstrapFpaSelection(modelId))
-    void dispatch(
-      fetchFpaDashboard({
-        modelId,
-        versionId: selectedVersionId || undefined,
-      }),
-    )
     void fpaApi
       .listDrivers({
         modelId,
         versionId: selectedVersionId || undefined,
         scenarioId: selectedScenarioId || undefined,
+        cycleId: budgetCycleId || undefined,
       })
       .then((res) => {
         if (res.success) setPlanningDrivers(res.data || [])
@@ -1057,6 +1133,7 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
         .getPlanningSummary(modelId, {
           versionId: selectedVersionId,
           scenarioId: selectedScenarioId,
+          cycleId: budgetCycleId || undefined,
         })
         .then((res) => {
           if (res.success && res.data) setPlanningSummary(res.data)
@@ -1064,15 +1141,16 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
         .catch(() => {})
     }
     setCollabReloadKey((k) => k + 1)
-  }, [dispatch, modelId, selectedVersionId, selectedScenarioId])
+  }, [dispatch, modelId, selectedVersionId, selectedScenarioId, budgetCycleId])
 
-  /** Stage 3: after INPUT edits / spread / bulk, refresh KPIs + validations (lighter than full shell). */
+  /** Stage 3: after INPUT edits / spread / bulk, refresh KPIs + validations (do not re-list drivers). */
   const refreshAfterPlanEdit = useCallback(() => {
     if (selectedVersionId && selectedScenarioId) {
       void fpaApi
         .getPlanningSummary(modelId, {
           versionId: selectedVersionId,
           scenarioId: selectedScenarioId,
+          cycleId: budgetCycleId || undefined,
         })
         .then((res) => {
           if (res.success && res.data) setPlanningSummary(res.data)
@@ -1091,16 +1169,23 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
           /* optional */
         })
     }
-    void dispatch(
-      fetchFpaDashboard({
-        modelId,
-        versionId: selectedVersionId || undefined,
-      }),
-    )
-  }, [modelId, selectedVersionId, selectedScenarioId, budgetCycleId, dispatch])
+  }, [modelId, selectedVersionId, selectedScenarioId, budgetCycleId])
   useEffect(() => {
     let cancelled = false
     void (async () => {
+      if (isLegacyBudgetCycle) {
+        setPlanningCycles(
+          budgetCycleId
+            ? [
+                {
+                  id: budgetCycleId,
+                  name: budgetCycleName || activeCycleDetail?.name || "Current budget cycle",
+                },
+              ]
+            : [],
+        )
+        return
+      }
       try {
         const res = await fpaApi.listModelPlanningCycles({ modelId })
         const rows =
@@ -1111,34 +1196,24 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
             id: c.id,
             name: c.cycle_name || `FY${c.financialYear} cycle`,
           }))
-          // Keep the URL cycle visible even if list is briefly empty / filtered out
-          if (budgetCycleId && !mapped.some((c) => c.id === budgetCycleId)) {
-            mapped.unshift({
-              id: budgetCycleId,
-              name: budgetCycleName || activeCycleDetail?.name || "Current cycle",
-            })
-          }
           setPlanningCycles(mapped)
         }
       } catch {
         if (!cancelled) {
-          setPlanningCycles(
-            budgetCycleId
-              ? [
-                  {
-                    id: budgetCycleId,
-                    name: budgetCycleName || "Current cycle",
-                  },
-                ]
-              : [],
-          )
+          setPlanningCycles([])
         }
       }
     })()
     return () => {
       cancelled = true
     }
-  }, [modelId, budgetCycleId, budgetCycleName, activeCycleDetail?.name])
+  }, [
+    modelId,
+    budgetCycleId,
+    budgetCycleName,
+    activeCycleDetail?.name,
+    isLegacyBudgetCycle,
+  ])
 
   useEffect(() => {
     if (!budgetCycleId) {
@@ -1146,10 +1221,18 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
       return
     }
     let cancelled = false
-    void fpaApi
-      .getModelPlanningCycle(budgetCycleId)
-      .then((res) => {
-        if (cancelled || !res.success || !res.data) return
+    void (async () => {
+      try {
+        if (isLegacyBudgetCycle) {
+          const res = await fpaApi.getBudgetCycle(budgetCycleId)
+          if (!cancelled) setActiveCycleDetail(res.success && res.data ? res.data : null)
+          return
+        }
+        const res = await fpaApi.getModelPlanningCycle(budgetCycleId)
+        if (cancelled || !res.success || !res.data) {
+          if (!cancelled) setActiveCycleDetail(null)
+          return
+        }
         const c = res.data
         const rawOwners = (c.owners ||
           (c as { Owners?: unknown[] }).Owners ||
@@ -1188,12 +1271,24 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
           id: c.id,
           name: c.cycle_name || (c as { name?: string }).name || "Planning cycle",
           modelId: c.sourceModelId,
+          versionId: c.sourceModelVersionId,
+          scenarioId: c.baseScenarioId,
           fiscalYear: c.financialYear,
           status: c.status as FpaBudgetCycle["status"],
+          currentStage: c.currentStage as FpaBudgetCycle["currentStage"],
           actualsCutoffDate: c.actualsCutoffPeriod || null,
           forecastStartPeriod: c.forecastStartPeriod || null,
+          materialVariancePct: c.materialVariancePct ?? 5,
+          submittedAt: c.submittedAt,
+          submittedById: c.submittedById,
+          approvedAt: c.approvedAt,
+          approvedById: c.approvedById,
+          lockedAt: c.lockedAt,
+          lockedById: c.lockedById,
+          createdAt: c.createdAt || undefined,
+          updatedAt: c.updatedAt || undefined,
           owners,
-        } as FpaBudgetCycle)
+        } as ActiveCycleDetail)
         setDeptById((prev) => {
           const next = new Map(prev)
           for (const o of owners) {
@@ -1201,22 +1296,14 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
           }
           return next
         })
-      })
-      .catch(() => {
-        // Fallback for legacy budget-cycle worksheet links
-        void fpaApi
-          .getBudgetCycle(budgetCycleId)
-          .then((res) => {
-            if (!cancelled && res.success && res.data) setActiveCycleDetail(res.data)
-          })
-          .catch(() => {
-            if (!cancelled) setActiveCycleDetail(null)
-          })
-      })
+      } catch {
+        if (!cancelled) setActiveCycleDetail(null)
+      }
+    })()
     return () => {
       cancelled = true
     }
-  }, [budgetCycleId])
+  }, [budgetCycleId, isLegacyBudgetCycle, cycleReloadKey])
 
   useEffect(() => {
     let cancelled = false
@@ -1237,124 +1324,96 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
             status: o.status,
             dueDate: o.dueDate,
           })
-          if (slice) taskById.set(slice.id, slice)
+          if (slice) taskById.set(slice.id, { ...slice, cycleId: budgetCycleId })
         }
 
         try {
-          const mpcRes = await fpaApi.listModelPlanningCycleTasks(budgetCycleId)
-          if (mpcRes.success && Array.isArray(mpcRes.data)) {
-            for (const t of mpcRes.data) {
+          const taskRes = isLegacyBudgetCycle
+            ? await fpaApi.listBudgetCycleTasks(budgetCycleId)
+            : await fpaApi.listModelPlanningCycleTasks(budgetCycleId)
+          if (taskRes.success && Array.isArray(taskRes.data)) {
+            for (const t of taskRes.data) {
               const mapped = mapCycleTaskToPlanningTask(
                 t,
                 cycleOwners.some((o) => o.taskId === t.id) ? "owner_slice" : "planning",
               )
-              taskById.set(mapped.id, mapped)
+              taskById.set(mapped.id, {
+                ...mapped,
+                cycleId: t.cycleId || budgetCycleId,
+              })
             }
           }
         } catch {
-          try {
-            const tRes = await fpaApi.listBudgetCycleTasks(budgetCycleId)
-            if (tRes.success && Array.isArray(tRes.data)) {
-              for (const t of tRes.data) {
-                taskById.set(t.id, mapCycleTaskToPlanningTask(t))
-              }
-            }
-          } catch {
-            /* legacy budget cycle only */
-          }
+          /* Empty is honest when the cycle-scoped task endpoint is unavailable. */
         }
 
         for (const t of taskById.values()) tasks.push(t)
 
-        // Comments + activity: prefer MPC-native endpoints, fall back to legacy budget-cycle.
         try {
-          const cRes = await fpaApi.listModelPlanningCycleComments(budgetCycleId)
+          const cRes = isLegacyBudgetCycle
+            ? await fpaApi.listBudgetCycleComments(budgetCycleId)
+            : await fpaApi.listModelPlanningCycleComments(budgetCycleId)
           if (cRes.success && Array.isArray(cRes.data)) {
+            const mapped: PlanningComment[] = []
             for (const c of cRes.data) {
               const author = c.authorName || "User"
-              comments.push({
+              mapped.push({
                 id: c.id,
+                cycleId: c.cycleId || budgetCycleId,
+                parentCommentId: c.parentCommentId || undefined,
                 author,
                 initials: planningInitials(author),
                 avatarTone: planningAvatarTone(author),
                 when: formatRelativeWhen(c.createdAt),
+                createdAt: c.createdAt || undefined,
                 body: c.body || "",
+                replies: [],
               })
+            }
+            const byId = new Map(mapped.map((comment) => [comment.id, comment]))
+            for (const comment of mapped) {
+              const parent = comment.parentCommentId
+                ? byId.get(comment.parentCommentId)
+                : undefined
+              if (parent) parent.replies!.push(comment)
+              else comments.push(comment)
             }
           }
         } catch {
-          try {
-            const cRes = await fpaApi.listBudgetCycleComments(budgetCycleId)
-            if (cRes.success && Array.isArray(cRes.data)) {
-              for (const c of cRes.data) {
-                const author = c.authorName || "User"
-                comments.push({
-                  id: c.id,
-                  author,
-                  initials: planningInitials(author),
-                  avatarTone: planningAvatarTone(author),
-                  when: formatRelativeWhen(c.createdAt),
-                  body: c.body || "",
-                })
-              }
-            }
-          } catch {
-            /* ignore */
-          }
+          /* Empty is honest when comments cannot be loaded. */
         }
 
         try {
-          const aRes = await fpaApi.listModelPlanningCycleActivity(budgetCycleId)
+          const aRes = isLegacyBudgetCycle
+            ? await fpaApi.listBudgetApprovalEvents(budgetCycleId)
+            : await fpaApi.listModelPlanningCycleActivity(budgetCycleId)
           if (aRes.success && Array.isArray(aRes.data)) {
             for (const e of aRes.data.slice(0, 12)) {
-              activity.push({
-                id: String(e.id || `${e.action}-${e.createdAt}`),
-                when: formatRelativeWhen(e.createdAt),
-                text: `${e.actorName || "User"} · ${String(e.action || e.rawAction || "Update").replace(/_/g, " ")}`,
-              })
-            }
-          }
-        } catch {
-          try {
-            const aRes = await fpaApi.listBudgetApprovalEvents(budgetCycleId)
-            if (aRes.success && Array.isArray(aRes.data)) {
-              for (const e of aRes.data.slice(0, 12)) {
-                activity.push({
-                  id: String(e.id || `${e.action}-${e.createdAt}`),
-                  when: formatRelativeWhen(e.createdAt),
-                  text: `${e.actorName || "User"} · ${String(e.action || e.rawAction || "Update").replace(/_/g, " ")}`,
-                })
+              const stable = e as typeof e & {
+                actor?: string
+                type?: string
+                status?: string
+                timestamp?: string
+                cycleId?: string
               }
-            }
-          } catch {
-            /* ignore */
-          }
-        }
-      }
-
-      if (selected?.id) {
-        try {
-          const res = await fpaApi.listCellComments(modelId, selected.id)
-          if (res.success && Array.isArray(res.data)) {
-            for (const c of res.data) {
-              const author =
-                (c as { authorName?: string; userName?: string }).authorName ||
-                (c as { userName?: string }).userName ||
-                "User"
-              comments.unshift({
-                id: `cell-${c.id}`,
-                author,
-                initials: planningInitials(author),
-                avatarTone: planningAvatarTone(author),
-                when: formatRelativeWhen(
-                  (c as { createdAt?: string }).createdAt || null,
-                ),
-                body: `[Cell] ${(c as { body?: string; text?: string }).body || (c as { text?: string }).text || ""}`,
+              const action = String(e.action || e.rawAction || "UPDATE")
+              const actor = e.actorName || e.byName || stable.actor || "User"
+              const createdAt = e.createdAt || e.at || stable.timestamp || undefined
+              activity.push({
+                id: String(e.id || `${action}-${createdAt}`),
+                cycleId: stable.cycleId || budgetCycleId,
+                actor,
+                action,
+                type: stable.type || e.target?.type || "CYCLE",
+                status: stable.status || action,
+                createdAt,
+                when: formatRelativeWhen(createdAt),
+                text: `${actor} · ${action.replace(/_/g, " ")}${e.commentSnippet || e.comment ? ` · ${e.commentSnippet || e.comment}` : ""}`,
               })
             }
           }
         } catch {
-          /* ignore */
+          /* Empty is honest when activity cannot be loaded. */
         }
       }
 
@@ -1368,13 +1427,17 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
     return () => {
       cancelled = true
     }
-  }, [budgetCycleId, selected?.id, modelId, collabReloadKey, cycleOwners])
+    // Cycle Comments / Tasks / Activity only — never refetch on cell select.
+  }, [budgetCycleId, modelId, collabReloadKey, cycleOwners, isLegacyBudgetCycle])
 
   const onCycleChange = useCallback(
     (id: string) => {
       const sp = new URLSearchParams(searchParams.toString())
-      if (id) sp.set("cycleId", id)
-      else sp.delete("cycleId")
+      if (id) {
+        sp.set("cycleId", id)
+      } else {
+        sp.delete("cycleId")
+      }
       const q = sp.toString()
       router.replace(q ? `${pathname}?${q}` : pathname)
     },
@@ -1421,23 +1484,30 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
       if (/approv/.test(t)) status = "approved"
       else if (/return/.test(t)) status = "returned"
       else if (/submit/.test(t)) status = "submitted"
-      return { id: a.id, when: a.when, text: a.text, status }
+      return {
+        id: a.id,
+        cycleId: a.cycleId,
+        actor: a.actor,
+        action: a.action,
+        type: a.type,
+        createdAt: a.createdAt,
+        when: a.when,
+        text: a.text,
+        status,
+      }
     })
   }, [collabActivity])
 
   const onAddCollabComment = useCallback(
-    async (body: string) => {
+    async (body: string, parentCommentId?: string) => {
       try {
         if (budgetCycleId) {
-          let res
-          try {
-            res = await fpaApi.postModelPlanningCycleComment(budgetCycleId, { body })
-          } catch {
-            // fall back to legacy budget-cycle endpoint
-          }
-          if (!res) {
-            res = await fpaApi.postBudgetCycleComment(budgetCycleId, { body })
-          }
+          const res = isLegacyBudgetCycle
+            ? await fpaApi.postBudgetCycleComment(budgetCycleId, { body })
+            : await fpaApi.postModelPlanningCycleComment(budgetCycleId, {
+                body,
+                parentCommentId,
+              })
           if (!res.success) throw new Error(res.message || "Comment failed")
           toast.success("Comment posted")
           setCollabReloadKey((k) => k + 1)
@@ -1450,12 +1520,13 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
           setCollabReloadKey((k) => k + 1)
           return
         }
-        toast.message("Select a planning cycle or a grid cell to comment")
+        throw new Error("Select a planning cycle or a grid cell to comment")
       } catch (err) {
         toast.error(errorMessage(err))
+        throw err
       }
     },
-    [budgetCycleId, selected?.id, modelId],
+    [budgetCycleId, selected?.id, modelId, isLegacyBudgetCycle],
   )
 
   const budgetSubmitUnmet = useMemo(() => {
@@ -1575,6 +1646,34 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
       return
     }
     let cancelled = false
+    if (isLegacyBudgetCycle) {
+      void fpaApi
+        .getOwnerWorkspace(budgetCycleId)
+        .then((res) => {
+          if (cancelled || !res.success || !res.data) return
+          setOwnerCanSubmit(res.data.canSubmit ?? null)
+          setOwnerUnmet((res.data.unmetRequirements || []).map((u) => u.message))
+          setDeptById((prev) => {
+            const next = new Map(prev)
+            for (const row of res.data!.departmentBudgetRegister || []) {
+              const id = String(row.departmentId || "")
+              const name = String(row.departmentName || "")
+              if (id && name) next.set(id, name)
+            }
+            return next
+          })
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setOwnerUnmet([])
+            setOwnerCanSubmit(null)
+            setMpcMyOwnerTaskId(null)
+          }
+        })
+      return () => {
+        cancelled = true
+      }
+    }
     void fpaApi
       .getModelPlanningOwnerWorkspace(budgetCycleId)
       .then((res) => {
@@ -1602,12 +1701,12 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
           // otherwise owners were dropped and Assign task showed "No cycle departments".
           setActiveCycleDetail((prev) =>
             prev
-              ? ({ ...prev, owners: mappedOwners } as FpaBudgetCycle)
+              ? ({ ...prev, owners: mappedOwners } as ActiveCycleDetail)
               : ({
                   id: budgetCycleId,
                   name: budgetCycleName || "Planning cycle",
                   owners: mappedOwners,
-                } as FpaBudgetCycle),
+                } as ActiveCycleDetail),
           )
         }
         setDeptById((prev) => {
@@ -1622,35 +1721,16 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
         })
       })
       .catch(() => {
-        // Legacy budget-cycle worksheet links only — never prefer this for MPC ids.
-        void fpaApi
-          .getOwnerWorkspace(budgetCycleId)
-          .then((res) => {
-            if (cancelled || !res.success || !res.data) return
-            setOwnerCanSubmit(res.data.canSubmit ?? null)
-            setOwnerUnmet((res.data.unmetRequirements || []).map((u) => u.message))
-            setDeptById((prev) => {
-              const next = new Map(prev)
-              for (const row of res.data.departmentBudgetRegister || []) {
-                const id = String(row.departmentId || "")
-                const name = String(row.departmentName || "")
-                if (id && name) next.set(id, name)
-              }
-              return next
-            })
-          })
-          .catch(() => {
-            if (!cancelled) {
-              setOwnerUnmet([])
-              setOwnerCanSubmit(null)
-              setMpcMyOwnerTaskId(null)
-            }
-          })
+        if (!cancelled) {
+          setOwnerUnmet([])
+          setOwnerCanSubmit(null)
+          setMpcMyOwnerTaskId(null)
+        }
       })
     return () => {
       cancelled = true
     }
-  }, [budgetCycleId])
+  }, [budgetCycleId, isLegacyBudgetCycle, cycleReloadKey])
 
   /** Load model scenarios/versions into the header, then pin cycle/query selection. */
   useEffect(() => {
@@ -1673,21 +1753,21 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
 
       if (budgetCycleId && (!scenarioId || !versionId)) {
         try {
-          const mpc = await fpaApi.getModelPlanningCycle(budgetCycleId)
-          if (mpc.success && mpc.data) {
-            scenarioId = scenarioId || mpc.data.baseScenarioId || null
-            versionId = versionId || mpc.data.sourceModelVersionId || null
-          }
-        } catch {
-          try {
+          if (isLegacyBudgetCycle) {
             const cycleRes = await fpaApi.getBudgetCycle(budgetCycleId)
             if (cycleRes.success && cycleRes.data) {
               scenarioId = scenarioId || cycleRes.data.scenarioId || null
               versionId = versionId || cycleRes.data.versionId || null
             }
-          } catch {
-            /* keep fallbacks below */
+          } else {
+            const mpc = await fpaApi.getModelPlanningCycle(budgetCycleId)
+            if (mpc.success && mpc.data) {
+              scenarioId = scenarioId || mpc.data.baseScenarioId || null
+              versionId = versionId || mpc.data.sourceModelVersionId || null
+            }
           }
+        } catch {
+          /* Keep model defaults; never cross cycle APIs by matching ID. */
         }
       }
 
@@ -1741,6 +1821,7 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
     budgetCycleId,
     queryScenarioId,
     queryVersionId,
+    isLegacyBudgetCycle,
     dispatch,
     searchParams,
     router,
@@ -1794,6 +1875,7 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
       return
     }
     setLoading(true)
+    setGridError(null)
     try {
       const [gridRes, valRes] = await Promise.all([
         fpaApi.getGrid(modelId, {
@@ -1832,7 +1914,7 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
           : Array.isArray((rawVal as { items?: FpaGridValidation[] } | null)?.items)
             ? (rawVal as { items: FpaGridValidation[] }).items
             : []
-      if (list.length) {
+      if (valRes?.success) {
         setValidationErrors(list)
       } else {
         const fallback = await fpaApi.validateModel(modelId).catch(() => null)
@@ -1861,7 +1943,9 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
         },
         response: err,
       })
-      toast.error(errorMessage(err, "Failed to load grid"))
+      const message = errorMessage(err, "Failed to load grid")
+      setGridError(message)
+      toast.error(message)
       setLineItems([])
       setCells([])
       setGridPeriods([])
@@ -1878,22 +1962,223 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
     void load()
   }, [load])
 
-  const onDriverSave = useCallback(
-    async (id: string, value: number) => {
+  const refreshMpcWorkspace = useCallback(async () => {
+    setCycleReloadKey((key) => key + 1)
+    setCollabReloadKey((key) => key + 1)
+    await load()
+    reloadPlanningShell()
+  }, [load, reloadPlanningShell])
+
+  const handleWorkflowError = useCallback((err: unknown, fallback: string) => {
+    const code = apiErrorCode(err)
+    const blockers = apiErrorBlockers(err)
+    if (code === "CYCLE_NOT_READY") {
+      toast.error("Cycle is not ready to submit (CYCLE_NOT_READY)", {
+        description: blockers.length ? blockers.join(" · ") : errorMessage(err, code),
+      })
+    } else if (code === "TASK_NOT_FOUND") {
+      toast.error("The selected owner task no longer exists (TASK_NOT_FOUND).")
+    } else if (code === "MAKER_CHECKER") {
+      toast.error("Maker-checker rule: the same person cannot perform this decision (MAKER_CHECKER).")
+    } else if (code === "INVALID_STATUS") {
+      toast.error("This action is not valid for the cycle's current status (INVALID_STATUS).")
+    } else if (code === "LOCKED_VERSION") {
+      toast.error("The planning version is locked (LOCKED_VERSION).")
+    } else {
+      toast.error(errorMessage(err, fallback))
+    }
+  }, [])
+
+  const mpcLifecycleActions = useMemo(() => {
+    if (!budgetCycleId || isLegacyBudgetCycle || !activeCycleDetail) {
+      return [] as Array<{ id: MpcLifecycleAction; label: string; tone?: "danger" }>
+    }
+    const status = String(activeCycleDetail.status || "").toUpperCase()
+    const stage = String(activeCycleDetail.currentStage || "").toUpperCase()
+    const actions: Array<{ id: MpcLifecycleAction; label: string; tone?: "danger" }> = []
+    const canConsolidate = isAdmin || canAssignTasks || canReviewSubmissions
+    const canReview = isAdmin || canReviewSubmissions
+    const canCfo = isAdmin || canApproveBudget
+    const canLock = isAdmin || canLockVersion
+
+    if (
+      canConsolidate &&
+      (status === "OPEN" ||
+        status === "RETURNED_FOR_CORRECTION" ||
+        stage === "OWNER_INPUT" ||
+        stage === "VALIDATE")
+    ) {
+      actions.push({ id: "submit", label: "Submit consolidated cycle" })
+    }
+    if (
+      canReview &&
+      (status === "SUBMITTED" ||
+        stage === "FPA_REVIEW" ||
+        (status === "UNDER_REVIEW" && stage !== "CFO_REVIEW"))
+    ) {
+      actions.push(
+        { id: "review-accept", label: "Accept FP&A review" },
+        { id: "review-return", label: "Return owner slice", tone: "danger" },
+      )
+    }
+    if (canCfo && stage === "CFO_REVIEW") {
+      actions.push(
+        { id: "cfo-approve", label: "CFO approve" },
+        { id: "cfo-return", label: "CFO return", tone: "danger" },
+      )
+    }
+    if (canLock && status === "APPROVED") {
+      actions.push({ id: "lock", label: "Lock cycle" })
+    }
+    if (canLock && status === "LOCKED") {
+      actions.push({ id: "reopen", label: "Request reopen" })
+    }
+    return actions
+  }, [
+    budgetCycleId,
+    isLegacyBudgetCycle,
+    activeCycleDetail,
+    isAdmin,
+    canAssignTasks,
+    canReviewSubmissions,
+    canApproveBudget,
+    canLockVersion,
+  ])
+
+  const openMpcLifecycleAction = (action: MpcLifecycleAction) => {
+    setLifecycleAction(action)
+    setLifecycleComment("")
+    if (action === "review-return") {
+      const first = cycleOwners.find((owner) => owner.departmentId && owner.taskId)
+      setLifecycleOwnerKey(first?.taskId || "")
+    } else {
+      setLifecycleOwnerKey("")
+    }
+  }
+
+  const runMpcLifecycleAction = async () => {
+    if (!budgetCycleId || isLegacyBudgetCycle || !lifecycleAction || anyBusy) return
+    const comment = lifecycleComment.trim()
+    const selectedOwner = cycleOwners.find(
+      (owner) => owner.taskId === lifecycleOwnerKey && owner.departmentId,
+    )
+    if (
+      (lifecycleAction === "review-return" ||
+        lifecycleAction === "cfo-return" ||
+        lifecycleAction === "lock" ||
+        lifecycleAction === "reopen") &&
+      !comment
+    ) {
+      toast.error(
+        lifecycleAction === "lock" || lifecycleAction === "reopen"
+          ? "A reason is required."
+          : "A return comment is required.",
+      )
+      return
+    }
+    if (lifecycleAction === "review-return" && !selectedOwner?.taskId) {
+      toast.error("Select a real department owner task to return.")
+      return
+    }
+
+    setBusyKey(`mpc:${lifecycleAction}`)
+    try {
+      let res
+      if (lifecycleAction === "submit") {
+        res = await fpaApi.submitModelPlanningCycle(budgetCycleId, {
+          note: comment || undefined,
+        })
+      } else if (lifecycleAction === "review-accept") {
+        res = await fpaApi.acceptModelPlanningCycleReview(budgetCycleId, {
+          comment: comment || undefined,
+        })
+      } else if (lifecycleAction === "review-return") {
+        res = await fpaApi.returnModelPlanningCycleReview(budgetCycleId, {
+          departmentId: selectedOwner!.departmentId,
+          taskId: selectedOwner!.taskId!,
+          comment,
+        })
+      } else if (lifecycleAction === "cfo-approve") {
+        res = await fpaApi.approveModelPlanningCycleByCfo(budgetCycleId, {
+          comment: comment || undefined,
+          scenarioId: selectedScenarioId || undefined,
+        })
+      } else if (lifecycleAction === "cfo-return") {
+        res = await fpaApi.returnModelPlanningCycleByCfo(budgetCycleId, {
+          comment,
+          scenarioId: selectedScenarioId || undefined,
+        })
+      } else if (lifecycleAction === "lock") {
+        res = await fpaApi.lockModelPlanningCycle(budgetCycleId, { reason: comment })
+      } else {
+        res = await fpaApi.requestModelPlanningCycleReopen(budgetCycleId, {
+          reason: comment,
+        })
+      }
+      if (!res.success || !res.data) throw new Error(res.message || "Cycle action failed")
+      setActiveCycleDetail((prev) =>
+        prev
+          ? ({
+              ...prev,
+              status: res.data!.status,
+              currentStage: res.data!.currentStage,
+              submittedAt: res.data!.submittedAt,
+              submittedById: res.data!.submittedById,
+              approvedAt: res.data!.approvedAt,
+              approvedById: res.data!.approvedById,
+              lockedAt: res.data!.lockedAt,
+              lockedById: res.data!.lockedById,
+              updatedAt: res.data!.updatedAt || undefined,
+            } as ActiveCycleDetail)
+          : prev,
+      )
+      toast.success("Cycle workflow updated")
+      setLifecycleAction(null)
+      setLifecycleComment("")
+      await refreshMpcWorkspace()
+    } catch (err) {
+      handleWorkflowError(err, "Could not update cycle workflow")
+    } finally {
+      setBusyKey(null)
+    }
+  }
+
+  const onApprovePlanningTask = useCallback(
+    async (taskId: string, comment?: string) => {
+      if (!taskId || taskActionBusyId) return
+      setTaskActionBusyId(taskId)
       try {
-        const res = await fpaApi.updateDriver(id, { value })
-        if (!res.success) throw new Error(res.message || "Driver update failed")
-        setPlanningDrivers((prev) =>
-          prev.map((d) => (d.id === id ? { ...d, value } : d)),
-        )
-        toast.success("Driver updated")
-        await load()
-        void refreshAfterPlanEdit()
+        const res = await fpaApi.approveTask(taskId, { comment })
+        if (!res.success) throw new Error(res.message || "Task approval failed")
+        toast.success("Task approved")
+        await refreshMpcWorkspace()
       } catch (err) {
-        toast.error(errorMessage(err))
+        handleWorkflowError(err, "Could not approve task")
+        throw err
+      } finally {
+        setTaskActionBusyId(null)
       }
     },
-    [load, refreshAfterPlanEdit],
+    [taskActionBusyId, refreshMpcWorkspace, handleWorkflowError],
+  )
+
+  const onReturnPlanningTask = useCallback(
+    async (taskId: string, comment: string) => {
+      if (!taskId || taskActionBusyId || !comment.trim()) return
+      setTaskActionBusyId(taskId)
+      try {
+        const res = await fpaApi.returnTask(taskId, { comment: comment.trim() })
+        if (!res.success) throw new Error(res.message || "Task return failed")
+        toast.success("Task returned")
+        await refreshMpcWorkspace()
+      } catch (err) {
+        handleWorkflowError(err, "Could not return task")
+        throw err
+      } finally {
+        setTaskActionBusyId(null)
+      }
+    },
+    [taskActionBusyId, refreshMpcWorkspace, handleWorkflowError],
   )
 
   useEffect(() => {
@@ -2184,6 +2469,14 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
       setCollabReloadKey((k) => k + 1)
       // Refresh owner workspace / task status
       if (budgetCycleId) {
+        if (isLegacyBudgetCycle) {
+          void fpaApi.getOwnerWorkspace(budgetCycleId).then((ws) => {
+            if (!ws.success || !ws.data) return
+            setOwnerCanSubmit(ws.data.canSubmit ?? null)
+            setOwnerUnmet((ws.data.unmetRequirements || []).map((u) => u.message))
+          })
+          return
+        }
         void fpaApi.getModelPlanningOwnerWorkspace(budgetCycleId).then((ws) => {
           if (!ws.success || !ws.data) return
           setOwnerCanSubmit(ws.data.canSubmit ?? null)
@@ -2221,66 +2514,85 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
     }
   }
 
-  const selectCell = async (cell: FpaCell, edit: boolean) => {
+  const selectCell = (cell: FpaCell, edit: boolean) => {
     setSelected(cell)
-    setDetailsOpen(true)
     setCommentOpen(false)
     setCommentDraft("")
-    setCellDetail(null)
     setTraceOpen(false)
     setCellTrace(null)
     const periodBand = periods.find((p) => p.key === monthKey(cell.periodDate))?.band
     if (edit && !isReadOnly(cell, periodBand) && canEditGrid) {
+      // Editing: local only — do not hit Comments/Tasks/detail/history APIs.
+      setDetailsOpen(false)
       setEditingCellId(cell.id)
       setEditDraft(String(asNumber(cell.value)))
-    } else {
-      setEditingCellId(null)
+      return
     }
-    try {
-      const [histRes, commentsRes, detailRes] = await Promise.all([
-        fpaApi.cellHistory(modelId, cell.id),
-        fpaApi.listCellComments(modelId, cell.id).catch(() => null),
-        fpaApi.getCellDetail(modelId, cell.id).catch(() => null),
-      ])
-      setHistory(histRes.success ? histRes.data || [] : [])
-      setCellComments(commentsRes?.success ? commentsRes.data || [] : [])
-      if (detailRes?.success && detailRes.data) {
-        const d = detailRes.data
-        const formulaRaw = d.formula
-        const formulaText =
-          typeof formulaRaw === "string"
-            ? formulaRaw
-            : formulaRaw && typeof formulaRaw === "object"
-              ? formulaRaw.expression || formulaRaw.id || null
-              : null
-        setCellDetail({
-          formula: formulaText,
-          drivers: d.currentDrivers || [],
-          cellStatus: d.cellStatus || d.cell?.cellStatus,
-        })
-        if (Array.isArray(d.history) && d.history.length && !(histRes.success && histRes.data?.length)) {
-          setHistory(d.history)
-        }
-        if (Array.isArray(d.comments) && d.comments.length && !(commentsRes?.success && commentsRes.data?.length)) {
-          setCellComments(d.comments)
-        }
-        if (d.cell) {
-          setSelected((prev) => (prev?.id === cell.id ? { ...prev, ...d.cell } : prev))
-        }
-      }
-    } catch (err) {
-      setHistory([])
-      setCellComments([])
-      logFpaGap({
-        category: "broken",
-        path: `/v1/fpa/models/${modelId}/cells/${cell.id}/history`,
-        method: "GET",
-        message: errorMessage(err),
-        impact: "Cell history drawer empty",
-        response: err,
-      })
-    }
+    setEditingCellId(null)
+    setDetailsOpen(true)
   }
+
+  /** Cell Details panel only — history / comments / formula. Not on every grid click. */
+  useEffect(() => {
+    if (!detailsOpen || !selected?.id) return
+    let cancelled = false
+    const cellId = selected.id
+    void (async () => {
+      try {
+        const [histRes, commentsRes, detailRes] = await Promise.all([
+          fpaApi.cellHistory(modelId, cellId),
+          fpaApi.listCellComments(modelId, cellId).catch(() => null),
+          fpaApi.getCellDetail(modelId, cellId).catch(() => null),
+        ])
+        if (cancelled) return
+        setHistory(histRes.success ? histRes.data || [] : [])
+        setCellComments(commentsRes?.success ? commentsRes.data || [] : [])
+        if (detailRes?.success && detailRes.data) {
+          const d = detailRes.data
+          const formulaRaw = d.formula
+          const formulaText =
+            typeof formulaRaw === "string"
+              ? formulaRaw
+              : formulaRaw && typeof formulaRaw === "object"
+                ? formulaRaw.expression || formulaRaw.id || null
+                : null
+          setCellDetail({
+            formula: formulaText,
+            drivers: d.currentDrivers || [],
+            cellStatus: d.cellStatus || d.cell?.cellStatus,
+          })
+          if (Array.isArray(d.history) && d.history.length && !(histRes.success && histRes.data?.length)) {
+            setHistory(d.history)
+          }
+          if (
+            Array.isArray(d.comments) &&
+            d.comments.length &&
+            !(commentsRes?.success && commentsRes.data?.length)
+          ) {
+            setCellComments(d.comments)
+          }
+          if (d.cell) {
+            setSelected((prev) => (prev?.id === cellId ? { ...prev, ...d.cell } : prev))
+          }
+        }
+      } catch (err) {
+        if (cancelled) return
+        setHistory([])
+        setCellComments([])
+        logFpaGap({
+          category: "broken",
+          path: `/v1/fpa/models/${modelId}/cells/${cellId}/history`,
+          method: "GET",
+          message: errorMessage(err),
+          impact: "Cell history drawer empty",
+          response: err,
+        })
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [detailsOpen, selected?.id, modelId])
 
   const loadCellTrace = async (cellId: string) => {
     setBusyKey(`trace:${cellId}`)
@@ -2308,6 +2620,60 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
     setSelected((prev) => (prev && byId.get(prev.id) ? { ...prev, ...byId.get(prev.id)! } : prev))
   }
 
+  /** Prefer updatedCells (INPUT + CALCULATED); fall back to cells[]. Returns true if merged. */
+  const applyToolCellPayload = (data?: {
+    cells?: FpaCell[]
+    updatedCells?: FpaCell[]
+  } | null) => {
+    const byId = new Map<string, FpaCell>()
+    for (const c of data?.cells || []) {
+      if (c?.id) byId.set(c.id, c)
+    }
+    for (const c of data?.updatedCells || []) {
+      if (c?.id) byId.set(c.id, c)
+    }
+    const list = Array.from(byId.values())
+    if (!list.length) return false
+    mergeCells(list)
+    return true
+  }
+
+  const onDriverSave = useCallback(
+    async (id: string, value: number): Promise<{ needsGridReload: boolean }> => {
+      const res = await fpaApi.updateDriver(id, { value })
+      if (!res.success) throw new Error(res.message || "Driver update failed")
+      const payload = res.data
+      setPlanningDrivers((prev) =>
+        prev.map((d) =>
+          d.id === id
+            ? {
+                ...d,
+                ...(payload || {}),
+                value: payload?.value ?? value,
+                updatedCells: undefined,
+              }
+            : d,
+        ),
+      )
+      const dependents = payload?.updatedCells || []
+      if (dependents.length) {
+        mergeCells(dependents)
+        return { needsGridReload: false }
+      }
+      return { needsGridReload: true }
+    },
+    [],
+  )
+
+  /** Called once after the driver panel finishes a Save batch. */
+  const onDriversSaved = useCallback(
+    async (needsGridReload: boolean) => {
+      if (needsGridReload) await load()
+      void refreshAfterPlanEdit()
+    },
+    [load, refreshAfterPlanEdit],
+  )
+
   const saveCell = async (cell: FpaCell, raw: string) => {
     if (!canEditGrid) {
       toast.error("You do not have permission to edit cells")
@@ -2322,6 +2688,12 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
       cancelEdit()
       return
     }
+    const previous = cell
+    const optimistic: FpaCell = { ...cell, value }
+    // Optimistic UI: keep the typed value visible while the API runs.
+    setCells((prev) => prev.map((c) => (c.id === cell.id ? optimistic : c)))
+    setSelected((prev) => (prev?.id === cell.id ? optimistic : prev))
+    cancelEdit()
     setBusyKey(`cell:${cell.id}`)
     try {
       const res = await fpaApi.updateCell(modelId, {
@@ -2341,7 +2713,6 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
             value: payload.value ?? value,
           }
         : { ...cell, value }
-      // Drop nested array off the cell shape if present
       delete (next as FpaCell & { updatedCells?: unknown }).updatedCells
       if (dependents.length) {
         mergeCells([next, ...dependents])
@@ -2349,9 +2720,11 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
         setCells((prev) => prev.map((c) => (c.id === cell.id ? next : c)))
         setSelected((prev) => (prev?.id === cell.id ? next : prev))
       }
-      cancelEdit()
       void refreshAfterPlanEdit()
     } catch (err) {
+      // Roll back only this cell if the write failed.
+      setCells((prev) => prev.map((c) => (c.id === previous.id ? previous : c)))
+      setSelected((prev) => (prev?.id === previous.id ? previous : prev))
       const status = (err as { status?: number })?.status
       const code = (err as { response?: { code?: string } })?.response?.code
       const conflict = (
@@ -2442,6 +2815,7 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
 
   const commitEdit = () => {
     if (!editingCellId) return
+    if (busyKey === `cell:${editingCellId}`) return
     const cell = cells.find((c) => c.id === editingCellId) || selected
     if (!cell) {
       cancelEdit()
@@ -2462,72 +2836,261 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
     setBusyKey(tool)
     try {
       if (tool === "spread" && selected) {
-        const monthCount = Math.max(periods.length, 1)
+        const selectedBand = periods.find(
+          (p) => p.key === monthKey(selected.periodDate),
+        )?.band
+        if (selectedBand === "ACTUAL") {
+          toast.error("Pick a forecast-period cell to spread — actuals are locked.")
+          return
+        }
+        const forecastPeriods = periods.filter((p) => p.band === "FORECAST")
+        if (!forecastPeriods.length) {
+          toast.error("No forecast periods to spread into (check actuals cutoff).")
+          return
+        }
+        const monthCount = forecastPeriods.length
         const total = asNumber(selected.value) * monthCount
-        const res = await fpaApi.spreadCells(modelId, {
-          versionId: selectedVersionId,
-          scenarioId: selectedScenarioId,
+        const periodDates = forecastPeriods.map((p) => p.iso.slice(0, 10))
+        const departmentId = budgetDepartmentId || selected.departmentId || null
+        let weights: number[] | undefined
+        if (spreadMethod === "CUSTOM_WEIGHT") {
+          weights = spreadWeights
+            .split(/[\s,]+/)
+            .map((x) => Number(x.trim()))
+            .filter((n) => Number.isFinite(n))
+          if (weights.length !== monthCount) {
+            toast.error(`Enter ${monthCount} weights (one per forecast period)`)
+            return
+          }
+          const sum = weights.reduce((a, b) => a + b, 0)
+          if (sum <= 0) {
+            toast.error("Weights must sum to a positive total")
+            return
+          }
+        }
+
+        const amounts = computeSpreadAmounts({
+          method: spreadMethod,
+          total,
+          forecastPeriods,
+          weights,
+          cells,
           lineItemId: selected.lineItemId,
-          value: total,
-          method: "EVEN",
-          cycleId: budgetCycleId || undefined,
+          departmentId,
         })
-        if (!res.success) throw new Error(res.message || "Spread failed")
-        const n = res.data?.spreadAcross ?? 0
-        if (n <= 0) {
+        const snapshot = cells
+        const selectedSnap = selected
+        const { next, touchedIds } = projectSpreadCells({
+          cells,
+          lineItemId: selected.lineItemId,
+          forecastPeriods,
+          amounts,
+          departmentId,
+        })
+        if (!touchedIds.length) {
           toast.message("Nothing to spread", {
-            description: "Line may be empty, locked, or already even.",
+            description: "No editable forecast cells on this line for the current view.",
           })
-        } else toast.success(`Spread across ${n} months`)
-        if (res.data?.cells?.length) {
-          const byId = new Map(res.data.cells.map((c) => [c.id, c]))
-          setCells((prev) => prev.map((c) => byId.get(c.id) || c))
-        } else await load()
-        void refreshAfterPlanEdit()
-      } else if (tool === "copy" && selected) {
-        const res = await fpaApi.copyForward(modelId, {
-          versionId: selectedVersionId,
-          scenarioId: selectedScenarioId,
-          lineItemId: selected.lineItemId,
-          fromPeriodDate: selected.periodDate.slice(0, 10),
-          cycleId: budgetCycleId || undefined,
+          return
+        }
+
+        // Optimistic: paint INPUT months immediately, then persist in background.
+        setCells(next)
+        setSelected((prev) => {
+          if (!prev) return prev
+          const hit = next.find((c) => c.id === prev.id)
+          return hit || prev
         })
-        if (!res.success) throw new Error(res.message || "Copy forward failed")
-        const n = res.data?.copied ?? 0
-        if (n <= 0) {
-          toast.message("Nothing copied", {
-            description: "No later months to fill, or cells are locked.",
+        setSpreadOpen(false)
+        toast.success(`Spread ${spreadMethod.replace(/_/g, " ").toLowerCase()} · ${touchedIds.length} months`)
+        setBusyKey(null)
+
+        try {
+          const res = await fpaApi.spreadCells(modelId, {
+            versionId: selectedVersionId,
+            scenarioId: selectedScenarioId,
+            lineItemId: selected.lineItemId,
+            value: total,
+            method: spreadMethod,
+            weights,
+            periodDates,
+            cycleId: budgetCycleId || undefined,
+            departmentId: departmentId || undefined,
           })
-        } else toast.success(`Copied into ${n} later months`)
-        if (res.data?.cells?.length) {
-          const byId = new Map(res.data.cells.map((c) => [c.id, c]))
-          setCells((prev) => prev.map((c) => byId.get(c.id) || c))
-        } else await load()
-        void refreshAfterPlanEdit()
+          if (!res.success) throw new Error(res.message || "Spread failed")
+          const serverCells = [
+            ...(res.data?.updatedCells || []),
+            ...(res.data?.cells || []),
+          ]
+          if (serverCells.length) {
+            setCells((prev) => softReconcileCells(prev, serverCells, touchedIds))
+            setSelected((prev) => {
+              if (!prev) return prev
+              const s = serverCells.find((c) => c.id === prev.id)
+              if (!s) return prev
+              return touchedIds.includes(prev.id)
+                ? { ...prev, ...s, value: prev.value }
+                : { ...prev, ...s }
+            })
+          }
+          void refreshAfterPlanEdit()
+        } catch (err) {
+          setCells(snapshot)
+          setSelected(selectedSnap)
+          const code = (err as { response?: { code?: string } })?.response?.code
+          if (code === "INVALID_WEIGHTS") {
+            toast.error(errorMessage(err, "Invalid spread weights — changes reverted"))
+          } else if (code === "UNSUPPORTED_SPREAD_METHOD") {
+            toast.error(errorMessage(err, "Spread method not supported — changes reverted"))
+          } else if (code === "ACTUAL_PERIOD_LOCKED") {
+            toast.error(
+              errorMessage(err, "Cannot write actual periods — changes reverted"),
+            )
+          } else {
+            toast.error(errorMessage(err, "Spread failed — changes reverted"))
+          }
+          logFpaGap({
+            category: "broken",
+            path: `/v1/fpa/models/${modelId}/cells/spread`,
+            method: "POST",
+            message: errorMessage(err),
+            impact: "Optimistic spread rolled back",
+            response: err,
+          })
+        }
+      } else if (tool === "copy" && selected) {
+        const forecastPeriods = periods.filter((p) => p.band === "FORECAST")
+        const snapshot = cells
+        const selectedSnap = selected
+        const { next, touchedIds } = projectCopyForward({
+          cells,
+          selected,
+          forecastPeriods,
+        })
+        if (!touchedIds.length) {
+          toast.message("Nothing copied", {
+            description: "No later forecast months to fill, or cells are locked.",
+          })
+          return
+        }
+        setCells(next)
+        setSelected((prev) => {
+          if (!prev) return prev
+          return next.find((c) => c.id === prev.id) || prev
+        })
+        toast.success(`Copied into ${touchedIds.length} later months`)
+        setBusyKey(null)
+
+        try {
+          const res = await fpaApi.copyForward(modelId, {
+            versionId: selectedVersionId,
+            scenarioId: selectedScenarioId,
+            lineItemId: selected.lineItemId,
+            fromPeriodDate: selected.periodDate.slice(0, 10),
+            cycleId: budgetCycleId || undefined,
+          })
+          if (!res.success) throw new Error(res.message || "Copy forward failed")
+          const serverCells = [
+            ...(res.data?.updatedCells || []),
+            ...(res.data?.cells || []),
+          ]
+          if (serverCells.length) {
+            setCells((prev) => softReconcileCells(prev, serverCells, touchedIds))
+          }
+          void refreshAfterPlanEdit()
+        } catch (err) {
+          setCells(snapshot)
+          setSelected(selectedSnap)
+          toast.error(errorMessage(err, "Copy failed — changes reverted"))
+          logFpaGap({
+            category: "broken",
+            path: `/v1/fpa/models/${modelId}/cells/copy-forward`,
+            method: "POST",
+            message: errorMessage(err),
+            impact: "Optimistic copy rolled back",
+            response: err,
+          })
+        }
       } else if (tool === "growth" && selected) {
         const ratePct = Number(growthRate)
         if (!Number.isFinite(ratePct)) {
           toast.error("Enter a valid growth rate")
           return
         }
-        const res = await fpaApi.applyGrowth(modelId, {
-          versionId: selectedVersionId,
-          scenarioId: selectedScenarioId,
-          lineItemId: selected.lineItemId,
-          fromPeriodDate: selected.periodDate.slice(0, 10),
+        const forecastPeriods = periods.filter((p) => p.band === "FORECAST")
+        const snapshot = cells
+        const selectedSnap = selected
+        const { next, touchedIds } = projectGrowth({
+          cells,
+          selected,
+          forecastPeriods,
           ratePct,
-          mode: "COMPOUND",
-          cycleId: budgetCycleId || undefined,
         })
-        if (!res.success) throw new Error(res.message || "Apply growth failed")
-        const n = res.data?.updated ?? res.data?.applied ?? res.data?.cells?.length ?? 0
-        toast.success(n > 0 ? `Applied ${ratePct}% growth to ${n} cells` : `Applied ${ratePct}% growth`)
-        setGrowthOpen(false)
-        if (res.data?.cells?.length) {
-          const byId = new Map(res.data.cells.map((c) => [c.id, c]))
-          setCells((prev) => prev.map((c) => byId.get(c.id) || c))
-        } else await load()
-        void refreshAfterPlanEdit()
+        if (!touchedIds.length) {
+          toast.message("Nothing to grow", {
+            description: "No later forecast months on this line.",
+          })
+          return
+        }
+        setCells(next)
+        setSelected((prev) => {
+          if (!prev) return prev
+          return next.find((c) => c.id === prev.id) || prev
+        })
+        const touchedPeriods = next
+          .filter((cell) => touchedIds.includes(cell.id))
+          .map((cell) => cell.periodDate.slice(0, 10))
+          .sort()
+        const periodFrom = touchedPeriods[0]
+        const periodTo = touchedPeriods[touchedPeriods.length - 1]
+        if (!periodFrom || !periodTo) {
+          setCells(snapshot)
+          setSelected(selectedSnap)
+          toast.error("Could not determine the forecast range to grow.")
+          return
+        }
+
+        try {
+          const res = await fpaApi.applyGrowth(modelId, {
+            versionId: selectedVersionId,
+            scenarioId: selectedScenarioId,
+            lineItemIds: [selected.lineItemId],
+            periodFrom,
+            periodTo,
+            ratePercent: ratePct,
+            mode: growthMode,
+            cycleId: budgetCycleId || undefined,
+          })
+          if (!res.success) throw new Error(res.message || "Apply growth failed")
+          const serverCells = [
+            ...(res.data?.updatedCells || []),
+            ...(res.data?.cells || []),
+          ]
+          if (serverCells.length) {
+            setCells((prev) => softReconcileCells(prev, serverCells, touchedIds))
+            setSelected((prev) => {
+              if (!prev) return prev
+              return serverCells.find((cell) => cell.id === prev.id)
+                ? { ...prev, ...serverCells.find((cell) => cell.id === prev.id)! }
+                : prev
+            })
+          }
+          setGrowthOpen(false)
+          toast.success(`Applied ${ratePct}% ${growthMode.toLowerCase()} growth to ${touchedIds.length} cells`)
+          void refreshAfterPlanEdit()
+        } catch (err) {
+          setCells(snapshot)
+          setSelected(selectedSnap)
+          toast.error(errorMessage(err, "Growth failed — changes reverted"))
+          logFpaGap({
+            category: "broken",
+            path: `/v1/fpa/models/${modelId}/cells/apply-growth`,
+            method: "POST",
+            message: errorMessage(err),
+            impact: "Optimistic growth rolled back",
+            response: err,
+          })
+        }
       } else if (tool === "sync") {
         const res = await fpaApi.syncActuals({
           modelId,
@@ -2538,6 +3101,7 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
         const data = res.data as { rowCount?: number; synced?: number; count?: number } | null
         const n = data?.rowCount ?? data?.synced ?? data?.count
         await load()
+        void refreshAfterPlanEdit()
         if (typeof n === "number") {
           toast.success(n > 0 ? `Imported ${n} actuals` : "No GL actuals found for this period")
         } else {
@@ -2545,6 +3109,7 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
         }
       }
     } catch (err) {
+      const code = (err as { response?: { code?: string } })?.response?.code
       logFpaGap({
         category: "broken",
         path: `/v1/fpa/models/${modelId}/cells/${tool}`,
@@ -2553,7 +3118,13 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
         impact: `Worksheet ${tool} action failed`,
         response: err,
       })
-      toast.error(errorMessage(err))
+      if (code === "INVALID_WEIGHTS") {
+        toast.error(errorMessage(err, "Invalid spread weights"))
+      } else if (code === "UNSUPPORTED_SPREAD_METHOD") {
+        toast.error(errorMessage(err, "Spread method not supported yet"))
+      } else {
+        toast.error(errorMessage(err))
+      }
     } finally {
       setBusyKey(null)
     }
@@ -2596,10 +3167,13 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
             : undefined,
       })
       if (!res.success) throw new Error(res.message || "Bulk operation failed")
-      const n = res.data?.updated ?? res.data?.cells?.length ?? 0
+      const n =
+        res.data?.updated ??
+        res.data?.updatedCells?.length ??
+        res.data?.cells?.length ??
+        0
       toast.success(n > 0 ? `${operation.replace(/_/g, " ")} · ${n} cells` : operation.replace(/_/g, " "))
-      if (res.data?.cells?.length) mergeCells(res.data.cells)
-      else await load()
+      if (!applyToolCellPayload(res.data)) await load()
       void refreshAfterPlanEdit()
     } catch (err) {
       const code = (err as { response?: { code?: string } })?.response?.code
@@ -2761,7 +3335,6 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
             type="text"
             inputMode="decimal"
             value={editDraft}
-            disabled={isBusy(`cell:${cell.id}`)}
             onChange={(e) => setEditDraft(e.target.value)}
             onBlur={() => commitEdit()}
             onKeyDown={(e) => {
@@ -2808,7 +3381,7 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
           workspaceView === "compare"
             ? "Scenario Comparison"
             : inBudgetContext
-              ? "Planning Worksheet"
+              ? "Budget Workspace"
               : "Model Planning"
         }
         hideFilters
@@ -2831,7 +3404,7 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
           forecastStart={effectiveForecastStart}
           onCycleChange={onCycleChange}
           drivers={driverRows}
-          canEditDrivers={canEditGrid}
+          canEditDrivers={Boolean(isAdmin || canEditGrid || canConfigureDrivers)}
           onVersionChange={(id) => {
             dispatch(setSelectedVersionId(id))
             const sp = new URLSearchParams(searchParams.toString())
@@ -2847,7 +3420,9 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
             router.replace(q ? `${pathname}?${q}` : pathname)
           }}
           onRefresh={reloadPlanningShell}
+          onExport={onExport}
           onDriverSave={onDriverSave}
+          onDriversSaved={onDriversSaved}
           viewByLabel={viewByLabel}
           viewByOptions={viewByOptions}
           onViewByChange={onViewByChange}
@@ -2857,6 +3432,20 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
           onCompareScenarioIdsChange={setCompareScenarioIds}
           hideKpis
         />
+
+        {gridError ? (
+          <div className="rounded-xl border border-[#fecaca] bg-[#fef2f2] px-4 py-3 text-sm text-[#b91c1c]">
+            <span>{gridError}</span>
+            <button
+              type="button"
+              className="ml-3 rounded-full border border-[#fca5a5] bg-white px-3 py-1 text-xs font-medium hover:bg-[#fff7f7]"
+              onClick={() => void load()}
+              disabled={loading}
+            >
+              Retry grid
+            </button>
+          </div>
+        ) : null}
 
         {workspaceView === "compare" ? (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-stretch">
@@ -2872,6 +3461,7 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
                 versionId={selectedVersionId}
                 scenarios={modelScenarios}
                 scenarioId={selectedScenarioId}
+                cycleId={budgetCycleId}
                 currency={currency}
                 selectedIds={compareScenarioIds}
                 onSelectedIdsChange={setCompareScenarioIds}
@@ -2888,7 +3478,10 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
                 comments={collabComments}
                 activity={collabActivity}
                 approvals={collabApprovals}
-                onAddComment={(body) => void onAddCollabComment(body)}
+                onAddComment={onAddCollabComment}
+                onReplyComment={
+                  budgetCycleId && !isLegacyBudgetCycle ? onAddCollabComment : undefined
+                }
                 commentPlaceholder="Add a comment..."
               />
             </div>
@@ -2912,6 +3505,124 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
         )}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-stretch">
           <div className="lg:col-span-9 space-y-3 min-w-0">
+        {budgetCycleId && !isLegacyBudgetCycle && activeCycleDetail ? (
+          <section className={cn(CARD, "px-4 py-3 space-y-3")}>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-[13px] font-semibold text-[#101828]">Cycle workflow</p>
+                <p className="mt-0.5 text-[11px] text-[#667085]">
+                  {String(activeCycleDetail.status || "UNKNOWN").replace(/_/g, " ")}
+                  {activeCycleDetail.currentStage
+                    ? ` · ${String(activeCycleDetail.currentStage).replace(/_/g, " ")}`
+                    : ""}
+                  {activeCycleDetail.submittedAt
+                    ? ` · submitted ${formatWhen(activeCycleDetail.submittedAt)}`
+                    : ""}
+                  {activeCycleDetail.approvedAt
+                    ? ` · approved ${formatWhen(activeCycleDetail.approvedAt)}`
+                    : ""}
+                  {activeCycleDetail.lockedAt
+                    ? ` · locked ${formatWhen(activeCycleDetail.lockedAt)}`
+                    : ""}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {mpcLifecycleActions.map((action) => (
+                  <button
+                    key={action.id}
+                    type="button"
+                    onClick={() => openMpcLifecycleAction(action.id)}
+                    disabled={anyBusy || loading}
+                    className={cn(
+                      "h-9 rounded-full px-4 text-xs font-medium shadow-sm disabled:opacity-50",
+                      action.tone === "danger"
+                        ? "border border-[#fca5a5] bg-white text-[#dc2626] hover:bg-[#fef2f2]"
+                        : "bg-[#2563eb] text-white hover:bg-[#1d4ed8]",
+                    )}
+                  >
+                    {action.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {lifecycleAction ? (
+              <div className="space-y-2 rounded-xl border border-[#dbeafe] bg-[#eff6ff]/60 p-3">
+                {lifecycleAction === "review-return" ? (
+                  <label className="block text-[11px] font-medium text-[#344054]">
+                    Department owner task
+                    <select
+                      value={lifecycleOwnerKey}
+                      onChange={(e) => setLifecycleOwnerKey(e.target.value)}
+                      disabled={anyBusy}
+                      className="mt-1 block h-9 w-full rounded-full border border-[#d0d5dd] bg-white px-3 text-[12px]"
+                    >
+                      <option value="">Select an owner slice</option>
+                      {cycleOwners
+                        .filter((owner) => owner.departmentId && owner.taskId)
+                        .map((owner) => (
+                          <option key={owner.taskId} value={owner.taskId}>
+                            {owner.departmentName || deptById.get(owner.departmentId) || owner.departmentId}
+                            {" · "}
+                            {owner.assigneeName || "Unassigned"}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                ) : null}
+                <label className="block text-[11px] font-medium text-[#344054]">
+                  {lifecycleAction === "lock" || lifecycleAction === "reopen"
+                    ? "Reason (required)"
+                    : lifecycleAction === "review-return" || lifecycleAction === "cfo-return"
+                      ? "Return comment (required)"
+                      : "Comment (optional)"}
+                  <textarea
+                    value={lifecycleComment}
+                    onChange={(e) => setLifecycleComment(e.target.value)}
+                    rows={2}
+                    disabled={anyBusy}
+                    className="mt-1 w-full rounded-xl border border-[#d0d5dd] bg-white px-3 py-2 text-[12px] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20 disabled:opacity-50"
+                  />
+                </label>
+                {lifecycleAction === "review-return" &&
+                !cycleOwners.some((owner) => owner.departmentId && owner.taskId) ? (
+                  <p className="text-[11px] text-[#b91c1c]">
+                    No owner slice with a real department and task ID is available to return.
+                  </p>
+                ) : null}
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void runMpcLifecycleAction()}
+                    disabled={
+                      anyBusy ||
+                      (lifecycleAction === "review-return" && !lifecycleOwnerKey) ||
+                      ((lifecycleAction === "review-return" ||
+                        lifecycleAction === "cfo-return" ||
+                        lifecycleAction === "lock" ||
+                        lifecycleAction === "reopen") &&
+                        !lifecycleComment.trim())
+                    }
+                    className="h-9 rounded-full bg-[#2563eb] px-4 text-xs font-medium text-white shadow-sm hover:bg-[#1d4ed8] disabled:opacity-50"
+                  >
+                    {busyKey === `mpc:${lifecycleAction}` ? (
+                      <Loader2 className="mr-1.5 inline h-3.5 w-3.5 animate-spin" />
+                    ) : null}
+                    Confirm
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLifecycleAction(null)}
+                    disabled={anyBusy}
+                    className="h-9 rounded-full border border-[#d0d5dd] bg-white px-4 text-xs font-medium text-[#344054] disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </section>
+        ) : null}
         {inBudgetContext && canSubmitTask ? (
           <div className={cn(CARD, "px-4 py-3 space-y-2.5")}>
             <div className="flex flex-wrap items-start justify-between gap-2">
@@ -3101,10 +3812,15 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
               </button>
               <button
                 type="button"
-                className={GRID_TOOL}
-                title="Spread selected value evenly across months"
+                className={cn(GRID_TOOL, spreadOpen && "border-[#2563eb] bg-[#eff6ff] text-[#2563eb]")}
+                title="Spread annual / selected value across months"
                 disabled={anyBusy || loading || !canEditGrid || !selected}
-                onClick={() => void runTool("spread")}
+                onClick={() => {
+                  setGrowthOpen(false)
+                  setBulkOpen(false)
+                  setCommentOpen(false)
+                  setSpreadOpen((v) => !v)
+                }}
               >
                 {isBusy("spread") ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -3121,6 +3837,7 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
                 onClick={() => {
                   setBulkOpen(false)
                   setCommentOpen(false)
+                  setSpreadOpen(false)
                   setGrowthOpen((v) => !v)
                 }}
               >
@@ -3135,6 +3852,7 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
                 onClick={() => {
                   setGrowthOpen(false)
                   setCommentOpen(false)
+                  setSpreadOpen(false)
                   setBulkOpen((v) => !v)
                 }}
               >
@@ -3149,6 +3867,7 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
                 onClick={() => {
                   setGrowthOpen(false)
                   setBulkOpen(false)
+                  setSpreadOpen(false)
                   setCommentOpen((v) => !v)
                   setDetailsOpen(true)
                 }}
@@ -3223,11 +3942,63 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
             </div>
           </div>
 
-          {/* Inline popovers for growth / bulk / comment when opened from More */}
-          {(growthOpen || bulkOpen || commentOpen) && (
+          {/* Inline popovers for spread / growth / bulk / comment */}
+          {(spreadOpen || growthOpen || bulkOpen || commentOpen) && (
             <div className="border-b border-[#e2e8f0] bg-[#f8fafc] px-4 py-2 flex flex-wrap gap-3">
+              {spreadOpen && (
+                <div className="inline-flex flex-wrap items-end gap-2 rounded-md border border-[#e2e8f0] bg-white p-2">
+                  <label className="text-[11px] text-[#64748b]">
+                    Method
+                    <select
+                      value={spreadMethod}
+                      onChange={(e) =>
+                        setSpreadMethod(
+                          e.target.value as typeof spreadMethod,
+                        )
+                      }
+                      className="mt-0.5 block h-8 min-w-[10rem] rounded-full border border-[#e2e8f0] bg-white px-2 text-[12px]"
+                    >
+                      <option value="EVEN">Even</option>
+                      <option value="CUSTOM_WEIGHT">Custom weights</option>
+                      <option value="PRIOR_YEAR_PATTERN">Prior year pattern</option>
+                      <option value="HISTORICAL_PATTERN">Historical pattern</option>
+                    </select>
+                  </label>
+                  {spreadMethod === "CUSTOM_WEIGHT" && (
+                    <label className="text-[11px] text-[#64748b]">
+                      Weights ({periods.filter((p) => p.band === "FORECAST").length} forecast
+                      periods)
+                      <input
+                        type="text"
+                        value={spreadWeights}
+                        onChange={(e) => setSpreadWeights(e.target.value)}
+                        placeholder="0.08, 0.08, …"
+                        className="mt-0.5 block h-8 w-[14rem] rounded-md border border-[#e2e8f0] px-2 text-[12px]"
+                      />
+                    </label>
+                  )}
+                  <button
+                    type="button"
+                    className={cn(GRID_TOOL, "rounded-full")}
+                    disabled={!selected || anyBusy}
+                    onClick={() => void runTool("spread")}
+                  >
+                    {isBusy("spread") ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : null}
+                    Apply
+                  </button>
+                  <button
+                    type="button"
+                    className={cn(GRID_TOOL, "rounded-full")}
+                    onClick={() => setSpreadOpen(false)}
+                  >
+                    Close
+                  </button>
+                </div>
+              )}
               {growthOpen && (
-                <div className="inline-flex items-end gap-2 rounded-md border border-[#e2e8f0] bg-white p-2">
+                <div className="inline-flex flex-wrap items-end gap-2 rounded-md border border-[#e2e8f0] bg-white p-2">
                   <label className="text-[11px] text-[#64748b]">
                     Growth %
                     <input
@@ -3238,15 +4009,34 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
                       className="mt-0.5 block h-8 w-20 rounded-md border border-[#e2e8f0] px-2 text-[12px]"
                     />
                   </label>
+                  <label className="text-[11px] text-[#64748b]">
+                    Mode
+                    <select
+                      value={growthMode}
+                      onChange={(e) => setGrowthMode(e.target.value as "COMPOUND" | "FLAT")}
+                      className="mt-0.5 block h-8 rounded-full border border-[#e2e8f0] bg-white px-3 text-[12px]"
+                    >
+                      <option value="COMPOUND">Compound</option>
+                      <option value="FLAT">Flat</option>
+                    </select>
+                  </label>
                   <button
                     type="button"
-                    className={GRID_TOOL}
+                    className={cn(GRID_TOOL, "rounded-full")}
                     disabled={!selected || anyBusy}
                     onClick={() => void runTool("growth")}
                   >
+                    {isBusy("growth") ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : null}
                     Apply
                   </button>
-                  <button type="button" className={GRID_TOOL} onClick={() => setGrowthOpen(false)}>
+                  <button
+                    type="button"
+                    className={cn(GRID_TOOL, "rounded-full")}
+                    disabled={anyBusy}
+                    onClick={() => setGrowthOpen(false)}
+                  >
                     Close
                   </button>
                 </div>
@@ -3722,8 +4512,9 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
         ) : (
           <PlanningWorkspaceInsights
             drivers={driverRows}
-            canEditDrivers={canEditGrid}
+            canEditDrivers={Boolean(isAdmin || canEditGrid || canConfigureDrivers)}
             onDriverSave={onDriverSave}
+            onDriversSaved={onDriversSaved}
             trendPoints={trendPoints}
             workflowSteps={workflowSteps}
           />
@@ -3747,20 +4538,43 @@ export function FpaWorksheet({ modelId }: { modelId: string }) {
                   tasks={collabTasks}
                   activity={collabActivity}
                   liveCycle={Boolean(budgetCycleId)}
-                  canAssignTasks={Boolean(budgetCycleId) && canAssignTasks}
+                  canAssignTasks={Boolean(budgetCycleId) && !isLegacyBudgetCycle && canAssignTasks}
                   assignDepartments={assignDepartments}
                   assignUsers={users}
                   defaultAssignDepartmentId={budgetDepartmentId}
                   onAssignTask={onAssignPlanningTask}
                   onCompleteTask={onCompletePlanningTask}
+                  canReviewTasks={Boolean(
+                    budgetCycleId &&
+                      !isLegacyBudgetCycle &&
+                      (isAdmin || canReviewSubmissions || canReturnTask),
+                  )}
+                  onApproveTask={
+                    budgetCycleId &&
+                    !isLegacyBudgetCycle &&
+                    (isAdmin || canReviewSubmissions)
+                      ? onApprovePlanningTask
+                      : undefined
+                  }
+                  onReturnTask={
+                    budgetCycleId &&
+                    !isLegacyBudgetCycle &&
+                    (isAdmin || canReviewSubmissions || canReturnTask)
+                      ? onReturnPlanningTask
+                      : undefined
+                  }
+                  taskActionBusyId={taskActionBusyId}
                   assignBusy={assignTaskBusy}
-                  onAddComment={(body) => void onAddCollabComment(body)}
+                  onAddComment={onAddCollabComment}
+                  onReplyComment={
+                    budgetCycleId && !isLegacyBudgetCycle ? onAddCollabComment : undefined
+                  }
                   commentPlaceholder="Add a comment..."
                 />
                 <PlanningTasksCard
                   tasks={collabTasks}
                   liveCycle={Boolean(budgetCycleId)}
-                  canAssignTasks={Boolean(budgetCycleId) && canAssignTasks}
+                  canAssignTasks={Boolean(budgetCycleId) && !isLegacyBudgetCycle && canAssignTasks}
                   assignDepartments={assignDepartments}
                   assignUsers={users}
                   defaultAssignDepartmentId={budgetDepartmentId}

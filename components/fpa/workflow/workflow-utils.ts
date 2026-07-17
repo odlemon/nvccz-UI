@@ -57,6 +57,7 @@ export type WorkflowTaskRow = {
   versionId?: string | null
   scenarioId?: string | null
   cycleId?: string | null
+  taskKind?: string | null
 }
 
 export const WORKFLOW_STAGES = [
@@ -400,9 +401,20 @@ export function normalizeTaskStatus(status?: string | null): string {
   return String(status || "PENDING").toUpperCase()
 }
 
-export function isPendingReviewStatus(status?: string | null): boolean {
+export function isPendingReviewStatus(
+  status?: string | null,
+  taskKind?: string | null,
+): boolean {
   const s = normalizeTaskStatus(status)
-  return s === "SUBMITTED" || s === "PENDING" || s === "IN_PROGRESS" || s === "OPEN"
+  const kind = String(taskKind || "").toUpperCase()
+  return (
+    s === "SUBMITTED" ||
+    s === "PENDING_REVIEW" ||
+    s === "IN_REVIEW" ||
+    s.includes("REVIEW") ||
+    kind.includes("REVIEW") ||
+    kind.includes("APPROVAL")
+  )
 }
 
 export function isReturnedStatus(status?: string | null): boolean {
@@ -464,26 +476,32 @@ export function mergeWorkflowTasks(opts: {
       versionId: t.versionId || opts.cycle?.versionId,
       scenarioId: t.scenarioId || opts.cycle?.scenarioId,
       cycleId: t.cycleId || opts.cycle?.id,
+      taskKind: t.taskKind,
     })
   }
 
   for (const t of opts.myTasks) {
     const existing = byId.get(t.id)
+    // The cycle endpoint is authoritative; never let a thinner global task
+    // overwrite cycle-scoped status or identity.
+    if (existing) continue
+
+    const modelMatches = Boolean(t.modelId && opts.cycle?.modelId && t.modelId === opts.cycle.modelId)
+    const versionMatches = Boolean(
+      t.versionId && opts.cycle?.versionId && t.versionId === opts.cycle.versionId,
+    )
+    const cycleMatches = Boolean(t.cycleId && opts.cycle?.id && t.cycleId === opts.cycle.id)
+    const workflowMatches = Boolean(
+      t.workflowId && opts.cycle?.workflowId && t.workflowId === opts.cycle.workflowId,
+    )
+    if (!modelMatches || !versionMatches || (!cycleMatches && !workflowMatches)) continue
+
     byId.set(
       t.id,
       taskFromFpaTask(t, {
-        cycleId: opts.cycle?.id,
+        cycleId: t.cycleId,
         scenarioId: opts.cycle?.scenarioId,
-        modelId: t.modelId || opts.cycle?.modelId,
-        versionId: t.versionId || opts.cycle?.versionId,
-        // Preserve richer cycle-task fields when my-tasks is thinner
-        submittedOn: existing?.submittedOn,
-        changeNotes: existing?.changeNotes,
-        departmentName: existing?.departmentName,
-        assigneeName: existing?.assigneeName,
-        reviewerId: existing?.reviewerId ?? t.reviewerId,
-        reviewerName: existing?.reviewerName ?? t.reviewerName,
-        priority: normalizePriority(t.priority) || existing?.priority || t.priority,
+        priority: normalizePriority(t.priority) || t.priority,
       }),
     )
   }
@@ -494,7 +512,7 @@ export function mergeWorkflowTasks(opts: {
     byId.set(q.id, {
       id: q.id,
       title: q.title || existing?.title || "Budget task",
-      status: q.status || existing?.status || "PENDING",
+      status: existing?.status || q.status || "PENDING",
       dueDate: q.dueDate ?? existing?.dueDate,
       departmentId: q.departmentId ?? existing?.departmentId,
       departmentName: q.departmentName ?? existing?.departmentName,
@@ -519,7 +537,7 @@ export function mergeWorkflowTasks(opts: {
     byId.set(o.taskId, {
       id: o.taskId,
       title: existing?.title || `${o.departmentName || "Department"} budget input`,
-      status: o.status || existing?.status || "PENDING",
+      status: existing?.status || o.status || "PENDING",
       dueDate: o.dueDate ?? existing?.dueDate,
       departmentId: o.departmentId || existing?.departmentId,
       departmentName: o.departmentName || existing?.departmentName,
@@ -546,7 +564,7 @@ export function mergeWorkflowTasks(opts: {
       ...existing,
       reviewerId: wt.reviewerId ?? existing.reviewerId,
       reviewerName: wt.reviewerName ?? existing.reviewerName,
-      status: String(wt.status || existing.status),
+      status: existing.status,
       assigneeId: wt.assigneeId ?? existing.assigneeId,
       submittedOn: existing.submittedOn || wt.submittedAt || null,
     })
@@ -561,7 +579,7 @@ export function mergeWorkflowTasks(opts: {
 
 export function countReviewQueue(tasks: WorkflowTaskRow[]) {
   return {
-    pending: tasks.filter((t) => isPendingReviewStatus(t.status)).length,
+    pending: tasks.filter((t) => isPendingReviewStatus(t.status, t.taskKind)).length,
     returned: tasks.filter((t) => isReturnedStatus(t.status)).length,
   }
 }

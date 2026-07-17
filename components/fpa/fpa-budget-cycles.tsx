@@ -34,12 +34,10 @@ import {
   type FpaBudgetCycle,
   type FpaBudgetCycleCreateRequest,
   type FpaBudgetInputCategory,
-  type FpaBudgetCycleStatus,
   type FpaModel,
   type FpaOwnerWorkspace,
   type FpaScenario,
   type FpaVersion,
-  type FpaWorkflow,
 } from "@/lib/api/fpa-api"
 import { departmentApiService } from "@/lib/api/department-api"
 import { usersApi, type AppUser } from "@/lib/api/users-api"
@@ -65,39 +63,6 @@ const FIELD =
   "mt-1 w-full h-9 rounded-full border border-[#e2e8f0] px-3 text-sm text-[#0f172a] bg-white"
 const SELECT_TRIGGER =
   "mt-1 w-full h-9 rounded-full border border-[#e2e8f0] bg-white px-3 text-sm text-[#0f172a] shadow-none focus:ring-2 focus:ring-[#2563eb]/30"
-
-function workflowToCycle(w: FpaWorkflow, modelId: string): FpaBudgetCycle {
-  const status = (w.status || mapStageToStatus(w.stage) || "DRAFT") as FpaBudgetCycleStatus
-  return {
-    id: w.id,
-    name: w.name,
-    modelId: w.modelId || modelId,
-    workflowId: w.id,
-    versionId: w.versionId,
-    scenarioId: w.scenarioId,
-    fiscalYear: w.fiscalYear || new Date().getFullYear(),
-    status,
-    currentStage: (w.stage as FpaBudgetCycle["currentStage"]) || "CREATE_CYCLE",
-    startDate: w.startDate,
-    endDate: w.endDate,
-    tasks: w.tasks,
-    workflow: w,
-  }
-}
-
-function mapStageToStatus(stage?: string): FpaBudgetCycleStatus {
-  const s = String(stage || "").toUpperCase()
-  if (s.includes("LOCK") || s.includes("REPORT")) return "LOCKED"
-  if (s.includes("CFO")) return "PENDING_CFO_REVIEW"
-  if (s.includes("FPA")) return "PENDING_FPA_REVIEW"
-  if (s.includes("VALID")) return "PENDING_VALIDATION"
-  if (s.includes("OWNER") || s.includes("INPUT")) return "OPEN_FOR_INPUT"
-  if (s.includes("ASSIGN")) return "OPEN_FOR_INPUT"
-  if (s.includes("BASELINE")) return "LOADING_BASELINE"
-  if (s.includes("ACTUAL")) return "LOADING_ACTUALS"
-  if (s.includes("RETURN")) return "RETURNED_FOR_CORRECTION"
-  return "DRAFT"
-}
 
 function humanDeptName(
   departmentId?: string | null,
@@ -152,7 +117,7 @@ export function FpaBudgetCycles() {
   const [busyKey, setBusyKey] = useState<string | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
   const [comment, setComment] = useState("")
-  const [usingFallback, setUsingFallback] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [validationErrors, setValidationErrors] = useState<
     Array<{ code: string; message: string; departmentId?: string; category?: string }>
   >([])
@@ -209,16 +174,17 @@ export function FpaBudgetCycles() {
   const refresh = useCallback(async () => {
     if (!selectedModelId) {
       setCycles([])
+      setLoadError(null)
       return
     }
     setLoading(true)
+    setLoadError(null)
     try {
       const res = await fpaApi.listBudgetCycles({ modelId: selectedModelId })
       if (!res.success || !Array.isArray(res.data)) {
         throw new Error(res.message || "listBudgetCycles failed")
       }
       setCycles(res.data)
-      setUsingFallback(false)
       const visible = canSeeAllCycles
         ? res.data!
         : res.data!.filter((c) => {
@@ -262,27 +228,12 @@ export function FpaBudgetCycles() {
         path: "/v1/fpa/budget-cycles",
         method: "GET",
         message: errorMessage(err),
-        impact: "Budget cycle list failed — trying workflows fallback",
+        impact: "Budget cycle list unavailable",
         response: err,
       })
-      try {
-        const wf = await fpaApi.listWorkflows({
-          modelId: selectedModelId,
-          workflowType: "BUDGET",
-        })
-        if (!wf.success || !Array.isArray(wf.data)) throw new Error(wf.message || "listWorkflows failed")
-        const mapped = wf.data.map((w) => workflowToCycle(w, selectedModelId))
-        setCycles(mapped)
-        setUsingFallback(true)
-        setSelectedId((prev) => {
-          if (cycleIdFromUrl && mapped.some((c) => c.id === cycleIdFromUrl)) return cycleIdFromUrl
-          if (prev && mapped.some((c) => c.id === prev)) return prev
-          return mapped[0]?.id ?? null
-        })
-      } catch (err2) {
-        toast.error(errorMessage(err2, "Failed to load budget cycles"))
-        setCycles([])
-      }
+      const message = errorMessage(err, "Failed to load budget cycles")
+      setLoadError(message)
+      toast.error(message)
     } finally {
       setLoading(false)
     }
@@ -389,6 +340,8 @@ export function FpaBudgetCycles() {
     <div className="min-h-full bg-[#f8fafc]">
       <FpaPageHeader
         title="Budgeting"
+        hideFilters
+        hideSearch
         actions={
           canCreateCycle ? (
             <button
@@ -421,12 +374,21 @@ export function FpaBudgetCycles() {
             <RefreshCw className={cn("w-3.5 h-3.5", loading && "animate-spin")} />
             Refresh
           </button>
-          {usingFallback && (
-            <span className="text-[11px] text-[#b45309] bg-[#fffbeb] border border-[#fde68a] rounded-full px-2.5 py-1">
-              Budget-cycles API unavailable — showing workflow fallback
-            </span>
-          )}
         </div>
+
+        {loadError ? (
+          <div className="rounded-xl border border-[#fecaca] bg-[#fef2f2] px-4 py-3 text-sm text-[#b91c1c]">
+            <span>{loadError}</span>
+            <button
+              type="button"
+              className="ml-3 rounded-full border border-[#fca5a5] bg-white px-3 py-1 text-xs font-medium hover:bg-[#fff7f7]"
+              onClick={() => void refresh()}
+              disabled={loading}
+            >
+              Retry
+            </button>
+          </div>
+        ) : null}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <div className="space-y-3">
@@ -449,6 +411,11 @@ export function FpaBudgetCycles() {
                     Create annual budget cycle
                   </button>
                 )}
+              </div>
+            ) : loadError && visibleCycles.length === 0 ? (
+              <div className="rounded-md border border-[#fecaca] bg-white p-10 text-center">
+                <p className="text-sm font-medium text-[#991b1b]">Budget cycles could not be loaded</p>
+                <p className="mt-1 text-xs text-[#64748b]">Retry to restore the canonical budget-cycle list.</p>
               </div>
             ) : loading && visibleCycles.length === 0 ? (
               <div className="flex items-center justify-center gap-2 py-16 text-[#64748b] text-sm">
@@ -788,7 +755,7 @@ function CycleDetailPanel({
     workspace?.validationIssues?.needsAttention ?? validationPassed === false
 
   const worksheetQs = new URLSearchParams()
-  worksheetQs.set("cycleId", cycle.id)
+  worksheetQs.set("modelId", modelId)
   if (ownerTaskId) worksheetQs.set("taskId", ownerTaskId)
   if (myDepartmentId) worksheetQs.set("departmentId", myDepartmentId)
   if (cycle.name) worksheetQs.set("cycleName", cycle.name)
@@ -796,7 +763,7 @@ function CycleDetailPanel({
   if (dueIso) worksheetQs.set("dueDate", String(dueIso).slice(0, 10))
   if (cycle.versionId) worksheetQs.set("versionId", cycle.versionId)
   if (cycle.scenarioId) worksheetQs.set("scenarioId", cycle.scenarioId)
-  const worksheetHref = `/forecasting/models/${modelId}/worksheet?${worksheetQs.toString()}`
+  const worksheetHref = `/forecasting/budget/${encodeURIComponent(cycle.id)}/workspace?${worksheetQs.toString()}`
 
   const planningAreas = (workspace?.planningAreas?.length
     ? workspace.planningAreas.map((a) => {

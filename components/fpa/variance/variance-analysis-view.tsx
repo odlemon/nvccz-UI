@@ -10,6 +10,7 @@ import {
   Info,
   Loader2,
   MoreHorizontal,
+  RefreshCw,
   X,
 } from "lucide-react"
 import {
@@ -30,105 +31,19 @@ import {
   planningAvatarTone,
   planningInitials,
 } from "@/components/fpa/planning/planning-collab-sidebar"
-import {
-  mockCommentaryReqs,
-  mockVarDeptRows,
-  mockVarKpis,
-  mockVarTrend,
-  mockVarTornado,
-} from "@/components/fpa/mock-data"
 import { CommentaryAllDialog, InfoDialog } from "@/components/fpa/variance/variance-dialogs"
 
 const R = "rounded-lg"
-
-const DEPT_ENTITIES: Record<string, string> = {
-  Marketing: "North America",
-  Sales: "North America",
-  "Product Development": "North America",
-  "Customer Success": "North America",
-  IT: "EMEA",
-  Finance: "EMEA",
-  "People & Culture": "EMEA",
-  Legal: "EMEA",
-  Operations: "APAC",
-  "R&D": "APAC",
-  "Shared Services": "LATAM",
-}
-
-const VERSION_SCALE: Record<string, number> = {
-  Working: 1,
-  Locked: 0.99,
-  Published: 0.97,
-}
-
-function scaleRow(row: VarDeptRow, factor: number): VarDeptRow {
-  if (factor === 1 || row.isSummary) return row
-  return {
-    ...row,
-    actual: row.actual * factor,
-    budget: row.budget * factor,
-    forecast: row.forecast * factor,
-    varB: row.varB * factor,
-    varF: row.varF * factor,
-  }
-}
-
-function aggregateEntityRows(rows: VarDeptRow[]): VarDeptRow[] {
-  const total = rows.find((r) => r.isSummary || r.dept === "Total Company")
-  const byEntity = new Map<string, VarDeptRow>()
-  for (const row of rows.filter((r) => !r.isSummary && r.dept !== "Total Company")) {
-    const ent = DEPT_ENTITIES[row.dept] || "Other"
-    const hit = byEntity.get(ent)
-    if (!hit) {
-      byEntity.set(ent, { ...row, dept: ent, isSummary: false })
-    } else {
-      byEntity.set(ent, {
-        ...hit,
-        actual: hit.actual + row.actual,
-        budget: hit.budget + row.budget,
-        forecast: hit.forecast + row.forecast,
-        varB: hit.varB + row.varB,
-        varF: hit.varF + row.varF,
-        varBp: hit.budget + row.budget ? ((hit.varB + row.varB) / (hit.budget + row.budget)) * 100 : 0,
-        commentary: row.commentary === "red" || hit.commentary === "red" ? "red" : row.commentary === "yellow" || hit.commentary === "yellow" ? "yellow" : "green",
-      })
-    }
-  }
-  const entityRows = [...byEntity.values()].sort((a, b) => a.dept.localeCompare(b.dept))
-  return total ? [total, ...entityRows] : entityRows
-}
-
-function toLineItemRows(rows: VarDeptRow[]): VarDeptRow[] {
-  const total = rows.find((r) => r.isSummary || r.dept === "Total Company")
-  const out: VarDeptRow[] = total ? [total] : []
-  for (const row of rows.filter((r) => !r.isSummary && r.dept !== "Total Company")) {
-    for (const suffix of ["Revenue", "Opex"] as const) {
-      const share = suffix === "Revenue" ? 0.62 : 0.38
-      out.push({
-        ...row,
-        dept: `${row.dept} · ${suffix}`,
-        actual: row.actual * share,
-        budget: row.budget * share,
-        forecast: row.forecast * share,
-        varB: row.varB * share,
-        varF: row.varF * share,
-        varBp: row.varBp,
-        commentary: row.commentary,
-      })
-    }
-  }
-  return out
-}
 
 export type VarDeptRow = {
   dept: string
   actual: number
   budget: number
-  forecast: number
+  forecast: number | null
   varB: number
   varBp: number
-  varF: number
-  commentary: "green" | "yellow" | "red"
+  varF: number | null
+  commentary?: "green" | "yellow" | "red"
   commentaryDone?: number
   commentaryTotal?: number
   isSummary?: boolean
@@ -141,7 +56,8 @@ export type VarCommentaryReq = {
   owner: string
   due: string
   variance: string
-  status: "Overdue" | "In Progress" | "Submitted"
+  status: "Overdue" | "In Progress" | "Submitted" | "—"
+  period?: string
 }
 
 export type VarKpi = {
@@ -154,6 +70,16 @@ export type VarKpi = {
   /** Revenue / Opex / EBITDA variance cards — circle arrow on the right */
   showTrendIcon?: boolean
   trendArrow?: "up" | "down"
+}
+
+export type VarTrendPoint = {
+  period: string
+  variance: number
+}
+
+export type VarTornadoPoint = {
+  dept: string
+  value: number
 }
 
 export type VarDetail = {
@@ -169,7 +95,7 @@ export type VarDetail = {
   supporting: Array<{ label: string; value: string }>
   owner: string
   due: string
-  status: "Overdue" | "In Progress" | "Submitted"
+  status: "Overdue" | "In Progress" | "Submitted" | "—"
 }
 
 function fmtMoneyM(n: number, summary = false): string {
@@ -190,93 +116,7 @@ function varTone(n: number): string {
   return n > 0 ? "text-[#12b76a]" : "text-[#f04438]"
 }
 
-export function mapMockDeptRows(): VarDeptRow[] {
-  return mockVarDeptRows.map((r) => ({
-    ...r,
-    commentaryDone: r.commentaryDone,
-    commentaryTotal: r.commentaryTotal,
-    isSummary: "isSummary" in r ? Boolean(r.isSummary) : r.dept === "Total Company",
-  }))
-}
-
-export function mapMockCommentary(): VarCommentaryReq[] {
-  return mockCommentaryReqs.map((r, i) => ({
-    id: `cr-${i}`,
-    ...r,
-  }))
-}
-
-export function mapMockKpis(): VarKpi[] {
-  const [actual, budget, revVar, opexVar, ebitdaVar] = mockVarKpis
-  return [
-    {
-      label: actual.label,
-      value: actual.value,
-      delta: "▲ 4.2% vs Budget",
-      deltaTone: "up",
-      spark: actual.spark,
-      sparkColor: "#3b82f6",
-    },
-    {
-      label: budget.label,
-      value: budget.value,
-      deltaTone: "neutral",
-      spark: budget.spark,
-      sparkColor: "#3b82f6",
-    },
-    {
-      label: revVar.label,
-      value: revVar.value,
-      delta: "▲ 3.6% vs Budget",
-      deltaTone: "up",
-      showTrendIcon: true,
-      trendArrow: "up",
-    },
-    {
-      label: opexVar.label,
-      value: opexVar.value,
-      delta: "▼ -2.1% vs Budget",
-      deltaTone: "up",
-      showTrendIcon: true,
-      trendArrow: "down",
-    },
-    {
-      label: ebitdaVar.label,
-      value: ebitdaVar.value,
-      delta: "▲ 8.7% vs Budget",
-      deltaTone: "up",
-      showTrendIcon: true,
-      trendArrow: "up",
-    },
-  ]
-}
-
-const DEMO_DETAILS: Record<string, VarDetail> = {
-  "Product Development|Headcount": {
-    id: "pd-hc",
-    dept: "Product Development",
-    area: "Headcount",
-    period: "May 2025",
-    headline: "$(0.80M)",
-    headlineTone: "down",
-    pctLabel: "-7.4% vs Budget",
-    explanation:
-      "Headcount variance driven by delayed hiring in engineering roles. Three senior engineer positions remain unfilled due to extended interview cycles and competing offers in the market.",
-    correctiveAction:
-      "Accelerate hiring pipeline with agency support for Q2 backfill. Revised offer bands approved for senior engineering roles effective June 1.",
-    supporting: [
-      { label: "Actual", value: "$15.00M" },
-      { label: "Budget", value: "$16.20M" },
-      { label: "Forecast", value: "$15.50M" },
-      { label: "Var to Budget $", value: "$(0.80M)" },
-      { label: "Var %", value: "-7.4%" },
-      { label: "Var to Forecast $", value: "$(0.50M)" },
-    ],
-    owner: "Devon Lane",
-    due: "May 30, 2025",
-    status: "Overdue",
-  },
-}
+export type FilterOption = { value: string; label: string }
 
 function FilterSelect({
   label,
@@ -286,7 +126,7 @@ function FilterSelect({
 }: {
   label: string
   value: string
-  options: string[]
+  options: FilterOption[]
   onChange: (v: string) => void
 }) {
   const [open, setOpen] = useState(false)
@@ -305,14 +145,14 @@ function FilterSelect({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className={`h-10 min-w-[118px] inline-flex items-center ${R} border border-[#d0d5dd] bg-white pl-2.5 pr-7 text-left hover:bg-[#f9fafb]`}
+        className="h-10 min-w-[118px] inline-flex items-center rounded-full border border-[#d0d5dd] bg-white pl-2.5 pr-7 text-left hover:bg-[#f9fafb]"
       >
         <span className="flex flex-col justify-center min-w-0 py-1">
           <span className="text-[9px] font-medium uppercase tracking-wide text-[#98a2b3] leading-none">
             {label}
           </span>
           <span className="text-[12px] font-semibold text-[#101828] leading-tight mt-0.5 truncate">
-            {value}
+            {options.find((option) => option.value === value)?.label || "—"}
           </span>
         </span>
         <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 size-4 text-[#98a2b3]" />
@@ -323,19 +163,19 @@ function FilterSelect({
         >
           {options.map((opt) => (
             <button
-              key={opt}
+              key={opt.value}
               type="button"
               onClick={() => {
-                onChange(opt)
+                onChange(opt.value)
                 setOpen(false)
               }}
               className={cn(
-                "w-full flex items-center justify-between gap-2 px-3 py-2 text-left text-[12px] hover:bg-[#f9fafb]",
-                opt === value ? "text-[#1570ef] font-semibold" : "text-[#344054]",
+                "w-full flex items-center justify-between gap-2 rounded-full px-3 py-2 text-left text-[12px] hover:bg-[#f9fafb]",
+                opt.value === value ? "text-[#1570ef] font-semibold" : "text-[#344054]",
               )}
             >
-              {opt}
-              {opt === value ? <Check className="size-3.5 shrink-0" /> : null}
+              {opt.label}
+              {opt.value === value ? <Check className="size-3.5 shrink-0" /> : null}
             </button>
           ))}
         </div>
@@ -353,7 +193,7 @@ function VarKpiCard({ kpi, onClick }: { kpi: VarKpi; onClick?: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className={`${R} border border-[#e4e7ec] bg-white px-4 py-3 shadow-[0_1px_2px_rgba(16,24,40,0.03)] flex items-center justify-between gap-3 min-h-[92px] w-full text-left hover:border-[#b2ddff] transition-colors`}
+      className="rounded-lg border border-[#e4e7ec] bg-white px-4 py-3 shadow-[0_1px_2px_rgba(16,24,40,0.03)] flex items-center justify-between gap-3 min-h-[92px] w-full text-left hover:border-[#b2ddff] transition-colors"
     >
       <div className="min-w-0 flex flex-col justify-center">
         <p className="text-[13px] font-semibold text-[#344054] leading-tight">{kpi.label}</p>
@@ -407,7 +247,9 @@ function StatusBadge({ status }: { status: VarCommentaryReq["status"] }) {
       ? "bg-[#fef3f2] text-[#d92d20] border-[#fecdca]"
       : status === "Submitted"
         ? "bg-[#ecfdf3] text-[#079455] border-[#abefc6]"
-        : "bg-[#eff8ff] text-[#1570ef] border-[#b2ddff]"
+        : status === "In Progress"
+          ? "bg-[#eff8ff] text-[#1570ef] border-[#b2ddff]"
+          : "bg-[#f2f4f7] text-[#667085] border-[#e4e7ec]"
   return (
     <span className={cn("inline-flex rounded-full border px-2 py-0.5 text-[11px] font-medium", styles)}>
       {status}
@@ -450,7 +292,7 @@ function VarianceDetailPanel({
         <button
           type="button"
           onClick={onClose}
-          className="text-[#98a2b3] hover:text-[#667085] p-1"
+          className="rounded-full text-[#98a2b3] hover:text-[#667085] hover:bg-[#f9fafb] p-1"
           aria-label="Close"
         >
           <X className="size-4" />
@@ -476,7 +318,7 @@ function VarianceDetailPanel({
             type="button"
             onClick={() => setTab(t)}
             className={cn(
-              "relative py-2.5 px-1 mr-4 text-[12px] font-medium capitalize",
+              "relative rounded-full py-2.5 px-2 mr-2 text-[12px] font-medium capitalize",
               tab === t ? "text-[#1570ef]" : "text-[#667085] hover:text-[#344054]",
             )}
           >
@@ -548,7 +390,7 @@ function VarianceDetailPanel({
                 </button>
               </div>
             ) : (
-              <button type="button" className="text-[12px] font-medium text-[#1570ef] hover:underline">
+              <button type="button" className="rounded-full px-2 py-1 text-[12px] font-medium text-[#1570ef] hover:bg-[#eff8ff]">
                 Add Comment
               </button>
             )}
@@ -562,49 +404,69 @@ function VarianceDetailPanel({
 }
 
 export type VarianceAnalysisViewProps = {
-  loading?: boolean
-  busy?: boolean
-  kpis?: VarKpi[]
-  deptRows?: VarDeptRow[]
-  commentaryReqs?: VarCommentaryReq[]
-  trend?: typeof mockVarTrend
-  breakdown?: typeof mockVarTornado
-  selectedDetail?: VarDetail | null
-  detailOpen?: boolean
-  periodLabel?: string
+  loading: boolean
+  busy: boolean
+  selectionError?: string | null
+  resultsError?: string | null
+  summaryError?: string | null
+  kpis: VarKpi[]
+  deptRows: VarDeptRow[]
+  commentaryReqs: VarCommentaryReq[]
+  trend: VarTrendPoint[]
+  breakdown: VarTornadoPoint[]
+  selectedDetail: VarDetail | null
+  detailOpen: boolean
+  periodLabel: string
+  periodOptions: string[]
+  onPeriodChange: (period: string) => void
+  versionLabel: string
+  selectedVersionId: string
+  versionOptions: FilterOption[]
+  onVersionChange: (versionId: string) => void
+  departmentOptions: string[]
   canAddCommentary?: boolean
+  canRecalculate?: boolean
   onResetFilters?: () => void
   onSelectDept?: (dept: string, period: string) => void
   onSelectCommentary?: (req: VarCommentaryReq, period: string) => void
   onCloseDetail?: () => void
   onSaveComment?: (body: string) => void
   onRefresh?: () => void
+  onRecalculate?: () => void
 }
 
 export function VarianceAnalysisView({
-  loading = false,
-  busy = false,
-  kpis = mapMockKpis(),
-  deptRows = mapMockDeptRows(),
-  commentaryReqs = mapMockCommentary(),
-  trend = mockVarTrend,
-  breakdown = mockVarTornado,
-  selectedDetail = DEMO_DETAILS["Product Development|Headcount"],
-  detailOpen = true,
-  periodLabel = "May 2025",
+  loading,
+  busy,
+  selectionError,
+  resultsError,
+  summaryError,
+  kpis,
+  deptRows,
+  commentaryReqs,
+  trend,
+  breakdown,
+  selectedDetail,
+  detailOpen,
+  periodLabel,
+  periodOptions,
+  onPeriodChange,
+  versionLabel,
+  selectedVersionId,
+  versionOptions,
+  onVersionChange,
+  departmentOptions,
   canAddCommentary,
+  canRecalculate,
   onResetFilters,
   onSelectDept,
   onSelectCommentary,
   onCloseDetail,
   onSaveComment,
   onRefresh,
+  onRecalculate,
 }: VarianceAnalysisViewProps) {
-  const [entity, setEntity] = useState("All Entities (4)")
   const [department, setDepartment] = useState("All Departments")
-  const [version, setVersion] = useState("Working")
-  const [period, setPeriod] = useState(periodLabel)
-  const [view, setView] = useState("Department View")
   const [commentaryOpen, setCommentaryOpen] = useState(false)
   const [infoOpen, setInfoOpen] = useState<string | null>(null)
   const [tableMenuOpen, setTableMenuOpen] = useState(false)
@@ -619,29 +481,13 @@ export function VarianceAnalysisView({
   }, [])
 
   useEffect(() => {
-    if (department === "All Departments") return
-    if (entity === "All Entities (4)") return
-    if (DEPT_ENTITIES[department] !== entity) setDepartment("All Departments")
-  }, [entity, department])
-
-  const versionFactor = VERSION_SCALE[version] ?? 1
-
-  const entityFilteredRows = useMemo(() => {
-    let rows = deptRows.map((r) => scaleRow(r, versionFactor))
-    if (entity !== "All Entities (4)") {
-      rows = rows.filter(
-        (r) =>
-          r.isSummary ||
-          r.dept === "Total Company" ||
-          DEPT_ENTITIES[r.dept] === entity ||
-          (view !== "Department View" && r.dept === entity),
-      )
+    if (department !== "All Departments" && !departmentOptions.includes(department)) {
+      setDepartment("All Departments")
     }
-    return rows
-  }, [deptRows, entity, versionFactor, view])
+  }, [department, departmentOptions])
 
   const filteredRows = useMemo(() => {
-    let rows = entityFilteredRows
+    let rows = deptRows
     if (department !== "All Departments") {
       rows = rows.filter(
         (r) =>
@@ -651,45 +497,38 @@ export function VarianceAnalysisView({
           r.dept.startsWith(`${department} ·`),
       )
     }
-
-    if (view === "Entity View") return aggregateEntityRows(rows)
-    if (view === "Line Item View") return toLineItemRows(rows)
     return rows
-  }, [entityFilteredRows, department, view])
+  }, [deptRows, department])
 
   const filteredCommentary = useMemo(() => {
     return commentaryReqs.filter((req) => {
       if (department !== "All Departments" && req.dept !== department) return false
-      if (entity !== "All Entities (4)" && DEPT_ENTITIES[req.dept] !== entity) return false
+      if (periodLabel !== "No periods" && req.period && req.period !== periodLabel) return false
       return true
     })
-  }, [commentaryReqs, department, entity])
+  }, [commentaryReqs, department, periodLabel])
 
   const filteredBreakdown = useMemo(() => {
-    const allowed = new Set(
-      filteredRows.filter((r) => !r.isSummary && r.dept !== "Total Company").map((r) => r.dept.split(" · ")[0]),
+    if (department === "All Departments") return breakdown
+    return breakdown.filter(
+      (point) => point.dept === department || point.dept.startsWith(`${department} ·`),
     )
-    if (!allowed.size) return breakdown
-    return breakdown.filter((b) => allowed.has(b.dept))
-  }, [breakdown, filteredRows])
+  }, [breakdown, department])
+
+  const filteredTrend = useMemo(
+    () => trend.filter((point) => periodLabel === "No periods" || point.period === periodLabel),
+    [periodLabel, trend],
+  )
 
   const resetFilters = () => {
-    setEntity("All Entities (4)")
     setDepartment("All Departments")
-    setVersion("Working")
-    setPeriod(periodLabel)
-    setView("Department View")
     toast.message("Filters reset")
     onResetFilters?.()
   }
 
   const pickDept = (dept: string) => {
     if (dept === "Total Company") return
-    const key =
-      view === "Entity View"
-        ? mockVarDeptRows.find((r) => DEPT_ENTITIES[r.dept] === dept)?.dept ?? dept
-        : dept.split(" · ")[0]
-    onSelectDept?.(key, period)
+    onSelectDept?.(dept, periodLabel)
   }
 
   const pickBreakdownDept = (dept: string) => {
@@ -700,7 +539,7 @@ export function VarianceAnalysisView({
     table:
       {
         title: "Actual vs Budget vs Forecast",
-        body: "Compare actuals, budget, and forecast by department for the selected period. Click a row to open variance detail in the sidebar.",
+        body: "Compare the version-level department summary returned by the variance summary endpoint. The period filter applies to result detail and trend data, not these summary totals.",
       },
     commentary:
       {
@@ -716,52 +555,43 @@ export function VarianceAnalysisView({
           <h1 className="text-[18px] font-semibold text-[#101828]">Variance Analysis</h1>
           <div className="mt-3 flex flex-wrap items-end gap-2">
             <FilterSelect
-              label="Entity"
-              value={entity}
-              options={["All Entities (4)", "North America", "EMEA", "APAC", "LATAM"]}
-              onChange={setEntity}
-            />
-            <FilterSelect
               label="Department"
               value={department}
-              options={[
-                "All Departments",
-                "Marketing",
-                "Sales",
-                "Product Development",
-                "Customer Success",
-                "IT",
-                "Finance",
-                "People & Culture",
-                "Legal",
-                "Operations",
-                "R&D",
-                "Shared Services",
-              ]}
+              options={["All Departments", ...departmentOptions].map((option) => ({
+                value: option,
+                label: option,
+              }))}
               onChange={setDepartment}
             />
             <FilterSelect
               label="Version"
-              value={version}
-              options={["Working", "Locked", "Published"]}
-              onChange={setVersion}
+              value={selectedVersionId}
+              options={versionOptions}
+              onChange={onVersionChange}
             />
             <FilterSelect
               label="Period"
-              value={period}
-              options={["May 2025", "Apr 2025", "Mar 2025", "FY2025", "FY2026"]}
-              onChange={setPeriod}
-            />
-            <FilterSelect
-              label="View"
-              value={view}
-              options={["Department View", "Entity View", "Line Item View"]}
-              onChange={setView}
+              value={periodLabel === "No periods" ? "" : periodLabel}
+              options={
+                periodOptions.length
+                  ? periodOptions.map((option) => ({ value: option, label: option }))
+                  : [{ value: "", label: "No periods" }]
+              }
+              onChange={onPeriodChange}
             />
             <button
               type="button"
+              disabled={!canRecalculate || busy}
+              onClick={onRecalculate}
+              className="h-10 rounded-full bg-[#1570ef] px-4 text-[12px] font-semibold text-white shadow-sm hover:bg-[#175cd3] disabled:cursor-not-allowed disabled:opacity-50 inline-flex items-center gap-2"
+            >
+              <RefreshCw className={cn("size-3.5", busy && "animate-spin")} />
+              Recalculate
+            </button>
+            <button
+              type="button"
               onClick={resetFilters}
-              className="ml-auto mb-0.5 px-1 text-[12px] font-semibold text-[#1570ef] hover:underline"
+              className="ml-auto mb-0.5 rounded-full px-3 py-2 text-[12px] font-semibold text-[#1570ef] hover:bg-[#eff8ff]"
             >
               Reset Filters
             </button>
@@ -769,21 +599,44 @@ export function VarianceAnalysisView({
         </div>
 
         <div className="px-4 sm:px-5 pb-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
-            {kpis.map((k) => (
-              <VarKpiCard
-                key={k.label}
-                kpi={k}
-                onClick={() => toast.message(k.label, { description: `${k.value} · ${period} · ${version}` })}
-              />
-            ))}
-          </div>
+          {kpis.length ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+              {kpis.map((k) => (
+                <VarKpiCard
+                  key={k.label}
+                  kpi={k}
+                  onClick={() => toast.message(k.label, { description: `${k.value} · ${versionLabel} version summary` })}
+                />
+              ))}
+            </div>
+          ) : (
+            <p className="py-5 text-center text-[12px] text-[#98a2b3]">
+              {summaryError
+                ? "Variance KPI summary could not be loaded."
+                : "No variance KPI summary is available for this model and version. KPIs are not period-filtered."}
+            </p>
+          )}
         </div>
       </div>
 
       <div className="flex flex-col xl:flex-row flex-1 min-h-0">
         <div className="flex-1 min-w-0 p-4 sm:p-5 space-y-4">
-          {loading ? (
+          {[selectionError, resultsError && `Results: ${resultsError}`, summaryError && `Summary: ${summaryError}`]
+            .filter((message): message is string => Boolean(message))
+            .map((message) => (
+            <div key={message} className={`${R} border border-[#fecdca] bg-[#fef3f2] px-4 py-3 text-[12px] text-[#b42318] flex items-center justify-between gap-3`} role="alert">
+              <span>{message}</span>
+              <button
+                type="button"
+                disabled={loading}
+                onClick={onRefresh}
+                className="h-8 shrink-0 rounded-full border border-[#fda29b] px-3 font-semibold hover:bg-[#fee4e2] disabled:opacity-50"
+              >
+                Retry
+              </button>
+            </div>
+            ))}
+          {loading && !kpis.length && !deptRows.length && !commentaryReqs.length && !trend.length && !breakdown.length ? (
             <div className="flex items-center gap-2 py-16 text-[#667085]">
               <Loader2 className="size-5 animate-spin" /> Loading variance…
             </div>
@@ -800,7 +653,7 @@ export function VarianceAnalysisView({
                         <button
                           type="button"
                           onClick={() => setInfoOpen("table")}
-                          className={`inline-flex h-5 w-5 items-center justify-center ${R} text-[#98a2b3] hover:text-[#667085] hover:bg-[#f9fafb]`}
+                          className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[#98a2b3] hover:text-[#667085] hover:bg-[#f9fafb]"
                           aria-label="About this table"
                         >
                           <Info className="size-3.5" />
@@ -810,7 +663,7 @@ export function VarianceAnalysisView({
                         <button
                           type="button"
                           onClick={() => setTableMenuOpen((o) => !o)}
-                          className={`inline-flex h-8 w-8 items-center justify-center ${R} text-[#667085] hover:bg-[#f9fafb]`}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[#667085] hover:bg-[#f9fafb]"
                           aria-label="Table options"
                         >
                           <MoreHorizontal className="size-4" />
@@ -819,7 +672,7 @@ export function VarianceAnalysisView({
                           <div className={`absolute right-0 top-full z-20 mt-1 w-44 ${R} border border-[#e4e7ec] bg-white py-1 shadow-lg`}>
                             <button
                               type="button"
-                              className="w-full px-3 py-2 text-left text-[12px] hover:bg-[#f9fafb] text-[#344054]"
+                              className="w-full rounded-full px-3 py-2 text-left text-[12px] hover:bg-[#f9fafb] text-[#344054]"
                               onClick={() => {
                                 toast.success("Table exported to CSV")
                                 setTableMenuOpen(false)
@@ -829,7 +682,7 @@ export function VarianceAnalysisView({
                             </button>
                             <button
                               type="button"
-                              className="w-full px-3 py-2 text-left text-[12px] hover:bg-[#f9fafb] text-[#344054]"
+                              className="w-full rounded-full px-3 py-2 text-left text-[12px] hover:bg-[#f9fafb] text-[#344054]"
                               onClick={() => {
                                 onRefresh?.()
                                 setTableMenuOpen(false)
@@ -860,9 +713,9 @@ export function VarianceAnalysisView({
                           </tr>
                           <tr className="border-b border-[#e4e7ec]">
                             <th className="px-4 py-1" />
-                            <th className="px-3 py-1 text-right text-[10px] font-normal text-[#98a2b3]">{period}</th>
-                            <th className="px-3 py-1 text-right text-[10px] font-normal text-[#98a2b3]">{period}</th>
-                            <th className="px-3 py-1 text-right text-[10px] font-normal text-[#98a2b3]">{period}</th>
+                            <th className="px-3 py-1 text-right text-[10px] font-normal text-[#98a2b3]">Summary</th>
+                            <th className="px-3 py-1 text-right text-[10px] font-normal text-[#98a2b3]">Summary</th>
+                            <th className="px-3 py-1 text-right text-[10px] font-normal text-[#98a2b3]">Summary</th>
                             <th className="px-3 py-1 text-right text-[10px] font-normal text-[#98a2b3]">$</th>
                             <th className="px-3 py-1 text-right text-[10px] font-normal text-[#98a2b3]">%</th>
                             <th className="px-3 py-1 text-right text-[10px] font-normal text-[#98a2b3]">$</th>
@@ -870,7 +723,7 @@ export function VarianceAnalysisView({
                           </tr>
                         </thead>
                         <tbody>
-                          {filteredRows.map((row) => {
+                          {filteredRows.length ? filteredRows.map((row) => {
                             const summary = row.isSummary || row.dept === "Total Company"
                             return (
                               <tr
@@ -910,7 +763,7 @@ export function VarianceAnalysisView({
                                     summary && "font-semibold",
                                   )}
                                 >
-                                  {fmtMoneyM(row.forecast, summary)}
+                                  {row.forecast == null ? "Unavailable" : fmtMoneyM(row.forecast, summary)}
                                 </td>
                                 <td
                                   className={cn(
@@ -933,16 +786,18 @@ export function VarianceAnalysisView({
                                 <td
                                   className={cn(
                                     "px-3 py-2.5 text-right tabular-nums font-medium",
-                                    varTone(row.varF),
+                                    row.varF != null && varTone(row.varF),
                                     summary && "font-semibold",
                                   )}
                                 >
-                                  {fmtMoneyM(row.varF, summary)}
+                                  {row.varF == null ? "Unavailable" : fmtMoneyM(row.varF, summary)}
                                 </td>
                                 <td className="px-4 py-2.5">
                                   <div className="flex items-center justify-end gap-1.5">
-                                    <CommentaryDot tone={row.commentary} />
-                                    {row.commentaryDone != null && row.commentaryTotal != null ? (
+                                    {row.commentary ? <CommentaryDot tone={row.commentary} /> : (
+                                      <span className="text-[11px] text-[#98a2b3]">Unavailable</span>
+                                    )}
+                                    {row.commentary && row.commentaryDone != null && row.commentaryTotal != null ? (
                                       <span className="text-[11px] text-[#667085] tabular-nums">
                                         {row.commentaryDone}/{row.commentaryTotal}
                                       </span>
@@ -951,25 +806,33 @@ export function VarianceAnalysisView({
                                 </td>
                               </tr>
                             )
-                          })}
+                          }) : (
+                            <tr>
+                              <td colSpan={8} className="px-4 py-8 text-center text-[12px] text-[#98a2b3]">
+                                {summaryError
+                                  ? "Department summary could not be loaded."
+                                  : "No department variance data is available for the current selection."}
+                              </td>
+                            </tr>
+                          )}
                         </tbody>
                       </table>
                     </div>
                   </section>
 
-                  <section className={`${R} border border-[#e4e7ec] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)] overflow-hidden`}>
-                    <div className="px-4 py-3 border-b border-[#e4e7ec] flex items-center gap-1.5">
+                  <section className={`${R} h-[320px] border border-[#e4e7ec] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)] overflow-hidden flex flex-col`}>
+                    <div className="px-4 py-3 border-b border-[#e4e7ec] flex items-center gap-1.5 shrink-0">
                       <h2 className="text-[13px] font-semibold text-[#101828]">Commentary Requests</h2>
                       <button
                         type="button"
                         onClick={() => setInfoOpen("commentary")}
-                        className={`inline-flex h-5 w-5 items-center justify-center ${R} text-[#98a2b3] hover:text-[#667085] hover:bg-[#f9fafb]`}
+                        className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[#98a2b3] hover:text-[#667085] hover:bg-[#f9fafb]"
                         aria-label="About commentary requests"
                       >
                         <Info className="size-3.5" />
                       </button>
                     </div>
-                    <div className="overflow-x-auto">
+                    <div className="flex-1 min-h-0 overflow-auto">
                       <table className="w-full border-collapse text-[12px] min-w-[700px]">
                         <thead>
                           <tr className="border-b border-[#e4e7ec]">
@@ -986,7 +849,7 @@ export function VarianceAnalysisView({
                             filteredCommentary.map((req) => (
                             <tr
                               key={req.id}
-                              onClick={() => onSelectCommentary?.(req, period)}
+                              onClick={() => onSelectCommentary?.(req, periodLabel)}
                               className="border-b border-[#f2f4f7] cursor-pointer hover:bg-[#fcfcfd] last:border-b-0"
                             >
                               <td className="px-4 py-2.5 font-medium text-[#101828]">{req.dept}</td>
@@ -1021,18 +884,20 @@ export function VarianceAnalysisView({
                           ) : (
                             <tr>
                               <td colSpan={6} className="px-4 py-8 text-center text-[12px] text-[#98a2b3]">
-                                No commentary requests match the current filters.
+                                {resultsError
+                                  ? "Commentary requests could not be loaded."
+                                  : "No commentary requests match the current filters."}
                               </td>
                             </tr>
                           )}
                         </tbody>
                       </table>
                     </div>
-                    <div className="px-4 py-3 border-t border-[#f2f4f7]">
+                    <div className="px-4 py-3 border-t border-[#f2f4f7] shrink-0">
                       <button
                         type="button"
                         onClick={() => setCommentaryOpen(true)}
-                        className="text-[12px] font-medium text-[#1570ef] hover:underline"
+                        className="rounded-full px-3 py-2 text-[12px] font-medium text-[#1570ef] hover:bg-[#eff8ff]"
                       >
                         View all commentary requests
                       </button>
@@ -1041,59 +906,63 @@ export function VarianceAnalysisView({
                 </div>
 
                 <div className="lg:col-span-5 flex flex-col gap-4 min-w-0 min-h-full">
-                  <section className={`${R} border border-[#e4e7ec] bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)] flex-1 flex flex-col min-h-0`}>
+                  <section className={`${R} h-[320px] border border-[#e4e7ec] bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)] flex flex-col min-h-0`}>
                     <h2 className="text-[13px] font-semibold text-[#101828] shrink-0">Variance Trend (Total Company)</h2>
-                    <p className="text-[11px] text-[#667085] mb-3 shrink-0">{period} · {version}</p>
-                    <div className="flex-1 min-h-[180px]">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <ComposedChart data={trend} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#f2f4f7" vertical={false} />
-                          <XAxis
-                            dataKey="m"
-                            tick={{ fontSize: 10, fill: "#667085" }}
-                            axisLine={false}
-                            tickLine={false}
-                          />
-                          <YAxis
-                            tick={{ fontSize: 10, fill: "#667085" }}
-                            axisLine={false}
-                            tickLine={false}
-                            width={28}
-                          />
-                          <Tooltip
-                            contentStyle={{
-                              fontSize: 12,
-                              borderRadius: 8,
-                              border: "1px solid #e4e7ec",
-                            }}
-                          />
-                          <Bar dataKey="budget" fill="#93c5fd" radius={[3, 3, 0, 0]} barSize={14} name="Var to Budget" />
-                          <Line
-                            type="monotone"
-                            dataKey="forecast"
-                            stroke="#12b76a"
-                            strokeWidth={2}
-                            dot={{ r: 3, fill: "#12b76a", strokeWidth: 0 }}
-                            name="Var to Forecast"
-                          />
-                        </ComposedChart>
-                      </ResponsiveContainer>
+                    <p className="text-[11px] text-[#667085] mb-3 shrink-0">{periodLabel} · {versionLabel}</p>
+                    <div className="flex-1 min-h-0 overflow-y-auto">
+                      {filteredTrend.length ? (
+                        <div className="h-[210px] min-w-0">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <ComposedChart data={filteredTrend} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#f2f4f7" vertical={false} />
+                            <XAxis
+                              dataKey="period"
+                              tick={{ fontSize: 10, fill: "#667085" }}
+                              axisLine={false}
+                              tickLine={false}
+                            />
+                            <YAxis
+                              tick={{ fontSize: 10, fill: "#667085" }}
+                              axisLine={false}
+                              tickLine={false}
+                              width={28}
+                            />
+                            <Tooltip
+                              contentStyle={{
+                                fontSize: 12,
+                                borderRadius: 8,
+                                border: "1px solid #e4e7ec",
+                              }}
+                            />
+                            <Line
+                              type="monotone"
+                              dataKey="variance"
+                              stroke="#1570ef"
+                              strokeWidth={2}
+                              dot={{ r: 3, fill: "#1570ef", strokeWidth: 0 }}
+                              name="Variance"
+                            />
+                          </ComposedChart>
+                        </ResponsiveContainer>
+                        </div>
+                      ) : (
+                        <div className="h-full flex items-center justify-center text-[12px] text-[#98a2b3]">
+                          {summaryError ? "Variance trend could not be loaded." : "No variance trend is available for the selected period."}
+                        </div>
+                      )}
                     </div>
                     <div className="mt-2 flex flex-wrap gap-3 text-[10px] text-[#667085] shrink-0">
                       <span className="inline-flex items-center gap-1.5">
-                        <span className={`size-2.5 ${R} bg-[#93c5fd]`} /> Var to Budget ($M)
-                      </span>
-                      <span className="inline-flex items-center gap-1.5">
-                        <span className="size-2.5 rounded-full bg-[#12b76a]" /> Var to Forecast ($M)
+                        <span className="size-2.5 rounded-full bg-[#1570ef]" /> Variance ($M)
                       </span>
                     </div>
                   </section>
 
-                  <section className={`${R} border border-[#e4e7ec] bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)] flex-1 flex flex-col min-h-0`}>
+                  <section className={`${R} h-[320px] border border-[#e4e7ec] bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)] flex flex-col min-h-0`}>
                     <h2 className="text-[13px] font-semibold text-[#101828] shrink-0">Variance Breakdown by Department</h2>
                     <p className="text-[11px] text-[#667085] mb-3 shrink-0">Var to Budget ($M) · click a bar</p>
-                    <div className="flex-1 min-h-[180px]">
-                      <ResponsiveContainer width="100%" height="100%">
+                    <div className="flex-1 min-h-0 overflow-y-auto">
+                      {filteredBreakdown.length ? <div style={{ height: Math.max(210, filteredBreakdown.length * 34) }} className="min-w-0"><ResponsiveContainer width="100%" height="100%">
                         <ComposedChart
                           layout="vertical"
                           data={filteredBreakdown}
@@ -1127,7 +996,13 @@ export function VarianceAnalysisView({
                             ))}
                           </Bar>
                         </ComposedChart>
-                      </ResponsiveContainer>
+                      </ResponsiveContainer></div> : (
+                        <div className="h-full flex items-center justify-center text-[12px] text-[#98a2b3]">
+                          {summaryError
+                            ? "Department variance breakdown could not be loaded."
+                            : "No department variance breakdown matches the current filters."}
+                        </div>
+                      )}
                     </div>
                   </section>
                 </div>
@@ -1157,17 +1032,15 @@ export function VarianceAnalysisView({
       <CommentaryAllDialog
         open={commentaryOpen}
         onOpenChange={setCommentaryOpen}
-        requests={commentaryReqs}
-        onSelect={(req) => onSelectCommentary?.(req, period)}
-        buildDetail={(req) => detailForCommentary(req, period)}
+        requests={filteredCommentary}
+        onSelect={(req) => onSelectCommentary?.(req, periodLabel)}
+        buildDetail={(req) => detailForCommentary(req, periodLabel)}
       />
     </div>
   )
 }
 
-export function detailForCommentary(req: VarCommentaryReq, period = "May 2025"): VarDetail {
-  const key = `${req.dept}|${req.area}`
-  if (DEMO_DETAILS[key]) return DEMO_DETAILS[key]
+export function detailForCommentary(req: VarCommentaryReq, period = "—"): VarDetail {
   const neg = req.variance.includes("(")
   return {
     id: req.id,
@@ -1176,9 +1049,9 @@ export function detailForCommentary(req: VarCommentaryReq, period = "May 2025"):
     period,
     headline: req.variance,
     headlineTone: neg ? "down" : "up",
-    pctLabel: neg ? "Unfavourable vs Budget" : "Favourable vs Budget",
-    explanation: `Variance in ${req.area.toLowerCase()} requires budget owner commentary for ${period}.`,
-    correctiveAction: "Owner to provide updated forecast and remediation plan in the commentary workflow.",
+    pctLabel: "—",
+    explanation: "—",
+    correctiveAction: "—",
     supporting: [
       { label: "Variance $", value: req.variance },
       { label: "Due", value: req.due },
@@ -1187,34 +1060,5 @@ export function detailForCommentary(req: VarCommentaryReq, period = "May 2025"):
     owner: req.owner,
     due: req.due,
     status: req.status,
-  }
-}
-
-export function detailForDept(dept: string, period = "May 2025"): VarDetail | null {
-  if (dept === "Product Development") return DEMO_DETAILS["Product Development|Headcount"]
-  const row = mockVarDeptRows.find((r) => r.dept === dept)
-  if (!row) return null
-  const summary = row.dept === "Total Company"
-  return {
-    id: `dept-${dept}`,
-    dept,
-    area: "Revenue",
-    period,
-    headline: fmtMoneyM(row.varB, summary),
-    headlineTone: row.varB >= 0 ? "up" : "down",
-    pctLabel: `${fmtPct(row.varBp)} vs Budget`,
-    explanation: `${dept} variance for ${period} is driven by actual performance vs budget baseline.`,
-    correctiveAction: "Review with department owner during the monthly variance close.",
-    supporting: [
-      { label: "Actual", value: fmtMoneyM(row.actual, summary) },
-      { label: "Budget", value: fmtMoneyM(row.budget, summary) },
-      { label: "Forecast", value: fmtMoneyM(row.forecast, summary) },
-      { label: "Var to Budget $", value: fmtMoneyM(row.varB, summary) },
-      { label: "Var %", value: fmtPct(row.varBp) },
-      { label: "Var to Forecast $", value: fmtMoneyM(row.varF, summary) },
-    ],
-    owner: "Budget Owner",
-    due: "—",
-    status: row.commentary === "red" ? "Overdue" : row.commentary === "yellow" ? "In Progress" : "Submitted",
   }
 }

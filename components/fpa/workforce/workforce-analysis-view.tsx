@@ -29,32 +29,22 @@ import {
 import { cn } from "@/lib/utils"
 import { KpiSparkline } from "@/components/fpa/kpi-sparkline"
 import { Button } from "@/components/ui/button"
-import {
-  mockWfAttritionTrend,
-  mockWfDeptRows,
-  mockWfDrivers,
-  mockWfHirePlan,
-  mockWfKpis,
-} from "@/components/fpa/mock-data"
-import {
-  planningAvatarTone,
-  planningInitials,
-} from "@/components/fpa/planning/planning-collab-sidebar"
+import type { FpaDomainScope, FpaDriver } from "@/lib/api/fpa-api"
 
 const R = "rounded-lg"
 
 export type WfDeptRow = {
   id: string
   dept: string
-  entity: string
-  hc: number
-  budgetHc: number
-  salary: number
-  avgSalary: number
-  hires: number
-  attrition: number
-  openRoles: number
-  status: "hiring" | "on-track" | "under" | "over"
+  entity: string | null
+  hc: number | null
+  budgetHc: number | null
+  salary: number | null
+  avgSalary: number | null
+  hires: number | null
+  attrition: number | null
+  openRoles: number | null
+  status?: "hiring" | "on-track" | "under" | "over"
 }
 
 export type WfKpi = {
@@ -65,54 +55,39 @@ export type WfKpi = {
   spark?: number[]
 }
 
+export type WfHirePlanPoint = { period: string; planned: number; actual: number }
+export type WfAttritionPoint = { period: string; pct: number }
+
 export type WfDetail = {
   id: string
   dept: string
-  entity: string
+  entity: string | null
   period: string
-  headcount: number
-  budgetHc: number
+  headcount: number | null
+  budgetHc: number | null
   salary: string
   avgSalary: string
-  netHires: number
-  attrition: number
-  openRoles: number
-  owner: string
-  narrative: string
-  roles: Array<{ title: string; status: string; priority: string }>
+  netHires: number | null
+  attrition: number | null
+  openRoles: number | null
 }
 
-const VERSION_SCALE: Record<string, number> = {
-  Working: 1,
-  Locked: 0.99,
-  Published: 0.97,
-}
-
-const DEPT_OWNERS: Record<string, string> = {
-  Engineering: "Leslie Alexander",
-  Sales: "Wade Warren",
-  Operations: "Cameron W.",
-  Marketing: "Jane Cooper",
-  "Customer Success": "Esther Howard",
-  Finance: "Robert Fox",
-}
-
-function fmtM(n: number): string {
-  return `$${n.toFixed(1)}M`
+function fmtM(n: number | null): string {
+  return n == null ? "—" : `$${n.toFixed(1)}M`
 }
 
 function statusPill(status: WfDeptRow["status"]) {
   if (status === "hiring") return "bg-[#eff8ff] text-[#175cd3] border-[#b2ddff]"
   if (status === "over") return "bg-[#fef3f2] text-[#b42318] border-[#fecdca]"
   if (status === "under") return "bg-[#fffaeb] text-[#b54708] border-[#fedf89]"
-  return "bg-[#ecfdf3] text-[#027a48] border-[#abefc6]"
+  return status === "on-track" ? "bg-[#ecfdf3] text-[#027a48] border-[#abefc6]" : "bg-[#f2f4f7] text-[#667085] border-[#e4e7ec]"
 }
 
 function statusLabel(status: WfDeptRow["status"]) {
   if (status === "hiring") return "Hiring"
   if (status === "over") return "Over Plan"
   if (status === "under") return "Under Plan"
-  return "On Track"
+  return status === "on-track" ? "On Track" : "—"
 }
 
 function FilterSelect({
@@ -142,7 +117,7 @@ function FilterSelect({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className={`h-10 min-w-[118px] inline-flex items-center ${R} border border-[#d0d5dd] bg-white pl-2.5 pr-7 text-left hover:bg-[#f9fafb]`}
+        className="h-10 min-w-[118px] inline-flex items-center rounded-full border border-[#d0d5dd] bg-white pl-2.5 pr-7 text-left hover:bg-[#f9fafb]"
       >
         <span className="flex flex-col justify-center min-w-0 py-1">
           <span className="text-[9px] font-medium uppercase tracking-wide text-[#98a2b3] leading-none">{label}</span>
@@ -198,7 +173,6 @@ function WfKpiCard({ kpi, onClick }: { kpi: WfKpi; onClick?: () => void }) {
 }
 
 export function detailForDept(row: WfDeptRow, period: string): WfDetail {
-  const owner = DEPT_OWNERS[row.dept] || "FP&A"
   return {
     id: row.id,
     dept: row.dept,
@@ -207,61 +181,106 @@ export function detailForDept(row: WfDeptRow, period: string): WfDetail {
     headcount: row.hc,
     budgetHc: row.budgetHc,
     salary: fmtM(row.salary),
-    avgSalary: `$${row.avgSalary}K`,
-    netHires: row.hires - row.attrition,
+    avgSalary: row.avgSalary == null ? "—" : `$${row.avgSalary}K`,
+    netHires: row.hires,
     attrition: row.attrition,
     openRoles: row.openRoles,
-    owner,
-    narrative:
-      row.status === "hiring"
-        ? `${row.dept} is actively hiring with ${row.openRoles} open roles. Net +${row.hires - row.attrition} this period against budget of ${row.budgetHc} FTEs.`
-        : row.hc > row.budgetHc
-          ? `${row.dept} is ${row.hc - row.budgetHc} FTEs over plan. Review backfill and contractor mix with ${owner}.`
-          : `${row.dept} is tracking to plan with ${row.hc} FTEs vs budget ${row.budgetHc}.`,
-    roles: [
-      { title: "Senior Engineer", status: "Open", priority: "High" },
-      { title: "Account Executive", status: row.openRoles > 2 ? "Open" : "Filled", priority: "Medium" },
-      { title: "Ops Analyst", status: "In Interview", priority: "Low" },
-    ].slice(0, Math.min(3, row.openRoles)),
   }
-}
-
-export function mapMockWfDepts(): WfDeptRow[] {
-  return mockWfDeptRows.map((r) => ({ ...r }))
-}
-
-export function mapMockWfKpis(): WfKpi[] {
-  return mockWfKpis.map((k) => ({ ...k }))
 }
 
 type WorkforceAnalysisViewProps = {
   loading?: boolean
+  error?: string
   kpis?: WfKpi[]
   deptRows?: WfDeptRow[]
+  hirePlan?: WfHirePlanPoint[]
+  attritionTrend?: WfAttritionPoint[]
   periodLabel?: string
   onRefresh?: () => void
+  entities?: Array<{ id: string; name: string }>
+  availablePeriods?: string[]
+  selectedEntityId?: string
+  periodFrom?: string
+  periodTo?: string
+  appliedScope?: FpaDomainScope
+  onEntityChange?: (value: string) => void
+  onPeriodFromChange?: (value: string) => void
+  onPeriodToChange?: (value: string) => void
+  drivers?: FpaDriver[]
+  preview?: { kpis: WfKpi[]; departments: WfDeptRow[]; hirePlan: WfHirePlanPoint[]; attritionTrend: WfAttritionPoint[] }
+  previewLoading?: boolean
+  previewError?: string
+  onPreview?: (driverCode: string, value: number) => void
+  onResetPreview?: () => void
 }
 
 export function WorkforceAnalysisView({
   loading = false,
-  kpis = mapMockWfKpis(),
-  deptRows = mapMockWfDepts(),
+  error,
+  kpis = [],
+  deptRows = [],
+  hirePlan = [],
+  attritionTrend = [],
   periodLabel = "May 2025",
   onRefresh,
+  entities = [],
+  availablePeriods = [],
+  selectedEntityId = "",
+  periodFrom = "",
+  periodTo = "",
+  appliedScope,
+  onEntityChange,
+  onPeriodFromChange,
+  onPeriodToChange,
+  drivers = [],
+  preview,
+  previewLoading = false,
+  previewError,
+  onPreview,
+  onResetPreview,
 }: WorkforceAnalysisViewProps) {
-  const [entity, setEntity] = useState("All Entities")
+  const displayedKpis = preview?.kpis ?? kpis
+  const displayedDeptRows = preview?.departments ?? deptRows
+  const displayedHirePlan = preview?.hirePlan ?? hirePlan
+  const displayedAttritionTrend = preview?.attritionTrend ?? attritionTrend
   const [department, setDepartment] = useState("All Departments")
-  const [version, setVersion] = useState("Working")
-  const [period, setPeriod] = useState(periodLabel)
   const [view, setView] = useState("Department View")
   const [salaryInflation, setSalaryInflation] = useState(6.0)
+  const [driverCode, setDriverCode] = useState("")
   const [detailOpen, setDetailOpen] = useState(true)
   const [selectedDetail, setSelectedDetail] = useState<WfDetail | null>(
-    detailForDept(deptRows[0], periodLabel),
+    displayedDeptRows[0] ? detailForDept(displayedDeptRows[0], periodLabel) : null,
   )
   const [infoOpen, setInfoOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+  const entityOptions = useMemo(() => ["All Entities", ...entities.map((option) => option.name)], [entities])
+  const departmentOptions = useMemo(() => ["All Departments", ...new Set(displayedDeptRows.map((row) => row.dept).filter(Boolean))], [displayedDeptRows])
+  const period = periodTo || periodFrom || periodLabel
+  const selectedEntityName = entities.find((option) => option.id === selectedEntityId)?.name ?? "All Entities"
+  const driverOptions = useMemo(() => drivers.map((driver) => `${driver.name} · ${driver.code}`), [drivers])
+
+  useEffect(() => {
+    setSelectedDetail((current) => {
+      const row = current ? displayedDeptRows.find((candidate) => candidate.id === current.id) : displayedDeptRows[0]
+      return row ? detailForDept(row, period) : null
+    })
+  }, [displayedDeptRows, period])
+
+  useEffect(() => {
+    if (driverCode && !drivers.some((driver) => driver.code === driverCode)) setDriverCode("")
+    if (!driverCode) {
+      const relevant = drivers.find((driver) => {
+        const value = `${driver.code} ${driver.name}`.toLowerCase()
+        return value.includes("salary") && value.includes("inflation")
+      })
+      if (relevant) {
+        setDriverCode(relevant.code)
+        const value = Number(relevant.value)
+        if (Number.isFinite(value)) setSalaryInflation(value)
+      }
+    }
+  }, [drivers, driverCode])
 
   useEffect(() => {
     const onDoc = (e: MouseEvent) => {
@@ -271,51 +290,35 @@ export function WorkforceAnalysisView({
     return () => document.removeEventListener("mousedown", onDoc)
   }, [])
 
-  const versionFactor = VERSION_SCALE[version] ?? 1
-  const inflationFactor = 1 + (salaryInflation - 6) / 100
-
   const filteredRows = useMemo(() => {
-    let rows = deptRows.map((r) => ({
-      ...r,
-      hc: Math.round(r.hc * versionFactor),
-      budgetHc: Math.round(r.budgetHc * versionFactor),
-      salary: r.salary * versionFactor * inflationFactor,
-      avgSalary: r.avgSalary * inflationFactor,
-    }))
-    if (entity !== "All Entities") rows = rows.filter((r) => r.entity === entity)
+    let rows = displayedDeptRows
     if (department !== "All Departments") rows = rows.filter((r) => r.dept === department)
     return rows
-  }, [deptRows, entity, department, versionFactor, inflationFactor])
+  }, [displayedDeptRows, department])
 
   const hcChartData = useMemo(() => {
-    return filteredRows.map((r) => ({
+    return filteredRows.filter((r) => r.hc != null || r.budgetHc != null).map((r) => ({
       dept: r.dept.split(" ")[0],
       actual: r.hc,
       budget: r.budgetHc,
-      gap: r.hc - r.budgetHc,
+      gap: r.hc == null || r.budgetHc == null ? null : r.hc - r.budgetHc,
     }))
   }, [filteredRows])
 
-  const totalHc = filteredRows.reduce((s, r) => s + r.hc, 0)
-  const totalSalary = filteredRows.reduce((s, r) => s + r.salary, 0)
-  const totalOpen = filteredRows.reduce((s, r) => s + r.openRoles, 0)
-
-  const adjustedKpis = useMemo(() => {
-    return kpis.map((k, i) => {
-      if (i === 0) return { ...k, value: String(totalHc) }
-      if (i === 1) return { ...k, value: fmtM(totalSalary) }
-      if (i === 4) return { ...k, value: String(totalOpen) }
-      return k
-    })
-  }, [kpis, totalHc, totalSalary, totalOpen])
+  const adjustedKpis = displayedKpis
+  const chartableAttrition = useMemo(
+    () => displayedAttritionTrend.filter((point) => point.period && Number.isFinite(point.pct)),
+    [displayedAttritionTrend],
+  )
 
   const resetFilters = () => {
-    setEntity("All Entities")
+    onEntityChange?.("")
+    onPeriodFromChange?.("")
+    onPeriodToChange?.("")
     setDepartment("All Departments")
-    setVersion("Working")
-    setPeriod(periodLabel)
     setView("Department View")
     setSalaryInflation(6.0)
+    onResetPreview?.()
     toast.message("Filters reset")
   }
 
@@ -325,7 +328,7 @@ export function WorkforceAnalysisView({
   }
 
   const exportCsv = () => {
-    const header = "Department,Entity,Headcount,Budget HC,Payroll,Hires,Attrition,Open Roles,Status\n"
+    const header = "Department,Entity,Headcount,Budget HC,Payroll,Hires,Attrition %,Open Roles,Status\n"
     const body = filteredRows
       .map((r) => `${r.dept},${r.entity},${r.hc},${r.budgetHc},${r.salary},${r.hires},${r.attrition},${r.openRoles},${r.status}`)
       .join("\n")
@@ -339,6 +342,10 @@ export function WorkforceAnalysisView({
     toast.success("Workforce export downloaded")
   }
 
+  const hasData = adjustedKpis.length > 0 || displayedDeptRows.length > 0 || displayedHirePlan.length > 0 || chartableAttrition.length > 0
+  if (loading && !hasData) return <div className="min-h-full bg-[#f1f5f9] flex items-center justify-center gap-2 text-sm text-[#64748b]"><Loader2 className="size-5 animate-spin" /> Loading workforce analysis…</div>
+  if (error && !hasData) return <div className="min-h-full bg-[#f1f5f9] flex items-center justify-center p-8 text-sm text-[#b42318]">{error}</div>
+
   return (
     <div className="min-h-full bg-[#f1f5f9] flex flex-col">
       <div className="bg-white border-b border-[#e4e7ec]">
@@ -351,27 +358,30 @@ export function WorkforceAnalysisView({
             </Button>
           </div>
           <div className="mt-3 flex flex-wrap items-end gap-2">
-            <FilterSelect label="Entity" value={entity} options={["All Entities", "North America", "EMEA", "APAC", "LATAM"]} onChange={setEntity} />
+            {entityOptions.length > 1 ? <FilterSelect label="Entity" value={selectedEntityName} options={entityOptions} onChange={(name) => onEntityChange?.(entities.find((option) => option.name === name)?.id ?? "")} /> : null}
+            {availablePeriods.length > 0 ? <>
+              <FilterSelect label="Period from" value={periodFrom || "All Periods"} options={["All Periods", ...availablePeriods]} onChange={(value) => onPeriodFromChange?.(value === "All Periods" ? "" : value)} />
+              <FilterSelect label="Period to" value={periodTo || "All Periods"} options={["All Periods", ...availablePeriods]} onChange={(value) => onPeriodToChange?.(value === "All Periods" ? "" : value)} />
+            </> : null}
             <FilterSelect
               label="Department"
               value={department}
-              options={["All Departments", "Engineering", "Sales", "Operations", "Marketing", "Customer Success", "Finance"]}
+              options={departmentOptions}
               onChange={setDepartment}
             />
-            <FilterSelect label="Version" value={version} options={["Working", "Locked", "Published"]} onChange={setVersion} />
-            <FilterSelect label="Period" value={period} options={["May 2025", "Apr 2025", "Mar 2025", "FY2025", "FY2026"]} onChange={setPeriod} />
             <FilterSelect label="View" value={view} options={["Department View", "Hire Plan View"]} onChange={setView} />
             <button type="button" onClick={resetFilters} className="ml-auto mb-0.5 px-1 text-[12px] font-semibold text-[#1570ef] hover:underline">
               Reset Filters
             </button>
           </div>
+          <p className="mt-2 text-[11px] text-[#667085]">
+            Applied scope: {appliedScope?.entityId ? selectedEntityName : "All entities"} · {appliedScope?.periodFrom || "First period"} → {appliedScope?.periodTo || "Latest period"}
+          </p>
         </div>
 
         <div className="px-4 sm:px-5 pb-4">
-          {loading ? (
-            <div className="flex items-center gap-2 py-8 text-[#64748b]">
-              <Loader2 className="size-5 animate-spin" /> Loading workforce…
-            </div>
+          {adjustedKpis.length === 0 ? (
+            <p className="py-8 text-sm text-[#64748b]">No workforce KPIs are available.</p>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
               {adjustedKpis.map((k) => (
@@ -384,24 +394,29 @@ export function WorkforceAnalysisView({
 
       <div className="flex-1 flex min-h-0">
         <div className="flex-1 p-4 sm:p-5 space-y-4 overflow-auto">
+          {preview ? <div className="rounded-lg border border-[#c4b5fd] bg-[#f5f3ff] px-4 py-3 text-xs font-semibold text-[#6d28d9]">Preview · not persisted — cards, charts, and tables below use the preview dataset.</div> : null}
+          {loading && hasData ? <p className="text-xs text-[#667085]"><Loader2 className="mr-1 inline size-3 animate-spin" />Refreshing current scope…</p> : null}
+          {error && hasData ? <p className="text-sm text-[#b42318]">{error}</p> : null}
           {view === "Hire Plan View" ? (
             <section className={`${R} border border-[#e4e7ec] bg-white p-4`}>
               <div className="flex items-center gap-2 mb-3">
                 <Users className="size-4 text-[#7c3aed]" />
                 <h2 className="text-sm font-semibold text-[#101828]">Hire Plan vs Actual</h2>
               </div>
-              <div className="h-[280px]">
+              {displayedHirePlan.length === 0 ? (
+                <p className="py-12 text-center text-sm text-[#64748b]">No hire plan data is available.</p>
+              ) : <div className="h-[280px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={mockWfHirePlan} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                  <ComposedChart data={displayedHirePlan} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f2f4f7" />
-                    <XAxis dataKey="month" tick={{ fontSize: 10, fill: "#667085" }} axisLine={false} tickLine={false} />
+                    <XAxis dataKey="period" tick={{ fontSize: 10, fill: "#667085" }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fontSize: 10, fill: "#667085" }} axisLine={false} tickLine={false} />
                     <Tooltip contentStyle={{ borderRadius: 8, fontSize: 12 }} />
                     <Bar dataKey="planned" fill="#ddd6fe" name="Planned" radius={[3, 3, 0, 0]} />
                     <Line type="monotone" dataKey="actual" stroke="#7c3aed" strokeWidth={2} dot={{ r: 4 }} name="Actual" connectNulls={false} />
                   </ComposedChart>
                 </ResponsiveContainer>
-              </div>
+              </div>}
             </section>
           ) : (
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
@@ -412,7 +427,9 @@ export function WorkforceAnalysisView({
                     <Info className="size-4" />
                   </button>
                 </div>
-                <div className="h-[240px]">
+                {hcChartData.length === 0 ? (
+                  <p className="py-12 text-center text-sm text-[#64748b]">No department headcount data is available.</p>
+                ) : <div className="h-[240px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={hcChartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f2f4f7" />
@@ -430,12 +447,12 @@ export function WorkforceAnalysisView({
                         }}
                       >
                         {hcChartData.map((entry, i) => (
-                          <Cell key={i} fill={entry.gap > 0 ? "#f04438" : entry.gap < 0 ? "#f59e0b" : "#12b76a"} />
+                          <Cell key={i} fill={entry.gap == null ? "#94a3b8" : entry.gap > 0 ? "#f04438" : entry.gap < 0 ? "#f59e0b" : "#12b76a"} />
                         ))}
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
-                </div>
+                </div>}
               </section>
 
               <section className={`${R} border border-[#e4e7ec] bg-white p-4`}>
@@ -443,17 +460,19 @@ export function WorkforceAnalysisView({
                   <h2 className="text-sm font-semibold text-[#101828]">Attrition Trend</h2>
                   <span className="text-xs text-[#667085]">Rolling 6 months</span>
                 </div>
-                <div className="h-[240px]">
+                {chartableAttrition.length === 0 ? (
+                  <p className="py-12 text-center text-sm text-[#64748b]">No attrition trend data is available.</p>
+                ) : <div className="h-[240px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart data={mockWfAttritionTrend} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                    <ComposedChart data={chartableAttrition} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f2f4f7" />
-                      <XAxis dataKey="m" tick={{ fontSize: 10, fill: "#667085" }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fontSize: 10, fill: "#667085" }} axisLine={false} tickLine={false} unit="%" domain={[7, 10]} />
+                      <XAxis dataKey="period" tick={{ fontSize: 10, fill: "#667085" }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 10, fill: "#667085" }} axisLine={false} tickLine={false} unit="%" />
                       <Tooltip formatter={(v: number) => `${v}%`} contentStyle={{ borderRadius: 8, fontSize: 12 }} />
-                      <Line type="monotone" dataKey="rate" stroke="#7c3aed" strokeWidth={2.5} dot={{ r: 4, fill: "#fff", strokeWidth: 2 }} name="Attrition %" />
+                      <Line type="monotone" dataKey="pct" stroke="#7c3aed" strokeWidth={2.5} dot={{ r: 4, fill: "#fff", strokeWidth: 2 }} name="Attrition %" />
                     </ComposedChart>
                   </ResponsiveContainer>
-                </div>
+                </div>}
               </section>
             </div>
           )}
@@ -470,7 +489,7 @@ export function WorkforceAnalysisView({
                     <button type="button" onClick={exportCsv} className="w-full px-3 py-2 text-left text-xs hover:bg-[#f9fafb] flex items-center gap-2">
                       <Download className="size-3.5" /> Export CSV
                     </button>
-                    <button type="button" onClick={() => { onRefresh?.(); toast.message("Data refreshed") }} className="w-full px-3 py-2 text-left text-xs hover:bg-[#f9fafb] flex items-center gap-2">
+                    <button type="button" onClick={() => onRefresh?.()} className="w-full px-3 py-2 text-left text-xs hover:bg-[#f9fafb] flex items-center gap-2">
                       <RefreshCw className="size-3.5" /> Refresh
                     </button>
                   </div>
@@ -489,14 +508,17 @@ export function WorkforceAnalysisView({
                     <th className="px-4 py-3 font-medium text-right">Payroll</th>
                     <th className="px-4 py-3 font-medium text-right">Avg Salary</th>
                     <th className="px-4 py-3 font-medium text-right">Hires</th>
-                    <th className="px-4 py-3 font-medium text-right">Exits</th>
+                    <th className="px-4 py-3 font-medium text-right">Attrition</th>
                     <th className="px-4 py-3 font-medium text-right">Open</th>
                     <th className="px-4 py-3 font-medium">Status</th>
                   </tr>
                 </thead>
                 <tbody>
+                  {filteredRows.length === 0 ? (
+                    <tr><td colSpan={11} className="px-4 py-10 text-center text-sm text-[#64748b]">No department workforce data is available.</td></tr>
+                  ) : null}
                   {filteredRows.map((row) => {
-                    const varHc = row.hc - row.budgetHc
+                    const varHc = row.hc == null || row.budgetHc == null ? null : row.hc - row.budgetHc
                     return (
                       <tr key={row.id} className="border-t border-[#f2f4f7] hover:bg-[#f9fafb] cursor-pointer" onClick={() => pickDept(row)}>
                         <td className="px-4 py-3">
@@ -504,17 +526,17 @@ export function WorkforceAnalysisView({
                             {row.dept}
                           </button>
                         </td>
-                        <td className="px-4 py-3 text-[#667085]">{row.entity}</td>
+                        <td className="px-4 py-3 text-[#667085]">{row.entity ?? "—"}</td>
                         <td className="px-4 py-3 text-right tabular-nums font-medium">{row.hc}</td>
                         <td className="px-4 py-3 text-right tabular-nums text-[#667085]">{row.budgetHc}</td>
-                        <td className={cn("px-4 py-3 text-right tabular-nums font-medium", varHc > 0 ? "text-[#f04438]" : varHc < 0 ? "text-[#f59e0b]" : "text-[#12b76a]")}>
-                          {varHc > 0 ? "+" : ""}{varHc}
+                        <td className={cn("px-4 py-3 text-right tabular-nums font-medium", varHc != null && varHc > 0 ? "text-[#f04438]" : varHc != null && varHc < 0 ? "text-[#f59e0b]" : "text-[#667085]")}>
+                          {varHc == null ? "—" : `${varHc > 0 ? "+" : ""}${varHc}`}
                         </td>
                         <td className="px-4 py-3 text-right tabular-nums">{fmtM(row.salary)}</td>
-                        <td className="px-4 py-3 text-right tabular-nums text-[#667085]">${row.avgSalary.toFixed(0)}K</td>
-                        <td className="px-4 py-3 text-right tabular-nums text-[#12b76a]">+{row.hires}</td>
-                        <td className="px-4 py-3 text-right tabular-nums text-[#f04438]">-{row.attrition}</td>
-                        <td className="px-4 py-3 text-right tabular-nums font-medium">{row.openRoles}</td>
+                        <td className="px-4 py-3 text-right tabular-nums text-[#667085]">{row.avgSalary == null ? "—" : `$${row.avgSalary.toFixed(0)}K`}</td>
+                        <td className="px-4 py-3 text-right tabular-nums text-[#12b76a]">{row.hires == null ? "—" : `+${row.hires}`}</td>
+                        <td className="px-4 py-3 text-right tabular-nums text-[#f04438]">{row.attrition == null ? "—" : `${row.attrition.toFixed(1)}%`}</td>
+                        <td className="px-4 py-3 text-right tabular-nums font-medium">{row.openRoles ?? "—"}</td>
                         <td className="px-4 py-3">
                           <span className={cn("inline-flex px-2 py-0.5 text-[11px] font-medium border rounded-full", statusPill(row.status))}>
                             {statusLabel(row.status)}
@@ -534,31 +556,24 @@ export function WorkforceAnalysisView({
               <h2 className="text-sm font-semibold text-[#101828]">What-if: Salary Inflation</h2>
               <span className="text-xs text-[#667085] ml-auto tabular-nums">{salaryInflation.toFixed(1)}%</span>
             </div>
-            <input
-              type="range"
-              min={3}
-              max={10}
-              step={0.1}
-              value={salaryInflation}
-              onChange={(e) => setSalaryInflation(Number(e.target.value))}
-              className="w-full accent-[#7c3aed]"
-            />
-            <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {mockWfDrivers.map((d) => (
-                <button
-                  key={d.name}
-                  type="button"
-                  onClick={() => toast.message(d.name, { description: d.impact })}
-                  className={`${R} border border-[#e4e7ec] px-3 py-2 text-left hover:border-[#c4b5fd] transition-colors`}
-                >
-                  <p className="text-[11px] text-[#667085]">{d.name}</p>
-                  <p className="text-sm font-semibold tabular-nums">
-                    {d.unit === "%" ? `${d.value}%` : d.unit === "days" ? `${d.value} days` : d.value}
-                  </p>
-                  <p className="text-[10px] text-[#98a2b3] mt-0.5">{d.impact}</p>
-                </button>
-              ))}
-            </div>
+            {drivers.length === 0 ? <p className="text-sm text-[#667085]">No workforce driver was returned, so this control is unavailable.</p> : <>
+              <div className="flex flex-wrap items-end gap-2">
+                <FilterSelect label="Driver" value={drivers.find((driver) => driver.code === driverCode) ? `${drivers.find((driver) => driver.code === driverCode)?.name} · ${driverCode}` : "Select driver"} options={["Select driver", ...driverOptions]} onChange={(value) => {
+                  const selected = drivers.find((driver) => `${driver.name} · ${driver.code}` === value)
+                  setDriverCode(selected?.code ?? "")
+                  const numeric = Number(selected?.value)
+                  if (Number.isFinite(numeric)) setSalaryInflation(numeric)
+                  onResetPreview?.()
+                }} />
+                <input type="number" step="0.1" value={salaryInflation} onChange={(e) => setSalaryInflation(Number(e.target.value))} className="h-10 w-32 rounded-full border border-[#d0d5dd] px-4 text-sm" />
+                <Button className="rounded-full h-10 px-6" disabled={!driverCode || !Number.isFinite(salaryInflation) || previewLoading} onClick={() => onPreview?.(driverCode, salaryInflation)}>
+                  {previewLoading ? <Loader2 className="size-4 animate-spin" /> : null} Preview
+                </Button>
+                {preview ? <Button variant="outline" className="rounded-full h-10 px-4" onClick={onResetPreview}>Reset to official</Button> : null}
+              </div>
+              {!driverCode ? <p className="mt-3 text-[11px] text-[#667085]">Choose a returned driver; no driver code has been guessed.</p> : null}
+            </>}
+            {previewError ? <p className="mt-3 text-sm text-[#b42318]">{previewError}</p> : null}
           </section>
         </div>
 
@@ -566,17 +581,8 @@ export function WorkforceAnalysisView({
           <aside className="w-full sm:w-[360px] shrink-0 border-l border-[#e4e7ec] bg-white flex flex-col">
             <div className="px-4 py-3 border-b border-[#e4e7ec] flex items-start justify-between gap-2">
               <div>
-                <p className="text-xs text-[#667085]">{selectedDetail.entity} · {selectedDetail.period}</p>
+                <p className="text-xs text-[#667085]">{selectedDetail.entity ?? "—"} · {selectedDetail.period}</p>
                 <h3 className="text-base font-semibold text-[#101828] mt-0.5">{selectedDetail.dept}</h3>
-                <div className="flex items-center gap-2 mt-2">
-                  <span
-                    className="size-7 rounded-full inline-flex items-center justify-center text-[10px] font-semibold text-white shrink-0"
-                    style={{ backgroundColor: planningAvatarTone(selectedDetail.owner) }}
-                  >
-                    {planningInitials(selectedDetail.owner)}
-                  </span>
-                  <span className="text-xs text-[#667085]">{selectedDetail.owner}</span>
-                </div>
               </div>
               <button type="button" onClick={() => setDetailOpen(false)} className="size-8 rounded-full hover:bg-[#f2f4f7] inline-flex items-center justify-center">
                 <X className="size-4 text-[#667085]" />
@@ -586,8 +592,8 @@ export function WorkforceAnalysisView({
               <div className="grid grid-cols-2 gap-2">
                 <div className={`${R} border border-[#e4e7ec] p-2 text-center`}>
                   <p className="text-[10px] text-[#667085]">Headcount</p>
-                  <p className="text-lg font-semibold tabular-nums">{selectedDetail.headcount}</p>
-                  <p className="text-[10px] text-[#98a2b3]">Budget {selectedDetail.budgetHc}</p>
+                  <p className="text-lg font-semibold tabular-nums">{selectedDetail.headcount ?? "—"}</p>
+                  <p className="text-[10px] text-[#98a2b3]">Budget {selectedDetail.budgetHc ?? "—"}</p>
                 </div>
                 <div className={`${R} border border-[#e4e7ec] p-2 text-center`}>
                   <p className="text-[10px] text-[#667085]">Payroll</p>
@@ -597,9 +603,9 @@ export function WorkforceAnalysisView({
               </div>
               <div className="grid grid-cols-3 gap-2 text-center">
                 {[
-                  { label: "Net Hires", value: `+${selectedDetail.netHires}` },
-                  { label: "Exits", value: `-${selectedDetail.attrition}` },
-                  { label: "Open Roles", value: String(selectedDetail.openRoles) },
+                  { label: "Net Hires", value: selectedDetail.netHires == null ? "—" : `+${selectedDetail.netHires}` },
+                  { label: "Attrition", value: selectedDetail.attrition == null ? "—" : `${selectedDetail.attrition.toFixed(1)}%` },
+                  { label: "Open Roles", value: selectedDetail.openRoles == null ? "—" : String(selectedDetail.openRoles) },
                 ].map((cell) => (
                   <div key={cell.label} className={`${R} border border-[#e4e7ec] p-2`}>
                     <p className="text-[10px] text-[#667085]">{cell.label}</p>
@@ -607,23 +613,7 @@ export function WorkforceAnalysisView({
                   </div>
                 ))}
               </div>
-              {selectedDetail.roles.length > 0 ? (
-                <div>
-                  <p className="text-xs font-semibold text-[#344054] mb-2">Open Roles</p>
-                  <ul className="space-y-2">
-                    {selectedDetail.roles.map((role) => (
-                      <li key={role.title} className={`${R} border border-[#e4e7ec] px-3 py-2 flex justify-between items-center text-sm`}>
-                        <span className="font-medium">{role.title}</span>
-                        <span className="text-[11px] text-[#667085]">{role.status} · {role.priority}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-              <p className="text-sm text-[#475569] leading-relaxed">{selectedDetail.narrative}</p>
-              <Button variant="gradient-info" className="rounded-full h-10 w-full shadow-sm" onClick={() => toast.message("Update hire plan", { description: `Open headcount drivers for ${selectedDetail.dept}` })}>
-                Update Hire Plan
-              </Button>
+              <p className="text-sm text-[#667085]">Role-level details and commentary are not included in this domain response.</p>
             </div>
           </aside>
         ) : null}
@@ -634,7 +624,7 @@ export function WorkforceAnalysisView({
           <div className={`${R} bg-white max-w-md w-full p-5 shadow-xl`} onClick={(e) => e.stopPropagation()}>
             <h3 className="text-base font-semibold text-[#101828]">Workforce Planning</h3>
             <p className="text-sm text-[#475569] mt-2 leading-relaxed">
-              Monitor headcount, payroll, hires, and attrition by department. Switch to Hire Plan View for forward-looking recruitment. Adjust salary inflation to model cost impact.
+              Monitor headcount, payroll, hires, and attrition by department. Sensitivity uses a returned workforce driver and replaces the active dataset only as a non-persisted preview.
             </p>
             <Button variant="outline" className="rounded-full mt-4" onClick={() => setInfoOpen(false)}>Close</Button>
           </div>

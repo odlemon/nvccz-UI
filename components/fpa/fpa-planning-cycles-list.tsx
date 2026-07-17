@@ -95,7 +95,7 @@ export function FpaPlanningCyclesList() {
       <FpaPageHeader
         title="Model Planning"
         hideFilters
-        searchPlaceholder="Search planning cycles…"
+        hideSearch
         actions={
           <button type="button" onClick={() => setCreateOpen(true)} className={BTN_PRIMARY}>
             <Plus className="w-3.5 h-3.5" />

@@ -98,87 +98,6 @@ export function apiModulesToFolders(modules: FpaBuilderModule[]): BuilderModuleF
   return (roots.length ? roots : modules).map(mapNode)
 }
 
-export const HARDCODED_MODULE_FOLDERS: BuilderModuleFolder[] = [
-  {
-    id: "revenue-planning",
-    name: "Revenue Planning",
-    children: [
-      { id: "revenue-summary", name: "Revenue Summary" },
-      { id: "units-pricing", name: "Units & Pricing" },
-      { id: "discounts-adjustments", name: "Discounts & Adjustments" },
-      { id: "net-revenue", name: "Net Revenue" },
-      { id: "revenue-by-segment", name: "Revenue by Segment" },
-      { id: "arr-metrics", name: "ARR Metrics" },
-      { id: "bookings", name: "Bookings" },
-      { id: "deferred-revenue", name: "Deferred Revenue" },
-    ],
-  },
-  {
-    id: "opex-planning",
-    name: "Opex Planning",
-    children: [
-      { id: "opex-summary", name: "Opex Summary" },
-      { id: "sales-marketing", name: "Sales & Marketing" },
-      { id: "g-and-a", name: "G&A" },
-      { id: "rd", name: "R&D" },
-      { id: "facilities", name: "Facilities" },
-      { id: "professional-services", name: "Professional Services" },
-      { id: "other-opex", name: "Other Opex" },
-    ],
-  },
-  {
-    id: "workforce",
-    name: "Workforce",
-    children: [
-      { id: "headcount", name: "Headcount" },
-      { id: "compensation", name: "Compensation" },
-      { id: "benefits", name: "Benefits" },
-      { id: "hiring-plan", name: "Hiring Plan" },
-      { id: "contractor-spend", name: "Contractor Spend" },
-      { id: "workforce-summary", name: "Workforce Summary" },
-    ],
-  },
-  {
-    id: "products",
-    name: "Products",
-    children: [
-      { id: "product-catalog", name: "Product Catalog" },
-      { id: "sku-pricing", name: "SKU Pricing" },
-      { id: "product-mix", name: "Product Mix" },
-      { id: "new-products", name: "New Products" },
-      { id: "product-margin", name: "Product Margin" },
-    ],
-  },
-  {
-    id: "regions",
-    name: "Regions",
-    children: [
-      { id: "north-america", name: "North America" },
-      { id: "emea", name: "EMEA" },
-      { id: "apac", name: "APAC" },
-      { id: "latam", name: "LATAM" },
-    ],
-  },
-  {
-    id: "versions",
-    name: "Versions",
-    children: [
-      { id: "budget-2026", name: "Budget 2026" },
-      { id: "forecast-q3", name: "Forecast Q3" },
-      { id: "working", name: "Working" },
-    ],
-  },
-  {
-    id: "time",
-    name: "Time",
-    children: [
-      { id: "monthly", name: "Monthly" },
-      { id: "quarterly", name: "Quarterly" },
-      { id: "annual", name: "Annual" },
-    ],
-  },
-]
-
 export type SelectedModuleLeaf = {
   folderId: string
   folderName: string
@@ -194,8 +113,6 @@ type TreeProps = {
   onSelectLineItem: (item: FpaLineItem) => void
   canCreateModule: boolean
   onCreateModuleClick: () => void
-  /** Prefer A.3 hardcoded tree when API modules empty. @deprecated Structure builder is API-only. */
-  useHardcoded?: boolean
   /** Live modules from GET /models/:id/modules */
   apiModules?: FpaBuilderModule[]
   selectedLeaf?: SelectedModuleLeaf | null
@@ -212,7 +129,6 @@ type TreeProps = {
 export function BuilderModulesTree({
   canCreateModule,
   onCreateModuleClick,
-  useHardcoded = false,
   apiModules,
   selectedLeaf,
   onSelectLeaf,
@@ -227,11 +143,7 @@ export function BuilderModulesTree({
     () => (apiModules?.length ? apiModulesToFolders(apiModules) : []),
     [apiModules],
   )
-  const folders = liveFolders.length
-    ? liveFolders
-    : useHardcoded
-      ? HARDCODED_MODULE_FOLDERS
-      : []
+  const folders = liveFolders
   const [expanded, setExpanded] = useState<Set<string>>(
     () => new Set(folders.slice(0, 1).map((f) => f.id)),
   )
@@ -274,7 +186,7 @@ export function BuilderModulesTree({
     setMenuLeafId(null)
   }
 
-  if (useHardcoded === false && !liveFolders.length) {
+  if (!liveFolders.length) {
     return (
       <div className="flex flex-col min-h-0 flex-1 rounded-xl border border-[#e2e8f0] bg-white p-4">
         <h2 className="text-[13px] font-semibold text-[#0f172a] mb-2">Modules</h2>
@@ -523,51 +435,6 @@ function toDimRows(
   })
 }
 
-const HARDCODED_DIMENSIONS: DimRow[] = [
-  {
-    id: "time",
-    name: "Time",
-    subtitle: "Monthly (Jan 2026 – Dec 2026)",
-    icon: "time",
-  },
-  {
-    id: "product",
-    name: "Product",
-    subtitle: "All Products (14)",
-    icon: "product",
-  },
-  {
-    id: "region",
-    name: "Region",
-    subtitle: "All Regions (8)",
-    icon: "region",
-  },
-  {
-    id: "customer-segment",
-    name: "Customer Segment",
-    subtitle: "All Segments (4)",
-    icon: "segment",
-  },
-  {
-    id: "version",
-    name: "Version",
-    subtitle: "Budget 2026, Forecast Q3, Best Case",
-    icon: "version",
-  },
-  {
-    id: "scenario",
-    name: "Scenario",
-    subtitle: "Budget, Upside, Downside",
-    icon: "scenario",
-  },
-  {
-    id: "currency",
-    name: "Currency",
-    subtitle: "USD",
-    icon: "currency",
-  },
-]
-
 const DIM_ICON: Record<
   DimIconKey,
   { Icon: typeof Calendar; wrap: string; iconClass: string }
@@ -612,7 +479,6 @@ const DIM_ICON: Record<
 type DimProps = {
   dimensions: FpaDimension[]
   modelDimensionKeys: string[]
-  useHardcoded?: boolean
   onSelectDimension?: (id: string) => void
   onAttachClick?: () => void
 }
@@ -620,17 +486,16 @@ type DimProps = {
 export function BuilderDimensionsPanel({
   dimensions,
   modelDimensionKeys,
-  useHardcoded = false,
   onSelectDimension,
   onAttachClick,
 }: DimProps) {
   const [q, setQ] = useState("")
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
-  const sourceRows = useMemo(() => {
-    if (!useHardcoded) return toDimRows(dimensions, modelDimensionKeys)
-    return HARDCODED_DIMENSIONS
-  }, [useHardcoded, dimensions, modelDimensionKeys])
+  const sourceRows = useMemo(
+    () => toDimRows(dimensions, modelDimensionKeys),
+    [dimensions, modelDimensionKeys],
+  )
 
   const rows = useMemo(() => {
     const needle = q.trim().toLowerCase()
@@ -714,7 +579,7 @@ export function BuilderDimensionsPanel({
         })}
         {!rows.length && (
           <li className="px-2 py-6 text-center text-[12px] text-[#94a3b8]">
-            {useHardcoded ? "No dimensions found" : "No dimensions from API yet"}
+            No dimensions from API yet
           </li>
         )}
       </ul>

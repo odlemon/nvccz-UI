@@ -118,7 +118,7 @@ DRAFT → SUBMITTED → UNDER_REVIEW → APPROVED
 
 **Done when:** Authorised inputs are in; calculated lines update; no blocking validation errors.
 
-**FE now / BE gaps:** INPUT-only edit, EVEN spread, copy/growth/bulk, Cell Details, Driver Assumptions UI, and post-edit KPI/validation refresh are in place. Still needs BE for driver `priorActual`, weighted/pattern spread methods, and guaranteed summary freshness — see [`fpa-model-planning-stage3-backend-asks.md`](./fpa-model-planning-stage3-backend-asks.md).
+**FE now:** Wired to Stage 3 BE contract — `priorActual` drivers (+ `cycleId`), spread methods (EVEN / weights / prior-year), `updatedCells` merge, live planning-summary KPIs, `materialVariancePct`. Contract: [`fpa-model-planning-stage3-api.md`](./fpa-model-planning-stage3-api.md).
 
 ---
 
@@ -138,6 +138,10 @@ DRAFT → SUBMITTED → UNDER_REVIEW → APPROVED
 5. Review **waterfall / bridge** and **scenario assumptions** panels.
 
 **Done when:** You can explain each case from Compare + assumptions.
+
+**FE now:** Wired to Stage 4 BE contract — [`fpa-model-planning-stage4-api.md`](./fpa-model-planning-stage4-api.md). Live list/create/copy/promote/archive; enriched compare when BE returns `metrics[]`; Assumptions library persists `confidence` / `spreadingMethod` + DELETE. Legacy pair responses still map with banner if BE falls back.
+
+**BE status:** Implemented (sensitivity may be empty array). Asks closed: [`fpa-model-planning-stage4-backend-asks.md`](./fpa-model-planning-stage4-backend-asks.md).
 
 ---
 
@@ -273,20 +277,23 @@ That starts a **new Stage 0**, not part of finishing the current cycle.
 | 0 Create / open | Create modal → worksheet | Working path |
 | 1 Orient | `PlanningWorkspaceChrome` | Largely there |
 | 2 Seed / open depts | Partial | Still mixed with budgeting; not full A.1 “open dept plans” |
-| 3 Grid / drivers | `fpa-worksheet` + Cell Details + KPI refresh after edits | Mostly there; BE: `priorActual`, non-EVEN spread, summary freshness — [`stage3-backend-asks`](./fpa-model-planning-stage3-backend-asks.md) |
-| 4 Compare | `?view=compare` + `/forecasting/scenarios` | Shell there; some stubs (Cash Runway, Edit Bridge) |
-| 5 Collab | Comments / Tasks / Activity | There; demo fallback when API empty; Approvals thin on planning rail |
-| 6–9 Workflow | Footer stepper + submit actions | Partial; submit-blocker banner still a gap |
-| 10 Reports | Separate FP&A report routes | Outside this worksheet journey |
+| 3 Grid / drivers | `fpa-worksheet` + Cell Details + spread methods + live KPIs | Implemented vs [`stage3-api`](./fpa-model-planning-stage3-api.md) — ready for UAT |
+| 4 Compare | `/forecasting/scenarios` + `?view=compare` + `/forecasting/drivers` | Implemented vs [`stage4-api`](./fpa-model-planning-stage4-api.md) — ready for UAT |
+| 5 Collab | Comments / Tasks / Activity | There; MPC tasks/comments still BE — see remaining pack Part A.2 + [`tasks-backend-asks`](./fpa-model-planning-tasks-backend-asks.md) |
+| 6–9 Workflow | Footer stepper + slice submit | Partial; **MPC** submit/review/CFO/lock asks in remaining pack Part A.3 |
+| 10 Reports | Separate FP&A report routes | Outside worksheet journey — Reports tab asks in remaining pack Part C.7 |
 
 ---
 
 ## Suggested next action on a live cycle
 
-1. **Stage 1** — confirm header (version / cycle / scenario).  
-2. **Stage 3** — edit a few INPUT drivers on Base → recalc.  
-3. **Stage 4** — open Compare.  
-4. **Stage 6** — try Submit and watch the workflow footer.
+1. **Stage 1** — confirm header (version / cycle / scenario).
+2. **Stage 3** — edit a few INPUT drivers on Base → recalc.
+3. **Stage 4** — open Compare (≥3 scenarios); confirm enriched columns; create Best/Downside from Base on Scenarios.
+4. **Stage 6–9** — wait on MPC workflow endpoints in [`fpa-remaining-modules-backend-asks.md`](./fpa-remaining-modules-backend-asks.md).
+
+**For BE / FE implement-at-once (Planning remainder + other FP&A tabs):**
+→ [`fpa-remaining-modules-backend-asks.md`](./fpa-remaining-modules-backend-asks.md)
 
 ---
 

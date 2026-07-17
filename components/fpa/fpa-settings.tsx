@@ -1,58 +1,88 @@
 "use client"
 
 import { useCallback, useEffect, useState, useMemo } from "react"
-import { ChevronRight, Loader2, Plus, Settings, ShieldAlert, Check, RefreshCw, Layers, Database, Sliders, Play } from "lucide-react"
+import {
+  Archive,
+  Database,
+  Layers,
+  Link2,
+  Loader2,
+  RefreshCw,
+  Settings,
+  ShieldAlert,
+  Sliders,
+  Unplug,
+} from "lucide-react"
 import { toast } from "sonner"
 import { FpaPageHeader } from "./fpa-page-header"
-import { fpaApi, type ForecastEntity } from "@/lib/api/fpa-api"
+import {
+  fpaApi,
+  type ForecastChartAccount,
+  type ForecastEntity,
+  type FpaSettings as PersistedFpaSettings,
+  type FpaSyncSource,
+} from "@/lib/api/fpa-api"
 import { errorMessage, logFpaGap } from "@/lib/fpa/fpa-api-gaps"
 import { useFpaPermissions } from "@/lib/hooks/useFpaPermissions"
 import { cn } from "@/lib/utils"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog"
 
 type LocalEntity = ForecastEntity & {
   accountCount: number
 }
 
-const INITIAL_ENTITIES: LocalEntity[] = [
-  { id: "ent-1", name: "Acme Corp (Global)", type: "COMPANY", baseCurrency: "USD", accountCount: 142 },
-  { id: "ent-2", name: "Acme EMEA Division", type: "COMPANY", baseCurrency: "EUR", accountCount: 89 },
-  { id: "ent-3", name: "Acme Tech Ventures", type: "COMPANY", baseCurrency: "USD", accountCount: 54 },
-]
-
-const MOCK_COAS: Record<string, Array<{ code: string; name: string }>> = {
-  "ent-1": [
-    { code: "1010", name: "Cash and Cash Equivalents" },
-    { code: "1200", name: "Accounts Receivable" },
-    { code: "4000", name: "Product Sales Revenue" },
-    { code: "5000", name: "Cost of Goods Sold (COGS)" },
-    { code: "6010", name: "Salaries & Benefits" },
-    { code: "6120", name: "Marketing & Campaigns" },
-  ],
-  "ent-2": [
-    { code: "1000-EU", name: "Cash EUR" },
-    { code: "4100-EU", name: "Services Revenue" },
-    { code: "6050-EU", name: "Rent & Facilities" },
-  ],
-  "ent-3": [
-    { code: "1010-TV", name: "Investments" },
-    { code: "4200-TV", name: "Licensing Revenue" },
-    { code: "6100-TV", name: "Research & Development" },
-  ],
+type SettingsDraft = {
+  variance: {
+    commentaryThresholdPct: string
+    enforceCommentary: boolean
+    blockSubmitWithoutCommentary: boolean
+  }
+  workflow: PersistedFpaSettings["workflow"]
 }
 
-type SyncSource = {
-  id: string
-  name: string
-  provider: string
-  status: "Connected" | "Not Connected" | "Syncing"
-  lastSynced: string
+function settingsDraft(settings: PersistedFpaSettings): SettingsDraft {
+  return {
+    variance: {
+      ...settings.variance,
+      commentaryThresholdPct: String(settings.variance.commentaryThresholdPct),
+    },
+    workflow: { ...settings.workflow },
+  }
+}
+
+function replaceSyncSource(
+  settings: PersistedFpaSettings,
+  source: FpaSyncSource,
+): PersistedFpaSettings {
+  return {
+    ...settings,
+    syncSources: settings.syncSources.map((current) =>
+      current.id === source.id ? source : current,
+    ),
+  }
+}
+
+function referenceCountLines(references: unknown): string[] {
+  if (Array.isArray(references)) {
+    return references.map((reference, index) => {
+      if (!reference || typeof reference !== "object") return `Reference ${index + 1}: 1`
+      const item = reference as Record<string, unknown>
+      const label = String(item.label || item.type || item.resource || item.name || `Reference ${index + 1}`)
+      const count = Number(item.count ?? item.total ?? 0)
+      return `${label}: ${Number.isFinite(count) ? count : 0}`
+    })
+  }
+  if (!references || typeof references !== "object") return []
+  return Object.entries(references as Record<string, unknown>).map(([name, value]) => {
+    const count =
+      typeof value === "number"
+        ? value
+        : Array.isArray(value)
+          ? value.length
+          : value && typeof value === "object" && "count" in value
+            ? Number((value as { count: unknown }).count)
+            : 0
+    return `${name}: ${Number.isFinite(count) ? count : 0}`
+  })
 }
 
 export function FpaSettings() {
@@ -60,114 +90,289 @@ export function FpaSettings() {
   const [activeSection, setActiveSection] = useState<"entities" | "thresholds" | "sync" | "workflow">("entities")
 
   // Entities state
-  const [entities, setDrivers] = useState<LocalEntity[]>(INITIAL_ENTITIES)
-  const [selectedEntity, setSelectedEntity] = useState<string | null>("ent-1")
+  const [entities, setEntities] = useState<LocalEntity[]>([])
+  const [selectedEntity, setSelectedEntity] = useState<string | null>(null)
+  const [entitiesLoading, setEntitiesLoading] = useState(true)
+  const [entitiesError, setEntitiesError] = useState<string | null>(null)
+  const [creatingEntity, setCreatingEntity] = useState(false)
   const [entityName, setEntityName] = useState("")
   const [entityCurrency, setEntityCurrency] = useState("USD")
   const [coaSearch, setCoaSearch] = useState("")
+  const [coaRows, setCoaRows] = useState<ForecastChartAccount[]>([])
+  const [coaLoading, setCoaLoading] = useState(false)
+  const [coaError, setCoaError] = useState<string | null>(null)
+  const [archiveConfirming, setArchiveConfirming] = useState(false)
+  const [archiveReason, setArchiveReason] = useState("")
+  const [archivingEntity, setArchivingEntity] = useState(false)
+  const [archiveError, setArchiveError] = useState<string | null>(null)
+  const [archiveReferences, setArchiveReferences] = useState<string[]>([])
 
-  // Thresholds state
-  const [threshold, setThreshold] = useState(10)
-  const [enforceCommentary, setEnforceCommentary] = useState(true)
-  const [blockSubmit, setBlockSubmit] = useState(false)
-  const [savingThreshold, setSavingThreshold] = useState(false)
-
-  // Sync sources state
-  const [syncSources, setSyncSources] = useState<SyncSource[]>([
-    { id: "ss-1", name: "NetSuite ERP Integration", provider: "Oracle NetSuite", status: "Connected", lastSynced: "2 hours ago" },
-    { id: "ss-2", name: "QuickBooks Online Sync", provider: "Intuit QuickBooks", status: "Not Connected", lastSynced: "Never" },
-    { id: "ss-3", name: "Xero General Ledger", provider: "Xero", status: "Not Connected", lastSynced: "Never" },
-    { id: "ss-4", name: "Arcus Data Hub API", provider: "Arcus Internal", status: "Connected", lastSynced: "Just now" },
-  ])
-  const [connectingSourceId, setConnectingSourceId] = useState<string | null>(null)
-
-  // Workflow settings state
-  const [linearWorkflow, setLinearWorkflow] = useState(true)
-  const [cfoSignature, setCfoSignature] = useState(true)
-  const [allowRerun, setAllowRerun] = useState(false)
-  const [savingWorkflow, setSavingWorkflow] = useState(false)
+  // Persisted settings state
+  const [settings, setSettings] = useState<PersistedFpaSettings | null>(null)
+  const [draft, setDraft] = useState<SettingsDraft | null>(null)
+  const [settingsLoading, setSettingsLoading] = useState(true)
+  const [settingsError, setSettingsError] = useState<string | null>(null)
+  const [savingSettings, setSavingSettings] = useState(false)
+  const [settingsValidationError, setSettingsValidationError] = useState<string | null>(null)
+  const [sourceBusy, setSourceBusy] = useState<Record<string, string>>({})
+  const [sourceErrors, setSourceErrors] = useState<Record<string, string>>({})
 
   const activeCoa = useMemo(() => {
-    if (!selectedEntity) return []
-    const rows = MOCK_COAS[selectedEntity] || []
+    const rows = coaRows.map((row) => ({
+      code: row.code || row.account_code || "—",
+      name: row.name || row.account_name || "Unnamed account",
+    }))
     const q = coaSearch.trim().toLowerCase()
     if (!q) return rows
     return rows.filter(
       (r) => r.code.toLowerCase().includes(q) || r.name.toLowerCase().includes(q),
     )
-  }, [selectedEntity, coaSearch])
+  }, [coaRows, coaSearch])
 
-  const createEntity = () => {
-    if (!entityName.trim()) return
-    const newEntity: LocalEntity = {
-      id: `ent-${Date.now()}`,
-      name: entityName.trim(),
-      type: "COMPANY",
-      baseCurrency: entityCurrency,
-      accountCount: 0,
+  const loadEntities = useCallback(async () => {
+    setEntitiesLoading(true)
+    setEntitiesError(null)
+    try {
+      const res = await fpaApi.listEntities()
+      if (!res.success) throw new Error(res.message || "Could not load entities")
+      const rows = (res.data || []).map((entity) => ({
+        ...entity,
+        baseCurrency: entity.baseCurrency || entity.base_currency,
+        accountCount: entity.account_count || 0,
+      }))
+      setEntities(rows)
+      setSelectedEntity((current) =>
+        current && rows.some((entity) => entity.id === current) ? current : rows[0]?.id || null,
+      )
+    } catch (err) {
+      const message = errorMessage(err)
+      setEntities([])
+      setSelectedEntity(null)
+      setEntitiesError(message)
+      logFpaGap({
+        category: "broken",
+        path: "/forecast-entities",
+        method: "GET",
+        message,
+        impact: "Settings entity list empty",
+        response: err,
+      })
+    } finally {
+      setEntitiesLoading(false)
     }
-    setDrivers((prev) => [...prev, newEntity])
-    setEntityName("")
-    setSelectedEntity(newEntity.id)
-    toast.success(`Entity "${newEntity.name}" created successfully`)
-  }
+  }, [])
 
-  const deleteEntity = (id: string) => {
-    if (entities.length <= 1) {
-      toast.message("At least one entity is required")
+  const loadSettings = useCallback(async () => {
+    setSettingsLoading(true)
+    setSettingsError(null)
+    try {
+      const res = await fpaApi.getSettings()
+      if (!res.success || !res.data) throw new Error(res.message || "Could not load settings")
+      setSettings(res.data)
+      setDraft(settingsDraft(res.data))
+      setSettingsValidationError(null)
+      setSourceErrors({})
+    } catch (err) {
+      setSettings(null)
+      setDraft(null)
+      setSettingsError(errorMessage(err))
+    } finally {
+      setSettingsLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadEntities()
+    void loadSettings()
+  }, [loadEntities, loadSettings])
+
+  const loadCoa = useCallback(async (entityId: string | null) => {
+    if (!entityId) {
+      setCoaRows([])
+      setCoaError(null)
       return
     }
-    setDrivers((prev) => prev.filter((e) => e.id !== id))
-    if (selectedEntity === id) {
-      setSelectedEntity(entities.find((e) => e.id !== id)?.id || null)
+    setCoaLoading(true)
+    setCoaError(null)
+    try {
+      const res = await fpaApi.getChartOfAccounts(entityId)
+      if (!res.success) throw new Error(res.message || "Could not load chart of accounts")
+      setCoaRows(res.data || [])
+    } catch (err) {
+      setCoaRows([])
+      setCoaError(errorMessage(err))
+    } finally {
+      setCoaLoading(false)
     }
-    toast.success("Entity removed")
+  }, [])
+
+  useEffect(() => {
+    void loadCoa(selectedEntity)
+  }, [loadCoa, selectedEntity])
+
+  useEffect(() => {
+    setArchiveConfirming(false)
+    setArchiveReason("")
+    setArchiveError(null)
+    setArchiveReferences([])
+  }, [selectedEntity])
+
+  const createEntity = async () => {
+    if (!entityName.trim() || !canManageSettings) return
+    setCreatingEntity(true)
+    try {
+      const res = await fpaApi.createEntity({
+        name: entityName.trim(),
+        type: "COMPANY",
+        base_currency: entityCurrency,
+      })
+      if (!res.success || !res.data) throw new Error(res.message || "Could not create entity")
+      setEntityName("")
+      await loadEntities()
+      setSelectedEntity(res.data.id)
+      toast.success(`Entity "${res.data.name}" created`)
+    } catch (err) {
+      toast.error("Could not create entity", { description: errorMessage(err) })
+    } finally {
+      setCreatingEntity(false)
+    }
   }
 
-  const saveThresholdSettings = () => {
-    setSavingThreshold(true)
-    setTimeout(() => {
-      setSavingThreshold(false)
-      toast.success("Variance thresholds updated successfully")
-    }, 400)
+  const saveSettings = async () => {
+    if (!settings || !draft || !canManageSettings) return
+    const threshold = Number(draft.variance.commentaryThresholdPct)
+    if (
+      draft.variance.commentaryThresholdPct.trim() === "" ||
+      !Number.isFinite(threshold) ||
+      threshold < 0
+    ) {
+      setSettingsValidationError("Commentary threshold must be a finite number greater than or equal to 0.")
+      return
+    }
+    setSavingSettings(true)
+    setSettingsValidationError(null)
+    try {
+      const res = await fpaApi.updateSettings({
+        variance: { ...draft.variance, commentaryThresholdPct: threshold },
+        workflow: { ...draft.workflow },
+        syncSources: settings.syncSources,
+      })
+      if (!res.success || !res.data) throw new Error(res.message || "Could not save settings")
+      setSettings(res.data)
+      setDraft(settingsDraft(res.data))
+      toast.success("FP&A settings saved")
+    } catch (err) {
+      toast.error("Could not save settings", { description: errorMessage(err) })
+    } finally {
+      setSavingSettings(false)
+    }
   }
 
-  const saveWorkflowDefaults = () => {
-    setSavingWorkflow(true)
-    setTimeout(() => {
-      setSavingWorkflow(false)
-      toast.success("Workflow default parameters updated")
-    }, 400)
-  }
-
-  const handleConnectSyncSource = (id: string) => {
-    setConnectingSourceId(id)
-    setTimeout(() => {
-      setSyncSources((prev) =>
-        prev.map((s) => (s.id === id ? { ...s, status: "Connected" } : s)),
+  const runSourceAction = async (
+    source: FpaSyncSource,
+    action: "connect" | "disconnect" | "sync",
+  ) => {
+    if (!canManageSettings) return
+    setSourceBusy((current) => ({ ...current, [source.id]: action }))
+    setSourceErrors((current) => {
+      const next = { ...current }
+      delete next[source.id]
+      return next
+    })
+    try {
+      const request =
+        action === "connect"
+          ? fpaApi.connectSyncSource(source.id)
+          : action === "disconnect"
+            ? fpaApi.disconnectSyncSource(source.id)
+            : fpaApi.syncSyncSource(source.id)
+      const res = await request
+      if (!res.success || !res.data) throw new Error(res.message || `Could not ${action} source`)
+      setSettings((current) => (current ? replaceSyncSource(current, res.data!) : current))
+      toast.success(
+        action === "sync"
+          ? `${res.data.label} synced`
+          : `${res.data.label} ${action === "connect" ? "connected" : "disconnected"}`,
       )
-      setConnectingSourceId(null)
-      toast.success("Integration connected successfully")
-    }, 1000)
+    } catch (err) {
+      const apiError = err as {
+        status?: number
+        message?: string
+        response?: {
+          message?: string
+          error?: string
+          data?: {
+            source?: FpaSyncSource
+            code?: string
+            message?: string
+            error?: string
+          }
+        }
+      }
+      const failedSource = apiError.response?.data?.source
+      const code = apiError.response?.code || apiError.response?.data?.code
+      if (apiError.status === 502 && code === "SYNC_FAILED" && failedSource) {
+        setSettings((current) => (current ? replaceSyncSource(current, failedSource) : current))
+      }
+      const message =
+        apiError.response?.data?.message ||
+        apiError.response?.data?.error ||
+        apiError.response?.message ||
+        apiError.response?.error ||
+        apiError.message ||
+        "Source action failed"
+      setSourceErrors((current) => ({ ...current, [source.id]: message }))
+      toast.error(`Could not ${action} ${source.label}`, { description: message })
+    } finally {
+      setSourceBusy((current) => {
+        const next = { ...current }
+        delete next[source.id]
+        return next
+      })
+    }
   }
 
-  const handleDisconnectSyncSource = (id: string) => {
-    setSyncSources((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, status: "Not Connected" } : s)),
-    )
-    toast.warning("Integration disconnected")
-  }
-
-  const handleSyncSourceNow = (id: string) => {
-    setSyncSources((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, status: "Syncing" } : s)),
-    )
-    setTimeout(() => {
-      setSyncSources((prev) =>
-        prev.map((s) => (s.id === id ? { ...s, status: "Connected", lastSynced: "Just now" } : s)),
-      )
-      toast.success("Sync completed: 1,482 records imported from ERP")
-    }, 1000)
+  const archiveSelectedEntity = async () => {
+    if (!selectedEntity || !archiveReason.trim() || !canManageSettings) return
+    setArchivingEntity(true)
+    setArchiveError(null)
+    setArchiveReferences([])
+    try {
+      const res = await fpaApi.archiveEntity(selectedEntity, {
+        archive: true,
+        reason: archiveReason.trim(),
+      })
+      if (!res.success) throw new Error(res.message || "Could not archive entity")
+      toast.success("Forecast entity archived")
+      setArchiveConfirming(false)
+      setArchiveReason("")
+      await loadEntities()
+    } catch (err) {
+      const apiError = err as {
+        message?: string
+        response?: {
+          code?: string
+          message?: string
+          data?: {
+            code?: string
+            message?: string
+            references?: unknown
+          }
+          references?: unknown
+        }
+      }
+      const payload = apiError.response?.data
+      const code = payload?.code || apiError.response?.code
+      const message = payload?.message || apiError.response?.message || apiError.message || "Could not archive entity"
+      setArchiveError(message)
+      if (code === "ENTITY_IN_USE") {
+        setArchiveReferences(
+          referenceCountLines(payload?.references || apiError.response?.references),
+        )
+      }
+    } finally {
+      setArchivingEntity(false)
+    }
   }
 
   return (
@@ -182,7 +387,7 @@ export function FpaSettings() {
               type="button"
               onClick={() => setActiveSection("entities")}
               className={cn(
-                "w-full h-10 inline-flex items-center gap-2.5 px-3 rounded-lg text-xs font-semibold tracking-wide text-left transition-all",
+                "w-full h-10 inline-flex items-center gap-2.5 px-3 rounded-full text-xs font-semibold tracking-wide text-left transition-all",
                 activeSection === "entities"
                   ? "bg-[#eff8ff] text-[#175cd3]"
                   : "text-[#475467] hover:bg-[#f9fafb] hover:text-[#101828]",
@@ -195,7 +400,7 @@ export function FpaSettings() {
               type="button"
               onClick={() => setActiveSection("thresholds")}
               className={cn(
-                "w-full h-10 inline-flex items-center gap-2.5 px-3 rounded-lg text-xs font-semibold tracking-wide text-left transition-all",
+                "w-full h-10 inline-flex items-center gap-2.5 px-3 rounded-full text-xs font-semibold tracking-wide text-left transition-all",
                 activeSection === "thresholds"
                   ? "bg-[#eff8ff] text-[#175cd3]"
                   : "text-[#475467] hover:bg-[#f9fafb] hover:text-[#101828]",
@@ -208,7 +413,7 @@ export function FpaSettings() {
               type="button"
               onClick={() => setActiveSection("sync")}
               className={cn(
-                "w-full h-10 inline-flex items-center gap-2.5 px-3 rounded-lg text-xs font-semibold tracking-wide text-left transition-all",
+                "w-full h-10 inline-flex items-center gap-2.5 px-3 rounded-full text-xs font-semibold tracking-wide text-left transition-all",
                 activeSection === "sync"
                   ? "bg-[#eff8ff] text-[#175cd3]"
                   : "text-[#475467] hover:bg-[#f9fafb] hover:text-[#101828]",
@@ -221,7 +426,7 @@ export function FpaSettings() {
               type="button"
               onClick={() => setActiveSection("workflow")}
               className={cn(
-                "w-full h-10 inline-flex items-center gap-2.5 px-3 rounded-lg text-xs font-semibold tracking-wide text-left transition-all",
+                "w-full h-10 inline-flex items-center gap-2.5 px-3 rounded-full text-xs font-semibold tracking-wide text-left transition-all",
                 activeSection === "workflow"
                   ? "bg-[#eff8ff] text-[#175cd3]"
                   : "text-[#475467] hover:bg-[#f9fafb] hover:text-[#101828]",
@@ -257,6 +462,25 @@ export function FpaSettings() {
                   <span className="text-[11px] text-[#667085]">Define scopes for consolidations</span>
                 </div>
 
+                {entitiesLoading ? (
+                  <div className="flex items-center gap-2 py-6 text-sm text-[#667085]">
+                    <Loader2 className="size-4 animate-spin" />
+                    Loading entities…
+                  </div>
+                ) : entitiesError ? (
+                  <div className="rounded-xl border border-[#fda29b] bg-[#fef3f2] p-4 text-sm text-[#b42318]">
+                    <p>{entitiesError}</p>
+                    <button
+                      type="button"
+                      onClick={() => void loadEntities()}
+                      className="mt-3 h-8 rounded-full border border-[#fda29b] px-3 text-xs font-semibold"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                ) : entities.length === 0 ? (
+                  <p className="py-6 text-sm text-[#667085]">No forecast entities returned by the API.</p>
+                ) : (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   {entities.map((e) => {
                     const isSelected = selectedEntity === e.id
@@ -265,29 +489,16 @@ export function FpaSettings() {
                         key={e.id}
                         onClick={() => setSelectedEntity(e.id)}
                         className={cn(
-                          "rounded-xl border p-4 cursor-pointer hover:shadow-md transition-all flex flex-col justify-between min-h-[100px] relative group",
+                          "rounded-xl border p-4 cursor-pointer hover:shadow-md transition-all flex flex-col justify-between min-h-[100px] relative",
                           isSelected
                             ? "border-[#2563eb] bg-[#eff8ff] text-[#175cd3]"
                             : "border-[#eaecf0] bg-white text-[#344054]",
                         )}
                       >
-                        {canManageSettings && entities.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={(ev) => {
-                              ev.stopPropagation()
-                              deleteEntity(e.id)
-                            }}
-                            className="absolute top-2 right-2 h-6 w-6 rounded-full text-[10px] font-bold text-[#b42318] bg-[#fef3f2] opacity-0 group-hover:opacity-100 transition-opacity"
-                            aria-label={`Remove ${e.name}`}
-                          >
-                            ×
-                          </button>
-                        )}
                         <div>
                           <h4 className="text-[13px] font-bold text-[#101828]">{e.name}</h4>
                           <p className="text-[10px] text-[#667085] mt-1">
-                            Currency: <span className="font-semibold">{e.baseCurrency}</span>
+                            Currency: <span className="font-semibold">{e.baseCurrency || e.base_currency || "—"}</span>
                           </p>
                         </div>
                         <span className="text-[10.5px] text-[#2563eb] font-semibold mt-3 block">
@@ -297,9 +508,11 @@ export function FpaSettings() {
                     )
                   })}
                 </div>
+                )}
 
                 {canManageSettings && (
-                  <div className="flex items-center gap-3 border-t border-[#f2f4f7] pt-4 flex-wrap">
+                  <div className="border-t border-[#f2f4f7] pt-4 space-y-2">
+                    <div className="flex items-center gap-3 flex-wrap">
                     <input
                       className="h-9 rounded-lg border border-[#d0d5dd] px-3 text-xs w-48 focus:outline-none focus:ring-1 focus:ring-[#2563eb]"
                       placeholder="New entity name"
@@ -317,18 +530,20 @@ export function FpaSettings() {
                     </select>
                     <button
                       type="button"
-                      disabled={!entityName.trim()}
-                      onClick={createEntity}
+                      disabled={!entityName.trim() || creatingEntity}
+                      onClick={() => void createEntity()}
                       className="h-9 rounded-full bg-[#2563eb] hover:bg-[#1d4ed8] px-5 text-xs font-semibold text-white transition-colors shadow-sm"
                     >
-                      Add Entity
+                      {creatingEntity ? "Adding…" : "Add Entity"}
                     </button>
+                    </div>
                   </div>
                 )}
               </section>
 
               {/* Chart of Accounts details */}
               {selectedEntity && (
+                <>
                 <section className="rounded-xl border border-[#eaecf0] bg-white p-5 shadow-sm">
                   <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                     <div>
@@ -344,7 +559,23 @@ export function FpaSettings() {
                     />
                   </div>
 
-                  {!activeCoa.length ? (
+                  {coaLoading ? (
+                    <p className="text-[12px] text-[#667085] py-4 inline-flex items-center gap-2">
+                      <Loader2 className="size-3.5 animate-spin" />
+                      Loading accounts…
+                    </p>
+                  ) : coaError ? (
+                    <div className="py-4 text-[12px] text-[#b42318]">
+                      <p>{coaError}</p>
+                      <button
+                        type="button"
+                        onClick={() => void loadCoa(selectedEntity)}
+                        className="mt-3 h-8 rounded-full border border-[#fda29b] px-3 text-xs font-semibold"
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  ) : !activeCoa.length ? (
                     <p className="text-[12px] text-[#98a2b3] py-4">No accounts mapped to this entity.</p>
                   ) : (
                     <ul className="max-h-64 overflow-y-auto text-[12.5px] divide-y divide-[#f2f4f7] pr-1.5">
@@ -357,6 +588,75 @@ export function FpaSettings() {
                     </ul>
                   )}
                 </section>
+                {canManageSettings && (
+                  <section className="rounded-xl border border-[#fda29b] bg-white p-5 shadow-sm">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <h3 className="text-[14px] font-semibold text-[#b42318]">Archive selected entity</h3>
+                        <p className="mt-1 text-[11px] text-[#667085]">
+                          Archived entities are removed from the active forecast entity list.
+                        </p>
+                      </div>
+                      {!archiveConfirming && (
+                        <button
+                          type="button"
+                          onClick={() => setArchiveConfirming(true)}
+                          className="inline-flex h-9 items-center gap-2 rounded-full border border-[#fda29b] px-4 text-xs font-semibold text-[#b42318]"
+                        >
+                          <Archive className="size-3.5" />
+                          Archive entity
+                        </button>
+                      )}
+                    </div>
+                    {archiveConfirming && (
+                      <div className="mt-4 space-y-3 border-t border-[#fef3f2] pt-4">
+                        <label className="block text-xs font-semibold text-[#344054]">
+                          Reason for archiving
+                          <textarea
+                            value={archiveReason}
+                            onChange={(event) => setArchiveReason(event.target.value)}
+                            placeholder="Enter an explicit reason"
+                            rows={3}
+                            className="mt-1.5 w-full rounded-xl border border-[#d0d5dd] px-3 py-2 text-xs font-normal focus:outline-none focus:ring-1 focus:ring-[#d92d20]"
+                          />
+                        </label>
+                        {archiveError && (
+                          <div className="rounded-xl border border-[#fda29b] bg-[#fef3f2] p-3 text-xs text-[#b42318]">
+                            <p>{archiveError}</p>
+                            {archiveReferences.length > 0 && (
+                              <p className="mt-1">References: {archiveReferences.join(", ")}</p>
+                            )}
+                          </div>
+                        )}
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            disabled={!archiveReason.trim() || archivingEntity}
+                            onClick={() => void archiveSelectedEntity()}
+                            className="inline-flex h-9 items-center gap-2 rounded-full bg-[#d92d20] px-4 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {archivingEntity && <Loader2 className="size-3.5 animate-spin" />}
+                            Confirm archive
+                          </button>
+                          <button
+                            type="button"
+                            disabled={archivingEntity}
+                            onClick={() => {
+                              setArchiveConfirming(false)
+                              setArchiveReason("")
+                              setArchiveError(null)
+                              setArchiveReferences([])
+                            }}
+                            className="h-9 rounded-full border border-[#d0d5dd] px-4 text-xs font-semibold text-[#344054]"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </section>
+                )}
+                </>
               )}
             </div>
           )}
@@ -366,73 +666,85 @@ export function FpaSettings() {
             <section className="rounded-xl border border-[#eaecf0] bg-white p-5 shadow-sm space-y-5">
               <div>
                 <h2 className="text-[15px] font-semibold text-[#101828]">Variance Commentary Thresholds</h2>
-                <p className="text-[12px] text-[#667085] mt-0.5">Determine when department managers are required to write explanations for budget deviations.</p>
+                <p className="text-[12px] text-[#667085] mt-0.5">
+                  Determine when department managers must explain budget deviations.
+                </p>
               </div>
-
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-[13px] font-semibold text-[#344054]">
-                    <span>Mandatory Commentary Threshold:</span>
-                    <span className="text-[#2563eb]">{threshold}% Variance</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="5"
-                    max="50"
-                    step="5"
+              {settingsLoading ? (
+                <LoadingState label="Loading variance settings…" />
+              ) : settingsError ? (
+                <SettingsErrorState message={settingsError} onRetry={loadSettings} />
+              ) : !settings || !draft ? (
+                <EmptyState label="No variance settings were returned by the API." />
+              ) : (
+                <>
+                  <label className="block max-w-sm text-xs font-semibold text-[#344054]">
+                    Commentary threshold (%)
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      disabled={!canManageSettings}
+                      value={draft.variance.commentaryThresholdPct}
+                      onChange={(event) => {
+                        setSettingsValidationError(null)
+                        setDraft((current) =>
+                          current
+                            ? {
+                                ...current,
+                                variance: {
+                                  ...current.variance,
+                                  commentaryThresholdPct: event.target.value,
+                                },
+                              }
+                            : current,
+                        )
+                      }}
+                      className="mt-1.5 h-10 w-full rounded-xl border border-[#d0d5dd] px-3 text-xs disabled:bg-[#f9fafb]"
+                    />
+                  </label>
+                  <ToggleRow
+                    label="Enforce commentary"
+                    description="Require commentary when the configured threshold is exceeded."
+                    checked={draft.variance.enforceCommentary}
                     disabled={!canManageSettings}
-                    value={threshold}
-                    onChange={(e) => setThreshold(Number(e.target.value))}
-                    className="w-full h-1.5 bg-[#eaecf0] rounded-lg appearance-none cursor-pointer accent-[#2563eb]"
+                    onChange={(checked) =>
+                      setDraft((current) =>
+                        current
+                          ? {
+                              ...current,
+                              variance: { ...current.variance, enforceCommentary: checked },
+                            }
+                          : current,
+                      )
+                    }
                   />
-                  <p className="text-[11.5px] text-[#667085] mt-1">
-                    💡 If a department's expense budget deviates from the actual result by more than {threshold}%, submission is locked until explanation comments are provided.
-                  </p>
-                </div>
-
-                <div className="space-y-3.5 border-t border-[#f2f4f7] pt-4">
-                  <label className="flex items-start gap-2.5 text-[12.5px] text-[#344054] cursor-pointer">
-                    <input
-                      type="checkbox"
-                      disabled={!canManageSettings}
-                      checked={enforceCommentary}
-                      onChange={(e) => setEnforceCommentary(e.target.checked)}
-                      className="mt-0.5 rounded border-[#d0d5dd] text-[#2563eb] focus:ring-[#2563eb]/20"
-                    />
-                    <div>
-                      <span className="font-semibold">Enforce commentary rules on Opex line items</span>
-                      <p className="text-[11px] text-[#667085] mt-0.5">Applies threshold validations to salaries, marketing, and operational expenses.</p>
-                    </div>
-                  </label>
-
-                  <label className="flex items-start gap-2.5 text-[12.5px] text-[#344054] cursor-pointer">
-                    <input
-                      type="checkbox"
-                      disabled={!canManageSettings}
-                      checked={blockSubmit}
-                      onChange={(e) => setBlockSubmit(e.target.checked)}
-                      className="mt-0.5 rounded border-[#d0d5dd] text-[#2563eb] focus:ring-[#2563eb]/20"
-                    />
-                    <div>
-                      <span className="font-semibold">Block budget cycle lock if variances are unexplained</span>
-                      <p className="text-[11px] text-[#667085] mt-0.5">Prevents finance administrators from locking the rolling forecast if comments are missing.</p>
-                    </div>
-                  </label>
-                </div>
-              </div>
-
-              {canManageSettings && (
-                <div className="border-t border-[#f2f4f7] pt-4 flex justify-end">
-                  <button
-                    type="button"
-                    disabled={savingThreshold}
-                    onClick={saveThresholdSettings}
-                    className="h-9 rounded-full bg-[#2563eb] hover:bg-[#1d4ed8] px-5 text-xs font-semibold text-white transition-colors inline-flex items-center gap-1.5 shadow-sm"
-                  >
-                    {savingThreshold ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
-                    Save Threshold Settings
-                  </button>
-                </div>
+                  <ToggleRow
+                    label="Block submit without commentary"
+                    description="Prevent submission until required commentary is supplied."
+                    checked={draft.variance.blockSubmitWithoutCommentary}
+                    disabled={!canManageSettings}
+                    onChange={(checked) =>
+                      setDraft((current) =>
+                        current
+                          ? {
+                              ...current,
+                              variance: {
+                                ...current.variance,
+                                blockSubmitWithoutCommentary: checked,
+                              },
+                            }
+                          : current,
+                      )
+                    }
+                  />
+                  <SettingsSaveBar
+                    canSave={canManageSettings}
+                    saving={savingSettings}
+                    error={settingsValidationError}
+                    onSave={saveSettings}
+                  />
+                </>
               )}
             </section>
           )}
@@ -442,76 +754,81 @@ export function FpaSettings() {
             <section className="rounded-xl border border-[#eaecf0] bg-white p-5 shadow-sm space-y-4">
               <div>
                 <h2 className="text-[15px] font-semibold text-[#101828]">ERP & Data Hub Integrations</h2>
-                <p className="text-[12px] text-[#667085] mt-0.5">Configure live pipelines to pull historical actuals and metadata structures.</p>
+                <p className="text-[12px] text-[#667085] mt-0.5">
+                  Configure live pipelines to pull historical actuals and metadata structures.
+                </p>
               </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                {syncSources.map((source) => {
-                  const isSyncing = source.status === "Syncing"
-                  const isConnected = source.status === "Connected"
-                  const isConnecting = connectingSourceId === source.id
-
-                  return (
-                    <div key={source.id} className="rounded-xl border border-[#eaecf0] p-4 flex flex-col justify-between gap-4 bg-white hover:shadow-sm transition-shadow">
-                      <div className="flex items-start justify-between gap-2.5">
-                        <div>
-                          <h4 className="text-[13px] font-bold text-[#101828]">{source.name}</h4>
-                          <span className="text-[10px] text-[#667085] mt-0.5">{source.provider}</span>
-                        </div>
-                        <span
-                          className={cn(
-                            "inline-flex items-center gap-1 text-[9.5px] font-bold px-2 py-0.5 rounded-full",
-                            source.status === "Connected" && "bg-[#edfcf2] text-[#087443]",
-                            source.status === "Not Connected" && "bg-[#f2f4f7] text-[#667085]",
-                            source.status === "Syncing" && "bg-[#eff8ff] text-[#175cd3]",
-                          )}
-                        >
-                          <span className={cn("w-1.5 h-1.5 rounded-full", isConnected ? "bg-[#12b76a]" : isSyncing ? "bg-[#2563eb] animate-ping" : "bg-[#98a2b3]")} />
-                          {source.status}
-                        </span>
-                      </div>
-
-                      <div className="text-[11px] text-[#667085]">
-                        Last synchronization: <span className="font-semibold text-[#344054]">{source.lastSynced}</span>
-                      </div>
-
-                      {canManageSettings && (
-                        <div className="flex items-center gap-2 border-t border-[#f2f4f7] pt-3 mt-1">
-                          {!isConnected ? (
+              {settingsLoading ? (
+                <LoadingState label="Loading sync sources…" />
+              ) : settingsError ? (
+                <SettingsErrorState message={settingsError} onRetry={loadSettings} />
+              ) : !settings ? (
+                <EmptyState label="No sync source settings were returned by the API." />
+              ) : settings.syncSources.length === 0 ? (
+                <EmptyState label="No sync sources are configured." />
+              ) : (
+                <div className="grid gap-3">
+                  {settings.syncSources.map((source) => {
+                    const busy = sourceBusy[source.id]
+                    const connected = source.status.toUpperCase() === "CONNECTED"
+                    return (
+                      <article key={source.id} className="rounded-xl border border-[#eaecf0] p-4">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h3 className="text-sm font-semibold text-[#101828]">{source.label}</h3>
+                              <span className="rounded-full bg-[#f2f4f7] px-2 py-0.5 text-[10px] font-semibold text-[#475467]">
+                                {source.status}
+                              </span>
+                            </div>
+                            <p className="mt-1 text-[11px] text-[#667085]">
+                              Last sync: {source.lastSyncAt ? new Date(source.lastSyncAt).toLocaleString() : "Never"}
+                            </p>
+                            {source.lastError && (
+                              <p className="mt-1 text-[11px] text-[#b42318]">{source.lastError}</p>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap gap-2">
                             <button
                               type="button"
-                              disabled={isConnecting}
-                              onClick={() => handleConnectSyncSource(source.id)}
-                              className="h-8 flex-1 inline-flex items-center justify-center rounded-lg bg-[#2563eb] text-xs font-semibold text-white hover:bg-[#1d4ed8]"
+                              disabled={!canManageSettings || Boolean(busy)}
+                              onClick={() => void runSourceAction(source, connected ? "disconnect" : "connect")}
+                              className="inline-flex h-9 items-center gap-2 rounded-full border border-[#d0d5dd] px-4 text-xs font-semibold text-[#344054] disabled:opacity-50"
                             >
-                              {isConnecting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Connect Integration"}
+                              {busy === (connected ? "disconnect" : "connect") ? (
+                                <Loader2 className="size-3.5 animate-spin" />
+                              ) : connected ? (
+                                <Unplug className="size-3.5" />
+                              ) : (
+                                <Link2 className="size-3.5" />
+                              )}
+                              {connected ? "Disconnect" : "Connect"}
                             </button>
-                          ) : (
-                            <>
-                              <button
-                                type="button"
-                                disabled={isSyncing}
-                                onClick={() => handleSyncSourceNow(source.id)}
-                                className="h-8 flex-1 inline-flex items-center justify-center gap-1 rounded-lg border border-[#d0d5dd] text-xs font-semibold text-[#344054] hover:bg-[#f9fafb]"
-                              >
-                                {isSyncing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3 h-3 text-[#475467]" />}
-                                Sync Now
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDisconnectSyncSource(source.id)}
-                                className="h-8 rounded-lg border border-[#fda29b] text-xs font-semibold text-[#b42318] px-3.5 hover:bg-[#fef3f2]"
-                              >
-                                Disconnect
-                              </button>
-                            </>
-                          )}
+                            <button
+                              type="button"
+                              disabled={!canManageSettings || Boolean(busy) || !connected}
+                              onClick={() => void runSourceAction(source, "sync")}
+                              className="inline-flex h-9 items-center gap-2 rounded-full bg-[#2563eb] px-4 text-xs font-semibold text-white disabled:opacity-50"
+                            >
+                              {busy === "sync" ? (
+                                <Loader2 className="size-3.5 animate-spin" />
+                              ) : (
+                                <RefreshCw className="size-3.5" />
+                              )}
+                              Sync now
+                            </button>
+                          </div>
                         </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
+                        {sourceErrors[source.id] && (
+                          <p className="mt-3 rounded-xl border border-[#fda29b] bg-[#fef3f2] p-3 text-xs text-[#b42318]">
+                            {sourceErrors[source.id]}
+                          </p>
+                        )}
+                      </article>
+                    )
+                  })}
+                </div>
+              )}
             </section>
           )}
 
@@ -520,72 +837,172 @@ export function FpaSettings() {
             <section className="rounded-xl border border-[#eaecf0] bg-white p-5 shadow-sm space-y-5">
               <div>
                 <h2 className="text-[15px] font-semibold text-[#101828]">Workflow Defaults</h2>
-                <p className="text-[12px] text-[#667085] mt-0.5">Configure default guidelines and checkpoint restrictions for budget approvals.</p>
+                <p className="text-[12px] text-[#667085] mt-0.5">
+                  Configure default guidelines and checkpoint restrictions for budget approvals.
+                </p>
               </div>
-
-              <div className="space-y-4 text-[13px]">
-                <div className="space-y-3.5">
-                  <label className="flex items-start gap-2.5 text-[#344054] cursor-pointer">
+              {settingsLoading ? (
+                <LoadingState label="Loading workflow settings…" />
+              ) : settingsError ? (
+                <SettingsErrorState message={settingsError} onRetry={loadSettings} />
+              ) : !settings || !draft ? (
+                <EmptyState label="No workflow settings were returned by the API." />
+              ) : (
+                <>
+                  <label className="block max-w-sm text-xs font-semibold text-[#344054]">
+                    Workflow path
                     <input
-                      type="checkbox"
+                      type="text"
                       disabled={!canManageSettings}
-                      checked={linearWorkflow}
-                      onChange={(e) => setLinearWorkflow(e.target.checked)}
-                      className="mt-0.5 rounded border-[#d0d5dd] text-[#2563eb] focus:ring-[#2563eb]/20"
+                      value={draft.workflow.path}
+                      onChange={(event) =>
+                        setDraft((current) =>
+                          current
+                            ? {
+                                ...current,
+                                workflow: { ...current.workflow, path: event.target.value },
+                              }
+                            : current,
+                        )
+                      }
+                      className="mt-1.5 h-10 w-full rounded-xl border border-[#d0d5dd] px-3 text-xs disabled:bg-[#f9fafb]"
                     />
-                    <div>
-                      <span className="font-semibold">Enforce linear path checks (Draft → Submitted → Approved)</span>
-                      <p className="text-[11px] text-[#667085] mt-0.5">Restricts roles so department managers cannot approve their own drafts.</p>
-                    </div>
                   </label>
-
-                  <label className="flex items-start gap-2.5 text-[#344054] cursor-pointer">
-                    <input
-                      type="checkbox"
-                      disabled={!canManageSettings}
-                      checked={cfoSignature}
-                      onChange={(e) => setCfoSignature(e.target.checked)}
-                      className="mt-0.5 rounded border-[#d0d5dd] text-[#2563eb] focus:ring-[#2563eb]/20"
-                    />
-                    <div>
-                      <span className="font-semibold">Require CFO signature to lock cycle consolidations</span>
-                      <p className="text-[11px] text-[#667085] mt-0.5">Enforces a dual-authorization barrier before closing forecast periods.</p>
-                    </div>
-                  </label>
-
-                  <label className="flex items-start gap-2.5 text-[#344054] cursor-pointer">
-                    <input
-                      type="checkbox"
-                      disabled={!canManageSettings}
-                      checked={allowRerun}
-                      onChange={(e) => setAllowRerun(e.target.checked)}
-                      className="mt-0.5 rounded border-[#d0d5dd] text-[#2563eb] focus:ring-[#2563eb]/20"
-                    />
-                    <div>
-                      <span className="font-semibold">Allow scenario recalculations on locked budgets</span>
-                      <p className="text-[11px] text-[#667085] mt-0.5">Allows administrators to trigger backruns on historic cycle data.</p>
-                    </div>
-                  </label>
-                </div>
-              </div>
-
-              {canManageSettings && (
-                <div className="border-t border-[#f2f4f7] pt-4 flex justify-end">
-                  <button
-                    type="button"
-                    disabled={savingWorkflow}
-                    onClick={saveWorkflowDefaults}
-                    className="h-9 rounded-full bg-[#2563eb] hover:bg-[#1d4ed8] px-5 text-xs font-semibold text-white transition-colors inline-flex items-center gap-1.5 shadow-sm"
-                  >
-                    {savingWorkflow ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
-                    Save Workflow Settings
-                  </button>
-                </div>
+                  <ToggleRow
+                    label="Require CFO signature"
+                    description="Add CFO sign-off to the workflow path."
+                    checked={draft.workflow.requireCfoSignature}
+                    disabled={!canManageSettings}
+                    onChange={(checked) =>
+                      setDraft((current) =>
+                        current
+                          ? {
+                              ...current,
+                              workflow: { ...current.workflow, requireCfoSignature: checked },
+                            }
+                          : current,
+                      )
+                    }
+                  />
+                  <ToggleRow
+                    label="Allow rerun after return"
+                    description="Let owners rerun a workflow after it is returned."
+                    checked={draft.workflow.allowRerunAfterReturn}
+                    disabled={!canManageSettings}
+                    onChange={(checked) =>
+                      setDraft((current) =>
+                        current
+                          ? {
+                              ...current,
+                              workflow: { ...current.workflow, allowRerunAfterReturn: checked },
+                            }
+                          : current,
+                      )
+                    }
+                  />
+                  <SettingsSaveBar
+                    canSave={canManageSettings}
+                    saving={savingSettings}
+                    error={settingsValidationError}
+                    onSave={saveSettings}
+                  />
+                </>
               )}
             </section>
           )}
         </main>
       </div>
+    </div>
+  )
+}
+
+function LoadingState({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-2 py-6 text-sm text-[#667085]">
+      <Loader2 className="size-4 animate-spin" />
+      {label}
+    </div>
+  )
+}
+
+function EmptyState({ label }: { label: string }) {
+  return <p className="rounded-xl border border-[#eaecf0] bg-[#f9fafb] p-4 text-xs text-[#667085]">{label}</p>
+}
+
+function SettingsErrorState({
+  message,
+  onRetry,
+}: {
+  message: string
+  onRetry: () => Promise<void>
+}) {
+  return (
+    <div className="rounded-xl border border-[#fda29b] bg-[#fef3f2] p-4 text-xs text-[#b42318]">
+      <p>{message}</p>
+      <button
+        type="button"
+        onClick={() => void onRetry()}
+        className="mt-3 h-8 rounded-full border border-[#fda29b] px-3 font-semibold"
+      >
+        Retry
+      </button>
+    </div>
+  )
+}
+
+function ToggleRow({
+  label,
+  description,
+  checked,
+  disabled,
+  onChange,
+}: {
+  label: string
+  description: string
+  checked: boolean
+  disabled: boolean
+  onChange: (checked: boolean) => void
+}) {
+  return (
+    <label className="flex items-center justify-between gap-4 rounded-xl border border-[#eaecf0] p-4">
+      <span>
+        <span className="block text-xs font-semibold text-[#344054]">{label}</span>
+        <span className="mt-0.5 block text-[11px] text-[#667085]">{description}</span>
+      </span>
+      <input
+        type="checkbox"
+        checked={checked}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.checked)}
+        className="size-4 accent-[#2563eb]"
+      />
+    </label>
+  )
+}
+
+function SettingsSaveBar({
+  canSave,
+  saving,
+  error,
+  onSave,
+}: {
+  canSave: boolean
+  saving: boolean
+  error: string | null
+  onSave: () => Promise<void>
+}) {
+  return (
+    <div className="border-t border-[#f2f4f7] pt-4">
+      {error && <p className="mb-2 text-xs text-[#b42318]">{error}</p>}
+      <button
+        type="button"
+        disabled={!canSave || saving}
+        onClick={() => void onSave()}
+        className="inline-flex h-10 items-center gap-2 rounded-full bg-[#2563eb] px-6 text-xs font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {saving && <Loader2 className="size-3.5 animate-spin" />}
+        Save settings
+      </button>
     </div>
   )
 }

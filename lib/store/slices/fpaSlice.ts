@@ -9,6 +9,7 @@ import {
   type FpaVarianceResult,
 } from '@/lib/api/fpa-api'
 import { errorMessage, logFpaGap } from '@/lib/fpa/fpa-api-gaps'
+import { normalizeFpaHomeDashboard } from '@/lib/fpa/normalize-home-dashboard'
 
 export interface FpaState {
   selectedModelId: string | null
@@ -100,19 +101,32 @@ export const bootstrapFpaSelection = createAsyncThunk(
       }
 
       const detailRes = await fpaApi.getModel(model.id)
-      const detail = detailRes.success ? detailRes.data : model
-      const scenarios = detail?.scenarios || []
-      const versions = detail?.versions || []
+      const detail = detailRes.success && detailRes.data ? detailRes.data : model
+      let scenarios = detail.scenarios || []
+      let versions = detail.versions || []
+
+      const [scenarioRes, versionRes] = await Promise.all([
+        scenarios.length ? Promise.resolve(null) : fpaApi.listModelScenarios(model.id),
+        versions.length ? Promise.resolve(null) : fpaApi.listModelVersions(model.id),
+      ])
+      if (scenarioRes) {
+        if (!scenarioRes.success) throw new Error(scenarioRes.message || 'Failed to load model scenarios')
+        scenarios = scenarioRes.data || []
+      }
+      if (versionRes) {
+        if (!versionRes.success) throw new Error(versionRes.message || 'Failed to load model versions')
+        versions = versionRes.data || []
+      }
 
       const selectedScenarioId =
-        detail?.defaultScenarioId ||
+        scenarios.find((s) => s.id === detail.defaultScenarioId)?.id ||
         scenarios.find((s) => s.scenarioType === 'BASE' || /base/i.test(s.name))?.id ||
         scenarios[0]?.id ||
         null
 
       // Prefer locked/published (planning snapshot) then default, then working draft.
       const selectedVersionId =
-        detail?.defaultVersionId ||
+        versions.find((v) => v.id === detail.defaultVersionId)?.id ||
         versions.find((v) => {
           const st = String(v.status).toUpperCase()
           return st === 'LOCKED' || st === 'PUBLISHED'
@@ -123,7 +137,7 @@ export const bootstrapFpaSelection = createAsyncThunk(
 
       return {
         models,
-        model: detail || model,
+        model: detail,
         scenarios,
         versions,
         selectedModelId: model.id,
@@ -147,7 +161,15 @@ export const bootstrapFpaSelection = createAsyncThunk(
 export const fetchFpaDashboard = createAsyncThunk(
   'fpa/fetchDashboard',
   async (
-    params: { modelId?: string; versionId?: string } | undefined,
+    params:
+      | {
+          modelId?: string
+          versionId?: string
+          scenarioId?: string
+          cycleId?: string
+          period?: string
+        }
+      | undefined,
     { rejectWithValue },
   ) => {
     try {
@@ -164,7 +186,7 @@ export const fetchFpaDashboard = createAsyncThunk(
         })
         return rejectWithValue(res.message || 'Failed to load dashboard')
       }
-      return res.data || null
+      return normalizeFpaHomeDashboard(res.data || null)
     } catch (err) {
       logFpaGap({
         category: 'broken',
@@ -244,11 +266,19 @@ const fpaSlice = createSlice({
         state.loadingModels = false
         state.error = (action.payload as string) || 'Failed to load models'
       })
-      .addCase(bootstrapFpaSelection.pending, (state) => {
+      .addCase(bootstrapFpaSelection.pending, (state, action) => {
         state.loadingModels = true
         state.error = null
+        if (action.meta.arg) {
+          state.selectedModelId = action.meta.arg
+          state.selectedScenarioId = null
+          state.selectedVersionId = null
+          state.scenarios = []
+          state.versions = []
+        }
       })
       .addCase(bootstrapFpaSelection.fulfilled, (state, action) => {
+        if (action.meta.arg && state.selectedModelId !== action.meta.arg) return
         state.loadingModels = false
         state.bootstrapped = true
         state.models = action.payload.models
@@ -259,6 +289,7 @@ const fpaSlice = createSlice({
         state.selectedVersionId = action.payload.selectedVersionId
       })
       .addCase(bootstrapFpaSelection.rejected, (state, action) => {
+        if (action.meta.arg && state.selectedModelId !== action.meta.arg) return
         state.loadingModels = false
         state.bootstrapped = true
         state.error = (action.payload as string) || 'Bootstrap failed'
@@ -267,17 +298,27 @@ const fpaSlice = createSlice({
         state.loadingDashboard = true
       })
       .addCase(fetchFpaDashboard.fulfilled, (state, action) => {
+        const requested = action.meta.arg
+        if (
+          (requested?.modelId && requested.modelId !== state.selectedModelId) ||
+          (requested?.versionId && requested.versionId !== state.selectedVersionId) ||
+          (requested?.scenarioId && requested.scenarioId !== state.selectedScenarioId)
+        ) {
+          return
+        }
         state.loadingDashboard = false
         state.dashboard = action.payload
         if (action.payload?.openTasks) state.tasks = action.payload.openTasks
-        if (action.payload?.versionId && !state.selectedVersionId) {
-          state.selectedVersionId = action.payload.versionId
-        }
-        if (action.payload?.model?.id && !state.selectedModelId) {
-          state.selectedModelId = action.payload.model.id
-        }
       })
       .addCase(fetchFpaDashboard.rejected, (state, action) => {
+        const requested = action.meta.arg
+        if (
+          (requested?.modelId && requested.modelId !== state.selectedModelId) ||
+          (requested?.versionId && requested.versionId !== state.selectedVersionId) ||
+          (requested?.scenarioId && requested.scenarioId !== state.selectedScenarioId)
+        ) {
+          return
+        }
         state.loadingDashboard = false
         state.error = (action.payload as string) || 'Dashboard failed'
       })

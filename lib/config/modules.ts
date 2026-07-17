@@ -515,7 +515,6 @@ export const MODULE_CONFIG: ModuleConfig[] = [
       { id: "fpa-model-builder", name: "Model Builder", path: "/forecasting/model-builder", icon: Settings, description: "Configure planning models" },
       { id: "fpa-budget", name: "Budgeting", path: "/forecasting/budget", icon: CiWallet, description: "Annual budgeting cycles" },
       { id: "fpa-rolling", name: "Forecasts", path: "/forecasting/rolling-forecast", icon: TrendingUp, description: "Rolling forecasts" },
-      { id: "fpa-scenarios", name: "Scenarios", path: "/forecasting/scenarios", icon: CiViewColumn, description: "Scenario comparison" },
       { id: "fpa-drivers", name: "Assumptions", path: "/forecasting/drivers", icon: CiText, description: "Assumptions and drivers" },
       { id: "fpa-workforce", name: "Workforce", path: "/forecasting/workforce", icon: Users, description: "Workforce planning" },
       { id: "fpa-revenue", name: "Revenue", path: "/forecasting/revenue", icon: DollarSign, description: "Revenue planning" },

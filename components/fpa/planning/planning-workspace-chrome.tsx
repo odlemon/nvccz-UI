@@ -73,6 +73,8 @@ export type PlanningDriverRow = {
   value: string | number
   unit?: string | null
   prior?: string | number | null
+  /** Column header hint from BE, e.g. "FY2025 Actual". */
+  priorPeriodLabel?: string | null
   changeLabel?: string
   changeTone?: "up" | "down" | "neutral"
 }
@@ -122,7 +124,13 @@ type Props = {
   onVersionChange: (id: string) => void
   onScenarioChange: (id: string) => void
   onRefresh: () => void
-  onDriverSave: (id: string, value: number) => Promise<void>
+  onExport: () => void | Promise<void>
+  onDriverSave: (
+    id: string,
+    value: number,
+  ) => Promise<void | { needsGridReload?: boolean }>
+  /** Fired once after a multi-driver Save — parent should refresh grid/KPIs at most once. */
+  onDriversSaved?: (needsGridReload: boolean) => Promise<void>
   trendPoints?: PlanningTrendPoint[]
   workflowSteps?: PlanningWorkflowStep[]
   viewByLabel?: string
@@ -140,53 +148,6 @@ type Props = {
   onCompareScenarioIdsChange?: (ids: string[]) => void
 }
 
-const DEMO_CYCLES: PlanningCycleOption[] = [
-  { id: "fy2026-budget", name: "FY2026 Budget" },
-  { id: "fy2026-q3-rf", name: "FY2026 Q3 Rolling Forecast" },
-]
-
-const DEMO_KPIS: PlanningKpi[] = [
-  {
-    label: "Revenue",
-    value: "$128.4M",
-    delta: "↑ 8.7% vs Plan",
-    deltaTone: "up",
-    spark: [98, 102, 105, 108, 112, 115, 118, 120, 122, 124, 126, 128.4],
-    sparkColor: "#3b82f6",
-  },
-  {
-    label: "Opex",
-    value: "$72.6M",
-    delta: "↑ 6.3% vs Plan",
-    deltaTone: "up",
-    spark: [58, 60, 61, 63, 64, 66, 67, 68, 69, 70, 71, 72.6],
-    sparkColor: "#8b5cf6",
-  },
-  {
-    label: "EBITDA",
-    value: "$55.8M",
-    delta: "↑ 12.4% vs Plan",
-    deltaTone: "up",
-    spark: [38, 40, 42, 44, 46, 48, 49, 51, 52, 53, 54, 55.8],
-    sparkColor: "#14b8a6",
-  },
-  {
-    label: "Cash Runway",
-    value: "14.6 Months",
-    delta: "↓ 1.1 MoM",
-    deltaTone: "down",
-    sparkColor: "#10b981",
-  },
-  {
-    label: "Variance to Plan",
-    value: "$3.9M",
-    delta: "↑ 2.1% of Revenue",
-    deltaTone: "up",
-    spark: [1.2, 1.5, 1.8, 2.0, 2.4, 2.6, 2.9, 3.1, 3.3, 3.5, 3.7, 3.9],
-    sparkColor: "#6366f1",
-  },
-]
-
 const KPI_THEMES: Record<
   string,
   { color: string; bg: string; Icon: typeof DollarSign; showSpark: boolean }
@@ -199,125 +160,6 @@ const KPI_THEMES: Record<
   Headcount: { color: "#7c3aed", bg: "#f5f3ff", Icon: Users, showSpark: false },
   "Variance to Plan": { color: "#6366f1", bg: "#eef2ff", Icon: Crosshair, showSpark: true },
 }
-
-/** Compare-mode KPI strip — matches design: Revenue, Gross Margin, EBITDA, Cash Runway, Headcount. */
-export const DEMO_COMPARE_KPIS: PlanningKpi[] = [
-  {
-    label: "Revenue",
-    value: "$128.4M",
-    delta: "↑ 8.7% vs Budget",
-    deltaTone: "up",
-    spark: [98, 102, 105, 108, 112, 115, 118, 120, 122, 124, 126, 128.4],
-    sparkColor: "#3b82f6",
-  },
-  {
-    label: "Gross Margin",
-    value: "62.3%",
-    delta: "↑ 1.9pp vs Budget",
-    deltaTone: "up",
-    spark: [58, 59, 59.5, 60, 60.5, 61, 61.2, 61.5, 61.8, 62, 62.1, 62.3],
-    sparkColor: "#8b5cf6",
-  },
-  {
-    label: "EBITDA",
-    value: "$55.8M",
-    delta: "↑ 12.4% vs Budget",
-    deltaTone: "up",
-    spark: [38, 40, 42, 44, 46, 48, 49, 51, 52, 53, 54, 55.8],
-    sparkColor: "#14b8a6",
-  },
-  {
-    label: "Cash Runway",
-    value: "14.6 Months",
-    delta: "↓ 1.1 Months vs Budget",
-    deltaTone: "down",
-    sparkColor: "#06b6d4",
-  },
-  {
-    label: "Headcount",
-    value: "568",
-    delta: "↑ 3.2% vs Budget",
-    deltaTone: "up",
-    sparkColor: "#7c3aed",
-  },
-]
-
-const DESIGN_SCENARIO_NAMES = [
-  "Base Case",
-  "Upside",
-  "Downside",
-  "FX Shock",
-  "Hiring Freeze",
-] as const
-
-const COMPARE_SCENARIO_NAMES = [
-  "Budget 2026",
-  "Forecast Q3",
-  "Best Case",
-  "Base Case",
-  "Downside",
-] as const
-
-const DEMO_DRIVERS: PlanningDriverRow[] = [
-  {
-    id: "d1",
-    name: "Volume Growth",
-    prior: "12.5%",
-    value: "9.8%",
-    unit: "%",
-    changeLabel: "↓ 2.7 pp",
-    changeTone: "down",
-  },
-  {
-    id: "d2",
-    name: "Price Change",
-    prior: "3.2%",
-    value: "2.5%",
-    unit: "%",
-    changeLabel: "↓ 0.7 pp",
-    changeTone: "down",
-  },
-  {
-    id: "d3",
-    name: "Headcount Plan",
-    prior: "512",
-    value: "568",
-    changeLabel: "↑ 56",
-    changeTone: "up",
-  },
-  {
-    id: "d4",
-    name: "Inflation (US)",
-    prior: "3.4%",
-    value: "2.6%",
-    unit: "%",
-    changeLabel: "↓ 0.8 pp",
-    changeTone: "up",
-  },
-  {
-    id: "d5",
-    name: "FX Rate (USD/EUR)",
-    prior: "1.08",
-    value: "1.12",
-    changeLabel: "↑ 0.04",
-    changeTone: "up",
-  },
-]
-
-const DEMO_TREND: PlanningTrendPoint[] = [
-  { label: "Jan", revenueActual: 80, revenuePlan: 78, opexActual: 50, opexPlan: 50 },
-  { label: "Feb", revenueActual: 88, revenuePlan: 86, opexActual: 52, opexPlan: 52 },
-  { label: "Mar", revenueActual: 95, revenuePlan: 93, opexActual: 54, opexPlan: 54 },
-  { label: "Apr", revenueActual: 102, revenuePlan: 100, opexActual: 56, opexPlan: 56 },
-  { label: "May", revenueActual: 110, revenuePlan: 106, opexActual: 58, opexPlan: 58 },
-  { label: "Jun", revenueActual: 98, revenuePlan: 112, opexActual: 60, opexPlan: 60 },
-  { label: "Jul", revenueActual: 125, revenuePlan: 118, opexActual: 63, opexPlan: 62 },
-  { label: "Aug", revenuePlan: 122, opexPlan: 64 },
-  { label: "Sep", revenuePlan: 126, opexPlan: 66 },
-  { label: "Oct", revenuePlan: 129, opexPlan: 67 },
-  { label: "Nov", revenuePlan: 132, opexPlan: 68 },
-  { label: "Dec", revenuePlan: 135, opexPlan: 70 },
-]
 
 const REV_COLOR = "#3b82f6"
 const OPEX_COLOR = "#8b5cf6"
@@ -341,37 +183,6 @@ function shortPeriodLabel(iso?: string | null): string | null {
   return iso
 }
 
-const DEMO_WORKFLOW: PlanningWorkflowStep[] = [
-  {
-    id: "w1",
-    label: "Draft",
-    status: "done",
-    actor: "Sarah Delgado",
-    when: "May 12, 2026 9:15 AM",
-  },
-  {
-    id: "w2",
-    label: "Submitted",
-    status: "done",
-    actor: "Michael Chen",
-    when: "May 12, 2026 2:45 PM",
-  },
-  {
-    id: "w3",
-    label: "Under Review",
-    status: "active",
-    actor: "FP&A Team",
-    when: "Due May 19, 2026",
-  },
-  {
-    id: "w4",
-    label: "Approved",
-    status: "pending",
-    actor: "James Whitaker",
-    when: "Due May 26, 2026",
-  },
-]
-
 export function PlanningWorkspaceChrome({
   versions,
   versionId,
@@ -387,6 +198,7 @@ export function PlanningWorkspaceChrome({
   onVersionChange,
   onScenarioChange,
   onRefresh,
+  onExport,
   viewByLabel = "Total Company",
   viewByOptions,
   onViewByChange,
@@ -413,8 +225,7 @@ export function PlanningWorkspaceChrome({
     setLocalViewBy(viewByLabel)
   }, [viewByLabel])
 
-  // Prefer live cycles; never invent demo cycles when parent passed an array.
-  const cycleOptions = cycles !== undefined ? cycles : DEMO_CYCLES
+  const cycleOptions = cycles ?? []
   const activeCycle = cycleId ?? localCycle
   const activeCycleLabel =
     cycleOptions.find((c) => c.id === activeCycle)?.name ||
@@ -437,55 +248,19 @@ export function PlanningWorkspaceChrome({
     return st === "LOCKED" || st === "PUBLISHED" || /working/i.test(selectedVersion.name)
   })()
 
-  const designNames = inCompare ? COMPARE_SCENARIO_NAMES : DESIGN_SCENARIO_NAMES
-
   const scenarioTabs = useMemo(() => {
-    // Prefer live API scenarios only — do not invent __demo__ tabs when data exists.
-    if (scenarios.length > 0) {
-      const byLower = new Map(
-        scenarios.map((s) => [String(s.name || "").trim().toLowerCase(), s] as const),
-      )
-      const ordered: FpaScenario[] = []
-      for (const name of designNames) {
-        const hit = byLower.get(name.toLowerCase())
-        if (hit) {
-          ordered.push(hit)
-          byLower.delete(name.toLowerCase())
-        }
-      }
-      for (const s of scenarios) {
-        if (!ordered.some((o) => o.id === s.id)) ordered.push(s)
-      }
-      return ordered
-    }
-    // Empty model: show design placeholders as non-selectable demos for layout only.
-    return designNames.map(
-      (name) =>
-        ({
-          id: `__demo__${name.replace(/\s+/g, "-").toLowerCase()}`,
-          modelId,
-          name,
-          scenarioType: "CUSTOM",
-        }) as FpaScenario,
-    )
-  }, [scenarios, modelId, designNames])
+    return scenarios
+  }, [scenarios])
 
   const selectedCompareIds = useMemo(() => {
     if (!inCompare) return []
     if (compareScenarioIds?.length) {
       return compareScenarioIds.filter((id) => scenarioTabs.some((s) => s.id === id))
     }
-    return scenarioTabs.filter((s) => !s.id.startsWith("__demo__")).slice(0, 5).map((s) => s.id)
+    return scenarioTabs.slice(0, 5).map((s) => s.id)
   }, [inCompare, compareScenarioIds, scenarioTabs])
 
   const toggleCompareScenario = (id: string) => {
-    if (id.startsWith("__demo__")) {
-      const name = scenarioTabs.find((s) => s.id === id)?.name || "Scenario"
-      toast.message(`${name} isn’t on this model yet`, {
-        description: "Create it under Scenarios to load live data.",
-      })
-      return
-    }
     const next = selectedCompareIds.includes(id)
       ? selectedCompareIds.filter((x) => x !== id)
       : [...selectedCompareIds, id]
@@ -496,8 +271,7 @@ export function PlanningWorkspaceChrome({
     onCompareScenarioIdsChange?.(next)
   }
 
-  const activeScenario =
-    scenarioId || scenarioTabs.find((s) => !s.id.startsWith("__demo__"))?.id || scenarioTabs[0]?.id
+  const activeScenario = scenarioId || scenarioTabs[0]?.id
   const viewByList =
     viewByOptions?.length
       ? viewByOptions
@@ -514,7 +288,7 @@ export function PlanningWorkspaceChrome({
             <Select value={versionId || undefined} onValueChange={onVersionChange}>
               <SelectTrigger
                 className={cn(
-                  `h-10 min-w-[200px] ${R} border-[#d0d5dd] bg-white pl-3 text-[13px] font-semibold text-[#101828] shadow-none`,
+                  "h-10 min-w-[200px] rounded-full border-[#d0d5dd] bg-white pl-3 text-[13px] font-semibold text-[#101828] shadow-none",
                   versionIsLatest ? "pr-20" : "pr-9",
                 )}
               >
@@ -549,7 +323,7 @@ export function PlanningWorkspaceChrome({
               }}
             >
               <SelectTrigger
-                className={`mt-1 h-10 min-w-[180px] ${R} border-[#d0d5dd] bg-white px-3 text-[13px] font-semibold text-[#101828] shadow-none`}
+                className="mt-1 h-10 min-w-[180px] rounded-full border-[#d0d5dd] bg-white px-3 text-[13px] font-semibold text-[#101828] shadow-none"
               >
                 <SelectValue placeholder="Select cycle" />
               </SelectTrigger>
@@ -563,28 +337,28 @@ export function PlanningWorkspaceChrome({
             </Select>
           ) : activeCycleLabel ? (
             <div
-              className={`mt-1 flex h-10 min-w-[180px] items-center ${R} border border-[#d0d5dd] bg-white px-3 text-[13px] font-semibold text-[#101828]`}
+              className="mt-1 flex h-10 min-w-[180px] items-center rounded-full border border-[#d0d5dd] bg-white px-3 text-[13px] font-semibold text-[#101828]"
               title={activeCycleLabel}
             >
               <span className="truncate">{activeCycleLabel}</span>
             </div>
           ) : (
             <div
-              className={`mt-1 flex h-10 min-w-[180px] items-center ${R} border border-dashed border-[#d0d5dd] px-3 text-[12px] text-[#667085]`}
+              className="mt-1 flex h-10 min-w-[180px] items-center rounded-full border border-dashed border-[#d0d5dd] px-3 text-[12px] text-[#667085]"
             >
               No cycle selected
             </div>
           )}
         </label>
 
-        {inCompare ? (
+        {inCompare && scenarioTabs.length ? (
           <label className="text-[11px] font-medium text-[#667085]">
             Scenarios
             <DropdownMenu open={scenariosMenuOpen} onOpenChange={setScenariosMenuOpen}>
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className={`mt-1 h-10 min-w-[140px] inline-flex items-center justify-between gap-2 ${R} border border-[#d0d5dd] bg-white px-3 text-[13px] font-semibold text-[#101828]`}
+                  className="mt-1 h-10 min-w-[140px] inline-flex items-center justify-between gap-2 rounded-full border border-[#d0d5dd] bg-white px-3 text-[13px] font-semibold text-[#101828]"
                 >
                   <span>{selectedCompareIds.length} selected</span>
                   <ChevronDown className="size-4 text-[#667085]" />
@@ -618,20 +392,11 @@ export function PlanningWorkspaceChrome({
             {scenarioTabs.length ? (
               scenarioTabs.slice(0, inCompare ? 5 : undefined).map((s, i) => {
                 const active = activeScenario === s.id
-                const isDemo = s.id.startsWith("__demo__")
                 return (
                   <button
                     key={s.id}
                     type="button"
-                    onClick={() => {
-                      if (isDemo) {
-                        toast.message(`${s.name} isn’t on this model yet`, {
-                          description: "Create it under Scenarios to load live data.",
-                        })
-                        return
-                      }
-                      onScenarioChange(s.id)
-                    }}
+                    onClick={() => onScenarioChange(s.id)}
                     className={cn(
                       "relative h-full px-3.5 text-[13px] font-medium transition-colors whitespace-nowrap",
                       i > 0 && "border-l border-[#e4e7ec]",
@@ -660,7 +425,7 @@ export function PlanningWorkspaceChrome({
             type="button"
             onClick={() => onWorkspaceViewChange?.(inCompare ? "planning" : "compare")}
             className={cn(
-              `h-10 inline-flex items-center gap-1.5 ${R} px-3.5 text-[13px] font-semibold border`,
+              "h-10 inline-flex items-center gap-1.5 rounded-full px-3.5 text-[13px] font-semibold border",
               inCompare
                 ? "bg-[#eff8ff] text-[#1570ef] border-[#b2ddff] hover:bg-[#eff8ff]"
                 : "border-[#d0d5dd] bg-white text-[#344054] hover:bg-[#f9fafb]",
@@ -677,7 +442,7 @@ export function PlanningWorkspaceChrome({
             <button
               type="button"
               onClick={() => setActionsOpen((o) => !o)}
-              className={`h-10 inline-flex items-stretch ${R} bg-[#1570ef] text-white hover:bg-[#175cd3] overflow-hidden`}
+              className="h-10 inline-flex items-stretch rounded-full bg-[#1570ef] text-white hover:bg-[#175cd3] overflow-hidden"
             >
               <span className="inline-flex items-center px-3.5 text-[13px] font-semibold">
                 Actions
@@ -744,8 +509,8 @@ export function PlanningWorkspaceChrome({
                     type="button"
                     className="w-full px-3 py-2 text-left text-[12px] hover:bg-[#f9fafb] inline-flex items-center gap-2 text-[#101828]"
                     onClick={() => {
-                      toast.message("Use Export in the grid toolbar for CSV export.")
                       setActionsOpen(false)
+                      void onExport()
                     }}
                   >
                     <Download className="size-3.5 text-[#667085]" /> Export grid CSV
@@ -815,7 +580,6 @@ export function PlanningWorkspaceKpiStrip({
   viewByOptions,
   onViewByChange,
   onRefresh,
-  demoFallback,
   showFooter = true,
 }: {
   kpis: PlanningKpi[]
@@ -824,8 +588,6 @@ export function PlanningWorkspaceKpiStrip({
   viewByOptions?: Array<{ id: string; label: string }>
   onViewByChange?: (id: string) => void
   onRefresh?: () => void
-  /** @deprecated Prefer empty states over demo KPI injection. */
-  demoFallback?: PlanningKpi[]
   /** When false, omit View-by controls (compare mode). */
   showFooter?: boolean
 }) {
@@ -834,7 +596,6 @@ export function PlanningWorkspaceKpiStrip({
     setLocalViewBy(viewByLabel)
   }, [viewByLabel])
 
-  void demoFallback
   const displayKpis = enrichKpis(kpis.length ? kpis.slice(0, 5) : [])
   const viewByList =
     viewByOptions?.length
@@ -844,14 +605,13 @@ export function PlanningWorkspaceKpiStrip({
   return (
     <div className="rounded-lg border border-[#e4e7ec] bg-white p-3 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
-        {displayKpis.length
-          ? displayKpis.map((k) => <KpiCard key={k.label} kpi={k} />)
-          : Array.from({ length: 5 }).map((_, i) => (
-              <KpiCard
-                key={`empty-${i}`}
-                kpi={{ label: ["Revenue", "Opex", "EBITDA", "Cash Runway", "Variance to Plan"][i], value: "—" }}
-              />
-            ))}
+        {displayKpis.length ? (
+          displayKpis.map((k) => <KpiCard key={k.label} kpi={k} />)
+        ) : (
+          <p className="col-span-full py-8 text-center text-[12px] text-[#98a2b3]">
+            No KPI data available for this selection.
+          </p>
+        )}
       </div>
       {showFooter ? (
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[12px] text-[#98a2b3]">
@@ -884,7 +644,7 @@ export function PlanningWorkspaceKpiStrip({
             </label>
             <button
               type="button"
-              className={`inline-flex h-8 w-8 items-center justify-center ${R} border border-[#d0d5dd] bg-white text-[#667085] hover:bg-[#f9fafb]`}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#d0d5dd] bg-white text-[#667085] hover:bg-[#f9fafb]"
               onClick={onRefresh}
               aria-label="Refresh KPIs"
             >
@@ -904,14 +664,19 @@ export function PlanningWorkspaceInsights({
   drivers,
   canEditDrivers,
   onDriverSave,
+  onDriversSaved,
   trendPoints = [],
   workflowSteps,
 }: Pick<
   Props,
-  "drivers" | "canEditDrivers" | "onDriverSave" | "trendPoints" | "workflowSteps"
+  | "drivers"
+  | "canEditDrivers"
+  | "onDriverSave"
+  | "onDriversSaved"
+  | "trendPoints"
+  | "workflowSteps"
 >) {
   const displayDrivers = mapDrivers(drivers)
-  const driversAreDemo = false
   const displayTrend = useMemo(() => {
     if (trendPoints.length < 2) return []
     return trendPoints
@@ -924,9 +689,9 @@ export function PlanningWorkspaceInsights({
         <TrendChartCard points={displayTrend} />
         <DriverAssumptionsCard
           drivers={displayDrivers}
-          canEdit={canEditDrivers && drivers.length > 0}
+          canEdit={canEditDrivers}
           onSave={onDriverSave}
-          demoMode={driversAreDemo}
+          onSaved={onDriversSaved}
         />
       </div>
       <WorkflowStatusBar steps={displayWorkflow} />
@@ -1114,7 +879,10 @@ function formatDriverDisplay(
   if (isPercentDriver(name, unit, s) && !/%/.test(s)) {
     return `${Number.isInteger(n) ? n : n.toFixed(1)}%`
   }
-  if (Math.abs(n) < 10 && !Number.isInteger(n)) return n.toFixed(2)
+  // Avoid float noise like 11.020000000000001
+  if (!Number.isInteger(n)) {
+    return String(Number(n.toFixed(2)))
+  }
   return String(n)
 }
 
@@ -1520,7 +1288,7 @@ function TrendChartCard({ points }: { points: PlanningTrendPoint[] }) {
             <PopoverTrigger asChild>
               <button
                 type="button"
-                className="h-7 inline-flex items-center gap-1.5 rounded-lg border border-[#d0d5dd] bg-white px-2 text-[11px] font-medium text-[#1570ef] hover:bg-[#f9fafb]"
+                className="h-7 inline-flex items-center gap-1.5 rounded-full border border-[#d0d5dd] bg-white px-2 text-[11px] font-medium text-[#1570ef] hover:bg-[#f9fafb]"
               >
                 <Pencil className="size-3" />
                 Edit Chart
@@ -1563,7 +1331,7 @@ function TrendChartCard({ points }: { points: PlanningTrendPoint[] }) {
               <button
                 type="button"
                 aria-label="More chart actions"
-                className="h-7 w-7 inline-flex items-center justify-center rounded-lg border border-[#d0d5dd] bg-white text-[#667085] hover:bg-[#f8fafc]"
+                className="h-7 w-7 inline-flex items-center justify-center rounded-full border border-[#d0d5dd] bg-white text-[#667085] hover:bg-[#f8fafc]"
               >
                 <MoreHorizontal className="size-4" />
               </button>
@@ -1652,12 +1420,15 @@ function DriverAssumptionsCard({
   drivers,
   canEdit,
   onSave,
-  demoMode = false,
+  onSaved,
 }: {
   drivers: PlanningDriverRow[]
   canEdit: boolean
-  onSave: (id: string, value: number) => Promise<void>
-  demoMode?: boolean
+  onSave: (
+    id: string,
+    value: number,
+  ) => Promise<void | { needsGridReload?: boolean }>
+  onSaved?: (needsGridReload: boolean) => Promise<void>
 }) {
   const [editing, setEditing] = useState(false)
   const [rows, setRows] = useState(drivers)
@@ -1665,12 +1436,19 @@ function DriverAssumptionsCard({
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
+    // Don't wipe in-progress edits when parent re-renders with the same drivers.
+    if (editing || saving) return
     setRows(drivers)
     setDrafts({})
-    setEditing(false)
-  }, [drivers])
+  }, [drivers, editing, saving])
 
   const startEdit = () => {
+    if (!rows.length) {
+      toast.message("No drivers on this model yet", {
+        description: "Open the Drivers library to add assumptions, then refresh.",
+      })
+      return
+    }
     if (!canEdit) {
       toast.message("Drivers are read-only for your role")
       return
@@ -1701,10 +1479,17 @@ function DriverAssumptionsCard({
     }
   })
 
+  const priorColLabel =
+    rows.find((d) => d.priorPeriodLabel)?.priorPeriodLabel || "Prior actual"
+  const planColLabel = "Plan"
+
   const commitAll = async () => {
     setSaving(true)
     try {
       const updates: PlanningDriverRow[] = []
+      let changedCount = 0
+      let needsGridReload = false
+
       for (const d of rows) {
         const raw = drafts[d.id]
         if (raw == null) {
@@ -1716,12 +1501,24 @@ function DriverAssumptionsCard({
           updates.push(d)
           continue
         }
+        const prev = parseDriverNumber(String(d.value))
+        const unchanged = prev != null && Math.abs(prev - n) < 1e-9
         const pct =
           isPercentDriver(d.name, d.unit, d.prior) || isPercentDriver(d.name, d.unit, d.value)
         const display = pct ? `${n}%` : String(n)
-        if (!demoMode) {
-          await onSave(d.id, n)
+
+        if (unchanged) {
+          updates.push({
+            ...d,
+            value: display,
+          })
+          continue
         }
+
+        const result = await onSave(d.id, n)
+        if (result && result.needsGridReload) needsGridReload = true
+        changedCount += 1
+
         const change = computeDriverChange(d.name, d.prior, display, d.unit)
         updates.push({
           ...d,
@@ -1730,10 +1527,20 @@ function DriverAssumptionsCard({
           changeTone: change.changeTone,
         })
       }
+
       setRows(updates)
       setEditing(false)
       setDrafts({})
-      toast.success(demoMode ? "Driver plan values updated" : "Drivers saved")
+
+      if (changedCount > 0 && onSaved) {
+        await onSaved(needsGridReload)
+      }
+
+      if (changedCount === 0) {
+        toast.message("No driver changes to save")
+      } else {
+        toast.success(changedCount === 1 ? "Driver saved" : `${changedCount} drivers saved`)
+      }
     } catch {
       toast.error("Could not save driver changes")
     } finally {
@@ -1755,7 +1562,7 @@ function DriverAssumptionsCard({
               type="button"
               onClick={cancelEdit}
               disabled={saving}
-              className="h-7 rounded-lg border border-[#d0d5dd] bg-white px-2 text-[11px] font-medium text-[#667085] hover:bg-[#f9fafb]"
+              className="h-7 rounded-full border border-[#d0d5dd] bg-white px-2 text-[11px] font-medium text-[#667085] hover:bg-[#f9fafb]"
             >
               Cancel
             </button>
@@ -1763,20 +1570,30 @@ function DriverAssumptionsCard({
               type="button"
               onClick={() => void commitAll()}
               disabled={saving}
-              className="h-7 rounded-lg border border-[#d0d5dd] bg-white px-2 text-[11px] font-medium text-[#1570ef] hover:bg-[#f5faff] disabled:opacity-60"
+              className="h-7 rounded-full border border-[#d0d5dd] bg-white px-2 text-[11px] font-medium text-[#1570ef] hover:bg-[#f5faff] disabled:opacity-60"
             >
               {saving ? "Saving…" : "Save"}
             </button>
           </div>
-        ) : (
+        ) : rows.length > 0 ? (
           <button
             type="button"
             onClick={startEdit}
-            className="h-7 inline-flex items-center gap-1.5 rounded-lg border border-[#d0d5dd] bg-white px-2 text-[11px] font-medium text-[#1570ef] hover:bg-[#f9fafb]"
+            disabled={!canEdit}
+            className="h-7 inline-flex items-center gap-1.5 rounded-full border border-[#d0d5dd] bg-white px-2 text-[11px] font-medium text-[#1570ef] hover:bg-[#f9fafb] disabled:opacity-50"
           >
             <Pencil className="size-3 text-[#1570ef]" strokeWidth={2} />
             Edit Drivers
           </button>
+        ) : (
+          <Link
+            href="/forecasting/drivers"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="h-7 inline-flex items-center rounded-full border border-[#d0d5dd] bg-white px-2 text-[11px] font-medium text-[#1570ef] hover:bg-[#f9fafb]"
+          >
+            Add drivers
+          </Link>
         )}
       </div>
 
@@ -1784,7 +1601,12 @@ function DriverAssumptionsCard({
         {!displayRows.length ? (
           <p className="text-[12px] text-[#98a2b3] py-6 text-center px-2">
             No drivers on this model yet.{" "}
-            <Link href="/forecasting/drivers" className="text-[#1570ef] hover:underline">
+            <Link
+              href="/forecasting/drivers"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[#1570ef] hover:underline"
+            >
               Open Drivers library
             </Link>
           </p>
@@ -1799,7 +1621,7 @@ function DriverAssumptionsCard({
                     "text-center font-semibold whitespace-nowrap bg-[#f9fafb]",
                   )}
                 >
-                  FY2025 Actual
+                  {priorColLabel}
                 </th>
                 <th
                   className={cn(
@@ -1807,7 +1629,7 @@ function DriverAssumptionsCard({
                     "text-center font-semibold whitespace-nowrap bg-[#f9fafb]",
                   )}
                 >
-                  FY2026 Plan
+                  {planColLabel}
                 </th>
                 <th className={cn(cell, "text-center font-semibold bg-[#f9fafb]")}>Change</th>
               </tr>
@@ -1919,13 +1741,15 @@ function WorkflowStatusBar({ steps }: { steps: PlanningWorkflowStep[] }) {
     <section className="rounded-lg border border-[#e4e7ec] bg-white px-4 py-4 shadow-[0_1px_2px_rgba(16,24,40,0.05)]">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
         <h3 className="text-[14px] font-semibold text-[#101828]">Workflow Status</h3>
-        <button
-          type="button"
-          onClick={() => setDetailsOpen(true)}
-          className="h-8 inline-flex items-center rounded-lg border border-[#d0d5dd] bg-white px-2.5 text-[12px] font-medium text-[#1570ef] hover:bg-[#f9fafb]"
-        >
-          View Workflow Details
-        </button>
+        {steps.length ? (
+          <button
+            type="button"
+            onClick={() => setDetailsOpen(true)}
+            className="h-8 inline-flex items-center rounded-full border border-[#d0d5dd] bg-white px-2.5 text-[12px] font-medium text-[#1570ef] hover:bg-[#f9fafb]"
+          >
+            View Workflow Details
+          </button>
+        ) : null}
       </div>
 
       {!steps.length ? (
@@ -2067,7 +1891,7 @@ function WorkflowStatusBar({ steps }: { steps: PlanningWorkflowStep[] }) {
           <DialogFooter className="px-5 py-3 border-t border-[#e4e7ec] bg-[#f9fafb] sm:justify-between gap-2">
             <Link
               href="/forecasting/workflow"
-              className="h-9 inline-flex items-center justify-center rounded-lg border border-[#d0d5dd] bg-white px-3 text-[12px] font-medium text-[#344054] hover:bg-white"
+              className="h-9 inline-flex items-center justify-center rounded-full border border-[#d0d5dd] bg-white px-3 text-[12px] font-medium text-[#344054] hover:bg-white"
               onClick={() => setDetailsOpen(false)}
             >
               Open workflow board
@@ -2075,7 +1899,7 @@ function WorkflowStatusBar({ steps }: { steps: PlanningWorkflowStep[] }) {
             <button
               type="button"
               onClick={() => setDetailsOpen(false)}
-              className="h-9 inline-flex items-center justify-center rounded-lg bg-[#1570ef] px-3 text-[12px] font-medium text-white hover:bg-[#175cd3]"
+              className="h-9 inline-flex items-center justify-center rounded-full bg-[#1570ef] px-3 text-[12px] font-medium text-white hover:bg-[#175cd3]"
             >
               Close
             </button>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { ChevronLeft, Loader2, Star } from "lucide-react"
@@ -60,17 +60,13 @@ import {
 import { errorMessage, logFpaGap } from "@/lib/fpa/fpa-api-gaps"
 import {
   buildAuditUiRows,
-  buildExceptionRows,
   buildExceptionRowsFromFeed,
   buildMappingUiRows,
   buildSensitivityView,
   buildTraceViewFromApi,
   buildCellMetaFromDetail,
-  buildValidationChecks,
   buildValidationChecksFromCatalog,
-  inferSuggestedMappingsFromLineItems,
   mappingSummaryPct,
-  validationSummaryFromCounts,
   type DetailedCellMeta,
   type DetailedTraceView,
 } from "@/lib/fpa/detailed-workspace-adapters"
@@ -102,11 +98,14 @@ export function FpaModelBuilder({ modelId }: { modelId?: string }) {
   )
 
   const [model, setModel] = useState<FpaModel | null>(null)
+  const [loadedModelId, setLoadedModelId] = useState<string | null>(null)
   const [lineItems, setLineItems] = useState<FpaLineItem[]>([])
   const [dimensions, setDimensions] = useState<FpaDimension[]>([])
   const [selected, setSelected] = useState<FpaLineItem | null>(null)
   const [expression, setExpression] = useState("")
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const loadRequestRef = useRef(0)
   const [busyKey, setBusyKey] = useState<string | null>(null)
   const [moduleKey, setModuleKey] = useState<string | null>(null)
   const [selectedLeaf, setSelectedLeaf] = useState<SelectedModuleLeaf | null>(null)
@@ -128,17 +127,6 @@ export function FpaModelBuilder({ modelId }: { modelId?: string }) {
   const [dimsAttachOpen, setDimsAttachOpen] = useState(false)
   const [modelDimKeys, setModelDimKeys] = useState<string[]>([])
   const [periodKeys, setPeriodKeys] = useState<string[]>([])
-  const [demoCreate, setDemoCreate] = useState<{
-    name: string
-    code: string
-    kind: "INPUT" | "CALCULATED"
-    nonce: number
-  } | null>(null)
-  const [demoFormulaPatch, setDemoFormulaPatch] = useState<{
-    rowId: string
-    formula: string
-    nonce: number
-  } | null>(null)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [showLineItemsOnMap, setShowLineItemsOnMap] = useState(true)
   const [showValidationModal, setShowValidationModal] = useState(false)
@@ -194,10 +182,6 @@ export function FpaModelBuilder({ modelId }: { modelId?: string }) {
     status: "MAPPED" | "UNMAPPED" | "SUGGESTED" | "TYPE_MISMATCH" | "STALE"
     notes?: string
   } | null>(null)
-  /** Structure builder is API-only — no demo fallbacks. */
-  const structureHardcoded = false
-  const gridHardcoded = false
-
   const modelVersions: FpaVersion[] = useMemo(() => {
     const fromStore = versions.filter((v) => !id || v.modelId === id || !v.modelId)
     if (fromStore.length) return fromStore
@@ -213,9 +197,8 @@ export function FpaModelBuilder({ modelId }: { modelId?: string }) {
   const activeVersion = modelVersions.find((v) => v.id === versionId) || null
   const versionStatusU = String(activeVersion?.status || "").toUpperCase()
   const versionLocked = versionStatusU === "LOCKED" || versionStatusU === "PUBLISHED"
-  const modelPublished = String(model?.status || "").toUpperCase() === "PUBLISHED"
-  /** Do not allow Publish when the model or selected version is already published/locked. */
-  const publishDisabled = versionLocked || modelPublished
+  const selectedVersionIsDraft = versionStatusU === "DRAFT"
+  const publishDisabled = !selectedVersionIsDraft || validation.valid !== true
   const canEditLive = canConfigureBuilder && !versionLocked
 
   const syncUrl = useCallback(
@@ -309,11 +292,53 @@ export function FpaModelBuilder({ modelId }: { modelId?: string }) {
     [apiModules, lineItems],
   )
 
+  const clearLoadedState = useCallback(() => {
+    setModel(null)
+    setLoadedModelId(null)
+    setLineItems([])
+    setDimensions([])
+    setSelected(null)
+    setExpression("")
+    setModuleKey(null)
+    setSelectedLeaf(null)
+    setModelDimKeys([])
+    setPeriodKeys([])
+    setPeriodLabels([])
+    setPreviewByLine({})
+    setCellIdsByLine({})
+    setFyTotals(null)
+    setApiModules([])
+    setDepGraph(null)
+    setLiveDepGraph(null)
+    setAuditEntries([])
+    setRawAuditEntries([])
+    setGridValidations([])
+    setValidationSummary(null)
+    setValidationChecksApi(null)
+    setDataMappings(null)
+    setMappingsInferred(false)
+    setExceptionsFeed(null)
+    setSensitivity(null)
+    setCellMeta(null)
+    setCellTrace(null)
+    setErrors([])
+    setWarnings([])
+    setInfo([])
+    setValidation({
+      valid: null,
+      errorCount: 0,
+      warningCount: 0,
+      circular: null,
+      circularPath: null,
+    })
+  }, [])
+
   const load = useCallback(async () => {
+    const requestId = ++loadRequestRef.current
+    clearLoadedState()
+    setLoadError(null)
     if (!id) {
       setLoading(false)
-      setModel(null)
-      setLineItems([])
       return
     }
     setLoading(true)
@@ -334,27 +359,11 @@ export function FpaModelBuilder({ modelId }: { modelId?: string }) {
           .catch(() => ({ success: false as const, data: null })),
       ])
       if (!mRes.success) throw new Error(mRes.message || "Model failed")
+      if (requestId !== loadRequestRef.current) return
       setModel(mRes.data || null)
+      setLoadedModelId(id)
 
-      // Heal missing default formulas on older models (idempotent)
-      try {
-        await fpaApi.seedModelDefaults(id)
-      } catch {
-        /* optional */
-      }
-
-      // Refetch LIs + graph after seed so formulas/edges are current
-      const [liRes2, graphRes2] = await Promise.all([
-        fpaApi.listLineItems(id).catch(() => liRes),
-        fpaApi
-          .getDependencyGraph(id, { view: "module" })
-          .catch(() => graphRes),
-      ])
-      const items = liRes2.success
-        ? liRes2.data || []
-        : liRes.success
-          ? liRes.data || []
-          : mRes.data?.lineItems || []
+      const items = liRes.success ? liRes.data || [] : mRes.data?.lineItems || []
       setLineItems(items)
       setDimensions(dimRes.success ? dimRes.data || [] : [])
       setModelDimKeys(
@@ -366,7 +375,7 @@ export function FpaModelBuilder({ modelId }: { modelId?: string }) {
       )
       const mods = modRes.success ? modRes.data || [] : []
       setApiModules(mods)
-      const liveGraph = graphRes2.success && graphRes2.data ? graphRes2.data : graphRes.success ? graphRes.data : null
+      const liveGraph = graphRes.success ? graphRes.data : null
       if (liveGraph) {
         setLiveDepGraph(liveGraph)
         const g: Record<string, string[]> = {}
@@ -439,6 +448,7 @@ export function FpaModelBuilder({ modelId }: { modelId?: string }) {
             pageSize: 500,
           })
           if (grid.success && grid.data) {
+            if (requestId !== loadRequestRef.current) return
             const periods = (grid.data.periods || [])
               .map((p) => {
                 if (p.label) return p.label
@@ -472,24 +482,29 @@ export function FpaModelBuilder({ modelId }: { modelId?: string }) {
             setPreviewByLine(byLine)
           }
         } catch {
+          if (requestId !== loadRequestRef.current) return
           setPeriodLabels([])
           setPreviewByLine({})
         }
       }
     } catch (err) {
+      if (requestId !== loadRequestRef.current) return
+      clearLoadedState()
+      const message = errorMessage(err)
+      setLoadError(message)
       logFpaGap({
         category: "broken",
         path: `/v1/fpa/models/${id}`,
         method: "GET",
-        message: errorMessage(err),
+        message,
         impact: "Model builder empty",
         response: err,
       })
-      toast.error(errorMessage(err))
+      toast.error(message)
     } finally {
-      setLoading(false)
+      if (requestId === loadRequestRef.current) setLoading(false)
     }
-  }, [id, routeModelId, dispatch, versionId, selectedScenarioId])
+  }, [id, routeModelId, dispatch, versionId, selectedScenarioId, clearLoadedState])
 
   useEffect(() => {
     void load()
@@ -668,15 +683,6 @@ export function FpaModelBuilder({ modelId }: { modelId?: string }) {
   }
 
   const validateFormula = async () => {
-    // Demo / offline formulas — validate locally without round-trip
-    if (selected?.id?.startsWith("demo-")) {
-      const ok = expression.trim().length > 0 && !/circular/i.test(expression)
-      setFormulaValid(ok)
-      setFormulaMessage(ok ? "No issues" : "Enter a formula")
-      if (ok) toast.success("Formula valid")
-      else toast.error("Enter a formula")
-      return
-    }
     try {
       const res = await fpaApi.validateFormula(expression)
       if (!res.success) throw new Error(res.message)
@@ -783,18 +789,6 @@ export function FpaModelBuilder({ modelId }: { modelId?: string }) {
 
   const saveFormula = async () => {
     if (!id || !selected) return
-    if (selected.id.startsWith("demo-")) {
-      const demoId = selected.id.replace(/^demo-/, "")
-      setSelected({
-        ...selected,
-        formulas: [{ id: selected.formulas?.[0]?.id || `fx-${demoId}`, expression }],
-      })
-      setFormulaValid(true)
-      setFormulaMessage("No issues")
-      setDemoFormulaPatch({ rowId: demoId, formula: expression, nonce: Date.now() })
-      toast.success("Formula saved")
-      return
-    }
     await saveFormulaForLineItem(selected.id, expression)
   }
 
@@ -805,9 +799,9 @@ export function FpaModelBuilder({ modelId }: { modelId?: string }) {
     }
     if (publishDisabled) {
       toast.error(
-        modelPublished
-          ? "This model is already published. Open a draft model to publish."
-          : "This workspace is already published/locked. Reopen a working copy first.",
+        !selectedVersionIsDraft
+          ? "Select an editable draft version before publishing."
+          : "Validate this draft successfully before publishing.",
       )
       return
     }
@@ -865,6 +859,8 @@ export function FpaModelBuilder({ modelId }: { modelId?: string }) {
 
   const loadAudit = async () => {
     if (!id) return
+    setRawAuditEntries([])
+    setAuditEntries([])
     try {
       const res = await fpaApi.getModelAudit(id, { limit: 40 })
       if (!res.success || !res.data) return
@@ -1014,25 +1010,16 @@ export function FpaModelBuilder({ modelId }: { modelId?: string }) {
     setFyTotals(grid.fyTotals || null)
   }
 
-  const loadDetailedGrid = async (opts?: {
-    grain?: "monthly" | "quarterly" | "annual"
-    seedIfSparse?: boolean
-  }) => {
+  const loadDetailedGrid = async (opts?: { grain?: "monthly" | "quarterly" | "annual" }) => {
     if (!id || !versionId) return
+    setPeriodLabels([])
+    setPeriodKeys([])
+    setPreviewByLine({})
+    setCellIdsByLine({})
+    setFyTotals(null)
     const scen = selectedScenarioId || model?.defaultScenarioId || model?.scenarios?.[0]?.id
     const grain = opts?.grain || gridGrain
     const moduleId = selectedLeaf?.leafId || undefined
-
-    if (opts?.seedIfSparse !== false && !versionLocked && scen) {
-      try {
-        await fpaApi.seedVersionCells(versionId, {
-          scenarioId: scen,
-          fillMissing: true,
-        })
-      } catch {
-        /* seed is best-effort */
-      }
-    }
 
     try {
       const grid = await fpaApi.getGrid(id, {
@@ -1065,25 +1052,15 @@ export function FpaModelBuilder({ modelId }: { modelId?: string }) {
         moduleId,
         limit: 200,
       })
-      const apiData =
+      setDataMappings(
         res.success && res.data
           ? res.data
-          : ({ summary: { total: 0, mapped: 0, pct: 0 }, entries: [] } as FpaDataMappingsResponse)
-
-      if ((apiData.entries?.length || 0) > 0) {
-        setDataMappings(apiData)
-        setMappingsInferred(false)
-        return
-      }
-
-      // Backend catalog empty (common on fresh DRAFT models) — derive from structure.
-      const inferred = inferSuggestedMappingsFromLineItems(lineItems, moduleId)
-      setDataMappings(inferred)
-      setMappingsInferred(inferred.entries.length > 0)
+          : ({ summary: { total: 0, mapped: 0, pct: 0 }, entries: [] } as FpaDataMappingsResponse),
+      )
+      setMappingsInferred(false)
     } catch {
-      const inferred = inferSuggestedMappingsFromLineItems(lineItems, moduleId)
-      setDataMappings(inferred)
-      setMappingsInferred(inferred.entries.length > 0)
+      setDataMappings({ summary: { total: 0, mapped: 0, pct: 0 }, entries: [] })
+      setMappingsInferred(false)
     }
   }
 
@@ -1104,13 +1081,12 @@ export function FpaModelBuilder({ modelId }: { modelId?: string }) {
   }
 
   const loadSensitivity = async (opts?: { driverLineItemId?: string; shockPct?: number }) => {
+    setSensitivity(null)
     if (!id || !versionId) {
-      setSensitivity(null)
       return
     }
     const scen = selectedScenarioId || model?.defaultScenarioId || model?.scenarios?.[0]?.id
     if (!scen) {
-      setSensitivity(null)
       return
     }
     const shockPct = opts?.shockPct ?? 5
@@ -1119,7 +1095,6 @@ export function FpaModelBuilder({ modelId }: { modelId?: string }) {
       : lineItems
     const pool = scoped.length ? scoped : lineItems
     if (!pool.length) {
-      setSensitivity(null)
       return
     }
 
@@ -1400,7 +1375,7 @@ export function FpaModelBuilder({ modelId }: { modelId?: string }) {
     displayScale?: number
     summaryMethod?: string
   }) => {
-    if (!selected || selected.id.startsWith("demo-")) return
+    if (!selected) return
     try {
       const res = await fpaApi.updateLineItem(selected.id, patch)
       if (!res.success || !res.data) throw new Error(res.message || "Update failed")
@@ -1516,22 +1491,14 @@ export function FpaModelBuilder({ modelId }: { modelId?: string }) {
     if (centreTab === "templates") void loadTemplates()
     if (centreTab === "validations" || viewMode === "detailed") void loadGridValidations()
     if (viewMode === "detailed") {
-      void loadDetailedGrid({ seedIfSparse: true })
+      void loadDetailedGrid()
       void loadValidationSummary()
       void loadValidationChecks()
       void loadDataMappings()
       void loadExceptionsFeed()
-      void runValidateModel()
-      void loadSensitivity()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [historyOpen, centreTab, id, versionId, viewMode, selectedLeaf?.leafId, lineItems.length])
-
-  useEffect(() => {
-    if (viewMode !== "detailed") return
-    void loadSensitivity()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewMode, selected?.id, versionId, selectedScenarioId])
 
   useEffect(() => {
     if (viewMode !== "detailed" || !id || !selected?.id) {
@@ -1583,20 +1550,12 @@ export function FpaModelBuilder({ modelId }: { modelId?: string }) {
     [dataMappings],
   )
 
-  const composedExceptionRows = useMemo(
-    () => buildExceptionRows(errors, warnings, info, gridValidations, lineItems),
-    [errors, warnings, info, gridValidations, lineItems],
-  )
-
   const feedExceptionRows = useMemo(
     () => buildExceptionRowsFromFeed(exceptionsFeed),
     [exceptionsFeed],
   )
 
-  const detailedExceptionRows = useMemo(() => {
-    if (feedExceptionRows.length) return feedExceptionRows
-    return composedExceptionRows
-  }, [feedExceptionRows, composedExceptionRows])
+  const detailedExceptionRows = feedExceptionRows
 
   const detailedSensitivity = useMemo(() => buildSensitivityView(sensitivity), [sensitivity])
 
@@ -1609,23 +1568,15 @@ export function FpaModelBuilder({ modelId }: { modelId?: string }) {
         errors: validationChecksApi.summary.errors,
       }
     }
-    return validationSummaryFromCounts(validationSummary, detailedExceptionRows)
-  }, [validationChecksApi, validationSummary, detailedExceptionRows])
-
-  const composedValidationChecks = useMemo(
-    () => buildValidationChecks(errors, warnings, info, gridValidations, lineItems),
-    [errors, warnings, info, gridValidations, lineItems],
-  )
+    return validationSummary || { total: 0, passed: 0, warnings: 0, errors: 0 }
+  }, [validationChecksApi, validationSummary])
 
   const catalogValidationChecks = useMemo(
     () => buildValidationChecksFromCatalog(validationChecksApi),
     [validationChecksApi],
   )
 
-  const detailedValidationChecks = useMemo(() => {
-    if (catalogValidationChecks.length) return catalogValidationChecks
-    return composedValidationChecks
-  }, [catalogValidationChecks, composedValidationChecks])
+  const detailedValidationChecks = catalogValidationChecks
 
   const formulaImpact = useMemo(() => {
     const data = impact as {
@@ -1637,15 +1588,7 @@ export function FpaModelBuilder({ modelId }: { modelId?: string }) {
   }, [impact])
 
   const dimTags = useMemo(() => {
-    // Match A.3 inspector chrome; merge API names when present
-    const design = ["Time", "Product", "Region", "Customer Segment", "Version"]
-    if (!dimensions.length) return design
-    const fromApi = dimensions.map((d) => d.name).filter(Boolean)
-    const merged = [...design]
-    for (const n of fromApi) {
-      if (!merged.some((x) => x.toLowerCase() === n.toLowerCase())) merged.push(n)
-    }
-    return merged.slice(0, 5)
+    return dimensions.map((d) => d.name).filter(Boolean)
   }, [dimensions])
 
   const allModelsLink = (
@@ -1704,9 +1647,23 @@ export function FpaModelBuilder({ modelId }: { modelId?: string }) {
             </Link>
           </div>
         </div>
-      ) : loading ? (
+      ) : loading || (!loadError && loadedModelId !== id) ? (
         <div className="flex-1 flex items-center justify-center gap-2 text-[#64748b]">
           <Loader2 className="w-5 h-5 animate-spin" /> Loading model…
+        </div>
+      ) : loadError ? (
+        <div className="flex-1 flex items-center justify-center p-10">
+          <div className="max-w-md text-center">
+            <p className="text-sm font-semibold text-[#0f172a]">Model could not be loaded</p>
+            <p className="mt-1 text-xs text-[#64748b]">{loadError}</p>
+            <button
+              type="button"
+              onClick={() => void load()}
+              className="mt-4 h-9 rounded-full bg-[#2563eb] px-5 text-xs font-medium text-white shadow-sm hover:bg-[#1d4ed8]"
+            >
+              Retry
+            </button>
+          </div>
         </div>
       ) : (
         <>
@@ -1721,10 +1678,13 @@ export function FpaModelBuilder({ modelId }: { modelId?: string }) {
               canConfigure={canConfigureBuilder}
               versionLocked={versionLocked}
               publishDisabled={publishDisabled}
-              modelPublished={modelPublished}
+              modelPublished={false}
               onReopenWorkspace={() => void reopenWorkspace()}
               hardcodeChrome={false}
               onModelChange={(mid) => {
+                clearLoadedState()
+                setLoadError(null)
+                setLoading(true)
                 dispatch(setSelectedModelId(mid))
                 dispatch(setSelectedVersionId(null))
                 syncUrl(mid, null, viewMode)
@@ -1752,7 +1712,6 @@ export function FpaModelBuilder({ modelId }: { modelId?: string }) {
               validation={validation}
               canEdit={canEditLive}
               publishDisabled={publishDisabled}
-              modelPublished={modelPublished}
               onBack={backToStructure}
               onOpenHistory={() => setHistoryOpen(true)}
               onOpenModelSettings={() => setModelSettingsOpen(true)}
@@ -1781,7 +1740,7 @@ export function FpaModelBuilder({ modelId }: { modelId?: string }) {
               gridGrain={gridGrain}
               onGridGrainChange={(g) => {
                 setGridGrain(g)
-                void loadDetailedGrid({ grain: g, seedIfSparse: false })
+                void loadDetailedGrid({ grain: g })
               }}
               selectedLineItemId={selected?.id || null}
               auditRows={detailedAuditRows}
@@ -1898,25 +1857,9 @@ export function FpaModelBuilder({ modelId }: { modelId?: string }) {
               onValidate={() => void runValidateModel()}
               onSelectRow={(row) => {
                 const li = lineItems.find((x) => x.id === row.id)
-                if (li) {
-                  selectLineItem(li)
-                  setExpression(row.formula)
-                  return
-                }
-                setSelected({
-                  id: row.id,
-                  modelId: id || "",
-                  code: row.id.toUpperCase().replace(/-/g, "_"),
-                  name: row.name,
-                  lineItemType: row.kind === "CALCULATED" ? "CALC" : "REVENUE",
-                  category: selectedLeaf?.folderName || "General",
-                  isEditable: row.kind === "INPUT",
-                  formulas:
-                    row.kind === "CALCULATED" && row.formula
-                      ? [{ id: `fx-${row.id}`, expression: row.formula }]
-                      : [],
-                })
-                setExpression(row.formula === "Input" ? "" : row.formula)
+                if (!li) return
+                selectLineItem(li)
+                setExpression(row.formula)
               }}
             />
           ) : (
@@ -1932,7 +1875,6 @@ export function FpaModelBuilder({ modelId }: { modelId?: string }) {
                 onSelectLineItem={selectLineItem}
                 canCreateModule={canConfigureBuilder && !versionLocked}
                 onCreateModuleClick={() => handleCreateModule()}
-                useHardcoded={structureHardcoded}
                 apiModules={apiModules}
                 selectedLeaf={selectedLeaf}
                 onSelectLeaf={(leaf) => {
@@ -1954,7 +1896,6 @@ export function FpaModelBuilder({ modelId }: { modelId?: string }) {
               <BuilderDimensionsPanel
                 dimensions={dimensions}
                 modelDimensionKeys={modelDimKeys}
-                useHardcoded={false}
                 onAttachClick={() => setDimsAttachOpen(true)}
               />
             </aside>
@@ -1976,11 +1917,7 @@ export function FpaModelBuilder({ modelId }: { modelId?: string }) {
                   periodKeys={periodKeys}
                   previewByLine={previewByLine}
                   canEdit={canEditLive}
-                  useHardcoded={gridHardcoded}
-                  demoCreate={null}
-                  demoFormulaPatch={null}
                   onSelect={selectLineItem}
-                  onDemoSelect={undefined}
                   onCellCommit={
                     canEditLive
                       ? (liId, periodIndex, value) => void commitGridCell(liId, periodIndex, value)
@@ -2087,11 +2024,6 @@ export function FpaModelBuilder({ modelId }: { modelId?: string }) {
                 formulaMessage={formulaMessage}
                 impact={impact}
                 dimensionTags={dimTags}
-                modulePath={
-                  selectedLeaf
-                    ? `${selectedLeaf.folderName} / ${selectedLeaf.leafName}`
-                    : activeModule?.label || null
-                }
                 onValidateFormula={() => void validateFormula()}
                 onSaveFormula={() => void saveFormula()}
                 onPersistProperties={(patch) => void persistLineItemProperties(patch)}

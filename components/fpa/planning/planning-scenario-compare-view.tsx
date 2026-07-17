@@ -13,7 +13,6 @@ import {
   Building,
   Users,
   Columns,
-  MoreHorizontal,
 } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
@@ -33,6 +32,8 @@ import {
   assumptionCellDriverId,
   assumptionCellValue,
   emptyCompareSkeleton,
+  isEnrichedCompareResult,
+  isLegacyPairCompareResult,
   mapCompareResultToRows,
   type CompareMetricRow,
 } from "@/lib/fpa/scenario-compare"
@@ -44,6 +45,14 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 /** Canonical metric order for the compare table (SRD / design). */
 type MetricRow = CompareMetricRow
@@ -54,6 +63,8 @@ type Props = {
   scenarios: FpaScenario[]
   /** Seed / focus scenario from worksheet chrome */
   scenarioId: string | null
+  /** MPC / planning cycle scope for compare when on worksheet. */
+  cycleId?: string | null
   currency?: string
   /** Controlled multi-select (header “N selected”). */
   selectedIds?: string[]
@@ -93,13 +104,12 @@ function getScenarioColor(name: string): string {
   return "#667085" // Grey
 }
 
-const DEMO_ASSUMPTIONS: Record<string, Record<string, number>> = {}
-
 export function PlanningScenarioCompareView({
   modelId,
   versionId,
   scenarios,
   scenarioId,
+  cycleId,
   currency = "USD",
   selectedIds: controlledIds,
   onSelectedIdsChange,
@@ -110,6 +120,8 @@ export function PlanningScenarioCompareView({
   const [anchorId, setAnchorId] = useState<string | null>(null)
   const [rows, setRows] = useState<MetricRow[]>([])
   const [loading, setLoading] = useState(false)
+  /** True when BE still returns legacy left/right pair (not enriched metrics[]). */
+  const [compareLegacyPair, setCompareLegacyPair] = useState(false)
   const [metricUnit, setMetricUnit] = useState<"$" | "%">("$")
   const [waterfallMetric, setWaterfallMetric] = useState<"revenue" | "ebitda" | "opex">("revenue")
   const [assumptionDrivers, setAssumptionDrivers] = useState<
@@ -119,12 +131,16 @@ export function PlanningScenarioCompareView({
   const [apiWaterfall, setApiWaterfall] = useState<FpaScenarioCompareWaterfall | null>(null)
   const [apiSensitivity, setApiSensitivity] = useState<FpaScenarioCompareSensitivityRow[]>([])
   const [savingAssumptions, setSavingAssumptions] = useState(false)
-
-  // Local overlays after save (keyed by driver name -> scenario name -> value)
-  const [customAssumptions, setCustomAssumptions] = useState<Record<string, Record<string, number>>>(DEMO_ASSUMPTIONS)
   const [isEditOpen, setIsEditOpen] = useState(false)
-  const [editDriverName, setEditDriverName] = useState("Revenue Growth")
+  const [editDriverName, setEditDriverName] = useState("")
   const [editScenarioValues, setEditScenarioValues] = useState<Record<string, string>>({})
+  const [visibleScenarioIds, setVisibleScenarioIds] = useState<string[]>([])
+  const [showVarianceAbs, setShowVarianceAbs] = useState(true)
+  const [showVariancePct, setShowVariancePct] = useState(true)
+  const [bridgeOpen, setBridgeOpen] = useState(false)
+  const [bridgeSourceId, setBridgeSourceId] = useState("")
+  const [bridgeTargetId, setBridgeTargetId] = useState("")
+  const [bridgeMetric, setBridgeMetric] = useState<"revenue" | "ebitda" | "opex">("revenue")
 
   // Seed selection when uncontrolled; keep anchor in sync.
   useEffect(() => {
@@ -164,6 +180,30 @@ export function PlanningScenarioCompareView({
     () => scenarios.filter((s) => selectedIds.includes(s.id)),
     [scenarios, selectedIds],
   )
+  const visibleScenarios = useMemo(
+    () => selectedScenarios.filter((s) => visibleScenarioIds.includes(s.id)),
+    [selectedScenarios, visibleScenarioIds],
+  )
+
+  useEffect(() => {
+    setVisibleScenarioIds((prev) => {
+      const valid = prev.filter((id) => selectedIds.includes(id))
+      const anchor = anchorId && selectedIds.includes(anchorId) ? anchorId : selectedIds[0]
+      const comparison = selectedIds.find((id) => id !== anchor)
+      if (!anchor || !comparison) return selectedIds
+      const next = new Set(valid)
+      next.add(anchor)
+      if (![...next].some((id) => id !== anchor)) next.add(comparison)
+      return selectedIds.filter((id) => next.has(id))
+    })
+    const source = anchorId && selectedIds.includes(anchorId) ? anchorId : selectedIds[0] || ""
+    setBridgeSourceId(source)
+    setBridgeTargetId((prev) =>
+      prev && selectedIds.includes(prev) && prev !== source
+        ? prev
+        : selectedIds.find((id) => id !== source) || "",
+    )
+  }, [selectedIds, anchorId])
 
   const runCompare = useCallback(async () => {
     const selected = scenarios.filter((s) => selectedIds.includes(s.id))
@@ -172,11 +212,13 @@ export function PlanningScenarioCompareView({
       setApiAssumptions([])
       setApiWaterfall(null)
       setApiSensitivity([])
+      setCompareLegacyPair(false)
       return
     }
     const others = selectedIds.filter((id) => id !== anchorId)
     if (!others.length) {
       setRows(emptyCompareSkeleton(selected))
+      setCompareLegacyPair(false)
       return
     }
 
@@ -186,6 +228,7 @@ export function PlanningScenarioCompareView({
         versionId,
         scenarioIds: selectedIds,
         anchorScenarioId: anchorId,
+        cycleId: cycleId || undefined,
         includeAssumptions: true,
         includeWaterfall: true,
         includeSensitivity: true,
@@ -203,7 +246,11 @@ export function PlanningScenarioCompareView({
         throw new Error(res.message || "Compare failed")
       }
       const data = res.data
-      setRows(mapCompareResultToRows(data, selectedIds, anchorId, others[0]))
+      const enriched = isEnrichedCompareResult(data)
+      const legacy = isLegacyPairCompareResult(data)
+      setCompareLegacyPair(legacy)
+      const mapIds = enriched ? selectedIds : legacy ? [anchorId, others[0]] : selectedIds
+      setRows(mapCompareResultToRows(data, mapIds, anchorId, others[0]))
       setApiAssumptions(Array.isArray(data.assumptions) ? data.assumptions : [])
       setApiWaterfall(data.waterfall ?? null)
       setApiSensitivity(Array.isArray(data.sensitivity) ? data.sensitivity : [])
@@ -221,6 +268,7 @@ export function PlanningScenarioCompareView({
           others.map(async (compareId) => {
             const res = await fpaApi.compareScenarios(anchorId, {
               versionId,
+              cycleId: cycleId || undefined,
               compareScenarioId: compareId,
               scenarioIds: [anchorId, compareId],
             })
@@ -247,6 +295,7 @@ export function PlanningScenarioCompareView({
           })
         }
         setRows(merged)
+        setCompareLegacyPair(true)
         setApiAssumptions([])
         setApiWaterfall(null)
         setApiSensitivity([])
@@ -260,6 +309,7 @@ export function PlanningScenarioCompareView({
           response: err2,
         })
         setRows(emptyCompareSkeleton(selected))
+        setCompareLegacyPair(false)
         setApiAssumptions([])
         setApiWaterfall(null)
         setApiSensitivity([])
@@ -267,45 +317,49 @@ export function PlanningScenarioCompareView({
     } finally {
       setLoading(false)
     }
-  }, [versionId, anchorId, selectedIds, scenarios, waterfallMetric])
+  }, [versionId, anchorId, selectedIds, scenarios, waterfallMetric, cycleId])
 
   useEffect(() => {
     void runCompare()
   }, [runCompare])
 
-  useEffect(() => {
+  const reloadAssumptionDrivers = useCallback(async () => {
     if (!modelId || !selectedIds.length) {
       setAssumptionDrivers([])
       return
     }
-    let cancelled = false
-    void (async () => {
-      const packs = await Promise.all(
-        selectedIds.map(async (id) => {
-          const s = scenarios.find((x) => x.id === id)
-          const name = s?.name || id
-          try {
-            const res = await fpaApi.listDrivers({
-              modelId,
-              versionId: versionId || undefined,
-              scenarioId: id,
-            })
-            return {
-              scenarioId: id,
-              scenarioName: name,
-              drivers: res.success && Array.isArray(res.data) ? res.data : [],
-            }
-          } catch {
-            return { scenarioId: id, scenarioName: name, drivers: [] as FpaDriver[] }
+    const packs = await Promise.all(
+      selectedIds.map(async (id) => {
+        const s = scenarios.find((x) => x.id === id)
+        const name = s?.name || id
+        try {
+          const res = await fpaApi.listDrivers({
+            modelId,
+            versionId: versionId || undefined,
+            scenarioId: id,
+          })
+          return {
+            scenarioId: id,
+            scenarioName: name,
+            drivers: res.success && Array.isArray(res.data) ? res.data : [],
           }
-        }),
-      )
-      if (!cancelled) setAssumptionDrivers(packs)
-    })()
+        } catch {
+          return { scenarioId: id, scenarioName: name, drivers: [] as FpaDriver[] }
+        }
+      }),
+    )
+    setAssumptionDrivers(packs)
+  }, [modelId, versionId, selectedIds, scenarios])
+
+  useEffect(() => {
+    let cancelled = false
+    void reloadAssumptionDrivers().catch(() => {
+      if (!cancelled) setAssumptionDrivers([])
+    })
     return () => {
       cancelled = true
     }
-  }, [modelId, versionId, selectedIds, scenarios])
+  }, [reloadAssumptionDrivers])
 
   const kpis = useMemo((): PlanningKpi[] => {
     const pick = (re: RegExp) => rows.find((r) => re.test(r.code) || re.test(r.label))
@@ -313,6 +367,7 @@ export function PlanningScenarioCompareView({
     const ebitda = pick(/^EBITDA$/)
     const margin = pick(/GROSS_MARGIN/)
     const headcount = pick(/HEADCOUNT/)
+    const anchorLabel = scenarios.find((s) => s.id === anchorId)?.name || "anchor"
     const mk = (row: MetricRow | undefined, label: string): PlanningKpi => {
       if (!row || row.varianceAbs == null) {
         return { label, value: "—" }
@@ -333,13 +388,13 @@ export function PlanningScenarioCompareView({
           : "—"
       const arrow = row.varianceAbs >= 0 ? "↑" : "↓"
       const delta = row.isPct
-        ? `${arrow} ${Math.abs(row.varianceAbs).toFixed(1)}pp vs Budget`
+        ? `${arrow} ${Math.abs(row.varianceAbs).toFixed(1)}pp vs ${anchorLabel}`
         : row.variancePct != null
-          ? `${arrow} ${Math.abs(row.variancePct).toFixed(1)}% vs Budget`
+          ? `${arrow} ${Math.abs(row.variancePct).toFixed(1)}% vs ${anchorLabel}`
           : `${arrow} ${formatMetric(Math.abs(row.varianceAbs), {
               pct: row.isPct,
               count: row.isCount,
-            })} vs Budget`
+            })} vs ${anchorLabel}`
       return {
         label,
         value: display,
@@ -354,7 +409,7 @@ export function PlanningScenarioCompareView({
       { label: "Cash Runway", value: "—", deltaTone: "neutral" },
       mk(headcount, "Headcount"),
     ]
-  }, [rows, selectedIds, anchorId])
+  }, [rows, selectedIds, anchorId, scenarios])
 
   useEffect(() => {
     onKpisChange?.(kpis)
@@ -366,9 +421,7 @@ export function PlanningScenarioCompareView({
         const byScenario: Record<string, string> = {}
         const unit = a.unit || "%"
         for (const sId of selectedIds) {
-          const sName = scenarios.find((s) => s.id === sId)?.name || sId
-          const custom = customAssumptions[a.driverName]?.[sName]
-          const raw = custom !== undefined ? custom : assumptionCellValue(a.byScenario?.[sId])
+          const raw = assumptionCellValue(a.byScenario?.[sId])
           if (raw == null || !Number.isFinite(raw)) byScenario[sId] = "—"
           else if (String(unit).includes("%")) {
             byScenario[sId] = raw < 0 ? `(${Math.abs(raw).toFixed(1)}%)` : `${raw.toFixed(1)}%`
@@ -387,16 +440,6 @@ export function PlanningScenarioCompareView({
         }
       }
     }
-    for (const name of Object.keys(customAssumptions)) {
-      if (![...driverNames.values()].some((d) => d.name === name)) {
-        driverNames.set(name, {
-          name,
-          code: name.toUpperCase().replace(/\s+/g, "_"),
-          unit: "%",
-        })
-      }
-    }
-
     return Array.from(driverNames.values()).map((driver) => {
       const byScenario: Record<string, string> = {}
       for (const sId of selectedIds) {
@@ -406,9 +449,7 @@ export function PlanningScenarioCompareView({
           (d) =>
             d.code === driver.code || d.name?.toLowerCase() === driver.name.toLowerCase(),
         )
-        const custom = customAssumptions[driver.name]?.[sName]
-        const raw =
-          custom !== undefined ? custom : live?.value != null ? asNumber(live.value) : null
+        const raw = live?.value != null ? asNumber(live.value) : null
         if (raw == null || !Number.isFinite(raw)) byScenario[sId] = "—"
         else if (String(driver.unit).includes("%")) {
           byScenario[sId] = raw < 0 ? `(${Math.abs(raw).toFixed(1)}%)` : `${raw.toFixed(1)}%`
@@ -421,24 +462,63 @@ export function PlanningScenarioCompareView({
         byScenario,
       }
     })
-  }, [apiAssumptions, assumptionDrivers, selectedIds, scenarios, customAssumptions])
+  }, [apiAssumptions, assumptionDrivers, selectedIds, scenarios])
 
   const anchorName =
-    selectedScenarios.find((s) => s.id === anchorId)?.name || "Budget"
+    selectedScenarios.find((s) => s.id === anchorId)?.name || "Anchor scenario"
+  const persistableDriverNames = new Set([
+    ...apiAssumptions.filter((a) => Boolean(a.driverCode)).map((a) => a.driverName),
+    ...assumptionDrivers.flatMap((pack) =>
+      pack.drivers.filter((d) => Boolean(d.id || d.code)).map((d) => d.name),
+    ),
+  ])
+  const firstEditableDriver =
+    assumptionMatrix.find((row) => persistableDriverNames.has(row.name))?.name || ""
 
   const openEditDialogForDriver = (driverName: string) => {
+    if (!driverName || !persistableDriverNames.has(driverName)) {
+      toast.error("This assumption has no persistent driver id or code")
+      return
+    }
     setEditDriverName(driverName)
     const currentVals: Record<string, string> = {}
     const apiRow = apiAssumptions.find((a) => a.driverName === driverName)
     for (const sId of selectedIds) {
       const sName = scenarios.find((s) => s.id === sId)?.name || sId
-      const custom = customAssumptions[driverName]?.[sName]
       const fromApi = apiRow ? assumptionCellValue(apiRow.byScenario?.[sId]) : null
-      const raw = custom !== undefined ? custom : fromApi
+      const pack = assumptionDrivers.find((p) => p.scenarioId === sId)
+      const live = pack?.drivers.find(
+        (d) =>
+          d.name?.toLowerCase() === driverName.toLowerCase() ||
+          d.code === apiRow?.driverCode,
+      )
+      const raw = fromApi ?? (live?.value != null ? asNumber(live.value) : null)
       currentVals[sName] = raw != null ? String(raw) : ""
     }
     setEditScenarioValues(currentVals)
     setIsEditOpen(true)
+  }
+
+  const toggleScenarioColumn = (id: string) => {
+    if (id === anchorId) {
+      toast.message("The anchor scenario column is required")
+      return
+    }
+    setVisibleScenarioIds((prev) => {
+      if (!prev.includes(id)) return selectedIds.filter((candidate) => prev.includes(candidate) || candidate === id)
+      const remaining = prev.filter((candidate) => candidate !== id)
+      if (!remaining.some((candidate) => candidate !== anchorId)) {
+        toast.message("Keep at least one comparison column")
+        return prev
+      }
+      return remaining
+    })
+  }
+
+  const resetColumns = () => {
+    setVisibleScenarioIds(selectedIds)
+    setShowVarianceAbs(true)
+    setShowVariancePct(true)
   }
 
   const saveAssumptions = async () => {
@@ -463,6 +543,7 @@ export function PlanningScenarioCompareView({
           d.code === apiRow?.driverCode,
       )
       const driverId = cellId || live?.id || null
+      const driverCode = apiRow?.driverCode || live?.code || null
       if (driverId) {
         updates.push({
           driverId,
@@ -470,9 +551,9 @@ export function PlanningScenarioCompareView({
           scenarioId: s.id,
           unit: apiRow?.unit || live?.unit || "%",
         })
-      } else if (apiRow?.driverCode) {
+      } else if (driverCode) {
         updates.push({
-          code: apiRow.driverCode,
+          code: driverCode,
           scenarioId: s.id,
           value: val,
           unit: apiRow.unit || "%",
@@ -480,27 +561,31 @@ export function PlanningScenarioCompareView({
         })
       }
     }
+    if (!updates.length) {
+      setSavingAssumptions(false)
+      toast.error("No persistable assumption updates")
+      return
+    }
     try {
-      if (updates.length && modelId) {
-        const bulk = await fpaApi.bulkUpdateDrivers(modelId, { versionId, updates })
-        if (!bulk.success) {
-          for (const u of updates) {
-            if (u.driverId) await fpaApi.updateDriver(u.driverId, { value: u.value, unit: u.unit })
+      const bulk = await fpaApi.bulkUpdateDrivers(modelId, { versionId, updates })
+      const bulkComplete =
+        bulk.success &&
+        bulk.data != null &&
+        Number(bulk.data.updated) >= updates.length
+      if (!bulkComplete) {
+        for (const u of updates) {
+          if (!u.driverId) {
+            throw new Error(`Driver ${u.code || editDriverName} has no persistent id`)
+          }
+          const single = await fpaApi.updateDriver(u.driverId, { value: u.value, unit: u.unit })
+          if (!single.success) {
+            throw new Error(single.message || `Could not persist ${u.driverId}`)
           }
         }
       }
-      setCustomAssumptions((prev) => {
-        const nextMap = { ...(prev[editDriverName] || {}) }
-        for (const [sName, strVal] of Object.entries(editScenarioValues)) {
-          const cleaned = strVal.replace(/[()%\s]/g, "")
-          const val = parseFloat(cleaned) * (strVal.includes("(") ? -1 : 1)
-          if (!Number.isNaN(val)) nextMap[sName] = val
-        }
-        return { ...prev, [editDriverName]: nextMap }
-      })
+      await Promise.all([runCompare(), reloadAssumptionDrivers()])
       setIsEditOpen(false)
       toast.success("Assumptions saved")
-      void runCompare()
     } catch (err) {
       logFpaGap({
         category: "broken",
@@ -518,22 +603,32 @@ export function PlanningScenarioCompareView({
 
   return (
     <div className="space-y-3">
+      {compareLegacyPair ? (
+        <div className="rounded-xl border border-[#fedf89] bg-[#fffaeb] px-4 py-3 text-[12px] text-[#b54708]">
+          Compare is on the <strong>legacy pair</strong> API (anchor vs first other only). Multi-column
+          metrics, assumptions, waterfall, and sensitivity need the enriched Stage 4 contract — see{" "}
+          <code className="text-[11px]">design-refs/fpa-model-planning-stage4-backend-asks.md</code>.
+        </div>
+      ) : null}
       {/* Metric comparison table */}
       <section className="rounded-xl border border-[#eaecf0] bg-white shadow-sm overflow-hidden">
         {/* Header toolbar matches design */}
         <div className="px-5 py-3.5 border-b border-[#eaecf0] flex flex-wrap items-center justify-between gap-3 bg-white">
           <div>
             <h2 className="text-[16px] font-semibold text-[#101828]">Scenario Comparison</h2>
-            <p className="text-[12px] text-[#667085] mt-0.5">All values in USD</p>
+            <p className="text-[12px] text-[#667085] mt-0.5">
+              All values in {currency}
+              {selectedIds.length >= 3 ? ` · ${selectedIds.length} scenarios` : ""}
+            </p>
           </div>
           <div className="flex items-center gap-3 shrink-0">
             {/* Toggle unit group */}
-            <div className="inline-flex rounded-lg border border-[#d0d5dd] p-0.5 bg-[#f9fafb]">
+            <div className="inline-flex rounded-full border border-[#d0d5dd] p-0.5 bg-[#f9fafb]">
               <button
                 type="button"
                 onClick={() => setMetricUnit("%")}
                 className={cn(
-                  "px-3 py-1 text-[12px] font-medium rounded-md transition-colors",
+                  "px-3 py-1 text-[12px] font-medium rounded-full transition-colors",
                   metricUnit === "%"
                     ? "bg-white text-[#101828] shadow-sm"
                     : "text-[#667085] hover:text-[#101828]",
@@ -545,7 +640,7 @@ export function PlanningScenarioCompareView({
                 type="button"
                 onClick={() => setMetricUnit("$")}
                 className={cn(
-                  "px-3 py-1 text-[12px] font-medium rounded-md transition-colors",
+                  "px-3 py-1 text-[12px] font-medium rounded-full transition-colors",
                   metricUnit === "$"
                     ? "bg-white text-[#101828] shadow-sm"
                     : "text-[#667085] hover:text-[#101828]",
@@ -554,22 +649,55 @@ export function PlanningScenarioCompareView({
                 $
               </button>
             </div>
-            {/* Columns button */}
-            <button
-              type="button"
-              className="inline-flex items-center gap-1.5 h-9 rounded-lg border border-[#d0d5dd] bg-white px-3 text-[12px] font-medium text-[#344054] hover:bg-[#f9fafb]"
-            >
-              <Columns className="w-3.5 h-3.5 text-[#475467]" />
-              Columns
-            </button>
-            {/* Action button */}
-            <button
-              type="button"
-              onClick={() => toast.message("More table options triggered")}
-              className="h-9 w-9 inline-flex items-center justify-center rounded-lg border border-[#d0d5dd] bg-white text-[#475467] hover:bg-[#f9fafb]"
-            >
-              <MoreHorizontal className="w-4 h-4" />
-            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1.5 h-9 rounded-full border border-[#d0d5dd] bg-white px-3 text-[12px] font-medium text-[#344054] hover:bg-[#f9fafb]"
+                >
+                  <Columns className="w-3.5 h-3.5 text-[#475467]" />
+                  Columns
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-60">
+                <DropdownMenuLabel>Scenario columns</DropdownMenuLabel>
+                {selectedScenarios.map((s) => (
+                  <DropdownMenuCheckboxItem
+                    key={s.id}
+                    checked={visibleScenarioIds.includes(s.id)}
+                    disabled={s.id === anchorId}
+                    onSelect={(event) => event.preventDefault()}
+                    onCheckedChange={() => toggleScenarioColumn(s.id)}
+                  >
+                    {s.name}{s.id === anchorId ? " (anchor)" : ""}
+                  </DropdownMenuCheckboxItem>
+                ))}
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>Variance columns</DropdownMenuLabel>
+                <DropdownMenuCheckboxItem
+                  checked={showVarianceAbs}
+                  onSelect={(event) => event.preventDefault()}
+                  onCheckedChange={(checked) => setShowVarianceAbs(checked === true)}
+                >
+                  Absolute variance
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={showVariancePct}
+                  onSelect={(event) => event.preventDefault()}
+                  onCheckedChange={(checked) => setShowVariancePct(checked === true)}
+                >
+                  Percentage variance
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuSeparator />
+                <button
+                  type="button"
+                  onClick={resetColumns}
+                  className="w-full rounded-full px-2 py-1.5 text-left text-[12px] font-medium text-[#1570ef] hover:bg-[#f9fafb]"
+                >
+                  Reset columns
+                </button>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
@@ -590,7 +718,7 @@ export function PlanningScenarioCompareView({
                   >
                     Metric
                   </th>
-                  {selectedScenarios.map((s) => (
+                  {visibleScenarios.map((s) => (
                     <th
                       key={s.id}
                       rowSpan={2}
@@ -606,16 +734,18 @@ export function PlanningScenarioCompareView({
                       ) : null}
                     </th>
                   ))}
-                  <th
-                    colSpan={2}
-                    className="px-4 py-1 text-center font-semibold border-b border-[#eaecf0]"
-                  >
-                    Variance to Budget
-                  </th>
+                  {showVarianceAbs || showVariancePct ? (
+                    <th
+                      colSpan={Number(showVarianceAbs) + Number(showVariancePct)}
+                      className="px-4 py-1 text-center font-semibold border-b border-[#eaecf0]"
+                    >
+                      Variance to {anchorName}
+                    </th>
+                  ) : null}
                 </tr>
                 <tr className="border-b border-[#eaecf0] bg-[#f9fafb] text-[#475467]">
-                  <th className="px-4 py-1 text-right font-semibold w-24">$</th>
-                  <th className="px-4 py-1 text-right font-semibold w-20">%</th>
+                  {showVarianceAbs ? <th className="px-4 py-1 text-right font-semibold w-24">$</th> : null}
+                  {showVariancePct ? <th className="px-4 py-1 text-right font-semibold w-20">%</th> : null}
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#eaecf0]">
@@ -631,7 +761,7 @@ export function PlanningScenarioCompareView({
                         {getMetricIcon(row.code)}
                         <span>{row.label}</span>
                       </td>
-                      {selectedScenarios.map((s) => {
+                      {visibleScenarios.map((s) => {
                         const isCurrentColumn = s.name.includes("Forecast")
                         const val = row.byScenario[s.id]
                         const anchorVal = row.byScenario[anchorId || ""]
@@ -673,7 +803,7 @@ export function PlanningScenarioCompareView({
                         )
                       })}
                       {/* Variance $ */}
-                      <td
+                      {showVarianceAbs ? <td
                         className={cn(
                           "px-4 py-1.5 text-right tabular-nums font-semibold",
                           favourable === true && "text-[#12b76a]",
@@ -689,9 +819,9 @@ export function PlanningScenarioCompareView({
                                 pct: row.isPct,
                                 count: row.isCount,
                               })}
-                      </td>
+                      </td> : null}
                       {/* Variance % */}
-                      <td
+                      {showVariancePct ? <td
                         className={cn(
                           "px-4 py-1.5 text-right tabular-nums font-semibold",
                           favourable === true && "text-[#12b76a]",
@@ -702,7 +832,7 @@ export function PlanningScenarioCompareView({
                         {row.variancePct != null
                           ? `${row.variancePct >= 0 ? "+" : ""}${row.variancePct.toFixed(1)}%`
                           : "—"}
-                      </td>
+                      </td> : null}
                     </tr>
                   )
                 })}
@@ -733,29 +863,21 @@ export function PlanningScenarioCompareView({
               <select
                 value={waterfallMetric}
                 onChange={(e) => setWaterfallMetric(e.target.value as any)}
-                className="h-7 rounded-md border border-[#d0d5dd] px-1.5 text-[11px] font-semibold text-[#344054] bg-white cursor-pointer"
+                className="h-7 rounded-full border border-[#d0d5dd] px-2 text-[11px] font-semibold text-[#344054] bg-white cursor-pointer"
               >
                 <option value="revenue">Revenue</option>
                 <option value="ebitda">EBITDA</option>
                 <option value="opex">Opex</option>
               </select>
             </div>
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => toast.info(`Editing waterfall bridge for ${waterfallMetric.toUpperCase()}`)}
-                className="h-7 rounded-md border border-[#d0d5dd] px-2.5 text-[11px] font-medium text-[#344054] hover:bg-[#f9fafb]"
-              >
-                Edit Bridge
-              </button>
-              <button
-                type="button"
-                onClick={() => toast.message("More bridge options triggered")}
-                className="h-7 w-7 inline-flex items-center justify-center rounded-md border border-[#d0d5dd] bg-white text-[#475467] hover:bg-[#f9fafb]"
-              >
-                <MoreHorizontal className="w-3.5 h-3.5" />
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => setBridgeOpen(true)}
+              disabled={selectedIds.length < 2}
+              className="h-7 rounded-full border border-[#d0d5dd] px-2.5 text-[11px] font-medium text-[#344054] hover:bg-[#f9fafb] disabled:opacity-50"
+            >
+              Edit Bridge
+            </button>
           </div>
         </section>
 
@@ -765,8 +887,9 @@ export function PlanningScenarioCompareView({
             <h3 className="text-[14px] font-semibold text-[#101828]">Scenario Assumptions</h3>
             <button
               type="button"
-              onClick={() => openEditDialogForDriver(editDriverName)}
-              className="h-7 inline-flex items-center rounded-md border border-[#d0d5dd] px-2.5 text-[11px] font-medium text-[#344054] hover:bg-[#f9fafb]"
+              onClick={() => openEditDialogForDriver(editDriverName || firstEditableDriver)}
+              disabled={!firstEditableDriver}
+              className="h-7 inline-flex items-center rounded-full border border-[#d0d5dd] px-2.5 text-[11px] font-medium text-[#344054] hover:bg-[#f9fafb] disabled:opacity-50"
             >
               Edit Assumptions
             </button>
@@ -810,9 +933,18 @@ export function PlanningScenarioCompareView({
                     return (
                       <tr
                         key={row.name}
-                        onClick={() => openEditDialogForDriver(row.name)}
-                        className="hover:bg-[#f9fafb] cursor-pointer transition-colors"
-                        title="Click to edit driver assumptions"
+                        onClick={() => {
+                          if (persistableDriverNames.has(row.name)) openEditDialogForDriver(row.name)
+                        }}
+                        className={cn(
+                          "hover:bg-[#f9fafb] transition-colors",
+                          persistableDriverNames.has(row.name) && "cursor-pointer",
+                        )}
+                        title={
+                          persistableDriverNames.has(row.name)
+                            ? "Click to edit driver assumptions"
+                            : "Read-only: no persistent driver id or code"
+                        }
                       >
                         {/* Driver label column */}
                         <td className="py-2 pr-3 font-medium text-[#344054] text-[12px]">
@@ -876,6 +1008,86 @@ export function PlanningScenarioCompareView({
         <SensitivityBoard rows={apiSensitivity} />
       </section>
 
+      <Dialog open={bridgeOpen} onOpenChange={setBridgeOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-[16px] font-semibold text-[#101828]">
+              Configure waterfall bridge
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-3">
+            <label className="block text-[12px] font-medium text-[#344054]">
+              Source scenario
+              <select
+                value={bridgeSourceId}
+                onChange={(event) => {
+                  const source = event.target.value
+                  setBridgeSourceId(source)
+                  if (bridgeTargetId === source) {
+                    setBridgeTargetId(selectedIds.find((id) => id !== source) || "")
+                  }
+                }}
+                className="mt-1 h-10 w-full rounded-full border border-[#d0d5dd] bg-white px-3 text-[13px]"
+              >
+                {selectedScenarios.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </label>
+            <label className="block text-[12px] font-medium text-[#344054]">
+              Target scenario
+              <select
+                value={bridgeTargetId}
+                onChange={(event) => setBridgeTargetId(event.target.value)}
+                className="mt-1 h-10 w-full rounded-full border border-[#d0d5dd] bg-white px-3 text-[13px]"
+              >
+                {selectedScenarios
+                  .filter((s) => s.id !== bridgeSourceId)
+                  .map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </label>
+            <label className="block text-[12px] font-medium text-[#344054]">
+              Metric
+              <select
+                value={bridgeMetric}
+                onChange={(event) => setBridgeMetric(event.target.value as typeof bridgeMetric)}
+                className="mt-1 h-10 w-full rounded-full border border-[#d0d5dd] bg-white px-3 text-[13px]"
+              >
+                <option value="revenue">Revenue</option>
+                <option value="ebitda">EBITDA</option>
+                <option value="opex">Opex</option>
+              </select>
+            </label>
+          </div>
+          <DialogFooter className="gap-2">
+            <button
+              type="button"
+              onClick={() => setBridgeOpen(false)}
+              className="h-9 rounded-full border border-[#d0d5dd] px-4 text-[13px] font-semibold text-[#344054]"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={!bridgeSourceId || !bridgeTargetId || bridgeSourceId === bridgeTargetId}
+              onClick={() => {
+                const nextIds = [
+                  bridgeSourceId,
+                  bridgeTargetId,
+                  ...selectedIds.filter((id) => id !== bridgeSourceId && id !== bridgeTargetId),
+                ]
+                setAnchorId(bridgeSourceId)
+                setWaterfallMetric(bridgeMetric)
+                if (controlledIds) onSelectedIdsChange?.(nextIds)
+                else setInternalIds(nextIds)
+                setBridgeOpen(false)
+              }}
+              className="h-9 rounded-full bg-[#2563eb] px-4 text-[13px] font-semibold text-white disabled:opacity-50"
+            >
+              Apply bridge
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
         <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto">
           <DialogHeader>
@@ -915,7 +1127,7 @@ export function PlanningScenarioCompareView({
             <button
               type="button"
               onClick={() => setIsEditOpen(false)}
-              className="h-9 rounded-lg border border-[#d0d5dd] px-4 text-[13px] font-semibold text-[#344054] hover:bg-[#f9fafb]"
+              className="h-9 rounded-full border border-[#d0d5dd] px-4 text-[13px] font-semibold text-[#344054] hover:bg-[#f9fafb]"
             >
               Cancel
             </button>

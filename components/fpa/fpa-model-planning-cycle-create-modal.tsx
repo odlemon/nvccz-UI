@@ -363,6 +363,8 @@ export function FpaModelPlanningCycleCreateModal({
         forecastStartPeriod: toPeriodStart(forecastStartPeriod),
         submissionDeadline: submissionDeadline || null,
         planningOwnerId,
+        /** Stage 3 material commentary threshold (%). BE default is also 5. */
+        materialVariancePct: 5,
         owners: owners.map((o) => ({
           departmentId: o.departmentId,
           assigneeId: o.assigneeId,

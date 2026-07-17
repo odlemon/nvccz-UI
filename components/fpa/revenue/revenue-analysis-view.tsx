@@ -20,7 +20,6 @@ import {
   Cell,
   ComposedChart,
   Line,
-  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -29,28 +28,20 @@ import {
 import { cn } from "@/lib/utils"
 import { KpiSparkline } from "@/components/fpa/kpi-sparkline"
 import { Button } from "@/components/ui/button"
-import {
-  mockRevByRegion,
-  mockRevDrivers,
-  mockRevKpis,
-  mockRevMonthly,
-  mockRevStreamRows,
-  mockWaterfall,
-} from "@/components/fpa/mock-data"
+import type { FpaDomainScope, FpaDriver } from "@/lib/api/fpa-api"
 
 const R = "rounded-lg"
 
 export type RevStreamRow = {
   id: string
   name: string
-  region: string
-  method: string
-  actual: number
-  budget: number
-  forecast: number
-  yoy: number
-  share: number
-  entity: string
+  region: string | null
+  method: string | null
+  actual: number | null
+  budget: number | null
+  forecast: number | null
+  yoy: number | null
+  share: number | null
 }
 
 export type RevKpi = {
@@ -61,11 +52,14 @@ export type RevKpi = {
   spark?: number[]
 }
 
+export type RevWaterfallPoint = { key: string; label: string; value?: number; delta?: number }
+export type RevMonthlyPoint = { period: string; actual?: number; budget?: number; forecast?: number }
+
 export type RevDetail = {
   id: string
   name: string
-  region: string
-  method: string
+  region: string | null
+  method: string | null
   period: string
   actual: string
   budget: string
@@ -73,17 +67,10 @@ export type RevDetail = {
   variance: string
   yoy: string
   drivers: Array<{ label: string; value: string }>
-  narrative: string
 }
 
-const VERSION_SCALE: Record<string, number> = {
-  Working: 1,
-  Locked: 0.99,
-  Published: 0.97,
-}
-
-function fmtM(n: number): string {
-  return `$${n.toFixed(1)}M`
+function fmtM(n: number | null): string {
+  return n == null ? "—" : `$${n.toFixed(1)}M`
 }
 
 function varTone(n: number): string {
@@ -118,7 +105,7 @@ function FilterSelect({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className={`h-10 min-w-[118px] inline-flex items-center ${R} border border-[#d0d5dd] bg-white pl-2.5 pr-7 text-left hover:bg-[#f9fafb]`}
+        className="h-10 min-w-[118px] inline-flex items-center rounded-full border border-[#d0d5dd] bg-white pl-2.5 pr-7 text-left hover:bg-[#f9fafb]"
       >
         <span className="flex flex-col justify-center min-w-0 py-1">
           <span className="text-[9px] font-medium uppercase tracking-wide text-[#98a2b3] leading-none">
@@ -181,27 +168,29 @@ function RevKpiCard({ kpi, onClick }: { kpi: RevKpi; onClick?: () => void }) {
   )
 }
 
-function buildWaterfallData() {
+function buildWaterfallData(items: RevWaterfallPoint[]) {
   let running = 0
-  return mockWaterfall.map((item) => {
-    if (item.type === "total") {
+  return items.map((item) => {
+    const amount = item.value ?? item.delta ?? 0
+    if (item.value != null) {
       const start = 0
-      running = item.value
-      return { ...item, start, end: item.value, fill: "#2563eb" }
+      running = amount
+      return { ...item, name: item.label, start, end: amount, fill: "#2563eb" }
     }
     const start = running
-    running += item.value
+    running += amount
     return {
       ...item,
+      name: item.label,
       start: Math.min(start, running),
       end: Math.max(start, running),
-      fill: item.value >= 0 ? "#12b76a" : "#f04438",
+      fill: amount >= 0 ? "#12b76a" : "#f04438",
     }
   })
 }
 
 export function detailForStream(row: RevStreamRow, period: string): RevDetail {
-  const varB = row.actual - row.budget
+  const varB = row.actual == null || row.budget == null ? null : row.actual - row.budget
   return {
     id: row.id,
     name: row.name,
@@ -211,52 +200,92 @@ export function detailForStream(row: RevStreamRow, period: string): RevDetail {
     actual: fmtM(row.actual),
     budget: fmtM(row.budget),
     forecast: fmtM(row.forecast),
-    variance: `${varB >= 0 ? "+" : ""}${fmtM(varB)}`,
-    yoy: `${row.yoy >= 0 ? "+" : ""}${row.yoy.toFixed(1)}%`,
-    drivers: mockRevDrivers.slice(0, 3).map((d) => ({
-      label: d.name,
-      value: d.unit === "%" ? `${d.value}%` : d.unit === "$" ? `$${d.value}` : String(d.value),
-    })),
-    narrative: `${row.name} is ${varB >= 0 ? "ahead of" : "behind"} budget driven by ${row.method.toLowerCase()}. YoY growth at ${row.yoy.toFixed(1)}% with ${row.share}% revenue share.`,
+    variance: varB == null ? "—" : `${varB >= 0 ? "+" : ""}${fmtM(varB)}`,
+    yoy: row.yoy == null ? "—" : `${row.yoy >= 0 ? "+" : ""}${row.yoy.toFixed(1)}%`,
+    drivers: [],
   }
-}
-
-export function mapMockRevStreams(): RevStreamRow[] {
-  return mockRevStreamRows.map((r) => ({ ...r }))
-}
-
-export function mapMockRevKpis(): RevKpi[] {
-  return mockRevKpis.map((k) => ({ ...k }))
 }
 
 type RevenueAnalysisViewProps = {
   loading?: boolean
+  error?: string
   kpis?: RevKpi[]
   streams?: RevStreamRow[]
+  waterfall?: RevWaterfallPoint[]
+  monthly?: RevMonthlyPoint[]
   periodLabel?: string
   onRefresh?: () => void
+  entities?: Array<{ id: string; name: string }>
+  availablePeriods?: string[]
+  selectedEntityId?: string
+  periodFrom?: string
+  periodTo?: string
+  appliedScope?: FpaDomainScope
+  onEntityChange?: (value: string) => void
+  onPeriodFromChange?: (value: string) => void
+  onPeriodToChange?: (value: string) => void
+  drivers?: FpaDriver[]
+  preview?: { kpis: RevKpi[]; streams: RevStreamRow[]; waterfall: RevWaterfallPoint[]; monthly: RevMonthlyPoint[] }
+  previewLoading?: boolean
+  previewError?: string
+  onPreview?: (driverCode: string, value: number) => void
+  onResetPreview?: () => void
 }
 
 export function RevenueAnalysisView({
   loading = false,
-  kpis = mapMockRevKpis(),
-  streams = mapMockRevStreams(),
+  error,
+  kpis = [],
+  streams = [],
+  waterfall = [],
+  monthly = [],
   periodLabel = "May 2025",
   onRefresh,
+  entities = [], availablePeriods = [], selectedEntityId = "", periodFrom = "", periodTo = "",
+  appliedScope, onEntityChange, onPeriodFromChange, onPeriodToChange,
+  drivers = [], preview, previewLoading = false, previewError, onPreview, onResetPreview,
 }: RevenueAnalysisViewProps) {
-  const [entity, setEntity] = useState("All Entities")
+  const displayedKpis = preview?.kpis ?? kpis
+  const displayedStreams = preview?.streams ?? streams
+  const displayedWaterfall = preview?.waterfall ?? waterfall
+  const displayedMonthly = preview?.monthly ?? monthly
   const [streamFilter, setStreamFilter] = useState("All Streams")
-  const [version, setVersion] = useState("Working")
-  const [period, setPeriod] = useState(periodLabel)
   const [view, setView] = useState("Stream View")
   const [growthRate, setGrowthRate] = useState(4.5)
+  const [driverCode, setDriverCode] = useState("")
   const [detailOpen, setDetailOpen] = useState(true)
   const [selectedDetail, setSelectedDetail] = useState<RevDetail | null>(
-    detailForStream(streams[0], periodLabel),
+    displayedStreams[0] ? detailForStream(displayedStreams[0], periodLabel) : null,
   )
   const [infoOpen, setInfoOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+  const streamOptions = useMemo(() => ["All Streams", ...new Set(displayedStreams.map((row) => row.name).filter(Boolean))], [displayedStreams])
+  const period = periodTo || periodFrom || periodLabel
+  const selectedEntityName = entities.find((option) => option.id === selectedEntityId)?.name ?? "All Entities"
+  const driverOptions = useMemo(() => drivers.map((driver) => `${driver.name} · ${driver.code}`), [drivers])
+
+  useEffect(() => {
+    setSelectedDetail((current) => {
+      const row = current ? displayedStreams.find((candidate) => candidate.id === current.id) : displayedStreams[0]
+      return row ? detailForStream(row, period) : null
+    })
+  }, [displayedStreams, period])
+
+  useEffect(() => {
+    if (driverCode && !drivers.some((driver) => driver.code === driverCode)) setDriverCode("")
+    if (!driverCode) {
+      const relevant = drivers.find((driver) => {
+        const value = `${driver.code} ${driver.name}`.toLowerCase()
+        return value.includes("revenue") && value.includes("growth")
+      })
+      if (relevant) {
+        setDriverCode(relevant.code)
+        const value = Number(relevant.value)
+        if (Number.isFinite(value)) setGrowthRate(value)
+      }
+    }
+  }, [drivers, driverCode])
 
   useEffect(() => {
     const onDoc = (e: MouseEvent) => {
@@ -266,63 +295,43 @@ export function RevenueAnalysisView({
     return () => document.removeEventListener("mousedown", onDoc)
   }, [])
 
-  const versionFactor = VERSION_SCALE[version] ?? 1
-  const growthFactor = 1 + (growthRate - 4.5) / 100
-
   const filteredStreams = useMemo(() => {
-    let rows = streams.map((r) => ({
-      ...r,
-      actual: r.actual * versionFactor * growthFactor,
-      budget: r.budget * versionFactor,
-      forecast: r.forecast * versionFactor * growthFactor,
-    }))
-    if (entity !== "All Entities") rows = rows.filter((r) => r.entity === entity)
+    let rows = displayedStreams
     if (streamFilter !== "All Streams") {
-      rows = rows.filter((r) => r.name.startsWith(streamFilter.split(" ")[0]))
+      rows = rows.filter((r) => r.name === streamFilter)
     }
     return rows
-  }, [streams, entity, streamFilter, versionFactor, growthFactor])
+  }, [displayedStreams, streamFilter])
 
   const regionRows = useMemo(() => {
-    return mockRevByRegion.map((r) => ({
-      ...r,
-      actual: r.actual * versionFactor * growthFactor,
-      budget: r.budget * versionFactor,
-      forecast: r.forecast * versionFactor * growthFactor,
-    }))
-  }, [versionFactor, growthFactor])
+    const grouped = new Map<string, RevStreamRow>()
+    for (const row of filteredStreams) {
+      const key = row.region
+      if (!key) continue
+      const current = grouped.get(key)
+      if (current) {
+        current.actual = current.actual == null || row.actual == null ? null : current.actual + row.actual
+        current.budget = current.budget == null || row.budget == null ? null : current.budget + row.budget
+        current.forecast = current.forecast == null || row.forecast == null ? null : current.forecast + row.forecast
+        current.share = current.share == null || row.share == null ? null : current.share + row.share
+      } else grouped.set(key, { ...row, id: key, name: key, method: null })
+    }
+    return [...grouped.values()]
+  }, [filteredStreams])
 
-  const tableRows = view === "Region View" ? regionRows.map((r) => ({
-    id: r.region,
-    name: r.region,
-    region: r.region,
-    method: "Consolidated",
-    actual: r.actual,
-    budget: r.budget,
-    forecast: r.forecast,
-    yoy: ((r.actual - r.budget) / r.budget) * 100,
-    share: Math.round((r.actual / 125.8) * 100),
-    entity: r.region,
-  })) : filteredStreams
+  const tableRows = view === "Region View" ? regionRows : filteredStreams
 
-  const waterfallData = buildWaterfallData()
-
-  const adjustedKpis = useMemo(() => {
-    const total = filteredStreams.reduce((s, r) => s + r.actual, 0)
-    return kpis.map((k, i) => {
-      if (i === 0) return { ...k, value: fmtM(total) }
-      if (i === 1) return { ...k, value: `${(growthRate + 14).toFixed(1)}%` }
-      return k
-    })
-  }, [kpis, filteredStreams, growthRate])
+  const waterfallData = useMemo(() => buildWaterfallData(displayedWaterfall), [displayedWaterfall])
+  const adjustedKpis = displayedKpis
 
   const resetFilters = () => {
-    setEntity("All Entities")
     setStreamFilter("All Streams")
-    setVersion("Working")
-    setPeriod(periodLabel)
+    onEntityChange?.("")
+    onPeriodFromChange?.("")
+    onPeriodToChange?.("")
     setView("Stream View")
     setGrowthRate(4.5)
+    onResetPreview?.()
     toast.message("Filters reset")
   }
 
@@ -346,6 +355,10 @@ export function RevenueAnalysisView({
     toast.success("Revenue export downloaded")
   }
 
+  const hasData = adjustedKpis.length > 0 || displayedStreams.length > 0 || displayedWaterfall.length > 0 || displayedMonthly.length > 0
+  if (loading && !hasData) return <div className="min-h-full bg-[#f1f5f9] flex items-center justify-center gap-2 text-sm text-[#64748b]"><Loader2 className="size-5 animate-spin" /> Loading revenue analysis…</div>
+  if (error && !hasData) return <div className="min-h-full bg-[#f1f5f9] flex items-center justify-center p-8 text-sm text-[#b42318]">{error}</div>
+
   return (
     <div className="min-h-full bg-[#f1f5f9] flex flex-col">
       <div className="bg-white border-b border-[#e4e7ec]">
@@ -364,29 +377,16 @@ export function RevenueAnalysisView({
             </div>
           </div>
           <div className="mt-3 flex flex-wrap items-end gap-2">
-            <FilterSelect
-              label="Entity"
-              value={entity}
-              options={["All Entities", "North America", "EMEA", "APAC", "LATAM"]}
-              onChange={setEntity}
-            />
+            {entities.length > 0 ? <FilterSelect label="Entity" value={selectedEntityName} options={["All Entities", ...entities.map((option) => option.name)]} onChange={(name) => onEntityChange?.(entities.find((option) => option.name === name)?.id ?? "")} /> : null}
+            {availablePeriods.length > 0 ? <>
+              <FilterSelect label="Period from" value={periodFrom || "All Periods"} options={["All Periods", ...availablePeriods]} onChange={(value) => onPeriodFromChange?.(value === "All Periods" ? "" : value)} />
+              <FilterSelect label="Period to" value={periodTo || "All Periods"} options={["All Periods", ...availablePeriods]} onChange={(value) => onPeriodToChange?.(value === "All Periods" ? "" : value)} />
+            </> : null}
             <FilterSelect
               label="Stream"
               value={streamFilter}
-              options={["All Streams", "Subscription", "Contract", "Volume", "Pipeline"]}
+              options={streamOptions}
               onChange={setStreamFilter}
-            />
-            <FilterSelect
-              label="Version"
-              value={version}
-              options={["Working", "Locked", "Published"]}
-              onChange={setVersion}
-            />
-            <FilterSelect
-              label="Period"
-              value={period}
-              options={["May 2025", "Apr 2025", "Mar 2025", "FY2025", "FY2026"]}
-              onChange={setPeriod}
             />
             <FilterSelect
               label="View"
@@ -402,13 +402,12 @@ export function RevenueAnalysisView({
               Reset Filters
             </button>
           </div>
+          <p className="mt-2 text-[11px] text-[#667085]">Applied scope: {appliedScope?.entityId ? selectedEntityName : "All entities"} · {appliedScope?.periodFrom || "First period"} → {appliedScope?.periodTo || "Latest period"}</p>
         </div>
 
         <div className="px-4 sm:px-5 pb-4">
-          {loading ? (
-            <div className="flex items-center gap-2 py-8 text-[#64748b]">
-              <Loader2 className="size-5 animate-spin" /> Loading revenue…
-            </div>
+          {adjustedKpis.length === 0 ? (
+            <p className="py-8 text-sm text-[#64748b]">No revenue KPIs are available.</p>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
               {adjustedKpis.map((k) => (
@@ -425,6 +424,9 @@ export function RevenueAnalysisView({
 
       <div className="flex-1 flex min-h-0">
         <div className="flex-1 p-4 sm:p-5 space-y-4 overflow-auto">
+          {preview ? <div className="rounded-lg border border-[#bfdbfe] bg-[#eff6ff] px-4 py-3 text-xs font-semibold text-[#1d4ed8]">Preview · not persisted — cards, charts, and tables below use the preview dataset.</div> : null}
+          {loading && hasData ? <p className="text-xs text-[#667085]"><Loader2 className="mr-1 inline size-3 animate-spin" />Refreshing current scope…</p> : null}
+          {error && hasData ? <p className="text-sm text-[#b42318]">{error}</p> : null}
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
             <section className={`${R} border border-[#e4e7ec] bg-white p-4`}>
               <div className="flex items-center justify-between mb-3">
@@ -436,7 +438,9 @@ export function RevenueAnalysisView({
                 </div>
                 <span className="text-xs text-[#667085]">{period} · Budget → Forecast</span>
               </div>
-              <div className="h-[240px]">
+              {waterfallData.length === 0 ? (
+                <p className="py-12 text-center text-sm text-[#64748b]">No revenue waterfall data is available.</p>
+              ) : <div className="h-[240px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={waterfallData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f2f4f7" />
@@ -453,7 +457,7 @@ export function RevenueAnalysisView({
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
-              </div>
+              </div>}
             </section>
 
             <section className={`${R} border border-[#e4e7ec] bg-white p-4`}>
@@ -461,20 +465,21 @@ export function RevenueAnalysisView({
                 <h2 className="text-sm font-semibold text-[#101828]">Monthly Trend</h2>
                 <span className="text-xs text-[#667085]">Actual vs Budget vs Forecast</span>
               </div>
-              <div className="h-[240px]">
+              {displayedMonthly.length === 0 ? (
+                <p className="py-12 text-center text-sm text-[#64748b]">No monthly revenue data is available.</p>
+              ) : <div className="h-[240px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={mockRevMonthly} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                  <ComposedChart data={displayedMonthly} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f2f4f7" />
-                    <XAxis dataKey="m" tick={{ fontSize: 10, fill: "#667085" }} axisLine={false} tickLine={false} />
+                    <XAxis dataKey="period" tick={{ fontSize: 10, fill: "#667085" }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fontSize: 10, fill: "#667085" }} axisLine={false} tickLine={false} />
                     <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid #e4e7ec", fontSize: 12 }} />
-                    <ReferenceLine x="May" stroke="#94a3b8" strokeDasharray="4 4" />
                     <Bar dataKey="budget" fill="#dbeafe" radius={[3, 3, 0, 0]} name="Budget" />
                     <Line type="monotone" dataKey="actual" stroke="#2563eb" strokeWidth={2} dot={{ r: 3 }} name="Actual" />
                     <Line type="monotone" dataKey="forecast" stroke="#12b76a" strokeWidth={2} strokeDasharray="4 4" dot={false} name="Forecast" />
                   </ComposedChart>
                 </ResponsiveContainer>
-              </div>
+              </div>}
             </section>
           </div>
 
@@ -501,7 +506,7 @@ export function RevenueAnalysisView({
                     <button type="button" onClick={exportCsv} className="w-full px-3 py-2 text-left text-xs hover:bg-[#f9fafb] flex items-center gap-2">
                       <Download className="size-3.5" /> Export CSV
                     </button>
-                    <button type="button" onClick={() => { onRefresh?.(); toast.message("Data refreshed") }} className="w-full px-3 py-2 text-left text-xs hover:bg-[#f9fafb] flex items-center gap-2">
+                    <button type="button" onClick={() => onRefresh?.()} className="w-full px-3 py-2 text-left text-xs hover:bg-[#f9fafb] flex items-center gap-2">
                       <RefreshCw className="size-3.5" /> Refresh
                     </button>
                   </div>
@@ -523,8 +528,11 @@ export function RevenueAnalysisView({
                   </tr>
                 </thead>
                 <tbody>
+                  {tableRows.length === 0 ? (
+                    <tr><td colSpan={8} className="px-4 py-10 text-center text-sm text-[#64748b]">No revenue stream data is available.</td></tr>
+                  ) : null}
                   {tableRows.map((row) => {
-                    const varB = row.actual - row.budget
+                    const varB = row.actual == null || row.budget == null ? null : row.actual - row.budget
                     return (
                       <tr
                         key={row.id}
@@ -536,17 +544,17 @@ export function RevenueAnalysisView({
                             {row.name}
                           </button>
                         </td>
-                        <td className="px-4 py-3 text-[#667085]">{row.method}</td>
+                        <td className="px-4 py-3 text-[#667085]">{row.method ?? "—"}</td>
                         <td className="px-4 py-3 text-right tabular-nums font-medium">{fmtM(row.actual)}</td>
                         <td className="px-4 py-3 text-right tabular-nums text-[#667085]">{fmtM(row.budget)}</td>
                         <td className="px-4 py-3 text-right tabular-nums">{fmtM(row.forecast)}</td>
-                        <td className={cn("px-4 py-3 text-right tabular-nums font-medium", varTone(varB))}>
-                          {varB >= 0 ? "+" : ""}{fmtM(varB)}
+                        <td className={cn("px-4 py-3 text-right tabular-nums font-medium", varB == null ? "text-[#667085]" : varTone(varB))}>
+                          {varB == null ? "—" : `${varB >= 0 ? "+" : ""}${fmtM(varB)}`}
                         </td>
-                        <td className={cn("px-4 py-3 text-right tabular-nums", varTone(row.yoy))}>
-                          {row.yoy >= 0 ? "+" : ""}{row.yoy.toFixed(1)}%
+                        <td className={cn("px-4 py-3 text-right tabular-nums", row.yoy == null ? "text-[#667085]" : varTone(row.yoy))}>
+                          {row.yoy == null ? "—" : `${row.yoy >= 0 ? "+" : ""}${row.yoy.toFixed(1)}%`}
                         </td>
-                        <td className="px-4 py-3 text-right tabular-nums text-[#667085]">{row.share}%</td>
+                        <td className="px-4 py-3 text-right tabular-nums text-[#667085]">{row.share == null ? "—" : `${row.share}%`}</td>
                       </tr>
                     )
                   })}
@@ -561,31 +569,24 @@ export function RevenueAnalysisView({
               <h2 className="text-sm font-semibold text-[#101828]">What-if: Revenue Growth Rate</h2>
               <span className="text-xs text-[#667085] ml-auto tabular-nums">{growthRate.toFixed(1)}%</span>
             </div>
-            <input
-              type="range"
-              min={0}
-              max={12}
-              step={0.1}
-              value={growthRate}
-              onChange={(e) => setGrowthRate(Number(e.target.value))}
-              className="w-full accent-[#2563eb]"
-            />
-            <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {mockRevDrivers.map((d) => (
-                <button
-                  key={d.name}
-                  type="button"
-                  onClick={() => toast.message(d.name, { description: d.impact })}
-                  className={`${R} border border-[#e4e7ec] px-3 py-2 text-left hover:border-[#b2ddff] transition-colors`}
-                >
-                  <p className="text-[11px] text-[#667085]">{d.name}</p>
-                  <p className="text-sm font-semibold tabular-nums">
-                    {d.unit === "%" ? `${d.value}%` : d.unit === "$" ? `$${d.value}` : d.value}
-                  </p>
-                  <p className="text-[10px] text-[#98a2b3] mt-0.5">{d.impact}</p>
-                </button>
-              ))}
-            </div>
+            {drivers.length === 0 ? <p className="text-sm text-[#667085]">No revenue driver was returned, so this control is unavailable.</p> : <>
+              <div className="flex flex-wrap items-end gap-2">
+                <FilterSelect label="Driver" value={drivers.find((driver) => driver.code === driverCode) ? `${drivers.find((driver) => driver.code === driverCode)?.name} · ${driverCode}` : "Select driver"} options={["Select driver", ...driverOptions]} onChange={(value) => {
+                  const selected = drivers.find((driver) => `${driver.name} · ${driver.code}` === value)
+                  setDriverCode(selected?.code ?? "")
+                  const numeric = Number(selected?.value)
+                  if (Number.isFinite(numeric)) setGrowthRate(numeric)
+                  onResetPreview?.()
+                }} />
+                <input type="number" step="0.1" value={growthRate} onChange={(e) => setGrowthRate(Number(e.target.value))} className="h-10 w-32 rounded-full border border-[#d0d5dd] px-4 text-sm" />
+                <Button className="rounded-full h-10 px-6" disabled={!driverCode || !Number.isFinite(growthRate) || previewLoading} onClick={() => onPreview?.(driverCode, growthRate)}>
+                  {previewLoading ? <Loader2 className="size-4 animate-spin" /> : null} Preview
+                </Button>
+                {preview ? <Button variant="outline" className="rounded-full h-10 px-4" onClick={onResetPreview}>Reset to official</Button> : null}
+              </div>
+              {!driverCode ? <p className="mt-3 text-[11px] text-[#667085]">Choose a returned driver; no driver code has been guessed.</p> : null}
+            </>}
+            {previewError ? <p className="mt-3 text-sm text-[#b42318]">{previewError}</p> : null}
           </section>
         </div>
 
@@ -593,9 +594,9 @@ export function RevenueAnalysisView({
           <aside className="w-full sm:w-[360px] shrink-0 border-l border-[#e4e7ec] bg-white flex flex-col">
             <div className="px-4 py-3 border-b border-[#e4e7ec] flex items-start justify-between gap-2">
               <div>
-                <p className="text-xs text-[#667085]">{selectedDetail.region} · {selectedDetail.period}</p>
+                <p className="text-xs text-[#667085]">{selectedDetail.region ?? "—"} · {selectedDetail.period}</p>
                 <h3 className="text-base font-semibold text-[#101828] mt-0.5">{selectedDetail.name}</h3>
-                <p className="text-xs text-[#98a2b3] mt-1">{selectedDetail.method}</p>
+                <p className="text-xs text-[#98a2b3] mt-1">{selectedDetail.method ?? "—"}</p>
               </div>
               <button type="button" onClick={() => setDetailOpen(false)} className="size-8 rounded-full hover:bg-[#f2f4f7] inline-flex items-center justify-center">
                 <X className="size-4 text-[#667085]" />
@@ -604,7 +605,7 @@ export function RevenueAnalysisView({
             <div className="p-4 space-y-4 overflow-auto flex-1">
               <div className={`${R} bg-[#f9fafb] border border-[#e4e7ec] p-3`}>
                 <p className="text-xs text-[#667085]">Variance to Budget</p>
-                <p className={cn("text-2xl font-semibold tabular-nums mt-1", selectedDetail.variance.startsWith("+") ? "text-[#12b76a]" : "text-[#f04438]")}>
+                <p className={cn("text-2xl font-semibold tabular-nums mt-1", selectedDetail.variance === "—" ? "text-[#667085]" : selectedDetail.variance.startsWith("+") ? "text-[#12b76a]" : "text-[#f04438]")}>
                   {selectedDetail.variance}
                 </p>
                 <p className="text-xs text-[#667085] mt-1">YoY {selectedDetail.yoy}</p>
@@ -621,7 +622,7 @@ export function RevenueAnalysisView({
                   </div>
                 ))}
               </div>
-              <div>
+              {selectedDetail.drivers.length > 0 ? <div>
                 <p className="text-xs font-semibold text-[#344054] mb-2">Key Drivers</p>
                 <ul className="space-y-2">
                   {selectedDetail.drivers.map((d) => (
@@ -631,11 +632,7 @@ export function RevenueAnalysisView({
                     </li>
                   ))}
                 </ul>
-              </div>
-              <p className="text-sm text-[#475569] leading-relaxed">{selectedDetail.narrative}</p>
-              <Button variant="gradient-info" className="rounded-full h-10 w-full shadow-sm" onClick={() => toast.message("Open in worksheet", { description: "Navigate to planning grid for this stream" })}>
-                Open in Worksheet
-              </Button>
+              </div> : <p className="text-sm text-[#667085]">Driver details and commentary are not included in this domain response.</p>}
             </div>
           </aside>
         ) : null}
@@ -646,7 +643,7 @@ export function RevenueAnalysisView({
           <div className={`${R} bg-white max-w-md w-full p-5 shadow-xl`} onClick={(e) => e.stopPropagation()}>
             <h3 className="text-base font-semibold text-[#101828]">Revenue Analysis</h3>
             <p className="text-sm text-[#475569] mt-2 leading-relaxed">
-              Explore revenue streams, regional breakdown, and budget-to-forecast waterfall. Use the growth slider to simulate what-if scenarios. Click any row for stream detail.
+              Explore revenue streams, regional breakdown, and budget-to-forecast waterfall. Sensitivity uses a returned revenue driver and activates a clearly labeled, non-persisted preview dataset.
             </p>
             <Button variant="outline" className="rounded-full mt-4" onClick={() => setInfoOpen(false)}>Close</Button>
           </div>

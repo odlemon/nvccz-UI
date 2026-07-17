@@ -434,6 +434,17 @@ export interface FpaLineItem {
   updatedByName?: string | null
 }
 
+/** Stage 4 driver confidence (API enum). */
+export type FpaDriverConfidence = "HIGH" | "MEDIUM" | "LOW" | string
+
+/** Stage 4 driver spreading (API enum; distinct from cell Spread tools). */
+export type FpaDriverSpreadingMethod =
+  | "EVEN"
+  | "SEASONAL"
+  | "PRIOR_YEAR"
+  | "MANUAL"
+  | string
+
 export interface FpaDriver {
   id: string
   modelId: string
@@ -449,9 +460,34 @@ export interface FpaDriver {
   priorActual?: number | null
   priorValue?: number | null
   priorPeriodLabel?: string | null
+  /** Stage 4 assumptions library metadata. */
+  confidence?: FpaDriverConfidence | null
+  spreadingMethod?: FpaDriverSpreadingMethod | null
   requiresApproval?: boolean
   createdById?: string
   createdAt?: string
+  /** Present on PUT driver when server recalculates dependents. */
+  updatedCells?: FpaCell[]
+}
+
+export type FpaSpreadMethod =
+  | 'EVEN'
+  | 'CUSTOM_WEIGHT'
+  | 'PRIOR_YEAR_PATTERN'
+  | 'HISTORICAL_PATTERN'
+  | 'WORKING_DAYS'
+  | 'SEASONAL_PROFILE'
+  | string
+
+/** Common payload from cell tools after Stage 3 dependents contract. */
+export interface FpaCellToolResult {
+  updated?: number
+  copied?: number
+  spreadAcross?: number
+  applied?: number
+  method?: FpaSpreadMethod
+  cells?: FpaCell[]
+  updatedCells?: FpaCell[]
 }
 
 export interface FpaFormula {
@@ -585,6 +621,10 @@ export interface FpaScenario {
   description?: string | null
   isOfficial?: boolean
   status?: string
+  /** Parent for inheritance (SRD §38 — overrides only). */
+  parentScenarioId?: string | null
+  inheritsFromScenarioId?: string | null
+  parentScenarioName?: string | null
 }
 
 /** Canonical compare metric unit codes (backend contract). */
@@ -625,7 +665,8 @@ export interface FpaScenarioCompareWaterfallStep {
 }
 
 export interface FpaScenarioCompareWaterfall {
-  metricCode: string
+  /** Optional when BE omits; FE treats missing as generic bridge. */
+  metricCode?: string
   fromScenarioId?: string
   toScenarioId?: string
   steps: FpaScenarioCompareWaterfallStep[]
@@ -641,12 +682,13 @@ export interface FpaScenarioCompareSensitivityRow {
   unit?: string
 }
 
-/** Enriched multi-scenario compare payload (preferred). */
+/** Enriched multi-scenario compare payload (preferred). Legacy pair fields still accepted. */
 export interface FpaScenarioCompareResult {
-  versionId: string
-  anchorScenarioId: string
-  scenarios: Array<{ id: string; name: string; scenarioType?: string }>
-  metrics: FpaScenarioCompareMetric[]
+  versionId?: string
+  anchorScenarioId?: string
+  scenarios?: Array<{ id: string; name: string; scenarioType?: string }>
+  /** Present when enriched Stage 4 contract is live. */
+  metrics?: FpaScenarioCompareMetric[]
   assumptions?: FpaScenarioCompareAssumption[]
   waterfall?: FpaScenarioCompareWaterfall | null
   sensitivity?: FpaScenarioCompareSensitivityRow[]
@@ -661,6 +703,8 @@ export interface FpaScenarioCompareRequest {
   scenarioIds?: string[]
   compareScenarioId?: string
   anchorScenarioId?: string
+  /** Planning cycle scope when comparing inside an MPC worksheet. */
+  cycleId?: string
   metrics?: string[]
   includeAssumptions?: boolean
   includeWaterfall?: boolean
@@ -668,6 +712,35 @@ export interface FpaScenarioCompareRequest {
   waterfallMetric?: string
   waterfallFromScenarioId?: string
   waterfallToScenarioId?: string
+}
+
+/** Sync copy result (preferred). */
+export interface FpaScenarioCopySyncResult {
+  scenario: FpaScenario
+  cellsCopied?: number
+  driversCopied?: number
+}
+
+/** Async copy job when BE returns 202 for large models. */
+export interface FpaScenarioCopyJobResult {
+  jobId: string
+  status: "PENDING" | "RUNNING" | "COMPLETED" | "FAILED" | string
+  pollUrl?: string
+  scenario?: FpaScenario
+  cellsCopied?: number
+  driversCopied?: number
+  error?: string | null
+}
+
+export type FpaScenarioCopyResult = FpaScenarioCopySyncResult | FpaScenarioCopyJobResult
+
+export function isScenarioCopyJob(
+  data: FpaScenarioCopyResult | null | undefined,
+): data is FpaScenarioCopyJobResult {
+  if (!data || typeof data !== "object") return false
+  // Sync payload may include scenario (+ optional copy stats); async starts with jobId only.
+  if ("scenario" in data && (data as FpaScenarioCopySyncResult).scenario?.id) return false
+  return Boolean((data as FpaScenarioCopyJobResult).jobId)
 }
 
 export interface FpaDriverBulkUpdateItem {
@@ -691,18 +764,51 @@ export interface FpaPlanningSummaryKpi {
   sparkline?: number[]
 }
 
+/** Flat KPI bag from Stage 3 planning-summary. */
+export interface FpaPlanningSummaryKpiBag {
+  revenue?: number
+  grossMargin?: number
+  grossMarginPct?: number
+  ebitda?: number
+  [key: string]: number | undefined
+}
+
+export interface FpaPlanningSummaryTrendSeries {
+  periods?: string[]
+  revenue?: number[]
+  ebitda?: number[]
+  grossMargin?: number[]
+}
+
 export interface FpaPlanningSummary {
-  modelId: string
-  versionId: string
-  scenarioId: string
+  modelId?: string
+  versionId?: string
+  scenarioId?: string
   currency?: string
-  kpis: FpaPlanningSummaryKpi[]
-  trend?: Array<{
-    period: string
+  asOf?: string
+  /** Cycle materiality threshold when cycleId was passed. */
+  materialVariancePct?: number
+  /** Flat live totals (Stage 3). */
+  revenue?: number
+  grossMargin?: number
+  grossMarginPct?: number
+  ebitda?: number
+  variance?: {
+    amount?: number
+    pct?: number
+    priorRevenue?: number
     label?: string
-    actual?: number | null
-    plan?: number | null
-  }>
+  }
+  /** Legacy array KPIs or Stage 3 object bag. */
+  kpis?: FpaPlanningSummaryKpi[] | FpaPlanningSummaryKpiBag
+  trend?:
+    | Array<{
+        period: string
+        label?: string
+        actual?: number | null
+        plan?: number | null
+      }>
+    | FpaPlanningSummaryTrendSeries
   workflowSteps?: Array<{
     id: string
     name: string
@@ -842,6 +948,8 @@ export interface FpaBudgetCycle {
   approvedById?: string | null
   boardPackUrl?: string | null
   actualsRowCount?: number
+  /** Material variance commentary threshold (%). Stage 3 MPC. */
+  materialVariancePct?: number | null
   /** Present after open when actuals load was attempted. */
   actualsLoadReason?: string | null
   stages?: FpaWorkflowStage[]
@@ -897,7 +1005,17 @@ export type FpaBudgetCycleUpdateRequest = Partial<Omit<FpaBudgetCycleCreateReque
 // and the source model as `sourceModelId` (not `modelId`). The request body
 // uses `name` (not `cycle_name`).
 
-export type FpaModelPlanningCycleStatus = 'DRAFT' | 'OPEN' | 'CLOSED' | 'ARCHIVED' | string
+export type FpaModelPlanningCycleStatus =
+  | 'DRAFT'
+  | 'OPEN'
+  | 'SUBMITTED'
+  | 'UNDER_REVIEW'
+  | 'RETURNED_FOR_CORRECTION'
+  | 'APPROVED'
+  | 'LOCKED'
+  | 'CLOSED'
+  | 'ARCHIVED'
+  | string
 
 /** Department slice owner on a Model Planning cycle (create + GET/list). */
 export interface FpaModelPlanningOwnerCreate {
@@ -932,9 +1050,18 @@ export interface FpaModelPlanningCycle {
   submissionDeadline?: string | null
   approvalWorkflowId?: string | null
   planningOwnerId?: string | null
+  /** Material variance commentary threshold (%). Default 5. */
+  materialVariancePct?: number | null
   /** Department / assignee scopes for this cycle. */
   owners?: FpaModelPlanningOwnerAssignment[]
   status: FpaModelPlanningCycleStatus
+  currentStage?: string | null
+  submittedAt?: string | null
+  submittedById?: string | null
+  approvedAt?: string | null
+  approvedById?: string | null
+  lockedAt?: string | null
+  lockedById?: string | null
   createdById?: string | null
   createdAt?: string | null
   updatedAt?: string | null
@@ -953,6 +1080,8 @@ export interface FpaModelPlanningCycleCreateRequest {
   submissionDeadline?: string | null
   approvalWorkflowId?: string | null
   planningOwnerId?: string | null
+  /** Material variance commentary threshold (%). Default 5 on BE. */
+  materialVariancePct?: number | null
   /** Optional department budget owners — creates per-dept scopes + tasks. */
   owners?: FpaModelPlanningOwnerCreate[]
 }
@@ -1167,6 +1296,7 @@ export interface FpaThreadComment {
   authorId?: string | null
   authorName?: string | null
   createdAt?: string | null
+  parentCommentId?: string | null
   taskId?: string | null
   cycleId?: string | null
 }
@@ -1265,12 +1395,17 @@ export interface FpaTask {
   priority?: string
   dueDate?: string | null
   assigneeId?: string | null
+  assigneeName?: string | null
+  assigneeAvatarUrl?: string | null
   reviewerId?: string | null
   reviewerName?: string | null
   departmentId?: string | null
   workflowId?: string
   modelId?: string | null
   versionId?: string | null
+  cycleId?: string | null
+  module?: string | null
+  href?: string | null
   submittedAt?: string | null
   workflow?: FpaWorkflow
   approvals?: unknown[]
@@ -1280,16 +1415,49 @@ export interface FpaVarianceResult {
   id: string
   modelId: string
   lineItemId: string
-  periodDate: string
-  varianceType: string
-  actualValue: string | number
-  planValue: string | number
-  varianceAmount: string | number
-  variancePercent: string | number
-  direction: string
+  lineItemName?: string | null
+  departmentId?: string | null
+  departmentName?: string | null
+  periodDate?: string
+  period?: string
+  varianceType?: string
+  actualValue?: string | number
+  planValue?: string | number
+  forecastValue?: string | number | null
+  varianceAmount?: string | number
+  variancePercent?: string | number | null
+  actual?: string | number
+  plan?: string | number
+  forecast?: string | number | null
+  varianceAbs?: string | number
+  variancePct?: string | number | null
+  direction?: string
   commentaryRequired?: boolean
+  commentary?: string | null
+  commentaryStatus?: string | null
   lineItem?: FpaLineItem
   comments?: FpaComment[]
+}
+
+export interface FpaVarianceDepartment {
+  departmentId: string
+  departmentName: string
+  actual: number
+  plan: number
+  forecast: number | null
+  varianceAbs: number
+  variancePct: number | null
+}
+
+export interface FpaVarianceSummary {
+  kpis: {
+    revenueVar?: number | null
+    opexVar?: number | null
+    ebitdaVar?: number | null
+  }
+  trend: Array<{ period: string; variance: number }>
+  tornado: Array<{ departmentId?: string; departmentName: string; varianceAbs: number }>
+  departments: FpaVarianceDepartment[]
 }
 
 export interface FpaComment {
@@ -1304,21 +1472,42 @@ export interface FpaComment {
 export interface FpaHomeDashboard {
   model?: Partial<FpaModel> | null
   versionId?: string | null
+  scenarioId?: string | null
+  cycleId?: string | null
+  activeCycle?: {
+    id: string
+    name?: string | null
+    status?: string | null
+    currentStage?: string | null
+  } | null
   ownerName?: string | null
   ownerAvatarUrl?: string | null
   kpis?: {
     revenue?: number | string
     ebitda?: number | string
     closingCash?: number | string
+    cash?: number | string
     runwayMonths?: number | string
+    forecastAccuracy?: number | string | null
+    revenueDeltaPct?: number | string | null
+    ebitdaDeltaPct?: number | string | null
+    closingCashDeltaPct?: number | string | null
     sparklines?: {
       revenue?: number[]
       ebitda?: number[]
       closingCash?: number[]
       runwayMonths?: number[]
+      headcount?: number[]
       [key: string]: number[] | undefined
     }
   } | null
+  revenueExpenseTrend?: Array<{
+    period: string
+    revenue?: number | string | null
+    expense?: number | string | null
+    expenses?: number | string | null
+    ebitda?: number | string | null
+  }>
   cashByMonth?: Array<{
     period: string
     opening?: number | string
@@ -1327,15 +1516,30 @@ export interface FpaHomeDashboard {
     closing?: number | string
   }>
   workflowProgress?: Array<{
-    id: string
-    name: string
-    stage: string
-    completedTasks: number
-    totalTasks: number
-    percent: number
+    id?: string
+    name?: string
+    stage?: string
+    status?: string
+    completedTasks?: number
+    totalTasks?: number
+    percent?: number
   }>
+  workflowStatusSlices?: Array<{ status: string; count: number }>
   openTasks?: FpaTask[]
   scenarioCompare?: {
+    anchorScenarioId?: string | null
+    scenarios?: Array<{ id: string; name: string; scenarioType?: string | null }>
+    metrics?: Array<{
+      key: string
+      label: string
+      values: Array<{
+        scenarioId: string
+        scenarioName: string
+        value: number | null
+        varianceAbs?: number | null
+        variancePct?: number | null
+      }>
+    }>
     left?: { id?: string; name?: string; revenue?: number; ebitda?: number }
     right?: { id?: string; name?: string; revenue?: number; ebitda?: number }
   }
@@ -1348,26 +1552,274 @@ export interface FpaHomeDashboard {
     actual: number
     overBy: number
   }>
+  cashRunway?: {
+    closingCash?: number | null
+    runwayMonths?: number | null
+    monthlyBurn?: number | null
+    byMonth?: Array<{
+      period: string
+      closingCash?: number | null
+      balance?: number | null
+    }>
+  } | null
+  recentActivity?: FpaHomeActivity[]
+  activity?: FpaHomeActivity[]
   message?: string
+}
+
+export interface FpaHomeActivity {
+  id?: string
+  title?: string
+  body?: string | null
+  actorName?: string | null
+  actorAvatarUrl?: string | null
+  createdAt?: string | null
+  kind?: string | null
+  href?: string | null
+}
+
+export interface FpaWorkforceDomain {
+  kpis?: {
+    headcount?: number | null
+    budgetHeadcount?: number | null
+    openRoles?: number | null
+    hiresYtd?: number | null
+    attritionPct?: number | null
+    avgSalary?: number | null
+    sparklines?: Record<string, number[]>
+  } | null
+  hirePlan?: Array<{ period: string; planned: number; actual: number }>
+  attritionTrend?: Array<{ period: string; pct: number }>
+  departments?: Array<{
+    departmentId: string
+    departmentName: string
+    entity?: string | null
+    headcount: number
+    budgetHeadcount: number
+    hires: number
+    attritionPct: number
+    avgSalary: number
+    openRoles: number
+    salary?: number | null
+    status?: string | null
+  }>
+}
+
+export interface FpaRevenueDomain {
+  kpis?: {
+    revenue?: number | null
+    budget?: number | null
+    forecast?: number | null
+    yoyPct?: number | null
+  } | null
+  waterfall?: Array<{ key: string; label: string; value?: number | null; delta?: number | null }>
+  monthly?: Array<{
+    period: string
+    actual?: number | null
+    budget?: number | null
+    forecast?: number | null
+  }>
+  streams?: Array<{
+    id: string
+    name: string
+    region?: string | null
+    method?: string | null
+    actual: number
+    budget: number
+    forecast: number
+    yoyPct?: number | null
+    sharePct?: number | null
+  }>
+}
+
+export interface FpaExpenseDomain {
+  kpis?: {
+    opex?: number | null
+    budget?: number | null
+    forecast?: number | null
+    variancePct?: number | null
+  } | null
+  alerts?: Array<{
+    departmentId: string
+    departmentName: string
+    severityPct?: number | null
+    severityAmount?: number | null
+    severity?: string | null
+  }>
+  byCategory?: Array<{ category: string; amount: number; sharePct?: number | null }>
+  monthlyBurn?: Array<{
+    period: string
+    actual?: number | null
+    budget?: number | null
+    forecast?: number | null
+  }>
+  bridge?: Array<{ key: string; label: string; value?: number | null; delta?: number | null }>
+  departments?: Array<{
+    departmentId: string
+    departmentName: string
+    budget: number
+    actual: number
+    runRate?: number | null
+    forecast: number
+    headcount?: number | null
+    status?: string | null
+  }>
+}
+
+export interface FpaCashDomain {
+  kpis?: {
+    closingCash?: number | null
+    netCashFlow?: number | null
+    runwayMonths?: number | null
+  } | null
+  periods?: string[]
+  rows?: Array<{
+    id: string
+    label: string
+    rowType: 'INFLOW' | 'OUTFLOW' | 'TOTAL' | string
+    values: Record<string, number | null>
+  }>
 }
 
 export interface FpaDomainView {
   modelId: string
   category: string
-  lineItems: FpaLineItem[]
-  drivers: FpaDriver[]
+  scope?: FpaDomainScope
+  availableFilters?: FpaDomainAvailableFilters
+  lineItems?: FpaLineItem[]
+  drivers?: FpaDriver[]
+  kpis?:
+    | FpaWorkforceDomain['kpis']
+    | FpaRevenueDomain['kpis']
+    | FpaExpenseDomain['kpis']
+    | FpaCashDomain['kpis']
+  hirePlan?: FpaWorkforceDomain['hirePlan']
+  attritionTrend?: FpaWorkforceDomain['attritionTrend']
+  departments?:
+    | FpaWorkforceDomain['departments']
+    | FpaExpenseDomain['departments']
+  waterfall?: FpaRevenueDomain['waterfall']
+  monthly?: FpaRevenueDomain['monthly']
+  streams?: FpaRevenueDomain['streams']
+  alerts?: FpaExpenseDomain['alerts']
+  byCategory?: FpaExpenseDomain['byCategory']
+  monthlyBurn?: FpaExpenseDomain['monthlyBurn']
+  bridge?: FpaExpenseDomain['bridge']
+  periods?: FpaCashDomain['periods']
+  rows?: FpaCashDomain['rows']
 }
+
+export interface FpaDomainScope {
+  modelId?: string | null
+  versionId?: string | null
+  scenarioId?: string | null
+  entityId?: string | null
+  periodFrom?: string | null
+  periodTo?: string | null
+}
+
+export interface FpaDomainAvailableFilters {
+  entities?: Array<{ id: string; name: string }>
+  periods?: string[]
+}
+
+export interface FpaDomainSensitivityOverride {
+  driverCode: string
+  value: number
+}
+
+export interface FpaDomainSensitivityResult {
+  scope?: FpaDomainScope
+  overrides: FpaDomainSensitivityOverride[]
+  base: FpaDomainView
+  preview: FpaDomainView
+  persisted: false
+}
+
+export type FpaExportType =
+  | 'BOARD_PACK'
+  | 'MANAGEMENT_REPORT'
+  | 'FINANCIAL_STATEMENTS'
+  | 'DEPT_EXPENSES'
 
 export interface FpaExportJob {
   id: string
   modelId: string
   versionId?: string
-  exportType: string
+  exportType: FpaExportType | string
   status: string
   downloadUrl?: string | null
   url?: string | null
+  period?: string | null
   payloadJson?: unknown
+  createdAt?: string | null
   completedAt?: string | null
+}
+
+export interface FpaExportCapability {
+  code: FpaExportType | string
+  enabled: boolean
+  reason?: string | null
+}
+
+export interface FpaExportCapabilities {
+  exportTypes: FpaExportCapability[]
+}
+
+export interface FpaSyncSource {
+  id: string
+  label: string
+  status: string
+  lastSyncAt?: string | null
+  lastError?: string | null
+}
+
+export interface FpaSettings {
+  variance: {
+    commentaryThresholdPct: number
+    enforceCommentary: boolean
+    blockSubmitWithoutCommentary: boolean
+  }
+  workflow: {
+    path: string
+    requireCfoSignature: boolean
+    allowRerunAfterReturn: boolean
+  }
+  syncSources: FpaSyncSource[]
+}
+
+export interface FpaRollingForecast {
+  modelId: string
+  versionId?: string | null
+  scenarioId?: string | null
+  cycleId?: string | null
+  actualsCutoff?: string | null
+  forecastStart?: string | null
+  horizonMonths: number
+  activeMethod?: string | null
+  kpis?: {
+    revenue?: number | null
+    ebitda?: number | null
+    cash?: number | null
+    closingCash?: number | null
+    runwayMonths?: number | null
+    accuracyPct?: number | null
+  } | null
+  trend?: Array<{
+    period: string
+    actual?: number | null
+    forecast?: number | null
+    budget?: number | null
+  }>
+  methods?: Array<{
+    code: string
+    label: string
+    revenue?: number | null
+    ebitda?: number | null
+    cash?: number | null
+    runwayMonths?: number | null
+    confidence?: string | null
+  }>
 }
 
 export interface ForecastEntity {
@@ -1379,6 +1831,21 @@ export interface ForecastEntity {
   is_default?: boolean
   account_count?: number
   created_at?: string
+  status?: string
+  reason?: string | null
+  archivedAt?: string | null
+}
+
+export interface ForecastChartAccount {
+  id?: string
+  code?: string
+  account_code?: string
+  name?: string
+  account_name?: string
+  accountType?: string | null
+  account_type?: string | null
+  isActive?: boolean
+  is_active?: boolean
 }
 
 function qs(params?: Record<string, string | number | undefined | null>): string {
@@ -1642,12 +2109,15 @@ export const fpaApi = {
     modelId: string
     scenarioId?: string
     versionId?: string
+    /** Improves priorActual resolution against cycle cutoff / prior FY. */
+    cycleId?: string
     category?: string
   }) =>
     apiClient.get<ApiResponse<FpaDriver[]>>(
       `${FPA}/models/${params.modelId}/drivers${qs({
         scenarioId: params.scenarioId,
         versionId: params.versionId,
+        cycleId: params.cycleId,
         category: params.category,
       })}`,
     ),
@@ -1663,6 +2133,8 @@ export const fpaApi = {
       periodDate?: string
       scenarioId?: string
       versionId?: string
+      confidence?: FpaDriverConfidence
+      spreadingMethod?: FpaDriverSpreadingMethod
       requiresApproval?: boolean
     },
   ) => apiClient.post<ApiResponse<FpaDriver>>(`${FPA}/models/${modelId}/drivers`, body),
@@ -1675,9 +2147,19 @@ export const fpaApi = {
       periodDate?: string | null
       name?: string
       category?: string
+      confidence?: FpaDriverConfidence | null
+      spreadingMethod?: FpaDriverSpreadingMethod | null
       requiresApproval?: boolean
     },
-  ) => apiClient.put<ApiResponse<FpaDriver>>(`${FPA}/drivers/${driverId}`, body),
+  ) =>
+    apiClient.put<ApiResponse<FpaDriver & { updatedCells?: FpaCell[] }>>(
+      `${FPA}/drivers/${driverId}`,
+      body,
+    ),
+
+  /** Soft-fail when driver is referenced by formulas/cells → 409. */
+  deleteDriver: (driverId: string) =>
+    apiClient.delete<ApiResponse<{ deleted?: boolean } | null>>(`${FPA}/drivers/${driverId}`),
 
   /** Bulk driver value updates (assumptions editor / multi-scenario save). */
   bulkUpdateDrivers: (
@@ -2042,7 +2524,7 @@ export const fpaApi = {
       periodDates?: string[]
     },
   ) =>
-    apiClient.post<ApiResponse<{ updated?: number; cells?: FpaCell[] }>>(
+    apiClient.post<ApiResponse<FpaCellToolResult>>(
       `${FPA}/models/${modelId}/cells/bulk-operation`,
       body,
     ),
@@ -2054,21 +2536,15 @@ export const fpaApi = {
       scenarioId: string
       lineItemId: string
       value: number
-      /** EVEN today; CUSTOM_WEIGHT / PRIOR_YEAR_PATTERN etc. when BE supports (Stage 3). */
-      method?:
-        | 'EVEN'
-        | 'CUSTOM_WEIGHT'
-        | 'PRIOR_YEAR_PATTERN'
-        | 'HISTORICAL_PATTERN'
-        | 'WORKING_DAYS'
-        | 'SEASONAL_PROFILE'
-        | string
+      method?: FpaSpreadMethod
       weights?: number[]
       periodDates?: string[]
       cycleId?: string
+      /** When omitted, BE targets company-level cells only. */
+      departmentId?: string
     },
   ) =>
-    apiClient.post<ApiResponse<{ spreadAcross: number; cells: FpaCell[] }>>(
+    apiClient.post<ApiResponse<FpaCellToolResult>>(
       `${FPA}/models/${modelId}/cells/spread`,
       body,
     ),
@@ -2083,7 +2559,7 @@ export const fpaApi = {
       cycleId?: string
     },
   ) =>
-    apiClient.post<ApiResponse<{ copied: number; cells: FpaCell[] }>>(
+    apiClient.post<ApiResponse<FpaCellToolResult>>(
       `${FPA}/models/${modelId}/cells/copy-forward`,
       body,
     ),
@@ -2093,15 +2569,26 @@ export const fpaApi = {
     body: {
       versionId: string
       scenarioId: string
-      lineItemId: string
-      fromPeriodDate: string
-      ratePct: number
-      mode?: "COMPOUND" | "SIMPLE" | string
+      lineItemIds: string[]
+      periodFrom: string
+      periodTo: string
+      ratePercent: number
+      mode?: "COMPOUND" | "FLAT"
       cycleId?: string
     },
   ) =>
-    apiClient.post<ApiResponse<{ updated?: number; cells?: FpaCell[]; applied?: number }>>(
+    apiClient.post<ApiResponse<FpaCellToolResult>>(
       `${FPA}/models/${modelId}/cells/apply-growth`,
+      body,
+    ),
+
+  /** Optional explicit recalc (Stage 3). Prefer updatedCells on write endpoints. */
+  recalculateModel: (
+    modelId: string,
+    body: { versionId: string; scenarioId: string; cycleId?: string },
+  ) =>
+    apiClient.post<ApiResponse<FpaCellToolResult | { recalculated?: number }>>(
+      `${FPA}/models/${modelId}/recalculate`,
       body,
     ),
 
@@ -2184,15 +2671,31 @@ export const fpaApi = {
     name: string
     scenarioType?: string
     description?: string
+    /** When set, BE should create as override child of this scenario (preferred over empty create). */
+    inheritFromScenarioId?: string
+    versionId?: string
   }) => apiClient.post<ApiResponse<FpaScenario>>(`${FPA}/scenarios`, body),
 
   copyScenario: (
     scenarioId: string,
-    body: { versionId: string; name: string; scenarioType?: string },
+    body: {
+      versionId: string
+      name: string
+      scenarioType?: string
+      description?: string
+      /** Keep link to source for inheritance display. */
+      inheritFromSource?: boolean
+    },
   ) =>
-    apiClient.post<ApiResponse<{ scenario: FpaScenario; cellsCopied: number; driversCopied: number }>>(
+    apiClient.post<ApiResponse<FpaScenarioCopyResult>>(
       `${FPA}/scenarios/${scenarioId}/copy`,
       body,
+    ),
+
+  /** Poll async scenario copy job (Stage 4 large-model path). */
+  getScenarioCopyJob: (jobId: string) =>
+    apiClient.get<ApiResponse<FpaScenarioCopyJobResult>>(
+      `${FPA}/scenarios/copy-jobs/${jobId}`,
     ),
 
   promoteScenario: (
@@ -2204,16 +2707,43 @@ export const fpaApi = {
       body ?? {},
     ),
 
+  updateScenario: (
+    scenarioId: string,
+    body: {
+      name?: string
+      description?: string | null
+      scenarioType?: string
+      parentScenarioId?: string | null
+    },
+  ) => apiClient.put<ApiResponse<FpaScenario>>(`${FPA}/scenarios/${scenarioId}`, body),
+
+  /** Alias — BE accepts PUT or PATCH. */
+  patchScenario: (
+    scenarioId: string,
+    body: {
+      name?: string
+      description?: string | null
+      scenarioType?: string
+      parentScenarioId?: string | null
+    },
+  ) => apiClient.patch<ApiResponse<FpaScenario>>(`${FPA}/scenarios/${scenarioId}`, body),
+
+  archiveScenario: (scenarioId: string) =>
+    apiClient.post<ApiResponse<FpaScenario | { scenario: FpaScenario }>>(
+      `${FPA}/scenarios/${scenarioId}/archive`,
+      {},
+    ),
+
   compareScenarios: (scenarioId: string, body: FpaScenarioCompareRequest) =>
     apiClient.post<ApiResponse<FpaScenarioCompareResult>>(
       `${FPA}/scenarios/${scenarioId}/compare`,
       body,
     ),
 
-  /** Scoped KPIs / trend / workflow for Planning Workspace chrome. */
+  /** Scoped KPIs / trend / workflow for Planning Workspace chrome (live from committed cells). */
   getPlanningSummary: (
     modelId: string,
-    params: { versionId: string; scenarioId: string },
+    params: { versionId: string; scenarioId: string; cycleId?: string },
   ) =>
     apiClient.get<ApiResponse<FpaPlanningSummary>>(
       `${FPA}/models/${modelId}/planning-summary${qs(params)}`,
@@ -2504,7 +3034,8 @@ export const fpaApi = {
   calculateVariance: (body: {
     modelId: string
     versionId: string
-    scenarioId: string
+    scenarioId?: string
+    cycleId?: string
     varianceType?: string
   }) =>
     apiClient.post<ApiResponse<{ count: number; results: FpaVarianceResult[] }>>(
@@ -2514,6 +3045,7 @@ export const fpaApi = {
 
   listVarianceResults: (params?: {
     modelId?: string
+    versionId?: string
     varianceType?: string
     direction?: string
     limit?: number
@@ -2526,21 +3058,69 @@ export const fpaApi = {
   ) =>
     apiClient.post<ApiResponse<FpaComment>>(`${FPA}/variance/${varianceId}/commentary`, body),
 
+  getVarianceSummary: (params: { modelId: string; versionId?: string }) =>
+    apiClient.get<ApiResponse<FpaVarianceSummary>>(`${FPA}/variance/summary${qs(params)}`),
+
   // —— Home ——
-  getDashboard: (params?: { modelId?: string; versionId?: string }) =>
+  getDashboard: (params?: {
+    modelId?: string
+    versionId?: string
+    scenarioId?: string
+    cycleId?: string
+    period?: string
+  }) =>
     apiClient.get<ApiResponse<FpaHomeDashboard>>(`${FPA}/home/dashboard${qs(params)}`),
 
   // —— Domain ——
-  getDomainView: (category: 'workforce' | 'revenue' | 'expense' | 'cash', modelId?: string) =>
-    apiClient.get<ApiResponse<FpaDomainView>>(`${FPA}/domain/${category}${qs({ modelId })}`),
+  getDomainView: (
+    category: 'workforce' | 'revenue' | 'expense' | 'cash',
+    params?: string | {
+      modelId?: string
+      versionId?: string
+      scenarioId?: string
+      entityId?: string
+      periodFrom?: string
+      periodTo?: string
+    },
+  ) =>
+    apiClient.get<ApiResponse<FpaDomainView>>(
+      `${FPA}/domain/${category}${qs(typeof params === 'string' ? { modelId: params } : params)}`,
+    ),
+
+  previewDomainSensitivity: (
+    category: 'workforce' | 'revenue' | 'expense' | 'cash',
+    body: {
+      modelId: string
+      versionId: string
+      scenarioId: string
+      entityId?: string
+      periodFrom?: string
+      periodTo?: string
+      overrides: FpaDomainSensitivityOverride[]
+    },
+  ) =>
+    apiClient.post<ApiResponse<FpaDomainSensitivityResult>>(
+      `${FPA}/domain/${category}/sensitivity`,
+      body,
+    ),
 
   // —— Exports ——
   createExport: (body: {
     modelId: string
     versionId?: string
-    exportType: 'BOARD_PACK' | 'MANAGEMENT_REPORT'
+    exportType: FpaExportType
+    period?: string
     meta?: Record<string, unknown>
   }) => apiClient.post<ApiResponse<FpaExportJob>>(`${FPA}/exports/board-pack`, body),
+
+  listExports: (params: { modelId: string; limit?: number }) =>
+    apiClient.get<ApiResponse<FpaExportJob[]>>(`${FPA}/exports${qs(params)}`),
+
+  getExportCapabilities: () =>
+    apiClient.get<ApiResponse<FpaExportCapabilities>>(`${FPA}/exports/capabilities`),
+
+  getExport: (exportId: string) =>
+    apiClient.get<ApiResponse<FpaExportJob>>(`${FPA}/exports/${exportId}`),
 
   downloadExport: (exportId: string) =>
     apiClient.get<ApiResponse<{ downloadUrl?: string; url?: string } | Blob | ArrayBuffer>>(
@@ -2562,6 +3142,53 @@ export const fpaApi = {
     return null
   },
 
+  // —— Rolling forecast ——
+  getRollingForecast: (
+    modelId: string,
+    params?: { versionId?: string; scenarioId?: string; cycleId?: string },
+  ) =>
+    apiClient.get<ApiResponse<FpaRollingForecast>>(
+      `${FPA}/models/${modelId}/rolling-forecast${qs(params)}`,
+    ),
+
+  updateRollingForecastCutoff: (
+    modelId: string,
+    body: {
+      versionId?: string
+      scenarioId?: string
+      cycleId?: string
+      actualsCutoff: string
+      horizonMonths: number
+    },
+  ) =>
+    apiClient.put<ApiResponse<FpaRollingForecast>>(
+      `${FPA}/models/${modelId}/rolling-forecast/cutoff`,
+      body,
+    ),
+
+  updateRollingForecastMethod: (
+    modelId: string,
+    body: { versionId?: string; scenarioId?: string; cycleId?: string; method: string },
+  ) =>
+    apiClient.put<ApiResponse<FpaRollingForecast>>(
+      `${FPA}/models/${modelId}/rolling-forecast/method`,
+      body,
+    ),
+
+  rollForwardForecast: (
+    modelId: string,
+    body: {
+      versionId?: string
+      scenarioId?: string
+      cycleId?: string
+      months?: number
+    },
+  ) =>
+    apiClient.post<ApiResponse<FpaRollingForecast>>(
+      `${FPA}/models/${modelId}/rolling-forecast/roll-forward`,
+      body,
+    ),
+
   // —— AI stubs ——
   aiSuggest: (body: { modelId: string; lineItemCode: string }) =>
     apiClient.post<ApiResponse<unknown>>(`${FPA}/ai/suggest`, body),
@@ -2579,12 +3206,42 @@ export const fpaApi = {
   createEntity: (body: Record<string, unknown>) =>
     apiClient.post<ApiResponse<ForecastEntity>>('/forecast-entities', body),
 
+  archiveEntity: (id: string, body: { archive: true; reason: string }) =>
+    apiClient.delete<ApiResponse<ForecastEntity>>(`/forecast-entities/${id}`, {
+      body: JSON.stringify(body),
+    }),
+
   getChartOfAccounts: (
     entityId: string,
     params?: { account_type?: string; is_active?: string; for_posting?: string },
   ) =>
-    apiClient.get<ApiResponse<unknown[]>>(
+    apiClient.get<ApiResponse<ForecastChartAccount[]>>(
       `/forecast-entities/${entityId}/chart-of-accounts${qs(params)}`,
+    ),
+
+  // —— Persisted FP&A settings ——
+  getSettings: () =>
+    apiClient.get<ApiResponse<FpaSettings>>(`${FPA}/settings`),
+
+  updateSettings: (body: FpaSettings) =>
+    apiClient.put<ApiResponse<FpaSettings>>(`${FPA}/settings`, body),
+
+  connectSyncSource: (sourceId: string) =>
+    apiClient.post<ApiResponse<FpaSyncSource>>(
+      `${FPA}/settings/sync-sources/${sourceId}/connect`,
+      {},
+    ),
+
+  disconnectSyncSource: (sourceId: string) =>
+    apiClient.post<ApiResponse<FpaSyncSource>>(
+      `${FPA}/settings/sync-sources/${sourceId}/disconnect`,
+      {},
+    ),
+
+  syncSyncSource: (sourceId: string) =>
+    apiClient.post<ApiResponse<FpaSyncSource>>(
+      `${FPA}/settings/sync-sources/${sourceId}/sync`,
+      {},
     ),
 
   // —— Model Planning Cycles (distinct from /budget-cycles) ——
@@ -2649,7 +3306,7 @@ export const fpaApi = {
     ),
   postModelPlanningCycleComment: (
     id: string,
-    body: { body: string },
+    body: { body: string; parentCommentId?: string | null },
   ) =>
     apiClient.post<ApiResponse<FpaWorkflowComment>>(
       `${FPA}/model-planning/cycles/${id}/comments`,
@@ -2658,6 +3315,57 @@ export const fpaApi = {
   listModelPlanningCycleActivity: (id: string) =>
     apiClient.get<ApiResponse<FpaApprovalEvent[]>>(
       `${FPA}/model-planning/cycles/${id}/activity`,
+    ),
+
+  submitModelPlanningCycle: (id: string, body?: { note?: string }) =>
+    apiClient.post<ApiResponse<FpaModelPlanningCycle>>(
+      `${FPA}/model-planning/cycles/${id}/submit`,
+      body ?? {},
+    ),
+
+  acceptModelPlanningCycleReview: (id: string, body?: { comment?: string }) =>
+    apiClient.post<ApiResponse<FpaModelPlanningCycle>>(
+      `${FPA}/model-planning/cycles/${id}/review/accept`,
+      body ?? {},
+    ),
+
+  returnModelPlanningCycleReview: (
+    id: string,
+    body: { departmentId: string; taskId: string; comment: string },
+  ) =>
+    apiClient.post<ApiResponse<FpaModelPlanningCycle>>(
+      `${FPA}/model-planning/cycles/${id}/review/return`,
+      body,
+    ),
+
+  approveModelPlanningCycleByCfo: (
+    id: string,
+    body: { comment?: string; scenarioId?: string },
+  ) =>
+    apiClient.post<ApiResponse<FpaModelPlanningCycle>>(
+      `${FPA}/model-planning/cycles/${id}/cfo-approve`,
+      body,
+    ),
+
+  returnModelPlanningCycleByCfo: (
+    id: string,
+    body: { comment: string; scenarioId?: string },
+  ) =>
+    apiClient.post<ApiResponse<FpaModelPlanningCycle>>(
+      `${FPA}/model-planning/cycles/${id}/cfo-return`,
+      body,
+    ),
+
+  lockModelPlanningCycle: (id: string, body: { reason: string }) =>
+    apiClient.post<ApiResponse<FpaModelPlanningCycle>>(
+      `${FPA}/model-planning/cycles/${id}/lock`,
+      body,
+    ),
+
+  requestModelPlanningCycleReopen: (id: string, body: { reason: string }) =>
+    apiClient.post<ApiResponse<FpaModelPlanningCycle>>(
+      `${FPA}/model-planning/cycles/${id}/request-reopen`,
+      body,
     ),
 
   updateModelPlanningCycle: (id: string, body: FpaModelPlanningCycleUpdateRequest) =>

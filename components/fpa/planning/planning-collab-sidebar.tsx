@@ -1,8 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import Link from "next/link"
-import { ChevronDown, Paperclip, Plus, ThumbsUp } from "lucide-react"
+import { ChevronDown, Plus } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import {
@@ -10,7 +9,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog"
 import {
   PlanningAssignTaskDialog,
@@ -19,10 +17,13 @@ import {
 
 export type PlanningComment = {
   id: string
+  cycleId?: string
+  parentCommentId?: string
   author: string
   initials: string
   avatarTone: string
   when: string
+  createdAt?: string
   body: string
   likes?: number
   replies?: PlanningComment[]
@@ -30,6 +31,7 @@ export type PlanningComment = {
 
 export type PlanningTask = {
   id: string
+  cycleId?: string
   title: string
   assignee: string
   due: string
@@ -50,16 +52,26 @@ export type PlanningActivity = {
   id: string
   when: string
   text: string
+  cycleId?: string
+  actor?: string
+  action?: string
+  type?: string
+  status?: string
+  createdAt?: string
 }
 
 type Tab = "comments" | "tasks" | "activity" | "approvals"
 
 export type PlanningApproval = {
   id: string
-  title: string
-  assignee: string
-  due: string
+  text: string
+  when: string
   status?: "approved" | "returned" | "pending" | "submitted"
+  cycleId?: string
+  actor?: string
+  action?: string
+  type?: string
+  createdAt?: string
 }
 
 type Props = {
@@ -67,7 +79,8 @@ type Props = {
   tasks?: PlanningTask[]
   activity?: PlanningActivity[]
   approvals?: PlanningApproval[]
-  onAddComment?: (body: string) => void
+  onAddComment?: (body: string, parentCommentId?: string) => void | Promise<void>
+  onReplyComment?: (body: string, parentCommentId: string) => Promise<void>
   disabledComment?: boolean
   commentPlaceholder?: string
   mode?: "planning" | "compare"
@@ -88,6 +101,10 @@ type Props = {
   }) => Promise<void>
   assignBusy?: boolean
   onCompleteTask?: (taskId: string) => Promise<void>
+  canReviewTasks?: boolean
+  onApproveTask?: (taskId: string, comment?: string) => Promise<void>
+  onReturnTask?: (taskId: string, comment: string) => Promise<void>
+  taskActionBusyId?: string | null
   className?: string
 }
 
@@ -97,118 +114,6 @@ const AVATAR_TONES = [
   "bg-[#dcfce7] text-[#15803d]",
   "bg-[#fce7f3] text-[#be185d]",
   "bg-[#ffedd5] text-[#c2410c]",
-]
-
-export const DEMO_PLANNING_COMMENTS: PlanningComment[] = [
-  {
-    id: "demo-c1",
-    author: "Michael Chen",
-    initials: "MC",
-    avatarTone: "bg-[#dbeafe] text-[#1d4ed8]",
-    when: "2 hours ago",
-    body: "@Sarah Delgado Can you confirm the increase in marketing spend in Q4 is intentional?",
-    replies: [
-      {
-        id: "demo-c1-r1",
-        author: "Sarah Delgado",
-        initials: "SD",
-        avatarTone: "bg-[#bfdbfe] text-[#1e40af]",
-        when: "1 hour ago",
-        body: "Yes, that includes the product launch campaign and partner event.",
-        likes: 2,
-      },
-    ],
-  },
-  {
-    id: "demo-c2",
-    author: "Priya Nair",
-    initials: "PN",
-    avatarTone: "bg-[#dcfce7] text-[#15803d]",
-    when: "30 mins ago",
-    body: "Let's review the headcount plan for Engineering. Looks aggressive.",
-  },
-]
-
-export const DEMO_COMPARE_COMMENTS: PlanningComment[] = [
-  {
-    id: "comp-c1",
-    author: "Michael Chen",
-    initials: "MC",
-    avatarTone: "bg-[#eff8ff] text-[#175cd3] font-semibold border border-[#b2ddff]",
-    when: "2 hours ago",
-    body: "@Sarah Delgado Revenue upside in Best Case assumes 12% price uplift and 6% volume growth. Let me know if that looks reasonable."
-  },
-  {
-    id: "comp-c2",
-    author: "Sarah Delgado",
-    initials: "SD",
-    avatarTone: "bg-[#eff8ff] text-[#175cd3] font-semibold border border-[#b2ddff]",
-    when: "1 hour ago",
-    body: "Thanks Michael. Looks good. I'll validate with Sales."
-  },
-  {
-    id: "comp-c3",
-    author: "Priya Nair",
-    initials: "PN",
-    avatarTone: "bg-[#edfcf2] text-[#087443] font-semibold border border-[#abefc6]",
-    when: "30 mins ago",
-    body: "Downside opex includes hiring freeze and 5% discretionary spend reduction."
-  }
-]
-
-export const DEMO_PLANNING_TASKS: PlanningTask[] = [
-  {
-    id: "demo-t1",
-    title: "Review Marketing Plan",
-    assignee: "Priya Nair",
-    due: "May 16",
-  },
-  {
-    id: "demo-t2",
-    title: "Validate Headcount Plan",
-    assignee: "Daniel Lee",
-    due: "May 18",
-  },
-  {
-    id: "demo-t3",
-    title: "Check FX Assumptions",
-    assignee: "Arjun Patel",
-    due: "May 19",
-  },
-  {
-    id: "demo-t4",
-    title: "Review Opex by Dept",
-    assignee: "James Whitaker",
-    due: "May 20",
-  },
-]
-
-export const DEMO_PLANNING_ACTIVITY: PlanningActivity[] = [
-  {
-    id: "demo-a1",
-    when: "2h ago",
-    text: "Michael Chen commented on Marketing OpEx · Q4",
-  },
-  {
-    id: "demo-a2",
-    when: "1h ago",
-    text: "Sarah Delgado replied in the marketing spend thread",
-  },
-  {
-    id: "demo-a3",
-    when: "45m ago",
-    text: "Priya Nair opened task · Review Marketing Plan",
-  },
-  {
-    id: "demo-a4",
-    when: "30m ago",
-    text: "Priya Nair flagged Engineering headcount as aggressive",
-  },
-  {
-    id: "demo-a5",
-    when: "12m ago",
-    text: "Daniel Lee started · Validate Headcount Plan",
-  },
 ]
 
 export function planningInitials(name: string): string {
@@ -243,10 +148,31 @@ function renderBodyWithMentions(body: string) {
 function CommentItem({
   comment,
   nested = false,
+  onReply,
+  disabled,
 }: {
   comment: PlanningComment
   nested?: boolean
+  onReply?: (body: string, parentCommentId: string) => Promise<void>
+  disabled?: boolean
 }) {
+  const [replying, setReplying] = useState(false)
+  const [replyDraft, setReplyDraft] = useState("")
+  const [replyBusy, setReplyBusy] = useState(false)
+
+  const submitReply = async () => {
+    const body = replyDraft.trim()
+    if (!body || !onReply || replyBusy) return
+    setReplyBusy(true)
+    try {
+      await onReply(body, comment.id)
+      setReplyDraft("")
+      setReplying(false)
+    } finally {
+      setReplyBusy(false)
+    }
+  }
+
   return (
     <article className={cn("flex gap-2.5", nested && "ml-8 mt-3")}>
       <span
@@ -267,25 +193,43 @@ function CommentItem({
         <p className="text-[13px] text-[#475467] mt-0.5 leading-relaxed">
           {renderBodyWithMentions(comment.body)}
         </p>
-        <div className="mt-1.5 flex items-center gap-3 text-[12px] text-[#98a2b3]">
+        {onReply ? (
           <button
             type="button"
-            className="hover:text-[#2563eb] font-medium"
-            onClick={() => toast.message("Threaded replies — pending API")}
+            onClick={() => setReplying((v) => !v)}
+            disabled={disabled || replyBusy}
+            className="mt-1 rounded-full text-[11px] font-medium text-[#2563eb] hover:underline disabled:opacity-50"
           >
             Reply
           </button>
-          <button
-            type="button"
-            className="inline-flex items-center gap-1 hover:text-[#2563eb]"
-            onClick={() => toast.message("Liked")}
-          >
-            <ThumbsUp className="w-3.5 h-3.5" strokeWidth={1.75} />
-            {comment.likes && comment.likes > 0 ? comment.likes : null}
-          </button>
-        </div>
+        ) : null}
+        {replying ? (
+          <div className="mt-2 flex items-center gap-2">
+            <input
+              value={replyDraft}
+              onChange={(e) => setReplyDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault()
+                  void submitReply()
+                }
+              }}
+              disabled={replyBusy}
+              placeholder="Write a reply..."
+              className="h-8 min-w-0 flex-1 rounded-full border border-[#d0d5dd] px-3 text-[12px] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20"
+            />
+            <button
+              type="button"
+              onClick={() => void submitReply()}
+              disabled={!replyDraft.trim() || replyBusy}
+              className="h-8 rounded-full bg-[#2563eb] px-3 text-[11px] font-medium text-white disabled:opacity-50"
+            >
+              {replyBusy ? "Posting..." : "Post"}
+            </button>
+          </div>
+        ) : null}
         {(comment.replies || []).map((r) => (
-          <CommentItem key={r.id} comment={r} nested />
+          <CommentItem key={r.id} comment={r} nested onReply={onReply} disabled={disabled} />
         ))}
       </div>
     </article>
@@ -295,14 +239,27 @@ function CommentItem({
 function TaskRow({
   task,
   onToggle,
+  canReview,
+  onApprove,
+  onReturn,
+  busy,
 }: {
   task: PlanningTask
   onToggle: () => void
+  canReview?: boolean
+  onApprove?: (taskId: string, comment?: string) => Promise<void>
+  onReturn?: (taskId: string, comment: string) => Promise<void>
+  busy?: boolean
 }) {
   const [expanded, setExpanded] = useState(false)
+  const [returning, setReturning] = useState(false)
+  const [returnComment, setReturnComment] = useState("")
   const statusLabel = String(task.status || (task.done ? "COMPLETED" : "OPEN")).replace(
     /_/g,
     " ",
+  )
+  const reviewable = /SUBMITTED|PENDING_REVIEW|UNDER_REVIEW/.test(
+    String(task.status || "").toUpperCase(),
   )
 
   return (
@@ -312,11 +269,13 @@ function TaskRow({
           type="button"
           onClick={(e) => {
             e.stopPropagation()
+            if (busy) return
             onToggle()
           }}
+          disabled={busy}
           aria-label={task.done ? "Mark incomplete" : "Mark complete"}
           className={cn(
-            "mt-0.5 h-[18px] w-[18px] shrink-0 rounded-full border-2 inline-flex items-center justify-center",
+            "mt-0.5 h-[18px] w-[18px] shrink-0 rounded-full border-2 inline-flex items-center justify-center disabled:opacity-50",
             task.done
               ? "border-[#2563eb] bg-[#2563eb]"
               : "border-[#d0d5dd] bg-white hover:border-[#98a2b3]",
@@ -412,6 +371,73 @@ function TaskRow({
               checkbox.
             </p>
           ) : null}
+          {canReview && reviewable && (onApprove || onReturn) ? (
+            <div className="space-y-2 border-t border-[#eaecf0] pt-2">
+              {returning ? (
+                <textarea
+                  value={returnComment}
+                  onChange={(e) => setReturnComment(e.target.value)}
+                  rows={2}
+                  placeholder="Required return comment"
+                  disabled={busy}
+                  className="w-full rounded-lg border border-[#d0d5dd] bg-white px-2.5 py-2 text-[12px] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20 disabled:opacity-50"
+                />
+              ) : null}
+              <div className="flex flex-wrap gap-2">
+                {onApprove ? (
+                  <button
+                    type="button"
+                    onClick={() => void onApprove(task.id).catch(() => {})}
+                    disabled={busy}
+                    className="h-8 rounded-full bg-[#16a34a] px-3 text-[11px] font-medium text-white disabled:opacity-50"
+                  >
+                    Approve
+                  </button>
+                ) : null}
+                {onReturn ? (
+                  returning ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const comment = returnComment.trim()
+                          if (!comment) return
+                          try {
+                            await onReturn(task.id, comment)
+                            setReturning(false)
+                            setReturnComment("")
+                          } catch {
+                            // Parent callback displays the persistent API error.
+                          }
+                        }}
+                        disabled={busy || !returnComment.trim()}
+                        className="h-8 rounded-full bg-[#dc2626] px-3 text-[11px] font-medium text-white disabled:opacity-50"
+                      >
+                        Confirm return
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setReturning(false)}
+                        disabled={busy}
+                        className="h-8 rounded-full border border-[#d0d5dd] bg-white px-3 text-[11px] font-medium text-[#344054] disabled:opacity-50"
+                      >
+                        Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setReturning(true)}
+                      disabled={busy}
+                      className="h-8 rounded-full border border-[#fca5a5] bg-white px-3 text-[11px] font-medium text-[#dc2626] disabled:opacity-50"
+                    >
+                      Return
+                    </button>
+                  )
+                ) : null}
+              </div>
+            </div>
+          ) : null}
         </div>
       ) : null}
     </li>
@@ -424,10 +450,10 @@ export function PlanningCollabSidebar({
   activity,
   approvals,
   onAddComment,
+  onReplyComment,
   disabledComment,
   commentPlaceholder = "Add a comment...",
   mode = "planning",
-  liveCycle = false,
   className,
   canAssignTasks = false,
   assignDepartments = [],
@@ -436,51 +462,34 @@ export function PlanningCollabSidebar({
   onAssignTask,
   assignBusy = false,
   onCompleteTask,
+  canReviewTasks = false,
+  onApproveTask,
+  onReturnTask,
+  taskActionBusyId,
 }: Props) {
   const [tab, setTab] = useState<Tab>("comments")
   const [draft, setDraft] = useState("")
-  const [localTasks, setLocalTasks] = useState<PlanningTask[]>(
-    () => (tasks?.length ? tasks : liveCycle ? [] : DEMO_PLANNING_TASKS),
-  )
+  const [localTasks, setLocalTasks] = useState<PlanningTask[]>(() => tasks || [])
   const [allCommentsOpen, setAllCommentsOpen] = useState(false)
   const [allTasksOpen, setAllTasksOpen] = useState(false)
   const [assignOpen, setAssignOpen] = useState(false)
 
-  const isCompareMode = mode === "compare"
-
-  // Interactive local comments state
   const [localComments, setLocalComments] = useState<PlanningComment[]>([])
+  const [postingComment, setPostingComment] = useState(false)
 
   useEffect(() => {
-    setLocalComments(
-      comments?.length
-        ? comments
-        : isCompareMode
-          ? DEMO_COMPARE_COMMENTS
-          : liveCycle
-            ? []
-            : DEMO_PLANNING_COMMENTS,
-    )
-  }, [comments, isCompareMode, liveCycle])
-
-  // Interactive approvals state
-  const [selectedApproval, setSelectedApproval] = useState<PlanningApproval | null>(null)
-  const [isApprovalOpen, setIsApprovalOpen] = useState(false)
-
-  const openApprovalModal = (title: string, assignee: string, due: string) => {
-    setSelectedApproval({ id: `appr-${Date.now()}`, title, assignee, due, status: "pending" })
-    setIsApprovalOpen(true)
-  }
+    setLocalComments(comments || [])
+  }, [comments])
 
   useEffect(() => {
     setTab("comments")
   }, [mode])
 
   useEffect(() => {
-    setLocalTasks(tasks?.length ? tasks : liveCycle ? [] : DEMO_PLANNING_TASKS)
-  }, [tasks, liveCycle])
+    setLocalTasks(tasks || [])
+  }, [tasks])
 
-  const activityRows = activity?.length ? activity : liveCycle ? [] : DEMO_PLANNING_ACTIVITY
+  const activityRows = activity || []
   const approvalRows = approvals ?? []
   const displayTasks = localTasks
   const openTaskCount = displayTasks.filter((t) => !t.done).length
@@ -488,7 +497,7 @@ export function PlanningCollabSidebar({
   const tabs: Array<{ id: Tab; label: string; badge?: number }> =
     mode === "compare"
       ? [
-          { id: "comments", label: "Comments", badge: 5 },
+          { id: "comments", label: "Comments", badge: localComments.length },
           { id: "approvals", label: "Approvals" },
           { id: "activity", label: "Activity" },
         ]
@@ -498,23 +507,18 @@ export function PlanningCollabSidebar({
           { id: "activity", label: "Activity" },
         ]
 
-  const postComment = () => {
+  const postComment = async () => {
     const body = draft.trim()
-    if (!body || disabledComment) return
-
-    // In-memory update for fast interaction feedback
-    const newComment: PlanningComment = {
-      id: `local-c-${Date.now()}`,
-      author: "Admin User",
-      initials: "AD",
-      avatarTone: "bg-[#ffedd5] text-[#c2410c] font-semibold border border-[#fedf89]",
-      when: "Just now",
-      body,
+    if (!body || disabledComment || !onAddComment || postingComment) return
+    setPostingComment(true)
+    try {
+      await onAddComment(body)
+      setDraft("")
+    } catch {
+      // Parent callback owns the persistent API error message.
+    } finally {
+      setPostingComment(false)
     }
-    setLocalComments((prev) => [newComment, ...prev])
-    onAddComment?.(body)
-    setDraft("")
-    toast.success("Comment added")
   }
 
   const toggleTask = async (id: string) => {
@@ -532,20 +536,6 @@ export function PlanningCollabSidebar({
     } catch {
       // keep local state unchanged on failure
     }
-  }
-
-  const handleApprove = () => {
-    if (selectedApproval) {
-      toast.success(`Approved stage: "${selectedApproval.title}" successfully!`)
-    }
-    setIsApprovalOpen(false)
-  }
-
-  const handleReject = () => {
-    if (selectedApproval) {
-      toast.warning(`Returned stage: "${selectedApproval.title}" for revision.`)
-    }
-    setIsApprovalOpen(false)
   }
 
   return (
@@ -592,27 +582,31 @@ export function PlanningCollabSidebar({
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && !e.shiftKey) {
                         e.preventDefault()
-                        postComment()
+                        void postComment()
                       }
                     }}
                     placeholder={commentPlaceholder}
-                    disabled={disabledComment}
-                    className="h-10 w-full rounded-[10px] border border-[#d0d5dd] bg-white pl-3.5 pr-10 text-[13px] text-[#101828] placeholder:text-[#98a2b3] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb] disabled:opacity-50"
+                    disabled={disabledComment || postingComment || !onAddComment}
+                    className="h-10 w-full rounded-[10px] border border-[#d0d5dd] bg-white px-3.5 text-[13px] text-[#101828] placeholder:text-[#98a2b3] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb] disabled:opacity-50"
                   />
-                  <button
-                    type="button"
-                    className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 inline-flex items-center justify-center rounded-full text-[#98a2b3] hover:bg-[#f9fafb] hover:text-[#667085]"
-                    onClick={() => toast.message("Attachments — coming soon")}
-                    aria-label="Attach file"
-                  >
-                    <Paperclip className="w-4 h-4" strokeWidth={1.75} />
-                  </button>
                 </div>
+                <p className="-mt-2 mb-3 text-[11px] text-[#98a2b3]">
+                  Replies, reactions, and attachments are unavailable.
+                </p>
 
                 <div className="flex-1 min-h-0 space-y-4 overflow-y-auto pr-1">
-                  {localComments.map((c) => (
-                    <CommentItem key={c.id} comment={c} />
-                  ))}
+                  {localComments.length ? (
+                  localComments.map((c) => (
+                    <CommentItem
+                      key={c.id}
+                      comment={c}
+                      onReply={onReplyComment}
+                      disabled={disabledComment || postingComment}
+                    />
+                  ))
+                  ) : (
+                    <p className="py-8 text-center text-[13px] text-[#98a2b3]">No comments yet.</p>
+                  )}
                 </div>
 
                 <button
@@ -624,101 +618,6 @@ export function PlanningCollabSidebar({
                 </button>
               </div>
 
-              {/* Approvals Section (only in compare mode) */}
-              {isCompareMode && (
-                <div className="py-4 shrink-0">
-                  <div className="flex items-center justify-between mb-3.5">
-                    <div className="flex items-center gap-1.5">
-                      <h4 className="text-[14px] font-semibold text-[#101828]">Approvals</h4>
-                      <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#f2f4f7] px-1 text-[11px] font-semibold text-[#667085]">
-                        2
-                      </span>
-                    </div>
-                  </div>
-
-                  <ul className="space-y-3.5">
-                    <li className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <span className="h-8 w-8 rounded-full bg-[#f4f3ff] text-[#53389e] font-semibold text-[13px] flex items-center justify-center shrink-0">
-                          3
-                        </span>
-                        <div className="min-w-0">
-                          <div className="text-[13px] font-semibold text-[#101828]">Under Review</div>
-                          <div className="text-[11px] text-[#667085] truncate">FP&A Team</div>
-                          <div className="text-[11px] text-[#667085] mt-0.5">Due May 19, 2026</div>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => openApprovalModal("Under Review", "FP&A Team", "Due May 19, 2026")}
-                        className="h-8 rounded-lg border border-[#d0d5dd] bg-white px-3.5 text-[12px] font-semibold text-[#344054] hover:bg-[#f9fafb] shrink-0"
-                      >
-                        Open
-                      </button>
-                    </li>
-                    <li className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <span className="h-8 w-8 rounded-full bg-[#f2f4f7] text-[#344054] font-semibold text-[13px] flex items-center justify-center shrink-0">
-                          4
-                        </span>
-                        <div className="min-w-0">
-                          <div className="text-[13px] font-semibold text-[#101828]">Approval</div>
-                          <div className="text-[11px] text-[#667085] truncate">James Whitaker</div>
-                          <div className="text-[11px] text-[#667085] mt-0.5">Due May 26, 2026</div>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => openApprovalModal("Approval", "James Whitaker", "Due May 26, 2026")}
-                        className="h-8 rounded-lg border border-[#d0d5dd] bg-white px-3.5 text-[12px] font-semibold text-[#344054] hover:bg-[#f9fafb] shrink-0"
-                      >
-                        Open
-                      </button>
-                    </li>
-                  </ul>
-
-                  <button
-                    type="button"
-                    onClick={() => toast.message("All approvals details opened")}
-                    className="mt-3.5 w-full text-center text-[13px] font-semibold text-[#1570ef] hover:underline"
-                  >
-                    View all approvals
-                  </button>
-                </div>
-              )}
-
-              {/* Scenario Notes Section (only in compare mode) */}
-              {isCompareMode && (
-                <div className="pt-4 shrink-0">
-                  <h4 className="text-[14px] font-semibold text-[#101828] mb-1.5">Scenario Notes</h4>
-                  <p className="text-[12px] text-[#475467] leading-relaxed">
-                    Key assumptions and risks documented in the
-                  </p>
-                  <Link
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault()
-                      toast.info("Opening Planning Narrative file")
-                    }}
-                    className="inline-flex items-center gap-1 text-[12px] font-semibold text-[#1570ef] hover:underline mt-0.5"
-                  >
-                    Planning Narrative
-                    <svg
-                      className="w-3.5 h-3.5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                      />
-                    </svg>
-                  </Link>
-                </div>
-              )}
             </div>
           )}
 
@@ -741,7 +640,15 @@ export function PlanningCollabSidebar({
               ) : (
                 <ul className="divide-y divide-[#f2f4f7]">
                   {displayTasks.map((t) => (
-                    <TaskRow key={t.id} task={t} onToggle={() => void toggleTask(t.id)} />
+                    <TaskRow
+                      key={t.id}
+                      task={t}
+                      onToggle={() => void toggleTask(t.id)}
+                      canReview={canReviewTasks}
+                      onApprove={onApproveTask}
+                      onReturn={onReturnTask}
+                      busy={Boolean(taskActionBusyId)}
+                    />
                   ))}
                 </ul>
               )}
@@ -822,7 +729,14 @@ export function PlanningCollabSidebar({
             {!localComments.length ? (
               <p className="text-[13px] text-[#98a2b3] text-center py-10">No comments yet.</p>
             ) : (
-              localComments.map((c) => <CommentItem key={c.id} comment={c} />)
+              localComments.map((c) => (
+                <CommentItem
+                  key={c.id}
+                  comment={c}
+                  onReply={onReplyComment}
+                  disabled={disabledComment || postingComment}
+                />
+              ))
             )}
           </div>
           <div className="shrink-0 border-t border-[#eaecf0] px-5 py-3 bg-[#f9fafb]">
@@ -834,22 +748,17 @@ export function PlanningCollabSidebar({
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault()
-                    postComment()
+                    void postComment()
                   }
                 }}
                 placeholder={commentPlaceholder}
-                disabled={disabledComment}
-                className="h-10 w-full rounded-lg border border-[#d0d5dd] bg-white pl-3 pr-10 text-[13px] text-[#101828] placeholder:text-[#98a2b3] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20"
+                disabled={disabledComment || postingComment || !onAddComment}
+                className="h-10 w-full rounded-lg border border-[#d0d5dd] bg-white px-3 text-[13px] text-[#101828] placeholder:text-[#98a2b3] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20 disabled:opacity-50"
               />
-              <button
-                type="button"
-                className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 inline-flex items-center justify-center rounded-full text-[#98a2b3]"
-                onClick={() => toast.message("Attachments — coming soon")}
-                aria-label="Attach file"
-              >
-                <Paperclip className="w-4 h-4" />
-              </button>
             </div>
+            <p className="mt-2 text-[11px] text-[#98a2b3]">
+              Replies, reactions, and attachments are unavailable.
+            </p>
           </div>
         </DialogContent>
       </Dialog>
@@ -864,53 +773,18 @@ export function PlanningCollabSidebar({
           <div className="flex-1 overflow-y-auto px-5 py-2">
             <ul className="divide-y divide-[#f2f4f7]">
               {displayTasks.map((t) => (
-                <TaskRow key={t.id} task={t} onToggle={() => void toggleTask(t.id)} />
+                <TaskRow
+                  key={t.id}
+                  task={t}
+                  onToggle={() => void toggleTask(t.id)}
+                  canReview={canReviewTasks}
+                  onApprove={onApproveTask}
+                  onReturn={onReturnTask}
+                  busy={Boolean(taskActionBusyId)}
+                />
               ))}
             </ul>
           </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Interactive approvals details modal */}
-      <Dialog open={isApprovalOpen} onOpenChange={setIsApprovalOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-[16px] font-semibold text-[#101828]">
-              Approval Workflow Stage
-            </DialogTitle>
-          </DialogHeader>
-          {selectedApproval && (
-            <div className="py-3.5 space-y-3">
-              <div>
-                <span className="text-[11px] uppercase tracking-wider font-semibold text-[#667085]">Stage Title</span>
-                <p className="text-[14px] font-bold text-[#101828] mt-0.5">{selectedApproval.title}</p>
-              </div>
-              <div>
-                <span className="text-[11px] uppercase tracking-wider font-semibold text-[#667085]">Assigned Reviewer</span>
-                <p className="text-[13px] font-medium text-[#344054] mt-0.5">{selectedApproval.assignee}</p>
-              </div>
-              <div>
-                <span className="text-[11px] uppercase tracking-wider font-semibold text-[#667085]">Deadline</span>
-                <p className="text-[13px] font-medium text-[#f04438] mt-0.5">{selectedApproval.due}</p>
-              </div>
-            </div>
-          )}
-          <DialogFooter className="gap-2">
-            <button
-              type="button"
-              onClick={handleReject}
-              className="h-9 rounded-lg border border-[#fda29b] bg-[#fffbfa] px-4 text-[13px] font-semibold text-[#b42318] hover:bg-[#fef3f2]"
-            >
-              Return for Revision
-            </button>
-            <button
-              type="button"
-              onClick={handleApprove}
-              className="h-9 rounded-lg bg-[#079455] px-4 text-[13px] font-semibold text-white hover:bg-[#067647]"
-            >
-              Approve Stage
-            </button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -933,7 +807,6 @@ export function PlanningCollabSidebar({
 export function PlanningTasksCard({
   tasks = [],
   className,
-  liveCycle = false,
   canAssignTasks = false,
   assignDepartments = [],
   assignUsers = [],
@@ -961,15 +834,13 @@ export function PlanningTasksCard({
   assignBusy?: boolean
   onCompleteTask?: (taskId: string) => Promise<void>
 }) {
-  const [localTasks, setLocalTasks] = useState(() =>
-    tasks.length ? tasks : liveCycle ? [] : DEMO_PLANNING_TASKS,
-  )
+  const [localTasks, setLocalTasks] = useState(() => tasks)
   const [allOpen, setAllOpen] = useState(false)
   const [assignOpen, setAssignOpen] = useState(false)
 
   useEffect(() => {
-    setLocalTasks(tasks.length ? tasks : liveCycle ? [] : DEMO_PLANNING_TASKS)
-  }, [tasks, liveCycle])
+    setLocalTasks(tasks)
+  }, [tasks])
 
   const toggleTask = async (id: string) => {
     const task = localTasks.find((t) => t.id === id)
@@ -1019,15 +890,19 @@ export function PlanningTasksCard({
           </div>
         </div>
         <div className="px-4 py-1 max-h-[280px] overflow-auto">
-          <ul className="divide-y divide-[#f2f4f7]">
-            {localTasks.map((t) => (
-              <TaskRow
-                key={t.id}
-                task={t}
-                onToggle={() => void toggleTask(t.id)}
-              />
-            ))}
-          </ul>
+          {localTasks.length ? (
+            <ul className="divide-y divide-[#f2f4f7]">
+              {localTasks.map((t) => (
+                <TaskRow
+                  key={t.id}
+                  task={t}
+                  onToggle={() => void toggleTask(t.id)}
+                />
+              ))}
+            </ul>
+          ) : (
+            <p className="py-6 text-center text-[12px] text-[#98a2b3]">No tasks yet.</p>
+          )}
         </div>
       </section>
 

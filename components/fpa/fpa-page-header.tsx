@@ -8,45 +8,23 @@ import { setSelectedScenarioId, setSelectedVersionId } from "@/lib/store/slices/
 
 export type FpaFilterChip = { label: string; value: string; icon?: "calendar" }
 
-/** Demo / empty-API fallback scenarios for FP&A chrome */
-export const FPA_HEADER_SCENARIOS = [
-  { id: "base-case", name: "Base Case" },
-  { id: "upside", name: "Upside" },
-  { id: "downside", name: "Downside" },
-  { id: "fx-shock", name: "FX Shock" },
-  { id: "hiring-freeze", name: "Hiring Freeze" },
-] as const
-
-export const FPA_HEADER_VERSIONS = [
-  { id: "working", name: "Working" },
-  { id: "locked", name: "Locked" },
-  { id: "published", name: "Published" },
-] as const
-
-export const FPA_HEADER_PERIODS = [
-  "May 2025",
-  "Apr 2025",
-  "Mar 2025",
-  "FY2025",
-  "FY2026",
-] as const
-
 interface FpaPageHeaderProps {
   title: string
   /** When false, hide live scenario/version selects and use static filters prop */
   liveFilters?: boolean
   /** When true, hide scenario/version/period chips entirely (e.g. Model Builder A.3) */
   hideFilters?: boolean
-  /** When true, hide the search field */
+  /** When true, hide the search field. Search is hidden unless controlled. */
   hideSearch?: boolean
   filters?: FpaFilterChip[]
   className?: string
   actions?: React.ReactNode
   periodLabel?: string
+  periodOptions?: string[]
   searchPlaceholder?: string
-  /** Prefer hardcoded scenario list (Home demo) over API list when set */
-  demoScenarios?: boolean
-  /** Controlled demo filter values (names) */
+  searchValue?: string
+  onSearchChange?: (value: string) => void
+  /** Controlled filter values (names) */
   scenario?: string
   version?: string
   period?: string
@@ -84,8 +62,9 @@ function HeaderFilter({
     <div className="relative" ref={ref}>
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="h-10 min-w-[118px] inline-flex items-center rounded-md border border-[#e2e8f0] bg-white pl-2.5 pr-7 text-left hover:bg-[#f8fafc]"
+        onClick={() => options.length && setOpen((o) => !o)}
+        disabled={!options.length}
+        className="h-10 min-w-[118px] inline-flex items-center rounded-full border border-[#e2e8f0] bg-white pl-2.5 pr-7 text-left hover:bg-[#f8fafc] disabled:cursor-default"
         aria-expanded={open}
         aria-haspopup="listbox"
       >
@@ -133,13 +112,15 @@ export function FpaPageHeader({
   title,
   liveFilters = true,
   hideFilters = false,
-  hideSearch = false,
+  hideSearch = true,
   filters,
   className,
   actions,
   periodLabel,
+  periodOptions = [],
   searchPlaceholder = "Search models, reports, sheets...",
-  demoScenarios = false,
+  searchValue,
+  onSearchChange,
   scenario: controlledScenario,
   version: controlledVersion,
   period: controlledPeriod,
@@ -148,82 +129,46 @@ export function FpaPageHeader({
   onPeriodChange,
 }: FpaPageHeaderProps) {
   const dispatch = useAppDispatch()
-  const { scenarios, versions, selectedScenarioId, selectedVersionId, models, selectedModelId } =
+  const { scenarios, versions, selectedScenarioId, selectedVersionId } =
     useAppSelector((s) => s.fpa)
-
-  const model = models.find((m) => m.id === selectedModelId)
-  const defaultPeriod =
-    periodLabel ||
-    (model?.startPeriod
-      ? new Date(model.startPeriod).toLocaleDateString("en-US", { month: "short", year: "numeric" })
-      : "May 2025")
-
-  const [localPeriod, setLocalPeriod] = useState(defaultPeriod)
-  const [localScenario, setLocalScenario] = useState(FPA_HEADER_SCENARIOS[0].name)
-  const [localVersion, setLocalVersion] = useState(FPA_HEADER_VERSIONS[0].name)
-
   const scenarioOptions = useMemo(() => {
-    if (demoScenarios || scenarios.length === 0) {
-      return FPA_HEADER_SCENARIOS.map((s) => s.name)
-    }
     return scenarios.map((s) => s.name)
-  }, [demoScenarios, scenarios])
+  }, [scenarios])
 
   const versionOptions = useMemo(() => {
-    if (demoScenarios || versions.length === 0) {
-      return FPA_HEADER_VERSIONS.map((v) => v.name)
-    }
     return versions.map((v) => v.name)
-  }, [demoScenarios, versions])
-
-  const periodOptions = useMemo(() => [...FPA_HEADER_PERIODS], [])
+  }, [versions])
 
   const scenarioName =
     controlledScenario ??
-    (demoScenarios || scenarios.length === 0
-      ? localScenario
-      : scenarios.find((s) => s.id === selectedScenarioId)?.name || scenarioOptions[0] || "—")
+    (scenarios.find((s) => s.id === selectedScenarioId)?.name || "—")
 
   const versionName =
     controlledVersion ??
-    (demoScenarios || versions.length === 0
-      ? localVersion
-      : versions.find((v) => v.id === selectedVersionId)?.name || versionOptions[0] || "—")
+    (versions.find((v) => v.id === selectedVersionId)?.name || "—")
 
-  const periodValue = controlledPeriod ?? localPeriod
+  const periodValue = controlledPeriod ?? periodLabel ?? "—"
+  const showPeriodFilter =
+    Boolean(controlledPeriod || periodLabel) && periodOptions.length > 0
 
   const setScenario = (name: string) => {
     onScenarioChange?.(name)
-    if (demoScenarios || scenarios.length === 0) {
-      setLocalScenario(name)
-      return
-    }
     const match = scenarios.find((s) => s.name === name)
     if (match) dispatch(setSelectedScenarioId(match.id))
   }
 
   const setVersion = (name: string) => {
     onVersionChange?.(name)
-    if (demoScenarios || versions.length === 0) {
-      setLocalVersion(name)
-      return
-    }
     const match = versions.find((v) => v.name === name)
     if (match) dispatch(setSelectedVersionId(match.id))
   }
 
   const setPeriod = (p: string) => {
     onPeriodChange?.(p)
-    setLocalPeriod(p)
   }
 
-  const staticFilters =
-    filters ??
-    ([
-      { label: "Scenario", value: "Base Case" },
-      { label: "Version", value: "Working" },
-      { label: "Period", value: periodValue, icon: "calendar" as const },
-    ] satisfies FpaFilterChip[])
+  const staticFilters = filters ?? []
+  const showSearch = !hideSearch && searchValue !== undefined && Boolean(onSearchChange)
 
   return (
     <header
@@ -237,12 +182,14 @@ export function FpaPageHeader({
         <Star className="w-4 h-4 text-[#cbd5e1]" strokeWidth={1.75} />
       </div>
 
-      {!hideSearch ? (
+      {showSearch ? (
         <div className="flex-1 min-w-[160px] max-w-md relative order-last sm:order-none w-full sm:w-auto">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#94a3b8]" />
           <input
             className="w-full h-10 rounded-md border border-[#e2e8f0] bg-white pl-9 pr-14 text-sm text-[#0f172a] placeholder:text-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/30"
             placeholder={searchPlaceholder}
+            value={searchValue}
+            onChange={(event) => onSearchChange?.(event.target.value)}
           />
           <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-[#94a3b8] border border-[#e2e8f0] rounded-[4px] bg-[#f8fafc] px-1.5 py-0.5 hidden sm:inline">
             ⌘ K
@@ -269,19 +216,21 @@ export function FpaPageHeader({
               onChange={setVersion}
               trailing={<ChevronDown className="w-3.5 h-3.5" />}
             />
-            <HeaderFilter
-              label="Period"
-              value={periodValue}
-              options={periodOptions}
-              onChange={setPeriod}
-              trailing={<Calendar className="w-3.5 h-3.5" />}
-            />
+            {showPeriodFilter ? (
+              <HeaderFilter
+                label="Period"
+                value={periodValue}
+                options={periodOptions}
+                onChange={setPeriod}
+                trailing={<Calendar className="w-3.5 h-3.5" />}
+              />
+            ) : null}
           </>
         ) : (
           staticFilters.map((f) => (
             <div
               key={f.label + f.value}
-              className="h-10 min-w-[108px] inline-flex flex-col justify-center rounded-md border border-[#e2e8f0] bg-white px-2.5 text-left"
+              className="h-10 min-w-[108px] inline-flex flex-col justify-center rounded-full border border-[#e2e8f0] bg-white px-2.5 text-left"
             >
               <span className="text-[9px] font-medium uppercase tracking-wide text-[#94a3b8] leading-none">
                 {f.label}

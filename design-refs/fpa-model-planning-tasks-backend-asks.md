@@ -1,8 +1,9 @@
 # Backend asks — Model Planning optional tasks (Stage 2)
 
-**Date:** 2026-07-16  
-**FE status:** Assign Task UI shipped on worksheet Tasks tab + Tasks card  
-**Context:** SRD Stage 2 step 4 — *“Optionally assign tasks (e.g. Review Marketing Plan)”*  
+**Date:** 2026-07-16
+**Backend status:** Delivered 2026-07-17
+**FE status:** Assign Task UI shipped; approve/return and threaded collaboration wiring in progress
+**Context:** SRD Stage 2 step 4 — *“Optionally assign tasks (e.g. Review Marketing Plan)”*
 **Distinct from:** Department **owner slice** tasks created on cycle create (`owners[].taskId`) — those are submit-eligible dept plans, not ad-hoc review tasks.
 
 ---
@@ -18,7 +19,7 @@ FE shows both in the Tasks list. Owner slices are tagged **Dept plan**; ad-hoc t
 
 ---
 
-## What FE calls today (needs BE)
+## Delivered MPC-native contracts
 
 ### 1. List cycle tasks (critical)
 

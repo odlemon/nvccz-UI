@@ -10,13 +10,9 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronRight,
-  Columns3,
   Database,
-  Filter,
-  Grid3X3,
   History,
   Info,
-  Pencil,
   Play,
   Plus,
   Search,
@@ -39,7 +35,6 @@ import type {
 } from "@/lib/api/fpa-api"
 import {
   apiModulesToFolders,
-  HARDCODED_MODULE_FOLDERS,
   type SelectedModuleLeaf,
 } from "./builder-modules-tree"
 import type { BuilderValidationState } from "./builder-header"
@@ -55,110 +50,8 @@ import {
   type DetailedValidationCheck,
   type DetailedWorkspaceRow,
 } from "@/lib/fpa/detailed-workspace-adapters"
-import { logFpaGap } from "@/lib/fpa/fpa-api-gaps"
 
 type WorkspaceRow = DetailedWorkspaceRow
-
-const MONTHS = [
-  "Jan '26",
-  "Feb '26",
-  "Mar '26",
-  "Apr '26",
-  "May '26",
-  "Jun '26",
-  "Jul '26",
-  "Aug '26",
-  "Sep '26",
-  "Oct '26",
-  "Nov '26",
-  "Dec '26",
-]
-
-/** Exact SRD Line Item Builder mock — always shown in Detailed workspace. */
-const PNL_FORECAST: WorkspaceRow[] = [
-  {
-    id: "starting-arr",
-    name: "Starting ARR",
-    kind: "INPUT",
-    formula: "—",
-    values: [
-      125000, 126180, 127380, 128600, 129840, 131100, 132380, 133680, 135000, 136200, 137500, 139459,
-    ],
-    fy: 1581319,
-    format: "currency",
-  },
-  {
-    id: "new-bookings",
-    name: "New Bookings",
-    kind: "INPUT",
-    formula: "—",
-    values: [8500, 9000, 9500, 10000, 10500, 11000, 11500, 12000, 12500, 13000, 14500, 15500],
-    fy: 138500,
-    format: "currency",
-  },
-  {
-    id: "churn",
-    name: "Churn",
-    kind: "INPUT",
-    formula: "—",
-    values: [-1250, -1300, -1350, -1400, -1450, -1500, -1550, -1600, -1650, -1700, -1750, -2014],
-    fy: -18514,
-    format: "currency",
-  },
-  {
-    id: "net-arr",
-    name: "Net ARR",
-    kind: "CALCULATED",
-    formula: "=[Starting ARR] + [New Bookings] + [Churn]",
-    values: [
-      132250, 133880, 135530, 137200, 138890, 140600, 142330, 144080, 145850, 147500, 150250, 152945,
-    ],
-    fy: 1699310,
-    format: "currency",
-  },
-  {
-    id: "payroll-expense",
-    name: "Payroll Expense",
-    kind: "CALCULATED",
-    formula: "=[Headcount] * [Avg Fully Burdened Cost]",
-    values: [3492, 3550, 3600, 3650, 3700, 3750, 3800, 3850, 3900, 3950, 4000, 3481],
-    fy: 44723,
-    format: "currency",
-  },
-  {
-    id: "marketing-spend",
-    name: "Marketing Spend",
-    kind: "INPUT",
-    formula: "—",
-    values: [1250, 1300, 1350, 1400, 1450, 1500, 1550, 1600, 1650, 1450, 1520, 1530],
-    fy: 17550,
-    format: "currency",
-  },
-  {
-    id: "ebitda",
-    name: "EBITDA",
-    kind: "CALCULATED",
-    formula: "=[Net ARR] - [Payroll Expense] - [Marketing Spend]",
-    values: [
-      127508, 129030, 130580, 132150, 133740, 135350, 136980, 138630, 140300, 142100, 144730, 147934,
-    ],
-    fy: 1637037,
-    format: "currency",
-  },
-  {
-    id: "cash-balance",
-    name: "Cash Balance",
-    kind: "CALCULATED",
-    formula: "= PREV([Cash Balance]) + [EBITDA] - [CapEx]",
-    values: [52340, 68520, 86200, 105400, 126200, 148600, 172700, 198500, 226000, 255400, 286900, 320774],
-    fy: 692734,
-    format: "currency",
-  },
-]
-
-function rowsForWorkspace(_leafId?: string | null): WorkspaceRow[] {
-  return PNL_FORECAST.map((r) => ({ ...r, values: [...r.values] }))
-}
 
 function formatCell(v: number, format?: WorkspaceRow["format"]) {
   if (format === "percent") return `${(v * 100).toFixed(1)}%`
@@ -195,25 +88,6 @@ function FormulaHighlight({
   )
 }
 
-const DEMO_MAPPINGS = [
-  { source: "CSV.PAYROLL_EXPENSE", system: "Custom / CSV", target: "Payroll Expense", ok: true },
-  { source: "GL_ACCOUNT.6100", system: "Accounting GL", target: "Marketing Spend", ok: true },
-  { source: "CRM.NEW_BOOKINGS", system: "CRM", target: "New Bookings", ok: true },
-  { source: "PR.HEADCOUNT", system: "Payroll", target: "Headcount", ok: true },
-  { source: "BANK.CASH_BALANCE", system: "Banking", target: "Cash Balance", ok: true },
-  { source: "PROC.PO_AMOUNT", system: "Procurement", target: "Other Operating Expense", ok: false },
-  { source: "MANUAL.RD_DRIVER", system: "Manual", target: "R&D Expense", ok: false },
-]
-
-const DEMO_AUDIT = [
-  { id: "a1", time: "May 12, 2026 9:12 AM", user: "Michael Chen", action: "Updated Formula", details: "EBITDA" },
-  { id: "a2", time: "May 12, 2026 8:47 AM", user: "Sarah Delgado", action: "Updated Mapping", details: "Payroll Expense" },
-  { id: "a3", time: "May 11, 2026 4:22 PM", user: "James Okonkwo", action: "Added Line Item", details: "Cash Balance" },
-  { id: "a4", time: "May 11, 2026 11:05 AM", user: "Priya Shah", action: "Updated Driver", details: "Churn" },
-  { id: "a5", time: "May 10, 2026 2:38 PM", user: "Michael Chen", action: "Validated Module", details: "Revenue & P&L" },
-  { id: "a6", time: "May 9, 2026 10:15 AM", user: "Sarah Delgado", action: "Imported Data", details: "Custom / CSV" },
-]
-
 const AUDIT_AVATAR_COLORS: Record<string, { bg: string; text: string }> = {
   MC: { bg: "#dbeafe", text: "#1d4ed8" },
   SD: { bg: "#dcfce7", text: "#15803d" },
@@ -230,41 +104,9 @@ function auditInitials(name: string) {
     .toUpperCase()
 }
 
-const DEMO_EXCEPTIONS = [
-  { id: "e1", sev: "error" as const, lineItem: "R&D Expense", issue: "Missing required mapping", impact: "High" as const },
-  { id: "e2", sev: "error" as const, lineItem: "Other Operating Expense", issue: "Source field not found in source system", impact: "High" as const },
-  { id: "w1", sev: "warning" as const, lineItem: "Churn", issue: "Driver has no data for Dec '26", impact: "Medium" as const },
-  { id: "w2", sev: "warning" as const, lineItem: "CapEx", issue: "Formula references missing precedent", impact: "Medium" as const },
-  { id: "w3", sev: "warning" as const, lineItem: "Marketing Spend", issue: "Stale driver — not updated in 45 days", impact: "Medium" as const },
-  { id: "w4", sev: "warning" as const, lineItem: "Payroll Expense", issue: "Negative value detected in Apr '26", impact: "Low" as const },
-  { id: "w5", sev: "warning" as const, lineItem: "Gross Margin", issue: "Division risk when Net Revenue = 0", impact: "Medium" as const },
-  { id: "w6", sev: "warning" as const, lineItem: "FX Rate", issue: "Fallback FX rate applied (EUR→USD)", impact: "Low" as const },
-  { id: "w7", sev: "warning" as const, lineItem: "Avg Fully Burdened Cost", issue: "Mapping type mismatch (Currency vs Number)", impact: "Low" as const },
-  { id: "i1", sev: "info" as const, lineItem: "Cash Balance", issue: "Circular reference detected", impact: "Low" as const },
-  { id: "i2", sev: "info" as const, lineItem: "Units & Pricing", issue: "Template applied — SaaS Revenue Pack", impact: "Low" as const },
-  { id: "i3", sev: "info" as const, lineItem: "Net ARR", issue: "Last calculated May 12, 2026 9:12 AM", impact: "Low" as const },
-  { id: "i4", sev: "info" as const, lineItem: "Model", issue: "Calc queue idle — no pending jobs", impact: "Low" as const },
-]
-
 type ExcTab = "errors" | "warnings" | "info" | null
 
-const VALIDATION_SUMMARY = { total: 13, passed: 9, warnings: 3, errors: 1 }
-
-const DEMO_VALIDATION_CHECKS = [
-  { id: "v1", check: "Formula syntax validation", status: "passed" as const, module: "Revenue & P&L" },
-  { id: "v2", check: "Circular reference scan", status: "passed" as const, module: "Cash Balance" },
-  { id: "v3", check: "Driver data completeness", status: "passed" as const, module: "Units & Pricing" },
-  { id: "v4", check: "Period alignment", status: "passed" as const, module: "Model" },
-  { id: "v5", check: "FX rate availability", status: "passed" as const, module: "Treasury" },
-  { id: "v6", check: "Module dependency graph", status: "passed" as const, module: "Revenue & P&L" },
-  { id: "v7", check: "Aggregation consistency", status: "passed" as const, module: "Payroll" },
-  { id: "v8", check: "Template version match", status: "passed" as const, module: "Units & Pricing" },
-  { id: "v9", check: "Calc engine readiness", status: "passed" as const, module: "Model" },
-  { id: "v10", check: "Missing required mapping", status: "error" as const, module: "R&D Expense" },
-  { id: "v11", check: "Stale driver data", status: "warning" as const, module: "Marketing Spend" },
-  { id: "v12", check: "Negative value detected", status: "warning" as const, module: "Churn" },
-  { id: "v13", check: "Mapping type mismatch", status: "warning" as const, module: "Avg Fully Burdened Cost" },
-]
+const EMPTY_VALIDATION_SUMMARY = { total: 0, passed: 0, warnings: 0, errors: 0 }
 
 type DetailModalKind = "mappings" | "audit" | "exceptions" | "validation" | null
 
@@ -278,9 +120,7 @@ type Props = {
   onOpenModelSettings?: () => void
   onTestCalc: () => void
   onPublish?: () => void
-  /** True when model/version is already published — keep Publish disabled. */
   publishDisabled?: boolean
-  modelPublished?: boolean
   onLeafChange: (leaf: SelectedModuleLeaf) => void
   onSelectRow?: (row: { id: string; name: string; formula: string; kind: "INPUT" | "CALCULATED" }) => void
   lineItems?: FpaLineItem[]
@@ -329,7 +169,6 @@ export function BuilderDetailedWorkspace({
   onTestCalc,
   onPublish,
   publishDisabled = false,
-  modelPublished = false,
   onLeafChange,
   onSelectRow,
   lineItems = [],
@@ -363,28 +202,23 @@ export function BuilderDetailedWorkspace({
   onRunSensitivity,
   onValidate,
 }: Props) {
-  const useLiveGrid = lineItems.length > 0 && periodLabels.length > 0
-  const monthHeaders = useLiveGrid ? periodLabels : MONTHS
+  const useLiveGrid = lineItems.length > 0
+  const monthHeaders = periodLabels
 
   const liveRows = useMemo(
-    () =>
-      useLiveGrid
-        ? buildDetailedRows(lineItems, monthHeaders.length, previewByLine, fyTotals)
-        : rowsForWorkspace(leaf?.leafId),
-    [useLiveGrid, lineItems, monthHeaders.length, previewByLine, fyTotals, leaf?.leafId],
+    () => buildDetailedRows(lineItems, monthHeaders.length, previewByLine, fyTotals),
+    [lineItems, monthHeaders.length, previewByLine, fyTotals],
   )
 
   const [rows, setRows] = useState<WorkspaceRow[]>(() => liveRows)
   const [selectedId, setSelectedId] = useState<string>(() => {
     if (selectedLineItemId) return selectedLineItemId
     const prefer = liveRows.find((r) => r.kind === "CALCULATED") || liveRows[0]
-    return prefer?.id || "ebitda"
+    return prefer?.id || ""
   })
-  const [showHidden, setShowHidden] = useState(false)
   const grainFromProp =
     gridGrain === "quarterly" ? "Quarterly" : gridGrain === "annual" ? "Annual" : "Monthly"
   const [grain, setGrain] = useState<"Monthly" | "Quarterly" | "Annual">(grainFromProp)
-  const [gridView, setGridView] = useState<"grid" | "columns" | "filter">("grid")
   const [editing, setEditing] = useState<{ rowId: string; col: number | "formula" } | null>(null)
   const [draft, setDraft] = useState("")
   const [excTab, setExcTab] = useState<ExcTab>(null)
@@ -415,18 +249,6 @@ export function BuilderDetailedWorkspace({
   }, [liveRows])
 
   useEffect(() => {
-    if (!useLiveGrid) {
-      logFpaGap({
-        category: "missing",
-        path: "/v1/fpa/models/:id/grid?moduleId=",
-        method: "GET",
-        message: "Detailed grid using demo P&L — no live line items or periods",
-        impact: "Line Item Builder shows SRD mock instead of API values",
-      })
-    }
-  }, [useLiveGrid])
-
-  useEffect(() => {
     if (selectedLineItemId) setSelectedId(selectedLineItemId)
   }, [selectedLineItemId])
 
@@ -449,10 +271,7 @@ export function BuilderDetailedWorkspace({
 
   const selected = rows.find((r) => r.id === selectedId) || rows[0]
 
-  const moduleFolders = useMemo(
-    () => (apiModules.length ? apiModulesToFolders(apiModules) : HARDCODED_MODULE_FOLDERS),
-    [apiModules],
-  )
+  const moduleFolders = useMemo(() => apiModulesToFolders(apiModules), [apiModules])
 
   const leafOptions = useMemo(
     () =>
@@ -468,21 +287,11 @@ export function BuilderDetailedWorkspace({
     [moduleFolders],
   )
 
-  const auditData = auditRows ?? DEMO_AUDIT
-  const exceptionData = exceptionRows ?? DEMO_EXCEPTIONS
-  const valSummary = validationSummary ?? VALIDATION_SUMMARY
-  const valChecks = validationChecks ?? DEMO_VALIDATION_CHECKS
-  const mappingData: DetailedMappingRow[] =
-    mappingRows ??
-    DEMO_MAPPINGS.map((m, i) => ({
-      id: `demo-${i}`,
-      source: m.source,
-      system: m.system,
-      target: m.target,
-      targetLineItemId: null,
-      ok: m.ok,
-      status: m.ok ? "MAPPED" : "UNMAPPED",
-    }))
+  const auditData = auditRows ?? []
+  const exceptionData = exceptionRows ?? []
+  const valSummary = validationSummary ?? EMPTY_VALIDATION_SUMMARY
+  const valChecks = validationChecks ?? []
+  const mappingData: DetailedMappingRow[] = mappingRows ?? []
 
   const filteredMaps = mappingData.filter((m) => {
     if (mapSystem !== "All Sources" && m.system !== mapSystem) return false
@@ -567,16 +376,14 @@ export function BuilderDetailedWorkspace({
         : "Validated"
       : validation.valid === false
         ? `${validation.errorCount} errors`
-        : "Validated"
+        : "Not validated"
 
   const publishBlocked =
     !onPublish || validation.valid === false || !canEdit || publishDisabled
   const publishTitle = !onPublish
     ? "Publish unavailable"
     : publishDisabled
-      ? modelPublished
-        ? "This model is already published"
-        : "This version is already published or locked"
+      ? "Select and validate an editable draft version"
       : validation.valid === false
         ? "Fix validation errors before publish"
         : "Publish workspace version"
@@ -592,7 +399,7 @@ export function BuilderDetailedWorkspace({
   }
 
   const startEditValue = (row: WorkspaceRow, col: number) => {
-    if (!canEdit) return
+    if (!canEdit || row.kind === "CALCULATED") return
     if (grain !== "Monthly") {
       toast.message("Switch to Monthly to edit period cells")
       return
@@ -669,7 +476,7 @@ export function BuilderDetailedWorkspace({
         <button
           type="button"
           onClick={onBack}
-          className="h-8 inline-flex items-center gap-1.5 rounded-md border border-[#e2e8f0] bg-white px-2.5 text-[12px] font-medium text-[#475569] hover:bg-[#f8fafc]"
+          className="h-8 inline-flex items-center gap-1.5 rounded-full border border-[#e2e8f0] bg-white px-2.5 text-[12px] font-medium text-[#475569] hover:bg-[#f8fafc]"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
           Structure
@@ -678,7 +485,7 @@ export function BuilderDetailedWorkspace({
         <label className="relative inline-flex items-center gap-1.5 text-[12px] text-[#64748b]">
           <span className="sr-only">Module</span>
           <select
-            className="h-8 appearance-none rounded-md border border-[#e2e8f0] bg-white pl-3 pr-8 text-[13px] font-semibold text-[#0f172a] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20"
+            className="h-8 appearance-none rounded-full border border-[#e2e8f0] bg-white pl-3 pr-8 text-[13px] font-semibold text-[#0f172a] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20"
             value={leaf?.leafId || ""}
             onChange={(e) => {
               const opt = leafOptions.find((o) => o.leafId === e.target.value)
@@ -701,21 +508,30 @@ export function BuilderDetailedWorkspace({
           <ChevronDown className="pointer-events-none absolute right-2 w-3.5 h-3.5 text-[#94a3b8]" />
         </label>
 
-        <div className="inline-flex items-center gap-1.5 rounded-full bg-[#ecfdf5] px-2.5 py-1 text-[11px] font-medium text-[#166534]">
-          <CheckCircle2 className="w-3.5 h-3.5" />
+        <div
+          className={cn(
+            "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium",
+            validation.valid === true
+              ? "bg-[#ecfdf5] text-[#166534]"
+              : validation.valid === false
+                ? "bg-[#fef2f2] text-[#b91c1c]"
+                : "bg-[#f1f5f9] text-[#64748b]",
+          )}
+        >
+          {validation.valid === true ? (
+            <CheckCircle2 className="w-3.5 h-3.5" />
+          ) : (
+            <AlertCircle className="w-3.5 h-3.5" />
+          )}
           {validatedLabel}
-          <span className="font-normal text-[#64748b]">as of May 12, 2026 9:12 AM</span>
         </div>
 
         <div className="flex-1" />
 
         <button
           type="button"
-          onClick={() => {
-            onTestCalc()
-            toast.success("Calculation preview refreshed")
-          }}
-          className="h-8 inline-flex items-center gap-1.5 rounded-md border border-[#e2e8f0] bg-white px-3 text-[12px] font-medium text-[#2563eb] hover:bg-[#f8fafc]"
+          onClick={onTestCalc}
+          className="h-8 inline-flex items-center gap-1.5 rounded-full border border-[#e2e8f0] bg-white px-3 text-[12px] font-medium text-[#2563eb] hover:bg-[#f8fafc]"
         >
           <Play className="w-3.5 h-3.5" />
           Test Calculation
@@ -723,7 +539,7 @@ export function BuilderDetailedWorkspace({
         <button
           type="button"
           onClick={onOpenHistory}
-          className="h-8 inline-flex items-center gap-1.5 rounded-md border border-[#e2e8f0] bg-white px-3 text-[12px] font-medium text-[#2563eb] hover:bg-[#f8fafc]"
+          className="h-8 inline-flex items-center gap-1.5 rounded-full border border-[#e2e8f0] bg-white px-3 text-[12px] font-medium text-[#2563eb] hover:bg-[#f8fafc]"
         >
           <History className="w-3.5 h-3.5" />
           Change History
@@ -746,26 +562,16 @@ export function BuilderDetailedWorkspace({
           className="h-8 inline-flex items-center gap-1 rounded-full bg-[#2563eb] px-3 text-[12px] font-medium text-white shadow-sm hover:bg-[#1d4ed8] disabled:opacity-50"
         >
           Publish
-          <ChevronDown className="w-3.5 h-3.5 opacity-80" />
         </button>
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto fpa-thin-scroll p-3 space-y-3">
-        {/* Line Item Builder — hardcoded to SRD screenshot */}
+        {/* Line Item Builder */}
         <section className="rounded-lg border border-[#e2e8f0] bg-white overflow-hidden">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-[#e2e8f0] px-4 py-3">
-            <div className="flex items-center gap-1.5 shrink-0">
-              <h2 className="text-[15px] font-semibold text-[#0f172a] tracking-tight">
-                Line Item Builder
-              </h2>
-              <button
-                type="button"
-                className="h-6 w-6 inline-flex items-center justify-center rounded text-[#94a3b8] hover:bg-[#f1f5f9] hover:text-[#64748b]"
-                aria-label="Edit builder title"
-              >
-                <Pencil className="w-3.5 h-3.5" />
-              </button>
-            </div>
+            <h2 className="shrink-0 text-[15px] font-semibold text-[#0f172a] tracking-tight">
+              Line Item Builder
+            </h2>
 
             <label className="inline-flex items-center gap-1.5 text-[12px] text-[#64748b]">
               View
@@ -778,22 +584,12 @@ export function BuilderDetailedWorkspace({
                     next === "Quarterly" ? "quarterly" : next === "Annual" ? "annual" : "monthly"
                   onGridGrainChange?.(apiGrain)
                 }}
-                className="h-8 rounded-md border border-[#e2e8f0] bg-white pl-2.5 pr-7 text-[12px] font-medium text-[#0f172a] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20"
+                className="h-8 rounded-full border border-[#e2e8f0] bg-white pl-2.5 pr-7 text-[12px] font-medium text-[#0f172a] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20"
               >
                 <option value="Monthly">Monthly</option>
                 <option value="Quarterly">Quarterly</option>
                 <option value="Annual">Annual</option>
               </select>
-            </label>
-
-            <label className="inline-flex items-center gap-2 text-[12px] text-[#64748b] cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={showHidden}
-                onChange={(e) => setShowHidden(e.target.checked)}
-                className="h-3.5 w-3.5 rounded border-[#cbd5e1] text-[#2563eb] focus:ring-[#2563eb]/30"
-              />
-              Show hidden
             </label>
 
             <div className="flex-1 min-w-[8px]" />
@@ -808,50 +604,6 @@ export function BuilderDetailedWorkspace({
               Add Line Item
             </button>
 
-            <div className="inline-flex items-center rounded-md border border-[#e2e8f0] overflow-hidden">
-              <button
-                type="button"
-                onClick={() => setGridView("grid")}
-                className={cn(
-                  "h-8 w-8 inline-flex items-center justify-center",
-                  gridView === "grid"
-                    ? "bg-[#eff6ff] text-[#2563eb] ring-1 ring-inset ring-[#2563eb]"
-                    : "text-[#64748b] hover:bg-[#f8fafc]",
-                )}
-                aria-label="Grid view"
-                title="Grid view"
-              >
-                <Grid3X3 className="w-3.5 h-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setGridView("columns")}
-                className={cn(
-                  "h-8 w-8 inline-flex items-center justify-center border-l border-[#e2e8f0]",
-                  gridView === "columns"
-                    ? "bg-[#eff6ff] text-[#2563eb]"
-                    : "text-[#64748b] hover:bg-[#f8fafc]",
-                )}
-                aria-label="Column layout"
-                title="Column layout"
-              >
-                <Columns3 className="w-3.5 h-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setGridView("filter")}
-                className={cn(
-                  "h-8 w-8 inline-flex items-center justify-center border-l border-[#e2e8f0]",
-                  gridView === "filter"
-                    ? "bg-[#eff6ff] text-[#2563eb]"
-                    : "text-[#64748b] hover:bg-[#f8fafc]",
-                )}
-                aria-label="Filter"
-                title="Filter"
-              >
-                <Filter className="w-3.5 h-3.5" />
-              </button>
-            </div>
           </div>
 
           <div className="overflow-x-auto">
@@ -882,7 +634,7 @@ export function BuilderDetailedWorkspace({
                     </th>
                   ))}
                   <th className="px-3 py-2.5 font-semibold text-right whitespace-nowrap text-[#0f172a]">
-                    FY2026
+                    Total
                   </th>
                 </tr>
               </thead>
@@ -968,7 +720,7 @@ export function BuilderDetailedWorkspace({
                       {row.values.map((v, i) => {
                         const isEditing =
                           editing?.rowId === row.id && editing.col === i
-                        const editable = canEdit && grain === "Monthly"
+                        const editable = canEdit && grain === "Monthly" && !isCalc
                         return (
                           <td
                             key={i}
@@ -1022,21 +774,26 @@ export function BuilderDetailedWorkspace({
                           "px-3 py-2 text-right tabular-nums font-semibold whitespace-nowrap",
                           row.fy < 0 ? "text-[#dc2626]" : "text-[#0f172a]",
                         )}
-                        title="FY total (read-only in demo)"
+                        title="Total (read-only)"
                       >
                         {formatCell(row.fy, row.format)}
                       </td>
                     </tr>
                   )
                 })}
+                {rows.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={4 + monthHeaders.length}
+                      className="px-6 py-10 text-center text-[12px] text-[#64748b]"
+                    >
+                      No line items are configured for this module. Add a line item or import model data.
+                    </td>
+                  </tr>
+                ) : null}
               </tbody>
             </table>
           </div>
-          {showHidden ? (
-            <p className="border-t border-[#f1f5f9] px-4 py-2 text-[11px] text-[#94a3b8]">
-              No hidden line items in this module.
-            </p>
-          ) : null}
         </section>
 
         {/* 2×3 analytics grid */}
@@ -1053,7 +810,6 @@ export function BuilderDetailedWorkspace({
             dependents={traceDependents}
             cellMeta={cellMeta}
             cellTrace={cellTrace}
-            preferLiveChain={useLiveGrid}
             onNavigate={(name) => {
               const match =
                 rows.find((r) => r.name === name) ||
@@ -1242,7 +998,6 @@ function FormulaTracePanel({
   dependents: dependentsOverride,
   cellMeta,
   cellTrace,
-  preferLiveChain,
 }: {
   row: WorkspaceRow | undefined
   rows: WorkspaceRow[]
@@ -1256,7 +1011,6 @@ function FormulaTracePanel({
   dependents?: string[]
   cellMeta?: DetailedCellMeta | null
   cellTrace?: DetailedTraceView | null
-  preferLiveChain?: boolean
 }) {
   const name = row?.name || "—"
   const formula = row?.formula && row.formula !== "—" ? row.formula : ""
@@ -1269,26 +1023,14 @@ function FormulaTracePanel({
 
   const precedents = useMemo(() => {
     if (precedentsOverride?.length) return precedentsOverride
-    if (!preferLiveChain) {
-      if (name === "EBITDA") return ["Net ARR", "Payroll Expense", "Marketing Spend"]
-      if (name === "Net ARR") return ["Starting ARR", "New Bookings", "Churn"]
-      if (name === "Cash Balance") return ["Cash Balance", "EBITDA", "CapEx"]
-      if (name === "Payroll Expense") return ["Headcount", "Avg Fully Burdened Cost"]
-    }
     if (isCalc) return extractRefs(formula)
     return []
-  }, [precedentsOverride, name, isCalc, formula, preferLiveChain])
+  }, [precedentsOverride, isCalc, formula])
 
   const dependents = useMemo(() => {
     if (dependentsOverride?.length) return dependentsOverride
-    if (!preferLiveChain) {
-      if (name === "EBITDA") return ["Cash Balance", "Free Cash Flow"]
-      if (name === "Net ARR") return ["EBITDA", "Cash Balance"]
-      if (name === "Starting ARR" || name === "New Bookings" || name === "Churn") return ["Net ARR"]
-      if (name === "Payroll Expense" || name === "Marketing Spend") return ["EBITDA"]
-    }
     return []
-  }, [dependentsOverride, name, preferLiveChain])
+  }, [dependentsOverride])
 
   const fmtWhen = (iso?: string | null) => {
     if (!iso) return "—"
@@ -1424,11 +1166,9 @@ function FormulaTracePanel({
             <div className="min-w-0">
               <p className="text-[10px] font-semibold text-[#0f172a] mb-1">Calculation Chain</p>
               <CalcChainFlow
-                byName={byName}
                 onNavigate={onNavigate}
                 focusName={name}
-                liveTrace={preferLiveChain ? cellTrace : null}
-                preferLive={preferLiveChain}
+                liveTrace={cellTrace}
               />
             </div>
           </div>
@@ -1458,12 +1198,10 @@ function FormulaTracePanel({
           <div>
             <p className="text-[10px] font-semibold text-[#0f172a] mb-2">Calculation Chain</p>
             <CalcChainFlow
-              byName={byName}
               onNavigate={onNavigate}
               focusName={name}
               wide
-              liveTrace={preferLiveChain ? cellTrace : null}
-              preferLive={preferLiveChain}
+              liveTrace={cellTrace}
             />
           </div>
         )}
@@ -1566,35 +1304,6 @@ type ChainNodeDef = {
   kind: ChainNodeKind
 }
 
-const CHAIN_LAYOUT: ChainNodeDef[] = [
-  { id: "starting-arr", label: "Starting ARR", x: 6, y: 4, w: 78, h: 36, kind: "driver" },
-  { id: "new-bookings", label: "New Bookings", x: 101, y: 4, w: 78, h: 36, kind: "driver" },
-  { id: "churn", label: "Churn", x: 196, y: 4, w: 78, h: 36, kind: "driver" },
-  { id: "net-arr", label: "Net ARR", x: 101, y: 52, w: 78, h: 36, kind: "calculated" },
-  { id: "payroll", label: "Payroll Expense", x: 36, y: 100, w: 78, h: 36, kind: "driver" },
-  { id: "marketing", label: "Marketing Spend", x: 166, y: 100, w: 78, h: 36, kind: "driver" },
-  { id: "ebitda", label: "EBITDA", x: 101, y: 148, w: 78, h: 36, kind: "result" },
-]
-
-const CHAIN_EDGES: Array<[string, string]> = [
-  ["starting-arr", "net-arr"],
-  ["new-bookings", "net-arr"],
-  ["churn", "net-arr"],
-  ["net-arr", "ebitda"],
-  ["payroll", "ebitda"],
-  ["marketing", "ebitda"],
-]
-
-const CASH_NODE: ChainNodeDef = {
-  id: "cash-balance",
-  label: "Cash Balance",
-  x: 101,
-  y: 196,
-  w: 78,
-  h: 36,
-  kind: "result",
-}
-
 function chainAnchor(node: ChainNodeDef, side: "top" | "bottom") {
   const cx = node.x + node.w / 2
   const cy = side === "top" ? node.y : node.y + node.h
@@ -1640,30 +1349,26 @@ function layoutLiveTrace(trace: DetailedTraceView): {
 }
 
 function CalcChainFlow({
-  byName,
   onNavigate,
   focusName,
   wide,
   liveTrace,
-  preferLive,
 }: {
-  byName: Map<string, WorkspaceRow>
   onNavigate: (name: string) => void
   focusName: string
   wide?: boolean
   liveTrace?: DetailedTraceView | null
-  preferLive?: boolean
 }) {
-  const live = preferLive ? liveTrace : null
-  if (preferLive && (!live || live.nodes.length === 0)) {
+  const live = liveTrace
+  if (!live || live.nodes.length === 0) {
     return (
       <div className="rounded-lg border border-[#e2e8f0] bg-[#fafbfc] px-3 py-4 text-[10px] text-[#64748b] leading-snug">
-        No calculation chain for this cell yet. Run Test Calculation, or select a CALCULATED line
-        item that has cell values.
+        Calculation chain unavailable. Run Test Calculation, or select a calculated line item with
+        live cell trace data.
       </div>
     )
   }
-  if (preferLive && live && live.nodes.length === 1 && live.edges.length === 0) {
+  if (live.nodes.length === 1 && live.edges.length === 0) {
     const only = live.nodes[0]
     return (
       <div className="rounded-lg border border-[#e2e8f0] bg-[#fafbfc] px-3 py-3 text-[10px] text-[#64748b] leading-snug space-y-1">
@@ -1677,22 +1382,12 @@ function CalcChainFlow({
     )
   }
 
-  const showCash = focusName === "Cash Balance"
-  const laidOut = live ? layoutLiveTrace(live) : null
-  const nodes = laidOut
-    ? laidOut.nodes
-    : showCash
-      ? [...CHAIN_LAYOUT, CASH_NODE]
-      : CHAIN_LAYOUT
-  const edges = laidOut
-    ? laidOut.edges
-    : showCash
-      ? [...CHAIN_EDGES, ["ebitda", "cash-balance"] as [string, string]]
-      : CHAIN_EDGES
+  const laidOut = layoutLiveTrace(live)
+  const nodes = laidOut.nodes
+  const edges = laidOut.edges
 
   const nodeById = new Map(nodes.map((n) => [n.id, n]))
-  const liveVal = (id: string) => live?.nodes.find((n) => n.id === id)?.value
-  const val = (label: string) => byName.get(label)?.fy
+  const liveVal = (id: string) => live.nodes.find((n) => n.id === id)?.value
 
   const kindStyles: Record<ChainNodeKind, { stroke: string; bar: string }> = {
     driver: { stroke: "#93c5fd", bar: "#2563eb" },
@@ -1701,13 +1396,11 @@ function CalcChainFlow({
   }
 
   const maxY = nodes.reduce((m, n) => Math.max(m, n.y + n.h), 0)
-  const vbH = Math.max(live ? maxY + 24 : showCash ? 240 : 200, 120)
-  const vbW = live
-    ? Math.max(
-        280,
-        nodes.reduce((m, n) => Math.max(m, n.x + n.w), 0) + 16,
-      )
-    : 280
+  const vbH = Math.max(maxY + 24, 120)
+  const vbW = Math.max(
+    280,
+    nodes.reduce((m, n) => Math.max(m, n.x + n.w), 0) + 16,
+  )
 
   return (
     <div
@@ -1755,14 +1448,13 @@ function CalcChainFlow({
         {nodes.map((node) => {
           const styles = kindStyles[node.kind]
           const liveV = liveVal(node.id)
-          const demoV = val(node.label)
           const value =
             liveV != null
               ? typeof liveV === "number"
                 ? liveV
                 : Number(liveV)
-              : demoV
-          const isFocus = node.label === focusName || live?.nodes.some(
+              : null
+          const isFocus = node.label === focusName || live.nodes.some(
             (n) => n.id === node.id && n.label === focusName,
           )
           const valueColor =
@@ -1961,7 +1653,7 @@ function DataMappingPanel({
               value={system}
               onChange={(e) => onSystem(e.target.value)}
               aria-label="Source System"
-              className="h-8 appearance-none rounded-md border border-[#e2e8f0] bg-white pl-2.5 pr-7 text-[11px] text-[#0f172a] min-w-[118px]"
+              className="h-8 appearance-none rounded-full border border-[#e2e8f0] bg-white pl-2.5 pr-7 text-[11px] text-[#0f172a] min-w-[118px]"
             >
               {systemOptions.map((s) => (
                 <option key={s} value={s}>
@@ -2451,29 +2143,18 @@ function ImpactAnalysisPanel({
     setDriverId((prev) => prev || drivers[0]?.id || "")
   }, [row?.id, drivers])
 
-  const fallbackName = row?.name || "Driver"
-  const useLive = sensitivity != null
   const driverName =
     sensitivity?.driverName ||
     drivers.find((d) => d.id === driverId)?.name ||
-    fallbackName
+    row?.name ||
+    "Driver"
   const shockLabel = sensitivity?.shockLabel || `+${shockPct}%`
-  const impacts = useLive
-    ? sensitivity?.impacts || []
-    : [
-        { lineItemId: "ebitda", name: "EBITDA", deltaTotal: 84965, deltaPct: 5.19 },
-        { lineItemId: "cash", name: "Cash Balance", deltaTotal: 84965, deltaPct: 5.19 },
-      ]
-  const months = useLive && sensitivity?.months?.length
-    ? sensitivity.months
-    : ["Jan '26", "Mar '26", "May '26", "Jul '26", "Sep '26", "Nov '26"]
-  const baseCase = useLive && sensitivity?.baseCase?.length
-    ? sensitivity.baseCase
-    : [1.02, 1.12, 1.22, 1.32, 1.42, 1.52]
-  const shocked = useLive && sensitivity?.shocked?.length
-    ? sensitivity.shocked
-    : [1.08, 1.2, 1.32, 1.45, 1.58, 1.72]
-  const unitLabel = sensitivity?.unitLabel || "USD (000s)"
+  const impacts = sensitivity?.impacts || []
+  const months = sensitivity?.months || []
+  const baseCase = sensitivity?.baseCase || []
+  const shocked = sensitivity?.shocked || []
+  const unitLabel = sensitivity?.unitLabel || ""
+  const hasChartData = months.length > 0 && baseCase.length > 0 && shocked.length > 0
 
   const chartW = 280
   const chartH = 160
@@ -2593,11 +2274,10 @@ function ImpactAnalysisPanel({
         </div>
 
         <div className="flex-1 min-w-0 flex flex-col min-h-[200px]">
-          {!useLive && leftCards.length > 0 ? (
-            <p className="text-[9px] text-[#94a3b8] mb-1">Demo preview — waiting for sensitivity API data</p>
-          ) : null}
-          {sensitivity?.emptyMessage && leftCards.length === 0 ? (
-            <p className="text-[11px] text-[#64748b] m-auto text-center px-4">{sensitivity.emptyMessage}</p>
+          {!hasChartData ? (
+            <p className="text-[11px] text-[#64748b] m-auto text-center px-4">
+              {sensitivity?.emptyMessage || "Run sensitivity analysis to view impact data."}
+            </p>
           ) : (
             <>
               <div className="flex items-center justify-center gap-4 mb-1 text-[9px] text-[#64748b] shrink-0">

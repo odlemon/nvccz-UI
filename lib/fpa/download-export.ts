@@ -149,89 +149,103 @@ export async function downloadFpaExportFile(opts: {
   filename?: string
 }): Promise<{ filename: string; format: "binary" | "csv" | "json" }> {
   const filename = opts.filename || "fpa-export.xlsx"
-  let fetchUrl: string | null = null
+  const visited = new Set<string>()
+  const maxDepth = 5
 
-  if (opts.exportId) {
-    fetchUrl = `${API_BASE}/v1/fpa/exports/${opts.exportId}/download`
-  } else if (opts.url) {
-    const id = extractFpaExportId(opts.url)
-    fetchUrl = id
-      ? `${API_BASE}/v1/fpa/exports/${id}/download`
-      : toAbsoluteApiUrl(opts.url)
-  }
-
-  if (!fetchUrl) throw new Error("No export file to download")
-
-  const token = getAuthToken()
-  const res = await fetch(fetchUrl, {
-    method: "GET",
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  })
-
-  if (!res.ok) {
-    let message = `Download failed (${res.status})`
-    try {
-      const err = await res.json()
-      if (err?.message) message = String(err.message)
-    } catch {
-      /* ignore */
-    }
-    throw new Error(message)
-  }
-
-  const contentType = (res.headers.get("content-type") || "").toLowerCase()
-  if (contentType.includes("application/json")) {
-    const json = await res.json()
-    const nested =
-      json?.data?.downloadUrl ||
-      json?.data?.url ||
-      json?.downloadUrl ||
-      json?.url
-    if (typeof nested === "string" && nested) {
-      return downloadFpaExportFile({ url: nested, filename })
+  const download = async (
+    target: { exportId?: string | null; url?: string | null },
+    depth: number,
+  ): Promise<{ filename: string; format: "binary" | "csv" | "json" }> => {
+    if (depth > maxDepth) {
+      throw new Error("Download returned too many redirect responses")
     }
 
-    // Backend currently returns the export payload as JSON (cells pack), not a binary file.
-    const payload =
-      json?.data && typeof json.data === "object" && !Array.isArray(json.data)
-        ? json.data
-        : json
-    if (
-      payload &&
-      typeof payload === "object" &&
-      (Array.isArray((payload as { cells?: unknown }).cells) ||
-        (payload as { cellCount?: unknown }).cellCount != null ||
-        (payload as { exportType?: unknown }).exportType)
-    ) {
-      const csv = boardPackPayloadToCsv(payload)
-      if (csv) {
-        const csvName = filename
-          .replace(/\.xlsx$/i, ".csv")
-          .replace(/\.xls$/i, ".csv")
-          .replace(/\.json$/i, ".csv")
-        const finalName = csvName.endsWith(".csv") ? csvName : `${csvName}.csv`
-        triggerBrowserDownload(new Blob([csv], { type: "text/csv;charset=utf-8" }), finalName)
-        return { filename: finalName, format: "csv" }
+    let fetchUrl: string | null = null
+    if (target.exportId) {
+      fetchUrl = `${API_BASE}/v1/fpa/exports/${target.exportId}/download`
+    } else if (target.url) {
+      fetchUrl = toAbsoluteApiUrl(target.url)
+    }
+
+    if (!fetchUrl) throw new Error("No export file to download")
+    if (visited.has(fetchUrl)) {
+      throw new Error("Download endpoint returned the same URL repeatedly")
+    }
+    visited.add(fetchUrl)
+
+    const token = getAuthToken()
+    const res = await fetch(fetchUrl, {
+      method: "GET",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+
+    if (!res.ok) {
+      let message = `Download failed (${res.status})`
+      try {
+        const err = await res.json()
+        if (err?.message) message = String(err.message)
+      } catch {
+        /* ignore */
+      }
+      throw new Error(message)
+    }
+
+    const contentType = (res.headers.get("content-type") || "").toLowerCase()
+    if (contentType.includes("application/json")) {
+      const json = await res.json()
+      const nested =
+        json?.data?.downloadUrl ||
+        json?.data?.url ||
+        json?.downloadUrl ||
+        json?.url
+      if (typeof nested === "string" && nested.trim()) {
+        return download({ url: nested.trim() }, depth + 1)
       }
 
-      if (/\.csv$/i.test(filename)) {
-        throw new Error("Export returned JSON without a cell grid — cannot build CSV")
+      // Backend currently returns the export payload as JSON (cells pack), not a binary file.
+      const payload =
+        json?.data && typeof json.data === "object" && !Array.isArray(json.data)
+          ? json.data
+          : json
+      if (
+        payload &&
+        typeof payload === "object" &&
+        (Array.isArray((payload as { cells?: unknown }).cells) ||
+          (payload as { cellCount?: unknown }).cellCount != null ||
+          (payload as { exportType?: unknown }).exportType)
+      ) {
+        const csv = boardPackPayloadToCsv(payload)
+        if (csv) {
+          const csvName = filename
+            .replace(/\.xlsx$/i, ".csv")
+            .replace(/\.xls$/i, ".csv")
+            .replace(/\.json$/i, ".csv")
+          const finalName = csvName.endsWith(".csv") ? csvName : `${csvName}.csv`
+          triggerBrowserDownload(new Blob([csv], { type: "text/csv;charset=utf-8" }), finalName)
+          return { filename: finalName, format: "csv" }
+        }
+
+        if (/\.csv$/i.test(filename)) {
+          throw new Error("Export returned JSON without a cell grid — cannot build CSV")
+        }
+
+        const jsonName = filename.replace(/\.xlsx$/i, ".json").replace(/\.xls$/i, ".json")
+        const finalName = jsonName.endsWith(".json") ? jsonName : `${jsonName}.json`
+        const blob = new Blob([JSON.stringify(payload, null, 2)], {
+          type: "application/json",
+        })
+        triggerBrowserDownload(blob, finalName)
+        return { filename: finalName, format: "json" }
       }
 
-      const jsonName = filename.replace(/\.xlsx$/i, ".json").replace(/\.xls$/i, ".json")
-      const finalName = jsonName.endsWith(".json") ? jsonName : `${jsonName}.json`
-      const blob = new Blob([JSON.stringify(payload, null, 2)], {
-        type: "application/json",
-      })
-      triggerBrowserDownload(blob, finalName)
-      return { filename: finalName, format: "json" }
+      throw new Error(json?.message || "Download not ready yet")
     }
 
-    throw new Error(json?.message || "Download not ready yet")
+    const blob = await res.blob()
+    const finalName = filenameFromHeaders(res, filename)
+    triggerBrowserDownload(blob, finalName)
+    return { filename: finalName, format: "binary" }
   }
 
-  const blob = await res.blob()
-  const finalName = filenameFromHeaders(res, filename)
-  triggerBrowserDownload(blob, finalName)
-  return { filename: finalName, format: "binary" }
+  return download({ exportId: opts.exportId, url: opts.url }, 0)
 }

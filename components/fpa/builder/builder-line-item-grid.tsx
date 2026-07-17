@@ -12,9 +12,7 @@ import {
   Filter,
   Grid3X3,
   Info,
-  Link2,
   Minimize2,
-  MoreHorizontal,
   Plus,
   Search,
   Sparkles,
@@ -525,7 +523,7 @@ function FormulaText({ formula }: { formula: string }) {
 type Props = {
   module: ModuleGroup | null
   pathOverride?: { parent: string; leaf: string } | null
-  /** Module tree leaf id — switches demo line items */
+  /** @deprecated Ignored. Line items always come from items. */
   leafId?: string | null
   items: FpaLineItem[]
   selectedId: string | null
@@ -539,19 +537,6 @@ type Props = {
   centreTab: CentreTab
   onCentreTab: (t: CentreTab) => void
   currency?: string
-  useHardcoded?: boolean
-  demoCreate?: {
-    name: string
-    code: string
-    kind: "INPUT" | "CALCULATED"
-    nonce: number
-  } | null
-  demoFormulaPatch?: {
-    rowId: string
-    formula: string
-    nonce: number
-  } | null
-  onDemoSelect?: (id: string, name: string, formula: string, kind: "INPUT" | "CALCULATED") => void
   onCellCommit?: (rowId: string, periodIndex: number, value: number) => void
   onFormulaCommit?: (rowId: string, formula: string) => void
   /** Open A.4 detailed workspace for current module leaf */
@@ -579,10 +564,6 @@ export function BuilderLineItemGrid({
   centreTab,
   onCentreTab,
   currency = "USD",
-  useHardcoded = true,
-  demoCreate,
-  demoFormulaPatch,
-  onDemoSelect,
   onCellCommit,
   onFormulaCommit,
   onOpenDetailedWorkspace,
@@ -594,77 +575,14 @@ export function BuilderLineItemGrid({
   onFocusValidation,
 }: Props) {
   const cardRef = useRef<HTMLElement>(null)
-  const [rows, setRows] = useState<DemoRow[]>(() => rowsForLeaf(leafId))
-  const [selectedDemoId, setSelectedDemoId] = useState<string | null>(null)
-  const [editing, setEditing] = useState<{ rowId: string; col: "formula" | number } | null>(null)
-  const [draft, setDraft] = useState("")
   const [filter, setFilter] = useState<"all" | "input" | "calc">("all")
   const [rowQuery, setRowQuery] = useState("")
-  const [viewMode, setViewMode] = useState<"grid" | "links">("grid")
   const [viewGrain, setViewGrain] = useState<ViewGrain>("Monthly")
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [showFilterBar, setShowFilterBar] = useState(false)
 
-  // Switch dataset when module leaf changes
-  useEffect(() => {
-    const next = rowsForLeaf(leafId)
-    setRows(next)
-    setEditing(null)
-    setFilter("all")
-    setRowQuery("")
-    const first = next.find((r) => r.kind === "CALCULATED") || next[0]
-    if (first) {
-      setSelectedDemoId(first.id)
-      onDemoSelect?.(
-        first.id,
-        first.name,
-        first.kind === "INPUT" ? "" : first.formula,
-        first.kind,
-      )
-    }
-  }, [leafId]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Instant create — append row without remounting / reloading module
-  useEffect(() => {
-    if (!demoCreate) return
-    const id = demoCreate.code.toLowerCase().replace(/[^a-z0-9]+/g, "-")
-    const row: DemoRow = {
-      id,
-      name: demoCreate.name,
-      kind: demoCreate.kind,
-      formula: demoCreate.kind === "INPUT" ? "Input" : "=[ ]",
-      values: [0, 0, 0, 0, 0, 0],
-      format: "number",
-      tint: demoCreate.kind === "CALCULATED",
-    }
-    setRows((prev) => {
-      if (prev.some((r) => r.id === id || r.name === demoCreate.name)) {
-        return prev.map((r) => (r.id === id ? { ...r, name: demoCreate.name, kind: demoCreate.kind } : r))
-      }
-      return [...prev, row]
-    })
-    setSelectedDemoId(id)
-    setFilter("all")
-    onCentreTab("items")
-    onDemoSelect?.(
-      id,
-      demoCreate.name,
-      demoCreate.kind === "INPUT" ? "" : "=[ ]",
-      demoCreate.kind,
-    )
-  }, [demoCreate?.nonce]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Instant formula save from inspector
-  useEffect(() => {
-    if (!demoFormulaPatch) return
-    setRows((prev) =>
-      prev.map((r) =>
-        r.id === demoFormulaPatch.rowId
-          ? { ...r, formula: demoFormulaPatch.formula, kind: "CALCULATED", tint: true }
-          : r,
-      ),
-    )
-  }, [demoFormulaPatch?.nonce]) // eslint-disable-line react-hooks/exhaustive-deps
+  void leafId
+  void onFormulaCommit
 
   useEffect(() => {
     const onFs = () => setIsFullscreen(Boolean(document.fullscreenElement))
@@ -704,106 +622,23 @@ export function BuilderLineItemGrid({
   ]
 
   const monthlyPeriods = useMemo(() => {
-    return useHardcoded || !periodLabels.length ? PERIODS : periodLabels.slice(0, 12)
-  }, [useHardcoded, periodLabels])
+    return periodLabels.slice(0, 12)
+  }, [periodLabels])
 
-  const periods = useMemo(
-    () => grainPeriodLabels(monthlyPeriods, viewGrain),
-    [monthlyPeriods, viewGrain],
-  )
-
-  const aggregateValues = useCallback(
-    (values: Array<number | null>) => aggregatePreview(values, viewGrain),
-    [viewGrain],
-  )
-
-  const visibleRows = useMemo(() => {
-    if (!useHardcoded) return []
-    let list = rows
-    if (filter === "input") list = list.filter((r) => r.kind === "INPUT")
-    if (filter === "calc") list = list.filter((r) => r.kind === "CALCULATED")
+  const visibleItems = useMemo(() => {
+    let list = items
+    if (filter === "input") list = list.filter((item) => lineItemKind(item) === "INPUT")
+    if (filter === "calc") list = list.filter((item) => lineItemKind(item) === "CALCULATED")
     const q = rowQuery.trim().toLowerCase()
     if (q) {
       list = list.filter(
-        (r) =>
-          r.name.toLowerCase().includes(q) ||
-          r.formula.toLowerCase().includes(q),
+        (item) =>
+          item.name.toLowerCase().includes(q) ||
+          String(item.formulas?.[0]?.expression || "").toLowerCase().includes(q),
       )
     }
     return list
-  }, [rows, filter, useHardcoded, rowQuery])
-
-  const fmt = (v: number | null | undefined, format: DemoRow["format"] = "number") => {
-    if (v == null || Number.isNaN(v)) return "—"
-    if (format === "percent") return `${(v * 100).toFixed(1)}%`
-    if (format === "currency")
-      return v.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })
-    return v.toLocaleString("en-US", { maximumFractionDigits: 0 })
-  }
-
-  const fmtCell = (row: DemoRow, values: Array<number | null>, i: number) => {
-    const v = values[i]
-    if (row.format === "percent" && viewGrain !== "Monthly" && v != null) {
-      // show average of monthly percents for Q/FY
-      const monthly = row.values.filter((x): x is number => x != null)
-      const avg =
-        monthly.length === 0 ? 0 : monthly.reduce((a, b) => a + b, 0) / monthly.length
-      return `${(avg * 100).toFixed(1)}%`
-    }
-    return fmt(v, row.format)
-  }
-
-  const startEdit = (rowId: string, col: "formula" | number, initial: string) => {
-    if (!canEdit) return
-    setEditing({ rowId, col })
-    setDraft(initial)
-  }
-
-  const commitEdit = () => {
-    if (!editing) return
-    const { rowId, col } = editing
-    if (col === "formula") {
-      setRows((prev) =>
-        prev.map((r) => (r.id === rowId ? { ...r, formula: draft || r.formula } : r)),
-      )
-      onFormulaCommit?.(rowId, draft)
-      const row = rows.find((r) => r.id === rowId)
-      if (row) {
-        onDemoSelect?.(rowId, row.name, draft || row.formula, "CALCULATED")
-      }
-      // no toast spam — parent / inline already feedback
-    } else {
-      if (viewGrain !== "Monthly") {
-        toast.message("Switch to Monthly view to edit period cells")
-        setEditing(null)
-        return
-      }
-      const n = Number(String(draft).replace(/[,%]/g, ""))
-      if (!Number.isFinite(n)) {
-        toast.error("Enter a valid number")
-        setEditing(null)
-        return
-      }
-      const row = rows.find((r) => r.id === rowId)
-      let store = n
-      if (row?.format === "percent" && n > 1) store = n / 100
-      setRows((prev) =>
-        prev.map((r) => {
-          if (r.id !== rowId) return r
-          const values = [...r.values]
-          values[col] = store
-          return { ...r, values }
-        }),
-      )
-      onCellCommit?.(rowId, col, store)
-    }
-    setEditing(null)
-  }
-
-  const selectDemo = (row: DemoRow) => {
-    setSelectedDemoId(row.id)
-    onDemoSelect?.(row.id, row.name, row.kind === "INPUT" ? "" : row.formula, row.kind)
-  }
+  }, [items, filter, rowQuery])
 
   return (
     <section
@@ -822,7 +657,7 @@ export function BuilderLineItemGrid({
               <button
                 type="button"
                 onClick={onOpenDetailedWorkspace}
-                className="h-8 inline-flex items-center gap-1 rounded-md border border-[#bfdbfe] bg-[#eff6ff] px-2.5 text-[11px] font-medium text-[#2563eb] hover:bg-[#dbeafe]"
+                className="h-8 inline-flex items-center gap-1 rounded-full border border-[#bfdbfe] bg-[#eff6ff] px-2.5 text-[11px] font-medium text-[#2563eb] hover:bg-[#dbeafe]"
                 title="Open detailed workspace"
               >
                 <BarChart3 className="w-3.5 h-3.5" />
@@ -839,16 +674,8 @@ export function BuilderLineItemGrid({
             </button>
             <button
               type="button"
-              onClick={() => {
-                setViewMode("grid")
-                onCentreTab("items")
-              }}
-              className={cn(
-                "h-8 w-8 inline-flex items-center justify-center rounded-md border",
-                viewMode === "grid"
-                  ? "border-[#bfdbfe] bg-[#eff6ff] text-[#2563eb]"
-                  : "border-[#e2e8f0] text-[#64748b] hover:bg-[#f8fafc]",
-              )}
+              onClick={() => onCentreTab("items")}
+              className="h-8 w-8 inline-flex items-center justify-center rounded-full border border-[#bfdbfe] bg-[#eff6ff] text-[#2563eb]"
               title="Grid view"
               aria-label="Grid view"
             >
@@ -856,25 +683,8 @@ export function BuilderLineItemGrid({
             </button>
             <button
               type="button"
-              onClick={() => {
-                setViewMode("links")
-                onCentreTab("items")
-              }}
-              className={cn(
-                "h-8 w-8 inline-flex items-center justify-center rounded-md border",
-                viewMode === "links"
-                  ? "border-[#bfdbfe] bg-[#eff6ff] text-[#2563eb]"
-                  : "border-[#e2e8f0] text-[#64748b] hover:bg-[#f8fafc]",
-              )}
-              title="Formula links view"
-              aria-label="Links view"
-            >
-              <Link2 className="w-3.5 h-3.5" />
-            </button>
-            <button
-              type="button"
               onClick={() => void toggleFullscreen()}
-              className="h-8 w-8 inline-flex items-center justify-center rounded-md border border-[#e2e8f0] text-[#64748b] hover:bg-[#f8fafc]"
+              className="h-8 w-8 inline-flex items-center justify-center rounded-full border border-[#e2e8f0] text-[#64748b] hover:bg-[#f8fafc]"
               title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
               aria-label={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
             >
@@ -920,7 +730,7 @@ export function BuilderLineItemGrid({
                 type="button"
                 onClick={() => setShowFilterBar((v) => !v)}
                 className={cn(
-                  "h-7 w-7 inline-flex items-center justify-center rounded-md border",
+                  "h-7 w-7 inline-flex items-center justify-center rounded-full border",
                   showFilterBar
                     ? "border-[#bfdbfe] bg-[#eff6ff] text-[#2563eb]"
                     : "border-[#e2e8f0] text-[#64748b]",
@@ -956,7 +766,7 @@ export function BuilderLineItemGrid({
           loading={templatesLoading}
           onApply={(id, name) => {
             if (onApplyTemplate) onApplyTemplate(id, name)
-            else toast.success(`Applied “${name}” to ${pathOverride?.leaf || "module"}`)
+            else toast.error("Template application is unavailable")
           }}
         />
       )}
@@ -974,209 +784,17 @@ export function BuilderLineItemGrid({
       {centreTab === "items" && (
         <>
           <div className="flex-1 overflow-auto min-h-0">
-            {viewMode === "links" ? (
-              <LinksView
-                rows={visibleRows}
-                selectedId={selectedDemoId}
-                onSelect={selectDemo}
-              />
-            ) : useHardcoded ? (
-              <table className="w-full text-[12px] border-collapse min-w-[900px]">
-                <thead className="sticky top-0 z-10">
-                  <tr className="bg-[#f8fafc] text-[#64748b] border-b border-[#e2e8f0]">
-                    <th className="w-8 px-2 py-2 font-medium sticky left-0 bg-[#f8fafc]">#</th>
-                    <th className="px-3 py-2 font-medium sticky left-8 bg-[#f8fafc] min-w-[160px] text-left">
-                      Line Item
-                    </th>
-                    <th className="px-3 py-2 font-medium min-w-[220px] text-left">Formula</th>
-                    <th
-                      colSpan={periods.length}
-                      className="px-3 py-1.5 font-medium text-center border-l border-[#e2e8f0]"
-                    >
-                      <div className="flex items-center justify-center gap-2">
-                        <span>
-                          FY2026 ({currency})
-                        </span>
-                        <button type="button" className="text-[#94a3b8]" aria-label="More">
-                          <MoreHorizontal className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </th>
-                  </tr>
-                  <tr className="bg-[#f8fafc] text-[#64748b] border-b border-[#e2e8f0]">
-                    <th className="sticky left-0 bg-[#f8fafc]" />
-                    <th className="sticky left-8 bg-[#f8fafc]" />
-                    <th />
-                    {periods.map((p) => (
-                      <th
-                        key={p}
-                        className="px-3 py-2 font-medium text-right whitespace-nowrap border-l border-[#f1f5f9]"
-                      >
-                        {p}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {visibleRows.length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan={3 + periods.length}
-                        className="px-4 py-12 text-center text-[#94a3b8]"
-                      >
-                        No line items match this filter.
-                      </td>
-                    </tr>
-                  ) : (
-                    visibleRows.map((row, idx) => {
-                      const sel = selectedDemoId === row.id
-                      const displayValues = aggregateValues(row.values)
-                      return (
-                        <tr
-                          key={row.id}
-                          className={cn(
-                            "border-b border-[#f1f5f9] cursor-pointer",
-                            sel || row.tint ? "bg-[#eff6ff]/70" : "hover:bg-[#f8fafc]",
-                          )}
-                          onClick={() => selectDemo(row)}
-                        >
-                          <td
-                            className={cn(
-                              "px-2 py-2 text-[#94a3b8] sticky left-0",
-                              sel || row.tint ? "bg-[#eff6ff]" : "bg-white",
-                            )}
-                          >
-                            {idx + 1}
-                          </td>
-                          <td
-                            className={cn(
-                              "px-3 py-2 sticky left-8",
-                              sel || row.tint ? "bg-[#eff6ff]" : "bg-white",
-                            )}
-                          >
-                            <div className="flex items-center gap-2">
-                              {row.kind === "INPUT" ? (
-                                <BarChart3 className="w-3.5 h-3.5 text-[#16a34a] shrink-0" />
-                              ) : (
-                                <span className="inline-flex h-5 min-w-[22px] items-center justify-center rounded bg-[#eff6ff] px-1 text-[10px] font-bold italic text-[#2563eb] shrink-0">
-                                  fx
-                                </span>
-                              )}
-                              <span className="font-medium text-[#0f172a]">{row.name}</span>
-                            </div>
-                          </td>
-                          <td
-                            className="px-2 py-1"
-                            onDoubleClick={(e) => {
-                              e.stopPropagation()
-                              if (row.kind !== "CALCULATED") return
-                              startEdit(row.id, "formula", row.formula)
-                            }}
-                          >
-                            {editing?.rowId === row.id && editing.col === "formula" ? (
-                              <input
-                                autoFocus
-                                value={draft}
-                                onChange={(e) => setDraft(e.target.value)}
-                                onBlur={commitEdit}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") commitEdit()
-                                  if (e.key === "Escape") setEditing(null)
-                                }}
-                                onClick={(e) => e.stopPropagation()}
-                                className="w-full h-8 rounded border-2 border-[#2563eb] px-2 text-[11px] font-mono outline-none"
-                              />
-                            ) : (
-                              <span
-                                className={cn(
-                                  "inline-flex w-full items-center rounded px-1.5 py-1 min-h-[28px]",
-                                  sel && row.kind === "CALCULATED" && "ring-2 ring-[#2563eb] bg-white",
-                                )}
-                              >
-                                <FormulaText formula={row.formula} />
-                              </span>
-                            )}
-                          </td>
-                          {periods.map((_, i) => {
-                            const isEditing =
-                              editing?.rowId === row.id &&
-                              editing.col === i &&
-                              viewGrain === "Monthly"
-                            const editable = row.kind === "INPUT" && viewGrain === "Monthly"
-                            return (
-                              <td
-                                key={`${row.id}-${i}`}
-                                className={cn(
-                                  "px-2 py-1 text-right tabular-nums border-l border-[#f8fafc]",
-                                  row.kind === "CALCULATED" ? "text-[#64748b]" : "text-[#0f172a]",
-                                )}
-                                onDoubleClick={(e) => {
-                                  e.stopPropagation()
-                                  if (!editable) {
-                                    toast.message(
-                                      row.kind === "CALCULATED"
-                                        ? "Calculated cells are formula-driven"
-                                        : "Switch to Monthly to edit",
-                                    )
-                                    return
-                                  }
-                                  const v = row.values[i]
-                                  startEdit(
-                                    row.id,
-                                    i,
-                                    v == null
-                                      ? ""
-                                      : row.format === "percent"
-                                        ? String(+(v * 100).toFixed(2))
-                                        : String(v),
-                                  )
-                                }}
-                              >
-                                {isEditing ? (
-                                  <input
-                                    autoFocus
-                                    value={draft}
-                                    onChange={(e) => setDraft(e.target.value)}
-                                    onBlur={commitEdit}
-                                    onKeyDown={(e) => {
-                                      if (e.key === "Enter") commitEdit()
-                                      if (e.key === "Escape") setEditing(null)
-                                    }}
-                                    onClick={(e) => e.stopPropagation()}
-                                    className="w-full h-8 rounded border-2 border-[#2563eb] px-2 text-right text-[12px] tabular-nums outline-none"
-                                  />
-                                ) : (
-                                  <span
-                                    className={cn(
-                                      "inline-block min-w-[4rem] rounded px-1 py-1",
-                                      editable && canEdit && "hover:bg-white/80",
-                                    )}
-                                  >
-                                    {fmtCell(row, displayValues, i)}
-                                  </span>
-                                )}
-                              </td>
-                            )
-                          })}
-                        </tr>
-                      )
-                    })
-                  )}
-                </tbody>
-              </table>
-            ) : (
-              <LiveItemsTable
-                items={items}
-                selectedId={selectedId}
-                periodLabels={monthlyPeriods}
-                periodKeys={periodKeys}
-                previewByLine={previewByLine}
-                viewGrain={viewGrain}
-                canEdit={canEdit}
-                onSelect={onSelect}
-                onCellCommit={onCellCommit}
-              />
-            )}
+            <LiveItemsTable
+              items={visibleItems}
+              selectedId={selectedId}
+              periodLabels={monthlyPeriods}
+              periodKeys={periodKeys}
+              previewByLine={previewByLine}
+              viewGrain={viewGrain}
+              canEdit={canEdit}
+              onSelect={onSelect}
+              onCellCommit={onCellCommit}
+            />
           </div>
 
           <div className="px-4 py-2 border-t border-[#e2e8f0] flex flex-wrap items-center gap-4 text-[12px] text-[#64748b] bg-white shrink-0">
@@ -1189,8 +807,8 @@ export function BuilderLineItemGrid({
               <Plus className="w-3.5 h-3.5" /> Add line item
             </button>
             <span>
-              {useHardcoded ? visibleRows.length : items.length} line item
-              {(useHardcoded ? visibleRows.length : items.length) === 1 ? "" : "s"}
+              {visibleItems.length} line item
+              {visibleItems.length === 1 ? "" : "s"}
               {filter !== "all" || rowQuery ? " (filtered)" : ""}
             </span>
             <span className="ml-auto flex items-center gap-3">
@@ -1281,16 +899,13 @@ function TemplatesPanel({
   onApply: (id: string, name: string) => void
 }) {
   const [q, setQ] = useState("")
-  const live = templates != null
-  const source = live
-    ? templates.map((t) => ({
+  const source = (templates ?? []).map((t) => ({
         id: t.id,
         name: t.name,
         desc: t.description || "Starter pack for this module",
         items: t.lineItems?.length ?? 0,
         tag: "Template",
       }))
-    : TEMPLATES
   const list = source.filter(
     (t) =>
       !q.trim() ||
@@ -1304,9 +919,7 @@ function TemplatesPanel({
         <div>
           <h3 className="text-[14px] font-semibold text-[#0f172a]">Line item templates</h3>
           <p className="text-[12px] text-[#64748b] mt-0.5">
-            {live
-              ? "Apply a template into the current module, then tweak formulas."
-              : "Drop a starter pack into the current module, then tweak formulas."}
+            Apply a template into the current module, then tweak formulas.
           </p>
         </div>
         <div className="relative w-full sm:w-64">
@@ -1362,9 +975,7 @@ function TemplatesPanel({
             <p className="col-span-full text-center text-[13px] text-[#94a3b8] py-10">
               {q.trim()
                 ? `No templates match “${q}”.`
-                : live
-                  ? "No templates available from the API yet."
-                  : "No templates."}
+                : "No templates available from the API yet."}
             </p>
           )}
         </div>
@@ -1383,7 +994,7 @@ function ValidationsPanel({
   onFocus?: (lineItemId: string | null | undefined) => void
 }) {
   const [sev, setSev] = useState<"all" | "ok" | "warn" | "error">("all")
-  const source = rows ?? VALIDATION_ROWS
+  const source = rows ?? []
   const list = source.filter((v) => sev === "all" || v.severity === sev)
   const counts = {
     ok: source.filter((v) => v.severity === "ok").length,
@@ -1479,7 +1090,7 @@ function HistoryPanel({
   rows?: HistoryRow[]
 }) {
   const [q, setQ] = useState("")
-  const source = rows ?? HISTORY_ROWS
+  const source = rows ?? []
   const list = source.filter(
     (h) =>
       !q.trim() ||
