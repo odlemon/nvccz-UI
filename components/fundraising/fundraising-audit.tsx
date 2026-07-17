@@ -1,7 +1,7 @@
 "use client"
 
-import { useMemo, useState, type ReactNode } from "react"
-import { ClipboardList, Download, Search } from "lucide-react"
+import { useEffect, useMemo, useState, type ReactNode } from "react"
+import { ClipboardList, Download, Loader2, Search } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -13,17 +13,83 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import {
-  AUDIT_ACTIONS,
-  AUDIT_LOGS,
-  AUDIT_USERS,
-  auditActionClass,
-  type AuditLog,
-} from "./audit-mock-data"
-import { FrDialogShell } from "./fundraising-modals"
+import { fundraisingApi, toastFrError } from "@/lib/api/fundraising-api"
+import { mapAuditLogRow, titleCase } from "@/lib/fundraising/mappers"
+import { downloadCsvPayload } from "@/lib/fundraising/export"
+import { auditActionClass } from "./audit-mock-data"
+import { FrDialogShell, FrTableSkeleton } from "./fundraising-modals"
 
 const CARD =
   "rounded-[6px] border border-[#e2e8f0] bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
+
+const UUID_ONLY = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+function auditLabel(...values: unknown[]): string | undefined {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim() && !UUID_ONLY.test(value.trim())) {
+      return value.trim()
+    }
+    if (value && typeof value === "object") {
+      const item = value as Record<string, any>
+      const nested = auditLabel(
+        item.displayName,
+        item.userName,
+        item.fullName,
+        item.legalName,
+        item.name,
+        item.label,
+        item.title,
+      )
+      if (nested) return nested
+    }
+  }
+  return undefined
+}
+
+function auditSummary(raw: Record<string, any>) {
+  for (const value of [
+    raw.message,
+    raw.description,
+    raw.summary,
+    raw.change,
+    raw.changeDescription,
+    raw.details?.message,
+  ]) {
+    if (typeof value === "string" && value.trim()) return value.trim()
+    if (value && typeof value === "object") return JSON.stringify(value)
+  }
+  return "No summary available"
+}
+
+function mapSafeAuditLogRow(raw: Record<string, any>) {
+  const mapped = mapAuditLogRow(raw)
+  return {
+    ...mapped,
+    user:
+      auditLabel(
+        raw.userName,
+        raw.actorName,
+        raw.user,
+        raw.actor,
+        raw.createdBy,
+        raw.performedBy,
+      ) || "System",
+    objectName:
+      auditLabel(
+        raw.objectName,
+        raw.objectLabel,
+        raw.entityName,
+        raw.subject,
+        raw.object,
+        raw.campaign,
+        raw.investor,
+        raw.opportunity,
+      ) || "Name unavailable",
+    summary: auditSummary(raw),
+  }
+}
+
+type AuditRow = ReturnType<typeof mapSafeAuditLogRow>
 
 function DetailField({ label, value }: { label: string; value: ReactNode }) {
   return (
@@ -35,16 +101,52 @@ function DetailField({ label, value }: { label: string; value: ReactNode }) {
 }
 
 export function FundraisingAudit() {
+  const [logs, setLogs] = useState<AuditRow[]>([])
+  const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
   const [actionFilter, setActionFilter] = useState("all")
   const [userFilter, setUserFilter] = useState("all")
-  const [selected, setSelected] = useState<AuditLog | null>(null)
+  const [objectFilter, setObjectFilter] = useState("all")
+  const [fromDate, setFromDate] = useState("")
+  const [toDate, setToDate] = useState("")
+  const [limit, setLimit] = useState(200)
+  const [selected, setSelected] = useState<AuditRow | null>(null)
+  const [exporting, setExporting] = useState(false)
+
+  useEffect(() => {
+    setLoading(true)
+    fundraisingApi
+      .listAuditLogs({ limit })
+      .then((res) => setLogs((res ?? []).map(mapSafeAuditLogRow)))
+      .catch((err) => {
+        toastFrError(err, "Could not load audit logs")
+        setLogs([])
+      })
+      .finally(() => setLoading(false))
+  }, [limit])
+
+  const actions = useMemo(
+    () => Array.from(new Set(logs.map((l) => l.action))).filter((a) => a !== "—").sort(),
+    [logs],
+  )
+  const users = useMemo(
+    () => Array.from(new Set(logs.map((l) => l.user))).sort(),
+    [logs],
+  )
+  const objectTypes = useMemo(
+    () => Array.from(new Set(logs.map((l) => l.objectType))).filter((v) => v !== "—").sort(),
+    [logs],
+  )
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    return AUDIT_LOGS.filter((log) => {
+    return logs.filter((log) => {
       if (actionFilter !== "all" && log.action !== actionFilter) return false
       if (userFilter !== "all" && log.user !== userFilter) return false
+      if (objectFilter !== "all" && log.objectType !== objectFilter) return false
+      const rawDate = log.raw?.createdAt || log.raw?.timestamp || log.raw?.occurredAt
+      if (fromDate && rawDate && new Date(rawDate) < new Date(`${fromDate}T00:00:00`)) return false
+      if (toDate && rawDate && new Date(rawDate) > new Date(`${toDate}T23:59:59`)) return false
       if (
         q &&
         !log.objectName.toLowerCase().includes(q) &&
@@ -56,7 +158,49 @@ export function FundraisingAudit() {
       }
       return true
     })
-  }, [search, actionFilter, userFilter])
+  }, [logs, search, actionFilter, userFilter, objectFilter, fromDate, toDate])
+
+  const today = new Date().toDateString()
+  const kpis = [
+    { label: "Total events", value: logs.length },
+    { label: "Users", value: users.filter((u) => u !== "System").length },
+    {
+      label: "Stage changes",
+      value: logs.filter((l) => l.action.toUpperCase().includes("STAGE")).length,
+    },
+    {
+      label: "Today",
+      value: logs.filter((l) => {
+        const raw = l.raw?.createdAt || l.raw?.timestamp || l.raw?.occurredAt
+        return raw && new Date(raw).toDateString() === today
+      }).length,
+    },
+  ]
+
+  async function exportLogs() {
+    setExporting(true)
+    try {
+      const selectedUserId =
+        userFilter === "all"
+          ? undefined
+          : logs.find((log) => log.user === userFilter)?.raw?.userId ||
+            logs.find((log) => log.user === userFilter)?.raw?.actorId
+      const payload = await fundraisingApi.exportAuditLogs({
+        objectType: objectFilter === "all" ? undefined : objectFilter,
+        userId: selectedUserId,
+        action: actionFilter === "all" ? undefined : actionFilter,
+        from: fromDate || undefined,
+        to: toDate || undefined,
+        limit,
+      })
+      downloadCsvPayload(payload, `fundraising-audit-logs-${new Date().toISOString().slice(0, 10)}`)
+      toast.success("Audit log CSV downloaded")
+    } catch (err) {
+      toastFrError(err, "Could not export audit logs")
+    } finally {
+      setExporting(false)
+    }
+  }
 
   return (
     <div className="h-full overflow-y-auto bg-[#f8fafc] p-4 md:p-6">
@@ -70,19 +214,16 @@ export function FundraisingAudit() {
         <Button
           variant="outline"
           className="h-9 rounded-full px-4"
-          onClick={() => toast.success("Audit export started")}
+          onClick={exportLogs}
+          disabled={exporting}
         >
-          <Download className="h-4 w-4" /> Export
+          {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+          {exporting ? "Exporting…" : "Export"}
         </Button>
       </div>
 
       <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4">
-        {[
-          { label: "Total events", value: AUDIT_LOGS.length },
-          { label: "Users", value: AUDIT_USERS.filter((u) => u !== "System").length },
-          { label: "Stage changes", value: AUDIT_LOGS.filter((l) => l.action === "Stage Change").length },
-          { label: "Today", value: AUDIT_LOGS.filter((l) => l.timestamp.startsWith("15 Jul")).length },
-        ].map((k) => (
+        {kpis.map((k) => (
           <div key={k.label} className={cn(CARD, "p-3.5")}>
             <p className="text-[11px] text-[#64748b]">{k.label}</p>
             <p className="mt-1 text-xl font-bold tabular-nums text-[#0f172a]">{k.value}</p>
@@ -115,9 +256,9 @@ export function FundraisingAudit() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All actions</SelectItem>
-                {AUDIT_ACTIONS.map((a) => (
+                {actions.map((a) => (
                   <SelectItem key={a} value={a}>
-                    {a}
+                    {titleCase(a)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -128,13 +269,22 @@ export function FundraisingAudit() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All users</SelectItem>
-                {AUDIT_USERS.map((u) => (
+                {users.map((u) => (
                   <SelectItem key={u} value={u}>
                     {u}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            <Select value={objectFilter} onValueChange={setObjectFilter}>
+              <SelectTrigger className="h-8 w-[140px] rounded-full border-[#e2e8f0] text-[12px] shadow-none"><SelectValue placeholder="Object" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All objects</SelectItem>
+                {objectTypes.map((type) => <SelectItem key={type} value={type}>{titleCase(type)}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="h-8 rounded-full border border-[#e2e8f0] px-3 text-[11px]" aria-label="From date" />
+            <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="h-8 rounded-full border border-[#e2e8f0] px-3 text-[11px]" aria-label="To date" />
           </div>
         </div>
 
@@ -150,7 +300,9 @@ export function FundraisingAudit() {
               </tr>
             </thead>
             <tbody>
-              {filtered.length === 0 ? (
+              {loading ? (
+                <FrTableSkeleton columns={6} rows={8} />
+              ) : filtered.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-3 py-10 text-center text-[12px] text-[#94a3b8]">
                     No audit events match your filters.
@@ -176,12 +328,12 @@ export function FundraisingAudit() {
                           auditActionClass(log.action),
                         )}
                       >
-                        {log.action}
+                        {titleCase(log.action)}
                       </span>
                     </td>
                     <td className="px-3 py-2">
                       <p className="text-[11px] font-medium text-[#0f172a]">{log.objectName}</p>
-                      <p className="mt-0.5 text-[10px] text-[#94a3b8]">{log.objectType}</p>
+                      <p className="mt-0.5 text-[10px] text-[#94a3b8]">{titleCase(log.objectType)}</p>
                     </td>
                     <td className="max-w-[240px] truncate px-3 py-2 text-[11px] text-[#475569]">
                       {log.summary}
@@ -195,13 +347,18 @@ export function FundraisingAudit() {
             </tbody>
           </table>
         </div>
+        {logs.length >= limit ? (
+          <div className="border-t border-[#f1f5f9] p-3 text-center">
+            <Button type="button" variant="outline" className="h-8 rounded-full px-4 text-[11px]" onClick={() => setLimit((value) => value + 200)}>Load more</Button>
+          </div>
+        ) : null}
       </div>
 
       <FrDialogShell
         open={!!selected}
         onOpenChange={(open) => !open && setSelected(null)}
         title="Audit event detail"
-        description={selected?.id}
+        description="Recorded fundraising activity"
         size="lg"
         footer={
           <Button
@@ -228,7 +385,7 @@ export function FundraisingAudit() {
                       auditActionClass(selected.action),
                     )}
                   >
-                    {selected.action}
+                    {titleCase(selected.action)}
                   </span>
                 }
               />
@@ -240,7 +397,7 @@ export function FundraisingAudit() {
                 value={
                   <>
                     <p className="font-medium">{selected.objectName}</p>
-                    <p className="mt-0.5 text-[11px] text-[#64748b]">{selected.objectType}</p>
+                    <p className="mt-0.5 text-[11px] text-[#64748b]">{titleCase(selected.objectType)}</p>
                   </>
                 }
               />
@@ -253,10 +410,24 @@ export function FundraisingAudit() {
                 </span>
               }
             />
-            <DetailField
-              label="Details"
-              value={<p className="leading-relaxed text-[#475569]">{selected.details}</p>}
-            />
+            {selected.previousValue != null || selected.newValue != null ? (
+              <div className="grid grid-cols-2 gap-4">
+                <DetailField
+                  label="Previous value"
+                  value={<span className="font-mono">{String(selected.previousValue ?? "—")}</span>}
+                />
+                <DetailField
+                  label="New value"
+                  value={<span className="font-mono">{String(selected.newValue ?? "—")}</span>}
+                />
+              </div>
+            ) : null}
+            {selected.details ? (
+              <DetailField
+                label="Details"
+                value={<p className="leading-relaxed text-[#475569]">{selected.details}</p>}
+              />
+            ) : null}
           </div>
         ) : null}
       </FrDialogShell>

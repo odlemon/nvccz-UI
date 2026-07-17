@@ -1,7 +1,8 @@
 export type PipelineStage = {
   id: string
   name: string
-  probability: number
+  /** null when this is a reference stage code (no live campaign/probability configured) */
+  probability: number | null
 }
 
 export type StageGate = {
@@ -24,25 +25,65 @@ export type FrNotification = {
   enabled: boolean
 }
 
-export const PE_STAGES: PipelineStage[] = [
-  { id: "pe-1", name: "Prospect", probability: 10 },
-  { id: "pe-2", name: "Qualified", probability: 25 },
-  { id: "pe-3", name: "Management Meeting", probability: 40 },
-  { id: "pe-4", name: "DD / Data Room", probability: 55 },
-  { id: "pe-5", name: "IC Review", probability: 70 },
-  { id: "pe-6", name: "Commitment", probability: 85 },
-  { id: "pe-7", name: "Closed", probability: 100 },
-]
+/**
+ * Fallback reference stages — used only when no live campaign of that type exists yet.
+ * Codes/order from design-refs/fundraising-frontend-api.md ("PE / VC stage codes (seed order)"
+ * and "AM mandate stage codes"). No probability shown — that is server-configured per campaign.
+ */
+export const PE_STAGE_CODES: PipelineStage[] = [
+  "TARGET_INVESTOR",
+  "CONTACTED",
+  "QUALIFIED",
+  "ENGAGED",
+  "DATA_ROOM",
+  "DUE_DILIGENCE",
+  "IC_REVIEW",
+  "COMMERCIAL_NEGOTIATION",
+  "SUBSCRIPTION_DOCS",
+  "KYC_COMPLIANCE",
+  "SIGNED",
+  "ADMITTED",
+  "FUNDED",
+].map((code) => ({
+  id: code,
+  name: code.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+  probability: null,
+}))
 
-export const AM_STAGES: PipelineStage[] = [
-  { id: "am-1", name: "Target Client", probability: 8 },
-  { id: "am-2", name: "Qualified", probability: 20 },
-  { id: "am-3", name: "RFI / RFP", probability: 35 },
-  { id: "am-4", name: "Proposal", probability: 50 },
-  { id: "am-5", name: "Due Diligence", probability: 65 },
-  { id: "am-6", name: "Awarded", probability: 80 },
-  { id: "am-7", name: "Activated", probability: 100 },
-]
+export const AM_STAGE_CODES: PipelineStage[] = [
+  "TARGET_CLIENT",
+  "INITIAL_CONTACT",
+  "DISCOVERY",
+  "QUALIFIED",
+  "RFI_RFP",
+  "PROPOSAL",
+  "DUE_DILIGENCE",
+  "PRESENTATION",
+  "PREFERRED_BIDDER",
+  "NEGOTIATION",
+  "AWARDED",
+  "ASSETS_IN_TRANSITION",
+  "ACTIVATED",
+].map((code) => ({
+  id: code,
+  name: code.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+  probability: null,
+}))
+
+/** SRD amount type labels (fundraising-frontend.md guardrails table) — read-only, independent, never overwrite each other. */
+export const AMOUNT_TYPES = [
+  "Indicative",
+  "Qualified",
+  "Soft Circle",
+  "Proposed",
+  "Signed",
+  "Admitted",
+  "Funded",
+  "Expected AUM",
+  "Activated AUM",
+] as const
+
+export type AmountType = (typeof AMOUNT_TYPES)[number]
 
 export const STAGE_GATES: StageGate[] = [
   {
@@ -76,19 +117,6 @@ export const STAGE_GATES: StageGate[] = [
     requirements: ["Proposal submitted", "Fee schedule attached", "Mandate scope documented"],
   },
 ]
-
-/** SRD amount type labels — read-only in settings UI */
-export const AMOUNT_TYPES = [
-  "Indicative",
-  "Soft circle",
-  "Signed",
-  "Admitted",
-  "Funded",
-  "Expected AUM",
-  "Activated AUM",
-] as const
-
-export type AmountType = (typeof AMOUNT_TYPES)[number]
 
 export const FR_ROLES: FrRole[] = [
   {
@@ -128,7 +156,8 @@ export const FR_NOTIFICATIONS: FrNotification[] = [
   { id: "n-8", label: "Closing checklist overdue", enabled: true },
 ]
 
-export function probabilityColor(value: number): string {
+export function probabilityColor(value: number | null): string {
+  if (value == null) return "#94a3b8"
   if (value >= 80) return "#16a34a"
   if (value >= 60) return "#2563eb"
   if (value >= 40) return "#0284c7"

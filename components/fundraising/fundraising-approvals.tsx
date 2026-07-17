@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Check, Download, Filter, X } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
@@ -12,98 +12,193 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { fundraisingApi, toastFrError } from "@/lib/api/fundraising-api"
+import { mapApprovalRow, titleCase } from "@/lib/fundraising/mappers"
+import { exportFundraisingCsv } from "@/lib/fundraising/export"
 import {
-  FR_APPROVALS,
   priorityClass,
   statusClass,
   typeClass,
-  type ApprovalRequest,
   type ApprovalStatus,
 } from "./approvals-mock-data"
 import {
   FrDialogShell,
   FrField,
   FrFormFooter,
+  FrTableSkeleton,
   FrViewAllDialog,
   frInputClass,
+  type ViewAllRow,
 } from "./fundraising-modals"
 
 const CARD =
   "rounded-[6px] border border-[#e2e8f0] bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
 
-type Decision = "Approved" | "Rejected"
+type Decision = "APPROVED" | "REJECTED"
+
+const IDENTIFIER_ONLY = /^[0-9a-f]{8}-[0-9a-f-]{27,}$/i
+
+function embeddedLabel(...values: unknown[]): string | undefined {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim() && !IDENTIFIER_ONLY.test(value.trim())) {
+      return value.trim()
+    }
+    if (value && typeof value === "object") {
+      const item = value as Record<string, any>
+      const nested = embeddedLabel(
+        item.displayName,
+        item.userName,
+        item.fullName,
+        item.legalName,
+        item.name,
+        item.label,
+        item.title,
+      )
+      if (nested) return nested
+    }
+  }
+  return undefined
+}
+
+function mapSafeApprovalRow(raw: Record<string, any>) {
+  const mapped = mapApprovalRow(raw)
+  return {
+    ...mapped,
+    campaign:
+      embeddedLabel(raw.campaignName, raw.campaign, raw.opportunity?.campaign) || "Name unavailable",
+    investor:
+      embeddedLabel(raw.investorName, raw.investor, raw.opportunity?.investor) || "Name unavailable",
+    requestedBy:
+      embeddedLabel(
+        raw.requestedByName,
+        raw.requesterName,
+        raw.createdByName,
+        raw.requestedBy,
+        raw.requester,
+        raw.createdBy,
+      ) || "Name unavailable",
+    decidedBy: embeddedLabel(raw.decidedByName, raw.decidedBy, raw.approver),
+    summary:
+      embeddedLabel(raw.description, raw.summary, raw.reason, raw.requestDetails) || mapped.summary,
+  }
+}
+
+type ApprovalRow = ReturnType<typeof mapSafeApprovalRow>
 
 export function FundraisingApprovals() {
-  const [requests, setRequests] = useState(FR_APPROVALS)
+  const [rows, setRows] = useState<ApprovalRow[]>([])
+  const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState<"all" | ApprovalStatus>("all")
   const [decisionOpen, setDecisionOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
-  const [selected, setSelected] = useState<ApprovalRequest | null>(null)
-  const [decision, setDecision] = useState<Decision>("Approved")
+  const [selected, setSelected] = useState<ApprovalRow | null>(null)
+  const [decision, setDecision] = useState<Decision>("APPROVED")
   const [reason, setReason] = useState("")
+  const [submitting, setSubmitting] = useState(false)
 
-  const filtered = useMemo(() => {
-    if (statusFilter === "all") return requests
-    return requests.filter((r) => r.status === statusFilter)
-  }, [requests, statusFilter])
+  async function loadApprovals() {
+    setLoading(true)
+    try {
+      const res = await fundraisingApi.listApprovals(
+        statusFilter !== "all" ? { status: statusFilter } : undefined,
+      )
+      setRows((res ?? []).map(mapSafeApprovalRow))
+    } catch (err) {
+      toastFrError(err, "Could not load approvals")
+      setRows([])
+    } finally {
+      setLoading(false)
+    }
+  }
 
-  const pendingCount = requests.filter((r) => r.status === "Pending").length
+  useEffect(() => {
+    loadApprovals()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusFilter])
 
-  const historyRows = useMemo(() => {
+  const pendingCount = useMemo(() => rows.filter((r) => r.status === "PENDING").length, [rows])
+
+  const historyRows = useMemo<ViewAllRow[]>(() => {
     if (!selected) return []
-    return selected.history.map((h) => ({
-      id: h.id,
-      title: h.action,
-      subtitle: h.note,
-      meta: `${h.actor} · ${h.at}`,
-      badge: h.action.includes("Approved")
-        ? "Approved"
-        : h.action.includes("Rejected")
-          ? "Rejected"
-          : undefined,
-      badgeClass: h.action.includes("Approved")
-        ? "bg-[#dcfce7] text-[#15803d]"
-        : h.action.includes("Rejected")
-          ? "bg-[#fee2e2] text-[#b91c1c]"
-          : "bg-[#f1f5f9] text-[#64748b]",
-    }))
+    const items: ViewAllRow[] = [
+      {
+        id: "submitted",
+        title: "Submitted for approval",
+        subtitle: selected.summary !== "—" ? selected.summary : undefined,
+        meta: `${selected.requestedBy} · ${selected.requestedAt}`,
+      },
+    ]
+    if (selected.status !== "PENDING") {
+      items.push({
+        id: "decided",
+        title: selected.status === "APPROVED" ? "Approved" : "Rejected",
+        subtitle: selected.decisionNotes,
+        meta: [selected.decidedBy, selected.decidedAt].filter(Boolean).join(" · ") || undefined,
+        badge: selected.status === "APPROVED" ? "Approved" : "Rejected",
+        badgeClass:
+          selected.status === "APPROVED"
+            ? "bg-[#dcfce7] text-[#15803d]"
+            : "bg-[#fee2e2] text-[#b91c1c]",
+      })
+    }
+    return items
   }, [selected])
 
-  function openDecision(req: ApprovalRequest, d: Decision) {
+  function openDecision(req: ApprovalRow, d: Decision) {
     setSelected(req)
     setDecision(d)
     setReason("")
     setDecisionOpen(true)
   }
 
-  function openHistory(req: ApprovalRequest) {
+  function openHistory(req: ApprovalRow) {
     setSelected(req)
     setHistoryOpen(true)
   }
 
-  function submitDecision() {
+  async function submitDecision() {
     if (!selected || !reason.trim()) return
-    setRequests((prev) =>
-      prev.map((r) => {
-        if (r.id !== selected.id) return r
-        return {
-          ...r,
-          status: decision,
-          history: [
-            ...r.history,
-            {
-              id: `h-${Date.now()}`,
-              at: "15 Jul 2026, now",
-              actor: "You",
-              action: decision,
-              note: reason.trim(),
-            },
-          ],
-        }
-      }),
+    setSubmitting(true)
+    try {
+      await fundraisingApi.decideApproval(selected.id, {
+        decision,
+        decisionNotes: reason.trim(),
+      })
+      toast.success(`Request ${decision === "APPROVED" ? "approved" : "rejected"}`)
+      setDecisionOpen(false)
+      await loadApprovals()
+    } catch (err) {
+      toastFrError(err, "Decision failed")
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  function exportApprovals() {
+    if (rows.length === 0) {
+      toast.error("There are no approval rows to export")
+      return
+    }
+    exportFundraisingCsv(
+      rows,
+      [
+        { key: "title", label: "Request" },
+        { key: "summary", label: "Summary" },
+        { key: "type", label: "Type", value: (row) => titleCase(row.type) },
+        { key: "campaign", label: "Campaign" },
+        { key: "investor", label: "Investor" },
+        { key: "amount", label: "Amount" },
+        { key: "priority", label: "Priority", value: (row) => titleCase(row.priority || "") },
+        { key: "status", label: "Status", value: (row) => titleCase(row.status) },
+        { key: "requestedBy", label: "Requested by" },
+        { key: "requestedAt", label: "Requested at" },
+        { key: "decidedBy", label: "Decided by" },
+        { key: "decidedAt", label: "Decided at" },
+        { key: "decisionNotes", label: "Decision notes" },
+      ],
+      "fundraising-approvals-export",
     )
-    setDecisionOpen(false)
-    toast.success(`Request ${decision.toLowerCase()}`)
+    toast.success("Approvals CSV downloaded")
   }
 
   return (
@@ -119,7 +214,8 @@ export function FundraisingApprovals() {
           <Button
             variant="outline"
             className="h-9 rounded-full px-4"
-            onClick={() => toast.success("Export started")}
+            onClick={exportApprovals}
+            disabled={loading}
           >
             <Download className="h-4 w-4" /> Export
           </Button>
@@ -146,9 +242,9 @@ export function FundraisingApprovals() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All statuses</SelectItem>
-                <SelectItem value="Pending">Pending</SelectItem>
-                <SelectItem value="Approved">Approved</SelectItem>
-                <SelectItem value="Rejected">Rejected</SelectItem>
+                <SelectItem value="PENDING">Pending</SelectItem>
+                <SelectItem value="APPROVED">Approved</SelectItem>
+                <SelectItem value="REJECTED">Rejected</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -174,97 +270,101 @@ export function FundraisingApprovals() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((req) => (
-                <tr
-                  key={req.id}
-                  className="border-b border-[#f1f5f9] last:border-0 hover:bg-[#f8fafc]"
-                >
-                  <td className="px-3 py-2.5">
-                    <button
-                      type="button"
-                      onClick={() => openHistory(req)}
-                      className="text-left"
-                    >
-                      <p className="text-[12px] font-medium text-[#0f172a] hover:text-[#2563eb]">
-                        {req.title}
-                      </p>
-                      <p className="mt-0.5 max-w-[220px] truncate text-[10px] text-[#94a3b8]">
-                        {req.summary}
-                      </p>
-                    </button>
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <span
-                      className={cn(
-                        "rounded-[4px] px-1.5 py-0.5 text-[10px] font-semibold",
-                        typeClass(req.type),
-                      )}
-                    >
-                      {req.type}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2.5 text-[11px] text-[#64748b]">{req.campaign}</td>
-                  <td className="px-3 py-2.5 text-[11px] text-[#64748b]">{req.investor}</td>
-                  <td className="px-3 py-2.5">
-                    <span
-                      className={cn(
-                        "rounded-[4px] px-1.5 py-0.5 text-[10px] font-semibold",
-                        priorityClass(req.priority),
-                      )}
-                    >
-                      {req.priority}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <span
-                      className={cn(
-                        "rounded-[4px] px-1.5 py-0.5 text-[10px] font-semibold",
-                        statusClass(req.status),
-                      )}
-                    >
-                      {req.status}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2.5 text-[11px] text-[#94a3b8]">
-                    <p>{req.requestedBy}</p>
-                    <p className="text-[10px]">{req.requestedAt}</p>
-                  </td>
-                  <td className="px-3 py-2.5">
-                    {req.status === "Pending" ? (
-                      <div className="flex flex-wrap gap-1.5">
-                        <Button
-                          size="sm"
-                          variant="gradient-create"
-                          className="h-7 rounded-full px-3 text-[10px]"
-                          onClick={() => openDecision(req, "Approved")}
-                        >
-                          <Check className="h-3 w-3" /> Approve
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7 rounded-full px-3 text-[10px] text-[#b91c1c] hover:bg-[#fee2e2]"
-                          onClick={() => openDecision(req, "Rejected")}
-                        >
-                          <X className="h-3 w-3" /> Reject
-                        </Button>
-                      </div>
-                    ) : (
+              {loading ? (
+                <FrTableSkeleton columns={8} rows={6} />
+              ) : (
+                rows.map((req) => (
+                  <tr
+                    key={req.id}
+                    className="border-b border-[#f1f5f9] last:border-0 hover:bg-[#f8fafc]"
+                  >
+                    <td className="px-3 py-2.5">
                       <button
                         type="button"
                         onClick={() => openHistory(req)}
-                        className="text-[11px] font-medium text-[#2563eb] hover:underline"
+                        className="rounded-full text-left"
                       >
-                        View history
+                        <p className="text-[12px] font-medium text-[#0f172a] hover:text-[#2563eb]">
+                          {req.title}
+                        </p>
+                        <p className="mt-0.5 max-w-[220px] truncate text-[10px] text-[#94a3b8]">
+                          {req.summary}
+                        </p>
                       </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <span
+                        className={cn(
+                          "rounded-[4px] px-1.5 py-0.5 text-[10px] font-semibold",
+                          typeClass(req.type),
+                        )}
+                      >
+                        {titleCase(req.type)}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2.5 text-[11px] text-[#64748b]">{req.campaign}</td>
+                    <td className="px-3 py-2.5 text-[11px] text-[#64748b]">{req.investor}</td>
+                    <td className="px-3 py-2.5">
+                      <span
+                        className={cn(
+                          "rounded-[4px] px-1.5 py-0.5 text-[10px] font-semibold",
+                          priorityClass(req.priority),
+                        )}
+                      >
+                        {req.priority ?? "—"}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <span
+                        className={cn(
+                          "rounded-[4px] px-1.5 py-0.5 text-[10px] font-semibold",
+                          statusClass(req.status),
+                        )}
+                      >
+                        {titleCase(req.status)}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2.5 text-[11px] text-[#94a3b8]">
+                      <p>{req.requestedBy}</p>
+                      <p className="text-[10px]">{req.requestedAt}</p>
+                    </td>
+                    <td className="px-3 py-2.5">
+                      {req.status === "PENDING" ? (
+                        <div className="flex flex-wrap gap-1.5">
+                          <Button
+                            size="sm"
+                            variant="gradient-create"
+                            className="h-7 rounded-full px-3 text-[10px]"
+                            onClick={() => openDecision(req, "APPROVED")}
+                          >
+                            <Check className="h-3 w-3" /> Approve
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 rounded-full px-3 text-[10px] text-[#b91c1c] hover:bg-[#fee2e2]"
+                            onClick={() => openDecision(req, "REJECTED")}
+                          >
+                            <X className="h-3 w-3" /> Reject
+                          </Button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => openHistory(req)}
+                          className="rounded-full text-[11px] font-medium text-[#2563eb] hover:underline"
+                        >
+                          View history
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
-        {filtered.length === 0 ? (
+        {!loading && rows.length === 0 ? (
           <p className="px-4 py-10 text-center text-[12px] text-[#94a3b8]">
             No requests match this filter.
           </p>
@@ -274,15 +374,17 @@ export function FundraisingApprovals() {
       <FrDialogShell
         open={decisionOpen}
         onOpenChange={setDecisionOpen}
-        title={decision === "Approved" ? "Approve request" : "Reject request"}
+        title={decision === "APPROVED" ? "Approve request" : "Reject request"}
         description={selected?.title}
         size="md"
         footer={
           <FrFormFooter
             onCancel={() => setDecisionOpen(false)}
             onSubmit={submitDecision}
-            submitLabel={decision === "Approved" ? "Approve" : "Reject"}
-            submitDisabled={!reason.trim()}
+            submitLabel={
+              submitting ? "Submitting…" : decision === "APPROVED" ? "Approve" : "Reject"
+            }
+            submitDisabled={!reason.trim() || submitting}
           />
         }
       >
@@ -290,7 +392,7 @@ export function FundraisingApprovals() {
           {selected ? (
             <div className="rounded-[6px] border border-[#f1f5f9] bg-[#fafafa] px-3 py-2 text-[11px] text-[#64748b]">
               <p>
-                <span className="font-medium text-[#0f172a]">{selected.type}</span> —{" "}
+                <span className="font-medium text-[#0f172a]">{titleCase(selected.type)}</span> —{" "}
                 {selected.investor}
                 {selected.amount ? ` · ${selected.amount}` : ""}
               </p>
@@ -301,7 +403,7 @@ export function FundraisingApprovals() {
             <textarea
               className={cn(frInputClass, "min-h-[88px] resize-y py-2")}
               placeholder={
-                decision === "Approved"
+                decision === "APPROVED"
                   ? "e.g. Within policy for anchor investors"
                   : "e.g. Outside approved fee grid"
               }
@@ -317,9 +419,7 @@ export function FundraisingApprovals() {
         onOpenChange={setHistoryOpen}
         title={selected ? selected.title : "Request history"}
         description={
-          selected
-            ? `${selected.type} · ${selected.status} · ${selected.history.length} events`
-            : undefined
+          selected ? `${titleCase(selected.type)} · ${titleCase(selected.status)}` : undefined
         }
         rows={historyRows}
         size="lg"

@@ -154,7 +154,12 @@ function LoginForm() {
             )}
 
             {/* Login Form */}
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 px-12">
+            <form
+              method="post"
+              action="#"
+              onSubmit={handleSubmit(onSubmit)}
+              className="space-y-4 px-12"
+            >
               {/* Email Field */}
               <motion.div
                 initial={{ opacity: 0, y: 10 }}

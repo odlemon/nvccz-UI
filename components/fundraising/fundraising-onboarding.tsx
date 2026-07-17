@@ -1,11 +1,12 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import {
   AlertTriangle,
   Check,
   Clock,
   Download,
+  Loader2,
   Plus,
   Search,
   Shield,
@@ -17,28 +18,31 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
-  CAMPAIGN_OPTIONS,
   KYC_STATUS_LABEL,
   MANDATE_STATUS_LABEL,
-  ONBOARDING_CASES,
   ONBOARDING_KPIS,
-  OWNER_OPTIONS,
   kycStatusClass,
   mandateStatusClass,
   type KycOnboardingStatus,
-  type OnboardingCase,
-  type OnboardingKpi,
-  type OnboardingType,
+  type MandateOnboardingStatus,
 } from "./onboarding-mock-data"
 import {
   FrDialogShell,
   FrField,
   FrFormFooter,
+  FrTableSkeleton,
   FrViewAllDialog,
+  FrRequirementsDialog,
+  emptyRequirementsState,
+  requirementsFromError,
+  type FrRequirementsState,
   frInputClass,
   frSelectClass,
 } from "./fundraising-modals"
 import { FrSimpleWizard, ReviewList } from "./fundraising-create-wizards"
+import { fundraisingApi, toastFrError } from "@/lib/api/fundraising-api"
+import { mapKycCaseToOnboarding, mapMandateToOnboarding } from "@/lib/fundraising/mappers"
+import { exportFundraisingCsv } from "@/lib/fundraising/export"
 
 const CARD =
   "rounded-[6px] border border-[#e2e8f0] bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
@@ -49,6 +53,28 @@ const KPI_ICONS = {
   clock: Clock,
   alert: AlertTriangle,
 } as const
+
+type OnboardingRow = ReturnType<typeof mapKycCaseToOnboarding> | ReturnType<typeof mapMandateToOnboarding>
+const KYC_LIFECYCLE_STATUSES = [
+  "NOT_STARTED",
+  "IN_PROGRESS",
+  "DOCUMENTS_REQUESTED",
+  "DOCUMENTS_RECEIVED",
+  "UNDER_REVIEW",
+  "MORE_INFORMATION_REQUIRED",
+  "APPROVED_WITH_CONDITIONS",
+  "APPROVED",
+  "CLEARED",
+  "REJECTED",
+  "EXPIRED",
+] as const
+
+function safeDisplay(value: unknown, fallback = "Unassigned") {
+  const text = String(value || "").trim()
+  return !text || /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(text)
+    ? fallback
+    : text
+}
 
 function StatusChip({ label, className }: { label: string; className: string }) {
   return (
@@ -63,7 +89,7 @@ function StatusChip({ label, className }: { label: string; className: string }) 
   )
 }
 
-function KpiCard({ kpi }: { kpi: OnboardingKpi }) {
+function KpiCard({ kpi }: { kpi: (typeof ONBOARDING_KPIS)[number] }) {
   const Icon = KPI_ICONS[kpi.icon]
   return (
     <div className={cn(CARD, "flex flex-col p-4")}>
@@ -98,11 +124,22 @@ function DetailPanel({
   item,
   onViewAllChecklist,
   onRequestDocs,
+  onActivateMandate,
+  onToggleMandateFlag,
+  requestingDocs,
+  activating,
+  togglingKey,
 }: {
-  item: OnboardingCase
+  item: OnboardingRow
   onViewAllChecklist: () => void
   onRequestDocs: () => void
+  onActivateMandate: () => void
+  onToggleMandateFlag: (key: string, value: boolean) => void
+  requestingDocs: boolean
+  activating: boolean
+  togglingKey: string | null
 }) {
+  const isMandate = item.kind === "MANDATE"
   const done = item.checklist.filter((c) => c.done).length
   const total = item.checklist.length
 
@@ -112,18 +149,21 @@ function DetailPanel({
         <div className="flex items-start gap-2">
           <UserCheck className="mt-0.5 h-4 w-4 shrink-0 text-[#7c3aed]" />
           <div className="min-w-0">
-            <h2 className="text-[13px] font-semibold text-[#0f172a]">{item.investor}</h2>
+            <h2 className="text-[13px] font-semibold text-[#0f172a]">{safeDisplay(item.investor, "Investor")}</h2>
             <p className="mt-0.5 text-[11px] text-[#64748b]">
-              {item.type} · {item.campaign}
+              {item.type} · {safeDisplay(item.campaign, "No campaign")}
             </p>
           </div>
         </div>
         <div className="mt-3 flex flex-wrap gap-1.5">
-          <StatusChip label={KYC_STATUS_LABEL[item.kycStatus]} className={kycStatusClass(item.kycStatus)} />
+          <StatusChip
+            label={KYC_STATUS_LABEL[item.kycStatus as KycOnboardingStatus] ?? item.kycStatus}
+            className={kycStatusClass(item.kycStatus as KycOnboardingStatus)}
+          />
           {item.mandateStatus ? (
             <StatusChip
-              label={MANDATE_STATUS_LABEL[item.mandateStatus]}
-              className={mandateStatusClass(item.mandateStatus)}
+              label={MANDATE_STATUS_LABEL[item.mandateStatus as MandateOnboardingStatus] ?? item.mandateStatus}
+              className={mandateStatusClass(item.mandateStatus as MandateOnboardingStatus)}
             />
           ) : null}
         </div>
@@ -134,7 +174,7 @@ function DetailPanel({
         ) : null}
         <div className="mt-3 flex items-center justify-between text-[11px]">
           <span className="text-[#94a3b8]">Owner</span>
-          <span className="font-medium text-[#0f172a]">{item.owner}</span>
+          <span className="font-medium text-[#0f172a]">{safeDisplay(item.owner)}</span>
         </div>
         <div className="mt-1 flex items-center justify-between text-[11px]">
           <span className="text-[#94a3b8]">Started</span>
@@ -144,7 +184,9 @@ function DetailPanel({
 
       <div className="px-4 py-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-[12px] font-semibold text-[#0f172a]">Readiness Checklist</h3>
+          <h3 className="text-[12px] font-semibold text-[#0f172a]">
+            {isMandate ? "Activation Checklist" : "Readiness Checklist"}
+          </h3>
           <span className="text-[11px] tabular-nums text-[#64748b]">
             {done}/{total}
           </span>
@@ -157,18 +199,33 @@ function DetailPanel({
         </div>
         <ul className="mt-3 space-y-2">
           {item.checklist.slice(0, 5).map((c) => (
-            <li key={c.id} className="flex items-start gap-2">
-              <span
-                className={cn(
-                  "mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full",
-                  c.done ? "bg-[#16a34a] text-white" : "border border-[#cbd5e1] bg-white",
-                )}
-              >
-                {c.done ? <Check className="h-2.5 w-2.5" strokeWidth={3} /> : null}
-              </span>
+            <li key={c.id} className="flex items-center justify-between gap-2">
               <span className={cn("text-[11px]", c.done ? "text-[#64748b]" : "text-[#0f172a]")}>
                 {c.label}
               </span>
+              {isMandate ? (
+                <button
+                  type="button"
+                  disabled={togglingKey === c.id}
+                  onClick={() => onToggleMandateFlag(c.id, !c.done)}
+                  aria-label={c.label}
+                  className={cn(
+                    "flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full disabled:opacity-50",
+                    c.done ? "bg-[#16a34a] text-white" : "border border-[#cbd5e1] bg-white",
+                  )}
+                >
+                  {c.done ? <Check className="h-2.5 w-2.5" strokeWidth={3} /> : null}
+                </button>
+              ) : (
+                <span
+                  className={cn(
+                    "flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full",
+                    c.done ? "bg-[#16a34a] text-white" : "border border-[#cbd5e1] bg-white",
+                  )}
+                >
+                  {c.done ? <Check className="h-2.5 w-2.5" strokeWidth={3} /> : null}
+                </span>
+              )}
             </li>
           ))}
         </ul>
@@ -182,33 +239,137 @@ function DetailPanel({
       </div>
 
       <div className="mt-auto border-t border-[#f1f5f9] px-4 py-3">
-        <Button
-          variant="outline"
-          className="h-8 w-full rounded-full text-[11px]"
-          disabled={item.complianceHold}
-          onClick={onRequestDocs}
-        >
-          Request Documents
-        </Button>
+        {isMandate ? (
+          <Button
+            variant="gradient-info"
+            className="h-8 w-full rounded-full text-[11px] font-semibold"
+            disabled={item.complianceHold || item.mandateStatus === "ACTIVE" || activating}
+            onClick={onActivateMandate}
+          >
+            {activating ? "Activating…" : item.mandateStatus === "ACTIVE" ? "Mandate Active" : "Activate Mandate"}
+          </Button>
+        ) : (
+          <Button
+            variant="outline"
+            className="h-8 w-full rounded-full text-[11px]"
+            disabled={item.complianceHold || item.kycStatus === "DOCUMENTS_REQUESTED" || requestingDocs}
+            onClick={onRequestDocs}
+          >
+            {requestingDocs ? "Sending…" : "Request Documents"}
+          </Button>
+        )}
       </div>
     </aside>
   )
 }
 
 export function FundraisingOnboarding() {
-  const [cases, setCases] = useState(ONBOARDING_CASES)
-  const [selectedId, setSelectedId] = useState(ONBOARDING_CASES[0].id)
   const [search, setSearch] = useState("")
+  const [selectedId, setSelectedId] = useState<string | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
   const [checklistOpen, setChecklistOpen] = useState(false)
   const [docsOpen, setDocsOpen] = useState(false)
-  const [form, setForm] = useState({
-    investor: "Stanbic Bank Zimbabwe",
-    type: "LP Commitment" as OnboardingType,
-    campaign: CAMPAIGN_OPTIONS[0],
-    owner: OWNER_OPTIONS[0],
-  })
   const [docsNote, setDocsNote] = useState("")
+  const [kycLifecycleOpen, setKycLifecycleOpen] = useState(false)
+  const [kycTargetStatus, setKycTargetStatus] = useState("UNDER_REVIEW")
+  const [kycDocsNote, setKycDocsNote] = useState("")
+  const [kycNotes, setKycNotes] = useState("")
+  const [requirements, setRequirements] = useState<FrRequirementsState>(emptyRequirementsState)
+
+  const [loading, setLoading] = useState(true)
+  const [rawKycCases, setRawKycCases] = useState<Record<string, any>[]>([])
+  const [rawMandates, setRawMandates] = useState<Record<string, any>[]>([])
+  const [rawInvestors, setRawInvestors] = useState<Record<string, any>[]>([])
+  const [rawCampaigns, setRawCampaigns] = useState<Record<string, any>[]>([])
+
+  const [requestingDocs, setRequestingDocs] = useState(false)
+  const [updatingKyc, setUpdatingKyc] = useState(false)
+  const [activating, setActivating] = useState(false)
+  const [togglingKey, setTogglingKey] = useState<string | null>(null)
+
+  // Start-onboarding wizard
+  const [wizardInvestors, setWizardInvestors] = useState<Record<string, any>[]>([])
+  const [wizardLoadingInvestors, setWizardLoadingInvestors] = useState(false)
+  const [form, setForm] = useState({ investorId: "", riskRating: "MEDIUM" })
+
+  async function loadData() {
+    setLoading(true)
+    try {
+      const [kycCases, mandates, investors, campaigns] = await Promise.all([
+        fundraisingApi.listKycCases(),
+        fundraisingApi.listMandates(),
+        fundraisingApi.listInvestors({ pageSize: 200 }),
+        fundraisingApi.listCampaigns(),
+      ])
+      setRawKycCases(kycCases ?? [])
+      setRawMandates(mandates ?? [])
+      setRawInvestors(investors?.items ?? [])
+      setRawCampaigns(campaigns ?? [])
+    } catch (err) {
+      toastFrError(err, "Could not load onboarding cases")
+      setRawKycCases([])
+      setRawMandates([])
+      setRawInvestors([])
+      setRawCampaigns([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadData()
+  }, [])
+
+  const investorsById = useMemo(() => {
+    const map: Record<string, any> = {}
+    rawInvestors.forEach((i) => {
+      map[String(i.id)] = i
+    })
+    return map
+  }, [rawInvestors])
+
+  const campaignsById = useMemo(() => {
+    const map: Record<string, any> = {}
+    rawCampaigns.forEach((c) => {
+      map[String(c.id)] = c
+    })
+    return map
+  }, [rawCampaigns])
+
+  const cases: OnboardingRow[] = useMemo(() => {
+    const kycRows = rawKycCases.map((c) => mapKycCaseToOnboarding(c, investorsById))
+    const mandateRows = rawMandates.map((m) => mapMandateToOnboarding(m, investorsById, campaignsById))
+    return [...kycRows, ...mandateRows]
+  }, [rawKycCases, rawMandates, investorsById, campaignsById])
+
+  const kpis = useMemo(() => {
+    const active = cases.length
+    const cleared = cases.filter((c) =>
+      c.kind === "MANDATE"
+        ? c.mandateStatus === "ACTIVE"
+        : ["APPROVED", "APPROVED_WITH_CONDITIONS", "CLEARED"].includes(c.kycStatus),
+    ).length
+    const inReview = cases.filter((c) =>
+      c.kind === "MANDATE"
+        ? ["ONBOARDING", "ASSETS_IN_TRANSITION", "PARTIALLY_FUNDED"].includes(c.mandateStatus || "")
+        : ["UNDER_REVIEW", "DOCUMENTS_REQUESTED", "IN_PROGRESS"].includes(c.kycStatus),
+    ).length
+    const holds = cases.filter((c) => c.complianceHold).length
+    return ONBOARDING_KPIS.map((kpi) => {
+      switch (kpi.id) {
+        case "active":
+          return { ...kpi, value: String(active) }
+        case "kyc-approved":
+          return { ...kpi, value: String(cleared) }
+        case "in-review":
+          return { ...kpi, value: String(inReview) }
+        case "holds":
+          return { ...kpi, value: String(holds) }
+        default:
+          return kpi
+      }
+    })
+  }, [cases])
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -221,70 +382,149 @@ export function FundraisingOnboarding() {
     )
   }, [cases, search])
 
-  const selected = cases.find((c) => c.id === selectedId) ?? cases[0]
+  const selected = filtered.find((c) => c.id === selectedId) ?? null
+
+  useEffect(() => {
+    if (!loading && cases.length > 0 && !cases.find((c) => c.id === selectedId)) {
+      setSelectedId(cases[0].id)
+    }
+  }, [loading, cases, selectedId])
 
   const holdBanner = selected?.complianceHold
 
-  function startCase() {
-    if (!form.investor.trim()) return
-    const next: OnboardingCase = {
-      id: `ob-${Date.now()}`,
-      investor: form.investor.trim(),
-      type: form.type,
-      kycStatus: "NOT_STARTED",
-      mandateStatus: form.type === "Mandate" ? "AWARDED" : undefined,
-      complianceHold: false,
-      owner: form.owner,
-      progress: 0,
-      startedAt: "15 Jul 2026",
-      campaign: form.campaign,
-      checklist:
-        form.type === "Mandate"
-          ? [
-              { id: "c1", label: "Mandate award letter acknowledged", done: false },
-              { id: "c2", label: "IMA draft circulated", done: false },
-              { id: "c3", label: "Custodian onboarding pack submitted", done: false },
-              { id: "c4", label: "Board resolution received", done: false },
-              { id: "c5", label: "Asset transition plan signed off", done: false },
-              { id: "c6", label: "Go-live readiness review", done: false },
-            ]
-          : [
-              { id: "c1", label: "Investor profile & UBO declaration", done: false },
-              { id: "c2", label: "Source of funds attestation", done: false },
-              { id: "c3", label: "AML / sanctions screening", done: false },
-              { id: "c4", label: "Subscription agreement executed", done: false },
-              { id: "c5", label: "Custodian account opened", done: false },
-              { id: "c6", label: "Capital call readiness confirmed", done: false },
-            ],
+  useEffect(() => {
+    if (!createOpen) return
+    setWizardLoadingInvestors(true)
+    fundraisingApi
+      .listInvestors({ pageSize: 200 })
+      .then((res) => setWizardInvestors(res.items ?? []))
+      .catch(() => setWizardInvestors([]))
+      .finally(() => setWizardLoadingInvestors(false))
+  }, [createOpen])
+
+  async function startCase() {
+    if (!form.investorId) {
+      toast.error("Investor is required")
+      throw new Error("validation")
     }
-    setCases((prev) => [next, ...prev])
-    setSelectedId(next.id)
-    setCreateOpen(false)
-    setForm({ investor: "Stanbic Bank Zimbabwe", type: "LP Commitment", campaign: CAMPAIGN_OPTIONS[0], owner: OWNER_OPTIONS[0] })
-    toast.success("Onboarding case started")
+    try {
+      await fundraisingApi.createKycCase({
+        investorId: form.investorId,
+        status: "NOT_STARTED",
+        riskRating: form.riskRating,
+      })
+      const investorName =
+        wizardInvestors.find((i) => String(i.id) === form.investorId)?.legalName || "Investor"
+      toast.success(`Onboarding case started for ${investorName}`)
+      setForm({ investorId: "", riskRating: "MEDIUM" })
+      await loadData()
+    } catch (err) {
+      toastFrError(err, "Could not start onboarding case")
+      throw err
+    }
   }
 
-  function requestDocuments() {
-    if (!selected) return
-    setDocsOpen(false)
-    setDocsNote("")
-    setCases((prev) =>
-      prev.map((c) =>
-        c.id === selected.id && c.kycStatus === "NOT_STARTED"
-          ? { ...c, kycStatus: "DOCUMENTS_REQUESTED" as KycOnboardingStatus }
-          : c.id === selected.id
-            ? c
-            : c,
-      ),
+  async function requestDocuments() {
+    if (!selected || selected.kind !== "KYC") return
+    setRequestingDocs(true)
+    try {
+      await fundraisingApi.patchKycCase(String(selected.raw.id), {
+        status: "DOCUMENTS_REQUESTED",
+        docsNote: docsNote.trim() || undefined,
+      })
+      setDocsOpen(false)
+      setDocsNote("")
+      toast.success(`Document request sent to ${safeDisplay(selected.investor, "investor")}`)
+      await loadData()
+    } catch (err) {
+      toastFrError(err, "Could not send document request")
+    } finally {
+      setRequestingDocs(false)
+    }
+  }
+
+  async function activateMandateCase() {
+    if (!selected || selected.kind !== "MANDATE") return
+    setActivating(true)
+    try {
+      await fundraisingApi.activateMandate(String((selected as any).mandateId))
+      toast.success(`${safeDisplay(selected.investor, "Investor")} mandate activated`)
+      await loadData()
+    } catch (err) {
+      const state = requirementsFromError(err, "Mandate cannot be activated")
+      if (state.open) setRequirements(state)
+      else toastFrError(err, "Mandate cannot be activated")
+    } finally {
+      setActivating(false)
+    }
+  }
+
+  function openKycLifecycle(status: string) {
+    if (!selected || selected.kind !== "KYC") return
+    setKycTargetStatus(status)
+    setKycDocsNote(String(selected.raw.docsNote || ""))
+    setKycNotes(String(selected.raw.notes || ""))
+    setKycLifecycleOpen(true)
+  }
+
+  async function updateKycStatus() {
+    if (!selected || selected.kind !== "KYC") return
+    setUpdatingKyc(true)
+    try {
+      await fundraisingApi.patchKycCase(String(selected.raw.id), {
+        status: kycTargetStatus,
+        docsNote: kycDocsNote.trim() || undefined,
+        notes: kycNotes.trim() || undefined,
+      })
+      toast.success(`KYC status updated to ${kycTargetStatus.replace(/_/g, " ").toLowerCase()}`)
+      setKycLifecycleOpen(false)
+      await loadData()
+    } catch (err) {
+      toastFrError(err, "Could not update KYC status")
+    } finally {
+      setUpdatingKyc(false)
+    }
+  }
+
+  function exportOnboarding() {
+    exportFundraisingCsv(
+      filtered,
+      [
+        { key: "investor", label: "Investor", value: (row) => safeDisplay(row.investor, "Investor") },
+        { key: "type", label: "Case type" },
+        { key: "kycStatus", label: "KYC status" },
+        { key: "mandateStatus", label: "Mandate status" },
+        { key: "progress", label: "Progress (%)" },
+        { key: "complianceHold", label: "Compliance hold", value: (row) => row.complianceHold ? "Yes" : "No" },
+        { key: "owner", label: "Owner", value: (row) => safeDisplay(row.owner) },
+        { key: "startedAt", label: "Started" },
+      ],
+      "fundraising-client-onboarding",
     )
-    toast.success(`Document request sent to ${selected.investor}`)
+    toast.success(`Exported ${filtered.length} onboarding cases`)
+  }
+
+  async function toggleMandateFlag(key: string, value: boolean) {
+    if (!selected || selected.kind !== "MANDATE") return
+    setTogglingKey(key)
+    try {
+      await fundraisingApi.patchMandate(String((selected as any).mandateId), { [key]: value })
+      await loadData()
+    } catch (err) {
+      toastFrError(err, "Could not update checklist")
+    } finally {
+      setTogglingKey(null)
+    }
   }
 
   return (
     <div className="h-full overflow-y-auto bg-[#f8fafc] p-4 md:p-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-bold text-[#0f172a] md:text-[22px]">Client Onboarding</h1>
+          <h1 className="flex items-center gap-2 text-xl font-bold text-[#0f172a] md:text-[22px]">
+            Client Onboarding
+            {loading ? <Loader2 className="h-4 w-4 animate-spin text-[#94a3b8]" /> : null}
+          </h1>
           <p className="mt-1 text-[12px] text-[#64748b]">
             KYC, compliance readiness and mandate activation
           </p>
@@ -293,7 +533,8 @@ export function FundraisingOnboarding() {
           <Button
             variant="outline"
             className="h-9 rounded-full px-4 shadow-sm"
-            onClick={() => toast.success("Export started")}
+            disabled={loading || filtered.length === 0}
+            onClick={exportOnboarding}
           >
             <Download className="h-4 w-4" />
             Export
@@ -309,7 +550,7 @@ export function FundraisingOnboarding() {
       </div>
 
       <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {ONBOARDING_KPIS.map((kpi) => (
+        {kpis.map((kpi) => (
           <KpiCard key={kpi.id} kpi={kpi} />
         ))}
       </div>
@@ -320,10 +561,23 @@ export function FundraisingOnboarding() {
           <div>
             <p className="text-[12px] font-semibold text-[#b91c1c]">Compliance hold active</p>
             <p className="mt-0.5 text-[11px] text-[#991b1b]">
-              {selected.investor} cannot be admitted, funded, or activated until the hold is
+              {safeDisplay(selected?.investor, "This investor")} cannot be admitted, funded, or activated until the hold is
               released by Compliance.
             </p>
           </div>
+        </div>
+      ) : null}
+      {selected?.kind === "KYC" ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          <span className="self-center text-[11px] font-medium text-[#64748b]">
+            Current: {String(selected.kycStatus).replace(/_/g, " ")}
+          </span>
+          <Button type="button" variant="outline" className="h-8 rounded-full px-3 text-[11px]" disabled={updatingKyc} onClick={() => openKycLifecycle("UNDER_REVIEW")}>Under review</Button>
+          <Button type="button" variant="outline" className="h-8 rounded-full px-3 text-[11px]" disabled={updatingKyc} onClick={() => openKycLifecycle("MORE_INFORMATION_REQUIRED")}>Request more info</Button>
+          <Button type="button" variant="outline" className="h-8 rounded-full px-3 text-[11px] text-[#15803d]" disabled={updatingKyc} onClick={() => openKycLifecycle("APPROVED")}>Approved</Button>
+          <Button type="button" variant="outline" className="h-8 rounded-full px-3 text-[11px] text-[#15803d]" disabled={updatingKyc} onClick={() => openKycLifecycle("CLEARED")}>Cleared</Button>
+          <Button type="button" variant="outline" className="h-8 rounded-full px-3 text-[11px] text-[#b91c1c]" disabled={updatingKyc} onClick={() => openKycLifecycle("REJECTED")}>Reject</Button>
+          <Button type="button" variant="outline" className="h-8 rounded-full px-3 text-[11px]" disabled={updatingKyc} onClick={() => openKycLifecycle(String(selected.kycStatus))}>More actions</Button>
         </div>
       ) : null}
 
@@ -342,7 +596,7 @@ export function FundraisingOnboarding() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search cases..."
-                className="h-8 rounded-[6px] border-[#e2e8f0] bg-white pl-8 text-[12px] shadow-none"
+                className="h-8 rounded-full border-[#e2e8f0] bg-white pl-8 text-[12px] shadow-none"
               />
             </div>
           </div>
@@ -367,45 +621,57 @@ export function FundraisingOnboarding() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((c) => (
-                  <tr
-                    key={c.id}
-                    onClick={() => setSelectedId(c.id)}
-                    className={cn(
-                      "cursor-pointer border-b border-[#f1f5f9] last:border-0",
-                      selectedId === c.id ? "bg-[#f5f3ff]" : "hover:bg-[#f8fafc]",
-                    )}
-                  >
-                    <td className="px-3 py-2.5">
-                      <span className="text-[12px] font-medium text-[#0f172a]">{c.investor}</span>
-                      {c.complianceHold ? (
-                        <AlertTriangle className="ml-1.5 inline h-3 w-3 text-[#dc2626]" />
-                      ) : null}
+                {loading ? (
+                  <FrTableSkeleton columns={8} rows={6} />
+                ) : filtered.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="px-3 py-10 text-center text-[13px] text-[#94a3b8]">
+                      {cases.length === 0 ? "No onboarding cases yet." : "No cases match your search."}
                     </td>
-                    <td className="px-3 py-2.5 text-[11px] text-[#64748b]">{c.type}</td>
-                    <td className="px-3 py-2.5">
-                      <StatusChip
-                        label={KYC_STATUS_LABEL[c.kycStatus]}
-                        className={kycStatusClass(c.kycStatus)}
-                      />
-                    </td>
-                    <td className="px-3 py-2.5 text-[11px] text-[#64748b]">
-                      {c.mandateStatus ? MANDATE_STATUS_LABEL[c.mandateStatus] : "—"}
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <ProgressBar pct={c.progress} />
-                    </td>
-                    <td className="px-3 py-2.5">
-                      {c.complianceHold ? (
-                        <StatusChip label="Hold" className="bg-[#fee2e2] text-[#dc2626]" />
-                      ) : (
-                        <span className="text-[11px] text-[#94a3b8]">—</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2.5 text-[11px] text-[#64748b]">{c.owner}</td>
-                    <td className="px-3 py-2.5 text-[11px] text-[#94a3b8]">{c.startedAt}</td>
                   </tr>
-                ))}
+                ) : (
+                  filtered.map((c) => (
+                    <tr
+                      key={c.id}
+                      onClick={() => setSelectedId(c.id)}
+                      className={cn(
+                        "cursor-pointer border-b border-[#f1f5f9] last:border-0",
+                        selectedId === c.id ? "bg-[#f5f3ff]" : "hover:bg-[#f8fafc]",
+                      )}
+                    >
+                      <td className="px-3 py-2.5">
+                        <span className="text-[12px] font-medium text-[#0f172a]">{safeDisplay(c.investor, "Investor")}</span>
+                        {c.complianceHold ? (
+                          <AlertTriangle className="ml-1.5 inline h-3 w-3 text-[#dc2626]" />
+                        ) : null}
+                      </td>
+                      <td className="px-3 py-2.5 text-[11px] text-[#64748b]">{c.type}</td>
+                      <td className="px-3 py-2.5">
+                        <StatusChip
+                          label={KYC_STATUS_LABEL[c.kycStatus as KycOnboardingStatus] ?? c.kycStatus}
+                          className={kycStatusClass(c.kycStatus as KycOnboardingStatus)}
+                        />
+                      </td>
+                      <td className="px-3 py-2.5 text-[11px] text-[#64748b]">
+                        {c.mandateStatus
+                          ? MANDATE_STATUS_LABEL[c.mandateStatus as MandateOnboardingStatus] ?? c.mandateStatus
+                          : "—"}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <ProgressBar pct={c.progress} />
+                      </td>
+                      <td className="px-3 py-2.5">
+                        {c.complianceHold ? (
+                          <StatusChip label="Hold" className="bg-[#fee2e2] text-[#dc2626]" />
+                        ) : (
+                          <span className="text-[11px] text-[#94a3b8]">—</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5 text-[11px] text-[#64748b]">{safeDisplay(c.owner)}</td>
+                      <td className="px-3 py-2.5 text-[11px] text-[#94a3b8]">{c.startedAt}</td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -416,6 +682,11 @@ export function FundraisingOnboarding() {
             item={selected}
             onViewAllChecklist={() => setChecklistOpen(true)}
             onRequestDocs={() => setDocsOpen(true)}
+            onActivateMandate={activateMandateCase}
+            onToggleMandateFlag={toggleMandateFlag}
+            requestingDocs={requestingDocs}
+            activating={activating}
+            togglingKey={togglingKey}
           />
         ) : null}
       </div>
@@ -424,69 +695,69 @@ export function FundraisingOnboarding() {
         open={createOpen}
         onOpenChange={setCreateOpen}
         title="Start Onboarding"
-        steps={[{ id: "client", short: "1", label: "Investor" }, { id: "setup", short: "2", label: "Case setup" }, { id: "review", short: "3", label: "Review" }]}
+        steps={[
+          { id: "investor", short: "1", label: "Investor" },
+          { id: "risk", short: "2", label: "Risk profile" },
+          { id: "review", short: "3", label: "Review" },
+        ]}
         submitLabel="Start case"
-        validateStep={(step) => step === "client" && !form.investor.trim() ? ["Investor or client is required"] : []}
-        onSubmit={startCase}
+        validateStep={(step) => (step === "investor" && !form.investorId ? ["Investor is required"] : [])}
+        onFinish={startCase}
       >
-        {(step) => step === "client" ? <div className="space-y-3">
-          <FrField label="Investor / client">
-            <input
-              className={frInputClass}
-              value={form.investor}
-              onChange={(e) => setForm((f) => ({ ...f, investor: e.target.value }))}
-              placeholder="e.g. Stanbic Bank Zimbabwe"
+        {(step) =>
+          step === "investor" ? (
+            <FrField label="Investor">
+              <select
+                className={cn(frSelectClass, "rounded-full")}
+                value={form.investorId}
+                disabled={wizardLoadingInvestors}
+                onChange={(e) => setForm((f) => ({ ...f, investorId: e.target.value }))}
+              >
+                <option value="">{wizardLoadingInvestors ? "Loading investors…" : "Select investor"}</option>
+                {wizardInvestors.map((i) => (
+                  <option key={i.id} value={i.id}>
+                    {i.legalName || i.name}
+                  </option>
+                ))}
+              </select>
+            </FrField>
+          ) : step === "risk" ? (
+            <FrField label="Risk rating">
+              <select
+                className={cn(frSelectClass, "rounded-full")}
+                value={form.riskRating}
+                onChange={(e) => setForm((f) => ({ ...f, riskRating: e.target.value }))}
+              >
+                <option value="LOW">Low</option>
+                <option value="MEDIUM">Medium</option>
+                <option value="HIGH">High</option>
+              </select>
+            </FrField>
+          ) : (
+            <ReviewList
+              items={[
+                {
+                  label: "Investor",
+                  value: wizardInvestors.find((i) => String(i.id) === form.investorId)?.legalName || "—",
+                },
+                { label: "Risk rating", value: form.riskRating },
+              ]}
             />
-          </FrField>
-          <FrField label="Type">
-            <select className={frSelectClass} value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value as OnboardingType }))}>
-              <option value="LP Commitment">LP Commitment</option><option value="Mandate">Mandate</option>
-            </select>
-          </FrField>
-        </div> : step === "setup" ? <div className="space-y-3">
-          <FrField label="Campaign">
-            <select
-              className={frSelectClass}
-              value={form.campaign}
-              onChange={(e) => setForm((f) => ({ ...f, campaign: e.target.value }))}
-            >
-              {CAMPAIGN_OPTIONS.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          </FrField>
-          <FrField label="Owner">
-            <select
-              className={frSelectClass}
-              value={form.owner}
-              onChange={(e) => setForm((f) => ({ ...f, owner: e.target.value }))}
-            >
-              {OWNER_OPTIONS.map((o) => (
-                <option key={o} value={o}>
-                  {o}
-                </option>
-              ))}
-            </select>
-          </FrField>
-        </div> : <ReviewList items={[
-          { label: "Investor", value: form.investor },
-          { label: "Type / campaign", value: `${form.type} · ${form.campaign}` },
-          { label: "Owner", value: form.owner },
-        ]} />}
+          )
+        }
       </FrSimpleWizard>
 
       <FrDialogShell
         open={docsOpen}
         onOpenChange={setDocsOpen}
         title="Request Documents"
-        description={`Send a document request to ${selected?.investor ?? "selected case"}`}
+        description={`Send a document request to ${safeDisplay(selected?.investor, "selected case")}`}
         footer={
           <FrFormFooter
             onCancel={() => setDocsOpen(false)}
             onSubmit={requestDocuments}
-            submitLabel="Send Request"
+            submitLabel={requestingDocs ? "Sending…" : "Send Request"}
+            submitDisabled={requestingDocs}
           />
         }
       >
@@ -497,7 +768,7 @@ export function FundraisingOnboarding() {
           </p>
           <FrField label="Additional note (optional)">
             <textarea
-              className={cn(frInputClass, "min-h-[72px] resize-none py-2")}
+              className={cn(frInputClass, "min-h-[72px] resize-none rounded-[22px] py-2")}
               value={docsNote}
               onChange={(e) => setDocsNote(e.target.value)}
               placeholder="Specify any additional documents required..."
@@ -506,10 +777,58 @@ export function FundraisingOnboarding() {
         </div>
       </FrDialogShell>
 
+      <FrDialogShell
+        open={kycLifecycleOpen}
+        onOpenChange={setKycLifecycleOpen}
+        title="Update KYC Lifecycle"
+        description={selected ? `${safeDisplay(selected.investor, "Investor")} · current status ${String(selected.kycStatus).replace(/_/g, " ")}` : undefined}
+        footer={
+          <FrFormFooter
+            onCancel={() => setKycLifecycleOpen(false)}
+            onSubmit={updateKycStatus}
+            submitLabel={updatingKyc ? "Updating…" : "Update KYC"}
+            submitDisabled={updatingKyc}
+          />
+        }
+      >
+        <div className="space-y-3">
+          <FrField label="Target status">
+            <select
+              className={cn(frSelectClass, "rounded-full")}
+              value={kycTargetStatus}
+              disabled={updatingKyc}
+              onChange={(event) => setKycTargetStatus(event.target.value)}
+            >
+              {KYC_LIFECYCLE_STATUSES.map((status) => (
+                <option key={status} value={status}>{status.replace(/_/g, " ")}</option>
+              ))}
+            </select>
+          </FrField>
+          <FrField label="Document note (optional)">
+            <textarea
+              className={cn(frInputClass, "min-h-[72px] resize-none rounded-[22px] py-2")}
+              value={kycDocsNote}
+              disabled={updatingKyc}
+              onChange={(event) => setKycDocsNote(event.target.value)}
+              placeholder="Documents received, missing, or requested"
+            />
+          </FrField>
+          <FrField label="Lifecycle notes (optional)">
+            <textarea
+              className={cn(frInputClass, "min-h-[88px] resize-none rounded-[22px] py-2")}
+              value={kycNotes}
+              disabled={updatingKyc}
+              onChange={(event) => setKycNotes(event.target.value)}
+              placeholder="Decision rationale, conditions, or follow-up"
+            />
+          </FrField>
+        </div>
+      </FrDialogShell>
+
       <FrViewAllDialog
         open={checklistOpen}
         onOpenChange={setChecklistOpen}
-        title={`Readiness Checklist — ${selected?.investor ?? ""}`}
+        title={`${selected?.kind === "MANDATE" ? "Activation" : "Readiness"} Checklist — ${safeDisplay(selected?.investor, "Investor")}`}
         description={`${selected?.progress ?? 0}% complete`}
         rows={(selected?.checklist ?? []).map((c) => ({
           id: c.id,
@@ -517,6 +836,10 @@ export function FundraisingOnboarding() {
           badge: c.done ? "Done" : "Pending",
           badgeClass: c.done ? "bg-[#dcfce7] text-[#15803d]" : "bg-[#f1f5f9] text-[#64748b]",
         }))}
+      />
+      <FrRequirementsDialog
+        state={requirements}
+        onOpenChange={(open) => setRequirements((current) => ({ ...current, open }))}
       />
     </div>
   )

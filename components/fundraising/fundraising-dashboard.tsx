@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import {
   BadgeCheck,
@@ -10,6 +10,7 @@ import {
   Coins,
   Download,
   FileText,
+  Loader2,
   Mail,
   Phone,
   Plus,
@@ -20,10 +21,10 @@ import {
   Users,
   Wallet,
 } from "lucide-react"
-import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { FrOpportunityWizard } from "@/components/fundraising/fundraising-create-wizards"
+import { FrTableSkeleton } from "@/components/fundraising/fundraising-modals"
 import { Input } from "@/components/ui/input"
 import {
   Select,
@@ -32,29 +33,75 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { fundraisingApi, toastFrError } from "@/lib/api/fundraising-api"
+import { exportFundraisingCsv } from "@/lib/fundraising/export"
+import { mapCampaignCard, mapOpportunityRow, moneyLabel, asNumber } from "@/lib/fundraising/mappers"
 import {
-  COVERAGE_BY_FILTER,
-  DASH_ACTIVITY,
-  DASH_AS_AT,
-  DASH_CAMPAIGNS,
-  DASH_OPPORTUNITIES,
-  DASH_TASKS,
-  FUNNEL_BY_FILTER,
-  KPIS_BY_FILTER,
-  PROGRESS_BY_FILTER,
   stageChipClass,
   taskStatusClass,
   taskStatusLabel,
-  type CampaignFilter,
   type DashActivity,
-  type DashMode,
-  type DashOpportunity,
-  type DashTask,
   type DashTaskStatus,
 } from "./dashboard-mock-data"
 
 const CARD =
   "rounded-[6px] border border-[#e2e8f0] bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
+
+type DashMode = "pe_vc" | "asset_mgmt"
+
+const AM_CAMPAIGN_TYPES = ["INSTITUTIONAL_MANDATE", "PRODUCT_LAUNCH", "DISTRIBUTOR_CAMPAIGN"]
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+function safePersonName(value: unknown, fallback = "Name unavailable") {
+  const name = typeof value === "string" ? value.trim() : ""
+  return name && !UUID_PATTERN.test(name) ? name : fallback
+}
+
+function embeddedOwnerName(raw: Record<string, any>, mappedOwner: string) {
+  const owner = raw.owner || raw.assignedOwner || raw.relationshipOwner
+  const embedded =
+    owner && typeof owner === "object"
+      ? owner.fullName || owner.name || [owner.firstName, owner.lastName].filter(Boolean).join(" ")
+      : undefined
+  return safePersonName(embedded || raw.ownerName || raw.assignedOwnerName || mappedOwner)
+}
+
+function modeForCampaignType(type?: string): DashMode {
+  return type && AM_CAMPAIGN_TYPES.includes(type) ? "asset_mgmt" : "pe_vc"
+}
+
+function formatType(type: string) {
+  return type.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+type MappedCampaign = ReturnType<typeof mapCampaignCard>
+type MappedOpportunity = ReturnType<typeof mapOpportunityRow>
+
+type DashTask = {
+  id: string
+  title: string
+  related: string
+  dueDate: string
+  status: DashTaskStatus
+  raw: Record<string, any>
+}
+
+function mapTaskRow(raw: Record<string, any>): DashTask {
+  return {
+    id: String(raw.id),
+    title: raw.title || raw.name || "Untitled task",
+    related:
+      raw.investorName ||
+      raw.campaignName ||
+      raw.opportunityName ||
+      (raw.investorId ? `Investor ${raw.investorId}` : "") ||
+      (raw.campaignId ? `Campaign ${raw.campaignId}` : "") ||
+      "—",
+    dueDate: raw.dueDate ? new Date(raw.dueDate).toLocaleDateString() : "—",
+    status: (raw.status || "NOT_STARTED") as DashTaskStatus,
+    raw,
+  }
+}
 
 type KpiCardDef = {
   id: string
@@ -188,20 +235,35 @@ function ActivityIcon({ kind }: { kind: DashActivity["kind"] }) {
   return <Icon className="h-3.5 w-3.5" strokeWidth={1.75} />
 }
 
+function oppInitials(name: string) {
+  return (
+    name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((w) => w[0]?.toUpperCase() ?? "")
+      .join("") || "?"
+  )
+}
+
+const LOGO_TONES = ["#f97316", "#16a34a", "#7c3aed", "#1d4ed8", "#0f766e", "#111827", "#0e7490", "#9333ea"]
+
 function OpportunityRow({
   opp,
   mode,
+  idx,
   selected,
   onSelect,
 }: {
-  opp: DashOpportunity
+  opp: MappedOpportunity
   mode: DashMode
+  idx: number
   selected: boolean
   onSelect: () => void
 }) {
-  const colA = mode === "pe_vc" ? opp.softAmount : opp.expectedAum
-  const colB = mode === "pe_vc" ? opp.signedAmount : opp.activatedAum
-  const colC = mode === "pe_vc" ? opp.fundedAmount : "—"
+  const colA = mode === "pe_vc" ? opp.softCircle : opp.expectedAum
+  const colB = mode === "pe_vc" ? opp.signed : opp.activatedAum
+  const colC = mode === "pe_vc" ? opp.funded : "—"
 
   return (
     <tr
@@ -215,15 +277,15 @@ function OpportunityRow({
         <div className="flex items-center gap-2">
           <span
             className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[4px] text-[9px] font-bold text-white"
-            style={{ backgroundColor: opp.logoBg }}
+            style={{ backgroundColor: LOGO_TONES[idx % LOGO_TONES.length] }}
           >
-            {opp.logoLabel}
+            {oppInitials(opp.investor)}
           </span>
           <span className="text-[12px] font-medium text-[#0f172a]">{opp.investor}</span>
         </div>
       </td>
       <td className="whitespace-nowrap px-3 py-2.5 text-[11px] text-[#64748b]">
-        {opp.campaignName}
+        {opp.campaign}
       </td>
       <td className="px-3 py-2.5">
         <span
@@ -246,34 +308,148 @@ function OpportunityRow({
           {colC}
         </td>
       ) : null}
-      <td className="whitespace-nowrap px-3 py-2.5 text-[11px] text-[#64748b]">{opp.owner}</td>
+      <td className="whitespace-nowrap px-3 py-2.5 text-[11px] text-[#64748b]">
+        {embeddedOwnerName(opp.raw, opp.owner)}
+      </td>
       <td className="max-w-[160px] truncate px-3 py-2.5 text-[11px] text-[#64748b]">
         {opp.nextAction}
       </td>
       <td className="whitespace-nowrap px-3 py-2.5 text-[11px] tabular-nums text-[#64748b]">
-        {opp.ageingDays}d
+        {opp.ageDays}d
       </td>
     </tr>
   )
 }
 
 export function FundraisingDashboard() {
-  const [campaignFilter, setCampaignFilter] = useState<CampaignFilter>("all")
+  const [campaigns, setCampaigns] = useState<MappedCampaign[]>([])
+  const [campaignFilter, setCampaignFilter] = useState<string>("all")
   const [mode, setMode] = useState<DashMode>("pe_vc")
   const [stageFilter, setStageFilter] = useState<string | null>(null)
   const [search, setSearch] = useState("")
   const [selectedOpp, setSelectedOpp] = useState<string | null>(null)
-  const [tasks, setTasks] = useState<DashTask[]>(DASH_TASKS)
+  const [tasks, setTasks] = useState<DashTask[]>([])
   const [createOppOpen, setCreateOppOpen] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [dashboard, setDashboard] = useState<Record<string, any> | null>(null)
+  const [opportunities, setOpportunities] = useState<MappedOpportunity[]>([])
+  const [activities, setActivities] = useState<DashActivity[]>([])
 
-  const campaign = DASH_CAMPAIGNS.find((c) => c.id === campaignFilter) ?? DASH_CAMPAIGNS[0]
-  const kpis = KPIS_BY_FILTER[campaignFilter]
-  const progress = PROGRESS_BY_FILTER[campaignFilter]
-  const coverage = COVERAGE_BY_FILTER[campaignFilter]
-  const funnel = FUNNEL_BY_FILTER[campaignFilter]
+  useEffect(() => {
+    fundraisingApi
+      .listCampaigns()
+      .then((rows) => setCampaigns(rows.map(mapCampaignCard)))
+      .catch((err) => toastFrError(err))
+  }, [])
 
-  const effectiveMode: DashMode =
-    campaignFilter === "mandate" ? "asset_mgmt" : campaignFilter === "zgf" ? "pe_vc" : mode
+  const campaignsById = useMemo(() => {
+    const map = new Map<string, MappedCampaign>()
+    campaigns.forEach((c) => map.set(c.id, c))
+    return map
+  }, [campaigns])
+
+  const selectedCampaign =
+    campaignFilter !== "all" ? campaignsById.get(campaignFilter) : undefined
+
+  const effectiveMode: DashMode = selectedCampaign
+    ? modeForCampaignType(selectedCampaign.type)
+    : mode
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    const params = campaignFilter !== "all" ? { campaignId: campaignFilter } : {}
+    Promise.all([
+      fundraisingApi.getDashboard(params),
+      fundraisingApi.listOpportunities(params),
+      fundraisingApi.listTasks(params),
+      fundraisingApi.listAuditLogs({ limit: 20 }),
+    ])
+      .then(([dash, opps, taskRes, auditRows]) => {
+        if (cancelled) return
+        setDashboard(dash || {})
+        setOpportunities((opps || []).map(mapOpportunityRow))
+        const rawTasks = (taskRes?.performanceTasks || []) as Record<string, any>[]
+        setTasks(rawTasks.map(mapTaskRow))
+        setActivities(
+          (auditRows ?? []).map((row: Record<string, any>, index: number) => {
+            const text = `${row.action || ""} ${row.objectType || ""}`.toLowerCase()
+            const kind: DashActivity["kind"] = text.includes("meeting")
+              ? "meeting"
+              : text.includes("ddq")
+                ? "ddq"
+                : text.includes("document") || text.includes("agreement")
+                  ? "document"
+                  : text.includes("commitment")
+                    ? "commitment"
+                    : text.includes("call")
+                      ? "call"
+                      : "email"
+            const at = row.createdAt || row.timestamp || row.occurredAt
+            return {
+              id: String(row.id ?? index),
+              kind,
+              title: row.summary || `${row.action || "Updated"} ${row.objectName || row.objectType || "record"}`,
+              detail: row.details || row.objectName || row.objectType || "Fundraising activity",
+              timestamp: at ? new Date(at).toLocaleString() : "—",
+              actor: safePersonName(
+                row.user?.fullName ||
+                  row.user?.name ||
+                  [row.user?.firstName, row.user?.lastName].filter(Boolean).join(" ") ||
+                  row.userName ||
+                  row.actorName,
+              ),
+            }
+          }),
+        )
+      })
+      .catch((err) => {
+        if (!cancelled) toastFrError(err)
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [campaignFilter])
+
+  const scopedOpportunities = useMemo(() => {
+    if (campaignFilter !== "all") return opportunities
+    return opportunities.filter((o) => {
+      const camp = o.campaignId ? campaignsById.get(String(o.campaignId)) : undefined
+      return modeForCampaignType(camp?.type) === effectiveMode
+    })
+  }, [opportunities, campaignFilter, campaignsById, effectiveMode])
+
+  const kpis = useMemo(() => {
+    const d = dashboard || {}
+    const target = asNumber(d.targetTotal)
+    const signed = asNumber(d.signedTotal)
+    const admitted = asNumber(d.admittedTotal)
+    const funded = asNumber(d.fundedTotal)
+    const expectedAum = asNumber(d.expectedAumTotal)
+    const activatedAum = asNumber(d.activatedAumTotal)
+    const weighted = asNumber(d.weightedPipeline)
+    const soft = scopedOpportunities.reduce((sum, o) => sum + asNumber(o.raw?.softCircleAmount), 0)
+    const pct = (v: number) => (target > 0 ? Math.round((v / target) * 100) : 0)
+    return {
+      target,
+      signed,
+      admitted,
+      funded,
+      expectedAum,
+      activatedAum,
+      weighted,
+      soft,
+      pctSigned: pct(signed),
+      pctAdmitted: pct(admitted),
+      pctFunded: pct(funded),
+      pctSoft: pct(soft),
+      pctExpectedAum: pct(expectedAum),
+      pctActivatedAum: pct(activatedAum),
+    }
+  }, [dashboard, scopedOpportunities])
 
   const kpiCards: KpiCardDef[] = useMemo(() => {
     if (effectiveMode === "asset_mgmt") {
@@ -281,8 +457,8 @@ export function FundraisingDashboard() {
         {
           id: "target",
           label: "AUM Target",
-          amount: kpis.target.amount,
-          helper: kpis.target.helper,
+          amount: moneyLabel(kpis.target),
+          helper: "Mandate target",
           icon: Target,
           iconColor: "#7c3aed",
           iconBg: "#ede9fe",
@@ -290,9 +466,9 @@ export function FundraisingDashboard() {
         {
           id: "soft",
           label: "Qualified Interest",
-          amount: kpis.soft.amount,
-          helper: `${kpis.soft.pctOfTarget}% of target`,
-          pct: kpis.soft.pctOfTarget,
+          amount: moneyLabel(kpis.soft),
+          helper: `${kpis.pctSoft}% of target`,
+          pct: kpis.pctSoft,
           icon: Users,
           iconColor: "#2563eb",
           iconBg: "#dbeafe",
@@ -301,9 +477,9 @@ export function FundraisingDashboard() {
         {
           id: "expected",
           label: "Expected AUM",
-          amount: (kpis.expectedAum ?? kpis.soft).amount,
-          helper: (kpis.expectedAum ?? kpis.soft).helper,
-          pct: (kpis.expectedAum ?? kpis.soft).pctOfTarget,
+          amount: moneyLabel(kpis.expectedAum),
+          helper: `${kpis.pctExpectedAum}% of target`,
+          pct: kpis.pctExpectedAum,
           icon: TrendingUp,
           iconColor: "#d97706",
           iconBg: "#fef3c7",
@@ -312,9 +488,9 @@ export function FundraisingDashboard() {
         {
           id: "signed",
           label: "Agreements Signed",
-          amount: kpis.signed.amount,
-          helper: kpis.signed.helper,
-          pct: kpis.signed.pctOfTarget,
+          amount: moneyLabel(kpis.signed),
+          helper: `${kpis.pctSigned}% of target`,
+          pct: kpis.pctSigned,
           icon: BadgeCheck,
           iconColor: "#7c3aed",
           iconBg: "#ede9fe",
@@ -323,9 +499,9 @@ export function FundraisingDashboard() {
         {
           id: "activated",
           label: "Activated AUM",
-          amount: (kpis.activatedAum ?? kpis.funded).amount,
+          amount: moneyLabel(kpis.activatedAum),
           helper: "Assets under management",
-          pct: (kpis.activatedAum ?? kpis.funded).pctOfTarget,
+          pct: kpis.pctActivatedAum,
           icon: Wallet,
           iconColor: "#16a34a",
           iconBg: "#dcfce7",
@@ -334,8 +510,8 @@ export function FundraisingDashboard() {
         {
           id: "weighted",
           label: "Weighted Pipeline",
-          amount: kpis.weighted.amount,
-          helper: kpis.weighted.helper,
+          amount: moneyLabel(kpis.weighted),
+          helper: "Prob × confidence",
           icon: Coins,
           iconColor: "#2563eb",
           iconBg: "#dbeafe",
@@ -347,8 +523,8 @@ export function FundraisingDashboard() {
       {
         id: "target",
         label: "Fundraising Target",
-        amount: kpis.target.amount,
-        helper: kpis.target.helper,
+        amount: moneyLabel(kpis.target),
+        helper: "Campaign target",
         icon: Target,
         iconColor: "#7c3aed",
         iconBg: "#ede9fe",
@@ -356,9 +532,9 @@ export function FundraisingDashboard() {
       {
         id: "soft",
         label: "Soft Circled",
-        amount: kpis.soft.amount,
-        helper: `${kpis.soft.pctOfTarget}% of target · non-binding`,
-        pct: kpis.soft.pctOfTarget,
+        amount: moneyLabel(kpis.soft),
+        helper: `${kpis.pctSoft}% of target · non-binding`,
+        pct: kpis.pctSoft,
         icon: Users,
         iconColor: "#7c3aed",
         iconBg: "#ede9fe",
@@ -367,9 +543,9 @@ export function FundraisingDashboard() {
       {
         id: "signed",
         label: "Signed Commitments",
-        amount: kpis.signed.amount,
-        helper: `${kpis.signed.pctOfTarget}% · not cash`,
-        pct: kpis.signed.pctOfTarget,
+        amount: moneyLabel(kpis.signed),
+        helper: `${kpis.pctSigned}% · not cash`,
+        pct: kpis.pctSigned,
         icon: BadgeCheck,
         iconColor: "#2563eb",
         iconBg: "#dbeafe",
@@ -378,9 +554,9 @@ export function FundraisingDashboard() {
       {
         id: "admitted",
         label: "Admitted at Close",
-        amount: kpis.admitted.amount,
-        helper: `${kpis.admitted.pctOfTarget}% of target`,
-        pct: kpis.admitted.pctOfTarget,
+        amount: moneyLabel(kpis.admitted),
+        helper: `${kpis.pctAdmitted}% of target`,
+        pct: kpis.pctAdmitted,
         icon: Shield,
         iconColor: "#0f766e",
         iconBg: "#ccfbf1",
@@ -389,9 +565,9 @@ export function FundraisingDashboard() {
       {
         id: "funded",
         label: "Funded",
-        amount: kpis.funded.amount,
-        helper: `${kpis.funded.pctOfTarget}% · cash received`,
-        pct: kpis.funded.pctOfTarget,
+        amount: moneyLabel(kpis.funded),
+        helper: `${kpis.pctFunded}% · cash received`,
+        pct: kpis.pctFunded,
         icon: Wallet,
         iconColor: "#16a34a",
         iconBg: "#dcfce7",
@@ -400,8 +576,8 @@ export function FundraisingDashboard() {
       {
         id: "weighted",
         label: "Weighted Pipeline",
-        amount: kpis.weighted.amount,
-        helper: kpis.weighted.helper,
+        amount: moneyLabel(kpis.weighted),
+        helper: "Prob × confidence",
         icon: Coins,
         iconColor: "#d97706",
         iconBg: "#fef3c7",
@@ -409,38 +585,110 @@ export function FundraisingDashboard() {
     ]
   }, [effectiveMode, kpis])
 
-  const opportunities = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    return DASH_OPPORTUNITIES.filter((o) => {
-      if (campaignFilter !== "all" && o.campaignId !== campaignFilter) return false
-      if (campaignFilter === "all" && effectiveMode !== o.mode) {
-        // When viewing All + mode toggle, filter by mode
-        // Keep both if we want mix — plan says mode toggle swaps labels; for "all" show mode-matching rows
-        return o.mode === effectiveMode
+  const progress = useMemo(() => {
+    const targetM = kpis.target / 1_000_000
+    const signedM = kpis.signed / 1_000_000
+    const fundedM = (effectiveMode === "asset_mgmt" ? kpis.activatedAum : kpis.funded) / 1_000_000
+    return {
+      targetM,
+      signedM,
+      fundedM,
+      remainingM: Math.max(targetM - signedM, 0),
+      signedLabel: effectiveMode === "asset_mgmt" ? "Agreements signed" : "Signed commitments",
+      fundedLabel: effectiveMode === "asset_mgmt" ? "Activated AUM" : "Funded capital",
+    }
+  }, [kpis, effectiveMode])
+
+  const coverage = useMemo(() => {
+    const d = dashboard || {}
+    const ratio = asNumber(d.coverageRatio)
+    const remaining = Math.max(kpis.target - kpis.signed, 0)
+    return {
+      grossPipeline: moneyLabel(d.grossPipeline),
+      weightedPipeline: moneyLabel(d.weightedPipeline),
+      remainingTarget: moneyLabel(remaining),
+      coverageRatio: ratio ? `${ratio.toFixed(2)}×` : "—",
+      coveragePct: Math.round(ratio * 100),
+    }
+  }, [dashboard, kpis])
+
+  const funnel = useMemo(() => {
+    const order: string[] = []
+    const byStage = new Map<string, { count: number; amount: number }>()
+    scopedOpportunities.forEach((o) => {
+      const key = o.stage
+      if (!byStage.has(key)) {
+        byStage.set(key, { count: 0, amount: 0 })
+        order.push(key)
       }
+      const entry = byStage.get(key)!
+      entry.count += 1
+      entry.amount += asNumber(o.raw?.indicativeAmount ?? o.raw?.softCircleAmount)
+    })
+    return order.map((label) => ({
+      id: label,
+      label,
+      count: byStage.get(label)!.count,
+      amount: moneyLabel(byStage.get(label)!.amount),
+    }))
+  }, [scopedOpportunities])
+
+  const filteredOpportunities = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return scopedOpportunities.filter((o) => {
       if (stageFilter && o.stage.toLowerCase() !== stageFilter.toLowerCase()) return false
       if (q && !o.investor.toLowerCase().includes(q)) return false
       return true
     })
-  }, [campaignFilter, effectiveMode, stageFilter, search])
+  }, [scopedOpportunities, stageFilter, search])
 
-  function toggleTask(id: string) {
-    setTasks((prev) =>
-      prev.map((t) => {
-        if (t.id !== id) return t
-        const next: DashTaskStatus =
-          t.status === "COMPLETED" ? "IN_PROGRESS" : "COMPLETED"
-        return { ...t, status: next }
-      }),
-    )
+  async function toggleTask(task: DashTask) {
+    const next: DashTaskStatus = task.status === "COMPLETED" ? "IN_PROGRESS" : "COMPLETED"
+    setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, status: next } : t)))
+    try {
+      await fundraisingApi.patchTask(task.id, { status: next })
+    } catch (err) {
+      setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, status: task.status } : t)))
+      toastFrError(err)
+    }
   }
 
   function onCampaignChange(v: string) {
-    const next = v as CampaignFilter
-    setCampaignFilter(next)
+    setCampaignFilter(v)
     setStageFilter(null)
-    if (next === "mandate") setMode("asset_mgmt")
-    if (next === "zgf") setMode("pe_vc")
+    setSelectedOpp(null)
+    const camp = v !== "all" ? campaignsById.get(v) : undefined
+    if (camp) setMode(modeForCampaignType(camp.type))
+  }
+
+  function exportDashboard() {
+    exportFundraisingCsv(
+      filteredOpportunities.map((opp) => ({
+        investor: opp.investor,
+        campaign: opp.campaign,
+        stage: opp.stage,
+        proposed: opp.proposed,
+        softCircle: opp.softCircle,
+        signed: opp.signed,
+        funded: opp.funded,
+        owner: embeddedOwnerName(opp.raw, opp.owner),
+        nextAction: opp.nextAction,
+        ageDays: opp.ageDays,
+      })),
+      [
+        { key: "investor", label: "Investor" },
+        { key: "campaign", label: "Campaign" },
+        { key: "stage", label: "Stage" },
+        { key: "proposed", label: "Proposed Amount" },
+        { key: "softCircle", label: "Soft Circle" },
+        { key: "signed", label: "Signed" },
+        { key: "funded", label: "Funded" },
+        { key: "owner", label: "Owner" },
+        { key: "nextAction", label: "Next Action" },
+        { key: "ageDays", label: "Days in Stage" },
+      ],
+      "fundraising-dashboard-opportunities",
+    )
   }
 
   return (
@@ -452,9 +700,9 @@ export function FundraisingDashboard() {
             Fundraising Dashboard
           </h1>
           <p className="mt-1 text-[12px] text-[#64748b]">
-            {campaign.name}
-            {campaign.id !== "all" ? (
-              <span className="text-[#94a3b8]"> · {campaign.typeLabel}</span>
+            {selectedCampaign ? selectedCampaign.name : "All Campaigns"}
+            {selectedCampaign ? (
+              <span className="text-[#94a3b8]"> · {formatType(selectedCampaign.type)}</span>
             ) : (
               <span className="text-[#94a3b8]">
                 {" "}
@@ -465,11 +713,12 @@ export function FundraisingDashboard() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Select value={campaignFilter} onValueChange={onCampaignChange}>
-            <SelectTrigger className="h-9 w-[200px] rounded-[6px] border-[#e2e8f0] text-[12px]">
+            <SelectTrigger className="h-9 w-[200px] rounded-full border-[#e2e8f0] text-[12px]">
               <SelectValue placeholder="Campaign" />
             </SelectTrigger>
             <SelectContent>
-              {DASH_CAMPAIGNS.map((c) => (
+              <SelectItem value="all">All Campaigns</SelectItem>
+              {campaigns.map((c) => (
                 <SelectItem key={c.id} value={c.id}>
                   {c.name}
                 </SelectItem>
@@ -478,7 +727,7 @@ export function FundraisingDashboard() {
           </Select>
 
           {campaignFilter === "all" ? (
-            <div className="inline-flex rounded-[6px] border border-[#e2e8f0] bg-white p-0.5">
+            <div className="inline-flex rounded-full border border-[#e2e8f0] bg-white p-0.5">
               <button
                 type="button"
                 onClick={() => {
@@ -486,7 +735,7 @@ export function FundraisingDashboard() {
                   setStageFilter(null)
                 }}
                 className={cn(
-                  "rounded-[4px] px-2.5 py-1.5 text-[11px] font-medium transition-colors",
+                  "rounded-full px-2.5 py-1.5 text-[11px] font-medium transition-colors",
                   effectiveMode === "pe_vc"
                     ? "rounded-full bg-gradient-to-r from-blue-600 to-cyan-600 text-white"
                     : "rounded-full text-[#64748b] hover:bg-[#f8fafc]",
@@ -501,7 +750,7 @@ export function FundraisingDashboard() {
                   setStageFilter(null)
                 }}
                 className={cn(
-                  "rounded-[4px] px-2.5 py-1.5 text-[11px] font-medium transition-colors",
+                  "rounded-full px-2.5 py-1.5 text-[11px] font-medium transition-colors",
                   effectiveMode === "asset_mgmt"
                     ? "rounded-full bg-gradient-to-r from-blue-600 to-cyan-600 text-white"
                     : "rounded-full text-[#64748b] hover:bg-[#f8fafc]",
@@ -514,12 +763,12 @@ export function FundraisingDashboard() {
 
           <span className="inline-flex items-center gap-1.5 text-[12px] text-[#64748b]">
             <CalendarDays className="h-3.5 w-3.5" />
-            As at {DASH_AS_AT}
+            {loading ? "Refreshing…" : "Live"}
           </span>
           <Button
             variant="outline"
             className="h-9 rounded-full px-4 shadow-sm"
-            onClick={() => toast.success("Dashboard export started")}
+            onClick={exportDashboard}
           >
             <Download className="h-4 w-4" />
             Export
@@ -536,9 +785,13 @@ export function FundraisingDashboard() {
 
       {/* KPI strip */}
       <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-        {kpiCards.map((kpi) => (
-          <KpiCard key={kpi.id} kpi={kpi} />
-        ))}
+        {loading && !dashboard ? (
+          <div className="col-span-2 flex items-center justify-center py-10 text-[#94a3b8] md:col-span-3 xl:col-span-6">
+            <Loader2 className="h-5 w-5 animate-spin" />
+          </div>
+        ) : (
+          kpiCards.map((kpi) => <KpiCard key={kpi.id} kpi={kpi} />)
+        )}
       </div>
 
       {/* Mid row */}
@@ -576,12 +829,20 @@ export function FundraisingDashboard() {
           </div>
           <div className="mt-4 grid grid-cols-2 gap-3 border-t border-[#f1f5f9] pt-3 text-[11px]">
             <div>
-              <p className="text-[#94a3b8]">First / next close</p>
-              <p className="mt-0.5 font-semibold text-[#0f172a]">{progress.firstClose}</p>
+              <p className="text-[#94a3b8]">Start date</p>
+              <p className="mt-0.5 font-semibold text-[#0f172a]">
+                {selectedCampaign?.startDate
+                  ? new Date(selectedCampaign.startDate).toLocaleDateString()
+                  : "—"}
+              </p>
             </div>
             <div>
-              <p className="text-[#94a3b8]">Final close target</p>
-              <p className="mt-0.5 font-semibold text-[#0f172a]">{progress.finalClose}</p>
+              <p className="text-[#94a3b8]">Target close</p>
+              <p className="mt-0.5 font-semibold text-[#0f172a]">
+                {selectedCampaign?.closeDate
+                  ? new Date(selectedCampaign.closeDate).toLocaleDateString()
+                  : "—"}
+              </p>
             </div>
             <div className="col-span-2">
               <p className="text-[#94a3b8]">Remaining to target</p>
@@ -636,10 +897,6 @@ export function FundraisingDashboard() {
                 />
               </div>
             </div>
-            <div className="flex items-center justify-between border-t border-[#f1f5f9] pt-2.5">
-              <span className="text-[#94a3b8]">Expected annual fee</span>
-              <span className="font-semibold text-[#0f172a]">{coverage.expectedFee}</span>
-            </div>
           </div>
         </div>
 
@@ -651,7 +908,7 @@ export function FundraisingDashboard() {
               <button
                 type="button"
                 onClick={() => setStageFilter(null)}
-                className="text-[11px] font-medium text-[#2563eb] hover:underline"
+                className="rounded-full px-2 py-1 text-[11px] font-medium text-[#2563eb] hover:underline"
               >
                 Clear filter
               </button>
@@ -660,35 +917,41 @@ export function FundraisingDashboard() {
             )}
           </div>
           <ul className="flex-1 divide-y divide-[#f1f5f9]">
-            {funnel.map((stage) => {
-              const active = stageFilter?.toLowerCase() === stage.label.toLowerCase()
-              return (
-                <li key={stage.id}>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setStageFilter((prev) =>
-                        prev?.toLowerCase() === stage.label.toLowerCase()
-                          ? null
-                          : stage.label,
-                      )
-                    }
-                    className={cn(
-                      "flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left transition-colors",
-                      active ? "bg-[#f5f3ff]" : "hover:bg-[#f8fafc]",
-                    )}
-                  >
-                    <div className="min-w-0">
-                      <p className="text-[12px] font-medium text-[#0f172a]">{stage.label}</p>
-                      <p className="text-[10px] text-[#94a3b8]">{stage.count} opportunities</p>
-                    </div>
-                    <span className="shrink-0 text-[12px] font-semibold tabular-nums text-[#0f172a]">
-                      {stage.amount}
-                    </span>
-                  </button>
-                </li>
-              )
-            })}
+            {funnel.length === 0 ? (
+              <li className="px-4 py-10 text-center text-[12px] text-[#94a3b8]">
+                No opportunities yet.
+              </li>
+            ) : (
+              funnel.map((stage) => {
+                const active = stageFilter?.toLowerCase() === stage.label.toLowerCase()
+                return (
+                  <li key={stage.id}>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setStageFilter((prev) =>
+                          prev?.toLowerCase() === stage.label.toLowerCase()
+                            ? null
+                            : stage.label,
+                        )
+                      }
+                      className={cn(
+                        "flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left transition-colors",
+                        active ? "bg-[#f5f3ff]" : "hover:bg-[#f8fafc]",
+                      )}
+                    >
+                      <div className="min-w-0">
+                        <p className="text-[12px] font-medium text-[#0f172a]">{stage.label}</p>
+                        <p className="text-[10px] text-[#94a3b8]">{stage.count} opportunities</p>
+                      </div>
+                      <span className="shrink-0 text-[12px] font-semibold tabular-nums text-[#0f172a]">
+                        {stage.amount}
+                      </span>
+                    </button>
+                  </li>
+                )
+              })
+            )}
           </ul>
         </div>
       </div>
@@ -701,7 +964,7 @@ export function FundraisingDashboard() {
             <div className="flex items-center gap-2">
               <h2 className="text-[13px] font-semibold text-[#0f172a]">Open Opportunities</h2>
               <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-[4px] bg-[#f1f5f9] px-1.5 text-[11px] font-semibold text-[#64748b]">
-                {opportunities.length}
+                {filteredOpportunities.length}
               </span>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -745,7 +1008,9 @@ export function FundraisingDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {opportunities.length === 0 ? (
+                {loading ? (
+                  <FrTableSkeleton columns={effectiveMode === "pe_vc" ? 9 : 8} rows={5} />
+                ) : filteredOpportunities.length === 0 ? (
                   <tr>
                     <td
                       colSpan={effectiveMode === "pe_vc" ? 9 : 8}
@@ -755,11 +1020,12 @@ export function FundraisingDashboard() {
                     </td>
                   </tr>
                 ) : (
-                  opportunities.map((opp) => (
+                  filteredOpportunities.map((opp, idx) => (
                     <OpportunityRow
                       key={opp.id}
                       opp={opp}
                       mode={effectiveMode}
+                      idx={idx}
                       selected={selectedOpp === opp.id}
                       onSelect={() => setSelectedOpp(opp.id)}
                     />
@@ -783,9 +1049,17 @@ export function FundraisingDashboard() {
               </Link>
             </div>
             <div className="max-h-[280px] overflow-y-auto">
-              {tasks.map((task) => (
-                <TaskRow key={task.id} task={task} onToggle={() => toggleTask(task.id)} />
-              ))}
+              {loading ? (
+                <div className="flex items-center justify-center py-10 text-[#94a3b8]">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                </div>
+              ) : tasks.length === 0 ? (
+                <p className="px-3 py-10 text-center text-[12px] text-[#94a3b8]">No open tasks.</p>
+              ) : (
+                tasks.map((task) => (
+                  <TaskRow key={task.id} task={task} onToggle={() => toggleTask(task)} />
+                ))
+              )}
             </div>
           </div>
 
@@ -794,27 +1068,50 @@ export function FundraisingDashboard() {
               <h2 className="text-[13px] font-semibold text-[#0f172a]">Recent Activity</h2>
             </div>
             <ul className="max-h-[300px] divide-y divide-[#f1f5f9] overflow-y-auto">
-              {DASH_ACTIVITY.map((item) => (
-                <li key={item.id} className="flex gap-2.5 px-3 py-2.5">
-                  <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-[6px] bg-[#f1f5f9] text-[#64748b]">
-                    <ActivityIcon kind={item.kind} />
-                  </span>
-                  <div className="min-w-0">
-                    <p className="text-[12px] font-medium leading-snug text-[#0f172a]">
-                      {item.title}
-                    </p>
-                    <p className="mt-0.5 text-[10px] leading-snug text-[#64748b]">{item.detail}</p>
-                    <p className="mt-1 text-[10px] text-[#94a3b8]">
-                      {item.actor} · {item.timestamp}
-                    </p>
-                  </div>
+              {loading ? (
+                <li className="px-3 py-10 text-center text-[12px] text-[#94a3b8]">Loading activity…</li>
+              ) : activities.length === 0 ? (
+                <li className="px-3 py-10 text-center text-[12px] text-[#94a3b8]">
+                  No recent activity from the audit log.
                 </li>
-              ))}
+              ) : (
+                activities.map((item) => (
+                  <li key={item.id} className="flex gap-2.5 px-3 py-2.5">
+                    <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-[6px] bg-[#f1f5f9] text-[#64748b]">
+                      <ActivityIcon kind={item.kind} />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-[12px] font-medium leading-snug text-[#0f172a]">
+                        {item.title}
+                      </p>
+                      <p className="mt-0.5 text-[10px] leading-snug text-[#64748b]">{item.detail}</p>
+                      <p className="mt-1 text-[10px] text-[#94a3b8]">
+                        {item.actor} · {item.timestamp}
+                      </p>
+                    </div>
+                  </li>
+                ))
+              )}
             </ul>
           </div>
         </aside>
       </div>
-      <FrOpportunityWizard open={createOppOpen} onOpenChange={setCreateOppOpen} />
+      <FrOpportunityWizard
+        open={createOppOpen}
+        onOpenChange={setCreateOppOpen}
+        campaignId={campaignFilter !== "all" ? campaignFilter : undefined}
+        onCreated={() => {
+          const params = campaignFilter !== "all" ? { campaignId: campaignFilter } : {}
+          fundraisingApi
+            .listOpportunities(params)
+            .then((rows) => setOpportunities(rows.map(mapOpportunityRow)))
+            .catch((err) => toastFrError(err))
+          fundraisingApi
+            .getDashboard(params)
+            .then((dash) => setDashboard(dash || {}))
+            .catch((err) => toastFrError(err))
+        }}
+      />
     </div>
   )
 }
