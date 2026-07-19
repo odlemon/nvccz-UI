@@ -1,5 +1,19 @@
 import { apiClient } from "./api-client"
 import type { Holding, PriceTick, RoutingHop, Security } from "./investments-api"
+import { idempotencyHeaders } from "./investment-ops-helpers"
+import type { OpsPaged } from "./investment-ops-helpers"
+export {
+  unwrapList,
+  unwrapPaged,
+  newIdempotencyKey,
+  idempotencyHeaders,
+  moneyAsString,
+  formatMoneyDisplay,
+  formatOpsError,
+  qs,
+} from "./investment-ops-helpers"
+export type { OpsEnvelope, OpsPaged } from "./investment-ops-helpers"
+
 
 // ─── Response wrapper ────────────────────────────────────────────────────────
 interface InvestmentOpsResponse<T = any> {
@@ -14,11 +28,12 @@ interface InvestmentOpsResponse<T = any> {
 export interface DashboardPortfolioSummary {
   fundId: string
   name: string
-  nav: number
+  /** Decimal string from BE (legacy number still accepted by adapters). */
+  nav: string | number
   valuationDate: string | null
-  pnl: number
-  pnlPct: number
-  periodRealizedPnl: number
+  pnl: string | number
+  pnlPct: string | number
+  periodRealizedPnl: string | number
   baseCurrency: string
   status: "OK" | "STALE" | string
   lastRecalculation: string | null
@@ -35,8 +50,8 @@ export interface DashboardSummary {
 }
 
 export interface AllocationBucket {
-  value: number
-  pct: number
+  value: string | number
+  pct: string | number
 }
 
 export interface DashboardAllocation {
@@ -52,7 +67,7 @@ export interface DashboardAllocation {
 
 export interface CurrencyExposureEntry {
   currency: string
-  value: number
+  value: string | number
 }
 
 export interface FundSnapshot {
@@ -82,8 +97,11 @@ export interface OpsFund {
 export interface PortfolioOverview {
   fundId: string
   name: string
-  nav: number
-  pnl: number
+  nav: string | number
+  pnl: string | number
+  cashBalance?: string | number | null
+  cashPct?: string | number | null
+  securitiesValue?: string | number | null
   startDate: string
   valuationDate: string | null
   baseCurrency: string
@@ -93,15 +111,19 @@ export interface PortfolioOverview {
 
 export interface PortfolioTransaction {
   id: string
-  type: "PURCHASE" | "SALE"
-  tradeRef: string
+  type?: "PURCHASE" | "SALE" | string
+  transactionType?: string
+  tradeRef?: string
+  transactionRef?: string
   symbol: string
-  quantity: number
-  price: number
+  quantity: string | number
+  price?: string | number
+  unitPrice?: string | number
+  netAmount?: string | number | null
   status: string
   tradeDate: string
   journalEntryId: string | null
-  realizedPnl: number | null
+  realizedPnl?: string | number | null
 }
 
 export interface ExposureByExchange {
@@ -158,6 +180,8 @@ export interface Instrument {
   approvedById: string | null
   approvedAt: string | null
   listedEquitySecurityId: string | null
+  latestPrice?: string | number | null
+  pricedAt?: string | null
   auditVersion: number
   createdAt: string
   updatedAt: string
@@ -210,10 +234,13 @@ export interface Order {
   id: string
   orderRef: string
   fundId: string
+  fundName?: string | null
+  fund?: { id?: string; name?: string } | null
   instrumentId: string
   securityId: string | null
   side: "BUY" | "SELL"
   quantity: string
+  filledQuantity?: string | number | null
   orderType: "MARKET" | "LIMIT" | string
   limitPrice: string | null
   executionPrice: string
@@ -221,6 +248,8 @@ export interface Order {
   settlementCurrency: string | null
   brokerProfileId: string | null
   custodianProfileId: string | null
+  brokerName?: string | null
+  custodianName?: string | null
   valueDate: string | null
   tradeDate: string | null
   status: OrderStatus
@@ -235,6 +264,7 @@ export interface Order {
   instrument: Instrument
   approvals?: OrderApproval[]
   complianceResults?: OrderComplianceResult[]
+  complianceRuns?: unknown[]
 }
 
 export interface OrderListResult {
@@ -299,13 +329,19 @@ export interface OpsFundRef {
 export interface OpsTrade {
   id: string
   tradeRef: string
+  orderRef?: string | null
+  orderId?: string | null
   fundId: string
+  fundName?: string | null
   securityId: string
   side: "BUY" | "SELL"
   quantity: string
+  filledQuantity?: string | number | null
   executionPrice: string
   executionCurrencyCode: string
   fees: string
+  taxes?: string | number | null
+  feesBreakdown?: Record<string, unknown> | null
   status: "DRAFT" | "EXECUTED" | "ROUTING" | "SETTLED" | "SETTLEMENT_FAILED" | "CANCELLED" | string
   idempotencyKey: string | null
   executedAt: string | null
@@ -319,11 +355,64 @@ export interface OpsTrade {
   accountingStatus: "NOT_POSTED" | "POSTED" | string
   confirmationStatus: "DISPATCHED" | "CONFIRMED" | string
   settlementStatus: "SETTLED" | "SETTLEMENT_FAILED" | "PENDING" | string
-  grossConsideration: number
-  netConsideration: number
+  grossConsideration: number | string
+  netConsideration: number | string
   brokerProfileId: string | null
   custodianProfileId: string | null
+  brokerName?: string | null
+  custodianName?: string | null
   valueDate: string | null
+}
+
+/** Flat pre-trade compliance result from GET /compliance/results */
+export interface ComplianceResultItem {
+  id: string
+  orderId: string
+  orderRef?: string | null
+  fundId?: string | null
+  instrumentTicker?: string | null
+  side?: string | null
+  ruleId?: string | null
+  ruleName?: string | null
+  ruleType?: string | null
+  limitDisplay?: string | null
+  currentDisplay?: string | null
+  afterTradeDisplay?: string | null
+  outcome: string
+  createdAt?: string | null
+  [key: string]: unknown
+}
+
+export interface OpsBlotter {
+  id: string
+  name?: string
+  title?: string
+  notes?: string | null
+  status?: string
+  fundId?: string | null
+  orderCount?: number
+  createdAt?: string
+  updatedAt?: string
+  [key: string]: unknown
+}
+
+export interface ApprovalRoute {
+  id: string
+  name?: string
+  fundId?: string | null
+  minAmount?: string | number | null
+  maxAmount?: string | number | null
+  requiredApprovals?: number
+  isActive?: boolean
+  steps?: unknown[]
+  [key: string]: unknown
+}
+
+export interface FundSetupLimits {
+  hardLimitEnabled?: boolean
+  positiveCashRequired?: boolean
+  limits?: Array<Record<string, unknown>>
+  [key: string]: unknown
 }
 
 // ─── Compliance ───────────────────────────────────────────────────────────────
@@ -717,6 +806,7 @@ export interface ModelPortfolio {
   strategyCode: string | null
   baseCurrencyCode: string
   isActive: boolean
+  linkedFundId?: string | null
   createdAt: string
   updatedAt: string
   allocations: ModelPortfolioAllocation[]
@@ -761,6 +851,9 @@ export interface ValuationRun {
   asOf: string
   status: "COMPLETED" | "COMPLETED_WITH_EXCEPTIONS" | string
   navBaseCurrency: string
+  realizedPnl?: string | number | null
+  unrealizedPnl?: string | number | null
+  totalPnl?: string | number | null
   errorMessage: string | null
   parametersJson: { costBasisMethod: string; [key: string]: any }
   startedById: string
@@ -836,6 +929,10 @@ class InvestmentOpsApiService {
     return apiClient.get(`${this.BASE}/portfolios/${fundId}/holdings`)
   }
 
+  async getPortfolioPositions(fundId: string): Promise<InvestmentOpsResponse<any>> {
+    return apiClient.get(`${this.BASE}/portfolios/${fundId}/positions`)
+  }
+
   async getPortfolioTransactions(fundId: string): Promise<InvestmentOpsResponse<PortfolioTransaction[]>> {
     return apiClient.get(`${this.BASE}/portfolios/${fundId}/transactions`)
   }
@@ -870,7 +967,18 @@ class InvestmentOpsApiService {
     return apiClient.get(`${this.BASE}/instruments${qs ? `?${qs}` : ""}`)
   }
 
-  // ── Market Data — Ingest Batches ──────────────────────────────────────────────
+  // ── Market Data — Prices & Ingest ─────────────────────────────────────────────
+  async getLatestPrices(params?: {
+    search?: string
+    exchangeCode?: string
+  }): Promise<InvestmentOpsResponse<any[]>> {
+    const q = new URLSearchParams()
+    if (params?.search) q.append("search", params.search)
+    if (params?.exchangeCode) q.append("exchangeCode", params.exchangeCode)
+    const qs = q.toString()
+    return apiClient.get(`${this.BASE}/market-data/prices/latest${qs ? `?${qs}` : ""}`)
+  }
+
   async listIngestBatches(): Promise<InvestmentOpsResponse<IngestBatch[]>> {
     return apiClient.get(`${this.BASE}/market-data/ingest/batches`)
   }
@@ -988,6 +1096,21 @@ class InvestmentOpsApiService {
     return apiClient.get(`${this.BASE}/compliance/rules${qs ? `?${qs}` : ""}`)
   }
 
+  async listComplianceResults(params?: {
+    fundId?: string
+    orderId?: string
+    page?: number
+    pageSize?: number
+  }): Promise<InvestmentOpsResponse<OpsPaged<ComplianceResultItem> | ComplianceResultItem[]>> {
+    const q = new URLSearchParams()
+    if (params?.fundId) q.append("fundId", params.fundId)
+    if (params?.orderId) q.append("orderId", params.orderId)
+    if (params?.page) q.append("page", String(params.page))
+    if (params?.pageSize) q.append("pageSize", String(params.pageSize))
+    const qs = q.toString()
+    return apiClient.get(`${this.BASE}/compliance/results${qs ? `?${qs}` : ""}`)
+  }
+
   async createComplianceRule(data: {
     ruleCode: string
     ruleName: string
@@ -1000,6 +1123,37 @@ class InvestmentOpsApiService {
 
   async createComplianceOverride(data: { orderId: string; reason: string }): Promise<InvestmentOpsResponse<any>> {
     return apiClient.post(`${this.BASE}/compliance/overrides`, data)
+  }
+
+  // ── Blotters ─────────────────────────────────────────────────────────────────
+  async listBlotters(params?: {
+    fundId?: string
+    page?: number
+    pageSize?: number
+  }): Promise<InvestmentOpsResponse<OpsPaged<OpsBlotter> | OpsBlotter[]>> {
+    const q = new URLSearchParams()
+    if (params?.fundId) q.append("fundId", params.fundId)
+    if (params?.page) q.append("page", String(params.page))
+    if (params?.pageSize) q.append("pageSize", String(params.pageSize))
+    const qs = q.toString()
+    return apiClient.get(`${this.BASE}/blotters${qs ? `?${qs}` : ""}`)
+  }
+
+  async createBlotter(data: {
+    name: string
+    fundId?: string
+    notes?: string
+  }): Promise<InvestmentOpsResponse<OpsBlotter>> {
+    return apiClient.post(`${this.BASE}/blotters`, data, { headers: idempotencyHeaders() })
+  }
+
+  async addBlotterOrder(
+    blotterId: string,
+    data: { orderId: string },
+  ): Promise<InvestmentOpsResponse<OpsBlotter>> {
+    return apiClient.post(`${this.BASE}/blotters/${blotterId}/orders`, data, {
+      headers: idempotencyHeaders(),
+    })
   }
 
   // ── Simulation ───────────────────────────────────────────────────────────────
@@ -1019,8 +1173,20 @@ class InvestmentOpsApiService {
   async createModelPortfolio(data: {
     name: string
     allocations: Array<{ allocationType: string; allocationKey: string; targetWeightPct: number }>
+    linkedFundId?: string
   }): Promise<InvestmentOpsResponse<ModelPortfolio>> {
-    return apiClient.post(`${this.BASE}/model-portfolios`, data)
+    return apiClient.post(`${this.BASE}/model-portfolios`, data, { headers: idempotencyHeaders() })
+  }
+
+  async updateModelPortfolio(
+    id: string,
+    data: {
+      name?: string
+      allocations?: Array<{ allocationType: string; allocationKey: string; targetWeightPct: number }>
+      linkedFundId?: string | null
+    },
+  ): Promise<InvestmentOpsResponse<ModelPortfolio>> {
+    return apiClient.patch(`${this.BASE}/model-portfolios/${id}`, data)
   }
 
   async getModelPortfolioDrift(modelId: string, fundId: string): Promise<InvestmentOpsResponse<ModelPortfolioDrift>> {
@@ -1028,7 +1194,27 @@ class InvestmentOpsApiService {
   }
 
   // ── Valuation ────────────────────────────────────────────────────────────────
-  async createValuationRun(data: { fundId: string; costBasisMethod: string }): Promise<InvestmentOpsResponse<ValuationRun>> {
+  async listValuationRuns(params?: {
+    fundId?: string
+    status?: string
+    page?: number
+    pageSize?: number
+  }): Promise<InvestmentOpsResponse<{ items: ValuationRun[]; page: number; pageSize: number; total: number; totalPages: number } | ValuationRun[]>> {
+    const q = new URLSearchParams()
+    if (params?.fundId) q.append("fundId", params.fundId)
+    if (params?.status) q.append("status", params.status)
+    if (params?.page) q.append("page", String(params.page))
+    if (params?.pageSize) q.append("pageSize", String(params.pageSize))
+    const qs = q.toString()
+    return apiClient.get(`${this.BASE}/valuation/runs${qs ? `?${qs}` : ""}`)
+  }
+
+  async createValuationRun(data: {
+    fundId: string
+    costBasisMethod: string
+    asOf?: string
+    processNow?: boolean
+  }): Promise<InvestmentOpsResponse<ValuationRun>> {
     return apiClient.post(`${this.BASE}/valuation/runs`, data)
   }
 
@@ -1036,11 +1222,68 @@ class InvestmentOpsApiService {
     return apiClient.get(`${this.BASE}/valuation/runs/${id}`)
   }
 
-  async listValuationExceptions(params?: { fundId?: string }): Promise<InvestmentOpsResponse<ValuationException[]>> {
+  async listValuationExceptions(params?: { fundId?: string; status?: string }): Promise<InvestmentOpsResponse<ValuationException[]>> {
     const q = new URLSearchParams()
     if (params?.fundId) q.append("fundId", params.fundId)
+    if (params?.status) q.append("status", params.status)
     const qs = q.toString()
     return apiClient.get(`${this.BASE}/valuation/exceptions${qs ? `?${qs}` : ""}`)
+  }
+
+  async getValuationRunInputs(id: string): Promise<
+    InvestmentOpsResponse<{
+      inputs?: unknown
+      prices?: unknown[]
+      fxRates?: unknown[]
+      [key: string]: unknown
+    }>
+  > {
+    return apiClient.get(`${this.BASE}/valuation/runs/${id}/inputs`)
+  }
+
+  async resolveValuationException(
+    id: string,
+    data: { reason?: string; note?: string; [key: string]: unknown } = {},
+  ): Promise<InvestmentOpsResponse<ValuationException>> {
+    return apiClient.post(`${this.BASE}/valuation/exceptions/${id}/resolve`, data, {
+      headers: idempotencyHeaders(),
+    })
+  }
+
+  async overrideValuationException(
+    id: string,
+    data: { overrideValue?: string | number; reason?: string; [key: string]: unknown },
+  ): Promise<InvestmentOpsResponse<ValuationException>> {
+    return apiClient.post(`${this.BASE}/valuation/exceptions/${id}/override`, data, {
+      headers: idempotencyHeaders(),
+    })
+  }
+
+  async escalateValuationException(
+    id: string,
+    data: { reason?: string; [key: string]: unknown } = {},
+  ): Promise<InvestmentOpsResponse<ValuationException>> {
+    return apiClient.post(`${this.BASE}/valuation/exceptions/${id}/escalate`, data, {
+      headers: idempotencyHeaders(),
+    })
+  }
+
+  async approveValuationOverride(
+    id: string,
+    data: { reason?: string; expectedVersion?: number } = {},
+  ): Promise<InvestmentOpsResponse<ValuationException>> {
+    return apiClient.post(`${this.BASE}/valuation/exceptions/${id}/approve-override`, data, {
+      headers: idempotencyHeaders(),
+    })
+  }
+
+  async rejectValuationOverride(
+    id: string,
+    data: { reason: string; expectedVersion?: number },
+  ): Promise<InvestmentOpsResponse<ValuationException>> {
+    return apiClient.post(`${this.BASE}/valuation/exceptions/${id}/reject-override`, data, {
+      headers: idempotencyHeaders(),
+    })
   }
 
   // ── Reconciliation ───────────────────────────────────────────────────────────
@@ -1103,6 +1346,74 @@ class InvestmentOpsApiService {
     return apiClient.get(`${this.BASE}/accounting/journals/${id}`)
   }
 
+  async submitJournal(
+    id: string,
+    data: { expectedVersion?: number } = {},
+  ): Promise<InvestmentOpsResponse<JournalEntry>> {
+    return apiClient.post(`${this.BASE}/accounting/journals/${id}/submit`, data, {
+      headers: idempotencyHeaders(),
+    })
+  }
+
+  async postJournal(
+    id: string,
+    data: { expectedVersion?: number } = {},
+  ): Promise<InvestmentOpsResponse<JournalEntry>> {
+    return apiClient.post(`${this.BASE}/accounting/journals/${id}/post`, data, {
+      headers: idempotencyHeaders(),
+    })
+  }
+
+  async approveJournal(
+    id: string,
+    data: { expectedVersion?: number } = {},
+  ): Promise<InvestmentOpsResponse<JournalEntry>> {
+    return apiClient.post(`${this.BASE}/accounting/journals/${id}/approve`, data, {
+      headers: idempotencyHeaders(),
+    })
+  }
+
+  async rejectJournal(
+    id: string,
+    data: { reason: string; expectedVersion?: number },
+  ): Promise<InvestmentOpsResponse<JournalEntry>> {
+    return apiClient.post(`${this.BASE}/accounting/journals/${id}/reject`, data, {
+      headers: idempotencyHeaders(),
+    })
+  }
+
+  async listAccountingReversals(params?: {
+    fundId?: string
+    page?: number
+    pageSize?: number
+  }): Promise<InvestmentOpsResponse<OpsPaged<Record<string, unknown>> | Record<string, unknown>[]>> {
+    const q = new URLSearchParams()
+    if (params?.fundId) q.append("fundId", params.fundId)
+    if (params?.page) q.append("page", String(params.page))
+    if (params?.pageSize) q.append("pageSize", String(params.pageSize))
+    const qs = q.toString()
+    return apiClient.get(`${this.BASE}/accounting/reversals${qs ? `?${qs}` : ""}`)
+  }
+
+  async listLedgerExports(params?: {
+    fundId?: string
+    page?: number
+    pageSize?: number
+  }): Promise<InvestmentOpsResponse<OpsPaged<Record<string, unknown>> | Record<string, unknown>[]>> {
+    const q = new URLSearchParams()
+    if (params?.fundId) q.append("fundId", params.fundId)
+    if (params?.page) q.append("page", String(params.page))
+    if (params?.pageSize) q.append("pageSize", String(params.pageSize))
+    const qs = q.toString()
+    return apiClient.get(`${this.BASE}/accounting/ledger-exports${qs ? `?${qs}` : ""}`)
+  }
+
+  async downloadLedgerExport(id: string): Promise<Blob> {
+    return apiClient.get<Blob>(`${this.BASE}/accounting/ledger-exports/${id}/download`, {
+      responseType: "blob",
+    })
+  }
+
   // ── Documents ─────────────────────────────────────────────────────────────────
   async listDocuments(params?: { fundId?: string; documentType?: string }): Promise<InvestmentOpsResponse<OpsDocument[]>> {
     const q = new URLSearchParams()
@@ -1116,9 +1427,10 @@ class InvestmentOpsApiService {
     fundId: string
     documentType: string
     title: string
-    fileRef: string
+    fileRef?: string
+    fileId?: string
   }): Promise<InvestmentOpsResponse<OpsDocument>> {
-    return apiClient.post(`${this.BASE}/documents`, data)
+    return apiClient.post(`${this.BASE}/documents`, data, { headers: idempotencyHeaders() })
   }
 
   async downloadDocument(id: string): Promise<Blob> {
@@ -1195,8 +1507,50 @@ class InvestmentOpsApiService {
     return apiClient.put(`${this.BASE}/setup/funds/${id}/config`, data)
   }
 
+  async getFundLimits(fundId: string): Promise<InvestmentOpsResponse<FundSetupLimits>> {
+    return apiClient.get(`${this.BASE}/setup/funds/${fundId}/limits`)
+  }
+
+  async putFundLimits(
+    fundId: string,
+    data: FundSetupLimits,
+  ): Promise<InvestmentOpsResponse<FundSetupLimits>> {
+    return apiClient.put(`${this.BASE}/setup/funds/${fundId}/limits`, data, {
+      headers: idempotencyHeaders(),
+    })
+  }
+
   async assignFundManager(fundId: string, data: { userId: string; role: string }): Promise<InvestmentOpsResponse<FundManagerAssignment>> {
     return apiClient.post(`${this.BASE}/setup/funds/${fundId}/managers`, data)
+  }
+
+  // ── Approval routes ──────────────────────────────────────────────────────────
+  async listApprovalRoutes(params?: {
+    fundId?: string
+    page?: number
+    pageSize?: number
+  }): Promise<InvestmentOpsResponse<OpsPaged<ApprovalRoute> | ApprovalRoute[]>> {
+    const q = new URLSearchParams()
+    if (params?.fundId) q.append("fundId", params.fundId)
+    if (params?.page) q.append("page", String(params.page))
+    if (params?.pageSize) q.append("pageSize", String(params.pageSize))
+    const qs = q.toString()
+    return apiClient.get(`${this.BASE}/approval-routes${qs ? `?${qs}` : ""}`)
+  }
+
+  async createApprovalRoute(data: Record<string, unknown>): Promise<InvestmentOpsResponse<ApprovalRoute>> {
+    return apiClient.post(`${this.BASE}/approval-routes`, data, { headers: idempotencyHeaders() })
+  }
+
+  async updateApprovalRoute(
+    id: string,
+    data: Record<string, unknown>,
+  ): Promise<InvestmentOpsResponse<ApprovalRoute>> {
+    return apiClient.put(`${this.BASE}/approval-routes/${id}`, data)
+  }
+
+  async deleteApprovalRoute(id: string): Promise<InvestmentOpsResponse<unknown>> {
+    return apiClient.delete(`${this.BASE}/approval-routes/${id}`)
   }
 
   // ── Setup — Brokers / Custodians ─────────────────────────────────────────────

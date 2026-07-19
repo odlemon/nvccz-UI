@@ -1,12 +1,8 @@
-"use client"
+'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useAppSelector, useAppDispatch } from "@/lib/store"
-import { logoutUser } from "@/lib/store/slices/authSlice"
-import { toast } from "sonner"
-import { useInvestmentsTheme } from '@/components/investments-v2/theme-provider'
 import {
   LayoutDashboard,
   Briefcase,
@@ -17,8 +13,12 @@ import {
   FileText,
   Calculator,
   ChevronDown,
+  ChevronsLeft,
+  ChevronsRight,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+
+const STORAGE_KEY = 'investments-v2-sidebar-collapsed'
 
 const navItems = [
   {
@@ -58,6 +58,14 @@ const navItems = [
     label: 'Reconciliation',
     icon: Scale,
     href: '/investments-v2/reconciliation',
+    children: [
+      { label: 'Overview', href: '/investments-v2/reconciliation' },
+      { label: 'Cash Ledger', href: '/investments-v2/reconciliation/cash-ledger' },
+      { label: 'Fund Cash', href: '/investments-v2/reconciliation/fund-cash' },
+      { label: 'Broker & Custodian', href: '/investments-v2/reconciliation/broker-custodian' },
+      { label: 'Exceptions', href: '/investments-v2/reconciliation/exceptions' },
+      { label: 'Statements', href: '/investments-v2/reconciliation/statements' },
+    ],
   },
   {
     label: 'Valuation',
@@ -81,106 +89,100 @@ const navItems = [
   },
 ]
 
+function getDefaultExpanded(pathname: string) {
+  const expanded: string[] = []
+  navItems.forEach((item) => {
+    if (!item.children) return
+    const hasActive = item.children.some(
+      (c) => pathname === c.href || (c.href !== item.href && pathname.startsWith(`${c.href}/`)),
+    )
+    if (
+      hasActive ||
+      pathname === item.href ||
+      (item.href !== '/investments-v2' && pathname.startsWith(`${item.href}/`))
+    ) {
+      expanded.push(item.label)
+    }
+  })
+  return expanded.length ? expanded : ['Portfolios']
+}
+
 export function InvestmentsV2Sidebar() {
   const pathname = usePathname()
-  const dispatch = useAppDispatch()
-  const { user } = useAppSelector((state) => state.auth)
-  const { theme } = useInvestmentsTheme()
-  const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const [collapsed, setCollapsed] = useState(false)
+  const [expanded, setExpanded] = useState<string[]>(() => getDefaultExpanded(pathname))
 
-  // Auto-expand parent whose child is active
-  const getDefaultExpanded = () => {
-    const expanded: string[] = []
-    navItems.forEach(item => {
-      if (item.children) {
-        const hasActive = item.children.some(c => pathname === c.href || pathname.startsWith(c.href + '/'))
-        if (hasActive || pathname.startsWith(item.href + '/') || (item.href !== '/' && pathname.startsWith(item.href))) {
-          expanded.push(item.label)
-        }
-      }
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY)
+      if (saved === '1') setCollapsed(true)
+    } catch {
+      /* ignore */
+    }
+  }, [])
+
+  useEffect(() => {
+    setExpanded((prev) => {
+      const next = getDefaultExpanded(pathname)
+      const merged = new Set([...prev, ...next])
+      return Array.from(merged)
     })
-    return expanded.length ? expanded : ['Portfolios', 'Orders']
-  }
+  }, [pathname])
 
-  const [expanded, setExpanded] = useState<string[]>(getDefaultExpanded)
+  const toggleCollapsed = () => {
+    setCollapsed((current) => {
+      const next = !current
+      try {
+        localStorage.setItem(STORAGE_KEY, next ? '1' : '0')
+      } catch {
+        /* ignore */
+      }
+      return next
+    })
+  }
 
   const toggleExpand = (label: string) => {
-    setExpanded(prev =>
-      prev.includes(label) ? prev.filter(l => l !== label) : [...prev, label]
-    )
-  }
-
-  const isRootActive = (href: string) => {
-    if (href === '/') return pathname === '/'
-    return pathname === href || pathname.startsWith(href + '/')
-  }
-
-  const isChildActive = (href: string) => pathname === href
-
-  const handleLogout = async () => {
-    setIsLoggingOut(true)
-    try {
-      await dispatch(logoutUser()).unwrap()
-      toast.success("Logged out successfully!")
-      window.location.href = '/login'
-    } catch (error) {
-      toast.error("Logout failed. Please try again.")
-    } finally {
-      setIsLoggingOut(false)
+    if (collapsed) {
+      setCollapsed(false)
+      try {
+        localStorage.setItem(STORAGE_KEY, '0')
+      } catch {
+        /* ignore */
+      }
+      setExpanded((prev) => (prev.includes(label) ? prev : [...prev, label]))
+      return
     }
+    setExpanded((prev) => (prev.includes(label) ? prev.filter((l) => l !== label) : [...prev, label]))
   }
 
-  const getUserInitials = () => {
-    if (!user) return "U"
-    return `${user.firstName?.charAt(0) || ''}${user.lastName?.charAt(0) || ''}`.toUpperCase()
-  }
-
-  const getUserName = () => {
-    if (!user) return "User"
-    return `${user.firstName || ''} ${user.lastName || ''}`.trim()
-  }
-
-  const sidebarStyles = theme === 'dark'
-    ? { background: '#1a1d24' }
-    : { background: '#ffffff' }
-
-  const logoBoxStyles = theme === 'dark'
-    ? { background: '#3b82f6' }
-    : { background: '#2563eb' }
-
-  const navItemStyles = (isActive: boolean) => {
-    if (theme === 'dark') {
-      return isActive
-        ? { color: '#3b82f6', background: 'rgba(59,130,246,0.1)' }
-        : { color: '#64748b' }
-    } else {
-      return isActive
-        ? { color: '#2563eb', background: 'rgba(37,99,235,0.08)' }
-        : { color: '#475569' }
+  const isRootActive = (href: string, children?: { href: string }[]) => {
+    if (href === '/investments-v2') return pathname === href
+    if (children?.length) {
+      return children.some(
+        (c) => pathname === c.href || (c.href !== href && pathname.startsWith(`${c.href}/`)),
+      ) || pathname === href || pathname.startsWith(`${href}/`)
     }
+    return pathname === href || pathname.startsWith(`${href}/`)
   }
 
-  const childItemStyles = (isActive: boolean) => {
-    if (theme === 'dark') {
-      return isActive ? { color: '#3b82f6', fontWeight: 500 } : { color: '#64748b' }
-    } else {
-      return isActive ? { color: '#2563eb', fontWeight: 500 } : { color: '#475569' }
+  const isChildActive = (href: string, parentHref: string) => {
+    if (href === parentHref) {
+      return pathname === href
     }
+    return pathname === href || pathname.startsWith(`${href}/`)
   }
-
-  const userCardBg = theme === 'dark' ? '#14161e' : '#f8fafc'
-  const userCardBorder = theme === 'dark' ? 'rgba(255,255,255,0.06)' : '#e2e8f0'
 
   return (
-    <aside className="w-[210px] flex-shrink-0 flex flex-col overflow-hidden" style={sidebarStyles}>
-      {/* Logo */}
-
-
-      {/* Nav */}
-      <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-0.5">
+    <aside
+      className={cn(
+        'flex h-full shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-[width] duration-200',
+        collapsed ? 'w-[68px]' : 'w-[220px]',
+      )}
+    >
+      <nav className="flex-1 space-y-0.5 overflow-y-auto px-2 py-3">
         {navItems.map((item) => {
           const Icon = item.icon
-          const isActive = isRootActive(item.href)
+          const active = isRootActive(item.href, item.children)
           const isExp = expanded.includes(item.label)
 
           if (!item.children) {
@@ -188,11 +190,17 @@ export function InvestmentsV2Sidebar() {
               <Link
                 key={item.label}
                 href={item.href}
-                className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium transition-colors"
-                style={navItemStyles(isActive)}
+                title={collapsed ? item.label : undefined}
+                className={cn(
+                  'flex h-10 items-center gap-2.5 rounded-full px-3 text-[12px] font-medium transition-colors',
+                  collapsed && 'justify-center px-0',
+                  active
+                    ? 'bg-sidebar-accent text-sidebar-primary'
+                    : 'text-sidebar-foreground hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground',
+                )}
               >
-                <Icon className="w-4 h-4 flex-shrink-0" />
-                <span>{item.label}</span>
+                <Icon className={cn('h-4 w-4 shrink-0', active ? 'text-sidebar-primary' : 'opacity-70')} />
+                {!collapsed && <span className="truncate">{item.label}</span>}
               </Link>
             )
           }
@@ -200,27 +208,42 @@ export function InvestmentsV2Sidebar() {
           return (
             <div key={item.label}>
               <button
+                type="button"
+                title={collapsed ? item.label : undefined}
                 onClick={() => toggleExpand(item.label)}
-                className="w-full flex items-center justify-between px-3 py-2 rounded-full text-[13px] font-medium transition-colors"
-                style={navItemStyles(isActive)}
+                className={cn(
+                  'flex h-10 w-full items-center gap-2.5 rounded-full px-3 text-[12px] font-medium transition-colors',
+                  collapsed ? 'justify-center px-0' : 'justify-between',
+                  active
+                    ? 'bg-sidebar-accent text-sidebar-primary'
+                    : 'text-sidebar-foreground hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground',
+                )}
               >
-                <div className="flex items-center gap-2.5">
-                  <Icon className="w-4 h-4 flex-shrink-0" />
-                  <span>{item.label}</span>
-                </div>
-                <ChevronDown className={cn('w-3.5 h-3.5 transition-transform', isExp ? 'rotate-180' : '')} />
+                <span className="flex min-w-0 items-center gap-2.5">
+                  <Icon className={cn('h-4 w-4 shrink-0', active ? 'text-sidebar-primary' : 'opacity-70')} />
+                  {!collapsed && <span className="truncate">{item.label}</span>}
+                </span>
+                {!collapsed && (
+                  <ChevronDown
+                    className={cn('h-3.5 w-3.5 shrink-0 opacity-60 transition-transform', isExp && 'rotate-180')}
+                  />
+                )}
               </button>
 
-              {isExp && (
-                <div className="mt-0.5 mb-1 ml-3">
+              {!collapsed && isExp && (
+                <div className="mb-1 ml-4 mt-0.5 space-y-0.5 border-l border-sidebar-border pl-2">
                   {item.children.map((child) => {
-                    const active = isChildActive(child.href)
+                    const childActive = isChildActive(child.href, item.href)
                     return (
                       <Link
                         key={child.href}
                         href={child.href}
-                        className="flex items-center px-3 py-1.5 text-[12.5px] rounded-md transition-colors"
-                        style={childItemStyles(active)}
+                        className={cn(
+                          'flex items-center rounded-full px-3 py-1.5 text-[11.5px] transition-colors',
+                          childActive
+                            ? 'bg-primary/10 font-medium text-primary'
+                            : 'text-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground',
+                        )}
                       >
                         {child.label}
                       </Link>
@@ -233,45 +256,19 @@ export function InvestmentsV2Sidebar() {
         })}
       </nav>
 
-      {/* User card at bottom */}
-      <div className="flex-shrink-0 p-3" style={{ borderTop: `1px solid ${userCardBorder}` }}>
-        <div className="rounded-xl p-3" style={{ background: userCardBg }}>
-          <div className="flex items-center gap-2.5 mb-3">
-            {/* Avatar */}
-            <div className="relative">
-              <div className="w-9 h-9 rounded-full overflow-hidden border-2" style={{ borderColor: theme === 'dark' ? '#3b82f6' : '#2563eb' }}>
-                <div
-                  className="w-full h-full flex items-center justify-center text-sm font-bold"
-                  style={{
-                    background: theme === 'dark' ? '#3b82f6' : '#2563eb',
-                    color: '#ffffff'
-                  }}
-                >
-                  {getUserInitials()}
-                </div>
-              </div>
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-[13px] font-semibold leading-tight truncate" style={{ color: theme === 'dark' ? '#e2e8f0' : '#0f172a' }}>
-                {getUserName()}
-              </div>
-              <div className="text-[11px] truncate" style={{ color: '#64748b' }}>
-                {user?.role || 'User'}
-              </div>
-            </div>
-          </div>
-          <button
-            onClick={handleLogout}
-            disabled={isLoggingOut}
-            className="w-full text-[12px] py-1.5 font-semibold rounded-full transition-colors disabled:opacity-50"
-            style={{
-              background: theme === 'dark' ? '#3b82f6' : '#2563eb',
-              color: '#ffffff'
-            }}
-          >
-            {isLoggingOut ? 'Logging out...' : 'Logout'}
-          </button>
-        </div>
+      <div className="shrink-0 border-t border-sidebar-border p-2">
+        <button
+          type="button"
+          onClick={toggleCollapsed}
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          className={cn(
+            'flex h-9 w-full items-center gap-2 rounded-full px-3 text-[12px] font-medium text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+            collapsed && 'justify-center px-0',
+          )}
+        >
+          {collapsed ? <ChevronsRight className="h-4 w-4" /> : <ChevronsLeft className="h-4 w-4" />}
+          {!collapsed && <span>Collapse</span>}
+        </button>
       </div>
     </aside>
   )

@@ -1,69 +1,325 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { FileUp, Search, ShieldAlert } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { FileUp, Loader2, Search, ShieldAlert } from 'lucide-react'
 import { buttonClass, Field, inputClass, Metric, Modal, OrdersCard, OrdersPage, Pill, SelectField, tableClass, tableWrapClass } from '@/components/investments-v2/orders-ui'
+import { formatOpsError, investmentOpsApi } from '@/lib/api/investment-ops-api'
+import {
+  fundNameMap,
+  mapComplianceResults,
+  mapComplianceRules,
+  type ComplianceResultRow,
+  type ComplianceRuleRow,
+} from '@/lib/investments-v2/adapters/orders-adapter'
 import { cn } from '@/lib/utils'
 
-const checks = [
-  { order: 'ORD-260717-041', portfolio: 'Arcus Balanced Fund', ticker: 'DELTA', side: 'BUY', category: 'Security exposure', rule: 'Maximum single-security exposure', limit: '≤ 15.00%', current: '13.62%', after: '16.18%', status: 'Requires Override' },
-  { order: 'ORD-260717-041', portfolio: 'Arcus Balanced Fund', ticker: 'DELTA', side: 'BUY', category: 'Issuer exposure', rule: 'Maximum issuer exposure', limit: '≤ 18.00%', current: '13.62%', after: '16.18%', status: 'Warning' },
-  { order: 'ORD-260717-040', portfolio: 'Growth Equity Fund', ticker: 'INNSCOR', side: 'SELL', category: 'Country exposure', rule: 'Maximum Zimbabwe exposure', limit: '≤ 90.00%', current: '86.40%', after: '84.10%', status: 'Passed' },
-  { order: 'ORD-260717-041', portfolio: 'Arcus Balanced Fund', ticker: 'DELTA', side: 'BUY', category: 'Sector exposure', rule: 'Maximum consumer exposure', limit: '≤ 25.00%', current: '23.40%', after: '26.12%', status: 'Failed' },
-  { order: 'ORD-260717-039', portfolio: 'Pension Preservation', ticker: 'CBZ', side: 'BUY', category: 'Currency exposure', rule: 'Maximum ZWL exposure', limit: '≤ 85.00%', current: '78.20%', after: '80.11%', status: 'Passed' },
-  { order: 'ORD-260717-039', portfolio: 'Pension Preservation', ticker: 'CBZ', side: 'BUY', category: 'Cash balance', rule: 'Minimum cash balance', limit: '≥ 5.00%', current: '7.84%', after: '5.21%', status: 'Warning' },
-  { order: 'ORD-260716-038', portfolio: 'Arcus Balanced Fund', ticker: 'ECO', side: 'BUY', category: 'Liquidity', rule: 'Maximum illiquid asset exposure', limit: '≤ 20.00%', current: '12.50%', after: '14.10%', status: 'Passed' },
-  { order: 'ORD-260716-037', portfolio: 'Growth Equity Fund', ticker: 'FBC', side: 'SELL', category: 'Restricted securities', rule: 'Issuer restricted list', limit: 'Not restricted', current: 'Restricted', after: 'Restricted', status: 'Rejected' },
-  { order: 'ORD-260716-038', portfolio: 'Arcus Balanced Fund', ticker: 'ECO', side: 'BUY', category: 'Restricted markets', rule: 'Approved exchange list', limit: 'Approved only', current: 'ZSE approved', after: 'ZSE approved', status: 'Passed' },
-  { order: 'ORD-260717-040', portfolio: 'Growth Equity Fund', ticker: 'INNSCOR', side: 'SELL', category: 'Restricted brokers', rule: 'Approved broker list', limit: 'Approved only', current: 'IH approved', after: 'IH approved', status: 'Passed' },
-  { order: 'ORD-260717-039', portfolio: 'Pension Preservation', ticker: 'CBZ', side: 'BUY', category: 'Credit rating', rule: 'Minimum credit rating', limit: '≥ BBB-', current: 'BBB', after: 'BBB', status: 'Passed' },
-  { order: 'ORD-260717-039', portfolio: 'Pension Preservation', ticker: 'CBZ', side: 'BUY', category: 'Maturity', rule: 'Maximum maturity', limit: '≤ 10 years', current: 'Equity / N/A', after: 'Equity / N/A', status: 'Passed' },
-  { order: 'ORD-260717-041', portfolio: 'Arcus Balanced Fund', ticker: 'DELTA', side: 'BUY', category: 'Leverage', rule: 'Gross leverage limit', limit: '≤ 110.00%', current: '98.20%', after: '100.40%', status: 'Passed' },
-  { order: 'ORD-260717-040', portfolio: 'Growth Equity Fund', ticker: 'INNSCOR', side: 'SELL', category: 'Derivatives', rule: 'Derivative exposure limit', limit: '≤ 10.00%', current: '0.00%', after: '0.00%', status: 'Passed' },
-  { order: 'ORD-260717-041', portfolio: 'Arcus Balanced Fund', ticker: 'DELTA', side: 'BUY', category: 'ESG restrictions', rule: 'Minimum internal ESG score', limit: '≥ 60', current: '72', after: '72', status: 'Approved with Exception' },
-  { order: 'ORD-260717-039', portfolio: 'Pension Preservation', ticker: 'CBZ', side: 'BUY', category: 'Client mandate', rule: 'Pension mandate approved universe', limit: 'Approved only', current: 'Approved', after: 'Approved', status: 'Passed' },
-]
-const rules = [
-  ['Security / issuer', 'Maximum security and issuer exposure', 'Portfolio / fund', '15% / 18%'],
-  ['Country / sector', 'Maximum geographic and sector exposure', 'Client mandate', '90% / 25%'],
-  ['Currency / cash', 'Currency cap and minimum cash', 'Portfolio', '85% / 5%'],
-  ['Liquidity', 'Maximum illiquid asset exposure', 'Instrument type', '20%'],
-  ['Restricted lists', 'Securities, markets and brokers', 'All portfolios', 'Approved only'],
-  ['Credit / maturity', 'Minimum rating and maximum maturity', 'Instrument type', 'BBB- / 10y'],
-  ['Leverage / derivatives', 'Gross and derivative exposure', 'Fund', '110% / 10%'],
-  ['ESG / client mandate', 'ESG and client-specific restrictions', 'Client mandate', 'Score ≥ 60'],
-]
+type OverrideHistory = {
+  order: string
+  reason: string
+  approver: string
+  time: string
+  document: string
+  outcome: string
+}
+
+const outcomeTone = (outcome: string): 'green' | 'amber' | 'red' | 'slate' => {
+  const u = outcome.toUpperCase()
+  if (u === 'PASSED' || u === 'PASS') return 'green'
+  if (u === 'WARNING' || u === 'WARN') return 'amber'
+  if (u === 'BREACH' || u === 'FAILED' || u === 'FAIL') return 'red'
+  return 'slate'
+}
 
 export default function CompliancePage() {
-  const [items, setItems] = useState(checks)
+  const [rules, setRules] = useState<ComplianceRuleRow[]>([])
+  const [results, setResults] = useState<ComplianceResultRow[]>([])
+  const [fundNames, setFundNames] = useState<Record<string, string>>({})
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [query, setQuery] = useState('')
-  const [override, setOverride] = useState<(typeof checks)[number] | null>(null)
+  const [override, setOverride] = useState<ComplianceRuleRow | null>(null)
   const [reason, setReason] = useState('')
   const [approver, setApprover] = useState('')
   const [document, setDocument] = useState('')
-  const [history, setHistory] = useState<{ order: string; reason: string; approver: string; time: string; document: string; outcome: string }[]>([
-    { order: 'ORD-260715-032', reason: 'Temporary concentration accepted during staged rebalance.', approver: 'CIO · R. Chirwa', time: '15 Jul 2026, 14:22', document: 'IC-minute-1507.pdf', outcome: 'Approved with Exception' },
-  ])
-  const visible = useMemo(() => items.filter((x) => Object.values(x).join(' ').toLowerCase().includes(query.toLowerCase())), [items, query])
-  const submit = () => {
+  const [history, setHistory] = useState<OverrideHistory[]>([])
+  const [overrideBusy, setOverrideBusy] = useState(false)
+  const [overrideError, setOverrideError] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const [rulesRes, resultsRes, portfoliosRes] = await Promise.all([
+        investmentOpsApi.listComplianceRules(),
+        investmentOpsApi.listComplianceResults({ pageSize: 100 }),
+        investmentOpsApi.listPortfolios(),
+      ])
+      if (rulesRes.success === false) {
+        throw new Error(formatOpsError(rulesRes, 'Failed to load compliance rules'))
+      }
+      if (resultsRes.success === false) {
+        throw new Error(formatOpsError(resultsRes, 'Failed to load compliance results'))
+      }
+      const names = fundNameMap(portfoliosRes.data)
+      setFundNames(names)
+      setRules(mapComplianceRules(rulesRes.data, names))
+      setResults(mapComplianceResults(resultsRes.data))
+    } catch (e) {
+      setError(formatOpsError(e, 'Failed to load compliance data'))
+      setRules([])
+      setResults([])
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  const visible = useMemo(
+    () => rules.filter((x) => Object.values(x).join(' ').toLowerCase().includes(query.toLowerCase())),
+    [rules, query],
+  )
+
+  const activeCount = rules.filter((r) => r.isActive).length
+  const inactiveCount = rules.length - activeCount
+
+  const submit = async () => {
     if (!override || !reason || !approver || !document) return
-    setItems((rows) => rows.map((row) => row.order === override.order && row.rule === override.rule ? { ...row, status: 'Approved with Exception' } : row))
-    setHistory((h) => [{ order: override.order, reason, approver, document, time: new Date().toLocaleString(), outcome: 'Approved with Exception' }, ...h])
-    setOverride(null); setReason(''); setApprover(''); setDocument('')
+    setOverrideBusy(true)
+    setOverrideError(null)
+    try {
+      // Override API requires orderId; rule-library overrides are recorded locally until a breach row exists.
+      setHistory((h) => [
+        {
+          order: override.ruleCode,
+          reason,
+          approver,
+          document,
+          time: new Date().toLocaleString(),
+          outcome: 'Approved with Exception',
+        },
+        ...h,
+      ])
+      setOverride(null)
+      setReason('')
+      setApprover('')
+      setDocument('')
+    } catch (e) {
+      setOverrideError(e instanceof Error ? e.message : 'Override failed')
+    } finally {
+      setOverrideBusy(false)
+    }
   }
-  return <OrdersPage title="Compliance" description="Pre-trade mandate checks, exceptions and a complete local override audit trail.">
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4"><Metric label="Checks passed" value={String(items.filter((x) => x.status === 'Passed').length)} tone="text-emerald-300" /><Metric label="Warnings" value={String(items.filter((x) => x.status === 'Warning').length)} tone="text-amber-300" /><Metric label="Exceptions" value={String(items.filter((x) => ['Failed', 'Requires Override', 'Rejected'].includes(x.status)).length)} tone="text-red-300" /><Metric label="Check categories" value="16" tone="text-blue-300" /></div>
-    <OrdersCard title="Pre-trade results" eyebrow="Latest checks" actions={<div className="relative"><Search className="absolute left-3 top-3 h-3 w-3 text-slate-500" /><input className={cn(inputClass, 'w-64 pl-8')} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search order, rule or portfolio" /></div>}>
-      <div className={tableWrapClass}><table className={tableClass}><thead><tr><th>Order</th><th>Portfolio</th><th>Instrument</th><th>Side</th><th>Category</th><th>Rule</th><th>Limit</th><th>Current</th><th>After trade</th><th>Result</th><th>Action</th></tr></thead>
-        <tbody>{visible.map((x) => <tr key={`${x.order}-${x.rule}`}><td className="font-mono text-blue-300">{x.order}</td><td>{x.portfolio}</td><td className="font-semibold">{x.ticker}</td><td className={x.side === 'BUY' ? 'text-emerald-300' : 'text-red-300'}>{x.side}</td><td>{x.category}</td><td>{x.rule}</td><td className="font-mono">{x.limit}</td><td className="font-mono">{x.current}</td><td className="font-mono">{x.after}</td><td><Pill tone={x.status === 'Passed' ? 'green' : x.status === 'Warning' ? 'amber' : x.status === 'Approved with Exception' ? 'violet' : 'red'}>{x.status}</Pill></td><td>{['Failed', 'Requires Override'].includes(x.status) ? <button className={cn(buttonClass, 'h-7 border-amber-400/30 px-3 text-amber-300')} onClick={() => setOverride(x)}><ShieldAlert className="h-3 w-3" /> Override</button> : '—'}</td></tr>)}</tbody>
-      </table></div>
-    </OrdersCard>
-    <div className="grid gap-4 xl:grid-cols-[1.1fr_.9fr]">
-      <OrdersCard title="Mandate rule library" eyebrow="Required categories"><div className={tableWrapClass}><table className={tableClass}><thead><tr><th>Category</th><th>Rule</th><th>Scope</th><th>Threshold</th><th>Status</th></tr></thead><tbody>{rules.map((r) => <tr key={r[1]}>{r.map((v) => <td key={v}>{v}</td>)}<td><Pill tone="green">Active</Pill></td></tr>)}</tbody></table></div></OrdersCard>
-      <OrdersCard title="Override audit history" eyebrow={`${history.length} permanent-style local records`}><div className="space-y-2 p-3">{history.map((h) => <div key={h.time} className="rounded-[18px] border border-white/[0.07] bg-[#080e18] p-3"><div className="flex justify-between"><span className="font-mono text-[10px] text-blue-300">{h.order}</span><Pill tone="violet">{h.outcome}</Pill></div><p className="mt-2 text-[10px]">{h.reason}</p><p className="mt-2 text-[9px] text-slate-500">{h.approver} · {h.time} · {h.document}</p></div>)}</div></OrdersCard>
-    </div>
-    <Modal open={!!override} onClose={() => setOverride(null)} title={`Compliance override · ${override?.order ?? ''}`} subtitle="All fields are required and written to the local audit history." footer={<><button className={buttonClass} onClick={() => setOverride(null)}>Cancel</button><button disabled={!reason || !approver || !document} className={cn(buttonClass, 'bg-amber-500 text-slate-950')} onClick={submit}>Request override</button></>}>
-      <div className="grid gap-4 sm:grid-cols-2"><Field label="Breach"><div className={cn(inputClass, 'flex items-center')}>{override?.rule}</div></Field><Field label="Timestamp"><div className={cn(inputClass, 'flex items-center')}>{new Date().toLocaleString()}</div></Field><Field label="Approver"><SelectField value={approver} onChange={setApprover}><option value="">Select approver</option><option>CIO · R. Chirwa</option><option>Head of Risk · P. Dube</option></SelectField></Field><Field label="Supporting document"><label className={cn(inputClass, 'flex cursor-pointer items-center gap-2')}><FileUp className="h-3.5 w-3.5" />{document || 'Attach approval memo'}<input type="file" className="hidden" onChange={(e) => setDocument(e.target.files?.[0]?.name ?? '')} /></label></Field><Field label="Override reason"><textarea className={cn(inputClass, 'h-24 resize-none py-2')} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Explain rationale and mitigating controls…" /></Field></div>
-    </Modal>
-  </OrdersPage>
+
+  return (
+    <OrdersPage title="Compliance" description="Pre-trade mandate checks, exceptions and a complete local override audit trail.">
+      {error && (
+        <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-2 text-[12px] text-rose-200">
+          {error}
+          <button type="button" className={cn(buttonClass, 'ml-3 h-7 px-3')} onClick={() => void load()}>
+            Retry
+          </button>
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Metric label="Active rules" value={loading ? '…' : String(activeCount)} tone="text-emerald-300" />
+        <Metric label="Inactive" value={loading ? '…' : String(inactiveCount)} tone="text-amber-300" />
+        <Metric label="Override history" value={String(history.length)} tone="text-red-300" />
+        <Metric label="Rule types" value={loading ? '…' : String(new Set(rules.map((r) => r.ruleType)).size)} tone="text-blue-300" />
+      </div>
+
+      <OrdersCard
+        title="Mandate rule library"
+        eyebrow="Compliance rules"
+        actions={
+          <div className="relative">
+            <Search className="absolute left-3 top-3 h-3 w-3 text-slate-500" />
+            <input className={cn(inputClass, 'w-64 pl-8')} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search rule, type or portfolio" />
+          </div>
+        }
+      >
+        <div className={tableWrapClass}>
+          <table className={tableClass}>
+            <thead>
+              <tr>
+                <th>Code</th>
+                <th>Category</th>
+                <th>Rule</th>
+                <th>Scope</th>
+                <th>Threshold</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading && (
+                <tr>
+                  <td colSpan={7} className="py-12 text-center text-[11px] text-slate-500">
+                    <Loader2 className="mr-2 inline h-3.5 w-3.5 animate-spin" />
+                    Loading compliance rules…
+                  </td>
+                </tr>
+              )}
+              {!loading && visible.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="py-12 text-center text-[11px] text-slate-500">
+                    No compliance rules found.
+                  </td>
+                </tr>
+              )}
+              {!loading &&
+                visible.map((x) => (
+                  <tr key={x.id}>
+                    <td className="font-mono text-blue-300">{x.ruleCode}</td>
+                    <td>{x.category}</td>
+                    <td>{x.rule}</td>
+                    <td>{x.scope}</td>
+                    <td className="font-mono">{x.threshold}</td>
+                    <td>
+                      <Pill tone={x.isActive ? 'green' : 'slate'}>{x.status}</Pill>
+                    </td>
+                    <td>
+                      {x.isActive ? (
+                        <button className={cn(buttonClass, 'h-7 border-amber-400/30 px-3 text-amber-300')} onClick={() => setOverride(x)}>
+                          <ShieldAlert className="h-3 w-3" /> Override note
+                        </button>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </div>
+      </OrdersCard>
+
+      <div className="grid gap-4 xl:grid-cols-[1.1fr_.9fr]">
+        <OrdersCard title="Pre-trade results" eyebrow={loading ? 'Loading…' : `${results.length} checks`}>
+          <div className={tableWrapClass}>
+            <table className={tableClass}>
+              <thead>
+                <tr>
+                  <th>Order ref</th>
+                  <th>Portfolio</th>
+                  <th>Ticker</th>
+                  <th>Side</th>
+                  <th>Rule</th>
+                  <th>Limit</th>
+                  <th>Current</th>
+                  <th>After trade</th>
+                  <th>Outcome</th>
+                  <th>Checked</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading && (
+                  <tr>
+                    <td colSpan={10} className="py-10 text-center text-[11px] text-slate-500">
+                      <Loader2 className="mr-2 inline h-3.5 w-3.5 animate-spin" />
+                      Loading pre-trade results…
+                    </td>
+                  </tr>
+                )}
+                {!loading && results.length === 0 && (
+                  <tr>
+                    <td colSpan={10} className="py-10 text-center text-[11px] text-slate-500">
+                      No pre-trade compliance results yet.
+                    </td>
+                  </tr>
+                )}
+                {!loading &&
+                  results.map((row) => (
+                    <tr key={row.id}>
+                      <td className="font-mono text-blue-300">{row.orderRef}</td>
+                      <td>{fundNames[row.fundId] ?? row.fundId}</td>
+                      <td className="font-semibold">{row.ticker}</td>
+                      <td className={row.side === 'BUY' ? 'text-emerald-300' : row.side === 'SELL' ? 'text-red-300' : ''}>
+                        {row.side}
+                      </td>
+                      <td>
+                        {row.ruleName}
+                        <div className="text-[9px] text-slate-600">{row.ruleType}</div>
+                      </td>
+                      <td className="font-mono">{row.limitDisplay}</td>
+                      <td className="font-mono text-slate-500">{row.currentDisplay}</td>
+                      <td className="font-mono">{row.afterTradeDisplay}</td>
+                      <td>
+                        <Pill tone={outcomeTone(row.outcome)}>{row.outcome}</Pill>
+                      </td>
+                      <td className="text-slate-500">{row.createdAt}</td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        </OrdersCard>
+        <OrdersCard title="Override audit history" eyebrow={`${history.length} records`}>
+          <div className="space-y-2 p-3">
+            {history.length === 0 && <p className="py-8 text-center text-[11px] text-slate-500">No override notes yet.</p>}
+            {history.map((h) => (
+              <div key={`${h.time}-${h.order}`} className="rounded-[18px] border border-white/[0.07] bg-[#080e18] p-3">
+                <div className="flex justify-between">
+                  <span className="font-mono text-[10px] text-blue-300">{h.order}</span>
+                  <Pill tone="violet">{h.outcome}</Pill>
+                </div>
+                <p className="mt-2 text-[10px]">{h.reason}</p>
+                <p className="mt-2 text-[9px] text-slate-500">
+                  {h.approver} · {h.time} · {h.document}
+                </p>
+              </div>
+            ))}
+          </div>
+        </OrdersCard>
+      </div>
+
+      <Modal
+        open={!!override}
+        onClose={() => setOverride(null)}
+        title={`Compliance note · ${override?.ruleCode ?? ''}`}
+        subtitle="Record a local override rationale. Order-level overrides require an order id from a breach."
+        footer={
+          <>
+            <button className={buttonClass} onClick={() => setOverride(null)}>
+              Cancel
+            </button>
+            <button disabled={!reason || !approver || !document || overrideBusy} className={cn(buttonClass, 'bg-amber-500 text-slate-950')} onClick={() => void submit()}>
+              {overrideBusy ? 'Saving…' : 'Save note'}
+            </button>
+          </>
+        }
+      >
+        {overrideError && <p className="mb-3 text-[11px] text-rose-300">{overrideError}</p>}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Rule">
+            <div className={cn(inputClass, 'flex items-center')}>{override?.rule}</div>
+          </Field>
+          <Field label="Timestamp">
+            <div className={cn(inputClass, 'flex items-center')}>{new Date().toLocaleString()}</div>
+          </Field>
+          <Field label="Approver">
+            <SelectField value={approver} onChange={setApprover}>
+              <option value="">Select approver</option>
+              <option>CIO</option>
+              <option>Head of Risk</option>
+              <option>Compliance</option>
+            </SelectField>
+          </Field>
+          <Field label="Supporting document">
+            <label className={cn(inputClass, 'flex cursor-pointer items-center gap-2')}>
+              <FileUp className="h-3.5 w-3.5" />
+              {document || 'Attach approval memo'}
+              <input type="file" className="hidden" onChange={(e) => setDocument(e.target.files?.[0]?.name ?? '')} />
+            </label>
+          </Field>
+          <Field label="Override reason">
+            <textarea className={cn(inputClass, 'h-24 resize-none py-2')} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Explain rationale and mitigating controls…" />
+          </Field>
+        </div>
+      </Modal>
+    </OrdersPage>
+  )
 }

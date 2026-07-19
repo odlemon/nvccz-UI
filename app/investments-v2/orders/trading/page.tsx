@@ -1,15 +1,14 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { CalendarDays, Check, ChevronDown, MoreVertical } from 'lucide-react'
-
-const positions = [
-  { portfolio: 'Multi Asset', reference: 'CADCAD CURRENCY', shortName: 'CADCAD CURRENCY', quantity: '2,000,000', open: '0', price: '1.0', tr: '0.00', currency: 'CAD', industry: 'Cash', type: 'Cash' },
-  { portfolio: 'Fixed Income', reference: 'EUR CASH', shortName: 'EUR CASH', quantity: '10,000,000', open: '0', price: '1.0', tr: '0.00', currency: 'EUR', industry: 'Cash', type: 'Cash' },
-  { portfolio: 'Multi Asset', reference: 'GBP CASH', shortName: 'GBP CASH', quantity: '1,800,000', open: '0', price: '1.0', tr: '0.00', currency: 'GBP', industry: 'Cash', type: 'Cash' },
-  { portfolio: 'Asia Select', reference: 'JPY CASH', shortName: 'JPY CASH', quantity: '200,000,000', open: '0', price: '1.0', tr: '0.00', currency: 'JPY', industry: 'Cash', type: 'Cash' },
-  { portfolio: 'Multi Asset', reference: 'JPY CASH', shortName: 'JPY CASH', quantity: '200,000,000', open: '0', price: '1.0', tr: '0.00', currency: 'JPY', industry: 'Cash', type: 'Cash' },
-]
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { CalendarDays, Check, ChevronDown, Loader2, MoreVertical } from 'lucide-react'
+import { investmentOpsApi } from '@/lib/api/investment-ops-api'
+import {
+  mapFundOptions,
+  mapPortfolioNavSummary,
+  mapTradingPositions,
+  type TradingPositionRow,
+} from '@/lib/investments-v2/adapters/orders-adapter'
 
 function FilterDropdown({
   label,
@@ -110,6 +109,11 @@ function ActionMenu({ onAction }: { onAction: (action: string) => void }) {
 }
 
 export default function TradingPage() {
+  const [positions, setPositions] = useState<TradingPositionRow[]>([])
+  const [funds, setFunds] = useState<{ id: string; name: string }[]>([])
+  const [navSummary, setNavSummary] = useState({ nav: '—', securities: '—', cash: '—', asOf: '—' })
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [closedPositions, setClosedPositions] = useState('Exclude')
   const [quantitySearch, setQuantitySearch] = useState('')
   const [side, setSide] = useState<'Long' | 'Short'>('Long')
@@ -120,10 +124,80 @@ export default function TradingPage() {
   const [currency, setCurrency] = useState('No filter')
   const [industry, setIndustry] = useState('No filter')
   const [view, setView] = useState('Default View')
-  const [fromDate, setFromDate] = useState('From: 11 Oct, 21')
-  const [asOfDate, setAsOfDate] = useState('As of: 11 Oct, 21')
+  const [fromDate, setFromDate] = useState('From: —')
+  const [asOfDate, setAsOfDate] = useState('As of: —')
   const [recalculated, setRecalculated] = useState(false)
-  const [selectedPosition, setSelectedPosition] = useState(positions[0].reference)
+  const [selectedPosition, setSelectedPosition] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const portfoliosRes = await investmentOpsApi.listPortfolios()
+      if (portfoliosRes.success === false) {
+        throw new Error(portfoliosRes.message || portfoliosRes.error || 'Failed to load portfolios')
+      }
+      const fundList = mapFundOptions(portfoliosRes.data)
+      setFunds(fundList)
+
+      if (fundList.length === 0) {
+        setPositions([])
+        setNavSummary({ nav: '—', securities: '—', cash: '—', asOf: '—' })
+        return
+      }
+
+      const holdingsResults = await Promise.all(
+        fundList.map(async (fund) => {
+          try {
+            const res = await investmentOpsApi.getPortfolioHoldings(fund.id)
+            if (res.success === false) return [] as TradingPositionRow[]
+            return mapTradingPositions(res.data, fund.name, fund.id)
+          } catch {
+            return [] as TradingPositionRow[]
+          }
+        }),
+      )
+      const all = holdingsResults.flat()
+      setPositions(all)
+      setSelectedPosition((prev) => prev ?? all[0]?.reference ?? null)
+
+      const primary = fundList[0]
+      try {
+        const overviewRes = await investmentOpsApi.getPortfolioOverview(primary.id)
+        if (overviewRes.success !== false && overviewRes.data) {
+          const summary = mapPortfolioNavSummary(overviewRes.data)
+          setNavSummary(summary)
+          setAsOfDate(summary.asOf !== '—' ? `As of: ${summary.asOf}` : 'As of: —')
+          setFromDate(overviewRes.data.startDate ? `From: ${overviewRes.data.startDate}` : 'From: —')
+        }
+      } catch {
+        /* overview optional */
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load positions')
+      setPositions([])
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  const portfolioNames = useMemo(() => ['No filter', 'All Portfolios', ...funds.map((f) => f.name)], [funds])
+  const currencyOptions = useMemo(() => {
+    const set = new Set(positions.map((p) => p.currency).filter((c) => c && c !== '—'))
+    return ['No filter', ...[...set].sort()]
+  }, [positions])
+  const typeOptions = useMemo(() => {
+    const set = new Set(positions.map((p) => p.type).filter((t) => t && t !== '—'))
+    return ['No filter', ...[...set].sort()]
+  }, [positions])
+  const industryOptions = useMemo(() => {
+    const set = new Set(positions.map((p) => p.industry).filter((t) => t && t !== '—'))
+    return ['No filter', ...[...set].sort()]
+  }, [positions])
 
   const filteredPositions = useMemo(() => {
     const quantity = quantitySearch.trim().replaceAll(',', '')
@@ -133,14 +207,27 @@ export default function TradingPage() {
       if (industry !== 'No filter' && position.industry !== industry) return false
       if (instrumentType !== 'No filter' && position.type !== instrumentType) return false
       if (quantity && !position.quantity.replaceAll(',', '').includes(quantity)) return false
+      if (side === 'Short') {
+        const qty = Number(position.quantity.replaceAll(',', ''))
+        if (!(Number.isFinite(qty) && qty < 0)) return false
+      }
       return true
     })
-  }, [currency, industry, instrumentType, portfolio, quantitySearch])
+  }, [currency, industry, instrumentType, portfolio, quantitySearch, positions, side])
 
-  const recalculate = () => {
-    setRecalculated(true)
-    window.setTimeout(() => setRecalculated(false), 1800)
+  const recalculate = async () => {
+    const fund = funds.find((f) => f.name === portfolio) || funds[0]
+    if (!fund) return
+    try {
+      await investmentOpsApi.recalculatePortfolio(fund.id)
+      setRecalculated(true)
+      await load()
+      window.setTimeout(() => setRecalculated(false), 1800)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Recalculate failed')
+    }
   }
+
   const handleMenuAction = (action: string) => {
     if (action === 'Reset filters') {
       setClosedPositions('Exclude'); setQuantitySearch(''); setSide('Long'); setExpiryDate('')
@@ -159,12 +246,21 @@ export default function TradingPage() {
 
   return (
     <div className="min-h-full bg-[#05090f] p-3 text-[#eef2f8] sm:p-5">
+      {error && (
+        <div className="mb-3 rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-2 text-[12px] text-rose-200">
+          {error}
+          <button type="button" className="ml-3 rounded-full border border-white/20 px-3 py-1 text-[11px]" onClick={() => void load()}>
+            Retry
+          </button>
+        </div>
+      )}
+
       <section className="overflow-visible rounded-[24px] border border-white/[0.025] bg-[linear-gradient(112deg,#172231_0%,#101a29_55%,#0c1522_100%)] shadow-[0_22px_70px_rgba(0,0,0,.18)]">
         <header className="flex min-h-[54px] items-center justify-between gap-3 border-b border-[#2a3547] px-5 py-3">
           <h1 className="text-[13px] font-medium text-white">Filters</h1>
           <button
             type="button"
-            onClick={recalculate}
+            onClick={() => void recalculate()}
             className="inline-flex h-8 min-w-[98px] items-center justify-center gap-1.5 rounded-full bg-white px-4 text-[11px] font-semibold text-[#111722] transition hover:bg-[#edf2f8]"
           >
             {recalculated && <Check className="h-3.5 w-3.5" />}
@@ -173,10 +269,10 @@ export default function TradingPage() {
         </header>
 
         <div className="flex flex-wrap items-center justify-end gap-2 border-b border-[#2a3547] px-4 py-3 sm:px-5">
-          <FilterDropdown label="Portfolio scope" value={portfolio === 'No filter' ? 'All Portfolios' : portfolio} options={['All Portfolios', 'Multi Asset', 'Fixed Income', 'Asia Select']} onChange={(value) => setPortfolio(value)} compact />
+          <FilterDropdown label="Portfolio scope" value={portfolio === 'No filter' ? 'All Portfolios' : portfolio} options={['All Portfolios', ...funds.map((f) => f.name)]} onChange={(value) => setPortfolio(value === 'All Portfolios' ? 'All Portfolios' : value)} compact />
           <FilterDropdown label="View" value={view} options={['Default View', 'Exposure View', 'Cash View', 'Compact View']} onChange={setView} compact />
-          <FilterDropdown label="From date" value={fromDate} options={['From: 11 Oct, 21', 'From: 01 Oct, 21', 'From: 01 Jan, 21']} onChange={setFromDate} compact />
-          <FilterDropdown label="As of date" value={asOfDate} options={['As of: 11 Oct, 21', 'As of: 24 May, 24', 'As of: Today']} onChange={setAsOfDate} compact />
+          <FilterDropdown label="From date" value={fromDate} options={[fromDate]} onChange={setFromDate} compact />
+          <FilterDropdown label="As of date" value={asOfDate} options={[asOfDate, 'As of: Today']} onChange={setAsOfDate} compact />
           <ActionMenu onAction={handleMenuAction} />
         </div>
 
@@ -227,7 +323,7 @@ export default function TradingPage() {
 
           <label className="block">
             <span className="mb-2 block text-[10.5px] text-[#c4ccd7]">Portfolio</span>
-            <FilterDropdown label="Portfolio" value={portfolio} options={['No filter', 'All Portfolios', 'Multi Asset', 'Fixed Income', 'Asia Select']} onChange={setPortfolio} />
+            <FilterDropdown label="Portfolio" value={portfolio} options={portfolioNames} onChange={setPortfolio} />
           </label>
 
           <label className="block">
@@ -237,17 +333,17 @@ export default function TradingPage() {
 
           <label className="block">
             <span className="mb-2 block text-[10.5px] text-[#c4ccd7]">Instrument type</span>
-            <FilterDropdown label="Instrument type" value={instrumentType} options={['No filter', 'Cash', 'Equity', 'Bond', 'Fund']} onChange={setInstrumentType} />
+            <FilterDropdown label="Instrument type" value={instrumentType} options={typeOptions} onChange={setInstrumentType} />
           </label>
 
           <label className="block">
             <span className="mb-2 block text-[10.5px] text-[#c4ccd7]">Currency</span>
-            <FilterDropdown label="Currency" value={currency} options={['No filter', 'CAD', 'EUR', 'GBP', 'JPY']} onChange={setCurrency} />
+            <FilterDropdown label="Currency" value={currency} options={currencyOptions} onChange={setCurrency} />
           </label>
 
           <label className="block">
             <span className="mb-2 block text-[10.5px] text-[#c4ccd7]">Industry</span>
-            <FilterDropdown label="Industry" value={industry} options={['No filter', 'Cash', 'Technology', 'Financials', 'Industrials']} onChange={setIndustry} />
+            <FilterDropdown label="Industry" value={industry} options={industryOptions.length > 1 ? industryOptions : ['No filter']} onChange={setIndustry} />
           </label>
         </div>
       </section>
@@ -256,11 +352,11 @@ export default function TradingPage() {
         <header className="flex min-h-[50px] flex-wrap items-center justify-between gap-3 px-5 py-3">
           <h2 className="text-[13px] font-medium text-white">Positions</h2>
           <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-[10px]">
-            <span className="text-[#738095]">NAV: <strong className="font-normal text-[#7eb1ef]">166,238,953.30</strong></span>
-            <span className="text-[#738095]">Securities: <strong className="font-normal text-[#7eb1ef]">166,238,953.30</strong></span>
+            <span className="text-[#738095]">NAV: <strong className="font-normal text-[#7eb1ef]">{loading ? '…' : navSummary.nav}</strong></span>
+            <span className="text-[#738095]">Securities: <strong className="font-normal text-[#7eb1ef]">{loading ? '…' : navSummary.securities}</strong></span>
             <span className="text-[#738095]">Cash balance:</span>
-            <span className="text-[#738095]">Checked Cash: <strong className="font-normal text-[#a9b6c7]">24 May 24</strong></span>
-            <span className="text-[#738095]">Pending Cash: <strong className="font-normal text-[#7eb1ef]">679,191.78</strong></span>
+            <span className="text-[#738095]">Checked Cash: <strong className="font-normal text-[#a9b6c7]">{navSummary.asOf}</strong></span>
+            <span className="text-[#738095]">Pending Cash: <strong className="font-normal text-[#7eb1ef]">{navSummary.cash}</strong></span>
           </div>
         </header>
         <div className="overflow-x-auto">
@@ -277,24 +373,33 @@ export default function TradingPage() {
               </tr>
             </thead>
             <tbody>
-              {filteredPositions.map((position, index) => (
-                <tr
-                  key={`${position.reference}-${index}`}
-                  onClick={() => setSelectedPosition(position.reference)}
-                  className={`cursor-pointer border-b border-[#243044] transition last:border-0 hover:bg-[#2f87fa]/[0.07] ${
-                    selectedPosition === position.reference ? 'bg-[#2f87fa]/[0.09]' : ''
-                  }`}
-                >
-                  <td className="px-5 py-4 text-[10.5px] text-[#dce3ec]">{position.portfolio}</td>
-                  <td className="px-4 py-4 text-[10.5px] text-[#dce3ec]">{position.reference}</td>
-                  <td className="px-4 py-4 text-[10.5px] text-[#dce3ec]">{position.shortName}</td>
-                  <td className="px-4 py-4 text-[10.5px] text-[#dce3ec]">{position.quantity}</td>
-                  <td className="px-4 py-4 text-[10.5px] text-[#dce3ec]">{position.open}</td>
-                  <td className="px-4 py-4 text-[10.5px] text-[#dce3ec]">{position.price}</td>
-                  <td className="px-5 py-4 text-[10.5px] text-[#dce3ec]">{position.tr}</td>
+              {loading && (
+                <tr>
+                  <td colSpan={7} className="px-5 py-12 text-center text-[11px] text-[#718095]">
+                    <Loader2 className="mr-2 inline h-3.5 w-3.5 animate-spin" />
+                    Loading positions…
+                  </td>
                 </tr>
-              ))}
-              {filteredPositions.length === 0 && (
+              )}
+              {!loading &&
+                filteredPositions.map((position, index) => (
+                  <tr
+                    key={`${position.fundId}-${position.reference}-${index}`}
+                    onClick={() => setSelectedPosition(position.reference)}
+                    className={`cursor-pointer border-b border-[#243044] transition last:border-0 hover:bg-[#2f87fa]/[0.07] ${
+                      selectedPosition === position.reference ? 'bg-[#2f87fa]/[0.09]' : ''
+                    }`}
+                  >
+                    <td className="px-5 py-4 text-[10.5px] text-[#dce3ec]">{position.portfolio}</td>
+                    <td className="px-4 py-4 text-[10.5px] text-[#dce3ec]">{position.reference}</td>
+                    <td className="px-4 py-4 text-[10.5px] text-[#dce3ec]">{position.shortName}</td>
+                    <td className="px-4 py-4 text-[10.5px] text-[#dce3ec]">{position.quantity}</td>
+                    <td className="px-4 py-4 text-[10.5px] text-[#dce3ec]">{position.open}</td>
+                    <td className="px-4 py-4 text-[10.5px] text-[#dce3ec]">{position.price}</td>
+                    <td className="px-5 py-4 text-[10.5px] text-[#dce3ec]">{position.tr}</td>
+                  </tr>
+                ))}
+              {!loading && filteredPositions.length === 0 && (
                 <tr><td colSpan={7} className="px-5 py-12 text-center text-[11px] text-[#718095]">No positions match the selected filters.</td></tr>
               )}
             </tbody>

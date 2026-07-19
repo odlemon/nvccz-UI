@@ -1,41 +1,26 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Check, ChevronDown, Search } from 'lucide-react'
+import { Check, ChevronDown, Loader2, Search } from 'lucide-react'
+import { useAppDispatch, useAppSelector } from '@/lib/store'
+import {
+  fetchDashboardAllocation,
+  fetchDashboardCurrencyExposure,
+  fetchDashboardFunds,
+  fetchDashboardSummary,
+} from '@/lib/store/slices/investmentOpsSlice'
+import { investmentOpsApi } from '@/lib/api/investment-ops-api'
+import {
+  mapAllocation,
+  mapCurrencyBars,
+  mapDashboardFunds,
+  mapDashboardPortfolios,
+  periodToApiParam,
+  type AllocationSlice,
+} from '@/lib/investments-v2/adapters/dashboard-adapter'
 
 type Period = 'Daily' | 'Weekly' | 'Monthly' | 'Quarterly' | 'YTD'
 const periodOptions: Period[] = ['Daily', 'Weekly', 'Monthly', 'Quarterly', 'YTD']
-
-const portfolios = [
-  { name: 'Crypto Portfolio', nav: '245,893,449', asOf: '14 Apr, 20', pnl: '245,893,449', percent: '63.50%', tone: 'gold' },
-  { name: 'Equity World', nav: '245,893,449', asOf: '20 Apr, 20', pnl: '245,893,449', percent: '63.50%', tone: 'blue' },
-  { name: 'Multi Asset', nav: '245,893,449', asOf: '20 Apr, 20', pnl: '245,893,449', percent: '63.50%', tone: 'blue' },
-  { name: 'Fixed Income', nav: '245,893,449', asOf: '21 Apr, 20', pnl: '245,893,449', percent: '63.50%', tone: 'gold' },
-  { name: 'Liquid Asset', nav: '245,893,449', asOf: '24 Apr, 20', pnl: '245,893,449', percent: '63.50%', tone: 'teal' },
-] as const
-
-const funds = [
-  { name: 'Crypto Fund', nav: '267,980,373', valueDate: '2 Jan, 20', shares: '102.43', currency: 'USD', tone: 'gold' },
-  { name: 'Equity World Fund', nav: '12,369,689', valueDate: '26 Apr, 22', shares: '209.68', currency: 'EUR', tone: 'gold' },
-  { name: 'Multi Asset SICAV', nav: '17,000,000', valueDate: '14 Jan, 20', shares: '231.25', currency: 'EUR', tone: 'blue' },
-  { name: 'Fixed Income UCITS', nav: '269,893,564', valueDate: '12 Oct, 22', shares: '100.45', currency: 'USD', tone: 'teal' },
-  { name: 'Liquid Assets Fund', nav: '98,420,110', valueDate: '9 Nov, 22', shares: '84.18', currency: 'GBP', tone: 'blue' },
-] as const
-
-const currencyBars = [
-  { label: 'CHF', value: 54, color: 'var(--iv2-chart-dark)' },
-  { label: 'EUR', value: 33, color: 'var(--iv2-chart-dark-2)' },
-  { label: 'GBP', value: 70, color: '#d2e5ff' },
-  { label: 'USD', value: 87, color: '#1388f5' },
-  { label: 'ZAR', value: 47, color: 'var(--iv2-chart-dark-2)' },
-]
-
-const allocation = [
-  { label: 'Bond', value: 39, color: '#ffffff' },
-  { label: 'Crypto', value: 29, color: 'var(--iv2-allocation-dark)' },
-  { label: 'Equity', value: 16, color: '#d9d0fa' },
-  { label: 'Others', value: 2, color: '#8d70f4' },
-]
 
 function MoneyDot({ tone }: { tone: string }) {
   const colors: Record<string, string> = {
@@ -111,18 +96,27 @@ function PeriodSelect({ value, onChange }: { value: Period; onChange: (value: Pe
 }
 
 function AllocationRings({
+  allocation,
   active,
   onActive,
 }: {
+  allocation: AllocationSlice[]
   active: string
   onActive: (label: string) => void
 }) {
-  const rings = [
-    { ...allocation[0], radius: 72, width: 8, rotate: -90 },
-    { ...allocation[1], radius: 58, width: 8, rotate: 18 },
-    { ...allocation[3], radius: 44, width: 8, rotate: -85 },
-    { ...allocation[2], radius: 30, width: 7, rotate: 62 },
-  ]
+  if (allocation.length === 0) {
+    return (
+      <div className="flex h-[190px] w-[190px] items-center justify-center text-[11px] text-white/70 sm:h-[208px] sm:w-[208px]">
+        No allocation data
+      </div>
+    )
+  }
+  const rings = allocation.slice(0, 4).map((item, idx) => ({
+    ...item,
+    radius: [72, 58, 44, 30][idx] ?? 30,
+    width: idx === 3 ? 7 : 8,
+    rotate: [-90, 18, -85, 62][idx] ?? 0,
+  }))
   const selected = allocation.find((item) => item.label === active) ?? allocation[0]
 
   return (
@@ -169,30 +163,97 @@ function AllocationRings({
 }
 
 export default function InvestmentsDashboardPage() {
+  const dispatch = useAppDispatch()
+  const summary = useAppSelector((s) => s.investmentOps.dashboardSummary)
+  const summaryLoading = useAppSelector((s) => s.investmentOps.dashboardSummaryLoading)
+  const allocationRaw = useAppSelector((s) => s.investmentOps.dashboardAllocation)
+  const allocationLoading = useAppSelector((s) => s.investmentOps.dashboardAllocationLoading)
+  const currencyRaw = useAppSelector((s) => s.investmentOps.dashboardCurrencyExposure)
+  const currencyLoading = useAppSelector((s) => s.investmentOps.dashboardCurrencyExposureLoading)
+  const fundsRaw = useAppSelector((s) => s.investmentOps.dashboardFunds)
+  const fundsLoading = useAppSelector((s) => s.investmentOps.dashboardFundsLoading)
+
   const [portfolioPeriod, setPortfolioPeriod] = useState<Period>('Monthly')
   const [currencyPeriod, setCurrencyPeriod] = useState<Period>('Monthly')
   const [fundPeriod, setFundPeriod] = useState<Period>('Monthly')
   const [search, setSearch] = useState('')
   const [recalculated, setRecalculated] = useState(false)
-  const [selectedPortfolio, setSelectedPortfolio] = useState(portfolios[0].name)
-  const [selectedFund, setSelectedFund] = useState(funds[0].name)
-  const [activeAllocation, setActiveAllocation] = useState(allocation[0].label)
+  const [recalcError, setRecalcError] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
+
+  const portfolios = useMemo(() => mapDashboardPortfolios(summary), [summary])
+  const funds = useMemo(() => mapDashboardFunds(fundsRaw), [fundsRaw])
+  const allocation = useMemo(() => mapAllocation(allocationRaw), [allocationRaw])
+  const currencyBars = useMemo(() => mapCurrencyBars(currencyRaw), [currencyRaw])
+
+  const [selectedPortfolio, setSelectedPortfolio] = useState('')
+  const [selectedFund, setSelectedFund] = useState('')
+  const [activeAllocation, setActiveAllocation] = useState('')
   const [selectedCurrency, setSelectedCurrency] = useState('USD')
   const [hoveredCurrency, setHoveredCurrency] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    setLoadError(null)
+    const period = periodToApiParam(portfolioPeriod)
+    Promise.all([
+      dispatch(fetchDashboardSummary({ period })),
+      dispatch(fetchDashboardFunds()),
+    ]).then((results) => {
+      if (cancelled) return
+      const failed = results.some((r) => r.meta.requestStatus === 'rejected')
+      if (failed) setLoadError('Unable to load dashboard data from the server.')
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [dispatch, portfolioPeriod])
+
+  useEffect(() => {
+    const fundId = portfolios[0]?.fundId || funds[0]?.fundId
+    if (!fundId) return
+    dispatch(fetchDashboardAllocation(fundId))
+    dispatch(fetchDashboardCurrencyExposure(fundId))
+  }, [dispatch, portfolios, funds])
+
+  useEffect(() => {
+    if (portfolios[0] && !selectedPortfolio) setSelectedPortfolio(portfolios[0].name)
+  }, [portfolios, selectedPortfolio])
+  useEffect(() => {
+    if (funds[0] && !selectedFund) setSelectedFund(funds[0].name)
+  }, [funds, selectedFund])
+  useEffect(() => {
+    if (allocation[0] && !activeAllocation) setActiveAllocation(allocation[0].label)
+  }, [allocation, activeAllocation])
+  useEffect(() => {
+    if (currencyBars[0]) setSelectedCurrency(currencyBars[0].label)
+  }, [currencyBars])
 
   const query = search.trim().toLowerCase()
   const visiblePortfolios = useMemo(
     () => portfolios.filter((item) => item.name.toLowerCase().includes(query)),
-    [query],
+    [query, portfolios],
   )
   const visibleFunds = useMemo(
     () => funds.filter((item) => item.name.toLowerCase().includes(query)),
-    [query],
+    [query, funds],
   )
 
-  const handleRecalculate = () => {
-    setRecalculated(true)
-    window.setTimeout(() => setRecalculated(false), 1800)
+  const loading = summaryLoading || fundsLoading
+
+  const handleRecalculate = async () => {
+    const fundId = portfolios.find((p) => p.name === selectedPortfolio)?.fundId || portfolios[0]?.fundId
+    if (!fundId) return
+    setRecalcError(null)
+    try {
+      await investmentOpsApi.recalculateDashboard(fundId)
+      setRecalculated(true)
+      dispatch(fetchDashboardSummary({ period: periodToApiParam(portfolioPeriod) }))
+      dispatch(fetchDashboardAllocation(fundId))
+      window.setTimeout(() => setRecalculated(false), 1800)
+    } catch (e) {
+      setRecalcError(e instanceof Error ? e.message : 'Recalculate failed')
+    }
   }
 
   return (
@@ -209,6 +270,18 @@ export default function InvestmentsDashboardPage() {
           />
         </label>
       </header>
+
+      {(loadError || recalcError) && (
+        <div className="mb-3 rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-2 text-[12px] text-rose-200">
+          {loadError || recalcError}
+        </div>
+      )}
+
+      {loading && portfolios.length === 0 && (
+        <div className="mb-3 flex items-center gap-2 text-[12px] text-[#8B95A7]">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading dashboard…
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_292px]">
         <section className="overflow-hidden rounded-[24px] border border-white/[0.025] bg-[linear-gradient(112deg,#172231_0%,#101a29_52%,#0c1522_100%)] shadow-[0_22px_70px_rgba(0,0,0,.18)]">
@@ -241,7 +314,7 @@ export default function InvestmentsDashboardPage() {
               <tbody>
                 {visiblePortfolios.map((portfolio) => (
                   <tr
-                    key={portfolio.name}
+                    key={portfolio.fundId}
                     onClick={() => setSelectedPortfolio(portfolio.name)}
                     className={`cursor-pointer border-b border-[#233043]/75 transition last:border-b-0 hover:bg-[#238cf4]/[0.08] ${
                       selectedPortfolio === portfolio.name ? 'bg-[#238cf4]/[0.11]' : ''
@@ -249,17 +322,27 @@ export default function InvestmentsDashboardPage() {
                   >
                     <td className="px-6 py-[18px] text-[12px] text-[#e2e7ef]">{portfolio.name}</td>
                     <td className="px-4 py-[18px] text-[12px] text-[#d5dce7]">
-                      <span className="inline-flex items-center gap-1.5"><MoneyDot tone={portfolio.tone} />{portfolio.nav}</span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <MoneyDot tone={portfolio.tone} />
+                        {portfolio.nav}
+                      </span>
                     </td>
                     <td className="px-4 py-[18px] text-[12px] text-[#c2cad7]">{portfolio.asOf}</td>
                     <td className="px-4 py-[18px] text-[12px] text-[#d5dce7]">
-                      <span className="inline-flex items-center gap-1.5"><MoneyDot tone={portfolio.tone} />{portfolio.pnl}</span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <MoneyDot tone={portfolio.tone} />
+                        {portfolio.pnl}
+                      </span>
                     </td>
                     <td className="px-6 py-[18px] text-[12px] text-[#dce2eb]">{portfolio.percent}</td>
                   </tr>
                 ))}
-                {visiblePortfolios.length === 0 && (
-                  <tr><td colSpan={5} className="px-6 py-16 text-center text-xs text-[#718096]">No portfolios match your search.</td></tr>
+                {visiblePortfolios.length === 0 && !summaryLoading && (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-16 text-center text-xs text-[#718096]">
+                      {query ? 'No portfolios match your search.' : 'No portfolio data returned from the API.'}
+                    </td>
+                  </tr>
                 )}
               </tbody>
             </table>
@@ -267,9 +350,11 @@ export default function InvestmentsDashboardPage() {
         </section>
 
         <section className="flex min-h-[350px] flex-col rounded-[24px] bg-[linear-gradient(145deg,#9d82e9_0%,#856dd8_52%,#7460ca_100%)] px-5 pb-5 pt-5 text-white shadow-[0_22px_70px_rgba(60,42,130,.24)] xl:min-h-[398px] xl:px-6">
-          <h2 className="text-[16px] font-medium">Asset Allocation</h2>
+          <h2 className="text-[16px] font-medium">
+            Asset Allocation{allocationLoading ? '…' : ''}
+          </h2>
           <div className="flex flex-1 items-center justify-center py-2">
-            <AllocationRings active={activeAllocation} onActive={setActiveAllocation} />
+            <AllocationRings allocation={allocation} active={activeAllocation} onActive={setActiveAllocation} />
           </div>
           <div className="grid grid-cols-2 gap-x-3 gap-y-2">
             {allocation.map((item) => (
@@ -293,42 +378,55 @@ export default function InvestmentsDashboardPage() {
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[420px_minmax(0,1fr)]">
         <section className="min-h-[390px] overflow-hidden rounded-[24px] border border-white/[0.025] bg-[linear-gradient(125deg,#162231_0%,#101a29_54%,#0c1522_100%)]">
           <div className="flex min-h-[62px] items-center justify-between gap-3 px-4 py-3 sm:px-6">
-            <h2 className="text-[16px] font-medium text-[#f2f5fa]">Currency Exposure</h2>
+            <h2 className="text-[16px] font-medium text-[#f2f5fa]">
+              Currency Exposure{currencyLoading ? '…' : ''}
+            </h2>
             <PeriodSelect value={currencyPeriod} onChange={setCurrencyPeriod} />
           </div>
           <div className="relative flex h-[308px] items-end justify-center gap-2 px-3 pb-9 sm:gap-5 sm:px-8">
-            {currencyBars.map((bar) => (
-              <button
-                key={bar.label}
-                type="button"
-                aria-label={`${bar.label} exposure ${bar.value}%`}
-                onMouseEnter={() => setHoveredCurrency(bar.label)}
-                onMouseLeave={() => setHoveredCurrency(null)}
-                onFocus={() => setHoveredCurrency(bar.label)}
-                onBlur={() => setHoveredCurrency(null)}
-                onClick={() => setSelectedCurrency(bar.label)}
-                className="flex h-full flex-1 flex-col items-center justify-end gap-2 outline-none"
-              >
-                <div
-                  className="relative w-full max-w-[51px] rounded-t-[18px] transition-all duration-200"
-                  style={{
-                    height: `${bar.value}%`,
-                    background: bar.color,
-                    transform: (hoveredCurrency ?? selectedCurrency) === bar.label ? 'translateY(-5px)' : 'translateY(0)',
-                    boxShadow: (hoveredCurrency ?? selectedCurrency) === bar.label ? '0 12px 30px rgba(19,136,245,.22)' : 'none',
-                    opacity: hoveredCurrency && hoveredCurrency !== bar.label ? 0.55 : 1,
-                  }}
+            {currencyBars.length === 0 ? (
+              <p className="self-center text-[12px] text-[#718096]">No currency exposure from API.</p>
+            ) : (
+              currencyBars.map((bar) => (
+                <button
+                  key={bar.label}
+                  type="button"
+                  aria-label={`${bar.label} exposure ${bar.value}%`}
+                  onMouseEnter={() => setHoveredCurrency(bar.label)}
+                  onMouseLeave={() => setHoveredCurrency(null)}
+                  onFocus={() => setHoveredCurrency(bar.label)}
+                  onBlur={() => setHoveredCurrency(null)}
+                  onClick={() => setSelectedCurrency(bar.label)}
+                  className="flex h-full flex-1 flex-col items-center justify-end gap-2 outline-none"
                 >
-                  {(hoveredCurrency ?? selectedCurrency) === bar.label && (
-                    <div className="absolute left-1/2 top-6 z-20 flex h-11 min-w-[69px] -translate-x-[8%] items-center justify-center rounded-full bg-white px-3 text-[16px] font-semibold text-[#10151d] shadow-[0_12px_30px_rgba(0,0,0,.3)]">
-                      <span className="absolute -left-1.5 h-2.5 w-2.5 rounded-full bg-black" />
-                      {bar.value}%
-                    </div>
-                  )}
-                </div>
-                <span className={`text-[10px] transition ${(hoveredCurrency ?? selectedCurrency) === bar.label ? 'text-white' : 'text-[#647389]'}`}>{bar.label}</span>
-              </button>
-            ))}
+                  <div
+                    className="relative w-full max-w-[51px] rounded-t-[18px] transition-all duration-200"
+                    style={{
+                      height: `${bar.value}%`,
+                      background: bar.color,
+                      transform: (hoveredCurrency ?? selectedCurrency) === bar.label ? 'translateY(-5px)' : 'translateY(0)',
+                      boxShadow:
+                        (hoveredCurrency ?? selectedCurrency) === bar.label ? '0 12px 30px rgba(19,136,245,.22)' : 'none',
+                      opacity: hoveredCurrency && hoveredCurrency !== bar.label ? 0.55 : 1,
+                    }}
+                  >
+                    {(hoveredCurrency ?? selectedCurrency) === bar.label && (
+                      <div className="absolute left-1/2 top-6 z-20 flex h-11 min-w-[69px] -translate-x-[8%] items-center justify-center rounded-full bg-white px-3 text-[16px] font-semibold text-[#10151d] shadow-[0_12px_30px_rgba(0,0,0,.3)]">
+                        <span className="absolute -left-1.5 h-2.5 w-2.5 rounded-full bg-black" />
+                        {bar.value}%
+                      </div>
+                    )}
+                  </div>
+                  <span
+                    className={`text-[10px] transition ${
+                      (hoveredCurrency ?? selectedCurrency) === bar.label ? 'text-white' : 'text-[#647389]'
+                    }`}
+                  >
+                    {bar.label}
+                  </span>
+                </button>
+              ))
+            )}
           </div>
         </section>
 
@@ -351,7 +449,7 @@ export default function InvestmentsDashboardPage() {
               <tbody>
                 {visibleFunds.map((fund) => (
                   <tr
-                    key={fund.name}
+                    key={fund.fundId}
                     onClick={() => setSelectedFund(fund.name)}
                     className={`cursor-pointer border-b border-[#233043]/75 transition last:border-b-0 hover:bg-[#238cf4]/[0.08] ${
                       selectedFund === fund.name ? 'bg-[#238cf4]/[0.11]' : ''
@@ -359,15 +457,22 @@ export default function InvestmentsDashboardPage() {
                   >
                     <td className="px-6 py-[18px] text-[12px] text-[#e2e7ef]">{fund.name}</td>
                     <td className="px-4 py-[18px] text-[12px] text-[#d5dce7]">
-                      <span className="inline-flex items-center gap-1.5"><MoneyDot tone={fund.tone} />{fund.nav}</span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <MoneyDot tone={fund.tone} />
+                        {fund.nav}
+                      </span>
                     </td>
                     <td className="px-4 py-[18px] text-[12px] text-[#c2cad7]">{fund.valueDate}</td>
                     <td className="px-4 py-[18px] text-[12px] text-[#c2cad7]">{fund.shares}</td>
                     <td className="px-6 py-[18px] text-[12px] text-[#c2cad7]">{fund.currency}</td>
                   </tr>
                 ))}
-                {visibleFunds.length === 0 && (
-                  <tr><td colSpan={5} className="px-6 py-16 text-center text-xs text-[#718096]">No funds match your search.</td></tr>
+                {visibleFunds.length === 0 && !fundsLoading && (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-16 text-center text-xs text-[#718096]">
+                      {query ? 'No funds match your search.' : 'No funds returned from the API.'}
+                    </td>
+                  </tr>
                 )}
               </tbody>
             </table>

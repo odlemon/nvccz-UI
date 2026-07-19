@@ -1,6 +1,8 @@
 import { createSlice, createAsyncThunk, type PayloadAction } from "@reduxjs/toolkit"
 import {
   investmentOpsApi,
+  unwrapList,
+  unwrapPaged,
   type DashboardSummary,
   type DashboardAllocation,
   type CurrencyExposureEntry,
@@ -119,6 +121,7 @@ interface InvestmentOpsState {
 
   // Valuation
   valuationRuns: ValuationRun[]
+  valuationRunsLoading: boolean
   valuationRunning: boolean
   valuationExceptions: ValuationException[]
   valuationExceptionsLoading: boolean
@@ -262,6 +265,7 @@ const initialState: InvestmentOpsState = {
   modelPortfolioDriftLoadingById: {},
 
   valuationRuns: [],
+  valuationRunsLoading: false,
   valuationRunning: false,
   valuationExceptions: [],
   valuationExceptionsLoading: false,
@@ -355,7 +359,7 @@ export const fetchDashboardCurrencyExposure = createAsyncThunk(
   async (fundId: string) => {
     const res = await investmentOpsApi.getDashboardCurrencyExposure(fundId)
     if (!res.success) throw new Error(res.error || res.message || "Failed to fetch currency exposure")
-    return res.data ?? []
+    return unwrapList(res.data)
   }
 )
 
@@ -364,7 +368,7 @@ export const fetchDashboardFunds = createAsyncThunk(
   async () => {
     const res = await investmentOpsApi.getDashboardFunds()
     if (!res.success) throw new Error(res.error || res.message || "Failed to fetch funds")
-    return res.data ?? []
+    return unwrapList(res.data)
   }
 )
 
@@ -383,7 +387,7 @@ export const fetchPortfolios = createAsyncThunk(
   async () => {
     const res = await investmentOpsApi.listPortfolios()
     if (!res.success) throw new Error(res.error || res.message || "Failed to fetch portfolios")
-    return res.data ?? []
+    return unwrapList(res.data)
   }
 )
 
@@ -401,7 +405,7 @@ export const fetchPortfolioHoldings = createAsyncThunk(
   async (fundId: string) => {
     const res = await investmentOpsApi.getPortfolioHoldings(fundId)
     if (!res.success) throw new Error(res.error || res.message || "Failed to fetch holdings")
-    return res.data ?? []
+    return unwrapList(res.data)
   }
 )
 
@@ -410,7 +414,7 @@ export const fetchPortfolioTransactions = createAsyncThunk(
   async (fundId: string) => {
     const res = await investmentOpsApi.getPortfolioTransactions(fundId)
     if (!res.success) throw new Error(res.error || res.message || "Failed to fetch transactions")
-    return res.data ?? []
+    return unwrapList(res.data)
   }
 )
 
@@ -438,7 +442,7 @@ export const fetchInstrumentTypes = createAsyncThunk(
   async () => {
     const res = await investmentOpsApi.getInstrumentTypes()
     if (!res.success) throw new Error(res.error || res.message || "Failed to fetch instrument types")
-    return res.data ?? []
+    return unwrapList(res.data)
   }
 )
 
@@ -457,7 +461,7 @@ export const fetchIngestBatches = createAsyncThunk(
   async () => {
     const res = await investmentOpsApi.listIngestBatches()
     if (!res.success) throw new Error(res.error || res.message || "Failed to fetch ingest batches")
-    return res.data ?? []
+    return unwrapList(res.data)
   }
 )
 
@@ -567,7 +571,7 @@ export const fetchOpsTrades = createAsyncThunk(
   async (params: { fundId?: string } = {}) => {
     const res = await investmentOpsApi.listTrades(params)
     if (!res.success) throw new Error(res.error || res.message || "Failed to fetch trades")
-    return res.data ?? []
+    return unwrapList(res.data)
   }
 )
 
@@ -643,7 +647,7 @@ export const fetchComplianceRules = createAsyncThunk(
   async (params: { fundId?: string } = {}) => {
     const res = await investmentOpsApi.listComplianceRules(params)
     if (!res.success) throw new Error(res.error || res.message || "Failed to fetch compliance rules")
-    return res.data ?? []
+    return unwrapList(res.data)
   }
 )
 
@@ -690,7 +694,7 @@ export const fetchModelPortfolios = createAsyncThunk(
   async () => {
     const res = await investmentOpsApi.listModelPortfolios()
     if (!res.success) throw new Error(res.error || res.message || "Failed to fetch model portfolios")
-    return res.data ?? []
+    return unwrapList(res.data)
   }
 )
 
@@ -713,9 +717,18 @@ export const fetchModelPortfolioDrift = createAsyncThunk(
 )
 
 // ─── Thunks — Valuation ─────────────────────────────────────────────────────
+export const fetchValuationRuns = createAsyncThunk(
+  "investmentOps/fetchValuationRuns",
+  async (params: { fundId?: string; status?: string; page?: number; pageSize?: number } = {}) => {
+    const res = await investmentOpsApi.listValuationRuns(params)
+    if (!res.success) throw new Error(res.error || res.message || "Failed to fetch valuation runs")
+    return unwrapList<ValuationRun>(res.data)
+  }
+)
+
 export const createValuationRun = createAsyncThunk(
   "investmentOps/createValuationRun",
-  async (data: { fundId: string; costBasisMethod: string }) => {
+  async (data: { fundId: string; costBasisMethod: string; asOf?: string; processNow?: boolean }) => {
     const res = await investmentOpsApi.createValuationRun(data)
     if (!res.success) throw new Error(res.error || res.message || "Failed to run valuation")
     return res.data as ValuationRun
@@ -724,10 +737,10 @@ export const createValuationRun = createAsyncThunk(
 
 export const fetchValuationExceptions = createAsyncThunk(
   "investmentOps/fetchValuationExceptions",
-  async (params: { fundId?: string } = {}) => {
+  async (params: { fundId?: string; status?: string } = {}) => {
     const res = await investmentOpsApi.listValuationExceptions(params)
     if (!res.success) throw new Error(res.error || res.message || "Failed to fetch valuation exceptions")
-    return res.data ?? []
+    return unwrapList<ValuationException>(res.data)
   }
 )
 
@@ -737,7 +750,7 @@ export const fetchReconciliationBatches = createAsyncThunk(
   async (params: { fundId?: string } = {}) => {
     const res = await investmentOpsApi.listReconciliationBatches(params)
     if (!res.success) throw new Error(res.error || res.message || "Failed to fetch reconciliation batches")
-    return res.data ?? []
+    return unwrapList(res.data)
   }
 )
 
@@ -783,7 +796,7 @@ export const fetchAccountingEvents = createAsyncThunk(
   async (params: { fundId?: string; status?: string; page?: number; pageSize?: number } = {}) => {
     const res = await investmentOpsApi.listAccountingEvents(params)
     if (!res.success) throw new Error(res.error || res.message || "Failed to fetch accounting events")
-    return res.data ?? { items: [], total: 0, page: 1, pageSize: 50, totalPages: 1 }
+    return unwrapPaged<AccountingEvent>(res.data, params.page ?? 1, params.pageSize ?? 50)
   }
 )
 
@@ -801,7 +814,7 @@ export const fetchJournalEntries = createAsyncThunk(
   async (params: { fundId?: string } = {}) => {
     const res = await investmentOpsApi.listJournalEntries(params)
     if (!res.success) throw new Error(res.error || res.message || "Failed to fetch journal entries")
-    return res.data ?? []
+    return unwrapList<JournalEntry>(res.data)
   }
 )
 
@@ -820,7 +833,7 @@ export const fetchDocuments = createAsyncThunk(
   async (params: { fundId?: string; documentType?: string } = {}) => {
     const res = await investmentOpsApi.listDocuments(params)
     if (!res.success) throw new Error(res.error || res.message || "Failed to fetch documents")
-    return res.data ?? []
+    return unwrapList<OpsDocument>(res.data)
   }
 )
 
@@ -839,7 +852,7 @@ export const fetchReportTemplates = createAsyncThunk(
   async () => {
     const res = await investmentOpsApi.listReportTemplates()
     if (!res.success) throw new Error(res.error || res.message || "Failed to fetch report templates")
-    return res.data ?? []
+    return unwrapList(res.data)
   }
 )
 
@@ -867,7 +880,7 @@ export const fetchSetupFunds = createAsyncThunk(
   async () => {
     const res = await investmentOpsApi.listSetupFunds()
     if (!res.success) throw new Error(res.error || res.message || "Failed to fetch funds")
-    return res.data ?? []
+    return unwrapList(res.data)
   }
 )
 
@@ -922,7 +935,7 @@ export const fetchBrokers = createAsyncThunk(
   async () => {
     const res = await investmentOpsApi.listBrokers()
     if (!res.success) throw new Error(res.error || res.message || "Failed to fetch brokers")
-    return res.data ?? []
+    return unwrapList<StakeholderProfile>(res.data)
   }
 )
 
@@ -940,7 +953,7 @@ export const fetchCustodians = createAsyncThunk(
   async () => {
     const res = await investmentOpsApi.listCustodians()
     if (!res.success) throw new Error(res.error || res.message || "Failed to fetch custodians")
-    return res.data ?? []
+    return unwrapList<StakeholderProfile>(res.data)
   }
 )
 
@@ -958,7 +971,7 @@ export const fetchCommissions = createAsyncThunk(
   async () => {
     const res = await investmentOpsApi.listCommissions()
     if (!res.success) throw new Error(res.error || res.message || "Failed to fetch commissions")
-    return res.data ?? []
+    return unwrapList<CommissionRate>(res.data)
   }
 )
 
@@ -976,7 +989,7 @@ export const fetchMarkets = createAsyncThunk(
   async () => {
     const res = await investmentOpsApi.listMarkets()
     if (!res.success) throw new Error(res.error || res.message || "Failed to fetch markets")
-    return res.data ?? []
+    return unwrapList<SetupMarket>(res.data)
   }
 )
 
@@ -995,7 +1008,7 @@ export const fetchSetupCurrencies = createAsyncThunk(
   async () => {
     const res = await investmentOpsApi.listCurrencies()
     if (!res.success) throw new Error(res.error || res.message || "Failed to fetch currencies")
-    return res.data ?? []
+    return unwrapList<SetupCurrency>(res.data)
   }
 )
 
@@ -1014,7 +1027,7 @@ export const fetchCountries = createAsyncThunk(
   async () => {
     const res = await investmentOpsApi.listCountries()
     if (!res.success) throw new Error(res.error || res.message || "Failed to fetch countries")
-    return res.data ?? []
+    return unwrapList<SetupCountry>(res.data)
   }
 )
 
@@ -1033,7 +1046,7 @@ export const fetchIssuers = createAsyncThunk(
   async (params: { countryCode?: string } = {}) => {
     const res = await investmentOpsApi.listIssuers(params)
     if (!res.success) throw new Error(res.error || res.message || "Failed to fetch issuers")
-    return res.data ?? []
+    return unwrapList<SetupIssuer>(res.data)
   }
 )
 
@@ -1052,7 +1065,7 @@ export const fetchPriceSources = createAsyncThunk(
   async () => {
     const res = await investmentOpsApi.listPriceSources()
     if (!res.success) throw new Error(res.error || res.message || "Failed to fetch price sources")
-    return res.data ?? []
+    return unwrapList<PriceSource>(res.data)
   }
 )
 
@@ -1061,7 +1074,13 @@ export const fetchSetupSettings = createAsyncThunk(
   async () => {
     const res = await investmentOpsApi.getSettings()
     if (!res.success) throw new Error(res.error || res.message || "Failed to fetch settings")
-    return res.data as SetupSettings
+    const data = res.data
+    // Setup stubs sometimes return `{ items: [{ id }] }` instead of a settings map.
+    if (data == null) return null
+    if (Array.isArray(data) || (typeof data === "object" && Array.isArray((data as { items?: unknown }).items))) {
+      return null
+    }
+    return data as SetupSettings
   }
 )
 
@@ -1321,10 +1340,14 @@ const investmentOpsSlice = createSlice({
       })
       .addCase(fetchModelPortfolioDrift.rejected, (state, action) => { state.modelPortfolioDriftLoadingById[action.meta.arg.modelId] = false })
 
+      .addCase(fetchValuationRuns.pending, (state) => { state.valuationRunsLoading = true })
+      .addCase(fetchValuationRuns.fulfilled, (state, action) => { state.valuationRunsLoading = false; state.valuationRuns = action.payload })
+      .addCase(fetchValuationRuns.rejected, (state) => { state.valuationRunsLoading = false })
+
       .addCase(createValuationRun.pending, (state) => { state.valuationRunning = true })
       .addCase(createValuationRun.fulfilled, (state, action) => {
         state.valuationRunning = false
-        state.valuationRuns = [action.payload, ...state.valuationRuns]
+        state.valuationRuns = [action.payload, ...state.valuationRuns.filter((r) => r.id !== action.payload.id)]
       })
       .addCase(createValuationRun.rejected, (state) => { state.valuationRunning = false })
 

@@ -1,53 +1,22 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { Check, ChevronDown, Folder, Plus, X } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Check, ChevronDown, Folder, Loader2, Plus, X } from 'lucide-react'
 import { PageHeader } from '@/components/investments-v2/page-header'
+import { investmentOpsApi, unwrapList, type PortfolioOverview } from '@/lib/api/investment-ops-api'
+import type { Holding } from '@/lib/api/investments-api'
+import {
+  mapFundTabs,
+  mapHoldingToOrderRow,
+  mapOverviewMetrics,
+  type FundTab,
+  type HoldingOrderRow,
+} from '@/lib/investments-v2/adapters/portfolio-adapter'
 
-const portfolioTabs = ['Equity World', 'New Portfolio', 'Multi Asset', 'Fixed Income', 'Asia Select']
+const CHART_COLORS = ['var(--iv2-chart-highlight)', '#2f87fa', '#9b82df', '#79b0f7', '#dcecff', '#87909d']
+const CURRENCY_COLORS = ['#2f7ff0', '#86baf8', '#8c73cf', '#deecfb', '#87909d', '#2f87fa']
 
-const portfolioMetrics: Record<string, { total: string; cash: string; securityPct: string; cashPct: string }> = {
-  'Equity World': { total: '9,346,467.46', cash: '2,150,000.00', securityPct: '81.46%', cashPct: '17.78%' },
-  'New Portfolio': { total: '4,108,220.14', cash: '920,000.00', securityPct: '74.20%', cashPct: '24.65%' },
-  'Multi Asset': { total: '12,884,903.80', cash: '3,110,450.00', securityPct: '72.35%', cashPct: '25.81%' },
-  'Fixed Income': { total: '7,629,190.32', cash: '1,240,000.00', securityPct: '82.74%', cashPct: '16.41%' },
-  'Asia Select': { total: '6,917,448.65', cash: '1,850,000.00', securityPct: '72.11%', cashPct: '26.83%' },
-}
-
-const countries = [
-  { label: 'US', value: 52, color: 'var(--iv2-chart-highlight)' },
-  { label: 'UK', value: 17, color: '#2f87fa' },
-  { label: 'FR', value: 9, color: '#9b82df' },
-  { label: 'GB', value: 12, color: '#79b0f7' },
-  { label: 'CH', value: 17, color: '#dcecff' },
-  { label: 'CA', value: 9, color: '#87909d' },
-]
-
-const sectors = [
-  { label: 'Cry', value: 72 },
-  { label: 'Ind', value: 42 },
-  { label: 'Cmm', value: 42 },
-  { label: 'Min', value: 26 },
-  { label: 'Tch', value: 87 },
-  { label: 'Cns', value: 13 },
-  { label: 'Mtr', value: 21 },
-  { label: 'Fin', value: 16 },
-]
-
-const currencies = [
-  { label: 'EUR', value: 52, visual: 43, color: '#2f7ff0' },
-  { label: 'JPY', value: 17, visual: 27, color: '#86baf8' },
-  { label: 'CHF', value: 9, visual: 18, color: '#8c73cf' },
-  { label: 'USD', value: 12, visual: 12, color: '#deecfb' },
-]
-
-const initialOrders = [
-  { transaction: 'USD Cash', type: 'C', reference: 'USD Currency', quantity: '2,100,100', cost: '-2,100,100', price: '1.0000', value: '245,893,449', fx: '1.0000', nav: '2,100,100' },
-  { transaction: 'Alphabet INC–CL A', type: 'A', reference: 'Google US Equity', quantity: '393', cost: '-1,000,904', price: '2,441.7900', value: '959,623', fx: '1.0000', nav: '959,623' },
-  { transaction: 'Apple Inc', type: 'A', reference: 'AAPL US Equity', quantity: '1,440', cost: '-244,800', price: '189.5400', value: '272,938', fx: '1.0000', nav: '272,938' },
-  { transaction: 'Microsoft Corp', type: 'A', reference: 'MSFT US Equity', quantity: '780', cost: '-286,440', price: '421.6600', value: '328,895', fx: '1.0000', nav: '328,895' },
-]
-type OrderRow = (typeof initialOrders)[number]
+type ChartSlice = { label: string; value: number; color: string; visual?: number }
 
 function Coin() {
   return (
@@ -58,12 +27,21 @@ function Coin() {
 }
 
 function CountryRings({
+  countries,
   active,
   onActive,
 }: {
+  countries: ChartSlice[]
   active: string
   onActive: (value: string) => void
 }) {
+  if (countries.length === 0) {
+    return (
+      <div className="flex h-[165px] w-[165px] items-center justify-center text-[10px] text-[#6f7e92] sm:h-[180px] sm:w-[180px]">
+        No exposure data
+      </div>
+    )
+  }
   const rings = countries.map((item, index) => ({
     ...item,
     radius: 68 - index * 10,
@@ -110,12 +88,22 @@ function CountryRings({
 }
 
 function CurrencyDonut({
+  currencies,
   active,
   onActive,
 }: {
+  currencies: ChartSlice[]
   active: string
   onActive: (value: string) => void
 }) {
+  if (currencies.length === 0) {
+    return (
+      <div className="flex h-[150px] w-[150px] items-center justify-center text-[10px] text-[#6f7e92] sm:h-[170px] sm:w-[170px]">
+        No currency data
+      </div>
+    )
+  }
+
   let startAngle = 0
   const polar = (radius: number, angle: number, offsetX: number, offsetY: number) => {
     const radians = ((angle - 90) * Math.PI) / 180
@@ -149,7 +137,7 @@ function CurrencyDonut({
     <div className="relative shrink-0">
       <svg viewBox="0 0 140 140" className="h-[150px] w-[150px] overflow-visible sm:h-[170px] sm:w-[170px]">
         {currencies.map((item) => {
-          const sweep = item.visual * 3.6
+          const sweep = (item.visual ?? item.value) * 3.6
           const segmentStart = startAngle + 2.2
           const segmentEnd = startAngle + sweep - 2.2
           startAngle += sweep
@@ -189,7 +177,7 @@ function NewPositionDialog({
 }: {
   open: boolean
   onClose: () => void
-  onAdd: (order: OrderRow) => void
+  onAdd: (order: HoldingOrderRow) => void
 }) {
   const [instrument, setInstrument] = useState('')
   const [quantity, setQuantity] = useState('')
@@ -198,6 +186,7 @@ function NewPositionDialog({
   const submit = () => {
     if (!instrument.trim() || !quantity.trim()) return
     onAdd({
+      id: `local-${Date.now()}`,
       transaction: instrument.trim(),
       type: 'A',
       reference: `${instrument.trim()} Equity`,
@@ -262,47 +251,182 @@ function NewPositionDialog({
 }
 
 export default function PortfoliosPage() {
-  const [activePortfolio, setActivePortfolio] = useState(portfolioTabs[0])
-  const [activeCountry, setActiveCountry] = useState(countries[0].label)
-  const [activeSector, setActiveSector] = useState('Tch')
-  const [activeCurrency, setActiveCurrency] = useState(currencies[0].label)
+  const [funds, setFunds] = useState<FundTab[]>([])
+  const [activeFundId, setActiveFundId] = useState('')
+  const [overview, setOverview] = useState<PortfolioOverview | null>(null)
+  const [holdings, setHoldings] = useState<Holding[]>([])
+  const [countries, setCountries] = useState<ChartSlice[]>([])
+  const [currencies, setCurrencies] = useState<ChartSlice[]>([])
+  const [sectors, setSectors] = useState<{ label: string; value: number }[]>([])
+  const [orders, setOrders] = useState<HoldingOrderRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [activeCountry, setActiveCountry] = useState('')
+  const [activeSector, setActiveSector] = useState('')
+  const [activeCurrency, setActiveCurrency] = useState('')
   const [expanded, setExpanded] = useState(true)
   const [recalculated, setRecalculated] = useState(false)
   const [positionDialogOpen, setPositionDialogOpen] = useState(false)
-  const [orders, setOrders] = useState(initialOrders)
-  const [selectedOrder, setSelectedOrder] = useState(initialOrders[0].transaction)
-  const metrics = portfolioMetrics[activePortfolio]
+  const [selectedOrder, setSelectedOrder] = useState('')
+
+  const activeFund = funds.find((f) => f.id === activeFundId) ?? funds[0]
+  const metrics = mapOverviewMetrics(overview, holdings)
+
+  const loadFunds = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await investmentOpsApi.listPortfolios()
+      if (!res.success) throw new Error(res.error || res.message || 'Failed to load portfolios')
+      const tabs = mapFundTabs(res.data)
+      setFunds(tabs)
+      setActiveFundId((current) => current || tabs[0]?.id || '')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load portfolios')
+      setFunds([])
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  const loadDetail = useCallback(async (fundId: string) => {
+    if (!fundId) {
+      setOverview(null)
+      setHoldings([])
+      setOrders([])
+      setCountries([])
+      setCurrencies([])
+      setSectors([])
+      return
+    }
+    setDetailLoading(true)
+    setError(null)
+    try {
+      const [overviewRes, holdingsRes, exposureRes] = await Promise.all([
+        investmentOpsApi.getPortfolioOverview(fundId),
+        investmentOpsApi.getPortfolioHoldings(fundId),
+        investmentOpsApi.getPortfolioExposure(fundId),
+      ])
+
+      if (!overviewRes.success && !holdingsRes.success) {
+        throw new Error(overviewRes.error || holdingsRes.error || 'Failed to load portfolio detail')
+      }
+
+      const nextOverview = overviewRes.success ? (overviewRes.data ?? null) : null
+      const nextHoldings = holdingsRes.success ? unwrapList<Holding>(holdingsRes.data) : []
+      setOverview(nextOverview)
+      setHoldings(nextHoldings)
+      const rows = nextHoldings.map(mapHoldingToOrderRow)
+      setOrders(rows)
+      setSelectedOrder(rows[0]?.transaction ?? '')
+
+      if (exposureRes.success && exposureRes.data?.byExchange?.length) {
+        const countrySlices = exposureRes.data.byExchange.map((item, i) => ({
+          label: item.key,
+          value: Number(item.pct) || 0,
+          color: CHART_COLORS[i % CHART_COLORS.length],
+        }))
+        setCountries(countrySlices)
+        setActiveCountry(countrySlices[0]?.label ?? '')
+      } else {
+        setCountries([])
+        setActiveCountry('')
+      }
+
+      const currencyBuckets = new Map<string, number>()
+      for (const h of nextHoldings) {
+        const ccy = h.wacCurrencyCode || h.security?.listingCurrencyCode || 'USD'
+        currencyBuckets.set(ccy, (currencyBuckets.get(ccy) ?? 0) + (h.marketValue ?? h.wac * h.quantity))
+      }
+      const currencyTotal = Array.from(currencyBuckets.values()).reduce((a, b) => a + b, 0)
+      const currencySlices = Array.from(currencyBuckets.entries()).map(([label, value], i) => {
+        const pct = currencyTotal > 0 ? (value / currencyTotal) * 100 : 0
+        return {
+          label,
+          value: Math.round(pct),
+          visual: Math.max(pct, 1),
+          color: CURRENCY_COLORS[i % CURRENCY_COLORS.length],
+        }
+      })
+      setCurrencies(currencySlices)
+      setActiveCurrency(currencySlices[0]?.label ?? '')
+      setSectors([])
+      setActiveSector('')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load portfolio detail')
+      setOverview(null)
+      setHoldings([])
+      setOrders([])
+      setCountries([])
+      setCurrencies([])
+      setSectors([])
+    } finally {
+      setDetailLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadFunds()
+  }, [loadFunds])
+
+  useEffect(() => {
+    if (activeFundId) void loadDetail(activeFundId)
+  }, [activeFundId, loadDetail])
 
   const activeSectorValue = useMemo(
     () => sectors.find((item) => item.label === activeSector)?.value ?? 0,
-    [activeSector],
+    [activeSector, sectors],
   )
 
-  const recalculate = () => {
-    setRecalculated(true)
-    window.setTimeout(() => setRecalculated(false), 1800)
+  const recalculate = async () => {
+    if (!activeFundId) return
+    try {
+      const res = await investmentOpsApi.recalculatePortfolio(activeFundId)
+      if (!res.success) throw new Error(res.error || res.message || 'Recalculate failed')
+      setRecalculated(true)
+      await loadDetail(activeFundId)
+      window.setTimeout(() => setRecalculated(false), 1800)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Recalculate failed')
+    }
   }
 
   return (
     <div className="flex min-h-full w-full flex-col bg-[#05090f] text-[#eef2f8]">
       <PageHeader title="Portfolios" />
 
+      {error && (
+        <div className="mx-3 mt-3 rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-2 text-[12px] text-rose-200 sm:mx-5">
+          {error}
+        </div>
+      )}
+
+      {(loading || detailLoading) && (
+        <div className="mx-3 mt-3 flex items-center gap-2 text-[12px] text-[#8B95A7] sm:mx-5">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading portfolios…
+        </div>
+      )}
+
       <div className="flex shrink-0 items-center gap-2 overflow-x-auto px-3 pb-4 pt-4 sm:px-5">
-        {portfolioTabs.map((portfolio) => (
+        {funds.map((portfolio) => (
           <button
-            key={portfolio}
+            key={portfolio.id}
             type="button"
-            onClick={() => setActivePortfolio(portfolio)}
+            onClick={() => setActiveFundId(portfolio.id)}
             className={`inline-flex h-8 shrink-0 items-center gap-2 rounded-full px-4 text-[11px] font-medium transition ${
-              activePortfolio === portfolio
+              activeFundId === portfolio.id
                 ? 'bg-[#2d8cf4] text-white shadow-[0_8px_24px_rgba(45,140,244,.25)]'
                 : 'border border-white/[0.04] bg-[#172231] text-[#e1e6ee] hover:bg-[#223149]'
             }`}
           >
             <Folder className="h-3.5 w-3.5" fill="currentColor" />
-            {portfolio}
+            {portfolio.name}
           </button>
         ))}
+        {!loading && funds.length === 0 && (
+          <p className="text-[11px] text-[#6f7e92]">No portfolios returned from the API.</p>
+        )}
       </div>
 
       <main className="flex-1 space-y-4 overflow-y-auto px-3 pb-6 sm:px-5">
@@ -310,12 +434,13 @@ export default function PortfoliosPage() {
           <header className="flex min-h-[55px] flex-wrap items-center justify-between gap-3 px-5 py-3">
             <div className="flex items-center gap-2 text-[12px] font-medium text-[#f0f3f8]">
               <Folder className="h-3.5 w-3.5" fill="currentColor" />
-              {activePortfolio}
+              {activeFund?.name ?? 'Portfolio'}
             </div>
             <button
               type="button"
-              onClick={recalculate}
-              className="inline-flex h-8 min-w-[96px] items-center justify-center gap-1.5 rounded-full bg-white px-4 text-[11px] font-semibold text-[#111722] transition hover:bg-[#edf2f8]"
+              onClick={() => void recalculate()}
+              disabled={!activeFundId}
+              className="inline-flex h-8 min-w-[96px] items-center justify-center gap-1.5 rounded-full bg-white px-4 text-[11px] font-semibold text-[#111722] transition hover:bg-[#edf2f8] disabled:opacity-40"
             >
               {recalculated && <Check className="h-3.5 w-3.5" />}
               {recalculated ? 'Updated' : 'Recalculate'}
@@ -350,12 +475,12 @@ export default function PortfoliosPage() {
                   </td>
                   <td className="px-4 py-4 text-[11px]"><span className="inline-flex items-center gap-1.5"><Coin />{metrics.total}</span></td>
                   <td className="px-4 py-4 text-[11px]">{metrics.securityPct}</td>
-                  <td className="px-4 py-4 text-[11px]">0.00</td>
-                  <td className="px-4 py-4 text-[11px]">0.00</td>
-                  <td className="px-4 py-4 text-[11px]">11</td>
+                  <td className="px-4 py-4 text-[11px]">—</td>
+                  <td className="px-4 py-4 text-[11px]">—</td>
+                  <td className="px-4 py-4 text-[11px]">{metrics.positions}</td>
                   <td className="px-4 py-4 text-[11px]">{metrics.total}</td>
-                  <td className="px-4 py-4 text-[11px]">0.00</td>
-                  <td className="px-5 py-4 text-[11px]">24 Apr, 20</td>
+                  <td className="px-4 py-4 text-[11px]">—</td>
+                  <td className="px-5 py-4 text-[11px]">{metrics.valueDate}</td>
                 </tr>
               </tbody>
             </table>
@@ -364,7 +489,7 @@ export default function PortfoliosPage() {
           {expanded && (
             <div className="grid min-h-[245px] grid-cols-1 border-b border-[#243044] bg-[radial-gradient(circle_at_50%_30%,rgba(34,84,145,.17),transparent_62%)] lg:grid-cols-3">
               <div className="flex min-h-[220px] items-center justify-start gap-2 border-b border-[#243044] px-3 py-4 sm:gap-3 sm:px-5 lg:border-b-0 lg:border-r">
-                <CountryRings active={activeCountry} onActive={setActiveCountry} />
+                <CountryRings countries={countries} active={activeCountry} onActive={setActiveCountry} />
                 <div className="space-y-1.5">
                   {countries.map((country) => (
                     <button
@@ -380,45 +505,50 @@ export default function PortfoliosPage() {
                       {country.label}({country.value}%)
                     </button>
                   ))}
+                  {countries.length === 0 && <p className="px-2 text-[9px] text-[#6f7e92]">No exchange exposure</p>}
                 </div>
               </div>
 
               <div className="flex min-h-[220px] items-end justify-center gap-3 border-b border-[#243044] px-5 pb-6 pt-10 lg:border-b-0 lg:border-r">
-                {sectors.map((sector) => {
-                  const active = activeSector === sector.label
-                  return (
-                    <button
-                      key={sector.label}
-                      type="button"
-                      onMouseEnter={() => setActiveSector(sector.label)}
-                      onFocus={() => setActiveSector(sector.label)}
-                      onClick={() => setActiveSector(sector.label)}
-                      className="group relative flex h-[165px] flex-1 flex-col items-center justify-end gap-2 outline-none"
-                    >
-                      <span
-                        className="absolute z-10 rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-[#10151d] shadow-lg transition"
-                        style={{ bottom: `${Math.min(activeSectorValue + 16, 92)}%`, opacity: active ? 1 : 0, transform: active ? 'translateY(0)' : 'translateY(5px)' }}
+                {sectors.length === 0 ? (
+                  <p className="self-center text-[10px] text-[#6f7e92]">No sector breakdown</p>
+                ) : (
+                  sectors.map((sector) => {
+                    const active = activeSector === sector.label
+                    return (
+                      <button
+                        key={sector.label}
+                        type="button"
+                        onMouseEnter={() => setActiveSector(sector.label)}
+                        onFocus={() => setActiveSector(sector.label)}
+                        onClick={() => setActiveSector(sector.label)}
+                        className="group relative flex h-[165px] flex-1 flex-col items-center justify-end gap-2 outline-none"
                       >
-                        <span className="absolute -left-1 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-[var(--iv2-chart-marker)]" />
-                        {sector.value}%
-                      </span>
-                      <span
-                        className="w-full max-w-[18px] rounded-t-md border border-white/[0.06] transition-all duration-200"
-                        style={{
-                          height: `${sector.value}%`,
-                          background: active ? '#2f8af4' : '#1d2b3e',
-                          boxShadow: active ? '0 12px 26px rgba(47,138,244,.25)' : 'none',
-                          transform: active ? 'translateY(-4px)' : 'none',
-                        }}
-                      />
-                      <span className={`text-[9px] transition ${active ? 'text-white' : 'text-[#65748a]'}`}>{sector.label}</span>
-                    </button>
-                  )
-                })}
+                        <span
+                          className="absolute z-10 rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-[#10151d] shadow-lg transition"
+                          style={{ bottom: `${Math.min(activeSectorValue + 16, 92)}%`, opacity: active ? 1 : 0, transform: active ? 'translateY(0)' : 'translateY(5px)' }}
+                        >
+                          <span className="absolute -left-1 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-[var(--iv2-chart-marker)]" />
+                          {sector.value}%
+                        </span>
+                        <span
+                          className="w-full max-w-[18px] rounded-t-md border border-white/[0.06] transition-all duration-200"
+                          style={{
+                            height: `${sector.value}%`,
+                            background: active ? '#2f8af4' : '#1d2b3e',
+                            boxShadow: active ? '0 12px 26px rgba(47,138,244,.25)' : 'none',
+                            transform: active ? 'translateY(-4px)' : 'none',
+                          }}
+                        />
+                        <span className={`text-[9px] transition ${active ? 'text-white' : 'text-[#65748a]'}`}>{sector.label}</span>
+                      </button>
+                    )
+                  })
+                )}
               </div>
 
               <div className="flex min-h-[220px] items-center justify-center gap-3 p-4">
-                <CurrencyDonut active={activeCurrency} onActive={setActiveCurrency} />
+                <CurrencyDonut currencies={currencies} active={activeCurrency} onActive={setActiveCurrency} />
                 <div className="space-y-2">
                   {currencies.map((currency) => (
                     <button
@@ -434,6 +564,7 @@ export default function PortfoliosPage() {
                       {currency.label}({currency.value}%)
                     </button>
                   ))}
+                  {currencies.length === 0 && <p className="px-2 text-[9px] text-[#6f7e92]">No currency data</p>}
                 </div>
               </div>
             </div>
@@ -446,23 +577,23 @@ export default function PortfoliosPage() {
                   <td className="w-[12%] px-5 py-4 text-[11px]">Cash</td>
                   <td className="w-[15%] px-4 py-4 text-[11px]"><span className="inline-flex items-center gap-1.5"><Coin />{metrics.cash}</span></td>
                   <td className="w-[10%] px-4 py-4 text-[11px]">{metrics.cashPct}</td>
-                  <td className="w-[10%] px-4 py-4 text-[11px]">0.00</td>
-                  <td className="w-[10%] px-4 py-4 text-[11px]">0.00</td>
-                  <td className="w-[10%] px-4 py-4 text-[11px]">11</td>
-                  <td className="w-[13%] px-4 py-4 text-[11px]">0.00</td>
-                  <td className="w-[10%] px-4 py-4 text-[11px]">0.00</td>
-                  <td className="w-[10%] px-5 py-4 text-[11px]">24 Apr, 20</td>
+                  <td className="w-[10%] px-4 py-4 text-[11px]">—</td>
+                  <td className="w-[10%] px-4 py-4 text-[11px]">—</td>
+                  <td className="w-[10%] px-4 py-4 text-[11px]">—</td>
+                  <td className="w-[13%] px-4 py-4 text-[11px]">—</td>
+                  <td className="w-[10%] px-4 py-4 text-[11px]">—</td>
+                  <td className="w-[10%] px-5 py-4 text-[11px]">{metrics.valueDate}</td>
                 </tr>
                 <tr className="transition hover:bg-white/[0.025]">
                   <td className="px-5 py-4 text-[11px]">Archive</td>
-                  <td className="px-4 py-4 text-[11px]"><span className="inline-flex items-center gap-1.5"><Coin />0.00</span></td>
-                  <td className="px-4 py-4 text-[11px]">0.00%</td>
-                  <td className="px-4 py-4 text-[11px]">0.00</td>
-                  <td className="px-4 py-4 text-[11px]">0.00</td>
-                  <td className="px-4 py-4 text-[11px]">1</td>
-                  <td className="px-4 py-4 text-[11px]">0.00</td>
-                  <td className="px-4 py-4 text-[11px]">0.00</td>
-                  <td className="px-5 py-4 text-[11px]">24 Apr, 20</td>
+                  <td className="px-4 py-4 text-[11px]"><span className="inline-flex items-center gap-1.5"><Coin />—</span></td>
+                  <td className="px-4 py-4 text-[11px]">—</td>
+                  <td className="px-4 py-4 text-[11px]">—</td>
+                  <td className="px-4 py-4 text-[11px]">—</td>
+                  <td className="px-4 py-4 text-[11px]">—</td>
+                  <td className="px-4 py-4 text-[11px]">—</td>
+                  <td className="px-4 py-4 text-[11px]">—</td>
+                  <td className="px-5 py-4 text-[11px]">—</td>
                 </tr>
               </tbody>
             </table>
@@ -471,7 +602,7 @@ export default function PortfoliosPage() {
 
         <section className="overflow-hidden rounded-[24px] border border-white/[0.025] bg-[linear-gradient(112deg,#172231_0%,#101a29_55%,#0c1522_100%)]">
           <header className="flex min-h-[54px] items-center justify-between gap-3 px-5 py-3">
-            <h2 className="text-[14px] font-medium text-white">Orders({orders.length + 26})</h2>
+            <h2 className="text-[14px] font-medium text-white">Holdings({orders.length})</h2>
             <button
               type="button"
               onClick={() => setPositionDialogOpen(true)}
@@ -499,7 +630,7 @@ export default function PortfoliosPage() {
               <tbody>
                 {orders.map((order) => (
                   <tr
-                    key={`${order.transaction}-${order.quantity}`}
+                    key={order.id}
                     onClick={() => setSelectedOrder(order.transaction)}
                     className={`cursor-pointer border-b border-[#243044] transition last:border-b-0 hover:bg-[#2f87fa]/[0.08] ${
                       selectedOrder === order.transaction ? 'bg-[#2f87fa]/[0.1]' : ''
@@ -516,6 +647,13 @@ export default function PortfoliosPage() {
                     <td className="px-5 py-4 text-[11px] text-[#c3ccd8]">{order.nav}</td>
                   </tr>
                 ))}
+                {!detailLoading && orders.length === 0 && (
+                  <tr>
+                    <td colSpan={9} className="px-5 py-14 text-center text-[11px] text-[#6f7e92]">
+                      {activeFundId ? 'No holdings returned from the API.' : 'Select a portfolio to view holdings.'}
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>

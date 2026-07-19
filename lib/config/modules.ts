@@ -427,10 +427,12 @@ export const MODULE_CONFIG: ModuleConfig[] = [
         icon: Scale,
         path: "/investments-v2/reconciliation",
         items: [
-          { id: "investments-reconciliation-cash",      name: "Cash Reconciliation",     path: "/investments-v2/reconciliation", icon: CiGrid41, description: "Cash reconciliation" },
-          { id: "investments-reconciliation-holdings",  name: "Holdings Reconciliation", path: "/investments-v2/reconciliation", icon: CiGrid41, description: "Holdings reconciliation" },
-          { id: "investments-reconciliation-trades",    name: "Trade Reconciliation",    path: "/investments-v2/reconciliation", icon: CiGrid41, description: "Trade reconciliation" },
-          { id: "investments-reconciliation-exceptions",name: "Exceptions",              path: "/investments-v2/reconciliation", icon: CiGrid41, description: "Reconciliation exceptions" },
+          { id: "investments-reconciliation-overview", name: "Client Accounts Overview", path: "/investments-v2/reconciliation", icon: CiGrid41, description: "Client cash accounts and reconciliation health" },
+          { id: "investments-reconciliation-cash-ledger", name: "Cash Ledger", path: "/investments-v2/reconciliation/cash-ledger", icon: CiGrid41, description: "Trading and fund cash ledgers" },
+          { id: "investments-reconciliation-fund-cash", name: "Fund Cash Reconciliation", path: "/investments-v2/reconciliation/fund-cash", icon: CiGrid41, description: "Internal ledger vs bank statement workspace" },
+          { id: "investments-reconciliation-broker-custodian", name: "Broker & Custodian", path: "/investments-v2/reconciliation/broker-custodian", icon: CiGrid41, description: "Three-way broker and custodian reconciliation" },
+          { id: "investments-reconciliation-exceptions", name: "Exceptions", path: "/investments-v2/reconciliation/exceptions", icon: CiGrid41, description: "Reconciliation exceptions and approvals" },
+          { id: "investments-reconciliation-statements", name: "Client Statements", path: "/investments-v2/reconciliation/statements", icon: CiGrid41, description: "Investor and client cash statements" },
         ],
       },
       {

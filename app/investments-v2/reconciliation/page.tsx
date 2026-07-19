@@ -1,153 +1,745 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Check, ChevronDown, FileUp, Search, ShieldCheck, X } from 'lucide-react'
+import { type ReactNode, useEffect, useMemo, useState } from 'react'
+import {
+  Banknote,
+  Calendar,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsRight,
+  CircleAlert,
+  Clock3,
+  Columns3,
+  Info,
+  Search,
+  ShieldAlert,
+  Star,
+  Upload,
+  Wallet,
+  FileText,
+} from 'lucide-react'
+import {
+  Cell,
+  ComposedChart,
+  CartesianGrid,
+  Line,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts'
+import { ReconApiBanner, ReconNavTabs } from '@/components/investments-v2/recon-ui'
+import { stockPickerCashApi } from '@/lib/api/stock-picker-cash-api'
+import {
+  mapCashOverviewKpis,
+  mapClientAccounts,
+  mapCurrencyPie,
+  mapDailyCashMovement,
+  mapExceptions,
+  opsErrorMessage,
+  requireOpsData,
+} from '@/lib/investments-v2/adapters/cash-recon-adapter'
+import { R as C } from '@/lib/investments-v2/recon-tokens'
+import { cn } from '@/lib/utils'
 
-const tabs = ['Cash', 'Holdings', 'Trade', 'Exceptions']
-const statuses = ['All statuses', 'Matched', 'Unmatched', 'Partially Matched', 'Investigating', 'Resolved', 'Written Off', 'Escalated']
-const batches = [
-  { id: 'REC-260717-04', type: 'Cash', source: 'Citi Custody', at: '17 Jul 2026 · 12:42', items: 248, exceptions: 3, status: 'Investigating' },
-  { id: 'REC-260717-03', type: 'Holdings', source: 'BNY Mellon', at: '17 Jul 2026 · 11:05', items: 184, exceptions: 1, status: 'Partially Matched' },
-  { id: 'REC-260717-02', type: 'Trade', source: 'Bloomberg AIM', at: '17 Jul 2026 · 09:30', items: 92, exceptions: 0, status: 'Matched' },
-  { id: 'REC-260716-08', type: 'Cash', source: 'HSBC', at: '16 Jul 2026 · 17:52', items: 61, exceptions: 2, status: 'Resolved' },
-]
-const reconItems = [
-  { id: 'RCI-84218', type: 'Cash', portfolio: 'Equity World', reference: 'CITI-USD-8492', internal: '$18,200,000.00', external: '$18,200,000.00', variance: '$0.00', status: 'Matched', owner: 'System' },
-  { id: 'RCI-84217', type: 'Cash', portfolio: 'Multi Asset', reference: 'BNY-USD-5104', internal: '$11,200,000.00', external: '$11,195,000.00', variance: '$5,000.00', status: 'Unmatched', owner: 'T. Ncube' },
-  { id: 'RCI-84216', type: 'Holdings', portfolio: 'Asia Select', reference: '0700:HK', internal: '84,200', external: '84,000', variance: '200', status: 'Partially Matched', owner: 'R. Moyo' },
-  { id: 'RCI-84215', type: 'Trade', portfolio: 'Fixed Income', reference: 'TRD-93882', internal: '$2,450,000.00', external: '$2,450,000.00', variance: '$0.00', status: 'Resolved', owner: 'A. Dube' },
-  { id: 'RCI-84214', type: 'Cash', portfolio: 'Asia Select', reference: 'HSBC-HKD-1022', internal: 'HK$4,200,000', external: 'HK$4,210,000', variance: '-HK$10,000', status: 'Escalated', owner: 'J. Moyo' },
-  { id: 'RCI-84213', type: 'Holdings', portfolio: 'Equity World', reference: 'MSFT:US', internal: '42,000', external: '41,950', variance: '50', status: 'Written Off', owner: 'S. Patel' },
-]
+type AccountRow = ReturnType<typeof mapClientAccounts>['items'][number]
 
-function Dropdown({ value, options, onChange }: { value: string; options: string[]; onChange: (value: string) => void }) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    const close = (event: MouseEvent) => { if (!ref.current?.contains(event.target as Node)) setOpen(false) }
-    document.addEventListener('mousedown', close)
-    return () => document.removeEventListener('mousedown', close)
-  }, [])
-  return <div ref={ref} className="relative">
-    <button type="button" onClick={() => setOpen(!open)} className="flex h-8 min-w-[132px] items-center justify-between gap-3 rounded-full border border-[#334155] bg-[#101927] px-3 text-[10px] text-[#cbd5e1] transition hover:border-[#52637a]">
-      <span className="truncate">{value}</span><ChevronDown className={`h-3 w-3 transition ${open ? 'rotate-180' : ''}`} />
-    </button>
-    {open && <div className="absolute right-0 z-50 mt-1.5 min-w-full overflow-hidden rounded-2xl border border-white/10 bg-[#111a28] p-1.5 shadow-2xl">
-      {options.map(option => <button key={option} type="button" onClick={() => { onChange(option); setOpen(false) }} className={`flex w-full items-center justify-between whitespace-nowrap rounded-full px-3 py-2 text-left text-[10px] ${option === value ? 'bg-[#2f87fa] text-white' : 'text-[#9ca9ba] hover:bg-white/[.07]'}`}>
-        {option}{option === value && <Check className="ml-3 h-3 w-3" />}
-      </button>)}
-    </div>}
-  </div>
-}
-
-function Status({ value }: { value: string }) {
-  const tone = value === 'Matched' || value === 'Resolved' ? 'bg-emerald-400/10 text-emerald-300' : value === 'Unmatched' || value === 'Escalated' ? 'bg-rose-400/10 text-rose-300' : value === 'Written Off' ? 'bg-slate-400/10 text-slate-300' : 'bg-amber-400/10 text-amber-300'
-  return <span className={`inline-flex rounded-full px-2 py-1 text-[9px] font-medium ${tone}`}>{value}</span>
-}
-
-export default function ReconciliationPage() {
-  const [batchRows, setBatchRows] = useState(batches)
-  const [activeTab, setActiveTab] = useState('Cash')
-  const [status, setStatus] = useState('All statuses')
-  const [portfolio, setPortfolio] = useState('All portfolios')
+export default function ClientAccountsOverviewPage() {
   const [search, setSearch] = useState('')
-  const [selectedBatch, setSelectedBatch] = useState(batches[0].id)
-  const [selectedItem, setSelectedItem] = useState<(typeof reconItems)[number] | null>(null)
-  const [resolution, setResolution] = useState('Resolved')
-  const [reason, setReason] = useState('')
-  const [evidence, setEvidence] = useState('')
-  const [resolutionLog, setResolutionLog] = useState<Record<string, { status: string; user: string; timestamp: string; reason: string; evidence: string }>>({})
+  const [accountType, setAccountType] = useState('All Account Types')
+  const [status, setStatus] = useState('All Statuses')
+  const [page, setPage] = useState(1)
+  const pageSize = 8
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [accounts, setAccounts] = useState<AccountRow[]>([])
+  const [accountTotal, setAccountTotal] = useState(0)
+  const [kpis, setKpis] = useState<
+    {
+      label: string
+      icon: typeof Wallet
+      iconBg: string
+      iconColor: string
+      primary: string
+      secondary: string
+      trend: string
+      trendTone: string
+      exceptions?: boolean
+    }[]
+  >([])
+  const [cashByCurrency, setCashByCurrency] = useState<
+    { name: string; pct: number; value: string; color: string; amount: number }[]
+  >([])
+  const [recentAlerts, setRecentAlerts] = useState<
+    { title: string; meta: string; amount?: string; when: string; tone: 'red' | 'amber' | 'blue' }[]
+  >([])
+  const [dailyMovement, setDailyMovement] = useState<{ date: string; net: number; close: number }[]>([])
 
-  const filtered = useMemo(() => reconItems.filter(item =>
-    (activeTab === 'Exceptions' ? item.status !== 'Matched' : item.type === activeTab) &&
-    (status === 'All statuses' || item.status === status) &&
-    (portfolio === 'All portfolios' || item.portfolio === portfolio) &&
-    (!search || `${item.id} ${item.reference} ${item.portfolio}`.toLowerCase().includes(search.toLowerCase()))
-  ), [activeTab, portfolio, search, status])
-
-  const submitResolution = () => {
-    if (!selectedItem || !reason.trim()) return
-    setResolutionLog(current => ({
-      ...current,
-      [selectedItem.id]: {
-        status: resolution,
-        user: 'J. Moyo (you)',
-        timestamp: '17 Jul 2026 · 13:49 CAT',
-        reason: reason.trim(),
-        evidence: evidence.trim() || 'No supporting reference supplied',
-      },
-    }))
-    setSelectedItem(null); setReason(''); setEvidence('')
-  }
-
-  const createBatch = () => {
-    const next = {
-      id: `REC-260717-${String(batchRows.length + 1).padStart(2, '0')}`,
-      type: activeTab === 'Exceptions' ? 'Cash' : activeTab,
-      source: 'Manual operations upload',
-      at: '17 Jul 2026 · 13:52',
-      items: 0,
-      exceptions: 0,
-      status: 'Investigating',
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      setLoading(true)
+      setError(null)
+      try {
+        const [overviewRes, accountsRes, exceptionsRes, movementRes] = await Promise.all([
+          stockPickerCashApi.getCashOverview(),
+          stockPickerCashApi.listClientCashAccounts({ page: 1, pageSize: 100 }),
+          stockPickerCashApi.listExceptions({ page: 1, pageSize: 5 }).catch(() => null),
+          stockPickerCashApi.getCashOverviewDailyMovement().catch(() => null),
+        ])
+        if (cancelled) return
+        const overview = requireOpsData(overviewRes, 'cash overview')
+        const accountsData = requireOpsData(accountsRes, 'client cash accounts')
+        const k = mapCashOverviewKpis(overview)
+        const mapped = mapClientAccounts(accountsData)
+        const unreconciled = mapped.items.reduce((s, a) => s + a.unreconciled, 0)
+        const ccy = k?.primaryCurrency ?? 'USD'
+        setAccounts(mapped.items)
+        setAccountTotal(mapped.total)
+        setCashByCurrency(mapCurrencyPie(k?.byCurrency ?? []))
+        if (movementRes?.success && movementRes.data) {
+          setDailyMovement(mapDailyCashMovement(movementRes.data))
+        } else {
+          setDailyMovement([])
+        }
+        setKpis([
+          {
+            label: 'Total Client Cash',
+            icon: Wallet,
+            iconBg: 'rgba(59,130,246,0.15)',
+            iconColor: '#60A5FA',
+            primary: `${ccy} ${k?.totalCash ?? '0.00'}`,
+            secondary: k?.secondaryCash ? `${k.secondaryCurrency} ${k.secondaryCash}` : `${mapped.total} accounts`,
+            trend: '—',
+            trendTone: 'text-[#64748B]',
+          },
+          {
+            label: 'Available Cash',
+            icon: Banknote,
+            iconBg: 'rgba(34,197,94,0.15)',
+            iconColor: '#4ADE80',
+            primary: `${ccy} ${k?.available ?? '0.00'}`,
+            secondary: k?.secondaryAvailable
+              ? `${k.secondaryCurrency} ${k.secondaryAvailable}`
+              : 'Order-eligible',
+            trend: '—',
+            trendTone: 'text-[#64748B]',
+          },
+          {
+            label: 'Pending Settlements',
+            icon: Clock3,
+            iconBg: 'rgba(245,158,11,0.15)',
+            iconColor: '#FBBF24',
+            primary: `${ccy} ${k?.reservations ?? '0.00'}`,
+            secondary: 'Active reservations',
+            trend: '—',
+            trendTone: 'text-[#64748B]',
+          },
+          {
+            label: 'Unreconciled Items',
+            icon: FileText,
+            iconBg: 'rgba(168,85,247,0.15)',
+            iconColor: '#C084FC',
+            primary: String(unreconciled),
+            secondary: 'Open breaks on accounts',
+            trend: '—',
+            trendTone: 'text-[#64748B]',
+          },
+          {
+            label: 'Exceptions',
+            icon: ShieldAlert,
+            iconBg: 'rgba(244,63,94,0.15)',
+            iconColor: '#FB7185',
+            primary: String(k?.unhealthyAccounts ?? 0),
+            secondary: 'Unhealthy accounts',
+            trend: '—',
+            trendTone: 'text-[#64748B]',
+            exceptions: true,
+          },
+        ])
+        if (exceptionsRes?.success && exceptionsRes.data) {
+          const ex = requireOpsData(exceptionsRes, 'exceptions')
+          const rowsEx = mapExceptions(ex).items
+          setRecentAlerts(
+            rowsEx.map((r) => ({
+              title: r.title,
+              meta: `${r.account} · ${r.client}`,
+              amount: `USD ${r.diffUsd}`,
+              when: `${r.ageDays}d`,
+              tone: r.severity === 'Critical' || r.severity === 'High' ? 'red' : r.severity === 'Medium' ? 'amber' : 'blue',
+            })),
+          )
+        } else {
+          setRecentAlerts([])
+        }
+      } catch (e) {
+        if (cancelled) return
+        setError(opsErrorMessage(e, 'Unable to load cash overview'))
+        setAccounts([])
+        setAccountTotal(0)
+        setKpis([])
+        setCashByCurrency([])
+        setDailyMovement([])
+        setRecentAlerts([])
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
     }
-    setBatchRows(current => [next, ...current])
-    setSelectedBatch(next.id)
-  }
+  }, [])
 
-  return <main className="min-h-full bg-[#05090f] p-3 text-[#eef2f8] sm:p-5">
-    <div className="mx-auto max-w-[1600px] space-y-4">
-      <section className="rounded-2xl border border-white/[.04] bg-[linear-gradient(120deg,#182434_0%,#101a29_55%,#0b1421_100%)] p-5 shadow-[0_24px_80px_rgba(0,0,0,.22)]">
-        <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
-          <div><p className="text-[10px] uppercase tracking-[.2em] text-[#738399]">Operations control</p><h1 className="mt-1 text-lg font-semibold">Reconciliation workspace</h1><p className="mt-1 text-[11px] text-[#8f9caf]">Compare internal books against custodian, broker and trade sources.</p></div>
-          <div className="grid grid-cols-3 gap-2 sm:min-w-[420px]">
-            {[['Matched today', '98.4%', 'text-emerald-300'], ['Open breaks', '6', 'text-amber-300'], ['Escalated', '1', 'text-rose-300']].map(([label, value, tone]) => <div key={label} className="rounded-xl border border-white/[.05] bg-[#09111d]/70 px-4 py-3"><p className="text-[9px] text-[#728197]">{label}</p><p className={`mt-1 text-lg font-semibold ${tone}`}>{value}</p></div>)}
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase()
+    return accounts.filter((row) => {
+      const matchQ =
+        !q ||
+        `${row.accountNumber} ${row.clientName} ${row.accountType}`.toLowerCase().includes(q)
+      const matchType = accountType === 'All Account Types' || row.accountType === accountType
+      const matchStatus = status === 'All Statuses' || row.status === status
+      return matchQ && matchType && matchStatus
+    })
+  }, [accountType, accounts, search, status])
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
+  const rows = filtered.slice((page - 1) * pageSize, page * pageSize)
+  const from = filtered.length === 0 ? 0 : (page - 1) * pageSize + 1
+  const to = Math.min(page * pageSize, filtered.length)
+  const dominantCcy = cashByCurrency[0]
+
+  return (
+    <main className="min-h-full bg-background text-foreground p-5 sm:p-6" style={{ background: C.page, color: C.text }}>
+      <div className="mx-auto max-w-[1600px] space-y-5">
+        {/* Header */}
+        <header className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+          <div>
+            <h1 className="text-[22px] font-semibold leading-tight tracking-[-0.01em]" style={{ color: C.text }}>
+              Client Accounts Overview
+            </h1>
+            <p className="mt-1.5 text-[13px] leading-snug" style={{ color: C.muted }}>
+              Real-time summary of client cash positions, activity and exceptions.
+            </p>
           </div>
-        </div>
-        <div className="mt-5 flex flex-wrap gap-1 rounded-full border border-white/[.05] bg-[#090f18]/70 p-1">
-          {tabs.map(tab => <button key={tab} type="button" onClick={() => setActiveTab(tab)} className={`rounded-full px-4 py-2 text-[10px] font-medium transition ${activeTab === tab ? 'bg-white text-[#101722] shadow' : 'text-[#8e9bad] hover:bg-white/[.06] hover:text-white'}`}>{tab}{tab === 'Exceptions' && <span className="ml-2 rounded-full bg-rose-500/20 px-1.5 text-rose-300">6</span>}</button>)}
-        </div>
-      </section>
 
-      <section className="grid gap-4 xl:grid-cols-[340px_minmax(0,1fr)]">
-        <aside className="rounded-2xl border border-white/[.04] bg-[linear-gradient(145deg,#142030,#0d1623)] p-4">
-          <div className="mb-3 flex items-center justify-between"><div><h2 className="text-[12px] font-semibold">Recent batches</h2><p className="text-[9px] text-[#718096]">Select a run to inspect</p></div><button type="button" onClick={createBatch} className="rounded-full bg-[#2f87fa] px-3 py-2 text-[10px] font-semibold text-white hover:bg-[#2277e6]">New batch</button></div>
-          <div className="space-y-2">{batchRows.map(batch => <button key={batch.id} type="button" onClick={() => { setSelectedBatch(batch.id); setActiveTab(batch.type) }} className={`w-full rounded-xl border p-3 text-left transition ${selectedBatch === batch.id ? 'border-[#2f87fa]/60 bg-[#2f87fa]/10' : 'border-white/[.05] bg-[#09111d]/55 hover:border-white/15'}`}>
-            <div className="flex items-center justify-between"><span className="font-mono text-[10px] text-[#dbe5f2]">{batch.id}</span><Status value={batch.status} /></div>
-            <p className="mt-2 text-[10px] text-[#9ca9ba]">{batch.type} · {batch.source}</p><div className="mt-2 flex justify-between text-[9px] text-[#64748b]"><span>{batch.at}</span><span>{batch.items} items · {batch.exceptions} breaks</span></div>
-          </button>)}</div>
-        </aside>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <label
+              className="flex h-9 w-[260px] items-center gap-2 rounded-full border px-3"
+              style={{ background: C.control, borderColor: C.controlBorder }}
+            >
+              <Search className="h-3.5 w-3.5 shrink-0" style={{ color: C.muted2 }} />
+              <input
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value)
+                  setPage(1)
+                }}
+                placeholder="Search accounts, clients..."
+                className="w-full bg-transparent text-[12px] outline-none placeholder:text-[#64748B]"
+                style={{ color: C.text }}
+              />
+              <span
+                className="shrink-0 rounded-md border px-1.5 py-0.5 text-[10px] font-medium"
+                style={{ color: C.muted2, borderColor: C.controlBorder, background: C.control }}
+              >
+                ⌘ K
+              </span>
+            </label>
 
-        <div className="min-w-0 rounded-2xl border border-white/[.04] bg-[linear-gradient(135deg,#142030,#0c1522)]">
-          <div className="flex flex-col gap-3 border-b border-white/[.06] p-4 lg:flex-row lg:items-center lg:justify-between">
-            <div><h2 className="text-[12px] font-semibold">{activeTab} reconciliation items</h2><p className="text-[9px] text-[#718096]">{filtered.length} visible records · Batch {selectedBatch}</p></div>
+            <button
+              type="button"
+              className="inline-flex h-9 items-center gap-2 rounded-full border px-3 text-[12px]"
+              style={{ background: C.control, borderColor: C.controlBorder, color: C.text }}
+            >
+              <Calendar className="h-3.5 w-3.5" style={{ color: C.muted }} />
+              <span>As of today</span>
+              <ChevronDown className="h-3.5 w-3.5" style={{ color: C.muted2 }} />
+            </button>
+
+            <button
+              type="button"
+              className="inline-flex h-9 items-center gap-2 rounded-full border px-3 text-[12px]"
+              style={{ background: C.control, borderColor: C.controlBorder, color: C.text }}
+            >
+              <Upload className="h-3.5 w-3.5" style={{ color: C.muted }} />
+              Export
+              <ChevronDown className="h-3.5 w-3.5" style={{ color: C.muted2 }} />
+            </button>
+          </div>
+        </header>
+
+        <ReconNavTabs variant="terminal-dark" />
+        <ReconApiBanner loading={loading} error={error} />
+
+        {/* KPI row */}
+        <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          {(kpis.length ? kpis : loading ? [] : [
+            {
+              label: 'Total Client Cash',
+              icon: Wallet,
+              iconBg: 'rgba(59,130,246,0.15)',
+              iconColor: '#60A5FA',
+              primary: '—',
+              secondary: 'No data',
+              trend: '—',
+              trendTone: 'text-[#64748B]',
+            },
+          ]).map((kpi) => {
+            const Icon = kpi.icon
+            return (
+              <article
+                key={kpi.label}
+                className="rounded-[12px] border p-4"
+                style={{ background: C.card, borderColor: C.cardBorder }}
+              >
+                <div className="flex items-center gap-2">
+                  <span
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-[10px]"
+                    style={{ background: kpi.iconBg }}
+                  >
+                    <Icon className="h-4 w-4" style={{ color: kpi.iconColor }} />
+                  </span>
+                  <span className="text-[12px] font-medium" style={{ color: C.muted }}>
+                    {kpi.label}
+                  </span>
+                  <Info className="h-3 w-3" style={{ color: C.muted2 }} />
+                </div>
+                <p className="mt-3 font-mono text-[18px] font-semibold leading-none tracking-tight" style={{ color: C.text }}>
+                  {kpi.primary}
+                </p>
+                <p className="mt-1.5 font-mono text-[11px]" style={{ color: C.muted2 }}>
+                  {kpi.secondary}
+                </p>
+                <p className={cn('mt-3 text-[11px]', kpi.trendTone)}>
+                  {kpi.trend} <span style={{ color: C.muted2 }}>vs last 7 days</span>
+                </p>
+              </article>
+            )
+          })}
+        </section>
+
+        {/* Accounts table */}
+        <section
+          className="overflow-hidden rounded-[12px] border"
+          style={{ background: C.card, borderColor: C.cardBorder }}
+        >
+          <div className="flex flex-col gap-3 border-b px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: C.cardBorder }}>
+            <div className="flex items-center gap-2.5">
+              <h2 className="text-[14px] font-semibold" style={{ color: C.text }}>
+                Client Accounts
+              </h2>
+              <span
+                className="rounded-full px-2.5 py-0.5 text-[11px] font-medium"
+                style={{ background: C.muted, color: C.muted, border: `1px solid ${C.cardBorder}` }}
+              >
+                {accountTotal || filtered.length} Accounts
+              </span>
+            </div>
             <div className="flex flex-wrap items-center gap-2">
-              <div className="flex h-8 items-center gap-2 rounded-full border border-[#334155] bg-[#101927] px-3"><Search className="h-3 w-3 text-[#718096]" /><input value={search} onChange={event => setSearch(event.target.value)} placeholder="Search reference" className="w-28 bg-transparent text-[10px] outline-none placeholder:text-[#66758a]" /></div>
-              <Dropdown value={portfolio} options={['All portfolios', 'Equity World', 'Multi Asset', 'Fixed Income', 'Asia Select']} onChange={setPortfolio} />
-              <Dropdown value={status} options={statuses} onChange={setStatus} />
+              <FilterSelect
+                value={accountType}
+                options={['All Account Types', 'Discretionary', 'Pension Fund', 'Custodial', 'Brokerage', 'Corporate']}
+                onChange={(v) => {
+                  setAccountType(v)
+                  setPage(1)
+                }}
+              />
+              <FilterSelect
+                value={status}
+                options={['All Statuses', 'Active', 'Restricted']}
+                onChange={(v) => {
+                  setStatus(v)
+                  setPage(1)
+                }}
+              />
+              <button
+                type="button"
+                className="inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[11px]"
+                style={{ background: C.control, borderColor: C.controlBorder, color: C.text }}
+              >
+                <Columns3 className="h-3.5 w-3.5" style={{ color: C.muted }} />
+                Columns
+              </button>
             </div>
           </div>
-          <div className="overflow-x-auto"><table className="w-full min-w-[920px] text-left text-[10px]">
-            <thead className="bg-[#08111d]/60 text-[9px] uppercase tracking-wider text-[#66758a]"><tr>{['Item ID', 'Portfolio', 'Reference', 'Internal', 'External', 'Variance', 'Status', 'Owner', ''].map(label => <th key={label} className="px-4 py-3 font-medium">{label}</th>)}</tr></thead>
-            <tbody className="divide-y divide-white/[.045]">{filtered.map(item => <tr key={item.id} onClick={() => setSelectedItem(item)} className={`cursor-pointer transition hover:bg-white/[.035] ${selectedItem?.id === item.id ? 'bg-[#2f87fa]/10' : ''}`}>
-              <td className="px-4 py-3 font-mono text-[#68a9ff]">{item.id}</td><td className="px-4 py-3 text-[#c4cedb]">{item.portfolio}</td><td className="px-4 py-3 font-mono text-[#94a3b8]">{item.reference}</td><td className="px-4 py-3 font-mono">{item.internal}</td><td className="px-4 py-3 font-mono">{item.external}</td><td className={`px-4 py-3 font-mono ${item.variance === '$0.00' ? 'text-emerald-300' : 'text-rose-300'}`}>{item.variance}</td><td className="px-4 py-3"><Status value={resolutionLog[item.id]?.status || item.status} /></td><td className="px-4 py-3 text-[#8795a8]">{item.owner}</td><td className="px-4 py-3"><button type="button" onClick={event => { event.stopPropagation(); setSelectedItem(item) }} className="rounded-full border border-white/10 px-3 py-1.5 text-[9px] hover:bg-white/10">Review</button></td>
-            </tr>)}</tbody>
-          </table></div>
-        </div>
-      </section>
-    </div>
 
-    {selectedItem && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onMouseDown={() => setSelectedItem(null)}>
-      <div className="w-full max-w-xl rounded-2xl border border-white/10 bg-[#111a28] shadow-2xl" onMouseDown={event => event.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-white/[.07] p-5"><div><h2 className="text-sm font-semibold">Resolve reconciliation item</h2><p className="mt-1 font-mono text-[10px] text-[#7890ad]">{selectedItem.id} · {selectedItem.reference}</p></div><button type="button" onClick={() => setSelectedItem(null)} className="rounded-full p-2 text-[#8090a5] hover:bg-white/10"><X className="h-4 w-4" /></button></div>
-        <div className="space-y-4 p-5">
-          <div className="grid grid-cols-2 gap-3 rounded-xl bg-[#09111d] p-4 text-[10px]"><div><span className="text-[#6f7e92]">Assigned user</span><p className="mt-1 text-[#d8e0eb]">{resolutionLog[selectedItem.id]?.user || 'J. Moyo (you)'}</p></div><div><span className="text-[#6f7e92]">Timestamp</span><p className="mt-1 text-[#d8e0eb]">{resolutionLog[selectedItem.id]?.timestamp || '17 Jul 2026 · 13:49 CAT'}</p></div></div>
-          {resolutionLog[selectedItem.id] && <div className="rounded-xl border border-emerald-400/15 bg-emerald-400/[.05] p-4 text-[10px] text-[#aab6c5]"><p className="font-medium text-emerald-300">Latest recorded resolution</p><p className="mt-2">{resolutionLog[selectedItem.id].reason}</p><p className="mt-1 text-[9px] text-[#718096]">Evidence: {resolutionLog[selectedItem.id].evidence}</p></div>}
-          <label className="block"><span className="mb-2 block text-[10px] text-[#a9b5c4]">Resolution outcome</span><Dropdown value={resolution} options={['Resolved', 'Written Off', 'Escalated', 'Investigating']} onChange={setResolution} /></label>
-          <label className="block"><span className="mb-2 block text-[10px] text-[#a9b5c4]">Reason <span className="text-rose-300">*</span></span><textarea value={reason} onChange={event => setReason(event.target.value)} rows={3} placeholder="Explain the variance and resolution decision" className="w-full rounded-xl border border-[#334155] bg-[#0b1420] p-3 text-[11px] outline-none focus:border-[#2f87fa]" /></label>
-          <label className="block"><span className="mb-2 block text-[10px] text-[#a9b5c4]">Supporting evidence</span><div className="flex h-10 items-center gap-2 rounded-full border border-dashed border-[#46566d] px-4 text-[10px] text-[#8391a4]"><FileUp className="h-3.5 w-3.5" /><input value={evidence} onChange={event => setEvidence(event.target.value)} placeholder="Paste evidence reference or note" className="flex-1 bg-transparent outline-none" /></div></label>
-        </div>
-        <div className="flex justify-end gap-2 border-t border-white/[.07] p-4"><button type="button" onClick={() => setSelectedItem(null)} className="rounded-full border border-white/10 px-4 py-2 text-[10px] hover:bg-white/5">Cancel</button><button type="button" disabled={!reason.trim()} onClick={submitResolution} className="flex items-center gap-2 rounded-full bg-[#2f87fa] px-5 py-2 text-[10px] font-semibold text-white disabled:opacity-40"><ShieldCheck className="h-3.5 w-3.5" />Record resolution</button></div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[1100px] text-left">
+              <thead>
+                <tr style={{ borderBottom: `1px solid ${C.rowBorder}` }}>
+                  {[
+                    'Account Number',
+                    'Client Name',
+                    'Base Currency',
+                    'Account Type',
+                    'Cash Balance',
+                    'Available Balance',
+                    'Status',
+                    'Last Activity',
+                  ].map((head) => (
+                    <th
+                      key={head}
+                      className="px-4 py-3 text-[11px] font-medium"
+                      style={{ color: C.muted2 }}
+                    >
+                      {head === 'Last Activity' ? (
+                        <span className="inline-flex items-center gap-1">
+                          {head}
+                          <ChevronDown className="h-3 w-3" />
+                        </span>
+                      ) : (
+                        head
+                      )}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {!loading && rows.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="px-4 py-10 text-center text-[12px]" style={{ color: C.muted2 }}>
+                      {error ? 'Unable to load accounts.' : 'No client cash accounts found.'}
+                    </td>
+                  </tr>
+                ) : null}
+                {rows.map((row) => (
+                  <tr key={row.id || row.accountNumber} style={{ borderBottom: `1px solid ${C.rowBorder}` }}>
+                    <td className="px-4 py-3">
+                      <span className="inline-flex items-center gap-2">
+                        {row.star === 'blue' ? (
+                          <Star className="h-3.5 w-3.5 fill-[#3B82F6] text-[#3B82F6]" />
+                        ) : row.star === 'amber' ? (
+                          <Star className="h-3.5 w-3.5 fill-[#F59E0B] text-[#F59E0B]" />
+                        ) : (
+                          <span className="inline-block h-3.5 w-3.5 rounded-full border" style={{ borderColor: '#334155' }} />
+                        )}
+                        <span className="font-mono text-[12px] font-medium" style={{ color: C.blueLink }}>
+                          {row.accountNumber}
+                        </span>
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-[12px] font-medium" style={{ color: C.text }}>
+                      {row.clientName}
+                    </td>
+                    <td className="px-4 py-3 font-mono text-[12px]" style={{ color: C.muted }}>
+                      {row.baseCurrency}
+                    </td>
+                    <td className="px-4 py-3 text-[12px]" style={{ color: C.muted }}>
+                      {row.accountType}
+                    </td>
+                    <td className="px-4 py-3 text-right font-mono text-[12px]" style={{ color: C.text }}>
+                      {row.cashBalance}
+                    </td>
+                    <td className="px-4 py-3 text-right font-mono text-[12px]" style={{ color: C.text }}>
+                      {row.availableBalance}
+                    </td>
+                    <td className="px-4 py-3">
+                      <StatusBadge status={row.status} />
+                    </td>
+                    <td className="px-4 py-3 text-[12px]" style={{ color: C.muted2 }}>
+                      {row.lastActivity}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div
+            className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+            style={{ borderTop: `1px solid ${C.cardBorder}` }}
+          >
+            <p className="text-[12px]" style={{ color: C.muted2 }}>
+              Showing {from} to {to} of {filtered.length} accounts
+            </p>
+            <div className="flex items-center gap-1">
+              <PagerBtn disabled={page === 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+                <ChevronLeft className="h-3.5 w-3.5" />
+              </PagerBtn>
+              {[1, 2, 3].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  disabled={n > totalPages}
+                  onClick={() => setPage(n)}
+                  className="flex h-7 w-7 items-center justify-center rounded-md text-[12px] font-medium disabled:opacity-30"
+                  style={
+                    page === n
+                      ? { background: C.blue, color: '#fff' }
+                      : { color: C.muted, background: 'transparent' }
+                  }
+                >
+                  {n}
+                </button>
+              ))}
+              <PagerBtn disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
+                <ChevronRight className="h-3.5 w-3.5" />
+              </PagerBtn>
+              <PagerBtn disabled={page >= totalPages} onClick={() => setPage(totalPages)}>
+                <ChevronsRight className="h-3.5 w-3.5" />
+              </PagerBtn>
+            </div>
+          </div>
+        </section>
+
+        {/* Bottom panels */}
+        <section className="grid grid-cols-1 gap-3 xl:grid-cols-3">
+          <article className="rounded-[12px] border p-4" style={{ background: C.card, borderColor: C.cardBorder }}>
+            <div className="mb-3 flex items-center gap-1.5">
+              <h3 className="text-[13px] font-semibold" style={{ color: C.text }}>
+                Cash by Currency
+              </h3>
+              <Info className="h-3 w-3" style={{ color: C.muted2 }} />
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="relative h-[160px] w-[160px] shrink-0">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={cashByCurrency}
+                      dataKey="pct"
+                      nameKey="name"
+                      innerRadius={52}
+                      outerRadius={74}
+                      stroke="none"
+                      paddingAngle={1.5}
+                    >
+                      {cashByCurrency.map((entry) => (
+                        <Cell key={entry.name} fill={entry.color} />
+                      ))}
+                    </Pie>
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-[11px] font-medium" style={{ color: C.muted }}>
+                    {dominantCcy?.name ?? '—'}
+                  </span>
+                  <span className="text-[16px] font-semibold" style={{ color: C.text }}>
+                    {dominantCcy ? `${dominantCcy.pct.toFixed(1)}%` : '—'}
+                  </span>
+                </div>
+              </div>
+              <ul className="min-w-0 flex-1 space-y-2.5">
+                {cashByCurrency.length === 0 ? (
+                  <li className="text-[12px]" style={{ color: C.muted2 }}>
+                    No currency breakdown available.
+                  </li>
+                ) : (
+                  cashByCurrency.map((item) => (
+                  <li key={item.name} className="flex items-start gap-2">
+                    <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ background: item.color }} />
+                    <div className="min-w-0">
+                      <p className="text-[12px] font-medium" style={{ color: C.text }}>
+                        {item.name} {item.pct.toFixed(1)}%
+                      </p>
+                      <p className="truncate font-mono text-[10px]" style={{ color: C.muted2 }}>
+                        {item.value}
+                      </p>
+                    </div>
+                  </li>
+                  ))
+                )}
+              </ul>
+            </div>
+          </article>
+
+          <article className="rounded-[12px] border p-4" style={{ background: C.card, borderColor: C.cardBorder }}>
+            <div className="mb-2 flex items-center gap-1.5">
+              <h3 className="text-[13px] font-semibold" style={{ color: C.text }}>
+                Daily Cash Movement (USD)
+              </h3>
+              <Info className="h-3 w-3" style={{ color: C.muted2 }} />
+            </div>
+            <div className="mb-2 flex flex-wrap items-center gap-4 text-[10px]" style={{ color: C.muted }}>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-0.5 w-3 rounded-full bg-[#3B82F6]" />
+                Net Cash Movement (USD)
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-0.5 w-3 rounded-full bg-[#22C55E]" />
+                Closing Cash Balance (USD)
+              </span>
+            </div>
+            <div className="h-[200px] w-full">
+              {dailyMovement.length === 0 ? (
+                <div className="flex h-full items-center justify-center text-[12px]" style={{ color: C.muted2 }}>
+                  No daily movement data returned.
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={dailyMovement} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                    <CartesianGrid stroke={C.rowBorder} strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="date" tick={{ fontSize: 10, fill: C.muted2 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 10, fill: C.muted2 }} axisLine={false} tickLine={false} />
+                    <Tooltip
+                      contentStyle={{ background: C.card, border: `1px solid ${C.cardBorder}`, borderRadius: 8, fontSize: 11 }}
+                      labelStyle={{ color: C.muted }}
+                    />
+                    <Line type="monotone" dataKey="net" stroke="#3B82F6" strokeWidth={2} dot={false} name="Net Cash Movement (USD)" />
+                    <Line type="monotone" dataKey="close" stroke="#22C55E" strokeWidth={2} dot={false} name="Closing Cash Balance (USD)" />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+          </article>
+
+          <article className="rounded-[12px] border p-4" style={{ background: C.card, borderColor: C.cardBorder }}>
+            <div className="mb-3 flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <h3 className="text-[13px] font-semibold" style={{ color: C.text }}>
+                  Recent Alerts & Exceptions
+                </h3>
+                <Info className="h-3 w-3" style={{ color: C.muted2 }} />
+              </div>
+              <button type="button" className="text-[12px] font-medium" style={{ color: C.blueLink }}>
+                View all
+              </button>
+            </div>
+            <ul>
+              {recentAlerts.length === 0 ? (
+                <li className="py-6 text-center text-[12px]" style={{ color: C.muted2 }}>
+                  No recent exceptions.
+                </li>
+              ) : (
+                recentAlerts.map((alert, index) => (
+                <li
+                  key={`${alert.title}-${alert.when}-${index}`}
+                  className="flex items-start gap-2.5 py-2.5"
+                  style={{ borderTop: index === 0 ? undefined : `1px solid ${C.rowBorder}` }}
+                >
+                  <AlertIcon tone={alert.tone} />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[12px] font-medium leading-snug" style={{ color: C.text }}>
+                      {alert.title}
+                    </p>
+                    <p className="mt-0.5 truncate text-[11px]" style={{ color: C.muted2 }}>
+                      {alert.meta}
+                    </p>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    {alert.amount && (
+                      <p className="font-mono text-[11px] font-medium" style={{ color: C.text }}>
+                        {alert.amount}
+                      </p>
+                    )}
+                    <p className="mt-0.5 text-[10px]" style={{ color: C.muted2 }}>
+                      {alert.when}
+                    </p>
+                  </div>
+                </li>
+                ))
+              )}
+            </ul>
+          </article>
+        </section>
       </div>
-    </div>}
-  </main>
+    </main>
+  )
+}
+
+function FilterSelect({
+  value,
+  options,
+  onChange,
+}: {
+  value: string
+  options: string[]
+  onChange: (value: string) => void
+}) {
+  return (
+    <div className="relative">
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-8 appearance-none rounded-full border py-0 pl-3 pr-8 text-[11px] outline-none"
+        style={{ background: C.control, borderColor: C.controlBorder, color: C.text }}
+      >
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
+      <ChevronDown
+        className="pointer-events-none absolute right-2.5 top-1/2 h-3 w-3 -translate-y-1/2"
+        style={{ color: C.muted2 }}
+      />
+    </div>
+  )
+}
+
+function StatusBadge({ status }: { status: 'Active' | 'Restricted' }) {
+  const active = status === 'Active'
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-medium"
+      style={{
+        color: active ? '#4ADE80' : '#FBBF24',
+        borderColor: active ? 'rgba(74,222,128,0.35)' : 'rgba(251,191,36,0.35)',
+        background: active ? 'rgba(34,197,94,0.08)' : 'rgba(245,158,11,0.08)',
+      }}
+    >
+      <span
+        className="h-1.5 w-1.5 rounded-full"
+        style={{ background: active ? '#4ADE80' : '#FBBF24' }}
+      />
+      {status}
+    </span>
+  )
+}
+
+function PagerBtn({
+  children,
+  disabled,
+  onClick,
+}: {
+  children: ReactNode
+  disabled?: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className="flex h-7 w-7 items-center justify-center rounded-md disabled:opacity-30"
+      style={{ color: C.muted }}
+    >
+      {children}
+    </button>
+  )
+}
+
+function AlertIcon({ tone }: { tone: 'red' | 'amber' | 'blue' }) {
+  if (tone === 'amber') {
+    return (
+      <span
+        className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full"
+        style={{ background: 'rgba(245,158,11,0.15)' }}
+      >
+        <CircleAlert className="h-3.5 w-3.5 text-[#F59E0B]" />
+      </span>
+    )
+  }
+  if (tone === 'blue') {
+    return (
+      <span
+        className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full"
+        style={{ background: 'rgba(59,130,246,0.15)' }}
+      >
+        <Info className="h-3.5 w-3.5 text-[#60A5FA]" />
+      </span>
+    )
+  }
+  return (
+    <span
+      className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full"
+      style={{ background: 'rgba(244,63,94,0.15)' }}
+    >
+      <CircleAlert className="h-3.5 w-3.5 text-[#F43F5E]" />
+    </span>
+  )
 }
