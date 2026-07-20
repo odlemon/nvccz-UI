@@ -1,9 +1,10 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { FileUp, Loader2, Search, ShieldAlert } from 'lucide-react'
-import { buttonClass, Field, inputClass, Metric, Modal, OrdersCard, OrdersPage, Pill, SelectField, tableClass, tableWrapClass } from '@/components/investments-v2/orders-ui'
-import { formatOpsError, investmentOpsApi } from '@/lib/api/investment-ops-api'
+import { Search, ShieldAlert } from 'lucide-react'
+import { OpsKpiSkeleton, OpsListSkeleton, OpsTableSkeleton } from '@/components/investments-v2/loading-skeletons'
+import { buttonClass, Field, inputClass, Metric, Modal, OrdersCard, OrdersPage, Pill, tableClass, tableWrapClass } from '@/components/investments-v2/orders-ui'
+import { formatOpsError, investmentOpsApi, unwrapList } from '@/lib/api/investment-ops-api'
 import {
   fundNameMap,
   mapComplianceResults,
@@ -30,6 +31,11 @@ const outcomeTone = (outcome: string): 'green' | 'amber' | 'red' | 'slate' => {
   return 'slate'
 }
 
+const isOverrideEligible = (row: ComplianceResultRow) => {
+  const u = row.outcome.toUpperCase()
+  return Boolean(row.orderId) && (u === 'BREACH' || u === 'FAILED' || u === 'FAIL' || u === 'WARNING' || u === 'WARN')
+}
+
 export default function CompliancePage() {
   const [rules, setRules] = useState<ComplianceRuleRow[]>([])
   const [results, setResults] = useState<ComplianceResultRow[]>([])
@@ -37,10 +43,8 @@ export default function CompliancePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [query, setQuery] = useState('')
-  const [override, setOverride] = useState<ComplianceRuleRow | null>(null)
+  const [resultOverride, setResultOverride] = useState<ComplianceResultRow | null>(null)
   const [reason, setReason] = useState('')
-  const [approver, setApprover] = useState('')
-  const [document, setDocument] = useState('')
   const [history, setHistory] = useState<OverrideHistory[]>([])
   const [overrideBusy, setOverrideBusy] = useState(false)
   const [overrideError, setOverrideError] = useState<string | null>(null)
@@ -49,10 +53,11 @@ export default function CompliancePage() {
     setLoading(true)
     setError(null)
     try {
-      const [rulesRes, resultsRes, portfoliosRes] = await Promise.all([
+      const [rulesRes, resultsRes, portfoliosRes, overridesRes] = await Promise.all([
         investmentOpsApi.listComplianceRules(),
         investmentOpsApi.listComplianceResults({ pageSize: 100 }),
         investmentOpsApi.listPortfolios(),
+        investmentOpsApi.listComplianceOverrides({ page: 1, pageSize: 100 }),
       ])
       if (rulesRes.success === false) {
         throw new Error(formatOpsError(rulesRes, 'Failed to load compliance rules'))
@@ -64,10 +69,26 @@ export default function CompliancePage() {
       setFundNames(names)
       setRules(mapComplianceRules(rulesRes.data, names))
       setResults(mapComplianceResults(resultsRes.data))
+      if (overridesRes.success !== false) {
+        const items = unwrapList<Record<string, unknown>>(overridesRes.data)
+        setHistory(
+          items.map((row) => ({
+            order: String(row.orderRef ?? row.orderId ?? '—'),
+            reason: String(row.reason ?? row.reasonCode ?? '—'),
+            approver: String(row.createdByName ?? row.createdById ?? '—'),
+            document: row.id ? `Override ${String(row.id)}` : '—',
+            time: row.createdAt ? new Date(String(row.createdAt)).toLocaleString() : '—',
+            outcome: String(row.status ?? '—'),
+          })),
+        )
+      } else {
+        setHistory([])
+      }
     } catch (e) {
       setError(formatOpsError(e, 'Failed to load compliance data'))
       setRules([])
       setResults([])
+      setHistory([])
     } finally {
       setLoading(false)
     }
@@ -85,36 +106,37 @@ export default function CompliancePage() {
   const activeCount = rules.filter((r) => r.isActive).length
   const inactiveCount = rules.length - activeCount
 
-  const submit = async () => {
-    if (!override || !reason || !approver || !document) return
+  const submitOverride = async () => {
+    if (!resultOverride?.orderId || !reason.trim()) return
     setOverrideBusy(true)
     setOverrideError(null)
     try {
-      // Override API requires orderId; rule-library overrides are recorded locally until a breach row exists.
-      setHistory((h) => [
-        {
-          order: override.ruleCode,
-          reason,
-          approver,
-          document,
-          time: new Date().toLocaleString(),
-          outcome: 'Approved with Exception',
-        },
-        ...h,
-      ])
-      setOverride(null)
+      const res = await investmentOpsApi.createComplianceOverride({
+        orderId: resultOverride.orderId,
+        reason: reason.trim(),
+      })
+      if (res.success === false) {
+        setOverrideError(formatOpsError(res, 'Override failed'))
+        return
+      }
+      setResultOverride(null)
       setReason('')
-      setApprover('')
-      setDocument('')
+      await load()
     } catch (e) {
-      setOverrideError(e instanceof Error ? e.message : 'Override failed')
+      setOverrideError(formatOpsError(e, 'Override failed'))
     } finally {
       setOverrideBusy(false)
     }
   }
 
+  const closeOverrideModal = () => {
+    setResultOverride(null)
+    setReason('')
+    setOverrideError(null)
+  }
+
   return (
-    <OrdersPage title="Compliance" description="Pre-trade mandate checks, exceptions and a complete local override audit trail.">
+    <OrdersPage title="Compliance" description="Pre-trade mandate checks, exceptions and API-backed override history.">
       {error && (
         <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-2 text-[12px] text-rose-200">
           {error}
@@ -124,12 +146,16 @@ export default function CompliancePage() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Metric label="Active rules" value={loading ? '…' : String(activeCount)} tone="text-emerald-300" />
-        <Metric label="Inactive" value={loading ? '…' : String(inactiveCount)} tone="text-amber-300" />
-        <Metric label="Override history" value={String(history.length)} tone="text-red-300" />
-        <Metric label="Rule types" value={loading ? '…' : String(new Set(rules.map((r) => r.ruleType)).size)} tone="text-blue-300" />
-      </div>
+      {loading && rules.length === 0 ? (
+        <OpsKpiSkeleton count={4} />
+      ) : (
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <Metric label="Active rules" value={loading ? '…' : String(activeCount)} tone="text-emerald-300" />
+          <Metric label="Inactive" value={loading ? '…' : String(inactiveCount)} tone="text-amber-300" />
+          <Metric label="Override history" value={String(history.length)} tone="text-red-300" />
+          <Metric label="Rule types" value={loading ? '…' : String(new Set(rules.map((r) => r.ruleType)).size)} tone="text-blue-300" />
+        </div>
+      )}
 
       <OrdersCard
         title="Mandate rule library"
@@ -157,9 +183,8 @@ export default function CompliancePage() {
             <tbody>
               {loading && (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-[11px] text-slate-500">
-                    <Loader2 className="mr-2 inline h-3.5 w-3.5 animate-spin" />
-                    Loading compliance rules…
+                  <td colSpan={7} className="p-0">
+                    <OpsTableSkeleton rows={8} cols={7} />
                   </td>
                 </tr>
               )}
@@ -183,8 +208,13 @@ export default function CompliancePage() {
                     </td>
                     <td>
                       {x.isActive ? (
-                        <button className={cn(buttonClass, 'h-7 border-amber-400/30 px-3 text-amber-300')} onClick={() => setOverride(x)}>
-                          <ShieldAlert className="h-3 w-3" /> Override note
+                        <button
+                          type="button"
+                          disabled
+                          title="Select a breach from Pre-trade results"
+                          className={cn(buttonClass, 'h-7 cursor-not-allowed border-white/10 px-3 text-slate-500 opacity-60')}
+                        >
+                          <ShieldAlert className="h-3 w-3" /> Request override
                         </button>
                       ) : (
                         '—'
@@ -213,20 +243,20 @@ export default function CompliancePage() {
                   <th>After trade</th>
                   <th>Outcome</th>
                   <th>Checked</th>
+                  <th>Action</th>
                 </tr>
               </thead>
               <tbody>
                 {loading && (
                   <tr>
-                    <td colSpan={10} className="py-10 text-center text-[11px] text-slate-500">
-                      <Loader2 className="mr-2 inline h-3.5 w-3.5 animate-spin" />
-                      Loading pre-trade results…
+                    <td colSpan={11} className="p-0">
+                      <OpsTableSkeleton rows={8} cols={8} />
                     </td>
                   </tr>
                 )}
                 {!loading && results.length === 0 && (
                   <tr>
-                    <td colSpan={10} className="py-10 text-center text-[11px] text-slate-500">
+                    <td colSpan={11} className="py-10 text-center text-[11px] text-slate-500">
                       No pre-trade compliance results yet.
                     </td>
                   </tr>
@@ -251,17 +281,38 @@ export default function CompliancePage() {
                         <Pill tone={outcomeTone(row.outcome)}>{row.outcome}</Pill>
                       </td>
                       <td className="text-slate-500">{row.createdAt}</td>
+                      <td>
+                        {isOverrideEligible(row) ? (
+                          <button
+                            type="button"
+                            className={cn(buttonClass, 'h-7 border-amber-400/30 px-3 text-amber-300')}
+                            onClick={() => {
+                              setResultOverride(row)
+                              setReason('')
+                              setOverrideError(null)
+                            }}
+                          >
+                            <ShieldAlert className="h-3 w-3" /> Override
+                          </button>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
                     </tr>
                   ))}
               </tbody>
             </table>
           </div>
         </OrdersCard>
-        <OrdersCard title="Override audit history" eyebrow={`${history.length} records`}>
+        <OrdersCard title="Override audit history" eyebrow={loading ? 'Loading…' : `${history.length} from API`}>
           <div className="space-y-2 p-3">
-            {history.length === 0 && <p className="py-8 text-center text-[11px] text-slate-500">No override notes yet.</p>}
-            {history.map((h) => (
-              <div key={`${h.time}-${h.order}`} className="rounded-[18px] border border-white/[0.07] bg-[#080e18] p-3">
+            {loading && history.length === 0 ? (
+              <OpsListSkeleton rows={4} />
+            ) : history.length === 0 ? (
+              <p className="py-8 text-center text-[11px] text-slate-500">No overrides returned by the API.</p>
+            ) : null}
+            {history.map((h, index) => (
+              <div key={`${h.document}-${h.time}-${index}`} className="rounded-[18px] border border-white/[0.07] bg-[#080e18] p-3">
                 <div className="flex justify-between">
                   <span className="font-mono text-[10px] text-blue-300">{h.order}</span>
                   <Pill tone="violet">{h.outcome}</Pill>
@@ -277,47 +328,49 @@ export default function CompliancePage() {
       </div>
 
       <Modal
-        open={!!override}
-        onClose={() => setOverride(null)}
-        title={`Compliance note · ${override?.ruleCode ?? ''}`}
-        subtitle="Record a local override rationale. Order-level overrides require an order id from a breach."
+        open={!!resultOverride}
+        onClose={closeOverrideModal}
+        title={`Compliance override · ${resultOverride?.orderRef ?? ''}`}
+        subtitle="Submit an order-level override for this pre-trade breach or warning."
         footer={
           <>
-            <button className={buttonClass} onClick={() => setOverride(null)}>
+            <button className={buttonClass} onClick={closeOverrideModal}>
               Cancel
             </button>
-            <button disabled={!reason || !approver || !document || overrideBusy} className={cn(buttonClass, 'bg-amber-500 text-slate-950')} onClick={() => void submit()}>
-              {overrideBusy ? 'Saving…' : 'Save note'}
+            <button
+              disabled={!reason.trim() || overrideBusy}
+              className={cn(buttonClass, 'bg-amber-500 text-slate-950')}
+              onClick={() => void submitOverride()}
+            >
+              {overrideBusy ? 'Submitting…' : 'Submit override'}
             </button>
           </>
         }
       >
         {overrideError && <p className="mb-3 text-[11px] text-rose-300">{overrideError}</p>}
         <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Order ref">
+            <div className={cn(inputClass, 'flex items-center font-mono text-blue-300')}>{resultOverride?.orderRef}</div>
+          </Field>
           <Field label="Rule">
-            <div className={cn(inputClass, 'flex items-center')}>{override?.rule}</div>
+            <div className={cn(inputClass, 'flex items-center')}>{resultOverride?.ruleName}</div>
           </Field>
-          <Field label="Timestamp">
-            <div className={cn(inputClass, 'flex items-center')}>{new Date().toLocaleString()}</div>
+          <Field label="Outcome">
+            <div className={cn(inputClass, 'flex items-center')}>{resultOverride?.outcome}</div>
           </Field>
-          <Field label="Approver">
-            <SelectField value={approver} onChange={setApprover}>
-              <option value="">Select approver</option>
-              <option>CIO</option>
-              <option>Head of Risk</option>
-              <option>Compliance</option>
-            </SelectField>
+          <Field label="Checked">
+            <div className={cn(inputClass, 'flex items-center')}>{resultOverride?.createdAt}</div>
           </Field>
-          <Field label="Supporting document">
-            <label className={cn(inputClass, 'flex cursor-pointer items-center gap-2')}>
-              <FileUp className="h-3.5 w-3.5" />
-              {document || 'Attach approval memo'}
-              <input type="file" className="hidden" onChange={(e) => setDocument(e.target.files?.[0]?.name ?? '')} />
-            </label>
-          </Field>
-          <Field label="Override reason">
-            <textarea className={cn(inputClass, 'h-24 resize-none py-2')} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Explain rationale and mitigating controls…" />
-          </Field>
+          <div className="sm:col-span-2">
+            <Field label="Override reason">
+              <textarea
+                className={cn(inputClass, 'h-24 resize-none py-2')}
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="Explain rationale and mitigating controls…"
+              />
+            </Field>
+          </div>
         </div>
       </Modal>
     </OrdersPage>

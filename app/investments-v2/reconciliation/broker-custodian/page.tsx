@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import { Cell, Pie, PieChart, ResponsiveContainer } from 'recharts'
 import { ReconApiBanner, ReconNavTabs } from '@/components/investments-v2/recon-ui'
+import { ReconTableSkeleton } from '@/components/investments-v2/loading-skeletons'
 import { stockPickerCashApi } from '@/lib/api/stock-picker-cash-api'
 import {
   buildBrokerQueueColumns,
@@ -143,11 +144,6 @@ export default function BrokerCustodianPage() {
           </div>
           <div className="flex flex-wrap items-center gap-2.5">
             <button type="button" className="inline-flex h-9 items-center gap-2 rounded-full border px-3 text-[12px]" style={{ background: C.control, borderColor: C.controlBorder, color: C.text }}>
-              <Upload className="h-3.5 w-3.5" style={{ color: C.muted }} />
-              Export
-              <ChevronDown className="h-3.5 w-3.5" style={{ color: C.muted2 }} />
-            </button>
-            <button type="button" className="inline-flex h-9 items-center gap-2 rounded-full border px-3 text-[12px]" style={{ background: C.control, borderColor: C.controlBorder, color: C.text }}>
               <Filter className="h-3.5 w-3.5" style={{ color: C.muted }} />
               Filters
             </button>
@@ -220,7 +216,9 @@ export default function BrokerCustodianPage() {
               </div>
 
               <div className="overflow-x-auto">
-                {filtered.length === 0 ? (
+                {loading ? (
+                  <ReconTableSkeleton rows={8} cols={6} className="px-4 py-6" />
+                ) : filtered.length === 0 ? (
                   <p className="px-4 py-10 text-center text-[12px]" style={{ color: C.muted2 }}>
                     {error ? 'Unable to load workspace.' : 'No broker/custodian items.'}
                   </p>

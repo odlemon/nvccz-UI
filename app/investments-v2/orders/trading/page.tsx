@@ -1,7 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { CalendarDays, Check, ChevronDown, Loader2, MoreVertical } from 'lucide-react'
+import { CalendarDays, Check, ChevronDown, MoreVertical, Plus } from 'lucide-react'
+import { OpsTableSkeleton } from '@/components/investments-v2/loading-skeletons'
+import { PlaceEquityOrderModal } from '@/components/investments-v2/place-equity-order-modal'
 import { investmentOpsApi } from '@/lib/api/investment-ops-api'
 import {
   mapFundOptions,
@@ -128,6 +130,7 @@ export default function TradingPage() {
   const [asOfDate, setAsOfDate] = useState('As of: —')
   const [recalculated, setRecalculated] = useState(false)
   const [selectedPosition, setSelectedPosition] = useState<string | null>(null)
+  const [showOrder, setShowOrder] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -258,14 +261,23 @@ export default function TradingPage() {
       <section className="overflow-visible rounded-[24px] border border-white/[0.025] bg-[linear-gradient(112deg,#172231_0%,#101a29_55%,#0c1522_100%)] shadow-[0_22px_70px_rgba(0,0,0,.18)]">
         <header className="flex min-h-[54px] items-center justify-between gap-3 border-b border-[#2a3547] px-5 py-3">
           <h1 className="text-[13px] font-medium text-white">Filters</h1>
-          <button
-            type="button"
-            onClick={() => void recalculate()}
-            className="inline-flex h-8 min-w-[98px] items-center justify-center gap-1.5 rounded-full bg-white px-4 text-[11px] font-semibold text-[#111722] transition hover:bg-[#edf2f8]"
-          >
-            {recalculated && <Check className="h-3.5 w-3.5" />}
-            {recalculated ? 'Updated' : 'Recalculate'}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowOrder(true)}
+              className="inline-flex h-8 items-center justify-center gap-1.5 rounded-full border border-[#2f87fa]/50 bg-[#2f87fa]/15 px-4 text-[11px] font-semibold text-[#9ec5ff] transition hover:bg-[#2f87fa]/25"
+            >
+              <Plus className="h-3.5 w-3.5" /> New order
+            </button>
+            <button
+              type="button"
+              onClick={() => void recalculate()}
+              className="inline-flex h-8 min-w-[98px] items-center justify-center gap-1.5 rounded-full bg-white px-4 text-[11px] font-semibold text-[#111722] transition hover:bg-[#edf2f8]"
+            >
+              {recalculated && <Check className="h-3.5 w-3.5" />}
+              {recalculated ? 'Updated' : 'Recalculate'}
+            </button>
+          </div>
         </header>
 
         <div className="flex flex-wrap items-center justify-end gap-2 border-b border-[#2a3547] px-4 py-3 sm:px-5">
@@ -375,9 +387,8 @@ export default function TradingPage() {
             <tbody>
               {loading && (
                 <tr>
-                  <td colSpan={7} className="px-5 py-12 text-center text-[11px] text-[#718095]">
-                    <Loader2 className="mr-2 inline h-3.5 w-3.5 animate-spin" />
-                    Loading positions…
+                  <td colSpan={7} className="p-0">
+                    <OpsTableSkeleton rows={8} cols={7} />
                   </td>
                 </tr>
               )}
@@ -406,6 +417,8 @@ export default function TradingPage() {
           </table>
         </div>
       </section>
+
+      <PlaceEquityOrderModal open={showOrder} onClose={() => setShowOrder(false)} onComplete={() => void load()} />
     </div>
   )
 }

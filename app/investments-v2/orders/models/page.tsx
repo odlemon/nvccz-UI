@@ -1,7 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Edit3, Loader2, Plus, Search } from 'lucide-react'
+import { Edit3, Plus, Search } from 'lucide-react'
+import { OpsKpiSkeleton, OpsListSkeleton } from '@/components/investments-v2/loading-skeletons'
 import { buttonClass, Field, inputClass, Metric, Modal, OrdersCard, OrdersPage, Pill, SelectField, tableClass, tableWrapClass } from '@/components/investments-v2/orders-ui'
 import { formatOpsError, investmentOpsApi } from '@/lib/api/investment-ops-api'
 import {
@@ -44,9 +45,9 @@ export default function ModelsPage() {
       setFunds(fundList)
       setModels(rows)
       setActiveId((prev) => {
-        const nextId = prev && rows.some((r) => r.id === prev) ? prev : rows[0]?.id ?? null
+        const nextId = prev && rows.some((r) => r.id === prev) ? prev : (rows[0]?.id ?? null)
         const activeModel = rows.find((r) => r.id === nextId)
-        setLinkedFundId((linkedPrev) => activeModel?.fundId ?? linkedPrev || fundList[0]?.id || '')
+        setLinkedFundId((linkedPrev) => activeModel?.fundId ?? (linkedPrev || fundList[0]?.id || ''))
         return nextId
       })
     } catch (e) {
@@ -169,12 +170,16 @@ export default function ModelsPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Metric label="Active models" value={loading ? '…' : String(models.filter((m) => m.isActive).length || models.length)} />
-        <Metric label="Linked fund" value={funds.find((f) => f.id === linkedFundId)?.name ?? '—'} tone="text-blue-300" />
-        <Metric label="Largest drift" value={model ? `${maxDrift.toFixed(1)}%` : '—'} tone="text-amber-300" />
-        <Metric label="Recommendations" value={model ? String(recCount) : '—'} tone="text-violet-300" />
-      </div>
+      {loading && models.length === 0 ? (
+        <OpsKpiSkeleton count={4} />
+      ) : (
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <Metric label="Active models" value={loading ? '…' : String(models.filter((m) => m.isActive).length || models.length)} />
+          <Metric label="Linked fund" value={funds.find((f) => f.id === linkedFundId)?.name ?? '—'} tone="text-blue-300" />
+          <Metric label="Largest drift" value={model ? `${maxDrift.toFixed(1)}%` : '—'} tone="text-amber-300" />
+          <Metric label="Recommendations" value={model ? String(recCount) : '—'} tone="text-violet-300" />
+        </div>
+      )}
 
       <div className="grid gap-4 xl:grid-cols-[320px_1fr]">
         <OrdersCard
@@ -188,12 +193,7 @@ export default function ModelsPage() {
           }
         >
           <div className="space-y-2 p-3">
-            {loading && (
-              <p className="py-8 text-center text-[11px] text-slate-500">
-                <Loader2 className="mr-2 inline h-3.5 w-3.5 animate-spin" />
-                Loading models…
-              </p>
-            )}
+            {loading && <OpsListSkeleton rows={5} />}
             {!loading && visible.length === 0 && <p className="py-8 text-center text-[11px] text-slate-500">No model portfolios found.</p>}
             {visible.map((item) => (
               <button

@@ -271,63 +271,63 @@ function DetailPanel({
 
         <div className="mt-4 flex flex-wrap gap-2">
           {isRfp ? (
-            <button
-              type="button"
+          <button
+            type="button"
               disabled={row.raw.outcome !== "WON" || converting}
               onClick={onConvert}
-              className={cn(
+            className={cn(
                 "inline-flex h-9 items-center justify-center gap-1.5 bg-gradient-to-r from-blue-600 to-cyan-600 px-3.5 text-xs font-medium text-white shadow-sm hover:from-blue-700 hover:to-cyan-700 disabled:opacity-50",
-                R6,
-              )}
-            >
+              R6,
+            )}
+          >
               {converting ? "Converting…" : "Convert to Mandate"}
-            </button>
+          </button>
           ) : (
-            <button
-              type="button"
+          <button
+            type="button"
               disabled={row.status === "ACTIVE" || Boolean((row as any).complianceBlocked) || activating}
               onClick={onActivate}
-              className={cn(
+            className={cn(
                 "inline-flex h-9 items-center justify-center gap-1.5 bg-gradient-to-r from-blue-600 to-cyan-600 px-3.5 text-xs font-medium text-white shadow-sm hover:from-blue-700 hover:to-cyan-700 disabled:opacity-50",
-                R6,
-              )}
-            >
+              R6,
+            )}
+          >
               {activating ? "Activating…" : row.status === "ACTIVE" ? "Mandate Active" : "Activate Mandate"}
-            </button>
-          )}
+          </button>
+            )}
         </div>
       </div>
 
       {isRfp ? (
-        <div className="border-b border-[#f1f5f9]">
+      <div className="border-b border-[#f1f5f9]">
           <DetailSectionHeader title="RFP Details" />
           <dl className="space-y-2 px-5 pb-4 text-[12px]">
             <div className="flex justify-between gap-2">
               <dt className="text-[#94a3b8]">Reference</dt>
               <dd className="font-medium text-[#0f172a]">{row.raw.referenceNumber || "—"}</dd>
-            </div>
+                </div>
             <div className="flex justify-between gap-2">
               <dt className="text-[#94a3b8]">Deadline</dt>
               <dd className="text-[#0f172a]">{row.rfpDueDate}</dd>
-            </div>
+                </div>
             <div className="flex justify-between gap-2">
               <dt className="text-[#94a3b8]">Presentation date</dt>
               <dd className="text-[#0f172a]">{fmtDate(row.raw.presentationDate) || "—"}</dd>
-            </div>
+              </div>
             <div className="flex justify-between gap-2">
               <dt className="text-[#94a3b8]">Outcome</dt>
               <dd className="text-[#0f172a]">{row.raw.outcome || "PENDING"}</dd>
-            </div>
+      </div>
           </dl>
         </div>
       ) : (
-        <div className="border-b border-[#f1f5f9]">
+      <div className="border-b border-[#f1f5f9]">
           <div className="flex items-center justify-between px-5 py-3.5">
             <h3 className="text-[13px] font-semibold text-[#0f172a]">Activation Checklist</h3>
             <span className="text-[11px] tabular-nums text-[#64748b]">
               {(row as any).checklistDone}/{(row as any).checklistTotal}
             </span>
-          </div>
+        </div>
           <ul className="space-y-2.5 px-5 pb-4">
             {MANDATE_ACTIVATION_FLAGS.map((f) => (
               <li key={f.key} className="flex items-center justify-between gap-2">
@@ -338,10 +338,10 @@ function DetailPanel({
                   onChange={() => onToggleFlag(f.key, !row.raw[f.key])}
                   label={f.label}
                 />
-              </li>
-            ))}
-          </ul>
-        </div>
+            </li>
+          ))}
+        </ul>
+      </div>
       )}
 
       <div>
@@ -362,11 +362,11 @@ function DetailPanel({
           <div className="flex justify-between gap-2">
             <dt className="text-[#94a3b8]">Owner</dt>
             <dd className="text-[#0f172a]">{ownerLabel(row)}</dd>
-          </div>
+                </div>
           <div className="flex justify-between gap-2">
             <dt className="text-[#94a3b8]">Next step</dt>
             <dd className="text-right text-[#0f172a]">{nextStepLabel(row)}</dd>
-          </div>
+              </div>
         </dl>
       </div>
     </aside>
@@ -440,8 +440,8 @@ export function FundraisingMandates() {
     return combined.filter(
       (m) =>
         (!q ||
-          m.name.toLowerCase().includes(q) ||
-          m.organization.toLowerCase().includes(q) ||
+        m.name.toLowerCase().includes(q) ||
+        m.organization.toLowerCase().includes(q) ||
           m.mandateType.toLowerCase().includes(q)) &&
         (typeFilter === "all" || m.mandateType === typeFilter) &&
         (geographyFilter === "all" || m.geography === geographyFilter) &&
@@ -558,7 +558,7 @@ export function FundraisingMandates() {
       {/* Page header */}
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
-          <h1 className="text-2xl font-semibold tracking-tight text-[#0f172a] sm:text-[28px]">Mandates</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-[#0f172a] sm:text-[28px]">Mandates</h1>
           {loading ? <Loader2 className="h-4 w-4 animate-spin text-[#94a3b8]" /> : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -703,64 +703,64 @@ export function FundraisingMandates() {
                   </tr>
                 ) : (
                   filtered.map((row) => {
-                    const isSelected = row.id === selectedId
-                    return (
-                      <tr
-                        key={row.id}
-                        onClick={() => setSelectedId(row.id)}
-                        className={cn(
-                          "cursor-pointer border-b border-[#f1f5f9] transition-colors",
-                          isSelected ? "bg-[#f8fafc]" : "hover:bg-[#fafbfc]",
-                        )}
-                      >
-                        <td className="px-4 py-2.5">
-                          <MandateCheckbox
-                            checked={checked.has(row.id)}
-                            onChange={() => toggleCheck(row.id)}
-                            label={`Select ${row.name}`}
-                          />
-                        </td>
-                        <td className="px-3 py-2.5">
-                          <div className="flex min-w-[200px] items-center gap-2.5">
-                            <OrgLogo row={row} />
-                            <span className="text-[13px] font-semibold leading-snug text-[#1d4ed8] hover:underline">
-                              {row.name}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="whitespace-nowrap px-3 py-2.5 text-[13px] text-[#334155]">{row.mandateType}</td>
-                        <td className="whitespace-nowrap px-3 py-2.5 text-[13px] text-[#334155]">{row.organization}</td>
-                        <td className="whitespace-nowrap px-3 py-2.5 text-[13px] text-[#334155]">{row.geography}</td>
-                        <td className="whitespace-nowrap px-3 py-2.5 text-[13px] font-medium tabular-nums text-[#0f172a]">
-                          {row.mandateSize}
-                        </td>
-                        <td className="whitespace-nowrap px-3 py-2.5">
-                          <span
-                            className={cn(
-                              "inline-flex px-2 py-0.5 text-[11px] font-medium",
-                              R4,
-                              STAGE_BADGE[row.stage],
-                            )}
-                          >
-                            {STAGE_LABEL[row.stage]}
+                  const isSelected = row.id === selectedId
+                  return (
+                    <tr
+                      key={row.id}
+                      onClick={() => setSelectedId(row.id)}
+                      className={cn(
+                        "cursor-pointer border-b border-[#f1f5f9] transition-colors",
+                        isSelected ? "bg-[#f8fafc]" : "hover:bg-[#fafbfc]",
+                      )}
+                    >
+                      <td className="px-4 py-2.5">
+                        <MandateCheckbox
+                          checked={checked.has(row.id)}
+                          onChange={() => toggleCheck(row.id)}
+                          label={`Select ${row.name}`}
+                        />
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <div className="flex min-w-[200px] items-center gap-2.5">
+                          <OrgLogo row={row} />
+                          <span className="text-[13px] font-semibold leading-snug text-[#1d4ed8] hover:underline">
+                            {row.name}
                           </span>
-                        </td>
-                        <td
+                        </div>
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-2.5 text-[13px] text-[#334155]">{row.mandateType}</td>
+                      <td className="whitespace-nowrap px-3 py-2.5 text-[13px] text-[#334155]">{row.organization}</td>
+                      <td className="whitespace-nowrap px-3 py-2.5 text-[13px] text-[#334155]">{row.geography}</td>
+                      <td className="whitespace-nowrap px-3 py-2.5 text-[13px] font-medium tabular-nums text-[#0f172a]">
+                        {row.mandateSize}
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-2.5">
+                        <span
                           className={cn(
-                            "whitespace-nowrap px-3 py-2.5 text-[13px] tabular-nums",
-                            row.rfpDueDate === "—" ? "text-[#94a3b8]" : "text-[#334155]",
+                            "inline-flex px-2 py-0.5 text-[11px] font-medium",
+                            R4,
+                            STAGE_BADGE[row.stage],
                           )}
                         >
-                          {row.rfpDueDate}
-                        </td>
+                          {STAGE_LABEL[row.stage]}
+                        </span>
+                      </td>
+                      <td
+                        className={cn(
+                          "whitespace-nowrap px-3 py-2.5 text-[13px] tabular-nums",
+                          row.rfpDueDate === "—" ? "text-[#94a3b8]" : "text-[#334155]",
+                        )}
+                      >
+                        {row.rfpDueDate}
+                      </td>
                         <td className="max-w-[170px] truncate whitespace-nowrap px-3 py-2.5 text-[13px] text-[#334155]">
                           {nextStepLabel(row)}
-                        </td>
-                        <td className="px-3 py-2.5 text-center">
-                          <ScoreBadge score={row.score} />
-                        </td>
-                      </tr>
-                    )
+                      </td>
+                      <td className="px-3 py-2.5 text-center">
+                        <ScoreBadge score={row.score} />
+                      </td>
+                    </tr>
+                  )
                   })
                 )}
               </tbody>
@@ -787,7 +787,7 @@ export function FundraisingMandates() {
               </button>
               <span className="inline-flex h-8 min-w-8 items-center justify-center px-2 text-xs font-medium text-[#2563eb]">
                 {page}
-              </span>
+                  </span>
               <button
                 type="button"
                 onClick={() => setPage((p) => p + 1)}

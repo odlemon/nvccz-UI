@@ -1,7 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ArrowDownUp, Check, ChevronDown, ChevronLeft, ChevronRight, Folder, FolderOpen, Link2, Loader2, Search, SlidersHorizontal, X } from 'lucide-react'
+import { ArrowDownUp, Check, ChevronDown, ChevronLeft, ChevronRight, Folder, FolderOpen, Link2, Search, SlidersHorizontal, X } from 'lucide-react'
+import { OpsKpiSkeleton, OpsTableSkeleton } from '@/components/investments-v2/loading-skeletons'
 import { investmentOpsApi, unwrapList } from '@/lib/api/investment-ops-api'
 import {
   formatMoneyDisplay,
@@ -36,7 +37,6 @@ export default function TransactionsPage() {
   const [sort, setSort] = useState<'date' | 'amount'>('date')
   const [page, setPage] = useState(1)
   const [selected, setSelected] = useState<TxnRow | null>(null)
-  const [notice, setNotice] = useState('')
 
   const activeFund = funds.find((f) => f.id === fundId) ?? funds[0]
   const portfolioName = activeFund?.name ?? 'Portfolio'
@@ -110,10 +110,6 @@ export default function TransactionsPage() {
   const income = transactions
     .filter((row) => row.type === 'Dividend' || row.type === 'Interest')
     .reduce((sum, row) => sum + row.amount, 0)
-  const flash = (value: string) => {
-    setNotice(`${value} opened locally`)
-    window.setTimeout(() => setNotice(''), 1600)
-  }
 
   return (
     <main className="min-h-full bg-[#05090f] p-3 text-[#edf3fa] sm:p-5">
@@ -127,12 +123,6 @@ export default function TransactionsPage() {
         {error && (
           <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-2 text-[12px] text-rose-200">{error}</div>
         )}
-        {loading && (
-          <div className="flex items-center gap-2 text-[12px] text-[#8B95A7]">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading transactions…
-          </div>
-        )}
-
         <nav className="flex gap-2 overflow-x-auto pb-1">
           {funds.map((item) => (
             <button
@@ -152,19 +142,23 @@ export default function TransactionsPage() {
           {!loading && funds.length === 0 && <p className="text-[11px] text-[#6f7e92]">No portfolios returned from the API.</p>}
         </nav>
 
-        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {[
-            ['Transactions', transactions.length],
-            ['Purchases', transactions.length ? `$${formatMoneyDisplay(purchases, 0)}` : '—'],
-            ['Sales', transactions.length ? `$${formatMoneyDisplay(sales, 0)}` : '—'],
-            ['Income received', transactions.length ? `$${formatMoneyDisplay(income, 0)}` : '—'],
-          ].map(([label, value]) => (
-            <div key={String(label)} className={`${card} px-5 py-4`}>
-              <p className="text-[9px] uppercase tracking-[.16em] text-[#718096]">{label}</p>
-              <p className="mt-2 font-mono text-xl font-semibold">{value}</p>
-            </div>
-          ))}
-        </section>
+        {loading && transactions.length === 0 && funds.length === 0 ? (
+          <OpsKpiSkeleton count={4} />
+        ) : (
+          <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {[
+              ['Transactions', transactions.length],
+              ['Purchases', transactions.length ? `$${formatMoneyDisplay(purchases, 0)}` : '—'],
+              ['Sales', transactions.length ? `$${formatMoneyDisplay(sales, 0)}` : '—'],
+              ['Income received', transactions.length ? `$${formatMoneyDisplay(income, 0)}` : '—'],
+            ].map(([label, value]) => (
+              <div key={String(label)} className={`${card} px-5 py-4`}>
+                <p className="text-[9px] uppercase tracking-[.16em] text-[#718096]">{label}</p>
+                <p className="mt-2 font-mono text-xl font-semibold">{value}</p>
+              </div>
+            ))}
+          </section>
+        )}
 
         <section className={`${card} overflow-visible`}>
           <div className="border-b border-white/[0.07] p-4">
@@ -220,7 +214,14 @@ export default function TransactionsPage() {
                 </tr>
               </thead>
               <tbody>
-                {pageRows.map((row) => (
+                {loading && (
+                  <tr>
+                    <td colSpan={10} className="p-0">
+                      <OpsTableSkeleton rows={8} cols={10} />
+                    </td>
+                  </tr>
+                )}
+                {!loading && pageRows.map((row) => (
                   <tr
                     key={row.id}
                     onClick={() => setSelected(row)}
@@ -263,12 +264,6 @@ export default function TransactionsPage() {
         </section>
       </div>
 
-      {notice && (
-        <div className="fixed bottom-5 right-5 z-[80] rounded-full border border-white/10 bg-[#172333] px-4 py-2 text-[11px] shadow-2xl">
-          <Check className="mr-2 inline h-3.5 w-3.5 text-emerald-300" />{notice}
-        </div>
-      )}
-
       {selected && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" onMouseDown={() => setSelected(null)}>
           <aside onMouseDown={(e) => e.stopPropagation()} className="absolute right-0 top-0 h-full w-full max-w-xl overflow-y-auto border-l border-white/10 bg-[linear-gradient(145deg,#172333,#0b1420_70%)] p-6 shadow-2xl">
@@ -295,19 +290,23 @@ export default function TransactionsPage() {
             </div>
             <div className="mt-5 space-y-3">
               {[
-                ['Trade record', selected.tradeRef, 'Execution, broker and settlement instructions'],
-                ['Valuation record', selected.valuationRef, 'Position valuation generated from this activity'],
-                ['Accounting record', selected.journalRef, 'General ledger journal and posting state'],
-                ['Document reference', selected.documentRef, 'Source advice, confirmation or supporting file'],
+                ['Trade record', selected.tradeId || selected.tradeRef, 'Execution, broker and settlement instructions'],
+                ['Order', selected.orderId || '—', 'Source order id when linked'],
+                ['Valuation record', selected.valuationRunId || selected.valuationRef, 'Position valuation generated from this activity'],
+                ['Accounting record', selected.journalEntryId || selected.journalRef, 'General ledger journal and posting state'],
+                ['Document reference', selected.documentId || selected.documentRef, 'Source advice, confirmation or supporting file'],
               ].map(([label, value, note]) => (
-                <button key={label} type="button" onClick={() => flash(label)} className="flex w-full items-center justify-between rounded-[20px] border border-white/[0.07] bg-black/10 p-4 text-left transition hover:border-[#2f87fa]/30 hover:bg-[#2f87fa]/[0.06]">
+                <div key={label} className="flex w-full items-center justify-between rounded-[20px] border border-white/[0.07] bg-black/10 p-4 text-left">
                   <div>
                     <p className="text-[9px] uppercase tracking-wider text-[#67778c]">{label}</p>
-                    <p className="mt-1 font-mono text-[11px] text-[#8ebcff]">{value}</p>
+                    <p className="mt-1 font-mono text-[11px] text-[#8ebcff]">{value || '—'}</p>
                     <p className="mt-1 text-[9px] text-[#68778a]">{note}</p>
+                    {(!value || value === '—') && (
+                      <p className="mt-1 text-[9px] text-amber-200/70">No linked id returned by the transactions API.</p>
+                    )}
                   </div>
                   <Link2 className="h-4 w-4 text-[#5d7798]" />
-                </button>
+                </div>
               ))}
             </div>
           </aside>

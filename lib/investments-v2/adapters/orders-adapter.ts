@@ -177,6 +177,7 @@ export type OrderbookRow = {
   created: string
   status: string
   rawStatus: string
+  version: number
 }
 
 function mapApprovalLabel(order: Order): string {
@@ -242,7 +243,7 @@ export function mapOrderbookOrders(data: unknown, fundNameById?: Record<string, 
       gross: formatMoneyDisplay(grossValue, 0),
       grossValue,
       broker: String(o.brokerName ?? o.brokerProfileId ?? DASH),
-      trader: String(o.createdById ?? DASH),
+      trader: String(o.ownerName ?? o.createdByName ?? o.createdById ?? DASH),
       tradeDate: fmtDate(o.tradeDate ?? o.submittedAt ?? o.createdAt),
       valueDate: fmtDate(o.valueDate),
       approval: mapApprovalLabel(o),
@@ -250,6 +251,7 @@ export function mapOrderbookOrders(data: unknown, fundNameById?: Record<string, 
       created: fmtDate(o.createdAt),
       status: uiStatus,
       rawStatus: String(o.status ?? ''),
+      version: Number(o.version ?? o.auditVersion ?? 1) || 1,
     }
   })
 }
@@ -346,6 +348,7 @@ export function mapComplianceRules(data: unknown, fundNameById?: Record<string, 
 
 export type ComplianceResultRow = {
   id: string
+  orderId: string | null
   orderRef: string
   fundId: string
   ticker: string
@@ -362,6 +365,7 @@ export type ComplianceResultRow = {
 export function mapComplianceResults(data: unknown): ComplianceResultRow[] {
   return unwrapList<ComplianceResultItem>(data).map((r) => ({
     id: String(r.id ?? ''),
+    orderId: r.orderId ? String(r.orderId) : null,
     orderRef: String(r.orderRef ?? r.orderId ?? DASH),
     fundId: String(r.fundId ?? DASH),
     ticker: String(r.instrumentTicker ?? DASH),

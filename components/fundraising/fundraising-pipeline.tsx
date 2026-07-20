@@ -771,7 +771,7 @@ export function FundraisingPipeline() {
             </button>
           </div>
           {stages.length > 0 ? (
-            <PipelineFunnel stages={stages} />
+          <PipelineFunnel stages={stages} />
           ) : (
             <p className="py-12 text-center text-sm text-[#94a3b8]">No pipeline stage data.</p>
           )}
@@ -832,8 +832,8 @@ export function FundraisingPipeline() {
                 No dated commitment or funding series is available.
               </div>
             ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={capitalSeries} margin={{ top: 18, right: 78, left: 4, bottom: 4 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={capitalSeries} margin={{ top: 18, right: 78, left: 4, bottom: 4 }}>
                 <defs>
                   <linearGradient id="committedFill" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.22} />
@@ -955,8 +955,8 @@ export function FundraisingPipeline() {
                     )
                   }}
                 />
-                </ComposedChart>
-              </ResponsiveContainer>
+              </ComposedChart>
+            </ResponsiveContainer>
             )}
           </div>
         </section>
@@ -977,9 +977,9 @@ export function FundraisingPipeline() {
               <li className="py-10 text-center text-sm text-[#94a3b8]">No upcoming meetings.</li>
             ) : (
               meetings.slice(0, 5).map((item) => (
-                <li key={item.id}>
-                  <MeetingRow item={item} />
-                </li>
+              <li key={item.id}>
+                <MeetingRow item={item} />
+              </li>
               ))
             )}
           </ul>
@@ -1119,10 +1119,10 @@ export function FundraisingPipeline() {
                 <li className="py-10 text-center text-sm text-[#94a3b8]">No upcoming meetings.</li>
               ) : (
                 meetings.map((item) => (
-                  <li key={item.id} className="py-1">
-                    <MeetingRow item={item} dense />
-                    {(item.owner || item.notes || item.status || item.location) && (
-                      <div className="ml-12 mb-3 rounded-lg bg-[#f8fafc] border border-[#f1f5f9] px-3 py-2 space-y-1">
+                <li key={item.id} className="py-1">
+                  <MeetingRow item={item} dense />
+                  {(item.owner || item.notes || item.status || item.location) && (
+                    <div className="ml-12 mb-3 rounded-lg bg-[#f8fafc] border border-[#f1f5f9] px-3 py-2 space-y-1">
                       {item.status && (
                         <p className="text-[11px] text-[#64748b]">
                           Status: <span className="font-medium text-[#334155]">{item.status}</span>
@@ -1139,9 +1139,9 @@ export function FundraisingPipeline() {
                         </p>
                       )}
                       {item.notes && <p className="text-[11px] text-[#475569] leading-relaxed">{item.notes}</p>}
-                      </div>
-                    )}
-                  </li>
+                    </div>
+                  )}
+                </li>
                 ))
               )}
             </ul>

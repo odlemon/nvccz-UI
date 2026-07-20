@@ -1,10 +1,5 @@
-import { LpPortalLayout } from "@/components/layout/lp-portal-layout"
-import { LpLedger } from "@/components/lp-portal/lp-ledger"
+import { redirect } from "next/navigation"
 
 export default function LpLedgerPage() {
-  return (
-    <LpPortalLayout>
-      <LpLedger />
-    </LpPortalLayout>
-  )
+  redirect("/lp-portal/account-activity")
 }

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Beaker, Loader2, RotateCcw } from 'lucide-react'
+import { OpsPanelSkeleton } from '@/components/investments-v2/loading-skeletons'
 import { buttonClass, Field, inputClass, Metric, OrdersCard, OrdersPage, Pill, SelectField } from '@/components/investments-v2/orders-ui'
 import { investmentOpsApi, unwrapList } from '@/lib/api/investment-ops-api'
 import type { Instrument } from '@/lib/api/investment-ops-api'
@@ -127,12 +128,9 @@ export default function SimulationPage() {
       <div className="grid gap-4 xl:grid-cols-[420px_1fr]">
         <OrdersCard title="Scenario inputs" eyebrow="Hypothetical trade">
           <div className="grid gap-4 p-4 sm:grid-cols-2 xl:grid-cols-1">
-            {loadingMeta && (
-              <p className="text-[11px] text-slate-500">
-                <Loader2 className="mr-2 inline h-3.5 w-3.5 animate-spin" />
-                Loading funds and instruments…
-              </p>
-            )}
+            {loadingMeta && <OpsPanelSkeleton />}
+            {!loadingMeta && (
+              <>
             <Field label="Scenario">
               <SelectField value={scenario} onChange={(value) => { setScenario(value); setResult(null) }}>
                 <option>Base case</option>
@@ -205,6 +203,8 @@ export default function SimulationPage() {
                 {running ? 'Running…' : 'Run simulation'}
               </button>
             </div>
+              </>
+            )}
           </div>
         </OrdersCard>
 

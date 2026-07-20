@@ -480,7 +480,7 @@ export function FundraisingForecasts() {
         projectedFees: Number(projected.projectedFees) || 0,
       })
       toast.success(`${activeMeta.label} scenario saved — new version created, live pipeline untouched`)
-      setAssumptionsOpen(false)
+    setAssumptionsOpen(false)
       await loadScenarios(campaignId)
     } catch (err) {
       toastFrError(err, "Could not save scenario")
@@ -686,7 +686,7 @@ export function FundraisingForecasts() {
           rows={sourceRows}
           loading={analyticsLoading}
         />
-      </div>
+          </div>
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
         <AnalyticsTable title="Owner performance" subtitle="Live owner conversion and pipeline" rows={ownerRows} loading={analyticsLoading} />
         <AnalyticsTable title="Stage ageing" subtitle="Live time-in-stage analysis" rows={ageingRows} loading={analyticsLoading} />

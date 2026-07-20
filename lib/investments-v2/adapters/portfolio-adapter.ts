@@ -283,6 +283,11 @@ export type TxnRow = {
   valuationRef: string
   journalRef: string
   documentRef: string
+  tradeId: string | null
+  orderId: string | null
+  journalEntryId: string | null
+  documentId: string | null
+  valuationRunId: string | null
 }
 
 function titleCaseType(raw: string): string {
@@ -331,10 +336,15 @@ export function mapPortfolioTransactions(
       amount: Number.isFinite(net) ? net : 0,
       currency: String(row.currencyCode ?? 'USD'),
       status: titleCaseStatus(String(row.status ?? 'Posted')),
-      tradeRef: String(row.tradeRef ?? row.transactionRef ?? '—'),
-      valuationRef: '—',
+      tradeRef: String(row.tradeId ?? row.tradeRef ?? row.transactionRef ?? '—'),
+      valuationRef: row.valuationRunId ? String(row.valuationRunId) : '—',
       journalRef: String(row.journalEntryId ?? '—'),
-      documentRef: '—',
+      documentRef: row.documentId ? String(row.documentId) : '—',
+      tradeId: row.tradeId != null ? String(row.tradeId) : null,
+      orderId: row.orderId != null ? String(row.orderId) : null,
+      journalEntryId: row.journalEntryId != null ? String(row.journalEntryId) : null,
+      documentId: row.documentId != null ? String(row.documentId) : null,
+      valuationRunId: row.valuationRunId != null ? String(row.valuationRunId) : null,
     }
   })
 }
@@ -351,7 +361,11 @@ export type InstrumentRow = {
   market: string
   currency: string
   price: number | null
+  /** Display label (Title Case for known statuses). */
   status: string
+  /** API status token: DRAFT | PENDING_APPROVAL | ACTIVE | … */
+  rawStatus: string
+  auditVersion: number
   restriction: string
   issuer: string
   country: string
@@ -363,10 +377,30 @@ export type InstrumentRow = {
   faceValue?: number
 }
 
+function formatInstrumentStatus(status: string): string {
+  switch (status) {
+    case 'ACTIVE':
+      return 'Active'
+    case 'INACTIVE':
+      return 'Inactive'
+    case 'DRAFT':
+      return 'Draft'
+    case 'PENDING_APPROVAL':
+      return 'Pending approval'
+    case 'ARCHIVED':
+      return 'Archived'
+    case 'SUSPENDED':
+      return 'Suspended'
+    default:
+      return status.replace(/_/g, ' ')
+  }
+}
+
 export function mapInstrumentRow(raw: Record<string, unknown>): InstrumentRow {
   const typeCode = String(raw.instrumentTypeCode ?? raw.type ?? '—')
   const status = String(raw.status ?? '—')
   const restriction = String(raw.complianceRestriction ?? 'None')
+  const auditVersionRaw = raw.auditVersion ?? raw.version ?? raw.expectedVersion
   return {
     id: String(raw.id ?? ''),
     symbol: String(raw.ticker ?? raw.instrumentCode ?? '—'),
@@ -382,7 +416,9 @@ export function mapInstrumentRow(raw: Record<string, unknown>): InstrumentRow {
       raw.latestPrice != null && raw.latestPrice !== '' && Number.isFinite(Number(raw.latestPrice))
         ? Number(raw.latestPrice)
         : null,
-    status: status === 'ACTIVE' ? 'Active' : status === 'INACTIVE' ? 'Inactive' : status,
+    status: formatInstrumentStatus(status),
+    rawStatus: status,
+    auditVersion: Number.isFinite(Number(auditVersionRaw)) ? Number(auditVersionRaw) : 1,
     restriction:
       restriction === 'null' || !restriction || restriction === 'NONE' ? 'None' : restriction,
     issuer: String(raw.issuerName ?? '—'),
@@ -407,6 +443,9 @@ export type PriceRow = {
   status: string
   time: string
   priceDate: string
+  /** Present when API returned a real tick id (required for approve/reject). */
+  canReview: boolean
+  auditVersion: number
   issue?: string
   flag?: string
 }
@@ -457,6 +496,9 @@ export function mapLatestPriceRow(raw: Record<string, unknown>, index: number): 
   const price = Number(tick.price)
   if (!Number.isFinite(price)) return null
 
+  const apiId = String(tick.id ?? raw.id ?? '').trim()
+  const canReview = Boolean(apiId)
+  const versionRaw = tick.version ?? tick.auditVersion ?? raw.version ?? raw.auditVersion
   const prevRaw = tick.previousClose ?? tick.previous_close
   const previous = prevRaw != null && prevRaw !== '' ? Number(prevRaw) : null
   const status = mapValidationStatus(String(tick.validationStatus ?? tick.validation_status ?? 'Approved'))
@@ -466,7 +508,7 @@ export function mapLatestPriceRow(raw: Record<string, unknown>, index: number): 
   const deviation = tick.deviationPct != null ? Number(tick.deviationPct) : null
 
   return {
-    id: String(tick.id ?? raw.id ?? `price-${index}`),
+    id: canReview ? apiId : `price-${index}`,
     ticker,
     name,
     market: String(security.exchangeCode ?? security.market ?? '—'),
@@ -477,6 +519,8 @@ export function mapLatestPriceRow(raw: Record<string, unknown>, index: number): 
     status,
     time: formatDateTime(pricedAt),
     priceDate: classifyPriceDate(pricedAt),
+    canReview,
+    auditVersion: Number.isFinite(Number(versionRaw)) ? Number(versionRaw) : 1,
     issue: status === 'Stale' ? 'Stale price' : status === 'Pending' ? 'Four-eye review' : undefined,
     flag:
       deviation != null && Number.isFinite(deviation) && Math.abs(deviation) >= 5

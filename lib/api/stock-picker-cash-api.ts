@@ -507,6 +507,36 @@ class StockPickerCashApi {
     })
   }
 
+  async listExceptionComments(id: string) {
+    return apiClient.get<OpsEnvelope<Array<Record<string, unknown>> | OpsPaged<Record<string, unknown>>>>(
+      `${BASE}/reconciliation-exceptions/${id}/comments`,
+    )
+  }
+
+  async postExceptionComment(id: string, body: { body: string }) {
+    return apiClient.post<OpsEnvelope<{ id: string; body: string; createdAt?: string; authorName?: string }>>(
+      `${BASE}/reconciliation-exceptions/${id}/comments`,
+      body,
+      { headers: idempotencyHeaders() },
+    )
+  }
+
+  async listExceptionAttachments(id: string) {
+    return apiClient.get<OpsEnvelope<Array<Record<string, unknown>> | OpsPaged<Record<string, unknown>>>>(
+      `${BASE}/reconciliation-exceptions/${id}/attachments`,
+    )
+  }
+
+  async postExceptionAttachment(id: string, body: { fileId: string; fileName?: string; note?: string }) {
+    return apiClient.post(`${BASE}/reconciliation-exceptions/${id}/attachments`, body, {
+      headers: idempotencyHeaders(),
+    })
+  }
+
+  async getExceptionAudit(id: string) {
+    return apiClient.get(`${BASE}/reconciliation-exceptions/${id}/audit`)
+  }
+
   // ── Client statements ──────────────────────────────────────────────────────
   async listClientStatements(params?: Record<string, string | number | undefined>) {
     return apiClient.get<OpsEnvelope<OpsPaged<ClientStatement> | ClientStatement[]>>(
@@ -555,6 +585,15 @@ class StockPickerCashApi {
     return apiClient.post(`${BASE}/client-statements/${id}/email`, body ?? {}, {
       headers: idempotencyHeaders(),
     })
+  }
+
+  // ── Cash setup catalogs ────────────────────────────────────────────────────
+  async listSetupProviders(params?: Record<string, string | number | undefined>) {
+    return apiClient.get(`${BASE}/setup/providers${qs(params ?? {})}`)
+  }
+
+  async listSetupFileLayouts(params?: Record<string, string | number | undefined>) {
+    return apiClient.get(`${BASE}/setup/file-layouts${qs(params ?? {})}`)
   }
 }
 

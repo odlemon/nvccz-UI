@@ -16,7 +16,9 @@ import {
   Upload,
 } from 'lucide-react'
 import { ReconApiBanner, ReconNavTabs } from '@/components/investments-v2/recon-ui'
+import { OpsListSkeleton, ReconTableSkeleton } from '@/components/investments-v2/loading-skeletons'
 import { stockPickerCashApi } from '@/lib/api/stock-picker-cash-api'
+import { formatOpsError, investmentOpsApi, unwrapList } from '@/lib/api/investment-ops-api'
 import {
   mapExceptionTimeline,
   mapExceptions,
@@ -32,6 +34,8 @@ type ExceptionStatus = 'Pending Approval' | 'Investigating' | 'Overdue'
 type ExceptionRow = ReturnType<typeof mapExceptions>['items'][number]
 type TimelineItem = ReturnType<typeof mapExceptionTimeline>[number]
 type PanelTab = 'Timeline' | 'Comments' | 'Attachments' | 'Audit Trail'
+type ExceptionComment = { id?: string; body?: string; createdAt?: string; authorName?: string }
+type ExceptionAttachment = { id?: string; fileId?: string; fileName?: string; note?: string; createdAt?: string; authorName?: string }
 
 const severityStyle: Record<ExceptionSeverity, { bg: string; color: string; border: string }> = {
   Critical: { bg: 'rgba(244,63,94,0.12)', color: ReconAccent.redSoft, border: 'rgba(244,63,94,0.28)' },
@@ -47,6 +51,20 @@ const statusStyle: Record<ExceptionStatus, { bg: string; color: string; border: 
 }
 
 const ageColor = (severity: ExceptionSeverity) => severityStyle[severity].color
+
+function bufferToBase64(buf: ArrayBuffer) {
+  const bytes = new Uint8Array(buf)
+  let binary = ''
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]!)
+  return btoa(binary)
+}
+
+async function sha256Hex(buf: ArrayBuffer): Promise<string> {
+  const hash = await crypto.subtle.digest('SHA-256', buf)
+  return Array.from(new Uint8Array(hash))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('')
+}
 
 export default function ExceptionsApprovalsPage() {
   const [selectedId, setSelectedId] = useState('')
@@ -64,6 +82,17 @@ export default function ExceptionsApprovalsPage() {
   const [summary, setSummary] = useState(mapExceptionsSummary(null))
   const [timeline, setTimeline] = useState<TimelineItem[]>([])
   const [search, setSearch] = useState('')
+  const [comments, setComments] = useState<ExceptionComment[]>([])
+  const [attachments, setAttachments] = useState<ExceptionAttachment[]>([])
+  const [auditEvents, setAuditEvents] = useState<TimelineItem[]>([])
+  const [collabLoading, setCollabLoading] = useState(false)
+  const [collabError, setCollabError] = useState<string | null>(null)
+  const [commentBody, setCommentBody] = useState('')
+  const [attachFileId, setAttachFileId] = useState('')
+  const [attachFileName, setAttachFileName] = useState('')
+  const [attachNote, setAttachNote] = useState('')
+  const [attachLocalFile, setAttachLocalFile] = useState<File | null>(null)
+  const [collabSubmitting, setCollabSubmitting] = useState(false)
   const pageSize = 20
 
   const loadList = useCallback(async (p = page) => {
@@ -118,6 +147,155 @@ export default function ExceptionsApprovalsPage() {
       cancelled = true
     }
   }, [selectedId])
+
+  useEffect(() => {
+    if (!selectedId) {
+      setComments([])
+      setAttachments([])
+      setAuditEvents([])
+      setCollabError(null)
+      return
+    }
+    if (panelTab === 'Timeline') return
+
+    let cancelled = false
+    setCollabLoading(true)
+    setCollabError(null)
+    ;(async () => {
+      try {
+        if (panelTab === 'Comments') {
+          const res = await stockPickerCashApi.listExceptionComments(selectedId)
+          if (cancelled) return
+          if ((res as { success?: boolean }).success === false) {
+            throw new Error((res as { message?: string }).message || 'Failed to load comments')
+          }
+          const data = (res as { data?: unknown }).data ?? res
+          setComments(unwrapList<ExceptionComment>(data))
+        } else if (panelTab === 'Attachments') {
+          const res = await stockPickerCashApi.listExceptionAttachments(selectedId)
+          if (cancelled) return
+          if ((res as { success?: boolean }).success === false) {
+            throw new Error((res as { message?: string }).message || 'Failed to load attachments')
+          }
+          const data = (res as { data?: unknown }).data ?? res
+          setAttachments(unwrapList<ExceptionAttachment>(data))
+        } else if (panelTab === 'Audit Trail') {
+          const res = await stockPickerCashApi.getExceptionAudit(selectedId)
+          if (cancelled) return
+          if ((res as { success?: boolean }).success === false) {
+            throw new Error((res as { message?: string }).message || 'Failed to load audit trail')
+          }
+          const data = (res as { data?: unknown }).data ?? res
+          setAuditEvents(mapExceptionTimeline(data))
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setCollabError(opsErrorMessage(e, `Unable to load ${panelTab.toLowerCase()}`))
+          if (panelTab === 'Comments') setComments([])
+          if (panelTab === 'Attachments') setAttachments([])
+          if (panelTab === 'Audit Trail') setAuditEvents([])
+        }
+      } finally {
+        if (!cancelled) setCollabLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [selectedId, panelTab])
+
+  const reloadComments = async () => {
+    if (!selectedId) return
+    const res = await stockPickerCashApi.listExceptionComments(selectedId)
+    if ((res as { success?: boolean }).success === false) {
+      throw new Error((res as { message?: string }).message || 'Failed to load comments')
+    }
+    const data = (res as { data?: unknown }).data ?? res
+    setComments(unwrapList<ExceptionComment>(data))
+  }
+
+  const reloadAttachments = async () => {
+    if (!selectedId) return
+    const res = await stockPickerCashApi.listExceptionAttachments(selectedId)
+    if ((res as { success?: boolean }).success === false) {
+      throw new Error((res as { message?: string }).message || 'Failed to load attachments')
+    }
+    const data = (res as { data?: unknown }).data ?? res
+    setAttachments(unwrapList<ExceptionAttachment>(data))
+  }
+
+  const submitComment = async () => {
+    if (!selectedId || !commentBody.trim()) return
+    setCollabSubmitting(true)
+    setCollabError(null)
+    try {
+      const res = await stockPickerCashApi.postExceptionComment(selectedId, { body: commentBody.trim() })
+      if ((res as { success?: boolean }).success === false) {
+        throw new Error((res as { message?: string }).message || 'Failed to post comment')
+      }
+      setCommentBody('')
+      await reloadComments()
+      setActionMsg('Comment posted.')
+    } catch (e) {
+      setCollabError(opsErrorMessage(e, 'Failed to post comment'))
+    } finally {
+      setCollabSubmitting(false)
+    }
+  }
+
+  const submitAttachment = async () => {
+    if (!selectedId) return
+    if (!attachLocalFile && !attachFileId.trim()) return
+    setCollabSubmitting(true)
+    setCollabError(null)
+    try {
+      let fileId = attachFileId.trim()
+      let fileName = attachFileName.trim()
+      if (attachLocalFile) {
+        const selected = rows.find((r) => r.id === selectedId)
+        const raw = selected?.raw as Record<string, unknown> | undefined
+        let fundId = String(raw?.fundId ?? raw?.['portfolioId'] ?? '')
+        if (!fundId) {
+          const portfoliosRes = await investmentOpsApi.listPortfolios()
+          const first = unwrapList<{ id?: string }>(portfoliosRes.data)[0]
+          fundId = String(first?.id ?? '')
+        }
+        if (!fundId) throw new Error('No fundId available for file upload. Seed portfolios or ensure the exception includes fundId.')
+        const buffer = await attachLocalFile.arrayBuffer()
+        const uploadRes = await investmentOpsApi.uploadBinaryFile({
+          fundId,
+          fileName: attachLocalFile.name,
+          mimeType: attachLocalFile.type || 'application/octet-stream',
+          contentBase64: bufferToBase64(buffer),
+          byteSize: attachLocalFile.size,
+          checksumSha256: await sha256Hex(buffer),
+        })
+        if (!uploadRes.success || !uploadRes.data?.fileId) {
+          throw new Error(formatOpsError(uploadRes, 'File upload failed'))
+        }
+        fileId = uploadRes.data.fileId
+        fileName = fileName || attachLocalFile.name
+      }
+      const res = await stockPickerCashApi.postExceptionAttachment(selectedId, {
+        fileId,
+        ...(fileName ? { fileName } : {}),
+        ...(attachNote.trim() ? { note: attachNote.trim() } : {}),
+      })
+      if ((res as { success?: boolean }).success === false) {
+        throw new Error((res as { message?: string }).message || 'Failed to attach file')
+      }
+      setAttachFileId('')
+      setAttachFileName('')
+      setAttachNote('')
+      setAttachLocalFile(null)
+      await reloadAttachments()
+      setActionMsg('Attachment linked.')
+    } catch (e) {
+      setCollabError(opsErrorMessage(e, 'Failed to attach file'))
+    } finally {
+      setCollabSubmitting(false)
+    }
+  }
 
   const filtered = rows.filter((r) => {
     const q = search.toLowerCase()
@@ -178,11 +356,6 @@ export default function ExceptionsApprovalsPage() {
               <span>All dates</span>
               <ChevronDown className="h-3.5 w-3.5" style={{ color: C.muted2 }} />
             </button>
-            <button type="button" className="inline-flex h-9 items-center gap-2 rounded-full border px-3 text-[12px]" style={{ background: C.control, borderColor: C.controlBorder, color: C.text }}>
-              <Upload className="h-3.5 w-3.5" style={{ color: C.muted }} />
-              Export
-              <ChevronDown className="h-3.5 w-3.5" style={{ color: C.muted2 }} />
-            </button>
           </div>
         </header>
 
@@ -206,10 +379,6 @@ export default function ExceptionsApprovalsPage() {
                   <Search className="h-3.5 w-3.5 shrink-0" style={{ color: C.muted2 }} />
                   <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search exceptions..." className="w-full bg-transparent text-[12px] outline-none placeholder:text-[#64748B]" style={{ color: C.text }} />
                 </label>
-                <button type="button" className="inline-flex h-9 items-center gap-2 rounded-full border px-3 text-[12px]" style={{ background: C.control, borderColor: C.controlBorder, color: C.text }}>
-                  <Columns3 className="h-3.5 w-3.5" style={{ color: C.muted }} />
-                  Columns
-                </button>
               </div>
             </div>
 
@@ -223,6 +392,13 @@ export default function ExceptionsApprovalsPage() {
                   </tr>
                 </thead>
                 <tbody>
+                  {loading ? (
+                    <tr>
+                      <td colSpan={9} className="p-0">
+                        <ReconTableSkeleton rows={7} cols={9} />
+                      </td>
+                    </tr>
+                  ) : null}
                   {!loading && filtered.length === 0 ? (
                     <tr>
                       <td colSpan={9} className="px-3.5 py-10 text-center text-[12px]" style={{ color: C.muted2 }}>
@@ -230,7 +406,8 @@ export default function ExceptionsApprovalsPage() {
                       </td>
                     </tr>
                   ) : null}
-                  {filtered.map((row) => {
+                  {!loading
+                    ? filtered.map((row) => {
                     const active = row.id === selected?.id
                     const sev = severityStyle[row.severity]
                     const st = statusStyle[row.status]
@@ -266,7 +443,8 @@ export default function ExceptionsApprovalsPage() {
                         </td>
                       </tr>
                     )
-                  })}
+                  })
+                    : null}
                 </tbody>
               </table>
             </div>
@@ -295,6 +473,24 @@ export default function ExceptionsApprovalsPage() {
               onDecision={setDecision}
               canSubmit={canSubmit}
               timeline={timeline}
+              comments={comments}
+              attachments={attachments}
+              auditEvents={auditEvents}
+              collabLoading={collabLoading}
+              collabError={collabError}
+              commentBody={commentBody}
+              onCommentBodyChange={setCommentBody}
+              attachFileId={attachFileId}
+              onAttachFileIdChange={setAttachFileId}
+              attachFileName={attachFileName}
+              onAttachFileNameChange={setAttachFileName}
+              attachNote={attachNote}
+              onAttachNoteChange={setAttachNote}
+              attachLocalFile={attachLocalFile}
+              onAttachLocalFileChange={setAttachLocalFile}
+              collabSubmitting={collabSubmitting}
+              onSubmitComment={() => void submitComment()}
+              onSubmitAttachment={() => void submitAttachment()}
               onSubmit={() => void submitDecision()}
               busy={busy}
             />
@@ -357,6 +553,24 @@ function DetailPanel({
   onDecision,
   canSubmit,
   timeline,
+  comments,
+  attachments,
+  auditEvents,
+  collabLoading,
+  collabError,
+  commentBody,
+  onCommentBodyChange,
+  attachFileId,
+  onAttachFileIdChange,
+  attachFileName,
+  onAttachFileNameChange,
+  attachNote,
+  onAttachNoteChange,
+  attachLocalFile,
+  onAttachLocalFileChange,
+  collabSubmitting,
+  onSubmitComment,
+  onSubmitAttachment,
   onSubmit,
   busy,
 }: {
@@ -369,6 +583,24 @@ function DetailPanel({
   onDecision: (d: 'approve' | 'info' | 'reject' | null) => void
   canSubmit: boolean
   timeline: TimelineItem[]
+  comments: ExceptionComment[]
+  attachments: ExceptionAttachment[]
+  auditEvents: TimelineItem[]
+  collabLoading: boolean
+  collabError: string | null
+  commentBody: string
+  onCommentBodyChange: (v: string) => void
+  attachFileId: string
+  onAttachFileIdChange: (v: string) => void
+  attachFileName: string
+  onAttachFileNameChange: (v: string) => void
+  attachNote: string
+  onAttachNoteChange: (v: string) => void
+  attachLocalFile: File | null
+  onAttachLocalFileChange: (f: File | null) => void
+  collabSubmitting: boolean
+  onSubmitComment: () => void
+  onSubmitAttachment: () => void
   onSubmit: () => void
   busy: boolean
 }) {
@@ -430,42 +662,155 @@ function DetailPanel({
       </div>
 
       <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
+        {collabError && panelTab !== 'Timeline' ? (
+          <p className="rounded-[8px] border px-3 py-2 text-[11px]" style={{ borderColor: 'rgba(244,63,94,0.35)', color: '#FB7185', background: 'rgba(244,63,94,0.08)' }}>
+            {collabError}
+          </p>
+        ) : null}
         {panelTab === 'Timeline' && (
-          timeline.length === 0 ? (
+          collabLoading ? (
+            <OpsListSkeleton rows={4} />
+          ) : timeline.length === 0 ? (
             <p className="text-[12px]" style={{ color: C.muted2 }}>No timeline events.</p>
           ) : (
-            <ol className="relative space-y-0 pl-1">
-              {timeline.map((item, idx) => {
-                const last = idx === timeline.length - 1
-                const amber = item.tone === 'amber'
-                return (
-                  <li key={`${item.title}-${idx}`} className="relative flex gap-3 pb-5 last:pb-0">
-                    {!last ? <span className="absolute left-[11px] top-6 bottom-0 w-px" style={{ background: 'rgba(59,130,246,0.35)' }} /> : null}
-                    <span
-                      className="relative z-[1] mt-0.5 inline-flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full border"
-                      style={{
-                        background: amber ? 'rgba(245,158,11,0.18)' : 'rgba(59,130,246,0.15)',
-                        borderColor: amber ? 'rgba(245,158,11,0.55)' : 'rgba(59,130,246,0.45)',
-                        color: amber ? '#FBBF24' : '#60A5FA',
-                      }}
-                    >
-                      {amber ? <Clock3 className="h-3 w-3" /> : <span className="h-1.5 w-1.5 rounded-full bg-current" />}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="text-[13px] font-medium leading-snug">{item.title}</p>
-                        <p className="shrink-0 text-right text-[11px]" style={{ color: C.muted2 }}>{item.when}</p>
-                      </div>
-                      <p className="mt-0.5 text-[11px]" style={{ color: C.muted }}>{item.who}</p>
-                    </div>
-                  </li>
-                )
-              })}
-            </ol>
+            <TimelineList items={timeline} />
           )
         )}
-        {panelTab !== 'Timeline' && (
-          <p className="text-[12px]" style={{ color: C.muted2 }}>{panelTab} content is not exposed as a dedicated cash API yet.</p>
+        {panelTab === 'Comments' && (
+          collabLoading ? (
+            <OpsListSkeleton rows={4} />
+          ) : (
+            <>
+              {comments.length === 0 ? (
+                <p className="text-[12px]" style={{ color: C.muted2 }}>No comments yet. Add the first note below.</p>
+              ) : (
+                <ul className="space-y-3">
+                  {comments.map((item, idx) => (
+                    <li key={item.id ?? `cmt-${idx}`} className="rounded-[10px] border px-3 py-2.5" style={{ borderColor: C.rowBorder, background: C.control }}>
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-[12px] font-medium">{item.authorName || 'Analyst'}</p>
+                        <p className="shrink-0 text-[10px]" style={{ color: C.muted2 }}>{formatCollabWhen(item.createdAt)}</p>
+                      </div>
+                      <p className="mt-1.5 text-[12px] leading-relaxed" style={{ color: C.muted }}>{item.body || '—'}</p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <div className="space-y-2 border-t pt-4" style={{ borderColor: C.rowBorder }}>
+                <label className="block">
+                  <span className="mb-1.5 block text-[12px]" style={{ color: C.muted }}>Add comment</span>
+                  <textarea
+                    value={commentBody}
+                    onChange={(e) => onCommentBodyChange(e.target.value)}
+                    rows={3}
+                    placeholder="Share investigation notes…"
+                    className="w-full resize-none rounded-[10px] border px-3 py-2.5 text-[12px] outline-none"
+                    style={{ background: C.control, borderColor: C.controlBorder, color: C.text }}
+                  />
+                </label>
+                <button
+                  type="button"
+                  disabled={!commentBody.trim() || collabSubmitting}
+                  onClick={onSubmitComment}
+                  className="inline-flex h-9 items-center rounded-full px-4 text-[12px] font-medium text-white disabled:opacity-50"
+                  style={{ background: ReconAccent.blue }}
+                >
+                  {collabSubmitting ? 'Posting…' : 'Post comment'}
+                </button>
+              </div>
+            </>
+          )
+        )}
+        {panelTab === 'Attachments' && (
+          collabLoading ? (
+            <OpsListSkeleton rows={3} />
+          ) : (
+            <>
+              {attachments.length === 0 ? (
+                <p className="text-[12px]" style={{ color: C.muted2 }}>No attachments linked. Add a file reference below.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {attachments.map((item, idx) => (
+                    <li key={item.id ?? `att-${idx}`} className="rounded-[10px] border px-3 py-2.5" style={{ borderColor: C.rowBorder, background: C.control }}>
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="font-mono text-[11px]" style={{ color: C.blueLink }}>{item.fileName || item.fileId || 'File'}</p>
+                        <p className="shrink-0 text-[10px]" style={{ color: C.muted2 }}>{formatCollabWhen(item.createdAt)}</p>
+                      </div>
+                      {item.fileId ? <p className="mt-1 text-[10px]" style={{ color: C.muted2 }}>fileId: {item.fileId}</p> : null}
+                      {item.note ? <p className="mt-1 text-[11px]" style={{ color: C.muted }}>{item.note}</p> : null}
+                      {item.authorName ? <p className="mt-1 text-[10px]" style={{ color: C.muted2 }}>by {item.authorName}</p> : null}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <div className="space-y-3 border-t pt-4" style={{ borderColor: C.rowBorder }}>
+                <label className="block">
+                  <span className="mb-1.5 block text-[12px]" style={{ color: C.muted }}>Local file</span>
+                  <input
+                    type="file"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0] ?? null
+                      onAttachLocalFileChange(file)
+                      if (file && !attachFileName.trim()) onAttachFileNameChange(file.name)
+                    }}
+                    className="block w-full text-[11px]"
+                    style={{ color: C.muted }}
+                  />
+                  {attachLocalFile ? (
+                    <p className="mt-1 text-[10px]" style={{ color: C.muted2 }}>Selected: {attachLocalFile.name}</p>
+                  ) : null}
+                </label>
+                <label className="block">
+                  <span className="mb-1.5 block text-[12px]" style={{ color: C.muted }}>File name (optional)</span>
+                  <input
+                    value={attachFileName}
+                    onChange={(e) => onAttachFileNameChange(e.target.value)}
+                    placeholder="broker-statement.pdf"
+                    className="h-9 w-full rounded-full border px-3 text-[12px] outline-none"
+                    style={{ background: C.control, borderColor: C.controlBorder, color: C.text }}
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1.5 block text-[12px]" style={{ color: C.muted }}>Note (optional)</span>
+                  <input
+                    value={attachNote}
+                    onChange={(e) => onAttachNoteChange(e.target.value)}
+                    placeholder="Supporting evidence for variance"
+                    className="h-9 w-full rounded-full border px-3 text-[12px] outline-none"
+                    style={{ background: C.control, borderColor: C.controlBorder, color: C.text }}
+                  />
+                </label>
+                <details className="text-[11px]" style={{ color: C.muted2 }}>
+                  <summary className="cursor-pointer">Advanced: paste existing fileId</summary>
+                  <input
+                    value={attachFileId}
+                    onChange={(e) => onAttachFileIdChange(e.target.value)}
+                    placeholder="file_…"
+                    className="mt-2 h-9 w-full rounded-full border px-3 font-mono text-[11px] outline-none"
+                    style={{ background: C.control, borderColor: C.controlBorder, color: C.text }}
+                  />
+                </details>
+                <button
+                  type="button"
+                  disabled={(!attachLocalFile && !attachFileId.trim()) || collabSubmitting}
+                  onClick={onSubmitAttachment}
+                  className="inline-flex h-9 items-center rounded-full px-4 text-[12px] font-medium text-white disabled:opacity-50"
+                  style={{ background: ReconAccent.blue }}
+                >
+                  {collabSubmitting ? 'Uploading…' : attachLocalFile ? 'Upload & attach' : 'Link attachment'}
+                </button>
+              </div>
+            </>
+          )
+        )}
+        {panelTab === 'Audit Trail' && (
+          collabLoading ? (
+            <OpsListSkeleton rows={4} />
+          ) : auditEvents.length === 0 ? (
+            <p className="text-[12px]" style={{ color: C.muted2 }}>No audit events recorded for this exception.</p>
+          ) : (
+            <TimelineList items={auditEvents} />
+          )
         )}
       </div>
 
@@ -498,5 +843,45 @@ function DetailPanel({
         </button>
       </div>
     </aside>
+  )
+}
+
+function formatCollabWhen(value?: string) {
+  if (!value) return '—'
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return value
+  return d.toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
+function TimelineList({ items }: { items: TimelineItem[] }) {
+  return (
+    <ol className="relative space-y-0 pl-1">
+      {items.map((item, idx) => {
+        const last = idx === items.length - 1
+        const amber = item.tone === 'amber'
+        return (
+          <li key={`${item.title}-${idx}`} className="relative flex gap-3 pb-5 last:pb-0">
+            {!last ? <span className="absolute left-[11px] top-6 bottom-0 w-px" style={{ background: 'rgba(59,130,246,0.35)' }} /> : null}
+            <span
+              className="relative z-[1] mt-0.5 inline-flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full border"
+              style={{
+                background: amber ? 'rgba(245,158,11,0.18)' : 'rgba(59,130,246,0.15)',
+                borderColor: amber ? 'rgba(245,158,11,0.55)' : 'rgba(59,130,246,0.45)',
+                color: amber ? '#FBBF24' : '#60A5FA',
+              }}
+            >
+              {amber ? <Clock3 className="h-3 w-3" /> : <span className="h-1.5 w-1.5 rounded-full bg-current" />}
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-[13px] font-medium leading-snug">{item.title}</p>
+                <p className="shrink-0 text-right text-[11px]" style={{ color: C.muted2 }}>{item.when}</p>
+              </div>
+              <p className="mt-0.5 text-[11px]" style={{ color: C.muted }}>{item.who}</p>
+            </div>
+          </li>
+        )
+      })}
+    </ol>
   )
 }

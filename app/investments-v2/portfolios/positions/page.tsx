@@ -1,7 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ArrowDownUp, Check, ChevronDown, ChevronLeft, ChevronRight, Folder, FolderOpen, Loader2, Search, SlidersHorizontal, X } from 'lucide-react'
+import { ArrowDownUp, Check, ChevronDown, ChevronLeft, ChevronRight, Folder, FolderOpen, Search, SlidersHorizontal, X } from 'lucide-react'
+import { OpsKpiSkeleton, OpsTableSkeleton } from '@/components/investments-v2/loading-skeletons'
 import { investmentOpsApi, unwrapList } from '@/lib/api/investment-ops-api'
 import type { Holding } from '@/lib/api/investments-api'
 import {
@@ -141,12 +142,6 @@ export default function PositionsPage() {
         {error && (
           <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-2 text-[12px] text-rose-200">{error}</div>
         )}
-        {loading && (
-          <div className="flex items-center gap-2 text-[12px] text-[#8B95A7]">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading positions…
-          </div>
-        )}
-
         <nav className="flex gap-2 overflow-x-auto pb-1">
           {funds.map((item) => (
             <button
@@ -166,19 +161,23 @@ export default function PositionsPage() {
           {!loading && funds.length === 0 && <p className="text-[11px] text-[#6f7e92]">No portfolios returned from the API.</p>}
         </nav>
 
-        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {[
-            ['Total market value', positions.length ? money(totalValue) : '—', 'text-white'],
-            ['Unrealised P&L', positions.length ? `${totalPnl >= 0 ? '+' : ''}${money(totalPnl)}` : '—', totalPnl >= 0 ? 'text-emerald-300' : 'text-rose-300'],
-            ['Cash balance', positions.length ? money(cashValue) : '—', 'text-[#70adff]'],
-            ['Open positions', positions.length, 'text-white'],
-          ].map(([label, value, tone]) => (
-            <div key={String(label)} className={`${card} px-5 py-4`}>
-              <p className="text-[9px] uppercase tracking-[.16em] text-[#718096]">{label}</p>
-              <p className={`mt-2 font-mono text-xl font-semibold ${tone}`}>{value}</p>
-            </div>
-          ))}
-        </section>
+        {loading && positions.length === 0 && funds.length === 0 ? (
+          <OpsKpiSkeleton count={4} />
+        ) : (
+          <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {[
+              ['Total market value', positions.length ? money(totalValue) : '—', 'text-white'],
+              ['Unrealised P&L', positions.length ? `${totalPnl >= 0 ? '+' : ''}${money(totalPnl)}` : '—', totalPnl >= 0 ? 'text-emerald-300' : 'text-rose-300'],
+              ['Cash balance', positions.length ? money(cashValue) : '—', 'text-[#70adff]'],
+              ['Open positions', positions.length, 'text-white'],
+            ].map(([label, value, tone]) => (
+              <div key={String(label)} className={`${card} px-5 py-4`}>
+                <p className="text-[9px] uppercase tracking-[.16em] text-[#718096]">{label}</p>
+                <p className={`mt-2 font-mono text-xl font-semibold ${tone}`}>{value}</p>
+              </div>
+            ))}
+          </section>
+        )}
 
         <section className={`${card} overflow-visible`}>
           <div className="flex flex-col gap-3 border-b border-white/[0.07] p-4 xl:flex-row xl:items-center xl:justify-between">
@@ -230,7 +229,14 @@ export default function PositionsPage() {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row) => (
+                {loading && (
+                  <tr>
+                    <td colSpan={11} className="p-0">
+                      <OpsTableSkeleton rows={8} cols={11} />
+                    </td>
+                  </tr>
+                )}
+                {!loading && rows.map((row) => (
                   <tr
                     key={row.id}
                     onClick={() => setSelected(row)}

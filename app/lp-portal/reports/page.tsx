@@ -1,10 +1,5 @@
-import { LpPortalLayout } from "@/components/layout/lp-portal-layout"
-import { LpReports } from "@/components/lp-portal/lp-reports"
+import { redirect } from "next/navigation"
 
 export default function LpReportsPage() {
-  return (
-    <LpPortalLayout>
-      <LpReports />
-    </LpPortalLayout>
-  )
+  redirect("/lp-portal/documents?category=Fund%20Reports")
 }

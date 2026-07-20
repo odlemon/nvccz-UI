@@ -21,6 +21,7 @@ import {
   Wallet,
 } from 'lucide-react'
 import { ReconApiBanner, ReconNavTabs, ViewSegment } from '@/components/investments-v2/recon-ui'
+import { OpsListSkeleton, ReconTableSkeleton } from '@/components/investments-v2/loading-skeletons'
 import { stockPickerCashApi } from '@/lib/api/stock-picker-cash-api'
 import {
   mapStatements,
@@ -354,15 +355,6 @@ export default function StatementsPage() {
                 : 'Generate and deliver client cash statements from the trading cash ledger.'}
             </p>
           </div>
-          <button
-            type="button"
-            className="inline-flex h-9 items-center gap-2 rounded-full border px-3 text-[12px]"
-            style={{ background: C.control, borderColor: C.controlBorder, color: C.text }}
-          >
-            <Upload className="h-3.5 w-3.5" style={{ color: C.muted }} />
-            Export
-            <ChevronDown className="h-3.5 w-3.5" style={{ color: C.muted2 }} />
-          </button>
         </header>
 
         <ReconNavTabs variant="terminal-dark" />
@@ -560,6 +552,13 @@ export default function StatementsPage() {
                   </tr>
                 </thead>
                 <tbody>
+                  {loading ? (
+                    <tr>
+                      <td colSpan={6} className="p-0">
+                        <ReconTableSkeleton rows={6} cols={6} />
+                      </td>
+                    </tr>
+                  ) : null}
                   {!loading && rows.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="px-3 py-10 text-center text-[12px]" style={{ color: C.muted2 }}>
@@ -571,7 +570,8 @@ export default function StatementsPage() {
                       </td>
                     </tr>
                   ) : null}
-                  {rows.map((row) => (
+                  {!loading
+                    ? rows.map((row) => (
                     <tr
                       key={row.id}
                       onClick={() => setSelectedId(row.id)}
@@ -600,7 +600,8 @@ export default function StatementsPage() {
                         {row.generatedOn}
                       </td>
                     </tr>
-                  ))}
+                  ))
+                    : null}
                 </tbody>
               </table>
             </div>
@@ -703,8 +704,14 @@ export default function StatementsPage() {
               style={{ background: C.doc, borderColor: C.cardBorder }}
             >
               {!preview ? (
-                <div className="flex flex-1 items-center justify-center text-[13px]" style={{ color: C.muted2 }}>
-                  {loading ? 'Loading…' : 'Select a statement run to preview.'}
+                <div className="flex flex-1 flex-col items-center justify-center p-4" style={{ color: C.muted2 }}>
+                  {loading ? (
+                    <div className="w-full max-w-md">
+                      <OpsListSkeleton rows={5} />
+                    </div>
+                  ) : (
+                    <p className="text-[13px]">Select a statement run to preview.</p>
+                  )}
                 </div>
               ) : (
                 <>

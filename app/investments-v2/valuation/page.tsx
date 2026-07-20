@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Check, ChevronDown, Loader2, Play, RefreshCw, ShieldAlert, X } from 'lucide-react'
+import { Check, ChevronDown, Play, RefreshCw, ShieldAlert, X } from 'lucide-react'
+import { OpsTableSkeleton } from '@/components/investments-v2/loading-skeletons'
 import { useAppDispatch, useAppSelector } from '@/lib/store'
 import {
   createValuationRun,
@@ -46,6 +47,11 @@ function navDisplay(run: ValuationRun) {
   const n = Number(String(nav).replace(/,/g, ''))
   if (!Number.isFinite(n)) return String(nav)
   return `$${formatMoneyDisplay(n)}`
+}
+
+function pnlColumn(value?: string | number | null) {
+  if (value == null || value === '') return '—'
+  return `$${formatMoneyDisplay(value)}`
 }
 
 function pnlDisplay(run: ValuationRun) {
@@ -305,7 +311,55 @@ export default function ValuationPage() {
     }
   }
 
-  const loading = portfoliosLoading || valuationRunsLoading || valuationExceptionsLoading
+  const escalateException = async () => {
+    if (!modal || !exceptionReason.trim()) return
+    setExceptionActionLoading(true)
+    setExceptionActionError(null)
+    try {
+      const res = await investmentOpsApi.escalateValuationException(modal.id, { reason: exceptionReason.trim() })
+      if (!res.success) throw new Error(formatOpsError(res))
+      setModal(null)
+      dispatch(fetchValuationExceptions({ fundId: modal.fundId }))
+    } catch (e) {
+      setExceptionActionError(e instanceof Error ? e.message : 'Failed to escalate exception')
+    } finally {
+      setExceptionActionLoading(false)
+    }
+  }
+
+  const approveOverride = async () => {
+    if (!modal) return
+    setExceptionActionLoading(true)
+    setExceptionActionError(null)
+    try {
+      const res = await investmentOpsApi.approveValuationOverride(modal.id, {
+        reason: exceptionReason.trim() || undefined,
+      })
+      if (!res.success) throw new Error(formatOpsError(res))
+      setModal(null)
+      dispatch(fetchValuationExceptions({ fundId: modal.fundId }))
+    } catch (e) {
+      setExceptionActionError(e instanceof Error ? e.message : 'Failed to approve override')
+    } finally {
+      setExceptionActionLoading(false)
+    }
+  }
+
+  const rejectOverride = async () => {
+    if (!modal || !exceptionReason.trim()) return
+    setExceptionActionLoading(true)
+    setExceptionActionError(null)
+    try {
+      const res = await investmentOpsApi.rejectValuationOverride(modal.id, { reason: exceptionReason.trim() })
+      if (!res.success) throw new Error(formatOpsError(res))
+      setModal(null)
+      dispatch(fetchValuationExceptions({ fundId: modal.fundId }))
+    } catch (e) {
+      setExceptionActionError(e instanceof Error ? e.message : 'Failed to reject override')
+    } finally {
+      setExceptionActionLoading(false)
+    }
+  }
 
   return (
     <main className="min-h-full bg-[#05090f] p-3 text-[#eef2f8] sm:p-5">
@@ -351,12 +405,6 @@ export default function ValuationPage() {
         {loadError && (
           <div className="rounded-2xl border border-rose-400/20 bg-rose-400/[.08] px-4 py-3 text-[11px] text-rose-200">{loadError}</div>
         )}
-        {loading && (
-          <div className="flex items-center gap-2 text-[11px] text-[#8f9caf]">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading valuation data…
-          </div>
-        )}
-
         {tab === 'NAV Runs' && (
           <div className="grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
             <section className="rounded-[24px] border border-white/[.04] bg-[linear-gradient(145deg,#142030,#0d1623)] p-5">
@@ -465,11 +513,10 @@ export default function ValuationPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/[.045]">
-                    {valuationRunsLoading ? (
+                    {valuationRunsLoading || portfoliosLoading ? (
                       <tr>
-                        <td colSpan={9} className="px-4 py-10 text-center text-[#8290a4]">
-                          <Loader2 className="mr-2 inline h-3.5 w-3.5 animate-spin" />
-                          Loading runs…
+                        <td colSpan={9} className="p-0">
+                          <OpsTableSkeleton rows={7} cols={9} />
                         </td>
                       </tr>
                     ) : valuationRuns.length === 0 ? (
@@ -505,11 +552,21 @@ export default function ValuationPage() {
         {tab === 'P&L Runs' && (
           <TableCard
             title="P&L calculation runs"
-            subtitle="P&L is produced with each valuation run; dedicated P&L list endpoint is not available"
-            headers={['Run', 'Portfolio', 'Method', 'NAV output', 'Status']}
-            empty="No valuation runs to derive P&L history from."
+            subtitle="Same GET /valuation/runs list — P&L columns (total, realised, unrealised) are included on each run"
+            headers={['Run', 'Portfolio', 'As of', 'Method', 'Total P&L', 'Realised P&L', 'Unrealised P&L', 'NAV output', 'Status']}
+            empty="No valuation runs returned by GET /valuation/runs."
             loading={valuationRunsLoading}
-            rows={valuationRuns.map((r) => [r.id, fundName(r.fundId), r.parametersJson?.costBasisMethod ?? '—', navDisplay(r), <Badge key="b" value={r.status} />])}
+            rows={valuationRuns.map((r) => [
+              r.id,
+              fundName(r.fundId),
+              formatDate(r.asOf),
+              r.parametersJson?.costBasisMethod ?? '—',
+              pnlColumn(r.totalPnl) !== '—' ? pnlColumn(r.totalPnl) : pnlDisplay(r),
+              pnlColumn(r.realizedPnl),
+              pnlColumn(r.unrealizedPnl),
+              navDisplay(r),
+              <Badge key="b" value={r.status} />,
+            ])}
           />
         )}
 
@@ -648,9 +705,33 @@ export default function ValuationPage() {
                 <div className="rounded-2xl border border-rose-400/20 bg-rose-400/[.08] p-3 text-[10px] text-rose-200">{exceptionActionError}</div>
               )}
             </div>
-            <div className="flex justify-end gap-2 border-t border-white/[.07] p-4">
+            <div className="flex flex-wrap justify-end gap-2 border-t border-white/[.07] p-4">
               <button type="button" onClick={() => setModal(null)} className="rounded-full border border-white/10 px-4 py-2 text-[10px]">
                 Close
+              </button>
+              <button
+                type="button"
+                disabled={!exceptionReason.trim() || exceptionActionLoading}
+                onClick={() => void escalateException()}
+                className="rounded-full border border-fuchsia-400/30 px-4 py-2 text-[10px] text-fuchsia-200 disabled:opacity-40"
+              >
+                Escalate
+              </button>
+              <button
+                type="button"
+                disabled={exceptionActionLoading}
+                onClick={() => void approveOverride()}
+                className="rounded-full border border-emerald-400/30 px-4 py-2 text-[10px] text-emerald-200 disabled:opacity-40"
+              >
+                Approve override
+              </button>
+              <button
+                type="button"
+                disabled={!exceptionReason.trim() || exceptionActionLoading}
+                onClick={() => void rejectOverride()}
+                className="rounded-full border border-rose-400/30 px-4 py-2 text-[10px] text-rose-300 disabled:opacity-40"
+              >
+                Reject override
               </button>
               <button
                 type="button"
@@ -723,9 +804,8 @@ function TableCard({
           <tbody className="divide-y divide-white/[.045]">
             {loading ? (
               <tr>
-                <td colSpan={headers.length} className="px-4 py-10 text-center text-[#8290a4]">
-                  <Loader2 className="mr-2 inline h-3.5 w-3.5 animate-spin" />
-                  Loading…
+                <td colSpan={headers.length} className="p-0">
+                  <OpsTableSkeleton rows={6} cols={headers.length} />
                 </td>
               </tr>
             ) : rows.length === 0 ? (

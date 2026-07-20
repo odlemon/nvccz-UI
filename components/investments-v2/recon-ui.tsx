@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Check, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { ReconTableSkeleton } from '@/components/investments-v2/loading-skeletons'
 
 /** Theme-token surfaces — work in .investments-terminal.light and .dark */
 export const reconCard =
@@ -272,8 +273,8 @@ export function ReconApiBanner({
   return (
     <div className="space-y-2">
       {loading ? (
-        <div className="rounded-[10px] border border-border bg-muted/40 px-3 py-2 text-[12px] text-muted-foreground">
-          Loading reconciliation data…
+        <div className="overflow-hidden rounded-[12px] border border-border bg-muted/30">
+          <ReconTableSkeleton rows={5} cols={5} />
         </div>
       ) : null}
       {error ? (

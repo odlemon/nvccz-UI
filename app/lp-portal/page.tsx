@@ -1,10 +1,5 @@
-import { LpPortalLayout } from "@/components/layout/lp-portal-layout"
-import { LpDashboard } from "@/components/lp-portal/lp-dashboard"
+import { LpPortalDashboardScreen } from "@/components/lp-portal/screens/lp-portal-dashboard-screen"
 
 export default function LpPortalPage() {
-  return (
-    <LpPortalLayout>
-      <LpDashboard />
-    </LpPortalLayout>
-  )
+  return <LpPortalDashboardScreen />
 }

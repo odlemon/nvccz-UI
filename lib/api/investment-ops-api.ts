@@ -124,6 +124,12 @@ export interface PortfolioTransaction {
   tradeDate: string
   journalEntryId: string | null
   realizedPnl?: string | number | null
+  orderId?: string | null
+  executionId?: string | null
+  tradeId?: string | null
+  documentId?: string | null
+  valuationRunId?: string | null
+  currencyCode?: string
 }
 
 export interface ExposureByExchange {
@@ -256,11 +262,16 @@ export interface Order {
   complianceStatus: "PASSED" | "BREACH" | "WARNING" | null
   notes: string | null
   tradeId: string | null
+  ownerName?: string | null
+  createdByName?: string | null
   createdById: string
   submittedAt: string | null
   approvedAt: string | null
   createdAt: string
   updatedAt: string
+  /** Optimistic concurrency — present on create/lifecycle responses. */
+  version?: number
+  auditVersion?: number
   instrument: Instrument
   approvals?: OrderApproval[]
   complianceResults?: OrderComplianceResult[]
@@ -283,19 +294,31 @@ export interface OrderComplianceCheck {
 }
 
 export interface OrderPreview {
-  grossConsideration: number
-  fees: number
-  taxes: number
-  settlementAmount: number
-  portfolioWeightAfterPct: number
-  cashImpact: number
-  nav: number
-  instrumentStatus: string
-  compliancePreview: {
+  id?: string
+  orderId?: string
+  inputHash?: string
+  revisionNo?: number
+  estimatedJson?: Record<string, any>
+  complianceJson?: {
+    outcome?: string
+    message?: string
+    checks?: OrderComplianceCheck[]
+  }
+  /** Legacy flattened preview shape (older clients). */
+  grossConsideration?: number
+  fees?: number
+  taxes?: number
+  settlementAmount?: number
+  portfolioWeightAfterPct?: number
+  cashImpact?: number
+  nav?: number
+  instrumentStatus?: string
+  compliancePreview?: {
     outcome: "PASSED" | "BREACH" | "WARNING" | string
     message: string
     checks: OrderComplianceCheck[]
   }
+  [key: string]: any
 }
 
 // ─── Trades ───────────────────────────────────────────────────────────────────
@@ -391,6 +414,9 @@ export interface OpsBlotter {
   status?: string
   fundId?: string | null
   orderCount?: number
+  ownerName?: string | null
+  createdByName?: string | null
+  createdById?: string | null
   createdAt?: string
   updatedAt?: string
   [key: string]: unknown
@@ -568,6 +594,61 @@ export interface OpsDocument {
   updatedAt: string
 }
 
+export interface PortfolioFolder {
+  id: string
+  fundId: string
+  name: string
+  path?: string
+  parentId?: string | null
+  sortOrder?: number
+  version?: number
+  isArchived?: boolean
+  [key: string]: unknown
+}
+
+export interface OrderConfiguration {
+  fundId: string
+  settlementPolicyJson?: Record<string, unknown>
+  approvalPolicyJson?: Record<string, unknown>
+  routingPolicyJson?: Record<string, unknown>
+  version?: number
+  [key: string]: unknown
+}
+
+export interface FileUploadSession {
+  uploadSessionId?: string
+  fileId?: string
+  status?: string
+  maxBytes?: number
+  allowedMimeTypes?: string[]
+  [key: string]: unknown
+}
+
+export interface SetupInstrumentType {
+  id: string
+  typeCode: string
+  displayName: string
+  isActive?: boolean
+  version?: number
+  isArchived?: boolean
+  [key: string]: unknown
+}
+
+export interface SetupTag {
+  id: string
+  code: string
+  name: string
+  isActive?: boolean
+  version?: number
+  isArchived?: boolean
+  [key: string]: unknown
+}
+
+export interface SetupCorporateActionMapping {
+  id: string
+  [key: string]: unknown
+}
+
 // ─── Reports ──────────────────────────────────────────────────────────────────
 export interface ReportTemplate {
   code: string
@@ -630,6 +711,11 @@ export interface ListedEquityFundConfig {
   coaMappingJson: Record<string, any>
   brokerProfileId: string | null
   custodianProfileId: string | null
+  costBasisMethod?: string | null
+  pricingSource?: string | null
+  settlementCycle?: string | null
+  cutoffTime?: string | null
+  cutoff?: string | null
   createdAt: string
   updatedAt: string
 }
@@ -713,6 +799,8 @@ export interface SetupCurrency {
   symbol: string
   isActive: boolean
   isDefault: boolean
+  decimalPlaces?: number
+  decimals?: number
   createdAt: string
   updatedAt: string
 }
@@ -945,6 +1033,19 @@ class InvestmentOpsApiService {
     return apiClient.post(`${this.BASE}/portfolios/${fundId}/recalculate`, {})
   }
 
+  async createPortfolio(data: {
+    name: string
+    baseCurrencyCode: string
+    description?: string
+    totalAmount?: string | number
+    status?: string
+    valuationPolicyJson?: Record<string, unknown>
+    settlementPolicyJson?: Record<string, unknown>
+    approvalPolicyJson?: Record<string, unknown>
+  }): Promise<InvestmentOpsResponse<OpsFund>> {
+    return apiClient.post(`${this.BASE}/portfolios`, data, { headers: idempotencyHeaders() })
+  }
+
   // ── Instruments ──────────────────────────────────────────────────────────────
   async getInstrumentTypes(): Promise<InvestmentOpsResponse<InstrumentType[]>> {
     return apiClient.get(`${this.BASE}/instruments/types`)
@@ -967,6 +1068,32 @@ class InvestmentOpsApiService {
     return apiClient.get(`${this.BASE}/instruments${qs ? `?${qs}` : ""}`)
   }
 
+  async createInstrument(data: {
+    ticker: string
+    shortName: string
+    fullName?: string
+    instrumentTypeCode: string
+    exchangeCode: string
+    marketCode?: string
+    countryCode?: string
+    listingCurrencyCode: string
+    valuationMethod?: string
+    isin?: string
+    sector?: string
+    industry?: string
+    pricingSource?: string
+  }): Promise<InvestmentOpsResponse<Instrument>> {
+    return apiClient.post(`${this.BASE}/instruments`, data, { headers: idempotencyHeaders() })
+  }
+
+  async submitInstrument(id: string, body: { expectedVersion?: number } = {}): Promise<InvestmentOpsResponse<Instrument>> {
+    return apiClient.post(`${this.BASE}/instruments/${id}/submit`, body, { headers: idempotencyHeaders() })
+  }
+
+  async approveInstrument(id: string, body: { expectedVersion?: number } = {}): Promise<InvestmentOpsResponse<Instrument>> {
+    return apiClient.post(`${this.BASE}/instruments/${id}/approve`, body, { headers: idempotencyHeaders() })
+  }
+
   // ── Market Data — Prices & Ingest ─────────────────────────────────────────────
   async getLatestPrices(params?: {
     search?: string
@@ -979,12 +1106,83 @@ class InvestmentOpsApiService {
     return apiClient.get(`${this.BASE}/market-data/prices/latest${qs ? `?${qs}` : ""}`)
   }
 
+  async getPriceHistory(
+    securityId: string,
+    params?: { from?: string; to?: string; page?: number; pageSize?: number; limit?: number },
+  ): Promise<
+    InvestmentOpsResponse<{
+      items?: { pricedAt?: string; price?: string | number }[]
+      series?: { pricedAt?: string; price?: string | number }[]
+      maxRangeDays?: number
+      page?: number
+      pageSize?: number
+      total?: number
+      [key: string]: unknown
+    }>
+  > {
+    const q = new URLSearchParams()
+    if (params?.from) q.append("from", params.from)
+    if (params?.to) q.append("to", params.to)
+    if (params?.page) q.append("page", String(params.page))
+    if (params?.pageSize) q.append("pageSize", String(params.pageSize))
+    else if (params?.limit) q.append("pageSize", String(params.limit))
+    const qs = q.toString()
+    return apiClient.get(`${this.BASE}/market-data/prices/${securityId}/history${qs ? `?${qs}` : ""}`)
+  }
+
+  async postManualPrice(data: {
+    securityId: string
+    price: string | number
+    priceType?: string
+  }): Promise<InvestmentOpsResponse<Record<string, unknown>>> {
+    return apiClient.post(`${this.BASE}/market-data/prices/manual`, data, {
+      headers: idempotencyHeaders(),
+    })
+  }
+
+  async uploadPrices(data: {
+    csvText: string
+    sourceCode?: string
+  }): Promise<InvestmentOpsResponse<Record<string, unknown>>> {
+    return apiClient.post(`${this.BASE}/market-data/prices/upload`, data, {
+      headers: idempotencyHeaders(),
+    })
+  }
+
+  async listValidationQueue(): Promise<InvestmentOpsResponse<Record<string, unknown>[] | OpsPaged<Record<string, unknown>>>> {
+    return apiClient.get(`${this.BASE}/market-data/validation-queue`)
+  }
+
+  async approveValidationTick(
+    tickId: string,
+    body: { reason?: string; expectedVersion?: number | string } = {},
+  ): Promise<InvestmentOpsResponse<Record<string, unknown>>> {
+    return apiClient.post(`${this.BASE}/market-data/validation-queue/${tickId}/approve`, body, {
+      headers: idempotencyHeaders(),
+    })
+  }
+
+  async rejectValidationTick(
+    tickId: string,
+    body: { reason: string; expectedVersion?: number | string },
+  ): Promise<InvestmentOpsResponse<Record<string, unknown>>> {
+    return apiClient.post(`${this.BASE}/market-data/validation-queue/${tickId}/reject`, body, {
+      headers: idempotencyHeaders(),
+    })
+  }
+
   async listIngestBatches(): Promise<InvestmentOpsResponse<IngestBatch[]>> {
     return apiClient.get(`${this.BASE}/market-data/ingest/batches`)
   }
 
   async getIngestBatchDetail(id: string): Promise<InvestmentOpsResponse<IngestBatchDetail>> {
     return apiClient.get(`${this.BASE}/market-data/ingest/batches/${id}`)
+  }
+
+  async runMarketDataIngest(data: Record<string, unknown> = {}): Promise<InvestmentOpsResponse<IngestBatch>> {
+    return apiClient.post(`${this.BASE}/market-data/ingest/run`, data, {
+      headers: idempotencyHeaders(),
+    })
   }
 
   // ── Orders ───────────────────────────────────────────────────────────────────
@@ -999,45 +1197,67 @@ class InvestmentOpsApiService {
   }
 
   async createOrder(data: {
-    fundId: string
-    instrumentId: string
-    side: "BUY" | "SELL"
-    quantity: number
-    executionPrice: number
-    orderType: "MARKET" | "LIMIT"
-    limitPrice?: number
+    previewId: string
+    inputHash: string
   }): Promise<InvestmentOpsResponse<Order>> {
-    return apiClient.post(`${this.BASE}/orders`, data)
+    return apiClient.post(`${this.BASE}/orders`, data, { headers: idempotencyHeaders() })
   }
 
   async previewOrder(data: {
     fundId: string
     instrumentId: string
     side: "BUY" | "SELL"
-    quantity: number
-    executionPrice: number
+    quantity: number | string
+    orderType: "MARKET" | "LIMIT" | string
+    limitPrice?: number | string | null
+    executionPrice?: number | string
+    tradeCurrency?: string
+    settlementCurrency?: string
+    tradeDate?: string
+    valueDate?: string
+    notes?: string
+    brokerProfileId?: string | null
+    custodianProfileId?: string | null
   }): Promise<InvestmentOpsResponse<OrderPreview>> {
-    return apiClient.post(`${this.BASE}/orders/preview`, data)
+    return apiClient.post(`${this.BASE}/orders/preview`, data, { headers: idempotencyHeaders() })
   }
 
   async getOrder(id: string): Promise<InvestmentOpsResponse<Order>> {
     return apiClient.get(`${this.BASE}/orders/${id}`)
   }
 
-  async submitOrder(id: string): Promise<InvestmentOpsResponse<Order>> {
-    return apiClient.post(`${this.BASE}/orders/${id}/submit`, {})
+  async submitOrder(
+    id: string,
+    body: { expectedVersion?: number | string } = {},
+  ): Promise<InvestmentOpsResponse<Order>> {
+    return apiClient.post(`${this.BASE}/orders/${id}/submit`, body, { headers: idempotencyHeaders() })
   }
 
-  async approveOrder(id: string): Promise<InvestmentOpsResponse<Order>> {
-    return apiClient.post(`${this.BASE}/orders/${id}/approve`, {})
+  async approveOrder(
+    id: string,
+    body: { expectedVersion?: number | string } = {},
+  ): Promise<InvestmentOpsResponse<Order>> {
+    return apiClient.post(`${this.BASE}/orders/${id}/approve`, body, { headers: idempotencyHeaders() })
   }
 
-  async sendOrderToBroker(id: string): Promise<InvestmentOpsResponse<Order>> {
-    return apiClient.post(`${this.BASE}/orders/${id}/send-to-broker`, {})
+  async sendOrderToBroker(
+    id: string,
+    body: {
+      expectedVersion?: number | string
+      venueCode?: string
+      brokerProfileId?: string
+    } = {},
+  ): Promise<InvestmentOpsResponse<Order>> {
+    return apiClient.post(`${this.BASE}/orders/${id}/send-to-broker`, body, {
+      headers: idempotencyHeaders(),
+    })
   }
 
-  async rejectOrder(id: string, reason: string): Promise<InvestmentOpsResponse<Order>> {
-    return apiClient.post(`${this.BASE}/orders/${id}/reject`, { reason })
+  async rejectOrder(
+    id: string,
+    data: { reason: string; expectedVersion?: number | string },
+  ): Promise<InvestmentOpsResponse<Order>> {
+    return apiClient.post(`${this.BASE}/orders/${id}/reject`, data, { headers: idempotencyHeaders() })
   }
 
   async cancelOrder(id: string, reason: string): Promise<InvestmentOpsResponse<Order>> {
@@ -1048,8 +1268,16 @@ class InvestmentOpsApiService {
     return apiClient.post(`${this.BASE}/orders/${id}/compliance-check`, {})
   }
 
-  async executeOrder(id: string): Promise<InvestmentOpsResponse<Order>> {
-    return apiClient.post(`${this.BASE}/orders/${id}/execute`, {})
+  /** Creates listedEquityTrade + sets order.tradeId (A17 blotter path). */
+  async executeOrder(
+    id: string,
+    body: {
+      expectedVersion?: number | string
+      quantity?: string | number
+      price?: string | number
+    } = {},
+  ): Promise<InvestmentOpsResponse<Order>> {
+    return apiClient.post(`${this.BASE}/orders/${id}/execute`, body, { headers: idempotencyHeaders() })
   }
 
   // ── Trades ───────────────────────────────────────────────────────────────────
@@ -1065,7 +1293,25 @@ class InvestmentOpsApiService {
   }
 
   async executeTrade(id: string): Promise<InvestmentOpsResponse<OpsTrade>> {
-    return apiClient.post(`${this.BASE}/trades/${id}/execute`, {})
+    return apiClient.post(`${this.BASE}/trades/${id}/execute`, {}, { headers: idempotencyHeaders() })
+  }
+
+  async confirmTrade(
+    id: string,
+    data: { externalOrderRef?: string; expectedVersion?: number | string } = {},
+  ): Promise<InvestmentOpsResponse<OpsTrade>> {
+    return apiClient.post(`${this.BASE}/trades/${id}/confirm`, data, { headers: idempotencyHeaders() })
+  }
+
+  async settleTrade(
+    id: string,
+    data: { allowDeferredAccounting?: boolean; expectedVersion?: number | string } = {},
+  ): Promise<InvestmentOpsResponse<OpsTrade>> {
+    return apiClient.post(
+      `${this.BASE}/trades/${id}/settle`,
+      { allowDeferredAccounting: true, ...data },
+      { headers: idempotencyHeaders() },
+    )
   }
 
   async getTradeRoutingHops(id: string): Promise<InvestmentOpsResponse<RoutingHop[]>> {
@@ -1073,19 +1319,143 @@ class InvestmentOpsApiService {
   }
 
   async confirmRoutingHop(tradeId: string, hopId: string): Promise<InvestmentOpsResponse<RoutingHop>> {
-    return apiClient.post(`${this.BASE}/trades/${tradeId}/routing-hops/${hopId}/confirm`, {})
+    return apiClient.post(`${this.BASE}/trades/${tradeId}/routing-hops/${hopId}/confirm`, {}, {
+      headers: idempotencyHeaders(),
+    })
   }
 
   async retryRoutingHop(tradeId: string, hopId: string): Promise<InvestmentOpsResponse<RoutingHop>> {
-    return apiClient.post(`${this.BASE}/trades/${tradeId}/routing-hops/${hopId}/retry`, {})
+    return apiClient.post(`${this.BASE}/trades/${tradeId}/routing-hops/${hopId}/retry`, {}, {
+      headers: idempotencyHeaders(),
+    })
   }
 
   async cancelRoutingHop(tradeId: string, hopId: string): Promise<InvestmentOpsResponse<RoutingHop>> {
-    return apiClient.post(`${this.BASE}/trades/${tradeId}/routing-hops/${hopId}/cancel`, {})
+    return apiClient.post(`${this.BASE}/trades/${tradeId}/routing-hops/${hopId}/cancel`, {}, {
+      headers: idempotencyHeaders(),
+    })
   }
 
   async getSettlementDocument(id: string): Promise<Blob> {
     return apiClient.get<Blob>(`${this.BASE}/trades/${id}/settlement-document`, { responseType: "blob" })
+  }
+
+  // ── Portfolio folders ────────────────────────────────────────────────────────
+  async listPortfolioFolders(
+    fundId: string,
+    params?: { includeArchived?: boolean },
+  ): Promise<InvestmentOpsResponse<PortfolioFolder[]>> {
+    const q = new URLSearchParams()
+    if (params?.includeArchived != null) q.append("includeArchived", String(params.includeArchived))
+    const qs = q.toString()
+    return apiClient.get(`${this.BASE}/portfolios/${fundId}/folders${qs ? `?${qs}` : ""}`)
+  }
+
+  async createPortfolioFolder(
+    fundId: string,
+    data: { name: string; parentId?: string | null; sortOrder?: number },
+  ): Promise<InvestmentOpsResponse<PortfolioFolder>> {
+    return apiClient.post(`${this.BASE}/portfolios/${fundId}/folders`, data, {
+      headers: idempotencyHeaders(),
+    })
+  }
+
+  async reorderPortfolioFolders(
+    fundId: string,
+    data: { orderedIds: string[] } | { items: Array<{ id: string; sortOrder: number; parentId?: string | null }> },
+  ): Promise<InvestmentOpsResponse<PortfolioFolder[]>> {
+    return apiClient.put(`${this.BASE}/portfolios/${fundId}/folders/reorder`, data)
+  }
+
+  async getFolder(id: string): Promise<InvestmentOpsResponse<PortfolioFolder>> {
+    return apiClient.get(`${this.BASE}/folders/${id}`)
+  }
+
+  async updateFolder(
+    id: string,
+    data: { name?: string; parentId?: string | null; sortOrder?: number; expectedVersion?: number },
+  ): Promise<InvestmentOpsResponse<PortfolioFolder>> {
+    return apiClient.patch(`${this.BASE}/folders/${id}`, data)
+  }
+
+  async archiveFolder(id: string, data: { expectedVersion?: number } = {}): Promise<InvestmentOpsResponse<PortfolioFolder>> {
+    return apiClient.post(`${this.BASE}/folders/${id}/archive`, data, { headers: idempotencyHeaders() })
+  }
+
+  async restoreFolder(id: string, data: { expectedVersion?: number } = {}): Promise<InvestmentOpsResponse<PortfolioFolder>> {
+    return apiClient.post(`${this.BASE}/folders/${id}/restore`, data, { headers: idempotencyHeaders() })
+  }
+
+  // ── Order configuration ──────────────────────────────────────────────────────
+  async getOrderConfiguration(fundId: string): Promise<InvestmentOpsResponse<OrderConfiguration>> {
+    return apiClient.get(`${this.BASE}/orders/configuration/${fundId}`)
+  }
+
+  async updateOrderConfiguration(
+    fundId: string,
+    data: Partial<OrderConfiguration> & { expectedVersion?: number | string },
+  ): Promise<InvestmentOpsResponse<OrderConfiguration>> {
+    return apiClient.patch(`${this.BASE}/orders/configuration/${fundId}`, data)
+  }
+
+  // ── Files ────────────────────────────────────────────────────────────────────
+  async createFileUploadSession(data: {
+    fundId: string
+    fileName: string
+    mimeType: string
+    byteSize: number
+    checksumSha256?: string | null
+  }): Promise<InvestmentOpsResponse<FileUploadSession>> {
+    return apiClient.post(`${this.BASE}/files/upload-sessions`, data, {
+      headers: idempotencyHeaders(),
+    })
+  }
+
+  async uploadFileContent(data: {
+    uploadSessionId: string
+    contentBase64: string
+    checksumSha256?: string
+  }): Promise<InvestmentOpsResponse<{ fileId: string; status?: string }>> {
+    return apiClient.post(`${this.BASE}/files`, data, { headers: idempotencyHeaders() })
+  }
+
+  async completeFileUpload(fileId: string): Promise<InvestmentOpsResponse<{ fileId: string; status?: string }>> {
+    return apiClient.post(`${this.BASE}/files/${fileId}/complete`, {}, { headers: idempotencyHeaders() })
+  }
+
+  async getFileStatus(fileId: string): Promise<InvestmentOpsResponse<Record<string, unknown>>> {
+    return apiClient.get(`${this.BASE}/files/${fileId}/status`)
+  }
+
+  /** Convenience: session → base64 body → complete → fileId */
+  async uploadBinaryFile(params: {
+    fundId: string
+    fileName: string
+    mimeType: string
+    contentBase64: string
+    byteSize: number
+    checksumSha256?: string | null
+  }): Promise<InvestmentOpsResponse<{ fileId: string }>> {
+    const session = await this.createFileUploadSession({
+      fundId: params.fundId,
+      fileName: params.fileName,
+      mimeType: params.mimeType,
+      byteSize: params.byteSize,
+      checksumSha256: params.checksumSha256 ?? null,
+    })
+    if (!session.success || !session.data) return session as InvestmentOpsResponse<{ fileId: string }>
+    const uploadSessionId = session.data.uploadSessionId || session.data.fileId
+    const uploaded = await this.uploadFileContent({
+      uploadSessionId,
+      contentBase64: params.contentBase64,
+      checksumSha256: params.checksumSha256 ?? undefined,
+    })
+    if (!uploaded.success || !uploaded.data?.fileId) {
+      return uploaded as InvestmentOpsResponse<{ fileId: string }>
+    }
+    const completed = await this.completeFileUpload(uploaded.data.fileId)
+    if (!completed.success) return completed as InvestmentOpsResponse<{ fileId: string }>
+    return { success: true, data: { fileId: uploaded.data.fileId } }
   }
 
   // ── Compliance ───────────────────────────────────────────────────────────────
@@ -1122,7 +1492,42 @@ class InvestmentOpsApiService {
   }
 
   async createComplianceOverride(data: { orderId: string; reason: string }): Promise<InvestmentOpsResponse<any>> {
-    return apiClient.post(`${this.BASE}/compliance/overrides`, data)
+    return apiClient.post(`${this.BASE}/compliance/overrides`, data, { headers: idempotencyHeaders() })
+  }
+
+  async listComplianceOverrides(params?: {
+    fundId?: string
+    orderId?: string
+    status?: string
+    page?: number
+    pageSize?: number
+  }): Promise<InvestmentOpsResponse<OpsPaged<Record<string, unknown>> | Record<string, unknown>[]>> {
+    const q = new URLSearchParams()
+    if (params?.fundId) q.append("fundId", params.fundId)
+    if (params?.orderId) q.append("orderId", params.orderId)
+    if (params?.status) q.append("status", params.status)
+    if (params?.page) q.append("page", String(params.page))
+    if (params?.pageSize) q.append("pageSize", String(params.pageSize))
+    const qs = q.toString()
+    return apiClient.get(`${this.BASE}/compliance/overrides${qs ? `?${qs}` : ""}`)
+  }
+
+  async approveComplianceOverride(
+    id: string,
+    body: { expectedVersion?: number | string } = {},
+  ): Promise<InvestmentOpsResponse<Record<string, unknown>>> {
+    return apiClient.post(`${this.BASE}/compliance/overrides/${id}/approve`, body, {
+      headers: idempotencyHeaders(),
+    })
+  }
+
+  async rejectComplianceOverride(
+    id: string,
+    body: { reason: string; expectedVersion?: number | string },
+  ): Promise<InvestmentOpsResponse<Record<string, unknown>>> {
+    return apiClient.post(`${this.BASE}/compliance/overrides/${id}/reject`, body, {
+      headers: idempotencyHeaders(),
+    })
   }
 
   // ── Blotters ─────────────────────────────────────────────────────────────────
@@ -1408,6 +1813,19 @@ class InvestmentOpsApiService {
     return apiClient.get(`${this.BASE}/accounting/ledger-exports${qs ? `?${qs}` : ""}`)
   }
 
+  async createLedgerExport(data: {
+    fundId: string
+    from: string
+    to: string
+    format?: string
+  }): Promise<InvestmentOpsResponse<Record<string, unknown>>> {
+    return apiClient.post(
+      `${this.BASE}/accounting/ledger-exports`,
+      { format: "JSON", ...data },
+      { headers: idempotencyHeaders() },
+    )
+  }
+
   async downloadLedgerExport(id: string): Promise<Blob> {
     return apiClient.get<Blob>(`${this.BASE}/accounting/ledger-exports/${id}/download`, {
       responseType: "blob",
@@ -1502,6 +1920,11 @@ class InvestmentOpsApiService {
       brokerProfileId?: string
       custodianProfileId?: string
       coaMappingJson?: Record<string, any>
+      costBasisMethod?: string
+      pricingSource?: string
+      settlementCycle?: string
+      cutoffTime?: string
+      cutoff?: string
     }
   ): Promise<InvestmentOpsResponse<ListedEquityFundConfig>> {
     return apiClient.put(`${this.BASE}/setup/funds/${id}/config`, data)
@@ -1616,6 +2039,163 @@ class InvestmentOpsApiService {
 
   async createIssuer(data: { issuerCode: string; legalName: string; countryCode: string }): Promise<InvestmentOpsResponse<SetupIssuer>> {
     return apiClient.post(`${this.BASE}/setup/issuers`, data)
+  }
+
+  // ── Setup — Instrument types / tags / corporate actions ──────────────────────
+  async listSetupInstrumentTypes(): Promise<InvestmentOpsResponse<SetupInstrumentType[] | OpsPaged<SetupInstrumentType>>> {
+    return apiClient.get(`${this.BASE}/setup/instrument-types`)
+  }
+
+  async createSetupInstrumentType(data: {
+    typeCode: string
+    displayName: string
+    isActive?: boolean
+  }): Promise<InvestmentOpsResponse<SetupInstrumentType>> {
+    return apiClient.post(`${this.BASE}/setup/instrument-types`, data, { headers: idempotencyHeaders() })
+  }
+
+  async listSetupTags(): Promise<InvestmentOpsResponse<SetupTag[] | OpsPaged<SetupTag>>> {
+    return apiClient.get(`${this.BASE}/setup/tags`)
+  }
+
+  async createSetupTag(data: {
+    code: string
+    name: string
+    isActive?: boolean
+  }): Promise<InvestmentOpsResponse<SetupTag>> {
+    return apiClient.post(`${this.BASE}/setup/tags`, data, { headers: idempotencyHeaders() })
+  }
+
+  async updateSetupTag(
+    id: string,
+    data: { name?: string; code?: string; isActive?: boolean; expectedVersion?: number | string },
+  ): Promise<InvestmentOpsResponse<SetupTag>> {
+    return apiClient.patch(`${this.BASE}/setup/tags/${id}`, data, { headers: idempotencyHeaders() })
+  }
+
+  async listCorporateActionMappings(): Promise<
+    InvestmentOpsResponse<SetupCorporateActionMapping[] | OpsPaged<SetupCorporateActionMapping>>
+  > {
+    return apiClient.get(`${this.BASE}/setup/corporate-action-mappings`)
+  }
+
+  async createCorporateActionMapping(
+    data: Record<string, unknown>,
+  ): Promise<InvestmentOpsResponse<SetupCorporateActionMapping>> {
+    return apiClient.post(`${this.BASE}/setup/corporate-action-mappings`, data, {
+      headers: idempotencyHeaders(),
+    })
+  }
+
+  async updateCorporateActionMapping(
+    id: string,
+    data: Record<string, unknown> & { expectedVersion?: number | string },
+  ): Promise<InvestmentOpsResponse<SetupCorporateActionMapping>> {
+    return apiClient.patch(`${this.BASE}/setup/corporate-action-mappings/${id}`, data, {
+      headers: idempotencyHeaders(),
+    })
+  }
+
+  async listInstrumentSubcategories(): Promise<
+    InvestmentOpsResponse<Array<Record<string, unknown>> | OpsPaged<Record<string, unknown>>>
+  > {
+    return apiClient.get(`${this.BASE}/setup/instrument-subcategories`)
+  }
+
+  async createInstrumentSubcategory(data: {
+    code?: string
+    name?: string
+    displayName?: string
+    instrumentTypeCode?: string
+    isActive?: boolean
+    [key: string]: unknown
+  }): Promise<InvestmentOpsResponse<Record<string, unknown>>> {
+    return apiClient.post(`${this.BASE}/setup/instrument-subcategories`, data, {
+      headers: idempotencyHeaders(),
+    })
+  }
+
+  async updateInstrumentSubcategory(
+    id: string,
+    data: Record<string, unknown> & { expectedVersion?: number | string },
+  ): Promise<InvestmentOpsResponse<Record<string, unknown>>> {
+    return apiClient.patch(`${this.BASE}/setup/instrument-subcategories/${id}`, data, {
+      headers: idempotencyHeaders(),
+    })
+  }
+
+  async archiveInstrumentSubcategory(
+    id: string,
+    body: { expectedVersion?: number | string } = {},
+  ): Promise<InvestmentOpsResponse<Record<string, unknown>>> {
+    return apiClient.post(`${this.BASE}/setup/instrument-subcategories/${id}/archive`, body, {
+      headers: idempotencyHeaders(),
+    })
+  }
+
+  async listCouponFrequencies(): Promise<
+    InvestmentOpsResponse<Array<Record<string, unknown>> | OpsPaged<Record<string, unknown>>>
+  > {
+    return apiClient.get(`${this.BASE}/setup/coupon-frequencies`)
+  }
+
+  async createCouponFrequency(data: {
+    code?: string
+    name?: string
+    displayName?: string
+    periodsPerYear?: number | string
+    [key: string]: unknown
+  }): Promise<InvestmentOpsResponse<Record<string, unknown>>> {
+    return apiClient.post(`${this.BASE}/setup/coupon-frequencies`, data, {
+      headers: idempotencyHeaders(),
+    })
+  }
+
+  async listSetupIcons(): Promise<
+    InvestmentOpsResponse<Array<Record<string, unknown>> | OpsPaged<Record<string, unknown>>>
+  > {
+    return apiClient.get(`${this.BASE}/setup/icons`)
+  }
+
+  async createSetupIcon(data: {
+    code?: string
+    name?: string
+    label?: string
+    [key: string]: unknown
+  }): Promise<InvestmentOpsResponse<Record<string, unknown>>> {
+    return apiClient.post(`${this.BASE}/setup/icons`, data, {
+      headers: idempotencyHeaders(),
+    })
+  }
+
+  async updateSetupIcon(
+    id: string,
+    data: Record<string, unknown>,
+  ): Promise<InvestmentOpsResponse<Record<string, unknown>>> {
+    return apiClient.patch(`${this.BASE}/setup/icons/${id}`, data)
+  }
+
+  async archiveSetupIcon(id: string): Promise<InvestmentOpsResponse<Record<string, unknown>>> {
+    return apiClient.post(`${this.BASE}/setup/icons/${id}/archive`, {}, {
+      headers: idempotencyHeaders(),
+    })
+  }
+
+  async listAccountingPostingStatus(params?: {
+    fundId?: string
+  }): Promise<
+    InvestmentOpsResponse<{
+      byStatus?: Record<string, number>
+      counts?: Record<string, number>
+      total?: number
+      recentFailures?: Array<Record<string, unknown>>
+      [key: string]: unknown
+    }>
+  > {
+    const q = new URLSearchParams()
+    if (params?.fundId) q.append("fundId", params.fundId)
+    const qs = q.toString()
+    return apiClient.get(`${this.BASE}/accounting/posting-status${qs ? `?${qs}` : ""}`)
   }
 
   // ── Setup — Price Sources ─────────────────────────────────────────────────────

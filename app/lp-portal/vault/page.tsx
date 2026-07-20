@@ -1,10 +1,5 @@
-import { LpPortalLayout } from "@/components/layout/lp-portal-layout"
-import { LpVault } from "@/components/lp-portal/lp-vault"
+import { redirect } from "next/navigation"
 
 export default function LpVaultPage() {
-  return (
-    <LpPortalLayout>
-      <LpVault />
-    </LpPortalLayout>
-  )
+  redirect("/lp-portal/documents")
 }

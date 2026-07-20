@@ -1,7 +1,9 @@
 'use client'
 
 import { type ReactNode, useEffect, useState } from 'react'
+import Link from 'next/link'
 import {
+  ArrowUpRight,
   Banknote,
   Calendar,
   ChevronDown,
@@ -18,6 +20,7 @@ import {
   Wallet,
 } from 'lucide-react'
 import { ReconApiBanner, ReconNavTabs, ViewSegment } from '@/components/investments-v2/recon-ui'
+import { ReconTableSkeleton } from '@/components/investments-v2/loading-skeletons'
 import { stockPickerCashApi } from '@/lib/api/stock-picker-cash-api'
 import {
   ComposedChart,
@@ -42,6 +45,34 @@ import { cn } from '@/lib/utils'
 const tabs = ['Ledger', 'Capital Calls', 'Distributions', 'Fees', 'Documents'] as const
 type LedgerView = 'trading' | 'fund'
 type LedgerRow = ReturnType<typeof mapCashLedgerRows>['items'][number]
+type FundActivityTab = Exclude<(typeof tabs)[number], 'Ledger'>
+
+const FUND_ACTIVITY_LINKS: Record<
+  FundActivityTab,
+  { href: string; title: string; description: string; note?: string }
+> = {
+  'Capital Calls': {
+    href: '/portfolio/funds/capital-calls',
+    title: 'Fund capital calls',
+    description: 'Issue notices, track paid vs outstanding, and manage LP call schedules in Fund Ops.',
+  },
+  Distributions: {
+    href: '/lp-portal/ledger',
+    title: 'LP distributions ledger',
+    description: 'Distribution notices and cash-out events are owned by the LP portal ledger, not the cash ledger API.',
+    note: 'Capital call activity (including some distribution offsets) may also appear under Fund Ops capital calls.',
+  },
+  Fees: {
+    href: '/lp-portal/ledger',
+    title: 'Management & admin fees',
+    description: 'Fee accruals and settlements are posted through the LP ledger module rather than fund cash ledger lines.',
+  },
+  Documents: {
+    href: '/investments-v2/documentation',
+    title: 'Investment documentation',
+    description: 'Fund notices, statements, and supporting files live in the Investments documentation register.',
+  },
+}
 
 export default function CashLedgerPage() {
   const [ledgerView, setLedgerView] = useState<LedgerView>('fund')
@@ -159,14 +190,6 @@ export default function CashLedgerPage() {
             <Control value={isFund ? 'All Funds' : 'All Clients'} />
             <LabeledControl label="Valuation Date" value="As of today" icon={<Calendar className="h-3.5 w-3.5" />} />
             <LabeledControl label="Currency" value="USD" />
-            <button
-              type="button"
-              className="inline-flex h-9 items-center gap-2 rounded-full border px-3 text-[12px]"
-              style={{ background: C.control, borderColor: C.controlBorder, color: C.text }}
-            >
-              <Upload className="h-3.5 w-3.5" style={{ color: C.muted }} />
-              Export
-            </button>
           </div>
         </header>
 
@@ -213,7 +236,6 @@ export default function CashLedgerPage() {
             </div>
             <div className="flex gap-2 pb-2 sm:pb-0">
               <GhostBtn icon={<Filter className="h-3.5 w-3.5" />}>Filters</GhostBtn>
-              <GhostBtn icon={<Columns3 className="h-3.5 w-3.5" />}>Columns</GhostBtn>
             </div>
           </div>
 
@@ -234,6 +256,13 @@ export default function CashLedgerPage() {
                     </tr>
                   </thead>
                   <tbody>
+                    {loading ? (
+                      <tr>
+                        <td colSpan={13} className="p-0">
+                          <ReconTableSkeleton rows={8} cols={13} />
+                        </td>
+                      </tr>
+                    ) : null}
                     {!loading && rows.length === 0 ? (
                       <tr>
                         <td colSpan={13} className="px-3 py-10 text-center text-[12px]" style={{ color: C.muted2 }}>
@@ -241,7 +270,8 @@ export default function CashLedgerPage() {
                         </td>
                       </tr>
                     ) : null}
-                    {rows.map((row, index) => (
+                    {!loading
+                      ? rows.map((row, index) => (
                       <tr key={`${row.date}-${row.description}-${index}`} style={{ borderBottom: `1px solid ${C.rowBorder}` }}>
                         <td className="whitespace-nowrap px-3 py-3 text-[12px]" style={{ color: C.muted }}>{row.date}</td>
                         {isFund ? (
@@ -267,7 +297,8 @@ export default function CashLedgerPage() {
                           </button>
                         </td>
                       </tr>
-                    ))}
+                    ))
+                      : null}
                   </tbody>
                 </table>
               </div>
@@ -297,9 +328,7 @@ export default function CashLedgerPage() {
               </div>
             </>
           ) : (
-            <div className="px-4 py-10 text-center text-[13px]" style={{ color: C.muted2 }}>
-              {tab} view — connect dedicated capital activity APIs when available.
-            </div>
+            <FundActivityDeepLinks tab={tab} />
           )}
         </section>
 
@@ -346,6 +375,47 @@ export default function CashLedgerPage() {
         ) : null}
       </div>
     </main>
+  )
+}
+
+function FundActivityDeepLinks({ tab }: { tab: FundActivityTab }) {
+  const link = FUND_ACTIVITY_LINKS[tab]
+  return (
+    <div className="space-y-4 px-4 py-8">
+      <div className="mx-auto max-w-xl space-y-2 text-center">
+        <p className="text-[13px] font-medium" style={{ color: C.text }}>
+          {tab} is not owned by the cash ledger API
+        </p>
+        <p className="text-[12px] leading-relaxed" style={{ color: C.muted2 }}>
+          Fund cash ledger lines cover bank receipts, payments, and running balances. {tab.toLowerCase()} activity is
+          maintained in a dedicated module — open it below to review or action records there.
+        </p>
+      </div>
+      <article
+        className="mx-auto max-w-xl rounded-[12px] border p-5"
+        style={{ background: C.control, borderColor: C.cardBorder }}
+      >
+        <h3 className="text-[14px] font-semibold" style={{ color: C.text }}>
+          {link.title}
+        </h3>
+        <p className="mt-2 text-[12px] leading-relaxed" style={{ color: C.muted }}>
+          {link.description}
+        </p>
+        {link.note ? (
+          <p className="mt-2 text-[11px] leading-relaxed" style={{ color: C.muted2 }}>
+            {link.note}
+          </p>
+        ) : null}
+        <Link
+          href={link.href}
+          className="mt-5 inline-flex h-10 items-center gap-2 rounded-full px-5 text-[12px] font-medium text-white transition hover:opacity-90"
+          style={{ background: C.blue }}
+        >
+          Open {tab}
+          <ArrowUpRight className="h-3.5 w-3.5" />
+        </Link>
+      </article>
+    </div>
   )
 }
 

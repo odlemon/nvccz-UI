@@ -518,22 +518,22 @@ function DetailPanel({
         ) : tasks.length === 0 ? (
           <p className="px-4 py-4 text-[11px] text-[#94a3b8]">No open tasks for this opportunity.</p>
         ) : (
-          <ul className="divide-y divide-[#f1f5f9]">
+        <ul className="divide-y divide-[#f1f5f9]">
             {tasks.map((t) => (
               <li key={t.id} className="flex items-start gap-2.5 px-4 py-3">
-                <span className="mt-0.5 w-8 h-8 rounded-lg bg-[#ede9fe] text-[#7c3aed] flex items-center justify-center shrink-0">
+              <span className="mt-0.5 w-8 h-8 rounded-lg bg-[#ede9fe] text-[#7c3aed] flex items-center justify-center shrink-0">
                   <Check className="w-4 h-4" strokeWidth={1.75} />
-                </span>
-                <div className="min-w-0 flex-1">
+              </span>
+              <div className="min-w-0 flex-1">
                   <p className="text-xs font-medium text-[#0f172a] leading-snug">{t.title}</p>
                   <p className="text-[11px] text-[#94a3b8] mt-0.5">{t.dueDate ? new Date(t.dueDate).toLocaleDateString() : "No due date"}</p>
-                </div>
-                <span className="shrink-0 rounded-md bg-[#dcfce7] text-[#15803d] px-2 py-0.5 text-[10px] font-medium mt-0.5">
+              </div>
+              <span className="shrink-0 rounded-md bg-[#dcfce7] text-[#15803d] px-2 py-0.5 text-[10px] font-medium mt-0.5">
                   {t.status || "OPEN"}
-                </span>
-              </li>
-            ))}
-          </ul>
+              </span>
+            </li>
+          ))}
+        </ul>
         )}
       </section>
 
@@ -542,21 +542,21 @@ function DetailPanel({
         {timeline.length === 0 ? (
           <p className="text-xs text-[#94a3b8]">No timeline events yet.</p>
         ) : (
-          <ul className="space-y-3">
+        <ul className="space-y-3">
             {timeline.slice(0, 8).map((item, i) => (
               <li key={i} className="flex items-start gap-2.5">
                 <span className="w-7 h-7 rounded-full bg-[#f1f5f9] text-[#64748b] flex items-center justify-center shrink-0">
                   <FileText className="w-3.5 h-3.5" strokeWidth={2} />
                 </span>
-                <div className="min-w-0 flex-1 pt-0.5">
+              <div className="min-w-0 flex-1 pt-0.5">
                   <p className="text-xs font-medium text-[#0f172a] leading-snug">
                     {item.type === "stage" ? `Moved to ${item.toStageCode}` : `${item.amountType} updated → ${item.newValue}`}
-                  </p>
+                </p>
                   <p className="mt-1 text-[10px] text-[#94a3b8]">{item.at ? new Date(item.at).toLocaleString() : ""}</p>
-                </div>
-              </li>
-            ))}
-          </ul>
+              </div>
+            </li>
+          ))}
+        </ul>
         )}
         <div className="mt-4 flex justify-end">
           <button
@@ -721,7 +721,7 @@ export function FundraisingPipelineBoard({
         </div>
       ) : (
         <>
-          <div className="flex flex-wrap gap-3 justify-start">
+      <div className="flex flex-wrap gap-3 justify-start">
             {[
               { id: "opps", label: "Open Opportunities", value: String(kpis.totalOpps), icon: Filter, accent: "#7c3aed" },
               { id: "indicative", label: "Indicative Pipeline", value: moneyLabel(kpis.indicativeSum), icon: Coins, accent: "#2563eb" },
@@ -729,36 +729,36 @@ export function FundraisingPipelineBoard({
               { id: "age", label: "Avg Stage Age", value: `${kpis.avgAge}d`, icon: Clock, accent: "#d97706" },
             ].map((kpi) => (
               <div key={kpi.id} className={cn(CARD, "flex items-center gap-3 px-3.5 py-3 w-[min(100%,200px)] shrink-0")}>
-                <span className="shrink-0" style={{ color: kpi.accent }}>
+              <span className="shrink-0" style={{ color: kpi.accent }}>
                   <kpi.icon className="w-7 h-7" strokeWidth={1.75} />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[11px] font-medium text-[#64748b] leading-tight truncate">{kpi.label}</p>
-                  <p className="mt-0.5 text-xl font-semibold text-[#0f172a] tabular-nums tracking-tight leading-none">
-                    {kpi.value}
-                  </p>
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-medium text-[#64748b] leading-tight truncate">{kpi.label}</p>
+                <p className="mt-0.5 text-xl font-semibold text-[#0f172a] tabular-nums tracking-tight leading-none">
+                  {kpi.value}
+                </p>
                 </div>
               </div>
             ))}
-          </div>
+      </div>
 
           <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-            <div
-              className={cn(
-                "grid gap-4 min-h-[min(70vh,780px)] items-stretch",
+      <div
+        className={cn(
+          "grid gap-4 min-h-[min(70vh,780px)] items-stretch",
                 selectedRow ? "grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px]" : "grid-cols-1",
-              )}
-            >
-              <div className="thin-scroll min-w-0 overflow-x-auto overflow-y-hidden rounded-[12px]">
-                <div className="flex gap-3 h-full min-h-[min(70vh,780px)] w-max">
+        )}
+      >
+        <div className="thin-scroll min-w-0 overflow-x-auto overflow-y-hidden rounded-[12px]">
+          <div className="flex gap-3 h-full min-h-[min(70vh,780px)] w-max">
                   {(board?.columns ?? []).map((col, colIdx) => {
                     const rows = rowsByStage.get(col.stage.stageCode) ?? []
-                    return (
-                      <div
+              return (
+                <div
                         key={col.stage.stageCode}
-                        className="w-[260px] shrink-0 flex flex-col rounded-[12px] bg-[#f1f5f9]/70 border border-[#eef2f7] h-full"
-                      >
-                        <div className="flex items-center gap-2 px-3 py-3 shrink-0">
+                  className="w-[260px] shrink-0 flex flex-col rounded-[12px] bg-[#f1f5f9]/70 border border-[#eef2f7] h-full"
+                >
+                  <div className="flex items-center gap-2 px-3 py-3 shrink-0">
                           <span
                             className="w-2 h-2 rounded-full shrink-0"
                             style={{ backgroundColor: STAGE_DOT_COLORS[colIdx % STAGE_DOT_COLORS.length] }}
@@ -766,10 +766,10 @@ export function FundraisingPipelineBoard({
                           <h3 className="text-sm font-semibold text-[#0f172a] truncate flex-1">
                             {col.stage.stageName || col.stage.stageCode}
                           </h3>
-                          <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full border border-[#e2e8f0] bg-white px-1.5 text-[11px] font-medium text-[#64748b] tabular-nums">
+                    <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full border border-[#e2e8f0] bg-white px-1.5 text-[11px] font-medium text-[#64748b] tabular-nums">
                             {rows.length}
-                          </span>
-                        </div>
+                    </span>
+                  </div>
 
                         <DroppableColumn stageCode={col.stage.stageCode}>
                           {rows.map((row) => (
@@ -778,36 +778,36 @@ export function FundraisingPipelineBoard({
                               row={row}
                               selected={row.id === selectedId}
                               onSelect={() => setSelectedId(row.id === selectedId ? null : row.id)}
-                            />
-                          ))}
+                      />
+                    ))}
                         </DroppableColumn>
 
-                        <div className="px-2.5 pb-2.5 shrink-0">
-                          <button
-                            type="button"
+                  <div className="px-2.5 pb-2.5 shrink-0">
+                    <button
+                      type="button"
                             onClick={() => setCreateOpen(true)}
-                            className="w-full h-9 rounded-full text-xs font-medium text-[#64748b] hover:bg-white hover:text-[#334155] border border-transparent hover:border-[#e2e8f0] transition-colors inline-flex items-center justify-center gap-1"
-                          >
-                            <Plus className="w-3.5 h-3.5" />
-                            Add Opportunity
-                          </button>
-                        </div>
-                      </div>
-                    )
-                  })}
+                      className="w-full h-9 rounded-full text-xs font-medium text-[#64748b] hover:bg-white hover:text-[#334155] border border-transparent hover:border-[#e2e8f0] transition-colors inline-flex items-center justify-center gap-1"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      Add Opportunity
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )
+            })}
+          </div>
+        </div>
 
               {selectedRow && (
-                <div className="min-w-0 lg:min-w-[360px] self-stretch">
+          <div className="min-w-0 lg:min-w-[360px] self-stretch">
                   <DetailPanel
                     row={selectedRow}
                     stageName={selectedStage?.stageName}
                     onReload={() => loadBoard(campaignId)}
                   />
-                </div>
-              )}
-            </div>
+          </div>
+        )}
+      </div>
 
             <DragOverlay>
               {activeCard ? (

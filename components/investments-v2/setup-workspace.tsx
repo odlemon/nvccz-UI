@@ -5,7 +5,16 @@ import {
   Check, ChevronDown, CircleAlert, CircleCheck, CircleX, GripVertical, Loader2,
   MessageCircle, Pencil, Plus, RefreshCw, Search, TriangleAlert, X,
 } from 'lucide-react'
+import { OpsListSkeleton, OpsTablePanelSkeleton, OpsTableSkeleton } from '@/components/investments-v2/loading-skeletons'
 import { cn } from '@/lib/utils'
+import {
+  formatOpsError,
+  investmentOpsApi,
+  unwrapList,
+  type SetupCorporateActionMapping,
+  type SetupInstrumentType,
+  type SetupTag,
+} from '@/lib/api/investment-ops-api'
 import { useAppDispatch, useAppSelector } from '@/lib/store'
 import {
   fetchBrokers,
@@ -17,6 +26,7 @@ import {
   fetchIssuers,
   fetchPriceSources,
   fetchSetupSettings,
+  updateSetupSettings,
   createBroker,
   createCustodian,
   createCommission,
@@ -77,8 +87,8 @@ export function Toggle({ checked, onChange }: { checked: boolean; onChange: (che
   </button>
 }
 
-export function SetupModal({ title, description, children, onClose, onSubmit, submitLabel = 'Save' }: {
-  title: string; description?: string; children: ReactNode; onClose: () => void; onSubmit: () => void; submitLabel?: string
+export function SetupModal({ title, description, children, onClose, onSubmit, submitLabel = 'Save', submitDisabled = false }: {
+  title: string; description?: string; children: ReactNode; onClose: () => void; onSubmit: () => void; submitLabel?: string; submitDisabled?: boolean
 }) {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm" onMouseDown={onClose}>
@@ -87,7 +97,7 @@ export function SetupModal({ title, description, children, onClose, onSubmit, su
           <button type="button" onClick={onClose} className="rounded-full p-2 text-[#8391a4] hover:bg-white/10 hover:text-white"><X className="h-4 w-4" /></button>
         </div>
         {children}
-        <div className="mt-6 flex justify-end gap-2"><button type="button" onClick={onClose} className={secondaryButtonClass}>Cancel</button><button type="button" onClick={onSubmit} className={buttonClass}>{submitLabel}</button></div>
+        <div className="mt-6 flex justify-end gap-2"><button type="button" onClick={onClose} className={secondaryButtonClass}>Cancel</button><button type="button" onClick={onSubmit} disabled={submitDisabled} className={buttonClass}>{submitLabel}</button></div>
       </div>
     </div>
   )
@@ -104,19 +114,25 @@ const referenceData: Record<string, { columns: string[]; rows: string[][] }> = {
   Markets: { columns: ['Code', 'Market', 'Country', 'Exchange', 'Status'], rows: [] },
 }
 
-const corporateRows = ['Dividend Code (without currency)', 'Dividend ex prefix for comment', 'Dividend pay prefix for comment', 'Coupon Code (without currency)', 'Coupon payment prefix comment', 'Cash account code (without currency)']
-const tags = [['Tag 0 Headline', 'Country'], ['Tag 1 Headline', 'Company'], ['Tag 2 Headline', 'Government'], ['Tag 3 Headline', 'OECD'], ['Tag 4 Headline', 'EU'], ['Tag 5 Headline', 'EEA'], ['Position Tag 1', 'Credit Institution'], ['Position Tag 2', 'Precious Metal'], ['Position Tag 3', 'Real Estate Exposure']]
-const initialCategories = ['Equity', 'Fund', 'Cash', 'ETF', 'Options', 'FX/Forwards', 'Futures', 'CFD', 'Certificate', 'Commodity', 'Bond']
-const initialInstruments = [
-  ['A', 'Equity', 'Equity', 'Equity', 'v, p, t', 'XXXXXXXXXXXX', 'XXXXXXXXXXXX'],
-  ['A01', 'Preferred', 'Preferred', '—', 'v, f, d, p, t', 'BPIPE_REFERENCE_SECURITY', 'SECURITY_TYP = COMMON STOCK'],
-  ['A02', 'ADR', 'ADR', '—', '—', 'BPIPE_REFERENCE_SECURITY', 'SECURITY_TYP = PREFERRED'],
-  ['A03', 'GDR', 'GDR', '—', '—', 'BPIPE_REFERENCE_SECURITY', 'SECURITY_TYP = ADR'],
-  ['A04', 'EDR', 'EDR', '—', '—', 'BPIPE_REFERENCE_SECURITY', 'SECURITY_TYP = EDR'],
-  ['A05', 'Coupon', 'Coupon', '—', '—', 'BPIPE_REFERENCE_SECURITY', 'SECURITY_TYP = MLP'],
-  ['A06', 'MLP', 'MLP', '—', '—', 'BPIPE_REFERENCE_SECURITY', 'SECURITY_TYP = REIT'],
-  ['A07', 'REITs', 'REITs', '—', '—', 'BPIPE_REFERENCE_SECURITY', 'SECURITY_TYP = PREFERRED'],
-]
+function mappingLabel(row: SetupCorporateActionMapping) {
+  const code = typeof row.code === 'string' ? row.code : ''
+  const name = typeof row.name === 'string' ? row.name : ''
+  return name || code || row.id
+}
+
+function mappingValue(row: SetupCorporateActionMapping) {
+  const external = typeof row.externalCode === 'string' ? row.externalCode : ''
+  const code = typeof row.code === 'string' ? row.code : ''
+  return external || code || '—'
+}
+
+function tagLabel(row: SetupTag) {
+  return row.name || row.code || row.id
+}
+
+function tagValue(row: SetupTag) {
+  return row.code || '—'
+}
 
 function StatusIcon({ name }: { name: string }) {
   const p = { className: 'h-4 w-4', strokeWidth: 1.5 }
@@ -155,15 +171,24 @@ export function ModuleSetupWorkspace({ orderSetupContent }: { orderSetupContent:
   const [activeTab, setActiveTab] = useState('Order Setup')
   const [editing, setEditing] = useState<string | null>(null)
   const [search, setSearch] = useState('')
-  const [modal, setModal] = useState<'reference' | 'type' | 'subcategory' | null>(null)
+  const [modal, setModal] = useState<'reference' | 'type' | 'subcategory' | 'corporate' | 'tag' | null>(null)
   const [referenceKind, setReferenceKind] = useState<'coupon' | 'icon' | null>(null)
   const [draft, setDraft] = useState({ code: '', name: '', extra: '' })
-  const [categories, setCategories] = useState(initialCategories)
-  const [category, setCategory] = useState('Equity')
-  const [instruments, setInstruments] = useState(initialInstruments)
-  const [couponRows, setCouponRows] = useState([['Monthly', '12', '12'], ['Quarterly', '4', '4'], ['Half Year', '2', '2'], ['Yearly', '1', '1']])
-  const [iconNames, setIconNames] = useState(['Error', 'Not Found', 'OK', 'OK but Old', 'Undefined', 'Not OK', 'Approved', 'Warnings'])
+  const [category, setCategory] = useState('')
+  const [instrumentTypes, setInstrumentTypes] = useState<SetupInstrumentType[]>([])
+  const [instrumentTypesLoading, setInstrumentTypesLoading] = useState(false)
+  const [corporateMappings, setCorporateMappings] = useState<SetupCorporateActionMapping[]>([])
+  const [setupTags, setSetupTags] = useState<SetupTag[]>([])
+  const [couponFrequencies, setCouponFrequencies] = useState<Array<Record<string, unknown>>>([])
+  const [setupIcons, setSetupIcons] = useState<Array<Record<string, unknown>>>([])
+  const [subcategories, setSubcategories] = useState<Array<Record<string, unknown>>>([])
+  const [setupRefLoading, setSetupRefLoading] = useState(false)
   const [setupLoadError, setSetupLoadError] = useState<string | null>(null)
+  const [createSaving, setCreateSaving] = useState(false)
+  const [tagEdits, setTagEdits] = useState<Record<string, string>>({})
+  const [corpEdits, setCorpEdits] = useState<Record<string, string>>({})
+  const [settingsEdits, setSettingsEdits] = useState<Record<string, string>>({})
+  const [editSaving, setEditSaving] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -188,6 +213,102 @@ export function ModuleSetupWorkspace({ orderSetupContent }: { orderSetupContent:
       cancelled = true
     }
   }, [dispatch])
+
+  const loadInstrumentTypes = async () => {
+    setInstrumentTypesLoading(true)
+    try {
+      const [typesRes, subRes] = await Promise.all([
+        investmentOpsApi.listSetupInstrumentTypes(),
+        investmentOpsApi.listInstrumentSubcategories().catch(() => null),
+      ])
+      if (!typesRes.success) throw new Error(formatOpsError(typesRes))
+      setInstrumentTypes(unwrapList<SetupInstrumentType>(typesRes.data))
+      if (subRes && subRes.success !== false) {
+        setSubcategories(unwrapList<Record<string, unknown>>(subRes.data))
+      } else {
+        setSubcategories([])
+      }
+    } catch (e) {
+      setInstrumentTypes([])
+      setSubcategories([])
+      setSetupLoadError(e instanceof Error ? e.message : 'Unable to load instrument types.')
+    } finally {
+      setInstrumentTypesLoading(false)
+    }
+  }
+
+  const loadSetupReference = async () => {
+    setSetupRefLoading(true)
+    try {
+      const [corpRes, tagRes, couponRes, iconRes] = await Promise.all([
+        investmentOpsApi.listCorporateActionMappings(),
+        investmentOpsApi.listSetupTags(),
+        investmentOpsApi.listCouponFrequencies(),
+        investmentOpsApi.listSetupIcons(),
+      ])
+      if (!corpRes.success) throw new Error(formatOpsError(corpRes))
+      if (!tagRes.success) throw new Error(formatOpsError(tagRes))
+      if (!couponRes.success) throw new Error(formatOpsError(couponRes))
+      if (!iconRes.success) throw new Error(formatOpsError(iconRes))
+      setCorporateMappings(unwrapList<SetupCorporateActionMapping>(corpRes.data))
+      setSetupTags(unwrapList<SetupTag>(tagRes.data))
+      setCouponFrequencies(unwrapList<Record<string, unknown>>(couponRes.data))
+      setSetupIcons(unwrapList<Record<string, unknown>>(iconRes.data))
+    } catch (e) {
+      setCorporateMappings([])
+      setSetupTags([])
+      setCouponFrequencies([])
+      setSetupIcons([])
+      setSetupLoadError(e instanceof Error ? e.message : 'Unable to load setup reference data.')
+    } finally {
+      setSetupRefLoading(false)
+    }
+  }
+
+  const couponTableRows = useMemo(
+    () =>
+      couponFrequencies.map((row) => [
+        String(row.name ?? row.displayName ?? '—'),
+        String(row.code ?? row.bloombergCode ?? '—'),
+        String(row.id ?? '—'),
+      ]),
+    [couponFrequencies],
+  )
+
+  useEffect(() => {
+    if (activeTab === 'Instrument Types') loadInstrumentTypes()
+  }, [activeTab])
+
+  useEffect(() => {
+    if (activeTab === 'Setup') loadSetupReference()
+  }, [activeTab])
+
+  const categories = useMemo(
+    () => instrumentTypes.map((t) => t.displayName || t.typeCode).filter(Boolean),
+    [instrumentTypes],
+  )
+
+  useEffect(() => {
+    if (!categories.length) {
+      if (category) setCategory('')
+      return
+    }
+    if (!category || !categories.includes(category)) setCategory(categories[0])
+  }, [categories, category])
+
+  const instrumentTableRows = useMemo(() => {
+    const selected = instrumentTypes.filter((t) => (t.displayName || t.typeCode) === category)
+    return selected.map((t) => [
+      t.typeCode || '—',
+      t.displayName || '—',
+      t.displayName || '—',
+      '—',
+      '—',
+      t.isActive === false ? 'Inactive' : 'Active',
+      '—',
+      '—',
+    ])
+  }, [instrumentTypes, category])
 
   const liveBrokerRows = useMemo(() => {
     const brokerRows = brokers.map((b) => [
@@ -239,7 +360,7 @@ export function ModuleSetupWorkspace({ orderSetupContent }: { orderSetupContent:
         c.code || '—',
         c.name || '—',
         c.symbol || '—',
-        '—',
+        c.decimalPlaces != null ? String(c.decimalPlaces) : c.decimals != null ? String(c.decimals) : '—',
         c.isDefault ? 'Yes' : 'No',
         c.isActive === false ? 'Inactive' : 'Active',
       ]),
@@ -310,7 +431,94 @@ export function ModuleSetupWorkspace({ orderSetupContent }: { orderSetupContent:
     (activeTab === 'Issuer' && issuersLoading) ||
     (activeTab === 'Markets' && marketsLoading)
 
-  const editAction = (key: string) => <button type="button" onClick={() => setEditing(editing === key ? null : key)} className="rounded-full p-2 text-[#73aef6] hover:bg-white/10 hover:text-white">{editing === key ? <Check className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}</button>
+  const editAction = (key: string) => (
+    <button
+      type="button"
+      disabled={editSaving}
+      onClick={() => {
+        void (async () => {
+          if (editing === key) {
+            setEditSaving(true)
+            try {
+              if (key === 'tags') {
+                for (const row of setupTags) {
+                  const nextName = (tagEdits[row.id] ?? tagValue(row)).trim()
+                  if (!nextName || nextName === tagValue(row)) continue
+                  const res = await investmentOpsApi.updateSetupTag(row.id, {
+                    name: nextName,
+                    expectedVersion: row.version,
+                  })
+                  if (!res.success) throw new Error(formatOpsError(res))
+                }
+                await loadSetupReference()
+              } else if (key === 'corporate') {
+                for (const row of corporateMappings) {
+                  const nextVal = (corpEdits[row.id] ?? mappingValue(row)).trim()
+                  if (!nextVal || nextVal === mappingValue(row)) continue
+                  const res = await investmentOpsApi.updateCorporateActionMapping(row.id, {
+                    externalCode: nextVal,
+                    expectedVersion: row.version as number | undefined,
+                  })
+                  if (!res.success) throw new Error(formatOpsError(res))
+                }
+                await loadSetupReference()
+              } else if (key === 'settings' && setupSettings) {
+                const next: Record<string, unknown> = { ...setupSettings }
+                for (const [displayKey, raw] of Object.entries(settingsEdits)) {
+                  const apiKey = displayKey.replace(/ /g, '_')
+                  const original = setupSettings[apiKey]
+                  if (typeof original === 'object' && original != null) {
+                    try {
+                      next[apiKey] = JSON.parse(raw)
+                    } catch {
+                      next[apiKey] = raw
+                    }
+                  } else if (typeof original === 'number') {
+                    next[apiKey] = Number(raw)
+                  } else if (typeof original === 'boolean') {
+                    next[apiKey] = raw === 'true'
+                  } else {
+                    next[apiKey] = raw
+                  }
+                }
+                await dispatch(updateSetupSettings(next as never)).unwrap()
+                dispatch(fetchSetupSettings())
+              }
+              setEditing(null)
+            } catch (e) {
+              setSetupLoadError(e instanceof Error ? e.message : 'Failed to save edits.')
+            } finally {
+              setEditSaving(false)
+            }
+            return
+          }
+          if (key === 'tags') {
+            const seed: Record<string, string> = {}
+            setupTags.forEach((row) => {
+              seed[row.id] = tagValue(row)
+            })
+            setTagEdits(seed)
+          } else if (key === 'corporate') {
+            const seed: Record<string, string> = {}
+            corporateMappings.forEach((row) => {
+              seed[row.id] = mappingValue(row)
+            })
+            setCorpEdits(seed)
+          } else if (key === 'settings') {
+            const seed: Record<string, string> = {}
+            settingsRows.forEach(([label, value]) => {
+              seed[label] = value
+            })
+            setSettingsEdits(seed)
+          }
+          setEditing(key)
+        })()
+      }}
+      className="rounded-full p-2 text-[#73aef6] hover:bg-white/10 hover:text-white disabled:opacity-50"
+    >
+      {editSaving && editing === key ? <Loader2 className="h-4 w-4 animate-spin" /> : editing === key ? <Check className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
+    </button>
+  )
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[#05090f]">
       <SetupHeader title="Investment Setup" description="Module-wide reference data, pricing and instrument configuration" />
@@ -325,7 +533,7 @@ export function ModuleSetupWorkspace({ orderSetupContent }: { orderSetupContent:
           <SetupCard title="Price API">
             <div className="space-y-2.5 p-5 text-[11px] text-[#8290a4]">
               {priceSourcesLoading ? (
-                <div className="flex items-center gap-2"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading price sources…</div>
+                <OpsListSkeleton rows={3} />
               ) : priceSources.length === 0 ? (
                 <p>No price sources returned by the API (empty stub or unset).</p>
               ) : (
@@ -341,19 +549,91 @@ export function ModuleSetupWorkspace({ orderSetupContent }: { orderSetupContent:
           <SetupCard title="Settings">
             <div className="space-y-2.5 p-5">
               {setupSettingsLoading ? (
-                <div className="flex items-center gap-2 text-[11px] text-[#8290a4]"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading settings…</div>
+                <OpsListSkeleton rows={5} />
               ) : settingsRows.length === 0 ? (
                 <p className="text-[11px] text-[#8290a4]">No settings payload returned (or API returned an empty stub list). See Phase 5 notes in design-refs/investments-v2-backend-asks.md.</p>
               ) : (
-                settingsRows.map(([l, v]) => <EditableRow key={l} label={l} value={v} edit={editing === 'settings'} />)
+                settingsRows.map(([l, v]) => (
+                  <EditableRow
+                    key={l}
+                    label={l}
+                    value={editing === 'settings' ? (settingsEdits[l] ?? v) : v}
+                    edit={editing === 'settings'}
+                    onChange={(next) => setSettingsEdits((prev) => ({ ...prev, [l]: next }))}
+                  />
+                ))
               )}
             </div>
           </SetupCard>
-          <SetupCard title="Corporate Actions" action={editAction('corporate')}><div className="space-y-2.5 p-5">{corporateRows.map(row => editing === 'corporate' ? <input key={row} defaultValue={row} className={cn(fieldClass, 'h-6')} /> : <div key={row} className="text-[11px] text-[#c8d0dc]">{row}</div>)}</div></SetupCard>
-          <SetupCard title="Tag Names" action={editAction('tags')} className="min-h-[390px]"><div className="space-y-2 p-5">{tags.map(([l, v]) => <EditableRow key={l} label={l} value={v} edit={editing === 'tags'} />)}</div></SetupCard>
-          <SetupCard title="Coupon Frequency" action={<button className={cn(buttonClass, 'h-7 px-4')} onClick={() => { setDraft({ code: '', name: '', extra: '' }); setReferenceKind('coupon'); setModal('reference') }}><Plus className="h-3 w-3" /> Add New</button>} className="min-h-[390px]"><DenseTable columns={['Frequency', 'Bloomberg', 'ID']} rows={couponRows} /></SetupCard>
-          <SetupCard title="Icons" action={<button className={cn(buttonClass, 'h-7 px-4')} onClick={() => { setDraft({ code: '', name: '', extra: '' }); setReferenceKind('icon'); setModal('reference') }}><Plus className="h-3 w-3" /> Add New</button>} className="min-h-[390px]">
-            <div className="overflow-x-auto"><table className="w-full"><thead><tr>{['Name', 'Icon', 'ID'].map(h => <th key={h} className="bg-white/[.035] px-5 py-2.5 text-left text-[9px] font-normal text-[#738095]">{h}</th>)}</tr></thead><tbody>{iconNames.map((name, i) => <tr key={`${name}-${i}`} className="border-b border-[#243044] last:border-0"><td className="px-5 py-3 text-[11px] text-[#e2e8f0]">{name}</td><td className="px-5 py-3 text-[#dce4ee]"><StatusIcon name={name} /></td><td className="px-5 py-3 text-[11px] text-[#8793a5]">{i % 4 + 1}</td></tr>)}</tbody></table></div>
+          <SetupCard title="Corporate Actions" action={
+            <div className="flex items-center gap-1">
+              <button type="button" className={cn(buttonClass, 'h-7 px-4')} onClick={() => { setDraft({ code: '', name: '', extra: '' }); setModal('corporate') }}><Plus className="h-3 w-3" /> Add New</button>
+              {editAction('corporate')}
+            </div>
+          }>
+            <div className="space-y-2.5 p-5">
+              {setupRefLoading ? (
+                <OpsListSkeleton rows={4} />
+              ) : corporateMappings.length === 0 ? (
+                <p className="text-[11px] text-[#8290a4]">No corporate action mappings returned by the API.</p>
+              ) : (
+                corporateMappings.map((row) => editing === 'corporate'
+                  ? (
+                    <input
+                      key={row.id}
+                      value={corpEdits[row.id] ?? mappingValue(row)}
+                      onChange={(e) => setCorpEdits((prev) => ({ ...prev, [row.id]: e.target.value }))}
+                      className={cn(fieldClass, 'h-6')}
+                    />
+                  )
+                  : <EditableRow key={row.id} label={mappingLabel(row)} value={mappingValue(row)} edit={false} />)
+              )}
+            </div>
+          </SetupCard>
+          <SetupCard title="Tag Names" action={
+            <div className="flex items-center gap-1">
+              <button type="button" className={cn(buttonClass, 'h-7 px-4')} onClick={() => { setDraft({ code: '', name: '', extra: '' }); setModal('tag') }}><Plus className="h-3 w-3" /> Add New</button>
+              {editAction('tags')}
+            </div>
+          } className="min-h-[390px]">
+            <div className="space-y-2 p-5">
+              {setupRefLoading ? (
+                <OpsListSkeleton rows={5} />
+              ) : setupTags.length === 0 ? (
+                <p className="text-[11px] text-[#8290a4]">No tags returned by the API.</p>
+              ) : (
+                setupTags.map((row) => (
+                  <EditableRow
+                    key={row.id}
+                    label={tagLabel(row)}
+                    value={editing === 'tags' ? (tagEdits[row.id] ?? tagValue(row)) : tagValue(row)}
+                    edit={editing === 'tags'}
+                    onChange={(next) => setTagEdits((prev) => ({ ...prev, [row.id]: next }))}
+                  />
+                ))
+              )}
+            </div>
+          </SetupCard>
+          <SetupCard title="Coupon Frequency" action={<button type="button" className={cn(buttonClass, 'h-7 px-4')} onClick={() => { setDraft({ code: '', name: '', extra: '' }); setReferenceKind('coupon'); setModal('reference') }}><Plus className="h-3 w-3" /> Add New</button>} className="min-h-[390px]">
+            {setupRefLoading ? (
+              <OpsTableSkeleton rows={5} cols={3} className="px-5 py-4" />
+            ) : couponTableRows.length === 0 ? (
+              <p className="p-5 text-[11px] text-[#8290a4]">No coupon frequencies returned by the API.</p>
+            ) : (
+              <DenseTable columns={['Frequency', 'Bloomberg', 'ID']} rows={couponTableRows} />
+            )}
+          </SetupCard>
+          <SetupCard title="Icons" action={<button type="button" className={cn(buttonClass, 'h-7 px-4')} onClick={() => { setDraft({ code: '', name: '', extra: '' }); setReferenceKind('icon'); setModal('reference') }}><Plus className="h-3 w-3" /> Add New</button>} className="min-h-[390px]">
+            {setupRefLoading ? (
+              <OpsTableSkeleton rows={5} cols={3} className="px-5 py-4" />
+            ) : setupIcons.length === 0 ? (
+              <p className="p-5 text-[11px] text-[#8290a4]">No icons returned by the API.</p>
+            ) : (
+              <div className="overflow-x-auto"><table className="w-full"><thead><tr>{['Name', 'Icon', 'ID'].map(h => <th key={h} className="bg-white/[.035] px-5 py-2.5 text-left text-[9px] font-normal text-[#738095]">{h}</th>)}</tr></thead><tbody>{setupIcons.map((row) => {
+                const name = String(row.name ?? row.label ?? row.code ?? '—')
+                return <tr key={String(row.id ?? name)} className="border-b border-[#243044] last:border-0"><td className="px-5 py-3 text-[11px] text-[#e2e8f0]">{name}</td><td className="px-5 py-3 text-[#dce4ee]"><StatusIcon name={name} /></td><td className="px-5 py-3 text-[11px] text-[#8793a5]">{String(row.id ?? '—')}</td></tr>
+              })}</tbody></table></div>
+            )}
           </SetupCard>
         </div>}
 
@@ -368,7 +648,7 @@ export function ModuleSetupWorkspace({ orderSetupContent }: { orderSetupContent:
             <div className="flex gap-2"><div className="relative flex-1 sm:w-60"><Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-[#627086]" /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search records…" className={cn(fieldClass, 'pl-9')} /></div><button className={buttonClass} onClick={() => { setDraft({ code: '', name: '', extra: '' }); setReferenceKind(null); setModal('reference') }}><Plus className="h-3.5 w-3.5" /> Add</button></div>
           </div>
           {liveTabLoading ? (
-            <div className="flex items-center gap-2 px-5 py-10 text-[11px] text-[#8290a4]"><Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…</div>
+            <OpsTableSkeleton rows={8} cols={data?.columns.length ?? 5} className="px-5 py-6" />
           ) : filtered.length === 0 ? (
             <div className="px-5 py-10 text-center text-[11px] text-[#8290a4]">
               {LIVE_REFERENCE_TABS.has(activeTab)
@@ -381,22 +661,181 @@ export function ModuleSetupWorkspace({ orderSetupContent }: { orderSetupContent:
         </section>}
 
         {activeTab === 'Instrument Types' && <div>
-          <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-[13px] font-semibold text-white">Instrument Type</h2><p className="mt-1 text-[9px] text-[#718095]">Classification and market-data mapping</p></div><div className="flex gap-2"><button className={buttonClass} onClick={() => { setDraft({ code: '', name: '', extra: '' }); setModal('type') }}>New Type</button><button className={buttonClass} onClick={() => { setDraft({ code: '', name: '', extra: '' }); setModal('subcategory') }}>New Sub Category</button></div></div>
-          <div className="mt-3 flex gap-2 overflow-x-auto border-b border-white/[.08] pb-4">{categories.map(item => <button key={item} onClick={() => setCategory(item)} className={cn('h-8 shrink-0 rounded-full px-4 text-[11px] font-medium transition', item === category ? 'bg-[#2f87fa] text-white shadow-[0_8px_24px_rgba(47,135,250,.24)]' : 'border border-white/[.04] bg-[#192536] text-[#d6dde7] hover:bg-[#26364d]')}>{item}</button>)}</div>
-          <section className={cn(cardClass, 'mt-4')}><header className="flex h-[52px] items-center px-5"><h3 className="text-[12px] font-medium text-white">Instruments · {category}</h3></header><DenseTable columns={['Code', 'Name', 'Title', 'Item', 'Fields', 'Status', 'API Filter I', 'API Filter II']} rows={instruments.map(row => [...row.slice(0, 5), 'Active', ...row.slice(5)])} /></section>
+          <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-[13px] font-semibold text-white">Instrument Type</h2><p className="mt-1 text-[9px] text-[#718095]">Classification and market-data mapping · loaded from setup/instrument-types</p></div><div className="flex gap-2"><button type="button" className={buttonClass} onClick={() => { setDraft({ code: '', name: '', extra: '' }); setModal('type') }}>New Type</button><button type="button" className={secondaryButtonClass} onClick={() => { setDraft({ code: '', name: '', extra: category || '' }); setModal('subcategory') }}>New Sub Category</button></div></div>
+          {instrumentTypesLoading ? (
+            <OpsTablePanelSkeleton rows={8} cols={8} showToolbar={false} className="mt-6 border-0 bg-transparent" />
+          ) : categories.length === 0 ? (
+            <div className="mt-6 rounded-2xl border border-white/[.06] bg-white/[.02] px-5 py-10 text-center text-[11px] text-[#8290a4]">No instrument types returned by the API.</div>
+          ) : (
+            <>
+              <div className="mt-3 flex gap-2 overflow-x-auto border-b border-white/[.08] pb-4">{categories.map(item => <button key={item} type="button" onClick={() => setCategory(item)} className={cn('h-8 shrink-0 rounded-full px-4 text-[11px] font-medium transition', item === category ? 'bg-[#2f87fa] text-white shadow-[0_8px_24px_rgba(47,135,250,.24)]' : 'border border-white/[.04] bg-[#192536] text-[#d6dde7] hover:bg-[#26364d]')}>{item}</button>)}</div>
+              <section className={cn(cardClass, 'mt-4')}><header className="flex h-[52px] items-center px-5"><h3 className="text-[12px] font-medium text-white">Instruments · {category}</h3></header>
+                {instrumentTableRows.length === 0 ? (
+                  <div className="px-5 py-10 text-center text-[11px] text-[#8290a4]">No instrument types in this category.</div>
+                ) : (
+                  <DenseTable columns={['Code', 'Name', 'Title', 'Item', 'Fields', 'Status', 'API Filter I', 'API Filter II']} rows={instrumentTableRows} />
+                )}
+              </section>
+              <section className={cn(cardClass, 'mt-4')}>
+                <header className="flex h-[52px] items-center px-5"><h3 className="text-[12px] font-medium text-white">Subcategories</h3></header>
+                {subcategories.length === 0 ? (
+                  <div className="px-5 py-8 text-center text-[11px] text-[#8290a4]">No subcategories returned. Create one with New Sub Category.</div>
+                ) : (
+                  <DenseTable
+                    columns={['Code', 'Name', 'Type', 'Status', 'ID']}
+                    rows={subcategories.map((row) => [
+                      String(row.code ?? '—'),
+                      String(row.name ?? row.displayName ?? '—'),
+                      String(row.instrumentTypeCode ?? '—'),
+                      row.isActive === false ? 'Inactive' : 'Active',
+                      String(row.id ?? '—'),
+                    ])}
+                  />
+                )}
+              </section>
+            </>
+          )}
         </div>}
       </div>
-      {modal && <SetupModal title={modal === 'type' ? 'New Instrument Type' : modal === 'subcategory' ? 'New Sub Category' : `Add ${referenceKind === 'coupon' ? 'Coupon Frequency' : referenceKind === 'icon' ? 'Icon' : activeTab}`} description={LIVE_REFERENCE_TABS.has(activeTab) && !referenceKind ? 'Creates a record via the Investment Ops API.' : 'Creates a local prototype record.'} onClose={() => setModal(null)} onSubmit={async () => {
-        const code = draft.code.trim(), name = draft.name.trim(), extra = draft.extra.trim(); if (!name && activeTab !== 'Commissions') return
-        if (modal === 'type') { setCategories(v => [...v, name]); setCategory(name); setModal(null); return }
-        if (modal === 'subcategory') { setInstruments(v => [...v, [code || 'NEW', name, name, '—', '—', 'BPIPE_REFERENCE_SECURITY', `SECURITY_TYP = ${name.toUpperCase()}`]]); setModal(null); return }
-        if (modal === 'reference' && referenceKind === 'coupon') {
-          const id = String(couponRows.length + 1)
-          setCouponRows(rows => [...rows, [name, code || id, id]])
-          setModal(null)
+      {modal && <SetupModal title={
+        modal === 'type' ? 'New Instrument Type'
+          : modal === 'subcategory' ? 'New Sub Category'
+            : modal === 'corporate' ? 'New Corporate Action Mapping'
+              : modal === 'tag' ? 'New Tag'
+                : `Add ${referenceKind === 'coupon' ? 'Coupon Frequency' : referenceKind === 'icon' ? 'Icon' : activeTab}`
+      } description={
+        modal === 'type' || modal === 'corporate' || modal === 'tag' || modal === 'subcategory'
+          ? 'Creates a record via the Investment Ops setup API.'
+          : LIVE_REFERENCE_TABS.has(activeTab) && !referenceKind
+              ? 'Creates a record via the Investment Ops API.'
+              : referenceKind === 'coupon' || referenceKind === 'icon'
+                ? 'Creates a record via the Investment Ops setup API.'
+                : 'Creates a record via the Investment Ops API when this tab is enabled for writes.'
+      } onClose={() => setModal(null)} onSubmit={async () => {
+        const code = draft.code.trim(), name = draft.name.trim(), extra = draft.extra.trim()
+        if (!name && modal !== 'corporate' && activeTab !== 'Commissions' && modal !== 'tag') return
+        if (modal === 'type') {
+          if (!name) return
+          setCreateSaving(true)
+          try {
+            const typeCode = code || name.toUpperCase().replace(/\s+/g, '_')
+            const res = await investmentOpsApi.createSetupInstrumentType({ typeCode, displayName: name, isActive: true })
+            if (!res.success) throw new Error(formatOpsError(res))
+            setModal(null)
+            setDraft({ code: '', name: '', extra: '' })
+            await loadInstrumentTypes()
+          } catch (e) {
+            setSetupLoadError(e instanceof Error ? e.message : 'Failed to create instrument type.')
+          } finally {
+            setCreateSaving(false)
+          }
           return
         }
-        if (modal === 'reference' && referenceKind === 'icon') { setIconNames(rows => [...rows, name]); setModal(null); return }
+        if (modal === 'corporate') {
+          if (!code && !name) return
+          setCreateSaving(true)
+          try {
+            const payload: Record<string, unknown> = {
+              code: code || name.toUpperCase().replace(/\s+/g, '_'),
+              name: name || code,
+              isActive: true,
+            }
+            if (extra) payload.externalCode = extra
+            const res = await investmentOpsApi.createCorporateActionMapping(payload)
+            if (!res.success) throw new Error(formatOpsError(res))
+            setModal(null)
+            setDraft({ code: '', name: '', extra: '' })
+            await loadSetupReference()
+          } catch (e) {
+            setSetupLoadError(e instanceof Error ? e.message : 'Failed to create corporate action mapping.')
+          } finally {
+            setCreateSaving(false)
+          }
+          return
+        }
+        if (modal === 'tag') {
+          if (!code && !name) return
+          setCreateSaving(true)
+          try {
+            const res = await investmentOpsApi.createSetupTag({
+              code: code || name.toUpperCase().replace(/\s+/g, '_'),
+              name: name || code,
+              isActive: true,
+            })
+            if (!res.success) throw new Error(formatOpsError(res))
+            setModal(null)
+            setDraft({ code: '', name: '', extra: '' })
+            await loadSetupReference()
+          } catch (e) {
+            setSetupLoadError(e instanceof Error ? e.message : 'Failed to create tag.')
+          } finally {
+            setCreateSaving(false)
+          }
+          return
+        }
+        if (modal === 'subcategory') {
+          if (!name && !code) return
+          setCreateSaving(true)
+          try {
+            const selectedType = instrumentTypes.find((t) => (t.displayName || t.typeCode) === category)
+            const res = await investmentOpsApi.createInstrumentSubcategory({
+              code: code || name.toUpperCase().replace(/\s+/g, '_'),
+              name: name || code,
+              displayName: name || code,
+              instrumentTypeCode: selectedType?.typeCode || extra || undefined,
+              isActive: true,
+            })
+            if (!res.success) throw new Error(formatOpsError(res))
+            setModal(null)
+            setDraft({ code: '', name: '', extra: '' })
+            await loadInstrumentTypes()
+          } catch (e) {
+            setSetupLoadError(e instanceof Error ? e.message : 'Failed to create subcategory.')
+          } finally {
+            setCreateSaving(false)
+          }
+          return
+        }
+        if (modal === 'reference' && referenceKind === 'coupon') {
+          if (!code && !name) return
+          setCreateSaving(true)
+          try {
+            const res = await investmentOpsApi.createCouponFrequency({
+              code: code || name.toUpperCase().replace(/\s+/g, '_'),
+              name: name || code,
+              isActive: true,
+            })
+            if (!res.success) throw new Error(formatOpsError(res))
+            setModal(null)
+            setDraft({ code: '', name: '', extra: '' })
+            await loadSetupReference()
+          } catch (e) {
+            setSetupLoadError(e instanceof Error ? e.message : 'Failed to create coupon frequency.')
+          } finally {
+            setCreateSaving(false)
+          }
+          return
+        }
+        if (modal === 'reference' && referenceKind === 'icon') {
+          if (!code && !name) return
+          setCreateSaving(true)
+          try {
+            const res = await investmentOpsApi.createSetupIcon({
+              code: code || name.toUpperCase().replace(/\s+/g, '_'),
+              name: name || code,
+              label: name || code,
+            })
+            if (!res.success) throw new Error(formatOpsError(res))
+            setModal(null)
+            setDraft({ code: '', name: '', extra: '' })
+            await loadSetupReference()
+          } catch (e) {
+            setSetupLoadError(e instanceof Error ? e.message : 'Failed to create icon.')
+          } finally {
+            setCreateSaving(false)
+          }
+          return
+        }
         if (modal === 'reference' && activeTab === 'Broker/Counterparties') {
           try {
             const email = code.includes('@') ? code : `${code || 'ops'}@example.com`
@@ -470,24 +909,24 @@ export function ModuleSetupWorkspace({ orderSetupContent }: { orderSetupContent:
           return
         }
         setModal(null)
-      }} submitLabel="Create">
+      }} submitLabel={createSaving ? 'Creating…' : 'Create'} submitDisabled={createSaving}>
         <div className="grid gap-4 sm:grid-cols-2">
           <label>
             <span className="mb-1.5 block text-[10px] text-[#8b99ad]">
-              {activeTab === 'Broker/Counterparties' ? 'Contact email' : activeTab === 'Commissions' ? 'Stakeholder profile id' : 'Code'}
+              {modal === 'type' ? 'Type code' : modal === 'corporate' ? 'Code' : modal === 'tag' ? 'Tag code' : activeTab === 'Broker/Counterparties' ? 'Contact email' : activeTab === 'Commissions' ? 'Stakeholder profile id' : 'Code'}
             </span>
-            <input autoFocus value={draft.code} onChange={e => setDraft(v => ({ ...v, code: e.target.value }))} className={fieldClass} placeholder={activeTab === 'Broker/Counterparties' ? 'ops@broker.com' : activeTab === 'Commissions' ? 'profile uuid' : 'e.g. EQ'} />
+            <input autoFocus value={draft.code} onChange={e => setDraft(v => ({ ...v, code: e.target.value }))} className={fieldClass} placeholder={modal === 'type' ? 'e.g. EQUITY' : modal === 'corporate' ? 'e.g. DIV' : modal === 'tag' ? 'e.g. CORE' : activeTab === 'Broker/Counterparties' ? 'ops@broker.com' : activeTab === 'Commissions' ? 'profile uuid' : 'e.g. EQ'} />
           </label>
           <label>
-            <span className="mb-1.5 block text-[10px] text-[#8b99ad]">{activeTab === 'Commissions' ? 'Rate (bps)' : 'Name'}</span>
-            <input value={draft.name} onChange={e => setDraft(v => ({ ...v, name: e.target.value }))} className={fieldClass} placeholder={activeTab === 'Commissions' ? '25' : 'Display name'} />
+            <span className="mb-1.5 block text-[10px] text-[#8b99ad]">{activeTab === 'Commissions' ? 'Rate (bps)' : modal === 'corporate' || modal === 'tag' ? 'Display name' : 'Name'}</span>
+            <input value={draft.name} onChange={e => setDraft(v => ({ ...v, name: e.target.value }))} className={fieldClass} placeholder={activeTab === 'Commissions' ? '25' : modal === 'corporate' ? 'Cash dividend' : modal === 'tag' ? 'Core holding' : 'Display name'} />
           </label>
-          {(activeTab === 'Broker/Counterparties' || activeTab === 'Countries' || activeTab === 'Markets' || activeTab === 'Issuer' || activeTab === 'Currencies') && !referenceKind && (
+          {(modal === 'corporate' || (activeTab === 'Broker/Counterparties' || activeTab === 'Countries' || activeTab === 'Markets' || activeTab === 'Issuer' || activeTab === 'Currencies') && !referenceKind) && (
             <label className="sm:col-span-2">
               <span className="mb-1.5 block text-[10px] text-[#8b99ad]">
-                {activeTab === 'Broker/Counterparties' ? 'Type (BROKER or CUSTODIAN)' : activeTab === 'Currencies' ? 'Symbol' : 'Country / region code'}
+                {modal === 'corporate' ? 'External code (optional)' : activeTab === 'Broker/Counterparties' ? 'Type (BROKER or CUSTODIAN)' : activeTab === 'Currencies' ? 'Symbol' : 'Country / region code'}
               </span>
-              <input value={draft.extra} onChange={e => setDraft(v => ({ ...v, extra: e.target.value }))} className={fieldClass} placeholder={activeTab === 'Broker/Counterparties' ? 'BROKER' : activeTab === 'Currencies' ? '$' : 'ZW'} />
+              <input value={draft.extra} onChange={e => setDraft(v => ({ ...v, extra: e.target.value }))} className={fieldClass} placeholder={modal === 'corporate' ? 'e.g. DVCA' : activeTab === 'Broker/Counterparties' ? 'BROKER' : activeTab === 'Currencies' ? '$' : 'ZW'} />
             </label>
           )}
         </div>
@@ -496,8 +935,28 @@ export function ModuleSetupWorkspace({ orderSetupContent }: { orderSetupContent:
   )
 }
 
-function EditableRow({ label, value, edit }: { label: string; value: string; edit: boolean }) {
-  return <div className="grid grid-cols-[minmax(0,1fr)_8px_minmax(70px,1fr)] items-center gap-2 text-[10.5px]"><span className="truncate text-[#778397]">{label}</span><span className="text-[#778397]">:</span>{edit ? <input defaultValue={value} className={cn(fieldClass, 'h-6 min-w-0')} /> : <span className="truncate font-medium text-[#e3e8f0]">{value}</span>}</div>
+function EditableRow({
+  label,
+  value,
+  edit,
+  onChange,
+}: {
+  label: string
+  value: string
+  edit: boolean
+  onChange?: (value: string) => void
+}) {
+  return (
+    <div className="grid grid-cols-[minmax(0,1fr)_8px_minmax(70px,1fr)] items-center gap-2 text-[10.5px]">
+      <span className="truncate text-[#778397]">{label}</span>
+      <span className="text-[#778397]">:</span>
+      {edit ? (
+        <input value={value} onChange={(e) => onChange?.(e.target.value)} className={cn(fieldClass, 'h-6 min-w-0')} />
+      ) : (
+        <span className="truncate font-medium text-[#e3e8f0]">{value}</span>
+      )}
+    </div>
+  )
 }
 
 export function DenseTable({ columns, rows, editable = false }: { columns: string[]; rows: string[][]; editable?: boolean }) {

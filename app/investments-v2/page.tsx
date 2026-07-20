@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Check, ChevronDown, Loader2, Search } from 'lucide-react'
+import { Check, ChevronDown, Search } from 'lucide-react'
+import { OpsPageSkeleton } from '@/components/investments-v2/loading-skeletons'
 import { useAppDispatch, useAppSelector } from '@/lib/store'
 import {
   fetchDashboardAllocation,
@@ -277,12 +278,10 @@ export default function InvestmentsDashboardPage() {
         </div>
       )}
 
-      {loading && portfolios.length === 0 && (
-        <div className="mb-3 flex items-center gap-2 text-[12px] text-[#8B95A7]">
-          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading dashboard…
-        </div>
-      )}
-
+      {loading && portfolios.length === 0 ? (
+        <OpsPageSkeleton className="mb-4" kpis={4} tableRows={8} tableCols={5} />
+      ) : (
+      <>
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_292px]">
         <section className="overflow-hidden rounded-[24px] border border-white/[0.025] bg-[linear-gradient(112deg,#172231_0%,#101a29_52%,#0c1522_100%)] shadow-[0_22px_70px_rgba(0,0,0,.18)]">
           <div className="flex min-h-[62px] flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
@@ -479,6 +478,8 @@ export default function InvestmentsDashboardPage() {
           </div>
         </section>
       </div>
+      </>
+      )}
     </div>
   )
 }

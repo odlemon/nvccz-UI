@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Check, FileCheck, Loader2, Plus, Search } from 'lucide-react'
+import { OpsKpiSkeleton, OpsTableSkeleton } from '@/components/investments-v2/loading-skeletons'
 import { NewEquityOrderModal } from '@/components/investments-v2/new-equity-order-modal'
 import { buttonClass, inputClass, Metric, OrdersCard, OrdersPage, Pill, SelectField, tableClass, tableWrapClass } from '@/components/investments-v2/orders-ui'
-import { investmentOpsApi } from '@/lib/api/investment-ops-api'
+import { formatOpsError, investmentOpsApi } from '@/lib/api/investment-ops-api'
 import {
   formatCompact,
   fundNameMap,
@@ -21,6 +22,8 @@ export default function TradeBlotterPage() {
   const [query, setQuery] = useState('')
   const [selected, setSelected] = useState<BlotterTradeRow | null>(null)
   const [showOrder, setShowOrder] = useState(false)
+  const [actionBusy, setActionBusy] = useState(false)
+  const [actionError, setActionError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -61,12 +64,30 @@ export default function TradeBlotterPage() {
 
   const money = (value: number | null | undefined) =>
     value == null || !Number.isFinite(value) ? '—' : value.toLocaleString('en-US', { minimumFractionDigits: 2 })
-  const updateSelected = (patch: Partial<BlotterTradeRow>) => {
-    if (!selected) return
-    const updated = { ...selected, ...patch }
-    setSelected(updated)
-    setTrades((items) => items.map((item) => (item.apiId === updated.apiId ? updated : item)))
+
+  const runTradeAction = async (action: () => Promise<{ success?: boolean; message?: string; error?: string; code?: string }>) => {
+    if (!selected?.apiId || actionBusy) return
+    setActionBusy(true)
+    setActionError(null)
+    try {
+      const res = await action()
+      if (res.success === false) {
+        setActionError(formatOpsError(res, 'Trade action failed'))
+        return
+      }
+      await load()
+    } catch (e) {
+      setActionError(formatOpsError(e, 'Trade action failed'))
+    } finally {
+      setActionBusy(false)
+    }
   }
+
+  const confirmSelectedTrade = () =>
+    runTradeAction(() => investmentOpsApi.confirmTrade(selected!.apiId))
+
+  const settleSelectedTrade = (allowDeferredAccounting: boolean) =>
+    runTradeAction(() => investmentOpsApi.settleTrade(selected!.apiId, { allowDeferredAccounting }))
 
   const grossTotal = trades.reduce((sum, t) => sum + t.gross, 0)
   const executedCount = trades.filter((t) => t.status === 'Executed').length
@@ -76,7 +97,7 @@ export default function TradeBlotterPage() {
   return (
     <OrdersPage
       title="Trade Blotter"
-      description="Executed and pending trades, confirmations and local settlement workflow."
+      description="Executed and pending trades with API confirmation and settlement actions."
       actions={
         <button className={cn(buttonClass, 'border-blue-500/40 bg-blue-600 text-white')} onClick={() => setShowOrder(true)}>
           <Plus className="h-3.5 w-3.5" /> New order
@@ -92,12 +113,16 @@ export default function TradeBlotterPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Metric label="Gross traded" value={loading ? '…' : formatCompact(grossTotal)} detail="All loaded trades" />
-        <Metric label="Executed" value={loading ? '…' : String(executedCount)} tone="text-emerald-300" />
-        <Metric label="Pending" value={loading ? '…' : String(pendingCount)} tone="text-amber-300" />
-        <Metric label="Unmatched" value={loading ? '…' : String(unmatchedCount)} tone="text-red-300" />
-      </div>
+      {loading && trades.length === 0 ? (
+        <OpsKpiSkeleton count={4} />
+      ) : (
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <Metric label="Gross traded" value={loading ? '…' : formatCompact(grossTotal)} detail="All loaded trades" />
+          <Metric label="Executed" value={loading ? '…' : String(executedCount)} tone="text-emerald-300" />
+          <Metric label="Pending" value={loading ? '…' : String(pendingCount)} tone="text-amber-300" />
+          <Metric label="Unmatched" value={loading ? '…' : String(unmatchedCount)} tone="text-red-300" />
+        </div>
+      )}
 
       <OrdersCard
         title="Trades"
@@ -144,9 +169,8 @@ export default function TradeBlotterPage() {
             <tbody>
               {loading && (
                 <tr>
-                  <td colSpan={18} className="py-12 text-center text-[11px] text-slate-500">
-                    <Loader2 className="mr-2 inline h-3.5 w-3.5 animate-spin" />
-                    Loading trades…
+                  <td colSpan={18} className="p-0">
+                    <OpsTableSkeleton rows={8} cols={8} />
                   </td>
                 </tr>
               )}
@@ -237,6 +261,11 @@ export default function TradeBlotterPage() {
               </div>
             </div>
           </div>
+          {actionError && (
+            <div className="mt-4 rounded-2xl border border-rose-400/20 bg-rose-400/[.08] px-4 py-3 text-[11px] text-rose-200">
+              {actionError}
+            </div>
+          )}
           <h3 className="mt-6 text-[11px] font-semibold">Settlement & confirmation</h3>
           <div className="mt-3 space-y-3">
             <div className="rounded-[18px] border border-white/[0.07] p-4">
@@ -248,11 +277,12 @@ export default function TradeBlotterPage() {
                 <Pill tone={selected.confirmation === 'Confirmed' ? 'green' : 'amber'}>{selected.confirmation}</Pill>
               </div>
               <button
-                disabled={selected.confirmation === 'Confirmed'}
+                disabled={actionBusy || selected.confirmation === 'Confirmed'}
                 className={cn(buttonClass, 'mt-3 w-full')}
-                onClick={() => updateSelected({ confirmation: 'Confirmed' })}
+                onClick={() => void confirmSelectedTrade()}
               >
-                <FileCheck className="h-3.5 w-3.5" /> Confirm trade
+                {actionBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileCheck className="h-3.5 w-3.5" />}
+                Confirm trade
               </button>
             </div>
             <div className="rounded-[18px] border border-white/[0.07] p-4">
@@ -266,27 +296,33 @@ export default function TradeBlotterPage() {
                 <Pill tone={selected.settlement === 'Settled' ? 'green' : 'amber'}>{selected.settlement}</Pill>
               </div>
               <button
-                disabled={selected.settlement === 'Settled'}
+                disabled={actionBusy || selected.settlement === 'Settled'}
                 className={cn(buttonClass, 'mt-3 w-full border-emerald-400/30 text-emerald-300')}
-                onClick={() => updateSelected({ settlement: 'Settled' })}
+                onClick={() => void settleSelectedTrade(true)}
               >
-                <Check className="h-3.5 w-3.5" /> Mark settled
+                {actionBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                Mark settled
               </button>
             </div>
             <div className="rounded-[18px] border border-white/[0.07] p-4">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-[11px] font-medium">Accounting posting</p>
-                  <p className="mt-1 text-[9px] text-slate-500">Create the local trade-date accounting marker.</p>
+                  <p className="mt-1 text-[9px] text-slate-500">Settle with immediate accounting via the trades API.</p>
                 </div>
                 <Pill tone={selected.accounting === 'Posted' ? 'green' : 'slate'}>{selected.accounting}</Pill>
               </div>
               <button
-                disabled={selected.accounting === 'Posted'}
+                disabled={
+                  actionBusy ||
+                  (selected.settlement === 'Settled' && selected.accounting === 'Posted') ||
+                  selected.accounting === 'Posted'
+                }
                 className={cn(buttonClass, 'mt-3 w-full border-blue-400/30 text-blue-300')}
-                onClick={() => updateSelected({ accounting: 'Posted' })}
+                onClick={() => void settleSelectedTrade(false)}
               >
-                <Check className="h-3.5 w-3.5" /> Mark posted
+                {actionBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                Mark posted
               </button>
             </div>
           </div>

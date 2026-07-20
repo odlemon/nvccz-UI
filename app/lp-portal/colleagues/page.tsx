@@ -1,13 +1,5 @@
-import { LpPortalLayout } from "@/components/layout/lp-portal-layout"
-import { ColleaguesAccessGuard } from "@/components/lp-portal/colleagues-access-guard"
-import { LpColleagues } from "@/components/lp-portal/lp-colleagues"
+import { redirect } from "next/navigation"
 
 export default function LpColleaguesPage() {
-  return (
-    <LpPortalLayout>
-      <ColleaguesAccessGuard>
-        <LpColleagues />
-      </ColleaguesAccessGuard>
-    </LpPortalLayout>
-  )
+  redirect("/lp-portal/organisation")
 }

@@ -540,8 +540,16 @@ export const sendOrderToBroker = createAsyncThunk(
 
 export const rejectOrder = createAsyncThunk(
   "investmentOps/rejectOrder",
-  async ({ id, reason }: { id: string; reason: string }) => {
-    const res = await investmentOpsApi.rejectOrder(id, reason)
+  async ({
+    id,
+    reason,
+    expectedVersion,
+  }: {
+    id: string
+    reason: string
+    expectedVersion?: number | string
+  }) => {
+    const res = await investmentOpsApi.rejectOrder(id, { reason, expectedVersion })
     if (!res.success) throw new Error(res.error || res.message || "Failed to reject order")
     return res.data as Order
   }
@@ -558,8 +566,18 @@ export const cancelOrder = createAsyncThunk(
 
 export const executeOrder = createAsyncThunk(
   "investmentOps/executeOrder",
-  async (id: string) => {
-    const res = await investmentOpsApi.executeOrder(id)
+  async ({
+    id,
+    expectedVersion,
+    quantity,
+    price,
+  }: {
+    id: string
+    expectedVersion?: number | string
+    quantity?: string | number
+    price?: string | number
+  }) => {
+    const res = await investmentOpsApi.executeOrder(id, { expectedVersion, quantity, price })
     if (!res.success) throw new Error(res.error || res.message || "Failed to execute order")
     return res.data as Order
   }
@@ -1226,13 +1244,13 @@ const investmentOpsSlice = createSlice({
       })
       .addCase(sendOrderToBroker.rejected, (state, action) => { state.orderActionLoadingById[action.meta.arg] = false })
 
-      .addCase(executeOrder.pending, (state, action) => { state.orderActionLoadingById[action.meta.arg] = true })
+      .addCase(executeOrder.pending, (state, action) => { state.orderActionLoadingById[action.meta.arg.id] = true })
       .addCase(executeOrder.fulfilled, (state, action) => {
         state.orderActionLoadingById[action.payload.id] = false
         const idx = state.orders.findIndex((o) => o.id === action.payload.id)
         if (idx >= 0) state.orders[idx] = action.payload
       })
-      .addCase(executeOrder.rejected, (state, action) => { state.orderActionLoadingById[action.meta.arg] = false })
+      .addCase(executeOrder.rejected, (state, action) => { state.orderActionLoadingById[action.meta.arg.id] = false })
 
       // reject/cancel take { id, reason } — key the loading map off meta.arg.id
       .addCase(rejectOrder.pending, (state, action) => { state.orderActionLoadingById[action.meta.arg.id] = true })

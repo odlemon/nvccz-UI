@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Loader2, Plus, Search } from 'lucide-react'
+import { OpsCardGridSkeleton, OpsTableSkeleton } from '@/components/investments-v2/loading-skeletons'
+import { PlaceEquityOrderModal } from '@/components/investments-v2/place-equity-order-modal'
 import { buttonClass, Field, inputClass, Modal, OrdersCard, OrdersPage, Pill, SelectField, tableClass, tableWrapClass } from '@/components/investments-v2/orders-ui'
 import { formatOpsError, investmentOpsApi, unwrapList, type OpsBlotter } from '@/lib/api/investment-ops-api'
 import {
@@ -33,7 +35,7 @@ function mapBlotterCards(data: unknown, fundNameById: Record<string, string>): B
       id: String(b.id ?? ''),
       name: String(b.name ?? b.title ?? 'Untitled blotter'),
       orders: Number(b.orderCount ?? 0),
-      owner: '—',
+      owner: String(b.ownerName ?? b.createdByName ?? '—'),
       portfolio: fundId ? fundNameById[fundId] ?? fundId : '—',
       updated: b.updatedAt
         ? new Date(String(b.updatedAt)).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -55,12 +57,14 @@ export default function OrderbookPage() {
   const [page, setPage] = useState(1)
   const [selected, setSelected] = useState<OrderbookRow | null>(null)
   const [newBlotter, setNewBlotter] = useState(false)
+  const [showOrder, setShowOrder] = useState(false)
   const [blotters, setBlotters] = useState<BlotterCard[]>([])
   const [blotterName, setBlotterName] = useState('')
   const [defaultPortfolioId, setDefaultPortfolioId] = useState('')
-  const [owner, setOwner] = useState('You')
   const [createBusy, setCreateBusy] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
+  const [lifeBusy, setLifeBusy] = useState(false)
+  const [lifeError, setLifeError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -145,14 +149,62 @@ export default function OrderbookPage() {
     }
   }
 
+  const runLifecycle = async (action: 'submit' | 'approve' | 'cancel' | 'send' | 'execute' | 'reject') => {
+    if (!selected?.apiId) return
+    setLifeBusy(true)
+    setLifeError(null)
+    try {
+      const body = { expectedVersion: selected.version }
+      let res
+      if (action === 'submit') res = await investmentOpsApi.submitOrder(selected.apiId, body)
+      else if (action === 'approve') res = await investmentOpsApi.approveOrder(selected.apiId, body)
+      else if (action === 'send') {
+        res = await investmentOpsApi.sendOrderToBroker(selected.apiId, {
+          expectedVersion: selected.version,
+        })
+      } else if (action === 'execute') {
+        const price = selected.execPrice ?? selected.limitPrice
+        res = await investmentOpsApi.executeOrder(selected.apiId, {
+          expectedVersion: selected.version,
+          quantity: selected.qty,
+          ...(price != null ? { price } : {}),
+        })
+      } else if (action === 'reject') {
+        const reason = window.prompt('Reject reason (required):')
+        if (!reason?.trim()) return
+        res = await investmentOpsApi.rejectOrder(selected.apiId, {
+          reason: reason.trim(),
+          expectedVersion: selected.version,
+        })
+      } else {
+        const reason = window.prompt('Cancel reason (required):')
+        if (!reason?.trim()) return
+        res = await investmentOpsApi.cancelOrder(selected.apiId, reason.trim())
+      }
+      if (res.success === false) throw new Error(formatOpsError(res, `Failed to ${action} order`))
+      await load()
+    } catch (e) {
+      setLifeError(formatOpsError(e, `Failed to ${action} order`))
+    } finally {
+      setLifeBusy(false)
+    }
+  }
+
+  const raw = selected?.rawStatus?.toUpperCase() ?? ''
+
   return (
     <OrdersPage
       title="Orderbook"
       description="Review the full order lifecycle, blotters and immutable status history."
       actions={
-        <button className={cn(buttonClass, 'border-blue-500/40 bg-blue-600 text-white hover:bg-blue-500')} onClick={() => setNewBlotter(true)}>
-          <Plus className="h-3.5 w-3.5" /> New Blotter
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button className={cn(buttonClass, 'border-blue-500/40 bg-blue-600 text-white hover:bg-blue-500')} onClick={() => setShowOrder(true)}>
+            <Plus className="h-3.5 w-3.5" /> New order
+          </button>
+          <button className={cn(buttonClass)} onClick={() => setNewBlotter(true)}>
+            <Plus className="h-3.5 w-3.5" /> New Blotter
+          </button>
+        </div>
       }
     >
       {error && (
@@ -165,8 +217,11 @@ export default function OrderbookPage() {
       )}
 
       <OrdersCard title="Open Blotters" eyebrow="Working sets">
+        {loading ? (
+          <OpsCardGridSkeleton count={6} />
+        ) : (
         <div className="grid gap-2 p-3 md:grid-cols-2 xl:grid-cols-3">
-          {blotters.length === 0 && !loading && (
+          {blotters.length === 0 && (
             <p className="col-span-full px-2 py-6 text-center text-[11px] text-slate-500">No blotters yet. Create one to group related orders.</p>
           )}
           {blotters.map((item) => (
@@ -192,41 +247,24 @@ export default function OrderbookPage() {
             </button>
           ))}
         </div>
+        )}
       </OrdersCard>
 
       <OrdersCard
         title="All orders"
         eyebrow={loading ? 'Loading…' : `${filtered.length} records`}
         actions={
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <div className="relative">
               <Search className="absolute left-3 top-3 h-3 w-3 text-slate-500" />
-              <input
-                value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value)
-                  setPage(1)
-                }}
-                placeholder="Search order, ticker, portfolio"
-                className={cn(inputClass, 'w-60 pl-8')}
-              />
+              <input className={cn(inputClass, 'w-56 pl-8')} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search order or ticker" />
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-[9px] uppercase tracking-wider text-slate-600">Sort by</span>
-              <SelectField
-                value={sort}
-                onChange={(value) => {
-                  setSort(value)
-                  setPage(1)
-                }}
-                className="w-40"
-              >
-                <option>Newest first</option>
-                <option>Oldest first</option>
-                <option>Largest value</option>
-                <option>Status</option>
-              </SelectField>
-            </div>
+            <SelectField value={sort} onChange={setSort}>
+              <option>Newest first</option>
+              <option>Oldest first</option>
+              <option>Largest value</option>
+              <option>Status</option>
+            </SelectField>
           </div>
         }
       >
@@ -234,8 +272,12 @@ export default function OrderbookPage() {
           {tabs.map((item) => (
             <button
               key={item}
+              type="button"
               onClick={() => changeTab(item)}
-              className={cn('whitespace-nowrap rounded-full px-3 py-1.5 text-[10px] font-medium text-slate-500 transition hover:text-white', tab === item && 'bg-blue-600 text-white')}
+              className={cn(
+                'h-8 shrink-0 rounded-full px-3 text-[10px]',
+                tab === item ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-white/5',
+              )}
             >
               {item}
             </button>
@@ -245,58 +287,37 @@ export default function OrderbookPage() {
           <table className={tableClass}>
             <thead>
               <tr>
-                <th>Order ref</th>
-                <th>Status</th>
-                <th>Blotter</th>
-                <th>Portfolio / fund</th>
-                <th>Instrument / master ref</th>
-                <th>Side</th>
-                <th>Type</th>
-                <th className="text-right">Qty / filled</th>
-                <th className="text-right">Exec / limit</th>
-                <th className="text-right">Consideration</th>
-                <th>Broker</th>
-                <th>Trader</th>
-                <th>Trade / value date</th>
-                <th>Approval</th>
-                <th>Routing</th>
+                {['Ref', 'Portfolio', 'Instrument', 'Side', 'Qty', 'Px', 'Gross', 'Broker', 'Trader', 'Dates', 'Approval', 'Routing'].map((h) => (
+                  <th key={h}>{h}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {loading && (
                 <tr>
-                  <td colSpan={15} className="py-12 text-center text-[11px] text-slate-500">
-                    <Loader2 className="mr-2 inline h-3.5 w-3.5 animate-spin" />
-                    Loading orders…
-                  </td>
-                </tr>
-              )}
-              {!loading && pageRows.length === 0 && (
-                <tr>
-                  <td colSpan={15} className="py-12 text-center text-[11px] text-slate-500">
-                    No orders found.
+                  <td colSpan={12} className="p-0">
+                    <OpsTableSkeleton rows={8} cols={8} />
                   </td>
                 </tr>
               )}
               {!loading &&
                 pageRows.map((order) => (
-                  <tr key={order.apiId || order.ref} onClick={() => setSelected(order)} className={cn('cursor-pointer', selected?.apiId === order.apiId && 'bg-blue-500/10')}>
-                    <td className="font-mono text-blue-300">{order.ref}</td>
-                    <td>
-                      <Pill tone={tone(order.status) as 'green' | 'amber' | 'blue' | 'red'}>{order.status}</Pill>
-                    </td>
-                    <td className="text-slate-400">{order.blotter}</td>
+                  <tr
+                    key={order.apiId || order.ref}
+                    onClick={() => {
+                      setLifeError(null)
+                      setSelected(order)
+                    }}
+                    className={cn('cursor-pointer hover:bg-white/[0.03]', selected?.apiId === order.apiId && 'bg-blue-500/10')}
+                  >
+                    <td className="font-mono">{order.ref}</td>
                     <td>{order.portfolio}</td>
                     <td>
-                      <b>{order.ticker}</b>
-                      <span className="ml-2 text-slate-500">{order.instrument}</span>
-                      <div className="font-mono text-[9px] text-slate-600">{order.masterRef}</div>
+                      {order.ticker}
+                      <div className="text-[9px] text-slate-600">{order.instrument}</div>
                     </td>
-                    <td className={order.side === 'BUY' ? 'text-emerald-300' : 'text-red-300'}>{order.side}</td>
-                    <td>{order.type}</td>
-                    <td className="text-right font-mono">
-                      {order.qty.toLocaleString()} / {order.filled.toLocaleString()}
-                    </td>
+                    <td>{order.side}</td>
+                    <td className="text-right font-mono">{order.qty.toLocaleString()}</td>
                     <td className="text-right font-mono">
                       {order.execPrice?.toFixed(2) ?? '—'} / {order.limitPrice?.toFixed(2) ?? 'MKT'}
                     </td>
@@ -354,6 +375,7 @@ export default function OrderbookPage() {
               'Trade date': selected.tradeDate,
               'Value date': selected.valueDate,
               Status: selected.status,
+              Version: String(selected.version),
             }).map(([label, value]) => (
               <div key={label} className="rounded-[16px] bg-white/[0.035] p-3">
                 <div className="text-[9px] uppercase text-slate-600">{label}</div>
@@ -361,6 +383,55 @@ export default function OrderbookPage() {
               </div>
             ))}
           </div>
+
+          <h3 className="mt-6 text-[11px] font-semibold">Lifecycle actions</h3>
+          {lifeError && <p className="mt-2 text-[10px] text-rose-300">{lifeError}</p>}
+          <div className="mt-3 flex flex-wrap gap-2">
+            {raw === 'DRAFT' && (
+              <button type="button" disabled={lifeBusy} className={cn(buttonClass, 'bg-blue-600 text-white')} onClick={() => void runLifecycle('submit')}>
+                {lifeBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                Submit
+              </button>
+            )}
+            {raw === 'SUBMITTED' && (
+              <button type="button" disabled={lifeBusy} className={cn(buttonClass, 'border-emerald-400/40 text-emerald-300')} onClick={() => void runLifecycle('approve')}>
+                {lifeBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                Approve
+              </button>
+            )}
+            {(raw === 'APPROVED' || raw === 'SUBMITTED' || raw === 'SENT_TO_BROKER' || raw === 'ROUTED') && (
+              <button type="button" disabled={lifeBusy} className={cn(buttonClass)} onClick={() => void runLifecycle('send')}>
+                Send to broker
+              </button>
+            )}
+            {(raw === 'APPROVED' || raw === 'SENT_TO_BROKER' || raw === 'ROUTED') && (
+              <button
+                type="button"
+                disabled={lifeBusy}
+                className={cn(buttonClass, 'bg-emerald-600 text-white')}
+                onClick={() => void runLifecycle('execute')}
+              >
+                {lifeBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                Execute (create trade)
+              </button>
+            )}
+            {(raw === 'SUBMITTED' || raw === 'APPROVED') && (
+              <button type="button" disabled={lifeBusy} className={cn(buttonClass, 'border-rose-400/30 text-rose-300')} onClick={() => void runLifecycle('reject')}>
+                Reject
+              </button>
+            )}
+            {!['CANCELLED', 'EXECUTED', 'SETTLED', 'REJECTED'].includes(raw) && (
+              <button type="button" disabled={lifeBusy} className={cn(buttonClass, 'border-rose-400/30 text-rose-300')} onClick={() => void runLifecycle('cancel')}>
+                Cancel
+              </button>
+            )}
+          </div>
+          {(raw === 'APPROVED' || raw === 'SENT_TO_BROKER' || raw === 'ROUTED') && (
+            <p className="mt-2 text-[9px] text-slate-500">
+              Send to broker alone does not create a blotter trade. Use Execute to create the trade, then Confirm/Settle on the blotter.
+            </p>
+          )}
+
           <h3 className="mt-6 text-[11px] font-semibold">Status</h3>
           <div className="mt-3 space-y-4 border-l border-white/10 pl-4">
             <div className="relative">
@@ -408,16 +479,10 @@ export default function OrderbookPage() {
               ))}
             </SelectField>
           </Field>
-          <Field label="Owner">
-            <SelectField value={owner} onChange={setOwner}>
-              <option>You</option>
-            </SelectField>
-          </Field>
-          <Field label="Trade date">
-            <input className={inputClass} type="date" />
-          </Field>
         </div>
       </Modal>
+
+      <PlaceEquityOrderModal open={showOrder} onClose={() => setShowOrder(false)} onComplete={() => void load()} />
     </OrdersPage>
   )
 }

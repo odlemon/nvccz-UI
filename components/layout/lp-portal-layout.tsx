@@ -1,10 +1,9 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
-import { usePathname, useRouter } from "next/navigation"
-import { SharedTopbar } from "./shared-topbar"
-import { MODULE_CONFIG, getModuleByPath } from "@/lib/config/modules"
+import { useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { LpPortalTopbar } from "./lp-portal-topbar"
 import { LpPortalSidebar } from "./lp-portal-sidebar"
 import { useRolePermissions } from "@/lib/hooks/useRolePermissions"
 import { toast } from "sonner"
@@ -14,13 +13,10 @@ interface LpPortalLayoutProps {
 }
 
 export function LpPortalLayout({ children }: LpPortalLayoutProps) {
-  const [currentModule, setCurrentModule] = useState("lp-portal")
-  const pathname = usePathname()
   const router = useRouter()
   const { hasModuleAccess, isLoading, isAuthenticated } = useRolePermissions()
+  const canAccessPortal = isAuthenticated && hasModuleAccess("lp-portal")
 
-  // Real RBAC gating (LIMITED_PARTNER role) rather than Application Portal's
-  // hardcoded string-role + force-logout — see plan §B.3 for the rationale.
   useEffect(() => {
     if (isLoading) return
     if (!isAuthenticated) {
@@ -33,28 +29,28 @@ export function LpPortalLayout({ children }: LpPortalLayoutProps) {
     }
   }, [isLoading, isAuthenticated, hasModuleAccess, router])
 
-  useEffect(() => {
-    const module = getModuleByPath(pathname)
-    if (module) {
-      setCurrentModule(module.id)
-    }
-  }, [pathname])
-
-  const handleModuleSelect = (module: string) => {
-    setCurrentModule(module)
-    const moduleConfig = MODULE_CONFIG.find((m) => m.id === module)
-    if (moduleConfig) {
-      window.location.href = moduleConfig.path
-    }
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+        <div className="size-8 animate-spin rounded-full border-2 border-slate-200 border-t-blue-600" />
+      </div>
+    )
   }
 
-  return (
-    <div className="min-h-screen bg-background">
-      <SharedTopbar onModuleSelect={handleModuleSelect} currentModule={currentModule} />
+  if (!canAccessPortal) return null
 
-      <div className="flex">
-        <LpPortalSidebar />
-        <main className="flex-1 overflow-auto">{children}</main>
+  return (
+    <div className="min-h-screen bg-slate-50 text-slate-950">
+      <LpPortalTopbar />
+      <div className="flex h-[calc(100vh-3.5rem)] min-h-0 sm:h-[calc(100vh-4rem)]">
+        <div className="hidden h-full lg:block">
+          <LpPortalSidebar />
+        </div>
+        <main className="min-w-0 flex-1 overflow-y-auto bg-[#f5f7fb]">
+          <div className="mx-auto min-h-full w-full max-w-[1500px] p-3 lg:p-4">
+            {children}
+          </div>
+        </main>
       </div>
     </div>
   )

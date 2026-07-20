@@ -1,10 +1,25 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Check, ChevronDown, FileText, History, Loader2, Search, ShieldCheck, Upload, X } from 'lucide-react'
+import { Check, ChevronDown, Download, FileText, History, Loader2, Search, ShieldCheck, Upload, X } from 'lucide-react'
+import { OpsTableSkeleton } from '@/components/investments-v2/loading-skeletons'
 import { useAppDispatch, useAppSelector } from '@/lib/store'
 import { createDocument, fetchDocuments, fetchPortfolios } from '@/lib/store/slices/investmentOpsSlice'
-import type { OpsDocument } from '@/lib/api/investment-ops-api'
+import { formatOpsError, investmentOpsApi, type OpsDocument } from '@/lib/api/investment-ops-api'
+
+function bufferToBase64(buf: ArrayBuffer) {
+  const bytes = new Uint8Array(buf)
+  let binary = ''
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]!)
+  return btoa(binary)
+}
+
+async function sha256Hex(buf: ArrayBuffer): Promise<string> {
+  const hash = await crypto.subtle.digest('SHA-256', buf)
+  return Array.from(new Uint8Array(hash))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('')
+}
 
 const categories = ['All documents', 'Trade Confirmations', 'Custodian & Bank', 'Valuation Packs', 'Legal & Compliance', 'Tax & Corporate Actions']
 
@@ -89,10 +104,12 @@ export default function DocumentationPage() {
   const [drawer, setDrawer] = useState<OpsDocument | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
-  const [fileName, setFileName] = useState('')
-  const [uploadFileId, setUploadFileId] = useState<string | null>(null)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [uploading, setUploading] = useState(false)
   const [documentType, setDocumentType] = useState('TRADE_CONFIRMATION')
   const [uploadFundId, setUploadFundId] = useState('')
+  const [downloadingId, setDownloadingId] = useState<string | null>(null)
+  const [downloadError, setDownloadError] = useState<string | null>(null)
 
   const selectedFundId = useMemo(() => {
     if (portfolio === 'All portfolios') return undefined
@@ -141,24 +158,57 @@ export default function DocumentationPage() {
   }, [documents])
 
   const submitUpload = async () => {
-    if (!fileName || !uploadFundId) return
+    if (!selectedFile || !uploadFundId) return
     setUploadError(null)
+    setUploading(true)
     try {
+      const buffer = await selectedFile.arrayBuffer()
+      const contentBase64 = bufferToBase64(buffer)
+      const checksumSha256 = await sha256Hex(buffer)
+      const uploadRes = await investmentOpsApi.uploadBinaryFile({
+        fundId: uploadFundId,
+        fileName: selectedFile.name,
+        mimeType: selectedFile.type || 'application/octet-stream',
+        contentBase64,
+        byteSize: selectedFile.size,
+        checksumSha256,
+      })
+      if (!uploadRes.success || !uploadRes.data?.fileId) {
+        throw new Error(formatOpsError(uploadRes))
+      }
       await dispatch(
         createDocument({
           fundId: uploadFundId,
           documentType,
-          title: fileName,
-          ...(uploadFileId ? { fileId: uploadFileId } : { fileRef: fileName }),
+          title: selectedFile.name,
+          fileId: uploadRes.data.fileId,
         }),
       ).unwrap()
       setUploadOpen(false)
-      setFileName('')
-      setUploadFileId(null)
-      setLinkedTrade('')
+      setSelectedFile(null)
       dispatch(fetchDocuments({ fundId: selectedFundId }))
     } catch (e) {
-      setUploadError(e instanceof Error ? e.message : 'Failed to create document')
+      setUploadError(formatOpsError(e))
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const downloadDoc = async (doc: OpsDocument) => {
+    setDownloadError(null)
+    setDownloadingId(doc.id)
+    try {
+      const blob = await investmentOpsApi.downloadDocument(doc.id)
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = doc.title || `${doc.id}.bin`
+      anchor.click()
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      setDownloadError(formatOpsError(e, 'Failed to download document'))
+    } finally {
+      setDownloadingId(null)
     }
   }
 
@@ -235,9 +285,8 @@ export default function DocumentationPage() {
               <tbody className="divide-y divide-white/[.045]">
                 {documentsLoading ? (
                   <tr>
-                    <td colSpan={10} className="px-4 py-10 text-center text-[#8290a4]">
-                      <Loader2 className="mr-2 inline h-3.5 w-3.5 animate-spin" />
-                      Loading documents…
+                    <td colSpan={10} className="p-0">
+                      <OpsTableSkeleton rows={7} cols={10} />
                     </td>
                   </tr>
                 ) : filtered.length === 0 ? (
@@ -275,16 +324,34 @@ export default function DocumentationPage() {
                       <td className="px-4 py-3 font-mono">v{document.versionNo}</td>
                       <td className="px-4 py-3 text-[#9eabbc]">—</td>
                       <td className="px-4 py-3">
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            setDrawer(document)
-                          }}
-                          className="rounded-full border border-white/10 p-2 hover:bg-white/10"
-                        >
-                          <History className="h-3 w-3" />
-                        </button>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            title="Download"
+                            disabled={downloadingId === document.id}
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              void downloadDoc(document)
+                            }}
+                            className="rounded-full border border-white/10 p-2 hover:bg-white/10 disabled:opacity-40"
+                          >
+                            {downloadingId === document.id ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <Download className="h-3 w-3" />
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              setDrawer(document)
+                            }}
+                            className="rounded-full border border-white/10 p-2 hover:bg-white/10"
+                          >
+                            <History className="h-3 w-3" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -301,7 +368,7 @@ export default function DocumentationPage() {
             <div className="flex items-center justify-between border-b border-white/[.07] p-5">
               <div>
                 <h2 className="text-sm font-semibold">Upload controlled document</h2>
-                <p className="mt-1 text-[10px] text-[#7890ad]">Creates a document record via the Investment Ops API. Send fileId when available from an upload job; otherwise fileRef is used.</p>
+                <p className="mt-1 text-[10px] text-[#7890ad]">Uploads file bytes via the files API, then creates a document record linked by fileId.</p>
               </div>
               <button type="button" onClick={() => setUploadOpen(false)} className="rounded-full p-2 hover:bg-white/10">
                 <X className="h-4 w-4" />
@@ -316,16 +383,14 @@ export default function DocumentationPage() {
                   <input
                     type="file"
                     onChange={(event) => {
-                      const file = event.target.files?.[0]
-                      setFileName(file?.name || '')
-                      const id = file ? (file as File & { fileId?: string }).fileId ?? null : null
-                      setUploadFileId(id)
+                      setSelectedFile(event.target.files?.[0] ?? null)
+                      setUploadError(null)
                     }}
                     className="absolute inset-0 cursor-pointer opacity-0"
                   />
                   <div>
                     <Upload className="mx-auto mb-2 h-4 w-4 text-[#68a9ff]" />
-                    {fileName || 'Choose a file from this device'}
+                    {selectedFile?.name || 'Choose a file from this device'}
                   </div>
                 </div>
               </label>
@@ -348,15 +413,6 @@ export default function DocumentationPage() {
                   }}
                 />
               </label>
-              <label className="sm:col-span-2">
-                <span className="mb-2 block text-[10px]">Upload file ID (optional)</span>
-                <input
-                  value={uploadFileId ?? ''}
-                  onChange={(event) => setUploadFileId(event.target.value.trim() || null)}
-                  placeholder="job_file_01 — from POST /files when available"
-                  className="h-9 w-full rounded-full border border-[#354257] bg-[#101927] px-4 text-[10px] outline-none focus:border-[#2f87fa]"
-                />
-              </label>
               {uploadError && <div className="sm:col-span-2 rounded-2xl border border-rose-400/20 bg-rose-400/[.08] p-3 text-[10px] text-rose-200">{uploadError}</div>}
             </div>
             <div className="flex justify-end gap-2 border-t border-white/[.07] p-4">
@@ -365,12 +421,12 @@ export default function DocumentationPage() {
               </button>
               <button
                 type="button"
-                disabled={!fileName || !uploadFundId || documentCreating}
+                disabled={!selectedFile || !uploadFundId || documentCreating || uploading}
                 onClick={submitUpload}
                 className="flex items-center gap-2 rounded-full bg-[#2f87fa] px-5 py-2 text-[10px] font-semibold disabled:opacity-40"
               >
-                {documentCreating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-                {documentCreating ? 'Creating…' : 'Create document'}
+                {documentCreating || uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                {uploading ? 'Uploading…' : documentCreating ? 'Creating…' : 'Create document'}
               </button>
             </div>
           </div>
@@ -401,12 +457,24 @@ export default function DocumentationPage() {
               <p>Created: {formatDate(drawer.createdAt)}</p>
               <p>Uploaded by: {drawer.uploadedById || '—'}</p>
             </div>
+            {downloadError && (
+              <div className="mt-4 rounded-2xl border border-rose-400/20 bg-rose-400/[.08] p-3 text-[10px] text-rose-200">{downloadError}</div>
+            )}
+            <button
+              type="button"
+              disabled={downloadingId === drawer.id}
+              onClick={() => void downloadDoc(drawer)}
+              className="mt-4 flex h-10 w-full items-center justify-center gap-2 rounded-full bg-[#2f87fa] text-[10px] font-semibold text-white disabled:opacity-40"
+            >
+              {downloadingId === drawer.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+              {downloadingId === drawer.id ? 'Downloading…' : 'Download file'}
+            </button>
             <div className="mt-5 rounded-2xl border border-amber-400/15 bg-amber-400/[.05] p-4 text-[10px] text-amber-100">
-              Version history, access control and audit trail endpoints exist in the API docs but are not wrapped on the Investment Ops client yet. Showing list metadata only.
+              Version history and access-control endpoints exist in OpenAPI but are not wired in this drawer yet. Download uses `GET /documents/:id/download`.
             </div>
             <div className="mt-5 rounded-2xl border border-emerald-400/15 bg-emerald-400/[.05] p-4 text-[10px] text-emerald-300">
               <ShieldCheck className="mr-2 inline h-3.5 w-3.5" />
-              Document list data is live from `/documents`.
+              Document list and download are live from `/documents`.
             </div>
           </aside>
         </div>

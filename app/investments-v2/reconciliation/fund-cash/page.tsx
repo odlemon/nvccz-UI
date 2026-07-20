@@ -13,13 +13,16 @@ import {
   Landmark,
   ListFilter,
   Percent,
+  Plus,
   Scale,
   Search,
   Settings,
   Upload,
   X,
 } from 'lucide-react'
+import { investmentOpsApi } from '@/lib/api/investment-ops-api'
 import { ReconApiBanner, ReconNavTabs } from '@/components/investments-v2/recon-ui'
+import { OpsKpiSkeleton, ReconTableSkeleton } from '@/components/investments-v2/loading-skeletons'
 import { stockPickerCashApi } from '@/lib/api/stock-picker-cash-api'
 import { unwrapList } from '@/lib/api/investment-ops-helpers'
 import {
@@ -67,6 +70,25 @@ export default function FundCashReconciliationPage() {
   const [suggestions, setSuggestions] = useState<FundSuggestion[]>([])
   const [rules, setRules] = useState<{ label: string; mode: string }[]>([])
   const [counts, setCounts] = useState({ matched: 0, breaks: 0, unmatched: 0 })
+  const [batchOpen, setBatchOpen] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
+  const [cashAccounts, setCashAccounts] = useState<{ id: string; label: string; currency?: string; fundId?: string }[]>([])
+  const [funds, setFunds] = useState<{ id: string; name: string }[]>([])
+  const [providers, setProviders] = useState<{ id: string; name: string }[]>([])
+  const [layouts, setLayouts] = useState<{ id: string; name: string }[]>([])
+  const [batchAccountId, setBatchAccountId] = useState('')
+  const [batchFundId, setBatchFundId] = useState('')
+  const [batchCurrency, setBatchCurrency] = useState('USD')
+  const [batchFrom, setBatchFrom] = useState(() => new Date().toISOString().slice(0, 10))
+  const [batchTo, setBatchTo] = useState(() => new Date().toISOString().slice(0, 10))
+  const [batchBusy, setBatchBusy] = useState(false)
+  const [batchError, setBatchError] = useState<string | null>(null)
+  const [importAccountId, setImportAccountId] = useState('')
+  const [importProviderId, setImportProviderId] = useState('')
+  const [importLayoutId, setImportLayoutId] = useState('')
+  const [importCurrency, setImportCurrency] = useState('USD')
+  const [importBusy, setImportBusy] = useState(false)
+  const [importError, setImportError] = useState<string | null>(null)
 
   const loadWorkspace = useCallback(async (id: string) => {
     const [wsRes, sumRes, batchSumRes] = await Promise.all([
@@ -96,10 +118,64 @@ export default function FundCashReconciliationPage() {
     setKpis(mapFundSummaryKpis(fundSummary, batchSummary))
   }, [])
 
+  const loadMasters = useCallback(async () => {
+    try {
+      const [accountsRes, fundsRes, providersRes, layoutsRes] = await Promise.all([
+        stockPickerCashApi.listClientCashAccounts({ page: 1, pageSize: 100 }),
+        investmentOpsApi.listPortfolios().catch(() => null),
+        stockPickerCashApi.listSetupProviders({ page: 1, pageSize: 100 }).catch(() => null),
+        stockPickerCashApi.listSetupFileLayouts({ page: 1, pageSize: 100 }).catch(() => null),
+      ])
+      if (accountsRes.success) {
+        const rows = unwrapList<Record<string, unknown>>(accountsRes.data).map((a) => ({
+          id: String(a.id ?? ''),
+          label: String(a.accountNumber ?? a.clientName ?? a.id ?? 'Account'),
+          currency: a.baseCurrency != null ? String(a.baseCurrency) : a.currency != null ? String(a.currency) : 'USD',
+          fundId: a.fundId != null ? String(a.fundId) : undefined,
+        })).filter((a) => a.id)
+        setCashAccounts(rows)
+        setBatchAccountId((prev) => prev || rows[0]?.id || '')
+        setImportAccountId((prev) => prev || rows[0]?.id || '')
+        if (rows[0]?.currency) {
+          setBatchCurrency((prev) => (prev === 'USD' || !prev ? rows[0]!.currency! : prev))
+          setImportCurrency((prev) => (prev === 'USD' || !prev ? rows[0]!.currency! : prev))
+        }
+        if (rows[0]?.fundId) setBatchFundId((prev) => prev || rows[0]!.fundId!)
+      }
+      if (fundsRes && fundsRes.success !== false) {
+        const fundRows = unwrapList<{ id?: string; name?: string }>(fundsRes.data).map((f) => ({
+          id: String(f.id ?? ''),
+          name: String(f.name ?? f.id ?? 'Fund'),
+        })).filter((f) => f.id)
+        setFunds(fundRows)
+        setBatchFundId((prev) => prev || fundRows[0]?.id || '')
+      }
+      if (providersRes && (providersRes as { success?: boolean }).success !== false) {
+        const provRows = unwrapList<Record<string, unknown>>((providersRes as { data?: unknown }).data).map((p) => ({
+          id: String(p.id ?? p.providerId ?? ''),
+          name: String(p.name ?? p.code ?? p.id ?? 'Provider'),
+        })).filter((p) => p.id)
+        setProviders(provRows)
+        setImportProviderId((prev) => prev || provRows[0]?.id || '')
+      }
+      if (layoutsRes && (layoutsRes as { success?: boolean }).success !== false) {
+        const layoutRows = unwrapList<Record<string, unknown>>((layoutsRes as { data?: unknown }).data).map((l) => ({
+          id: String(l.id ?? l.layoutId ?? ''),
+          name: String(l.name ?? l.code ?? l.id ?? 'Layout'),
+        })).filter((l) => l.id)
+        setLayouts(layoutRows)
+        setImportLayoutId((prev) => prev || layoutRows[0]?.id || '')
+      }
+    } catch {
+      /* masters optional for read of existing batches */
+    }
+  }, [])
+
   const refresh = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
+      await loadMasters()
       const [batchesRes, rulesRes] = await Promise.all([
         stockPickerCashApi.listReconciliationBatches({ page: 1, pageSize: 20, reconType: 'CASH_STATEMENT' }),
         stockPickerCashApi.getActiveReconciliationRules().catch(() => null),
@@ -146,7 +222,7 @@ export default function FundCashReconciliationPage() {
     } finally {
       setLoading(false)
     }
-  }, [loadWorkspace])
+  }, [loadMasters, loadWorkspace])
 
   useEffect(() => {
     void refresh()
@@ -221,6 +297,77 @@ export default function FundCashReconciliationPage() {
     }
   }
 
+  const createBatch = async () => {
+    if (!batchAccountId) {
+      setBatchError('Select a cash account')
+      return
+    }
+    setBatchBusy(true)
+    setBatchError(null)
+    try {
+      const res = await stockPickerCashApi.createReconciliationBatch({
+        cashAccountId: batchAccountId,
+        currency: batchCurrency || 'USD',
+        periodFrom: batchFrom,
+        periodTo: batchTo,
+        reconType: 'CASH_STATEMENT',
+        autoMatchEnabled: autoMatch,
+        ...(batchFundId ? { fundId: batchFundId } : {}),
+      })
+      const data = requireOpsData(res, 'create reconciliation batch') as { id?: string }
+      if (!data.id) throw new Error('Batch created without id')
+      setBatchOpen(false)
+      setActionMsg(`Batch ${data.id} created.`)
+      await refresh()
+    } catch (e) {
+      setBatchError(opsErrorMessage(e, 'Failed to create batch'))
+    } finally {
+      setBatchBusy(false)
+    }
+  }
+
+  const importStatementFile = async (file: File) => {
+    if (!importAccountId || !importProviderId) {
+      setImportError('Cash account and provider are required')
+      return
+    }
+    setImportBusy(true)
+    setImportError(null)
+    try {
+      const rawContent = await file.text()
+      const buf = await file.arrayBuffer()
+      const hashBuffer = await crypto.subtle.digest('SHA-256', buf)
+      const fileHash = Array.from(new Uint8Array(hashBuffer))
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join('')
+      const createRes = await stockPickerCashApi.createExternalStatementImport({
+        providerId: importProviderId,
+        cashAccountId: importAccountId,
+        currency: importCurrency || 'USD',
+        fileName: file.name,
+        fileHash,
+        ...(importLayoutId ? { layoutId: importLayoutId } : {}),
+        rawContent,
+      })
+      const created = requireOpsData(createRes, 'create statement import') as { id?: string }
+      if (!created.id) throw new Error('Import created without id')
+      await stockPickerCashApi.validateExternalStatementImport(created.id)
+      await stockPickerCashApi.submitExternalStatementImport(created.id)
+      try {
+        await stockPickerCashApi.commitExternalStatementImport(created.id)
+      } catch {
+        /* commit may need checker role — draft/submitted import still exists */
+      }
+      setImportOpen(false)
+      setActionMsg(`Statement import ${created.id} uploaded (validated/submitted).`)
+      await refresh()
+    } catch (e) {
+      setImportError(opsErrorMessage(e, 'Failed to import statement'))
+    } finally {
+      setImportBusy(false)
+    }
+  }
+
   return (
     <main className="min-h-full bg-background text-foreground p-5 sm:p-6" style={{ background: C.page, color: C.text }}>
       <div className="mx-auto max-w-[1680px] space-y-4">
@@ -232,21 +379,44 @@ export default function FundCashReconciliationPage() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <GhostBtn icon={<Settings className="h-3.5 w-3.5" />}>Reconciliation Rules</GhostBtn>
-            <GhostBtn icon={<Upload className="h-3.5 w-3.5" />}>Import Statements</GhostBtn>
-            <button type="button" className="inline-flex h-9 items-center gap-1.5 rounded-full px-4 text-[12px] font-semibold text-white" style={{ background: C.blue }}>
-              Actions
-              <ChevronDown className="h-3.5 w-3.5" />
+            <GhostBtn
+              icon={<Settings className="h-3.5 w-3.5" />}
+              onClick={() => setActionMsg(rules.length ? `Active rules: ${rules.map((r) => r.label).join(', ')}` : 'No active rules returned by API.')}
+            >
+              Reconciliation Rules
+            </GhostBtn>
+            <GhostBtn icon={<Upload className="h-3.5 w-3.5" />} onClick={() => { setImportError(null); setImportOpen(true) }}>
+              Import Statements
+            </GhostBtn>
+            <button
+              type="button"
+              onClick={() => { setBatchError(null); setBatchOpen(true) }}
+              className="inline-flex h-9 items-center gap-1.5 rounded-full px-4 text-[12px] font-semibold text-white"
+              style={{ background: C.blue }}
+            >
+              New batch
+              <Plus className="h-3.5 w-3.5" />
             </button>
           </div>
         </header>
 
         <ReconNavTabs variant="terminal-dark" />
-        <ReconApiBanner loading={loading} error={error} />
+        <ReconApiBanner loading={false} error={error} />
         {actionMsg ? (
           <div className="rounded-[10px] border border-border bg-muted/40 px-3 py-2 text-[12px] text-muted-foreground">{actionMsg}</div>
         ) : null}
 
+        {loading ? (
+          <div className="space-y-3">
+            <OpsKpiSkeleton count={5} />
+            <div className="grid gap-3 xl:grid-cols-3">
+              <div className="overflow-hidden rounded-[12px] border border-border"><ReconTableSkeleton rows={6} cols={4} /></div>
+              <div className="overflow-hidden rounded-[12px] border border-border"><ReconTableSkeleton rows={6} cols={4} /></div>
+              <div className="overflow-hidden rounded-[12px] border border-border"><ReconTableSkeleton rows={6} cols={4} /></div>
+            </div>
+          </div>
+        ) : (
+        <>
         <section className="flex flex-wrap items-end gap-3 rounded-[12px] border p-3" style={{ background: C.card, borderColor: C.cardBorder }}>
           <Field label="Fund" value={kpis.fundsLabel} className="min-w-[180px] flex-1" />
           <Field label="Batch" value={batchId ?? '—'} className="min-w-[180px] flex-1" />
@@ -484,7 +654,112 @@ export default function FundCashReconciliationPage() {
             )}
           </article>
         </section>
+        </>
+        )}
       </div>
+
+      {batchOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onMouseDown={() => setBatchOpen(false)}>
+          <div className="w-full max-w-md rounded-[16px] border p-5" style={{ background: C.card, borderColor: C.cardBorder }} onMouseDown={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h2 className="text-[15px] font-semibold">New reconciliation batch</h2>
+              <button type="button" onClick={() => setBatchOpen(false)} className="rounded-full p-1"><X className="h-4 w-4" /></button>
+            </div>
+            {batchError && <p className="mt-3 text-[11px] text-rose-300">{batchError}</p>}
+            <div className="mt-4 space-y-3">
+              <label className="block text-[11px]" style={{ color: C.muted2 }}>
+                Cash account
+                <select value={batchAccountId} onChange={(e) => setBatchAccountId(e.target.value)} className="mt-1 h-9 w-full rounded-full border px-3 text-[12px]" style={{ background: C.control, borderColor: C.controlBorder, color: C.text }}>
+                  <option value="">Select…</option>
+                  {cashAccounts.map((a) => <option key={a.id} value={a.id}>{a.label}</option>)}
+                </select>
+              </label>
+              <label className="block text-[11px]" style={{ color: C.muted2 }}>
+                Fund (optional)
+                <select value={batchFundId} onChange={(e) => setBatchFundId(e.target.value)} className="mt-1 h-9 w-full rounded-full border px-3 text-[12px]" style={{ background: C.control, borderColor: C.controlBorder, color: C.text }}>
+                  <option value="">—</option>
+                  {funds.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+                </select>
+              </label>
+              <label className="block text-[11px]" style={{ color: C.muted2 }}>
+                Currency
+                <input value={batchCurrency} onChange={(e) => setBatchCurrency(e.target.value)} className="mt-1 h-9 w-full rounded-full border px-3 text-[12px]" style={{ background: C.control, borderColor: C.controlBorder, color: C.text }} />
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="block text-[11px]" style={{ color: C.muted2 }}>
+                  From
+                  <input type="date" value={batchFrom} onChange={(e) => setBatchFrom(e.target.value)} className="mt-1 h-9 w-full rounded-full border px-3 text-[12px]" style={{ background: C.control, borderColor: C.controlBorder, color: C.text }} />
+                </label>
+                <label className="block text-[11px]" style={{ color: C.muted2 }}>
+                  To
+                  <input type="date" value={batchTo} onChange={(e) => setBatchTo(e.target.value)} className="mt-1 h-9 w-full rounded-full border px-3 text-[12px]" style={{ background: C.control, borderColor: C.controlBorder, color: C.text }} />
+                </label>
+              </div>
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <GhostBtn onClick={() => setBatchOpen(false)}>Cancel</GhostBtn>
+              <button type="button" disabled={batchBusy} onClick={() => void createBatch()} className="inline-flex h-9 items-center rounded-full px-4 text-[12px] font-semibold text-white disabled:opacity-50" style={{ background: C.blue }}>
+                {batchBusy ? 'Creating…' : 'Create batch'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {importOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onMouseDown={() => setImportOpen(false)}>
+          <div className="w-full max-w-md rounded-[16px] border p-5" style={{ background: C.card, borderColor: C.cardBorder }} onMouseDown={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h2 className="text-[15px] font-semibold">Import bank statement</h2>
+              <button type="button" onClick={() => setImportOpen(false)} className="rounded-full p-1"><X className="h-4 w-4" /></button>
+            </div>
+            {importError && <p className="mt-3 text-[11px] text-rose-300">{importError}</p>}
+            <div className="mt-4 space-y-3">
+              <label className="block text-[11px]" style={{ color: C.muted2 }}>
+                Cash account
+                <select value={importAccountId} onChange={(e) => setImportAccountId(e.target.value)} className="mt-1 h-9 w-full rounded-full border px-3 text-[12px]" style={{ background: C.control, borderColor: C.controlBorder, color: C.text }}>
+                  <option value="">Select…</option>
+                  {cashAccounts.map((a) => <option key={a.id} value={a.id}>{a.label}</option>)}
+                </select>
+              </label>
+              <label className="block text-[11px]" style={{ color: C.muted2 }}>
+                Provider
+                <select value={importProviderId} onChange={(e) => setImportProviderId(e.target.value)} className="mt-1 h-9 w-full rounded-full border px-3 text-[12px]" style={{ background: C.control, borderColor: C.controlBorder, color: C.text }}>
+                  <option value="">Select…</option>
+                  {providers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+                {providers.length === 0 && <span className="mt-1 block text-[10px] text-amber-300">No setup providers — seed `/setup/providers`.</span>}
+              </label>
+              <label className="block text-[11px]" style={{ color: C.muted2 }}>
+                File layout (optional)
+                <select value={importLayoutId} onChange={(e) => setImportLayoutId(e.target.value)} className="mt-1 h-9 w-full rounded-full border px-3 text-[12px]" style={{ background: C.control, borderColor: C.controlBorder, color: C.text }}>
+                  <option value="">—</option>
+                  {layouts.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+                </select>
+              </label>
+              <label className="block text-[11px]" style={{ color: C.muted2 }}>
+                Currency
+                <input value={importCurrency} onChange={(e) => setImportCurrency(e.target.value)} className="mt-1 h-9 w-full rounded-full border px-3 text-[12px]" style={{ background: C.control, borderColor: C.controlBorder, color: C.text }} />
+              </label>
+              <label className="mt-2 flex h-28 cursor-pointer flex-col items-center justify-center rounded-full border border-dashed text-[11px]" style={{ borderColor: C.controlBorder, color: C.muted }}>
+                <Upload className="mb-2 h-5 w-5" />
+                {importBusy ? 'Uploading…' : 'Select CSV statement file'}
+                <input
+                  type="file"
+                  accept=".csv,.txt,text/csv"
+                  className="hidden"
+                  disabled={importBusy}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) void importStatementFile(file)
+                    e.target.value = ''
+                  }}
+                />
+              </label>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   )
 }
@@ -625,10 +900,11 @@ function SearchField({ value, onChange, placeholder }: { value: string; onChange
   )
 }
 
-function GhostBtn({ children, icon, compact }: { children: ReactNode; icon?: ReactNode; compact?: boolean }) {
+function GhostBtn({ children, icon, compact, onClick }: { children: ReactNode; icon?: ReactNode; compact?: boolean; onClick?: () => void }) {
   return (
     <button
       type="button"
+      onClick={onClick}
       className={cn('inline-flex items-center gap-1.5 rounded-full border text-[11px]', compact ? 'h-8 px-2.5' : 'h-9 px-3')}
       style={{ background: C.control, borderColor: C.controlBorder, color: C.text }}
     >

@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Check, ChevronDown, Loader2, RotateCcw, Search, X } from 'lucide-react'
+import { Check, ChevronDown, RotateCcw, Search, X } from 'lucide-react'
+import { OpsPanelSkeleton, OpsTableSkeleton } from '@/components/investments-v2/loading-skeletons'
 import { useAppDispatch, useAppSelector } from '@/lib/store'
 import {
   fetchAccountingEvents,
@@ -101,11 +102,27 @@ export default function AccountingPage() {
   const [reverseEvent, setReverseEvent] = useState<AccountingEvent | null>(null)
   const [reason, setReason] = useState('')
   const [journalPosting, setJournalPosting] = useState(false)
+  const [journalLifecycleBusy, setJournalLifecycleBusy] = useState(false)
+  const [ledgerCreating, setLedgerCreating] = useState(false)
+  const [exportFrom, setExportFrom] = useState(() => {
+    const d = new Date()
+    d.setUTCDate(1)
+    return d.toISOString().slice(0, 10)
+  })
+  const [exportTo, setExportTo] = useState(() => new Date().toISOString().slice(0, 10))
   const [reversals, setReversals] = useState<Record<string, unknown>[]>([])
   const [reversalsLoading, setReversalsLoading] = useState(false)
   const [ledgerExports, setLedgerExports] = useState<Record<string, unknown>[]>([])
   const [ledgerExportsLoading, setLedgerExportsLoading] = useState(false)
   const [ledgerDownloadId, setLedgerDownloadId] = useState<string | null>(null)
+  const [postingStatus, setPostingStatus] = useState<{
+    byStatus?: Record<string, number>
+    counts?: Record<string, number>
+    total?: number
+    recentFailures?: Array<Record<string, unknown>>
+  } | null>(null)
+  const [postingStatusLoading, setPostingStatusLoading] = useState(false)
+  const [postingStatusError, setPostingStatusError] = useState<string | null>(null)
 
   const selectedFundId = useMemo(() => {
     if (portfolioFilter === 'All portfolios') return undefined
@@ -186,6 +203,36 @@ export default function AccountingPage() {
     }
   }, [tab, selectedFundId])
 
+  useEffect(() => {
+    if (tab !== 'Posting Statuses') return
+    let cancelled = false
+    setPostingStatusLoading(true)
+    setPostingStatusError(null)
+    investmentOpsApi
+      .listAccountingPostingStatus({ fundId: selectedFundId })
+      .then((res) => {
+        if (cancelled) return
+        if (!res.success) {
+          setPostingStatus(null)
+          setPostingStatusError(formatOpsError(res))
+          return
+        }
+        setPostingStatus(res.data ?? null)
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          setPostingStatus(null)
+          setPostingStatusError(e instanceof Error ? e.message : 'Failed to load posting status')
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setPostingStatusLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [tab, selectedFundId])
+
   const fundName = (id: string) => portfolios.find((p) => p.id === id)?.name ?? id
 
   const statusOptions = useMemo(() => {
@@ -230,20 +277,64 @@ export default function AccountingPage() {
     dispatch(fetchJournalEntryDetail(id))
   }
 
-  const postSelectedJournal = async () => {
+  const journalVersion = (j: JournalEntry) =>
+    Number((j as JournalEntry & { version?: number; auditVersion?: number }).version ?? (j as JournalEntry & { auditVersion?: number }).auditVersion ?? j.auditTrailSequenceNumber ?? 0) || undefined
+
+  const runJournalLifecycle = async (action: 'submit' | 'approve' | 'reject' | 'post') => {
     if (!journal) return
     setActionError(null)
-    setJournalPosting(true)
+    setJournalLifecycleBusy(true)
     try {
-      const res = await investmentOpsApi.postJournal(journal.id)
+      const expectedVersion = journalVersion(journal)
+      let res
+      if (action === 'submit') res = await investmentOpsApi.submitJournal(journal.id, { expectedVersion })
+      else if (action === 'approve') res = await investmentOpsApi.approveJournal(journal.id, { expectedVersion })
+      else if (action === 'reject') {
+        const reason = window.prompt('Reject reason (required):')
+        if (!reason?.trim()) return
+        res = await investmentOpsApi.rejectJournal(journal.id, { reason: reason.trim(), expectedVersion })
+      } else {
+        res = await investmentOpsApi.postJournal(journal.id, { expectedVersion })
+      }
       if (!res.success) throw new Error(formatOpsError(res))
       dispatch(fetchJournalEntries({ fundId: selectedFundId }))
       dispatch(fetchJournalEntryDetail(journal.id))
       dispatch(fetchAccountingEvents({ fundId: selectedFundId, pageSize: 100 }))
     } catch (e) {
-      setActionError(e instanceof Error ? e.message : 'Failed to post journal')
+      setActionError(e instanceof Error ? e.message : `Failed to ${action} journal`)
     } finally {
+      setJournalLifecycleBusy(false)
       setJournalPosting(false)
+    }
+  }
+
+  const postSelectedJournal = async () => {
+    setJournalPosting(true)
+    await runJournalLifecycle('post')
+  }
+
+  const createExport = async () => {
+    const fundId = selectedFundId || portfolios[0]?.id
+    if (!fundId) {
+      setActionError('Select a portfolio (or ensure at least one portfolio exists) before creating a ledger export.')
+      return
+    }
+    setActionError(null)
+    setLedgerCreating(true)
+    try {
+      const res = await investmentOpsApi.createLedgerExport({
+        fundId,
+        from: exportFrom,
+        to: exportTo,
+        format: 'JSON',
+      })
+      if (!res.success) throw new Error(formatOpsError(res))
+      const list = await investmentOpsApi.listLedgerExports({ fundId: selectedFundId, pageSize: 100 })
+      if (list.success) setLedgerExports(unwrapList(list.data))
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : 'Failed to create ledger export')
+    } finally {
+      setLedgerCreating(false)
     }
   }
 
@@ -273,7 +364,19 @@ export default function AccountingPage() {
     return '—'
   }
 
-  const journalPostable = journal && !['POSTED', 'REVERSED'].includes(journal.status?.toUpperCase() ?? '')
+  const journalStatus = journal?.status?.toUpperCase() ?? ''
+  const journalDraftish = journal && ['DRAFT', 'NEW', 'OPEN', ''].includes(journalStatus)
+  const journalSubmitted = journal && ['SUBMITTED', 'PENDING_APPROVAL', 'IN_REVIEW'].includes(journalStatus)
+  const journalApproved = journal && ['APPROVED', 'READY', 'READY_TO_POST'].includes(journalStatus)
+  const journalPostable = journal && !['POSTED', 'REVERSED', 'REJECTED'].includes(journalStatus) && (journalApproved || journalDraftish || journalSubmitted || isBalanced)
+
+  const postingCounts = useMemo(() => {
+    if (!postingStatus) return [] as [string, number][]
+    const source = postingStatus.byStatus ?? postingStatus.counts ?? {}
+    return Object.entries(source).sort(([a], [b]) => a.localeCompare(b))
+  }, [postingStatus])
+
+  const postingFailures = postingStatus?.recentFailures ?? []
 
   return (
     <main className="min-h-full bg-[#05090f] p-3 text-[#eef2f8] sm:p-5">
@@ -377,11 +480,7 @@ export default function AccountingPage() {
               />
             </Card>
             <section className="rounded-[24px] border border-white/[.04] bg-[linear-gradient(145deg,#142030,#0d1623)] p-5">
-              {selectedJournalEntryLoading && (
-                <div className="flex items-center gap-2 text-[10px] text-[#8290a4]">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading journal detail…
-                </div>
-              )}
+              {selectedJournalEntryLoading && <OpsPanelSkeleton />}
               {!journal && !selectedJournalEntryLoading && (
                 <p className="text-[11px] text-[#8290a4]">Select a journal to inspect lines.</p>
               )}
@@ -449,14 +548,47 @@ export default function AccountingPage() {
                         : `Debits and credits differ by ${money(Math.abs(debitTotal - creditTotal))}.`}
                     </div>
                   )}
-                  <button
-                    type="button"
-                    disabled={!journalPostable || journalPosting || !isBalanced}
-                    onClick={postSelectedJournal}
-                    className="mt-4 h-10 w-full rounded-full bg-[#2f87fa] text-[10px] font-semibold disabled:opacity-50"
-                  >
-                    {journalPosting ? 'Posting…' : 'Post journal'}
-                  </button>
+                  <div className="mt-4 flex flex-col gap-2">
+                    {journalDraftish && (
+                      <button
+                        type="button"
+                        disabled={!isBalanced || journalLifecycleBusy}
+                        onClick={() => void runJournalLifecycle('submit')}
+                        className="h-10 w-full rounded-full border border-blue-400/40 text-[10px] font-semibold text-blue-200 disabled:opacity-50"
+                      >
+                        {journalLifecycleBusy ? 'Working…' : 'Submit journal'}
+                      </button>
+                    )}
+                    {journalSubmitted && (
+                      <>
+                        <button
+                          type="button"
+                          disabled={journalLifecycleBusy}
+                          onClick={() => void runJournalLifecycle('approve')}
+                          className="h-10 w-full rounded-full border border-emerald-400/40 text-[10px] font-semibold text-emerald-200 disabled:opacity-50"
+                        >
+                          {journalLifecycleBusy ? 'Working…' : 'Approve journal'}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={journalLifecycleBusy}
+                          onClick={() => void runJournalLifecycle('reject')}
+                          className="h-10 w-full rounded-full border border-rose-400/30 text-[10px] font-semibold text-rose-300 disabled:opacity-50"
+                        >
+                          Reject journal
+                        </button>
+                      </>
+                    )}
+                    <button
+                      type="button"
+                      disabled={!journalPostable || journalPosting || journalLifecycleBusy || !isBalanced}
+                      onClick={postSelectedJournal}
+                      className="h-10 w-full rounded-full bg-[#2f87fa] text-[10px] font-semibold disabled:opacity-50"
+                    >
+                      {journalPosting || journalLifecycleBusy ? 'Posting…' : 'Post journal'}
+                    </button>
+                    <p className="text-[9px] text-[#718096]">Workflow: submit → approve → post (post may still work when BE allows direct post).</p>
+                  </div>
                 </>
               )}
             </section>
@@ -464,11 +596,64 @@ export default function AccountingPage() {
         )}
 
         {tab === 'Posting Statuses' && (
-          <EmptyPanel
-            title="Posting status by portfolio"
-            subtitle="Local posting queue and control state"
-            message="Aggregated posting-status endpoint is not available. Use Accounting Events and Journals for live statuses."
-          />
+          <Card title="Posting status by portfolio" subtitle="Aggregated accounting posting queue from the server">
+            <Toolbar>
+              <Drop
+                value={portfolioFilter}
+                options={['All portfolios', ...portfolios.map((p) => p.name)]}
+                onChange={setPortfolioFilter}
+              />
+            </Toolbar>
+            {postingStatusError ? (
+              <div className="border-b border-white/[.05] px-4 py-3 text-[11px] text-rose-300">{postingStatusError}</div>
+            ) : null}
+            {postingStatusLoading ? (
+              <OpsPanelSkeleton className="px-4 py-6" />
+            ) : postingCounts.length === 0 && postingFailures.length === 0 ? (
+              <div className="px-4 py-12 text-center text-[11px] text-[#8290a4]">
+                No posting status summary returned for this filter.
+              </div>
+            ) : (
+              <div className="space-y-4 p-4">
+                {postingStatus?.total != null ? (
+                  <p className="text-[10px] text-[#718096]">
+                    Total events tracked: <span className="font-semibold text-[#c5cfdb]">{postingStatus.total}</span>
+                  </p>
+                ) : null}
+                {postingCounts.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
+                    {postingCounts.map(([status, count]) => (
+                      <div key={status} className="rounded-2xl border border-white/[.05] bg-[#09111d]/70 px-4 py-3">
+                        <p className="text-[9px] text-[#728197]">{formatStatus(status)}</p>
+                        <p className="mt-1 text-[15px] font-semibold">{count}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+                {postingFailures.length > 0 ? (
+                  <div className="overflow-hidden rounded-2xl border border-white/[.06]">
+                    <div className="border-b border-white/[.06] px-4 py-3">
+                      <h3 className="text-[11px] font-semibold">Recent failures</h3>
+                    </div>
+                    <Table
+                      headers={['Event', 'Portfolio', 'Type', 'Reference', 'Status', 'Reason']}
+                      rows={postingFailures.map((row) => [
+        cellValue(row, ['id', 'eventId', 'accountingEventId']),
+                        (() => {
+                          const fundId = row.fundId ?? row['fundId']
+                          return fundId ? fundName(String(fundId)) : '—'
+                        })(),
+                        cellValue(row, ['eventType', 'type']),
+                        cellValue(row, ['tradeRef', 'reference', 'sourceId']),
+                        <Badge key="s" value={cellValue(row, ['status'])} />,
+                        cellValue(row, ['failureReason', 'reason', 'message', 'error']),
+                      ])}
+                    />
+                  </div>
+                ) : null}
+              </div>
+            )}
+          </Card>
         )}
         {tab === 'Reversals' && (
           <Card title="Reversal register" subtitle="Approved counter-entries retain the original event audit trail">
@@ -486,7 +671,38 @@ export default function AccountingPage() {
           </Card>
         )}
         {tab === 'Ledger Exports' && (
-          <Card title="Ledger export history" subtitle="Generated files and download status">
+          <Card title="Ledger export history" subtitle="Create an export batch, then download the file stream">
+            <div className="mb-4 flex flex-wrap items-end gap-3 rounded-2xl border border-white/[.05] bg-[#09111d]/50 p-4">
+              <label className="block">
+                <span className="mb-1.5 block text-[9px] text-[#718096]">From</span>
+                <input
+                  type="date"
+                  value={exportFrom}
+                  onChange={(e) => setExportFrom(e.target.value)}
+                  className="h-9 rounded-full border border-[#354257] bg-[#101927] px-3 text-[10px] outline-none"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1.5 block text-[9px] text-[#718096]">To</span>
+                <input
+                  type="date"
+                  value={exportTo}
+                  onChange={(e) => setExportTo(e.target.value)}
+                  className="h-9 rounded-full border border-[#354257] bg-[#101927] px-3 text-[10px] outline-none"
+                />
+              </label>
+              <button
+                type="button"
+                disabled={ledgerCreating || !exportFrom || !exportTo}
+                onClick={() => void createExport()}
+                className="h-9 rounded-full bg-[#2f87fa] px-5 text-[10px] font-semibold text-white disabled:opacity-40"
+              >
+                {ledgerCreating ? 'Creating…' : 'Create ledger export'}
+              </button>
+              <p className="text-[9px] text-[#718096]">
+                Uses selected portfolio filter, or the first portfolio when filter is All.
+              </p>
+            </div>
             <Table
               headers={['Export', 'Portfolio', 'Reference', 'Status', '']}
               loading={ledgerExportsLoading}
@@ -563,18 +779,6 @@ export default function AccountingPage() {
   )
 }
 
-function EmptyPanel({ title, subtitle, message }: { title: string; subtitle: string; message: string }) {
-  return (
-    <section className="overflow-hidden rounded-[24px] border border-white/[.04] bg-[linear-gradient(135deg,#142030,#0c1522)]">
-      <div className="border-b border-white/[.06] p-4">
-        <h2 className="text-[12px] font-semibold">{title}</h2>
-        <p className="text-[9px] text-[#718096]">{subtitle}</p>
-      </div>
-      <div className="px-4 py-12 text-center text-[11px] text-[#8290a4]">{message}</div>
-    </section>
-  )
-}
-
 function Card({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
   return (
     <section className="min-w-0 overflow-visible rounded-[24px] border border-white/[.04] bg-[linear-gradient(135deg,#142030,#0c1522)]">
@@ -617,9 +821,8 @@ function Table({
         <tbody className="divide-y divide-white/[.045]">
           {loading ? (
             <tr>
-              <td colSpan={headers.length} className="px-4 py-10 text-center text-[#8290a4]">
-                <Loader2 className="mr-2 inline h-3.5 w-3.5 animate-spin" />
-                Loading…
+              <td colSpan={headers.length} className="p-0">
+                <OpsTableSkeleton rows={6} cols={headers.length} />
               </td>
             </tr>
           ) : rows.length === 0 ? (

@@ -1,7 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Check, ChevronDown, Folder, Loader2, Plus, X } from 'lucide-react'
+import { Check, ChevronDown, Folder } from 'lucide-react'
+import { OpsPageSkeleton, OpsTableSkeleton } from '@/components/investments-v2/loading-skeletons'
 import { PageHeader } from '@/components/investments-v2/page-header'
 import { investmentOpsApi, unwrapList, type PortfolioOverview } from '@/lib/api/investment-ops-api'
 import type { Holding } from '@/lib/api/investments-api'
@@ -170,86 +171,6 @@ function CurrencyDonut({
   )
 }
 
-function NewPositionDialog({
-  open,
-  onClose,
-  onAdd,
-}: {
-  open: boolean
-  onClose: () => void
-  onAdd: (order: HoldingOrderRow) => void
-}) {
-  const [instrument, setInstrument] = useState('')
-  const [quantity, setQuantity] = useState('')
-  if (!open) return null
-
-  const submit = () => {
-    if (!instrument.trim() || !quantity.trim()) return
-    onAdd({
-      id: `local-${Date.now()}`,
-      transaction: instrument.trim(),
-      type: 'A',
-      reference: `${instrument.trim()} Equity`,
-      quantity,
-      cost: '-0.00',
-      price: '0.0000',
-      value: '0.00',
-      fx: '1.0000',
-      nav: '0.00',
-    })
-    setInstrument('')
-    setQuantity('')
-    onClose()
-  }
-
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onMouseDown={onClose}>
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="new-position-title"
-        onMouseDown={(event) => event.stopPropagation()}
-        className="w-full max-w-md rounded-[24px] border border-white/10 bg-[#111b29] p-5 shadow-[0_28px_90px_rgba(0,0,0,.6)]"
-      >
-        <div className="mb-5 flex items-center justify-between">
-          <div>
-            <h2 id="new-position-title" className="text-base font-semibold text-white">New Position</h2>
-            <p className="mt-1 text-[11px] text-[#76859a]">Add a local position to this design preview.</p>
-          </div>
-          <button type="button" onClick={onClose} className="rounded-full p-2 text-[#8391a4] transition hover:bg-white/10 hover:text-white">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-        <div className="space-y-4">
-          <label className="block">
-            <span className="mb-1.5 block text-[11px] text-[#8b99ad]">Instrument</span>
-            <input
-              value={instrument}
-              onChange={(event) => setInstrument(event.target.value)}
-              placeholder="e.g. Tesla Inc"
-              className="h-10 w-full rounded-full border border-white/10 bg-[#0b1320] px-4 text-xs text-white outline-none transition placeholder:text-[#4f5e72] focus:border-[#2f87fa] focus:ring-2 focus:ring-[#2f87fa]/25"
-            />
-          </label>
-          <label className="block">
-            <span className="mb-1.5 block text-[11px] text-[#8b99ad]">Quantity</span>
-            <input
-              value={quantity}
-              onChange={(event) => setQuantity(event.target.value)}
-              inputMode="numeric"
-              placeholder="0"
-              className="h-10 w-full rounded-full border border-white/10 bg-[#0b1320] px-4 text-xs text-white outline-none transition placeholder:text-[#4f5e72] focus:border-[#2f87fa] focus:ring-2 focus:ring-[#2f87fa]/25"
-            />
-          </label>
-        </div>
-        <div className="mt-6 flex justify-end gap-2">
-          <button type="button" onClick={onClose} className="h-9 rounded-full border border-white/10 px-5 text-xs text-[#a4afbd] transition hover:bg-white/[0.06] hover:text-white">Cancel</button>
-          <button type="button" onClick={submit} className="h-9 rounded-full bg-white px-5 text-xs font-semibold text-[#111722] transition hover:bg-[#edf2f8]">Add Position</button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 export default function PortfoliosPage() {
   const [funds, setFunds] = useState<FundTab[]>([])
   const [activeFundId, setActiveFundId] = useState('')
@@ -267,7 +188,6 @@ export default function PortfoliosPage() {
   const [activeCurrency, setActiveCurrency] = useState('')
   const [expanded, setExpanded] = useState(true)
   const [recalculated, setRecalculated] = useState(false)
-  const [positionDialogOpen, setPositionDialogOpen] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState('')
 
   const activeFund = funds.find((f) => f.id === activeFundId) ?? funds[0]
@@ -402,12 +322,6 @@ export default function PortfoliosPage() {
         </div>
       )}
 
-      {(loading || detailLoading) && (
-        <div className="mx-3 mt-3 flex items-center gap-2 text-[12px] text-[#8B95A7] sm:mx-5">
-          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading portfolios…
-        </div>
-      )}
-
       <div className="flex shrink-0 items-center gap-2 overflow-x-auto px-3 pb-4 pt-4 sm:px-5">
         {funds.map((portfolio) => (
           <button
@@ -430,6 +344,8 @@ export default function PortfoliosPage() {
       </div>
 
       <main className="flex-1 space-y-4 overflow-y-auto px-3 pb-6 sm:px-5">
+        {loading && funds.length === 0 && <OpsPageSkeleton kpis={0} tableRows={6} tableCols={9} />}
+
         <section className="overflow-hidden rounded-[24px] border border-white/[0.025] bg-[linear-gradient(112deg,#172231_0%,#101a29_55%,#0c1522_100%)] shadow-[0_22px_70px_rgba(0,0,0,.18)]">
           <header className="flex min-h-[55px] flex-wrap items-center justify-between gap-3 px-5 py-3">
             <div className="flex items-center gap-2 text-[12px] font-medium text-[#f0f3f8]">
@@ -603,14 +519,6 @@ export default function PortfoliosPage() {
         <section className="overflow-hidden rounded-[24px] border border-white/[0.025] bg-[linear-gradient(112deg,#172231_0%,#101a29_55%,#0c1522_100%)]">
           <header className="flex min-h-[54px] items-center justify-between gap-3 px-5 py-3">
             <h2 className="text-[14px] font-medium text-white">Holdings({orders.length})</h2>
-            <button
-              type="button"
-              onClick={() => setPositionDialogOpen(true)}
-              className="inline-flex h-8 items-center gap-1.5 rounded-full bg-white px-4 text-[11px] font-semibold text-[#111722] transition hover:bg-[#edf2f8]"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              New Position
-            </button>
           </header>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[900px] border-collapse">
@@ -628,7 +536,14 @@ export default function PortfoliosPage() {
                 </tr>
               </thead>
               <tbody>
-                {orders.map((order) => (
+                {detailLoading && (
+                  <tr>
+                    <td colSpan={9} className="p-0">
+                      <OpsTableSkeleton rows={8} cols={9} />
+                    </td>
+                  </tr>
+                )}
+                {!detailLoading && orders.map((order) => (
                   <tr
                     key={order.id}
                     onClick={() => setSelectedOrder(order.transaction)}
@@ -660,14 +575,6 @@ export default function PortfoliosPage() {
         </section>
       </main>
 
-      <NewPositionDialog
-        open={positionDialogOpen}
-        onClose={() => setPositionDialogOpen(false)}
-        onAdd={(order) => {
-          setOrders((current) => [order, ...current])
-          setSelectedOrder(order.transaction)
-        }}
-      />
     </div>
   )
 }

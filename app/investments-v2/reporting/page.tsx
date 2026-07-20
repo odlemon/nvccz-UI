@@ -5,6 +5,7 @@ import { format } from 'date-fns'
 import { StatusBadge } from '@/components/arcus/status-badge'
 import { cn } from '@/lib/utils'
 import { Check, ChevronsUpDown, Download, FileText, Loader2, Plus, Search, X } from 'lucide-react'
+import { OpsTableSkeleton } from '@/components/investments-v2/loading-skeletons'
 import { useAppDispatch, useAppSelector } from '@/lib/store'
 import { fetchPortfolios, fetchReportTemplates, fetchReports, generateReport } from '@/lib/store/slices/investmentOpsSlice'
 import { investmentOpsApi } from '@/lib/api/investment-ops-api'
@@ -371,7 +372,7 @@ export default function ReportingPage() {
               </thead>
               <tbody className="divide-y divide-border">
                 {reportRunsLoading ? (
-                  <tr><td colSpan={7} className="py-10 text-center text-muted-foreground"><Loader2 className="mr-2 inline h-4 w-4 animate-spin" />Loading report library…</td></tr>
+                  <tr><td colSpan={7} className="p-0"><OpsTableSkeleton rows={8} cols={7} /></td></tr>
                 ) : runRows.length > 0 ? runRows.map((run) => (
                   <tr key={run.id}>
                     <td><div><p className="max-w-[230px] truncate font-medium">{run.reportTypeName}</p><p className="mt-0.5 font-mono text-[9px] text-primary">{run.id}</p></div></td>

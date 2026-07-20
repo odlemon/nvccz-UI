@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { CheckCircle2, Loader2, Save, ShieldCheck } from 'lucide-react'
+import { OpsPageSkeleton } from '@/components/investments-v2/loading-skeletons'
 import { DenseTable, SetupCard, SetupHeader, SetupSelect, Toggle, buttonClass, fieldClass } from '@/components/investments-v2/setup-workspace'
 import { formatOpsError, investmentOpsApi, type FundSetupLimits } from '@/lib/api/investment-ops-api'
 import { useAppDispatch, useAppSelector } from '@/lib/store'
@@ -16,6 +17,58 @@ import {
   updateSetupFundConfig,
   updateSetupSettings,
 } from '@/lib/store/slices/investmentOpsSlice'
+
+const COST_BASIS_FROM_API: Record<string, string> = {
+  WAC: 'Weighted average',
+  WEIGHTED_AVERAGE: 'Weighted average',
+  FIFO: 'FIFO',
+  LIFO: 'LIFO',
+  SPECIFIC_LOT: 'Specific lot',
+  SPECIFIC: 'Specific lot',
+}
+
+const COST_BASIS_TO_API: Record<string, string> = {
+  'Weighted average': 'WAC',
+  FIFO: 'FIFO',
+  LIFO: 'LIFO',
+  'Specific lot': 'SPECIFIC_LOT',
+}
+
+const PRICING_FROM_API: Record<string, string> = {
+  PRIMARY_MARKET_CLOSE: 'Primary market close',
+  BLOOMBERG_BVAL: 'Bloomberg BVAL',
+  CUSTODIAN_FEED: 'Custodian feed',
+}
+
+const PRICING_TO_API: Record<string, string> = {
+  'Primary market close': 'PRIMARY_MARKET_CLOSE',
+  'Bloomberg BVAL': 'BLOOMBERG_BVAL',
+  'Custodian feed': 'CUSTODIAN_FEED',
+}
+
+const SETTLEMENT_FROM_API: Record<string, string> = {
+  T_PLUS_0: 'T+0',
+  T_PLUS_1: 'T+1',
+  T_PLUS_2: 'T+2',
+  T_PLUS_3: 'T+3',
+  'T+0': 'T+0',
+  'T+1': 'T+1',
+  'T+2': 'T+2',
+  'T+3': 'T+3',
+}
+
+const SETTLEMENT_TO_API: Record<string, string> = {
+  'T+0': 'T_PLUS_0',
+  'T+1': 'T_PLUS_1',
+  'T+2': 'T_PLUS_2',
+  'T+3': 'T_PLUS_3',
+}
+
+function normalizeCutoff(value?: string | null) {
+  if (!value) return ''
+  const match = value.match(/^(\d{2}:\d{2})/)
+  return match ? match[1] : value
+}
 
 export default function PortfolioSetupPage() {
   const dispatch = useAppDispatch()
@@ -45,6 +98,12 @@ export default function PortfolioSetupPage() {
   const [costBasis, setCostBasis] = useState('Weighted average')
   const [pricing, setPricing] = useState('Primary market close')
   const [cycle, setCycle] = useState('T+2')
+  const [cutoffTime, setCutoffTime] = useState('')
+  const [createOpen, setCreateOpen] = useState(false)
+  const [createName, setCreateName] = useState('')
+  const [createCurrency, setCreateCurrency] = useState('USD')
+  const [createBusy, setCreateBusy] = useState(false)
+  const [createError, setCreateError] = useState<string | null>(null)
   const [fourEye, setFourEye] = useState(true)
   const [blockBreaches, setBlockBreaches] = useState(true)
   const [positiveCash, setPositiveCash] = useState(false)
@@ -104,6 +163,17 @@ export default function PortfolioSetupPage() {
     if (fund.config?.baseCurrencyCode) setCurrency(fund.config.baseCurrencyCode)
     if (fund.config?.brokerProfileId) setBrokerId(fund.config.brokerProfileId)
     if (fund.config?.custodianProfileId) setCustodianId(fund.config.custodianProfileId)
+    if (fund.config?.costBasisMethod) {
+      setCostBasis(COST_BASIS_FROM_API[fund.config.costBasisMethod] ?? fund.config.costBasisMethod)
+    }
+    if (fund.config?.pricingSource) {
+      setPricing(PRICING_FROM_API[fund.config.pricingSource] ?? fund.config.pricingSource)
+    }
+    if (fund.config?.settlementCycle) {
+      setCycle(SETTLEMENT_FROM_API[fund.config.settlementCycle] ?? fund.config.settlementCycle)
+    }
+    const cutoff = fund.config?.cutoffTime ?? fund.config?.cutoff
+    if (cutoff) setCutoffTime(normalizeCutoff(cutoff))
   }, [fundId, fundOptions])
 
   useEffect(() => {
@@ -203,6 +273,10 @@ export default function PortfolioSetupPage() {
             baseCurrencyCode: currency || undefined,
             brokerProfileId: brokerId || undefined,
             custodianProfileId: custodianId || undefined,
+            costBasisMethod: COST_BASIS_TO_API[costBasis] ?? costBasis,
+            pricingSource: PRICING_TO_API[pricing] ?? pricing,
+            settlementCycle: SETTLEMENT_TO_API[cycle] ?? cycle,
+            cutoffTime: cutoffTime || undefined,
           },
         }),
       ).unwrap()
@@ -241,16 +315,48 @@ export default function PortfolioSetupPage() {
     }
   }
 
+  const createFund = async () => {
+    if (!createName.trim()) {
+      setCreateError('Name is required')
+      return
+    }
+    setCreateBusy(true)
+    setCreateError(null)
+    try {
+      const res = await investmentOpsApi.createPortfolio({
+        name: createName.trim(),
+        baseCurrencyCode: createCurrency || 'USD',
+        status: 'OPEN',
+        totalAmount: '0',
+      })
+      if (!res.success) throw new Error(formatOpsError(res, 'Failed to create portfolio'))
+      const id = (res.data as { id?: string } | undefined)?.id
+      setCreateOpen(false)
+      setCreateName('')
+      await Promise.all([dispatch(fetchPortfolios()), dispatch(fetchSetupFunds())])
+      if (id) setFundId(id)
+    } catch (e) {
+      setCreateError(e instanceof Error ? e.message : 'Failed to create portfolio')
+    } finally {
+      setCreateBusy(false)
+    }
+  }
+
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[#05090f]">
       <SetupHeader
         title="Portfolio Setup"
         description="Portfolio-specific valuation, settlement, controls and investment limits"
         action={
-          <button type="button" className={buttonClass} disabled={saving || !fundId} onClick={save}>
-            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-            Save changes
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className={buttonClass} onClick={() => { setCreateError(null); setCreateOpen(true) }}>
+              New portfolio
+            </button>
+            <button type="button" className={buttonClass} disabled={saving || !fundId} onClick={save}>
+              {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+              Save changes
+            </button>
+          </div>
         }
       />
       <div className="flex-1 overflow-y-auto p-3 sm:p-5">
@@ -262,11 +368,10 @@ export default function PortfolioSetupPage() {
             Fund status, currency, broker/custodian and settings keys saved via API.
           </div>
         )}
-        {loading && (
-          <div className="mb-4 flex items-center gap-2 text-[11px] text-[#8290a4]">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading portfolio setup…
-          </div>
-        )}
+        {loading ? (
+          <OpsPageSkeleton kpis={0} tableRows={6} tableCols={4} />
+        ) : (
+        <>
         <div className="grid gap-4 lg:grid-cols-2">
           <SetupCard title="Portfolio Context">
             <div className="grid gap-4 p-5 sm:grid-cols-2">
@@ -294,9 +399,9 @@ export default function PortfolioSetupPage() {
                 options={['Primary market close', 'Bloomberg BVAL', 'Custodian feed']}
                 onChange={setPricing}
               />
-              <Field label="Valuation cutoff" type="time" value="17:00" />
+              <Field label="Valuation cutoff" type="time" value={cutoffTime} onChange={setCutoffTime} />
               <p className="sm:col-span-2 text-[9px] text-[#718095]">
-                Valuation method / four-eye persist to setup/settings when settings payload is available. Cost-basis and pricing source have no fund-config fields yet.
+                Valuation method / four-eye persist to setup/settings. Cost-basis, pricing source, settlement cycle and cutoff persist to fund config via PUT …/config.
               </p>
             </div>
           </SetupCard>
@@ -338,16 +443,43 @@ export default function PortfolioSetupPage() {
             {limitsLoading ? 'Loading fund limits…' : limitRows.length ? 'Limits loaded from setup/funds limits API.' : 'No portfolio limits returned for this fund.'}
           </p>
         </SetupCard>
+        </>
+        )}
       </div>
+
+      {createOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onMouseDown={() => setCreateOpen(false)}>
+          <div className="w-full max-w-md rounded-[24px] border border-white/10 bg-[#101a29] p-5" onMouseDown={(e) => e.stopPropagation()}>
+            <h2 className="text-[15px] font-semibold text-white">New portfolio</h2>
+            <p className="mt-1 text-[10px] text-[#8290a4]">Creates via POST /portfolios then reloads the selector.</p>
+            {createError && <p className="mt-3 text-[11px] text-rose-300">{createError}</p>}
+            <label className="mt-4 block text-[10px] text-[#8290a4]">
+              Name
+              <input value={createName} onChange={(e) => setCreateName(e.target.value)} className={`${fieldClass} mt-1`} />
+            </label>
+            <label className="mt-3 block text-[10px] text-[#8290a4]">
+              Base currency
+              <input value={createCurrency} onChange={(e) => setCreateCurrency(e.target.value.toUpperCase())} className={`${fieldClass} mt-1`} />
+            </label>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" className={buttonClass} onClick={() => setCreateOpen(false)}>Cancel</button>
+              <button type="button" className={buttonClass} disabled={createBusy} onClick={() => void createFund()}>
+                {createBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                Create
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
-function Field({ label, value, type = 'text', readOnly }: { label: string; value: string; type?: string; readOnly?: boolean }) {
+function Field({ label, value, type = 'text', readOnly, onChange }: { label: string; value: string; type?: string; readOnly?: boolean; onChange?: (value: string) => void }) {
   return (
     <label>
       <span className="mb-1.5 block text-[9px] uppercase tracking-[.12em] text-[#718095]">{label}</span>
-      <input type={type} value={value} readOnly={readOnly} onChange={() => undefined} className={fieldClass} />
+      <input type={type} value={value} readOnly={readOnly} onChange={onChange ? (e) => onChange(e.target.value) : undefined} className={fieldClass} />
     </label>
   )
 }
