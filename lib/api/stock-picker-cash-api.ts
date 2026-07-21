@@ -75,11 +75,19 @@ export type BatchWorkspace = {
   unmatchedInternal?: unknown[]
   unmatchedExternal?: unknown[]
   suggested?: unknown[]
+  suggestions?: unknown[]
+  matchSuggestions?: unknown[]
   matches?: unknown[]
   breaks?: unknown[]
   internal?: unknown[]
   external?: unknown[]
   results?: unknown[]
+  lastRunAt?: string
+  lastReconciledAt?: string
+  runAt?: string
+  completedAt?: string
+  updatedAt?: string
+  status?: string
   [key: string]: unknown
 }
 
@@ -305,8 +313,15 @@ class StockPickerCashApi {
     return apiClient.get(`${BASE}/external-statements/imports/${id}`)
   }
 
-  async validateExternalStatementImport(id: string) {
-    return apiClient.post(`${BASE}/external-statements/imports/${id}/validate`, {}, {
+  async validateExternalStatementImport(
+    id: string,
+    body: {
+      controlOpening?: string | number
+      controlClosing?: string | number
+      requireControlTotals?: boolean
+    } = {},
+  ) {
+    return apiClient.post(`${BASE}/external-statements/imports/${id}/validate`, body, {
       headers: idempotencyHeaders(),
     })
   }
@@ -317,8 +332,14 @@ class StockPickerCashApi {
     })
   }
 
-  async commitExternalStatementImport(id: string) {
-    return apiClient.post(`${BASE}/external-statements/imports/${id}/commit`, {}, {
+  async commitExternalStatementImport(
+    id: string,
+    body: {
+      controlOpening?: string | number
+      controlClosing?: string | number
+    } = {},
+  ) {
+    return apiClient.post(`${BASE}/external-statements/imports/${id}/commit`, body, {
       headers: idempotencyHeaders(),
     })
   }
@@ -327,6 +348,10 @@ class StockPickerCashApi {
     return apiClient.post(`${BASE}/external-statements/imports/${id}/reject`, body, {
       headers: idempotencyHeaders(),
     })
+  }
+
+  async listExternalStatementImportErrors(id: string) {
+    return apiClient.get(`${BASE}/external-statements/imports/${id}/errors`)
   }
 
   // ── Cash reconciliation batches ────────────────────────────────────────────
@@ -558,10 +583,11 @@ class StockPickerCashApi {
 
   async downloadClientStatement(id: string, opts?: { acceptPdf?: boolean }) {
     if (opts?.acceptPdf) {
-      return apiClient.get<OpsEnvelope<{ contentBase64?: string; downloadUrl?: string | null; fileName?: string }>>(
-        `${BASE}/client-statements/${id}/download`,
-        { headers: { Accept: 'application/pdf' } },
-      )
+      // Binary PDF — must use blob or apiClient JSON-parses and corrupts the file
+      return apiClient.get<Blob>(`${BASE}/client-statements/${id}/download`, {
+        headers: { Accept: 'application/pdf, application/json' },
+        responseType: 'blob',
+      })
     }
     return apiClient.get<
       | Blob

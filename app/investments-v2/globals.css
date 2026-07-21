@@ -276,8 +276,9 @@
   cursor: pointer;
   transition: background .15s, color .15s;
 }
-.pg-btn:hover { background: #1e2330; color: #94a3b8; }
+.pg-btn:hover:not(:disabled) { background: #1e2330; color: #94a3b8; }
 .pg-btn.active { background: #3b82f6; color: #fff; }
+.pg-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
 /* ── Action buttons ──────────────────────────────────────────── */
 .btn-white {
@@ -544,8 +545,9 @@
   cursor: pointer;
   transition: background .15s, color .15s;
 }
-.investments-terminal.dark .pg-btn:hover { background: #1e2330; color: #94a3b8; }
+.investments-terminal.dark .pg-btn:hover:not(:disabled) { background: #1e2330; color: #94a3b8; }
 .investments-terminal.dark .pg-btn.active { background: #3b82f6; color: #fff; }
+.investments-terminal.dark .pg-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
 .investments-terminal.light .pg-btn {
   width: 28px;
@@ -560,8 +562,9 @@
   cursor: pointer;
   transition: background .15s, color .15s;
 }
-.investments-terminal.light .pg-btn:hover { background: #eef1f6; color: #475569; }
+.investments-terminal.light .pg-btn:hover:not(:disabled) { background: #eef1f6; color: #475569; }
 .investments-terminal.light .pg-btn.active { background: #2563eb; color: #fff; }
+.investments-terminal.light .pg-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
 /* ── Buttons (Dark) ────────────────────────────────────────────── */
 .investments-terminal.dark .btn-white {

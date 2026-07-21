@@ -1,4 +1,5 @@
 {
     "typescript.autoClosingTags": false,
-    "kiroAgent.configureMCP": "Disabled"
+    "kiroAgent.configureMCP": "Disabled",
+    "simpleBrowser.focusLockIndicator.enabled": true
 }

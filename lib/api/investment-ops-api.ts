@@ -102,11 +102,16 @@ export interface PortfolioOverview {
   cashBalance?: string | number | null
   cashPct?: string | number | null
   securitiesValue?: string | number | null
+  interestIncome?: string | number | null
+  dividendIncome?: string | number | null
+  marginBalance?: string | number | null
+  marginUsed?: string | number | null
   startDate: string
   valuationDate: string | null
   baseCurrency: string
   portfolioManager: string
   status: string
+  [key: string]: unknown
 }
 
 export interface PortfolioTransaction {
@@ -139,7 +144,10 @@ export interface ExposureByExchange {
 }
 
 export interface PortfolioExposure {
-  byExchange: ExposureByExchange[]
+  byExchange?: ExposureByExchange[]
+  byCountry?: ExposureByExchange[]
+  bySector?: ExposureByExchange[]
+  byCurrency?: ExposureByExchange[]
   topHoldings: Holding[]
 }
 
@@ -183,6 +191,7 @@ export interface Instrument {
   status: string
   complianceRestriction: string | null
   createdById: string | null
+  createdByName?: string | null
   approvedById: string | null
   approvedAt: string | null
   listedEquitySecurityId: string | null
@@ -390,6 +399,8 @@ export interface OpsTrade {
 /** Flat pre-trade compliance result from GET /compliance/results */
 export interface ComplianceResultItem {
   id: string
+  /** Alias some payloads use for the same row id */
+  complianceResultId?: string | null
   orderId: string
   orderRef?: string | null
   fundId?: string | null
@@ -402,8 +413,20 @@ export interface ComplianceResultItem {
   currentDisplay?: string | null
   afterTradeDisplay?: string | null
   outcome: string
+  /** SRD display label from BE (e.g. "Requires Override") */
+  srdLabel?: string | null
   createdAt?: string | null
   [key: string]: unknown
+}
+
+/** POST /orders/:id/execute envelope (BA-2 / BA-T2) */
+export type OrderExecuteResult = Order & {
+  order?: Order
+  trade?: unknown
+  tradeId?: string | null
+  status?: string
+  filledQuantity?: string | number | null
+  remainingQuantity?: string | number | null
 }
 
 export interface OpsBlotter {
@@ -1021,8 +1044,17 @@ class InvestmentOpsApiService {
     return apiClient.get(`${this.BASE}/portfolios/${fundId}/positions`)
   }
 
-  async getPortfolioTransactions(fundId: string): Promise<InvestmentOpsResponse<PortfolioTransaction[]>> {
-    return apiClient.get(`${this.BASE}/portfolios/${fundId}/transactions`)
+  async getPortfolioTransactions(
+    fundId: string,
+    params?: { page?: number; pageSize?: number; status?: string; type?: string },
+  ): Promise<InvestmentOpsResponse<PortfolioTransaction[] | InstrumentListResult>> {
+    const q = new URLSearchParams()
+    if (params?.page) q.append('page', String(params.page))
+    if (params?.pageSize) q.append('pageSize', String(params.pageSize))
+    if (params?.status) q.append('status', params.status)
+    if (params?.type) q.append('type', params.type)
+    const qs = q.toString()
+    return apiClient.get(`${this.BASE}/portfolios/${fundId}/transactions${qs ? `?${qs}` : ''}`)
   }
 
   async getPortfolioExposure(fundId: string): Promise<InvestmentOpsResponse<PortfolioExposure>> {
@@ -1208,8 +1240,9 @@ class InvestmentOpsApiService {
     instrumentId: string
     side: "BUY" | "SELL"
     quantity: number | string
-    orderType: "MARKET" | "LIMIT" | string
+    orderType: "MARKET" | "LIMIT" | "STOP" | "STOP_LIMIT" | string
     limitPrice?: number | string | null
+    stopPrice?: number | string | null
     executionPrice?: number | string
     tradeCurrency?: string
     settlementCurrency?: string
@@ -1218,6 +1251,8 @@ class InvestmentOpsApiService {
     notes?: string
     brokerProfileId?: string | null
     custodianProfileId?: string | null
+    settlementAccountId?: string | null
+    approvalRouteId?: string | null
   }): Promise<InvestmentOpsResponse<OrderPreview>> {
     return apiClient.post(`${this.BASE}/orders/preview`, data, { headers: idempotencyHeaders() })
   }
@@ -1274,10 +1309,35 @@ class InvestmentOpsApiService {
     body: {
       expectedVersion?: number | string
       quantity?: string | number
+      partialFillQuantity?: string | number
+      filledQuantity?: string | number
       price?: string | number
+      executionPrice?: string | number
     } = {},
-  ): Promise<InvestmentOpsResponse<Order>> {
+  ): Promise<InvestmentOpsResponse<OrderExecuteResult>> {
     return apiClient.post(`${this.BASE}/orders/${id}/execute`, body, { headers: idempotencyHeaders() })
+  }
+
+  /** BA-T4 — fail order (reason required). */
+  async failOrder(
+    id: string,
+    data: { reason: string; expectedVersion?: number | string },
+  ): Promise<InvestmentOpsResponse<Order>> {
+    return apiClient.post(`${this.BASE}/orders/${id}/fail`, data, { headers: idempotencyHeaders() })
+  }
+
+  /** BA-T4 — archive terminal order. */
+  async archiveOrder(
+    id: string,
+    data: { reason?: string; expectedVersion?: number | string } = {},
+  ): Promise<InvestmentOpsResponse<Order>> {
+    return apiClient.post(`${this.BASE}/orders/${id}/archive`, data, { headers: idempotencyHeaders() })
+  }
+
+  async listApplicableApprovalRoutes(
+    orderId: string,
+  ): Promise<InvestmentOpsResponse<OpsPaged<ApprovalRoute> | ApprovalRoute[]>> {
+    return apiClient.get(`${this.BASE}/orders/${orderId}/applicable-approval-routes`)
   }
 
   // ── Trades ───────────────────────────────────────────────────────────────────
@@ -1491,7 +1551,14 @@ class InvestmentOpsApiService {
     return apiClient.post(`${this.BASE}/compliance/rules`, data)
   }
 
-  async createComplianceOverride(data: { orderId: string; reason: string }): Promise<InvestmentOpsResponse<any>> {
+  async createComplianceOverride(data: {
+    complianceResultId?: string
+    resultId?: string
+    orderId?: string
+    orderRef?: string
+    reasonCode?: string
+    reason: string
+  }): Promise<InvestmentOpsResponse<any>> {
     return apiClient.post(`${this.BASE}/compliance/overrides`, data, { headers: idempotencyHeaders() })
   }
 

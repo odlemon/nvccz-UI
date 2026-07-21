@@ -1,6 +1,6 @@
 'use client'
 
-import { type ReactNode, useEffect, useState } from 'react'
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import {
   ArrowUpRight,
@@ -10,15 +10,16 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock3,
-  Columns3,
   Download,
   Filter,
   Info,
   MoreVertical,
   Percent,
-  Upload,
   Wallet,
 } from 'lucide-react'
+import { useRefetchLoading } from '@/components/investments-v2/hooks/use-refetch-loading'
+import { RefetchOverlay } from '@/components/investments-v2/ui/refetch-overlay'
+import { investmentOpsApi, unwrapList } from '@/lib/api/investment-ops-api'
 import { ReconApiBanner, ReconNavTabs, ViewSegment } from '@/components/investments-v2/recon-ui'
 import { ReconTableSkeleton } from '@/components/investments-v2/loading-skeletons'
 import { stockPickerCashApi } from '@/lib/api/stock-picker-cash-api'
@@ -32,12 +33,15 @@ import {
   YAxis,
 } from 'recharts'
 import {
+  mapCashAccountOptions,
   mapCashLedgerRows,
   mapCashOverviewKpis,
   mapDailyCashMovement,
   mapFundSummaryKpis,
   opsErrorMessage,
   requireOpsData,
+  resolveCashAccountLabel,
+  resolvePortfolioName,
 } from '@/lib/investments-v2/adapters/cash-recon-adapter'
 import { R as C, ReconAccent } from '@/lib/investments-v2/recon-tokens'
 import { cn } from '@/lib/utils'
@@ -79,6 +83,7 @@ export default function CashLedgerPage() {
   const [tab, setTab] = useState<(typeof tabs)[number]>('Ledger')
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
+  const { isRefetching, withRefetch } = useRefetchLoading()
   const [error, setError] = useState<string | null>(null)
   const [rows, setRows] = useState<LedgerRow[]>([])
   const [total, setTotal] = useState(0)
@@ -87,76 +92,132 @@ export default function CashLedgerPage() {
   const [kpiAvailable, setKpiAvailable] = useState('—')
   const [kpiReservations, setKpiReservations] = useState('—')
   const [dailyMovement, setDailyMovement] = useState<{ date: string; net: number; close: number }[]>([])
+  const [portfolios, setPortfolios] = useState<{ id: string; name: string }[]>([])
+  const [cashAccounts, setCashAccounts] = useState<{ id: string; label: string }[]>([])
+  const [portfolioFilter, setPortfolioFilter] = useState('All')
+  const [currencyFilter, setCurrencyFilter] = useState('All')
+  const [asOfDate, setAsOfDate] = useState(() => new Date().toISOString().slice(0, 10))
   const isFund = ledgerView === 'fund'
   const pageSize = 20
 
   useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      setLoading(true)
-      setError(null)
-      try {
-        const [ledgerRes, overviewRes, fundRes, movementRes] = await Promise.all([
-          stockPickerCashApi.getCashLedger({
-            page,
-            pageSize,
-            view: 'LINES',
-            accountPurpose: isFund ? 'FUND' : 'TRADING',
-          }),
-          stockPickerCashApi.getCashOverview().catch(() => null),
-          isFund ? stockPickerCashApi.getFundCashSummary().catch(() => null) : Promise.resolve(null),
-          isFund ? stockPickerCashApi.getCashOverviewDailyMovement().catch(() => null) : Promise.resolve(null),
-        ])
-        if (cancelled) return
-        const ledgerData = requireOpsData(ledgerRes, 'cash ledger')
-        const mapped = mapCashLedgerRows(ledgerData)
-        setRows(mapped.items)
-        setTotal(mapped.total)
-        setTotalPages(Math.max(1, mapped.totalPages || Math.ceil((mapped.total || mapped.items.length) / pageSize) || 1))
+    investmentOpsApi.listPortfolios().then((res) => {
+      if (res.success !== false) {
+        setPortfolios(
+          unwrapList<{ id?: string; name?: string }>(res.data).map((p) => ({
+            id: String(p.id ?? ''),
+            name: String(p.name ?? p.id ?? 'Fund'),
+          })).filter((p) => p.id),
+        )
+      }
+    }).catch(() => undefined)
+    stockPickerCashApi.listClientCashAccounts({ page: 1, pageSize: 200 }).then((res) => {
+      if (res.success && res.data) {
+        const next = mapCashAccountOptions(res.data)
+        setCashAccounts((prev) =>
+          prev.length === next.length && prev.every((p, i) => p.id === next[i]?.id && p.label === next[i]?.label)
+            ? prev
+            : next,
+        )
+      }
+    }).catch(() => undefined)
+  }, [])
 
-        if (isFund && fundRes?.success && fundRes.data) {
-          const fk = mapFundSummaryKpis(requireOpsData(fundRes, 'fund cash summary'))
-          setKpiPrimary(fk.totalCash)
-          setKpiAvailable(fk.available)
-          setKpiReservations(fk.unreconciledValue)
-        } else if (overviewRes?.success && overviewRes.data) {
-          const ok = mapCashOverviewKpis(requireOpsData(overviewRes, 'cash overview'))
-          const ccy = ok?.primaryCurrency ?? 'USD'
-          setKpiPrimary(`${ccy} ${ok?.totalCash ?? '0.00'}`)
-          setKpiAvailable(`${ccy} ${ok?.available ?? '0.00'}`)
-          setKpiReservations(`${ccy} ${ok?.reservations ?? '0.00'}`)
-        } else {
-          setKpiPrimary('—')
-          setKpiAvailable('—')
-          setKpiReservations('—')
-        }
+  const selectedPortfolioId = useMemo(() => {
+    if (portfolioFilter === 'All') return undefined
+    return portfolios.find((p) => p.name === portfolioFilter)?.id
+  }, [portfolioFilter, portfolios])
 
-        if (isFund && movementRes?.success && movementRes.data) {
-          setDailyMovement(mapDailyCashMovement(movementRes.data))
-        } else {
-          setDailyMovement([])
-        }
-      } catch (e) {
-        if (cancelled) return
-        setError(opsErrorMessage(e, 'Unable to load cash ledger'))
-        setRows([])
-        setTotal(0)
-        setTotalPages(1)
+  const loadLedger = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const [ledgerRes, overviewRes, fundRes, movementRes] = await Promise.all([
+        stockPickerCashApi.getCashLedger({
+          page,
+          pageSize,
+          view: 'LINES',
+          // BA-1: FUND / TRADING purpose filters seeded + BE maps CUSTODY/CLIENT → TRADING
+          accountPurpose: isFund ? 'FUND' : 'TRADING',
+          ...(selectedPortfolioId ? { portfolioId: selectedPortfolioId } : {}),
+          ...(currencyFilter !== 'All' ? { currency: currencyFilter } : {}),
+          to: asOfDate,
+        }),
+        stockPickerCashApi.getCashOverview().catch(() => null),
+        isFund ? stockPickerCashApi.getFundCashSummary(selectedPortfolioId ? { fundId: selectedPortfolioId, asOf: asOfDate } : { asOf: asOfDate }).catch(() => null) : Promise.resolve(null),
+        isFund ? stockPickerCashApi.getCashOverviewDailyMovement({ to: asOfDate }).catch(() => null) : Promise.resolve(null),
+      ])
+      const ledgerData = requireOpsData(ledgerRes, 'cash ledger')
+      const mapped = mapCashLedgerRows(ledgerData)
+      setRows(
+        mapped.items.map((row) => ({
+          ...row,
+          fund: resolvePortfolioName(row.fund, portfolios, row.fund),
+          cashAccount:
+            row.cashAccount !== '—'
+              ? row.cashAccount
+              : resolveCashAccountLabel(row.cashAccountId, cashAccounts),
+          account:
+            row.account !== '—'
+              ? row.account
+              : resolveCashAccountLabel(row.cashAccountId, cashAccounts),
+        })),
+      )
+      setTotal(mapped.total)
+      setTotalPages(Math.max(1, mapped.totalPages || Math.ceil((mapped.total || mapped.items.length) / pageSize) || 1))
+
+      if (isFund && fundRes?.success && fundRes.data) {
+        const fundSummary = requireOpsData(fundRes, 'fund cash summary')
+        const fk = mapFundSummaryKpis(
+          fundSummary,
+          null,
+          resolvePortfolioName((fundSummary as { fundId?: string }).fundId, portfolios),
+        )
+        setKpiPrimary(fk.totalCash)
+        setKpiAvailable(fk.available)
+        setKpiReservations(fk.unreconciledValue)
+      } else if (overviewRes?.success && overviewRes.data) {
+        const ok = mapCashOverviewKpis(requireOpsData(overviewRes, 'cash overview'))
+        const ccy = ok?.primaryCurrency ?? 'USD'
+        setKpiPrimary(`${ccy} ${ok?.totalCash ?? '0.00'}`)
+        setKpiAvailable(`${ccy} ${ok?.available ?? '0.00'}`)
+        setKpiReservations(`${ccy} ${ok?.reservations ?? '0.00'}`)
+      } else {
         setKpiPrimary('—')
         setKpiAvailable('—')
         setKpiReservations('—')
-        setDailyMovement([])
-      } finally {
-        if (!cancelled) setLoading(false)
       }
-    })()
-    return () => {
-      cancelled = true
+
+      if (isFund && movementRes?.success && movementRes.data) {
+        setDailyMovement(mapDailyCashMovement(movementRes.data))
+      } else {
+        setDailyMovement([])
+      }
+    } catch (e) {
+      setError(opsErrorMessage(e, 'Unable to load cash ledger'))
+      setRows([])
+      setTotal(0)
+      setTotalPages(1)
+      setKpiPrimary('—')
+      setKpiAvailable('—')
+      setKpiReservations('—')
+      setDailyMovement([])
+    } finally {
+      setLoading(false)
     }
-  }, [isFund, page])
+  }, [asOfDate, cashAccounts, currencyFilter, ledgerView, page, portfolios, selectedPortfolioId])
+
+  useEffect(() => {
+    void withRefetch(loadLedger)
+  }, [loadLedger, withRefetch])
 
   const from = rows.length === 0 ? 0 : (page - 1) * pageSize + 1
   const to = Math.min(page * pageSize, total || rows.length)
+  const tableBusy = loading && !isRefetching && rows.length === 0
+  const portfolioOptions = useMemo(
+    () => ['All', ...portfolios.map((p) => p.name)],
+    [portfolios],
+  )
 
   return (
     <main className="min-h-full bg-background text-foreground p-5 sm:p-6" style={{ background: C.page, color: C.text }}>
@@ -187,9 +248,34 @@ export default function CashLedgerPage() {
             </p>
           </div>
           <div className="flex flex-wrap items-end gap-2.5">
-            <Control value={isFund ? 'All Funds' : 'All Clients'} />
-            <LabeledControl label="Valuation Date" value="As of today" icon={<Calendar className="h-3.5 w-3.5" />} />
-            <LabeledControl label="Currency" value="USD" />
+            <FilterSelect
+              label={isFund ? 'Fund' : 'Portfolio'}
+              value={portfolioFilter}
+              options={portfolioOptions}
+              onChange={(v) => {
+                setPortfolioFilter(v)
+                setPage(1)
+              }}
+            />
+            <FilterSelect
+              label="Valuation Date"
+              value={asOfDate}
+              options={[]}
+              type="date"
+              onChange={(v) => {
+                setAsOfDate(v)
+                setPage(1)
+              }}
+            />
+            <FilterSelect
+              label="Currency"
+              value={currencyFilter}
+              options={['All', 'USD', 'ZWL', 'ZWG']}
+              onChange={(v) => {
+                setCurrencyFilter(v)
+                setPage(1)
+              }}
+            />
           </div>
         </header>
 
@@ -203,7 +289,7 @@ export default function CashLedgerPage() {
               <Kpi icon={<Banknote className="h-4 w-4 text-[#34D399]" />} iconBg="rgba(16,185,129,0.15)" label="Unrestricted Cash" primary={kpiAvailable} secondary="Order-eligible" trend="—" trendTone={C.muted2} />
               <Kpi icon={<Clock3 className="h-4 w-4 text-[#FBBF24]" />} iconBg="rgba(245,158,11,0.15)" label="Open Break Variance" primary={kpiReservations} secondary="Unreconciled value" trend="—" trendTone={C.muted2} />
               <Kpi icon={<Download className="h-4 w-4 text-[#C084FC]" />} iconBg="rgba(168,85,247,0.15)" label="Ledger Rows" primary={String(total)} secondary={`Page ${page} of ${totalPages}`} trend="—" trendTone={C.muted2} />
-              <Kpi icon={<Percent className="h-4 w-4 text-[#60A5FA]" />} iconBg="rgba(59,130,246,0.15)" label="View" primary="Fund" secondary="accountPurpose=FUND" trend="—" trendTone={C.muted2} />
+              <Kpi icon={<Percent className="h-4 w-4 text-[#60A5FA]" />} iconBg="rgba(59,130,246,0.15)" label="View" primary="Fund" secondary="All ledger lines" trend="—" trendTone={C.muted2} />
             </>
           ) : (
             <>
@@ -211,7 +297,7 @@ export default function CashLedgerPage() {
               <Kpi icon={<Banknote className="h-4 w-4 text-[#34D399]" />} iconBg="rgba(16,185,129,0.15)" label="Available to Trade" primary={kpiAvailable} secondary="After reservations" trend="—" trendTone={C.muted2} />
               <Kpi icon={<Clock3 className="h-4 w-4 text-[#FBBF24]" />} iconBg="rgba(245,158,11,0.15)" label="Active Reservations" primary={kpiReservations} secondary="Holds" trend="—" trendTone={C.muted2} />
               <Kpi icon={<Download className="h-4 w-4 text-[#C084FC]" />} iconBg="rgba(168,85,247,0.15)" label="Ledger Rows" primary={String(total)} secondary={`Page ${page} of ${totalPages}`} trend="—" trendTone={C.muted2} />
-              <Kpi icon={<Percent className="h-4 w-4 text-[#FB7185]" />} iconBg="rgba(244,63,94,0.15)" label="View" primary="Trading" secondary="accountPurpose=TRADING" trend="—" trendTone={C.muted2} />
+              <Kpi icon={<Percent className="h-4 w-4 text-[#FB7185]" />} iconBg="rgba(244,63,94,0.15)" label="View" primary="Trading" secondary="All ledger lines" trend="—" trendTone={C.muted2} />
             </>
           )}
         </section>
@@ -241,7 +327,8 @@ export default function CashLedgerPage() {
 
           {tab === 'Ledger' ? (
             <>
-              <div className="overflow-x-auto">
+              <div className="relative overflow-x-auto">
+                <RefetchOverlay active={isRefetching} rows={8} cols={13} />
                 <table className="w-full min-w-[1280px] text-left">
                   <thead>
                     <tr style={{ borderBottom: `1px solid ${C.rowBorder}` }}>
@@ -256,21 +343,21 @@ export default function CashLedgerPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {loading ? (
+                    {tableBusy ? (
                       <tr>
                         <td colSpan={13} className="p-0">
                           <ReconTableSkeleton rows={8} cols={13} />
                         </td>
                       </tr>
                     ) : null}
-                    {!loading && rows.length === 0 ? (
+                    {!tableBusy && rows.length === 0 ? (
                       <tr>
                         <td colSpan={13} className="px-3 py-10 text-center text-[12px]" style={{ color: C.muted2 }}>
                           {error ? 'Unable to load ledger.' : 'No ledger entries for this segment.'}
                         </td>
                       </tr>
                     ) : null}
-                    {!loading
+                    {!tableBusy
                       ? rows.map((row, index) => (
                       <tr key={`${row.date}-${row.description}-${index}`} style={{ borderBottom: `1px solid ${C.rowBorder}` }}>
                         <td className="whitespace-nowrap px-3 py-3 text-[12px]" style={{ color: C.muted }}>{row.date}</td>
@@ -382,15 +469,6 @@ function FundActivityDeepLinks({ tab }: { tab: FundActivityTab }) {
   const link = FUND_ACTIVITY_LINKS[tab]
   return (
     <div className="space-y-4 px-4 py-8">
-      <div className="mx-auto max-w-xl space-y-2 text-center">
-        <p className="text-[13px] font-medium" style={{ color: C.text }}>
-          {tab} is not owned by the cash ledger API
-        </p>
-        <p className="text-[12px] leading-relaxed" style={{ color: C.muted2 }}>
-          Fund cash ledger lines cover bank receipts, payments, and running balances. {tab.toLowerCase()} activity is
-          maintained in a dedicated module — open it below to review or action records there.
-        </p>
-      </div>
       <article
         className="mx-auto max-w-xl rounded-[12px] border p-5"
         style={{ background: C.control, borderColor: C.cardBorder }}
@@ -452,26 +530,50 @@ function Kpi({
   )
 }
 
-function Control({ value }: { value: string }) {
-  return (
-    <span className="inline-flex h-9 items-center gap-2 rounded-[8px] border px-3 text-[12px]" style={{ background: C.control, borderColor: C.controlBorder }}>
-      {value}
-      <ChevronDown className="h-3.5 w-3.5" style={{ color: C.muted2 }} />
-    </span>
-  )
-}
-
-function LabeledControl({ label, value, icon }: { label: string; value: string; icon?: ReactNode }) {
+function FilterSelect({
+  label,
+  value,
+  options,
+  onChange,
+  type = 'select',
+}: {
+  label: string
+  value: string
+  options: string[]
+  onChange: (value: string) => void
+  type?: 'select' | 'date'
+}) {
   return (
     <label className="block">
       <span className="mb-1.5 block text-[11px]" style={{ color: C.muted2 }}>{label}</span>
-      <span className="inline-flex h-9 min-w-[140px] items-center justify-between gap-2 rounded-[8px] border px-3 text-[12px]" style={{ background: C.control, borderColor: C.controlBorder }}>
-        <span className="inline-flex items-center gap-2">
-          {icon && <span style={{ color: C.muted }}>{icon}</span>}
-          {value}
+      {type === 'date' ? (
+        <span className="inline-flex h-9 min-w-[140px] items-center gap-2 rounded-[8px] border px-3 text-[12px]" style={{ background: C.control, borderColor: C.controlBorder }}>
+          <Calendar className="h-3.5 w-3.5" style={{ color: C.muted }} />
+          <input
+            type="date"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            className="w-full bg-transparent outline-none"
+            style={{ color: C.text }}
+          />
         </span>
-        <ChevronDown className="h-3.5 w-3.5" style={{ color: C.muted2 }} />
-      </span>
+      ) : (
+        <span className="relative inline-flex">
+          <select
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            className="h-9 min-w-[140px] appearance-none rounded-[8px] border py-0 pl-3 pr-8 text-[12px] outline-none"
+            style={{ background: C.control, borderColor: C.controlBorder, color: C.text }}
+          >
+            {options.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+          <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2" style={{ color: C.muted2 }} />
+        </span>
+      )}
     </label>
   )
 }

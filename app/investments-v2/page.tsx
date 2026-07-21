@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Check, ChevronDown, Search } from 'lucide-react'
-import { OpsPageSkeleton } from '@/components/investments-v2/loading-skeletons'
+import { Check, ChevronDown, Loader2, Search } from 'lucide-react'
+import { OpsKpiSkeleton, OpsPageSkeleton } from '@/components/investments-v2/loading-skeletons'
+import { RefetchOverlay } from '@/components/investments-v2/ui/refetch-overlay'
 import { useAppDispatch, useAppSelector } from '@/lib/store'
 import {
   fetchDashboardAllocation,
@@ -179,6 +180,7 @@ export default function InvestmentsDashboardPage() {
   const [fundPeriod, setFundPeriod] = useState<Period>('Monthly')
   const [search, setSearch] = useState('')
   const [recalculated, setRecalculated] = useState(false)
+  const [recalcLoading, setRecalcLoading] = useState(false)
   const [recalcError, setRecalcError] = useState<string | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
 
@@ -211,11 +213,20 @@ export default function InvestmentsDashboardPage() {
   }, [dispatch, portfolioPeriod])
 
   useEffect(() => {
-    const fundId = portfolios[0]?.fundId || funds[0]?.fundId
+    dispatch(fetchDashboardFunds())
+  }, [dispatch, fundPeriod])
+
+  useEffect(() => {
+    const fundId = portfolios.find((p) => p.name === selectedPortfolio)?.fundId || portfolios[0]?.fundId || funds[0]?.fundId
     if (!fundId) return
     dispatch(fetchDashboardAllocation(fundId))
+  }, [dispatch, portfolios, funds, selectedPortfolio])
+
+  useEffect(() => {
+    const fundId = portfolios.find((p) => p.name === selectedPortfolio)?.fundId || portfolios[0]?.fundId || funds[0]?.fundId
+    if (!fundId) return
     dispatch(fetchDashboardCurrencyExposure(fundId))
-  }, [dispatch, portfolios, funds])
+  }, [dispatch, portfolios, funds, selectedPortfolio, currencyPeriod])
 
   useEffect(() => {
     if (portfolios[0] && !selectedPortfolio) setSelectedPortfolio(portfolios[0].name)
@@ -246,14 +257,18 @@ export default function InvestmentsDashboardPage() {
     const fundId = portfolios.find((p) => p.name === selectedPortfolio)?.fundId || portfolios[0]?.fundId
     if (!fundId) return
     setRecalcError(null)
+    setRecalcLoading(true)
     try {
       await investmentOpsApi.recalculateDashboard(fundId)
       setRecalculated(true)
       dispatch(fetchDashboardSummary({ period: periodToApiParam(portfolioPeriod) }))
       dispatch(fetchDashboardAllocation(fundId))
+      dispatch(fetchDashboardCurrencyExposure(fundId))
       window.setTimeout(() => setRecalculated(false), 1800)
     } catch (e) {
       setRecalcError(e instanceof Error ? e.message : 'Recalculate failed')
+    } finally {
+      setRecalcLoading(false)
     }
   }
 
@@ -291,15 +306,21 @@ export default function InvestmentsDashboardPage() {
               <button
                 type="button"
                 onClick={handleRecalculate}
-                className="inline-flex h-8 min-w-[110px] items-center justify-center gap-1.5 rounded-full bg-white px-5 text-[11px] font-semibold text-[#111722] shadow-sm transition hover:bg-[#edf2f8]"
+                disabled={recalcLoading}
+                className="inline-flex h-8 min-w-[110px] items-center justify-center gap-1.5 rounded-full bg-white px-5 text-[11px] font-semibold text-[#111722] shadow-sm transition hover:bg-[#edf2f8] disabled:opacity-60"
               >
-                {recalculated && <Check className="h-3.5 w-3.5" />}
-                {recalculated ? 'Recalculated' : 'Recalculate'}
+                {recalcLoading ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : recalculated ? (
+                  <Check className="h-3.5 w-3.5" />
+                ) : null}
+                {recalcLoading ? 'Recalculating…' : recalculated ? 'Recalculated' : 'Recalculate'}
               </button>
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
+            <RefetchOverlay active={summaryLoading && portfolios.length > 0} rows={6} cols={5} />
             <table className="w-full min-w-[620px] border-collapse">
               <thead className="bg-white/[0.035] text-left text-[10px] font-normal text-[#738095]">
                 <tr>
@@ -383,8 +404,11 @@ export default function InvestmentsDashboardPage() {
             <PeriodSelect value={currencyPeriod} onChange={setCurrencyPeriod} />
           </div>
           <div className="relative flex h-[308px] items-end justify-center gap-2 px-3 pb-9 sm:gap-5 sm:px-8">
-            {currencyBars.length === 0 ? (
+            <RefetchOverlay active={currencyLoading && currencyBars.length > 0} rows={4} cols={4} />
+            {currencyBars.length === 0 && !currencyLoading ? (
               <p className="self-center text-[12px] text-[#718096]">No currency exposure from API.</p>
+            ) : currencyBars.length === 0 && currencyLoading ? (
+              <OpsKpiSkeleton count={4} className="w-full self-center px-4" />
             ) : (
               currencyBars.map((bar) => (
                 <button
@@ -396,12 +420,12 @@ export default function InvestmentsDashboardPage() {
                   onFocus={() => setHoveredCurrency(bar.label)}
                   onBlur={() => setHoveredCurrency(null)}
                   onClick={() => setSelectedCurrency(bar.label)}
-                  className="flex h-full flex-1 flex-col items-center justify-end gap-2 outline-none"
+                  className="group flex h-full min-h-[40px] flex-1 flex-col items-center justify-end gap-2 outline-none"
                 >
                   <div
-                    className="relative w-full max-w-[51px] rounded-t-[18px] transition-all duration-200"
+                    className="relative w-full max-w-[51px] min-h-[8px] rounded-t-[18px] transition-all duration-200 group-hover:opacity-100"
                     style={{
-                      height: `${bar.value}%`,
+                      height: `${Math.max(bar.value, 4)}%`,
                       background: bar.color,
                       transform: (hoveredCurrency ?? selectedCurrency) === bar.label ? 'translateY(-5px)' : 'translateY(0)',
                       boxShadow:
@@ -410,8 +434,7 @@ export default function InvestmentsDashboardPage() {
                     }}
                   >
                     {(hoveredCurrency ?? selectedCurrency) === bar.label && (
-                      <div className="absolute left-1/2 top-6 z-20 flex h-11 min-w-[69px] -translate-x-[8%] items-center justify-center rounded-full bg-white px-3 text-[16px] font-semibold text-[#10151d] shadow-[0_12px_30px_rgba(0,0,0,.3)]">
-                        <span className="absolute -left-1.5 h-2.5 w-2.5 rounded-full bg-black" />
+                      <div className="pointer-events-none absolute left-1/2 top-6 z-20 flex h-11 min-w-[69px] -translate-x-1/2 items-center justify-center rounded-full bg-white px-3 text-[16px] font-semibold text-[#10151d] shadow-[0_12px_30px_rgba(0,0,0,.3)]">
                         {bar.value}%
                       </div>
                     )}
@@ -434,7 +457,8 @@ export default function InvestmentsDashboardPage() {
             <h2 className="text-[16px] font-medium text-[#f2f5fa]">Funds</h2>
             <PeriodSelect value={fundPeriod} onChange={setFundPeriod} />
           </div>
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
+            <RefetchOverlay active={fundsLoading && funds.length > 0} rows={6} cols={5} />
             <table className="w-full min-w-[650px] border-collapse">
               <thead className="bg-white/[0.035] text-left text-[10px] text-[#738095]">
                 <tr>

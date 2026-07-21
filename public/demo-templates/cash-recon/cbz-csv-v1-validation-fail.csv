@@ -1,0 +1,6 @@
+value_date,trade_date,amount,debit_credit,reference,counterparty,description
+not-a-date,2026-07-01,100.00,Debit,BAD-DATE-01,CBZ Bank,Invalid value_date — expect line error code
+2026-07-02,2026-07-02,-50.00,Credit,NEG-AMT-01,CBZ Bank,Negative amount with Credit — expect schema error
+2026-07-03,2026-07-03,200.00,Foo,BAD-SIGN-01,CBZ Bank,Unknown debit_credit token — expect signMap failure
+,2026-07-04,10.00,Debit,,CBZ Bank,Missing value_date and reference — expect required field errors
+2026-07-05,2026-07-05,abc,Debit,BAD-NUM-01,CBZ Bank,Non-numeric amount

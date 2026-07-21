@@ -1,8 +1,10 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ArrowDownUp, Check, ChevronDown, ChevronLeft, ChevronRight, Folder, FolderOpen, Link2, Search, SlidersHorizontal, X } from 'lucide-react'
+import { ArrowDownUp, Check, ChevronDown, Folder, FolderOpen, Link2, Search, SlidersHorizontal, X } from 'lucide-react'
 import { OpsKpiSkeleton, OpsTableSkeleton } from '@/components/investments-v2/loading-skeletons'
+import { DetailPanel } from '@/components/investments-v2/ui/detail-panel'
+import { TablePagination } from '@/components/investments-v2/ui/table-pagination'
 import { investmentOpsApi, unwrapList } from '@/lib/api/investment-ops-api'
 import {
   formatMoneyDisplay,
@@ -14,6 +16,7 @@ import {
 
 const card = 'rounded-[24px] border border-white/[0.06] bg-[linear-gradient(135deg,#172333_0%,#101a29_58%,#0b1420_100%)] shadow-[0_20px_60px_rgba(0,0,0,.2)]'
 const pill = 'inline-flex h-9 items-center justify-center gap-2 rounded-full border border-white/10 px-4 text-[11px] font-medium transition hover:border-white/20 hover:bg-white/[0.06]'
+const PAGE_SIZE = 5
 const typeTone: Record<string, string> = {
   Purchase: 'bg-emerald-400/10 text-emerald-300',
   Sale: 'bg-rose-400/10 text-rose-300',
@@ -28,6 +31,8 @@ export default function TransactionsPage() {
   const [funds, setFunds] = useState<FundTab[]>([])
   const [fundId, setFundId] = useState('')
   const [transactions, setTransactions] = useState<TxnRow[]>([])
+  const [totalRows, setTotalRows] = useState(0)
+  const [totalPages, setTotalPages] = useState(1)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [type, setType] = useState('All')
@@ -63,48 +68,65 @@ export default function TransactionsPage() {
     }
   }, [])
 
-  const loadTransactions = useCallback(async (id: string, fund: FundTab | undefined) => {
+  const loadTransactions = useCallback(async (id: string, fund: FundTab | undefined, pageNum = 1) => {
     if (!id || !fund) {
       setTransactions([])
+      setTotalRows(0)
+      setTotalPages(1)
       return
     }
     setLoading(true)
     setError(null)
     try {
-      const res = await investmentOpsApi.getPortfolioTransactions(id)
+      const res = await investmentOpsApi.getPortfolioTransactions(id, {
+        page: pageNum,
+        pageSize: PAGE_SIZE,
+        ...(status !== 'All statuses' ? { status: status.toUpperCase() } : {}),
+        ...(type !== 'All' ? { type: type.toUpperCase().replace(/\s+/g, '_') } : {}),
+      })
       if (!res.success) throw new Error(res.error || res.message || 'Failed to load transactions')
-      const items = unwrapList<Record<string, unknown>>(res.data)
+
+      const payload = res.data
+      let items: Record<string, unknown>[] = []
+      if (Array.isArray(payload)) {
+        items = payload as Record<string, unknown>[]
+        setTotalRows(items.length)
+        setTotalPages(Math.max(1, Math.ceil(items.length / PAGE_SIZE)))
+      } else if (payload && typeof payload === 'object') {
+        const envelope = payload as { items?: unknown[]; total?: number; totalPages?: number; page?: number }
+        items = unwrapList<Record<string, unknown>>(payload)
+        setTotalRows(Number(envelope.total ?? items.length))
+        setTotalPages(Math.max(1, Number(envelope.totalPages ?? Math.ceil((envelope.total ?? items.length) / PAGE_SIZE))))
+      }
+
       setTransactions(mapPortfolioTransactions(items, fund))
       setSelected(null)
-      setPage(1)
-      setType('All')
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load transactions')
       setTransactions([])
+      setTotalRows(0)
+      setTotalPages(1)
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [status, type])
 
   useEffect(() => {
     void loadFunds()
   }, [loadFunds])
 
   useEffect(() => {
-    if (fundId) void loadTransactions(fundId, funds.find((f) => f.id === fundId))
-  }, [fundId, funds, loadTransactions])
+    if (fundId) void loadTransactions(fundId, funds.find((f) => f.id === fundId), page)
+  }, [fundId, funds, loadTransactions, page])
 
   const rows = useMemo(
     () =>
       transactions
-        .filter((row) => type === 'All' || row.type === type)
-        .filter((row) => status === 'All statuses' || row.status === status)
         .filter((row) => !search || `${row.ref} ${row.instrument} ${row.description} ${row.tradeRef}`.toLowerCase().includes(search.toLowerCase()))
         .sort((a, b) => (sort === 'date' ? b.date.localeCompare(a.date) : Math.abs(b.amount) - Math.abs(a.amount))),
-    [search, sort, status, transactions, type],
+    [search, sort, transactions],
   )
-  const totalPages = Math.max(1, Math.ceil(rows.length / 5))
-  const pageRows = rows.slice((page - 1) * 5, page * 5)
+  const pageRows = rows
   const purchases = transactions.filter((row) => row.type === 'Purchase').reduce((sum, row) => sum + Math.abs(row.amount), 0)
   const sales = transactions.filter((row) => row.type === 'Sale').reduce((sum, row) => sum + row.amount, 0)
   const income = transactions
@@ -253,20 +275,20 @@ export default function TransactionsPage() {
               </tbody>
             </table>
           </div>
-          <footer className="flex items-center justify-between px-4 py-3 text-[10px] text-[#718096]">
-            <span>Showing {pageRows.length} of {rows.length} transactions</span>
-            <div className="flex items-center gap-2">
-              <button type="button" disabled={page === 1} onClick={() => setPage((p) => p - 1)} className={`${pill} h-8 w-8 px-0 disabled:opacity-30`}><ChevronLeft className="h-3.5 w-3.5" /></button>
-              <span>{page} / {totalPages}</span>
-              <button type="button" disabled={page === totalPages} onClick={() => setPage((p) => p + 1)} className={`${pill} h-8 w-8 px-0 disabled:opacity-30`}><ChevronRight className="h-3.5 w-3.5" /></button>
-            </div>
-          </footer>
+          <TablePagination
+            page={page}
+            totalPages={totalPages}
+            onPageChange={setPage}
+            rowsShown={pageRows.length}
+            totalRows={totalRows}
+            pageSize={PAGE_SIZE}
+          />
         </section>
       </div>
 
-      {selected && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" onMouseDown={() => setSelected(null)}>
-          <aside onMouseDown={(e) => e.stopPropagation()} className="absolute right-0 top-0 h-full w-full max-w-xl overflow-y-auto border-l border-white/10 bg-[linear-gradient(145deg,#172333,#0b1420_70%)] p-6 shadow-2xl">
+      <DetailPanel open={Boolean(selected)} onClose={() => setSelected(null)} width="max-w-xl">
+        {selected && (
+          <>
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-[9px] uppercase tracking-[.2em] text-[#64758b]">Linked record</p>
@@ -309,9 +331,9 @@ export default function TransactionsPage() {
                 </div>
               ))}
             </div>
-          </aside>
-        </div>
-      )}
+          </>
+        )}
+      </DetailPanel>
     </main>
   )
 }

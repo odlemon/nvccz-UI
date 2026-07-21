@@ -71,12 +71,15 @@ export interface Holding {
   fundId: string
   securityId: string
   quantity: number
+  openQuantity?: number | null
   wac: number
   wacCurrencyCode: string
   lastValuationAt?: string | null
   createdAt?: string
   updatedAt?: string
   security?: Security
+  /** Nested instrument snapshot from GET …/holdings (2026-07-20 UX polish). */
+  instrument?: Security
   currentPrice?: number | null
   marketValue?: number | null
   unrealizedPnl?: number | null

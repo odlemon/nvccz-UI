@@ -375,7 +375,7 @@ export default function ReportingPage() {
                   <tr><td colSpan={7} className="p-0"><OpsTableSkeleton rows={8} cols={7} /></td></tr>
                 ) : runRows.length > 0 ? runRows.map((run) => (
                   <tr key={run.id}>
-                    <td><div><p className="max-w-[230px] truncate font-medium">{run.reportTypeName}</p><p className="mt-0.5 font-mono text-[9px] text-primary">{run.id}</p></div></td>
+                    <td><div><p className="max-w-[230px] truncate font-medium">{run.reportTypeName}</p><p className="mt-0.5 text-[9px] text-muted-foreground">{format(new Date(run.createdAt), 'dd MMM yyyy HH:mm')}</p></div></td>
                     <td><span className="rounded-full bg-muted px-2 py-1 text-[9px] font-medium text-muted-foreground">{run.format}</span></td>
                     <td className="text-muted-foreground">{run.fundName ?? run.clientName ?? 'Firm-wide'}</td>
                     <td className="text-muted-foreground">{run.requestedBy?.name ?? '—'}</td>
@@ -401,7 +401,7 @@ export default function ReportingPage() {
       </div>
 
       {showGenerate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3 backdrop-blur-sm sm:p-5" onMouseDown={() => setShowGenerate(false)}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-3 backdrop-blur-sm sm:p-5" onMouseDown={() => setShowGenerate(false)}>
           <section className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-[24px] border border-border bg-card shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>
             <div className="flex items-start justify-between border-b border-border p-5">
               <div>

@@ -1,0 +1,55 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Open Investments Walkthrough Browser",
+      "type": "shell",
+      "command": "echo ${input:openInvestmentsBrowser}",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "never",
+        "echo": false,
+        "focus": false,
+        "panel": "shared",
+        "showReuseMessage": false
+      },
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      }
+    },
+    {
+      "label": "Open Login in Editor Browser",
+      "type": "shell",
+      "command": "echo ${input:openLoginBrowser}",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "never",
+        "echo": false,
+        "focus": false,
+        "panel": "shared",
+        "showReuseMessage": false
+      }
+    },
+    {
+      "label": "Walkthrough: Dev server + Editor Browser",
+      "dependsOn": ["npm: dev", "Open Investments Walkthrough Browser"],
+      "dependsOrder": "sequence",
+      "problemMatcher": []
+    }
+  ],
+  "inputs": [
+    {
+      "id": "openInvestmentsBrowser",
+      "type": "command",
+      "command": "simpleBrowser.api.open",
+      "args": ["http://localhost:3001/investments-v2/reconciliation/statements"]
+    },
+    {
+      "id": "openLoginBrowser",
+      "type": "command",
+      "command": "simpleBrowser.api.open",
+      "args": ["http://localhost:3001/login"]
+    }
+  ]
+}

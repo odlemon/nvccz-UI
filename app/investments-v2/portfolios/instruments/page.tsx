@@ -1,9 +1,11 @@
 'use client'
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
-import { ArrowDownUp, Check, ChevronDown, ChevronLeft, ChevronRight, Loader2, Plus, Search, ShieldAlert, X } from 'lucide-react'
+import { ArrowDownUp, Check, ChevronDown, Loader2, Plus, Search, ShieldAlert, X } from 'lucide-react'
 import { OpsKpiSkeleton, OpsTableSkeleton } from '@/components/investments-v2/loading-skeletons'
-import { formatOpsError, investmentOpsApi, unwrapList } from '@/lib/api/investment-ops-api'
+import { DetailPanel } from '@/components/investments-v2/ui/detail-panel'
+import { TablePagination } from '@/components/investments-v2/ui/table-pagination'
+import { formatOpsError, investmentOpsApi, unwrapList, type InstrumentType } from '@/lib/api/investment-ops-api'
 import { mapInstrumentRow, type InstrumentRow } from '@/lib/investments-v2/adapters/portfolio-adapter'
 
 const card = 'rounded-[24px] border border-white/[0.06] bg-[linear-gradient(135deg,#172333_0%,#101a29_58%,#0b1420_100%)] shadow-[0_20px_60px_rgba(0,0,0,.2)]'
@@ -36,6 +38,18 @@ export default function InstrumentsPage() {
   const [createError, setCreateError] = useState<string | null>(null)
   const [lifecycleBusy, setLifecycleBusy] = useState(false)
   const [lifecycleError, setLifecycleError] = useState<string | null>(null)
+  const [instrumentTypes, setInstrumentTypes] = useState<InstrumentType[]>([])
+
+  const loadInstrumentTypes = useCallback(async () => {
+    try {
+      const res = await investmentOpsApi.getInstrumentTypes()
+      if (res.success !== false) {
+        setInstrumentTypes(unwrapList<InstrumentType>(res.data))
+      }
+    } catch {
+      setInstrumentTypes([])
+    }
+  }, [])
 
   const loadInstruments = useCallback(async () => {
     setLoading(true)
@@ -57,7 +71,17 @@ export default function InstrumentsPage() {
 
   useEffect(() => {
     void loadInstruments()
-  }, [loadInstruments])
+    void loadInstrumentTypes()
+  }, [loadInstruments, loadInstrumentTypes])
+
+  const typeOptions = useMemo(() => {
+    const fromApi = instrumentTypes
+      .filter((t) => t.isActive !== false)
+      .map((t) => ({ code: t.typeCode, label: t.displayName || t.typeCode }))
+    if (fromApi.length) return fromApi
+    const fromRows = new Set(items.map((row) => row.type.replace(/\s+/g, '_').toUpperCase()).filter(Boolean))
+    return Array.from(fromRows).map((code) => ({ code, label: code.replace(/_/g, ' ') }))
+  }, [instrumentTypes, items])
 
   const categories = useMemo(() => {
     const set = new Set(items.map((row) => row.type).filter(Boolean))
@@ -93,7 +117,7 @@ export default function InstrumentsPage() {
       const ticker = String(data.get('symbol') || '').trim().toUpperCase()
       const market = String(data.get('market') || '').trim().toUpperCase()
       const typeRaw = String(data.get('type') || '').trim()
-      const instrumentTypeCode = (typeRaw ? typeRaw.toUpperCase().replace(/\s+/g, '_') : 'EQUITY')
+      const instrumentTypeCode = typeRaw ? typeRaw.toUpperCase().replace(/\s+/g, '_') : 'EQUITY'
       const isin = String(data.get('isin') || '').trim()
       const sector = String(data.get('sector') || '').trim()
       const submitAfterCreate = data.get('submitAfterCreate') === 'on'
@@ -265,7 +289,10 @@ export default function InstrumentsPage() {
                     className={`cursor-pointer border-b border-white/[0.045] transition hover:bg-white/[0.035] ${selected?.id === row.id ? 'bg-[#2f87fa]/10' : ''}`}
                   >
                     <td className="px-4 py-3"><p className="font-semibold text-white">{row.symbol}</p><p className="mt-1 text-[9px] text-[#78879a]">{row.name}</p></td>
-                    <td className="px-4 py-3 font-mono text-[#8c9aab]"><p>{row.isin}</p><p className="mt-1 text-[9px]">{row.sedol}</p></td>
+                    <td className="px-4 py-3 font-mono text-[#8c9aab]">
+                      <p>{row.isin}</p>
+                      {row.sedol !== '—' && <p className="mt-1 text-[9px] text-[#78879a]">{row.sedol}</p>}
+                    </td>
                     <td className="px-4 py-3"><p>{row.type}</p><p className="mt-1 text-[9px] text-[#78879a]">{row.sector}</p></td>
                     <td className="px-4 py-3">{row.market}</td>
                     <td className="px-4 py-3 font-mono">{row.currency}</td>
@@ -285,20 +312,20 @@ export default function InstrumentsPage() {
               </tbody>
             </table>
           </div>
-          <footer className="flex items-center justify-between px-4 py-3 text-[10px] text-[#718096]">
-            <span>Showing {rows.length} of {filtered.length} instruments</span>
-            <div className="flex items-center gap-2">
-              <button type="button" disabled={page === 1} onClick={() => setPage((p) => p - 1)} className={`${pill} h-8 w-8 px-0 disabled:opacity-30`}><ChevronLeft className="h-3.5 w-3.5" /></button>
-              <span>{page} / {totalPages}</span>
-              <button type="button" disabled={page === totalPages} onClick={() => setPage((p) => p + 1)} className={`${pill} h-8 w-8 px-0 disabled:opacity-30`}><ChevronRight className="h-3.5 w-3.5" /></button>
-            </div>
-          </footer>
+          <TablePagination
+            page={page}
+            totalPages={totalPages}
+            onPageChange={setPage}
+            rowsShown={rows.length}
+            totalRows={filtered.length}
+            pageSize={PAGE_SIZE}
+          />
         </section>
       </div>
 
-      {selected && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" onMouseDown={() => setSelected(null)}>
-          <aside onMouseDown={(e) => e.stopPropagation()} className="absolute right-0 top-0 h-full w-full max-w-xl overflow-y-auto border-l border-white/10 bg-[linear-gradient(145deg,#172333,#0b1420_70%)] p-6 shadow-2xl">
+      <DetailPanel open={Boolean(selected)} onClose={() => setSelected(null)} width="max-w-xl">
+        {selected && (
+          <>
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-[9px] uppercase tracking-[.2em] text-[#64758b]">Security master</p>
@@ -374,12 +401,12 @@ export default function InstrumentsPage() {
                 </dl>
               </section>
             ))}
-          </aside>
-        </div>
-      )}
+          </>
+        )}
+      </DetailPanel>
 
       {createOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onMouseDown={() => setCreateOpen(false)}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onMouseDown={() => setCreateOpen(false)}>
           <form onSubmit={addInstrument} onMouseDown={(e) => e.stopPropagation()} className={`${card} w-full max-w-lg p-6`}>
             <div className="flex items-center justify-between">
               <div>
@@ -392,12 +419,39 @@ export default function InstrumentsPage() {
               <div className="mt-4 rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-2 text-[12px] text-rose-200">{createError}</div>
             )}
             <div className="mt-6 grid gap-4 sm:grid-cols-2">
-              {[['symbol', 'Symbol'], ['name', 'Instrument name'], ['isin', 'ISIN'], ['type', 'Asset type'], ['sector', 'Sector'], ['market', 'Market']].map(([name, label]) => (
-                <label key={name}>
-                  <span className="mb-2 block text-[10px] text-[#8795a8]">{label}</span>
-                  <input name={name} required={name !== 'isin'} className={input} />
-                </label>
-              ))}
+              <label>
+                <span className="mb-2 block text-[10px] text-[#8795a8]">Symbol</span>
+                <input name="symbol" required className={input} />
+              </label>
+              <label>
+                <span className="mb-2 block text-[10px] text-[#8795a8]">Instrument name</span>
+                <input name="name" required className={input} />
+              </label>
+              <label>
+                <span className="mb-2 block text-[10px] text-[#8795a8]">ISIN</span>
+                <input name="isin" className={input} />
+              </label>
+              <label>
+                <span className="mb-2 block text-[10px] text-[#8795a8]">Asset type</span>
+                <select name="type" required defaultValue={typeOptions[0]?.code ?? 'EQUITY'} className={input}>
+                  {typeOptions.map((opt) => (
+                    <option key={opt.code} value={opt.code}>{opt.label}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span className="mb-2 block text-[10px] text-[#8795a8]">Sector</span>
+                <select name="sector" className={input} defaultValue="">
+                  <option value="">Select sector</option>
+                  {['Financials', 'Technology', 'Healthcare', 'Consumer', 'Industrials', 'Energy', 'Materials', 'Utilities', 'Real Estate', 'Telecommunications'].map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span className="mb-2 block text-[10px] text-[#8795a8]">Market</span>
+                <input name="market" required className={input} />
+              </label>
             </div>
             <label className="mt-4 flex items-start gap-2 text-[10px] text-[#aeb8c7]">
               <input name="submitAfterCreate" type="checkbox" defaultChecked className="mt-0.5 rounded border-white/20" />

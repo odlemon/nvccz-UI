@@ -59,7 +59,7 @@ export interface LoginCredentials {
 
 export const authApiService = {
   async login(credentials: LoginCredentials): Promise<LoginResponse> {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://31.220.82.129:3009/api'}/auth/login`, {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3009/api'}/auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -101,7 +101,7 @@ export const authApiService = {
   },
 
   async forgotPassword(email: string): Promise<{ success: boolean; message: string }> {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://31.220.82.129:3009/api'}/auth/forgot-password`, {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3009/api'}/auth/forgot-password`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

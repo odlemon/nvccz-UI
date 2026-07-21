@@ -1,21 +1,17 @@
 'use client'
 
-import { type ReactNode, useEffect, useMemo, useState } from 'react'
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 import {
   Banknote,
   Calendar,
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsRight,
   CircleAlert,
   Clock3,
-  Columns3,
   Info,
   Search,
   ShieldAlert,
   Star,
-  Upload,
   Wallet,
   FileText,
 } from 'lucide-react'
@@ -33,8 +29,12 @@ import {
 } from 'recharts'
 import { ReconApiBanner, ReconNavTabs } from '@/components/investments-v2/recon-ui'
 import { ReconTableSkeleton } from '@/components/investments-v2/loading-skeletons'
+import { useRefetchLoading } from '@/components/investments-v2/hooks/use-refetch-loading'
+import { RefetchOverlay } from '@/components/investments-v2/ui/refetch-overlay'
+import { TablePagination } from '@/components/investments-v2/ui/table-pagination'
 import { stockPickerCashApi } from '@/lib/api/stock-picker-cash-api'
 import {
+  mapCashAccountOptions,
   mapCashOverviewKpis,
   mapClientAccounts,
   mapCurrencyPie,
@@ -42,6 +42,7 @@ import {
   mapExceptions,
   opsErrorMessage,
   requireOpsData,
+  resolveCashAccountLabel,
 } from '@/lib/investments-v2/adapters/cash-recon-adapter'
 import { R as C } from '@/lib/investments-v2/recon-tokens'
 import { cn } from '@/lib/utils'
@@ -52,12 +53,16 @@ export default function ClientAccountsOverviewPage() {
   const [search, setSearch] = useState('')
   const [accountType, setAccountType] = useState('All Account Types')
   const [status, setStatus] = useState('All Statuses')
+  const [asOfDate, setAsOfDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [page, setPage] = useState(1)
   const pageSize = 8
   const [loading, setLoading] = useState(true)
+  const [accountsLoading, setAccountsLoading] = useState(true)
+  const { isRefetching, withRefetch } = useRefetchLoading()
   const [error, setError] = useState<string | null>(null)
   const [accounts, setAccounts] = useState<AccountRow[]>([])
   const [accountTotal, setAccountTotal] = useState(0)
+  const [accountTypeOptions, setAccountTypeOptions] = useState<string[]>(['All Account Types'])
   const [kpis, setKpis] = useState<
     {
       label: string
@@ -79,138 +84,167 @@ export default function ClientAccountsOverviewPage() {
   >([])
   const [dailyMovement, setDailyMovement] = useState<{ date: string; net: number; close: number }[]>([])
 
-  useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      setLoading(true)
-      setError(null)
-      try {
-        const [overviewRes, accountsRes, exceptionsRes, movementRes] = await Promise.all([
-          stockPickerCashApi.getCashOverview(),
-          stockPickerCashApi.listClientCashAccounts({ page: 1, pageSize: 100 }),
-          stockPickerCashApi.listExceptions({ page: 1, pageSize: 5 }).catch(() => null),
-          stockPickerCashApi.getCashOverviewDailyMovement().catch(() => null),
-        ])
-        if (cancelled) return
-        const overview = requireOpsData(overviewRes, 'cash overview')
-        const accountsData = requireOpsData(accountsRes, 'client cash accounts')
-        const k = mapCashOverviewKpis(overview)
-        const mapped = mapClientAccounts(accountsData)
-        const unreconciled = mapped.items.reduce((s, a) => s + a.unreconciled, 0)
-        const ccy = k?.primaryCurrency ?? 'USD'
-        setAccounts(mapped.items)
-        setAccountTotal(mapped.total)
-        setCashByCurrency(mapCurrencyPie(k?.byCurrency ?? []))
-        if (movementRes?.success && movementRes.data) {
-          setDailyMovement(mapDailyCashMovement(movementRes.data))
-        } else {
-          setDailyMovement([])
-        }
-        setKpis([
-          {
-            label: 'Total Client Cash',
-            icon: Wallet,
-            iconBg: 'rgba(59,130,246,0.15)',
-            iconColor: '#60A5FA',
-            primary: `${ccy} ${k?.totalCash ?? '0.00'}`,
-            secondary: k?.secondaryCash ? `${k.secondaryCurrency} ${k.secondaryCash}` : `${mapped.total} accounts`,
-            trend: '—',
-            trendTone: 'text-[#64748B]',
-          },
-          {
-            label: 'Available Cash',
-            icon: Banknote,
-            iconBg: 'rgba(34,197,94,0.15)',
-            iconColor: '#4ADE80',
-            primary: `${ccy} ${k?.available ?? '0.00'}`,
-            secondary: k?.secondaryAvailable
-              ? `${k.secondaryCurrency} ${k.secondaryAvailable}`
-              : 'Order-eligible',
-            trend: '—',
-            trendTone: 'text-[#64748B]',
-          },
-          {
-            label: 'Pending Settlements',
-            icon: Clock3,
-            iconBg: 'rgba(245,158,11,0.15)',
-            iconColor: '#FBBF24',
-            primary: `${ccy} ${k?.reservations ?? '0.00'}`,
-            secondary: 'Active reservations',
-            trend: '—',
-            trendTone: 'text-[#64748B]',
-          },
-          {
-            label: 'Unreconciled Items',
-            icon: FileText,
-            iconBg: 'rgba(168,85,247,0.15)',
-            iconColor: '#C084FC',
-            primary: String(unreconciled),
-            secondary: 'Open breaks on accounts',
-            trend: '—',
-            trendTone: 'text-[#64748B]',
-          },
-          {
-            label: 'Exceptions',
-            icon: ShieldAlert,
-            iconBg: 'rgba(244,63,94,0.15)',
-            iconColor: '#FB7185',
-            primary: String(k?.unhealthyAccounts ?? 0),
-            secondary: 'Unhealthy accounts',
-            trend: '—',
-            trendTone: 'text-[#64748B]',
-            exceptions: true,
-          },
-        ])
-        if (exceptionsRes?.success && exceptionsRes.data) {
-          const ex = requireOpsData(exceptionsRes, 'exceptions')
-          const rowsEx = mapExceptions(ex).items
-          setRecentAlerts(
-            rowsEx.map((r) => ({
+  const statusApiValue = useMemo(() => {
+    if (status === 'Active') return 'ACTIVE'
+    if (status === 'Restricted') return 'RESTRICTED'
+    return undefined
+  }, [status])
+
+  const loadOverview = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const [overviewRes, exceptionsRes, movementRes, accountsRes] = await Promise.all([
+        stockPickerCashApi.getCashOverview(),
+        stockPickerCashApi.listExceptions({ page: 1, pageSize: 5 }).catch(() => null),
+        stockPickerCashApi.getCashOverviewDailyMovement({ to: asOfDate }).catch(() => null),
+        stockPickerCashApi.listClientCashAccounts({ page: 1, pageSize: 100 }).catch(() => null),
+      ])
+      const overview = requireOpsData(overviewRes, 'cash overview')
+      const k = mapCashOverviewKpis(overview)
+      const unreconciled =
+        accountsRes?.success && accountsRes.data
+          ? mapClientAccounts(requireOpsData(accountsRes, 'client cash accounts')).items.reduce(
+              (s, a) => s + a.unreconciled,
+              0,
+            )
+          : 0
+      const ccy = k?.primaryCurrency ?? 'USD'
+      setCashByCurrency(mapCurrencyPie(k?.byCurrency ?? []))
+      if (movementRes?.success && movementRes.data) {
+        setDailyMovement(mapDailyCashMovement(movementRes.data))
+      } else {
+        setDailyMovement([])
+      }
+      setKpis([
+        {
+          label: 'Total Client Cash',
+          icon: Wallet,
+          iconBg: 'rgba(59,130,246,0.15)',
+          iconColor: '#60A5FA',
+          primary: `${ccy} ${k?.totalCash ?? '0.00'}`,
+          secondary: k?.secondaryCash ? `${k.secondaryCurrency} ${k.secondaryCash}` : `${k?.accountCount ?? 0} accounts`,
+          trend: '—',
+          trendTone: 'text-[#64748B]',
+        },
+        {
+          label: 'Available Cash',
+          icon: Banknote,
+          iconBg: 'rgba(34,197,94,0.15)',
+          iconColor: '#4ADE80',
+          primary: `${ccy} ${k?.available ?? '0.00'}`,
+          secondary: k?.secondaryAvailable
+            ? `${k.secondaryCurrency} ${k.secondaryAvailable}`
+            : 'Order-eligible',
+          trend: '—',
+          trendTone: 'text-[#64748B]',
+        },
+        {
+          label: 'Pending Settlements',
+          icon: Clock3,
+          iconBg: 'rgba(245,158,11,0.15)',
+          iconColor: '#FBBF24',
+          primary: `${ccy} ${k?.reservations ?? '0.00'}`,
+          secondary: 'Active reservations',
+          trend: '—',
+          trendTone: 'text-[#64748B]',
+        },
+        {
+          label: 'Unreconciled Items',
+          icon: FileText,
+          iconBg: 'rgba(168,85,247,0.15)',
+          iconColor: '#C084FC',
+          primary: String(unreconciled),
+          secondary: 'Open breaks on accounts',
+          trend: '—',
+          trendTone: 'text-[#64748B]',
+        },
+        {
+          label: 'Exceptions',
+          icon: ShieldAlert,
+          iconBg: 'rgba(244,63,94,0.15)',
+          iconColor: '#FB7185',
+          primary: String(k?.unhealthyAccounts ?? 0),
+          secondary: 'Unhealthy accounts',
+          trend: '—',
+          trendTone: 'text-[#64748B]',
+          exceptions: true,
+        },
+      ])
+      if (exceptionsRes?.success && exceptionsRes.data) {
+        const ex = requireOpsData(exceptionsRes, 'exceptions')
+        const accountOpts =
+          accountsRes?.success && accountsRes.data ? mapCashAccountOptions(accountsRes.data) : []
+        const rowsEx = mapExceptions(ex).items
+        setRecentAlerts(
+          rowsEx.map((r) => {
+            const account =
+              r.account !== '—'
+                ? r.account
+                : resolveCashAccountLabel(r.cashAccountId, accountOpts)
+            const client = r.client !== '—' ? r.client : '—'
+            return {
               title: r.title,
-              meta: `${r.account} · ${r.client}`,
+              meta: `${account} · ${client}`,
               amount: `USD ${r.diffUsd}`,
               when: `${r.ageDays}d`,
               tone: r.severity === 'Critical' || r.severity === 'High' ? 'red' : r.severity === 'Medium' ? 'amber' : 'blue',
-            })),
-          )
-        } else {
-          setRecentAlerts([])
-        }
-      } catch (e) {
-        if (cancelled) return
-        setError(opsErrorMessage(e, 'Unable to load cash overview'))
-        setAccounts([])
-        setAccountTotal(0)
-        setKpis([])
-        setCashByCurrency([])
-        setDailyMovement([])
+            }
+          }),
+        )
+      } else {
         setRecentAlerts([])
-      } finally {
-        if (!cancelled) setLoading(false)
       }
-    })()
-    return () => {
-      cancelled = true
+    } catch (e) {
+      setError(opsErrorMessage(e, 'Unable to load cash overview'))
+      setKpis([])
+      setCashByCurrency([])
+      setDailyMovement([])
+      setRecentAlerts([])
+    } finally {
+      setLoading(false)
     }
-  }, [])
+  }, [asOfDate])
 
-  const filtered = useMemo(() => {
-    const q = search.toLowerCase()
-    return accounts.filter((row) => {
-      const matchQ =
-        !q ||
-        `${row.accountNumber} ${row.clientName} ${row.accountType}`.toLowerCase().includes(q)
-      const matchType = accountType === 'All Account Types' || row.accountType === accountType
-      const matchStatus = status === 'All Statuses' || row.status === status
-      return matchQ && matchType && matchStatus
-    })
-  }, [accountType, accounts, search, status])
+  const loadAccounts = useCallback(async () => {
+    setAccountsLoading(true)
+    try {
+      const accountsRes = await stockPickerCashApi.listClientCashAccounts({
+        page,
+        pageSize,
+        ...(search.trim() ? { search: search.trim() } : {}),
+        ...(statusApiValue ? { status: statusApiValue } : {}),
+        ...(accountType !== 'All Account Types' ? { accountType } : {}),
+      })
+      const accountsData = requireOpsData(accountsRes, 'client cash accounts')
+      const mapped = mapClientAccounts(accountsData)
+      setAccounts(mapped.items)
+      setAccountTotal(mapped.total)
+      const types = Array.from(new Set(mapped.items.map((a) => a.accountType).filter((t) => t && t !== '—')))
+      if (types.length) {
+        setAccountTypeOptions(['All Account Types', ...types])
+      }
+    } catch (e) {
+      setError(opsErrorMessage(e, 'Unable to load client cash accounts'))
+      setAccounts([])
+      setAccountTotal(0)
+    } finally {
+      setAccountsLoading(false)
+    }
+  }, [accountType, page, search, statusApiValue])
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
-  const rows = filtered.slice((page - 1) * pageSize, page * pageSize)
-  const from = filtered.length === 0 ? 0 : (page - 1) * pageSize + 1
-  const to = Math.min(page * pageSize, filtered.length)
+  useEffect(() => {
+    void loadOverview()
+  }, [loadOverview])
+
+  useEffect(() => {
+    void withRefetch(loadAccounts)
+  }, [loadAccounts, withRefetch])
+
+  const totalPages = Math.max(1, Math.ceil(accountTotal / pageSize))
+  const rows = accounts
   const dominantCcy = cashByCurrency[0]
+  const tableBusy = accountsLoading && !isRefetching && accounts.length === 0
 
   return (
     <main className="min-h-full bg-background text-foreground p-5 sm:p-6" style={{ background: C.page, color: C.text }}>
@@ -254,9 +288,20 @@ export default function ClientAccountsOverviewPage() {
               type="button"
               className="inline-flex h-9 items-center gap-2 rounded-full border px-3 text-[12px]"
               style={{ background: C.control, borderColor: C.controlBorder, color: C.text }}
+              onClick={() => {
+                const today = new Date().toISOString().slice(0, 10)
+                setAsOfDate((prev) => (prev === today ? prev : today))
+              }}
             >
               <Calendar className="h-3.5 w-3.5" style={{ color: C.muted }} />
-              <span>As of today</span>
+              <input
+                type="date"
+                value={asOfDate}
+                onChange={(e) => setAsOfDate(e.target.value)}
+                className="w-[108px] bg-transparent text-[12px] outline-none"
+                style={{ color: C.text }}
+                aria-label="As of date"
+              />
               <ChevronDown className="h-3.5 w-3.5" style={{ color: C.muted2 }} />
             </button>
           </div>
@@ -326,13 +371,13 @@ export default function ClientAccountsOverviewPage() {
                 className="rounded-full px-2.5 py-0.5 text-[11px] font-medium"
                 style={{ background: C.muted, color: C.muted, border: `1px solid ${C.cardBorder}` }}
               >
-                {accountTotal || filtered.length} Accounts
+                {accountTotal || rows.length} Accounts
               </span>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <FilterSelect
                 value={accountType}
-                options={['All Account Types', 'Discretionary', 'Pension Fund', 'Custodial', 'Brokerage', 'Corporate']}
+                options={accountTypeOptions}
                 onChange={(v) => {
                   setAccountType(v)
                   setPage(1)
@@ -349,7 +394,8 @@ export default function ClientAccountsOverviewPage() {
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
+            <RefetchOverlay active={isRefetching} rows={7} cols={8} />
             <table className="w-full min-w-[1100px] text-left">
               <thead>
                 <tr style={{ borderBottom: `1px solid ${C.rowBorder}` }}>
@@ -381,21 +427,21 @@ export default function ClientAccountsOverviewPage() {
                 </tr>
               </thead>
               <tbody>
-                {loading ? (
+                {tableBusy ? (
                   <tr>
                     <td colSpan={8} className="p-0">
                       <ReconTableSkeleton rows={7} cols={8} />
                     </td>
                   </tr>
                 ) : null}
-                {!loading && rows.length === 0 ? (
+                {!tableBusy && rows.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="px-4 py-10 text-center text-[12px]" style={{ color: C.muted2 }}>
                       {error ? 'Unable to load accounts.' : 'No client cash accounts found.'}
                     </td>
                   </tr>
                 ) : null}
-                {!loading
+                {!tableBusy
                   ? rows.map((row) => (
                   <tr key={row.id || row.accountNumber} style={{ borderBottom: `1px solid ${C.rowBorder}` }}>
                     <td className="px-4 py-3">
@@ -440,41 +486,14 @@ export default function ClientAccountsOverviewPage() {
             </table>
           </div>
 
-          <div
-            className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
-            style={{ borderTop: `1px solid ${C.cardBorder}` }}
-          >
-            <p className="text-[12px]" style={{ color: C.muted2 }}>
-              Showing {from} to {to} of {filtered.length} accounts
-            </p>
-            <div className="flex items-center gap-1">
-              <PagerBtn disabled={page === 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
-                <ChevronLeft className="h-3.5 w-3.5" />
-              </PagerBtn>
-              {[1, 2, 3].map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  disabled={n > totalPages}
-                  onClick={() => setPage(n)}
-                  className="flex h-7 w-7 items-center justify-center rounded-md text-[12px] font-medium disabled:opacity-30"
-                  style={
-                    page === n
-                      ? { background: C.blue, color: '#fff' }
-                      : { color: C.muted, background: 'transparent' }
-                  }
-                >
-                  {n}
-                </button>
-              ))}
-              <PagerBtn disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
-                <ChevronRight className="h-3.5 w-3.5" />
-              </PagerBtn>
-              <PagerBtn disabled={page >= totalPages} onClick={() => setPage(totalPages)}>
-                <ChevronsRight className="h-3.5 w-3.5" />
-              </PagerBtn>
-            </div>
-          </div>
+          <TablePagination
+            page={page}
+            totalPages={totalPages}
+            onPageChange={setPage}
+            rowsShown={rows.length}
+            totalRows={accountTotal}
+            pageSize={pageSize}
+          />
         </section>
 
         {/* Bottom panels */}
@@ -586,9 +605,9 @@ export default function ClientAccountsOverviewPage() {
                 </h3>
                 <Info className="h-3 w-3" style={{ color: C.muted2 }} />
               </div>
-              <button type="button" className="text-[12px] font-medium" style={{ color: C.blueLink }}>
+              <Link href="/investments-v2/reconciliation/exceptions" className="text-[12px] font-medium" style={{ color: C.blueLink }}>
                 View all
-              </button>
+              </Link>
             </div>
             <ul>
               {recentAlerts.length === 0 ? (
@@ -680,28 +699,6 @@ function StatusBadge({ status }: { status: 'Active' | 'Restricted' }) {
       />
       {status}
     </span>
-  )
-}
-
-function PagerBtn({
-  children,
-  disabled,
-  onClick,
-}: {
-  children: ReactNode
-  disabled?: boolean
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      className="flex h-7 w-7 items-center justify-center rounded-md disabled:opacity-30"
-      style={{ color: C.muted }}
-    >
-      {children}
-    </button>
   )
 }
 

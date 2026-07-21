@@ -1,0 +1,10 @@
+value_date,trade_date,amount,debit_credit,reference,counterparty,description
+2026-07-01,2026-07-01,10000.00,Credit,OPEN-BAL-DEMO,CBZ Bank,Opening credit / funding
+2026-07-03,2026-07-03,2450.00,Debit,TRD-BUY-EQ-001,CBZ Custody,Equity purchase settlement
+2026-07-05,2026-07-05,125.50,Debit,FEE-CUST-JUL,CBZ Custody,Custody fee July
+2026-07-08,2026-07-08,5000.00,Credit,DEP-CLIENT-014,CBZ Bank,Client deposit
+2026-07-10,2026-07-10,980.00,Debit,TRD-BUY-EQ-002,CBZ Custody,Equity purchase settlement
+2026-07-12,2026-07-12,75.00,Debit,CHG-WIRE-09,CBZ Bank,Wire transfer charge
+2026-07-15,2026-07-15,3200.00,Credit,DIV-XYZ-2026Q2,CBZ Custody,Dividend receipt XYZ
+2026-07-18,2026-07-18,1500.00,Debit,TRD-SELL-CLR,CBZ Custody,Sale proceeds clearing debit
+2026-07-19,2026-07-19,50.00,Credit,ADJ-ROUND-01,CBZ Bank,Rounding / FX adjustment credit

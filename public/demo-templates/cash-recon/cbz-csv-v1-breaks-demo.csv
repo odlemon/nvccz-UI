@@ -1,0 +1,7 @@
+value_date,trade_date,amount,debit_credit,reference,counterparty,description
+2026-07-02,2026-07-02,3000.00,Credit,EXT-ONLY-UNMATCH-01,CBZ Bank,External credit with no internal twin (creates UNMATCHED_EXTERNAL)
+2026-07-04,2026-07-04,417.25,Debit,AMT-VAR-INTERNAL-01,CBZ Custody,Amount variance vs internal 400.00
+2026-07-06,2026-07-06,890.00,Debit,STALE-REF-OLD,CBZ Bank,Stale / weak reference for suggested band demo
+2026-07-09,2026-07-09,2100.00,Credit,DUP-LINE-A,CBZ Bank,First of near-duplicate pair
+2026-07-09,2026-07-09,2100.00,Credit,DUP-LINE-A,CBZ Bank,Second of near-duplicate pair (line fingerprint risk)
+2026-07-14,2026-07-14,55.00,Debit,FEE-UNKNOWN-MKT,Unknown Broker,Counterparty mismatch for scoring demo

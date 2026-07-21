@@ -1,14 +1,15 @@
 import type { Holding } from '@/lib/api/investments-api'
-import type {
-  ComplianceResultItem,
-  ComplianceRule,
-  ModelPortfolio,
-  ModelPortfolioDrift,
-  OpsFund,
-  OpsTrade,
-  Order,
-  PortfolioOverview,
-  SimulationRun,
+import {
+  investmentOpsApi,
+  type ComplianceResultItem,
+  type ComplianceRule,
+  type ModelPortfolio,
+  type ModelPortfolioDrift,
+  type OpsFund,
+  type OpsTrade,
+  type Order,
+  type PortfolioOverview,
+  type SimulationRun,
 } from '@/lib/api/investment-ops-api'
 import { formatMoneyDisplay, unwrapList, unwrapPaged } from '@/lib/api/investment-ops-helpers'
 
@@ -26,6 +27,14 @@ function fmtNum(value: unknown, digits = 2): string {
   return num.toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits })
 }
 
+function qtyField(primary: unknown, fallback: unknown): string {
+  const num = n(primary)
+  if (num != null) return num.toLocaleString('en-US')
+  const fb = n(fallback)
+  if (fb != null) return fb.toLocaleString('en-US')
+  return DASH
+}
+
 function fmtInt(value: unknown): string {
   const num = n(value)
   if (num == null) return DASH
@@ -39,6 +48,19 @@ function fmtDate(value: unknown): string {
   return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
+function fmtDateTime(value: unknown): string {
+  if (value == null || value === '') return DASH
+  const d = new Date(String(value))
+  if (Number.isNaN(d.getTime())) return String(value)
+  return d.toLocaleString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
 function titleCaseStatus(raw: string): string {
   const s = raw.trim()
   if (!s) return DASH
@@ -49,24 +71,55 @@ function titleCaseStatus(raw: string): string {
     .join(' ')
 }
 
-/** Map API order status → orderbook tab labels. */
+/** Map API order status → SRD lifecycle labels (Section 8.4). */
 export function mapOrderUiStatus(status: string | null | undefined): string {
   const u = String(status ?? '').toUpperCase()
-  if (u === 'DRAFT') return 'New'
-  if (u === 'SUBMITTED' || u === 'APPROVED' || u === 'SENT_TO_BROKER') return 'Pending'
+  if (u === 'DRAFT') return 'Draft'
+  if (u === 'SUBMITTED' || u === 'COMPLIANCE_REVIEW' || u === 'CHECKED') return 'Submitted'
+  if (u === 'APPROVED') return 'Approved'
+  if (u === 'SENT_TO_BROKER' || u === 'ROUTED') return 'Sent to Broker'
+  if (u.includes('PARTIAL')) return 'Partially Executed'
   if (u === 'EXECUTED') return 'Executed'
+  if (u === 'PENDING_SETTLEMENT' || u === 'PENDING SETTLEMENT') return 'Pending Settlement'
+  if (u.includes('FAIL')) return 'Failed'
+  if (u === 'SETTLED') return 'Settled'
+  if (u.includes('SETTLE') && !u.includes('PENDING')) return 'Settled'
   if (u === 'REJECTED') return 'Rejected'
   if (u === 'CANCELLED') return 'Cancelled'
-  if (u.includes('FAIL')) return 'Failed'
-  if (u.includes('SETTLE')) return 'Settled'
+  if (u.includes('ARCHIVE')) return 'Archived'
   return titleCaseStatus(String(status ?? DASH))
+}
+
+/** Tabs aligned to SRD order lifecycle + alternate outcomes. */
+export const ORDERBOOK_LIFECYCLE_TABS = [
+  'Orderbook',
+  'Draft',
+  'Submitted',
+  'Approved',
+  'Sent to Broker',
+  'Partially Executed',
+  'Executed',
+  'Pending Settlement',
+  'Settled',
+  'Cancelled',
+  'Failed',
+  'Rejected',
+  'Archived',
+] as const
+
+export function orderMatchesLifecycleTab(uiStatus: string, tab: string): boolean {
+  if (tab === 'Orderbook') return true
+  if (tab === 'Submitted') return uiStatus === 'Submitted' || uiStatus === 'Compliance Review'
+  return uiStatus === tab
 }
 
 function mapTradeUiStatus(status: string | null | undefined): string {
   const u = String(status ?? '').toUpperCase()
-  if (u === 'EXECUTED' || u === 'SETTLED') return 'Executed'
+  if (u.includes('PARTIAL')) return 'Partially Executed'
+  if (u === 'SETTLED') return 'Settled'
+  if (u === 'EXECUTED') return 'Executed'
+  if (u === 'PENDING_SETTLEMENT') return 'Pending Settlement'
   if (u === 'ROUTING' || u === 'DRAFT') return 'Pending'
-  if (u.includes('PARTIAL')) return 'Partial'
   return titleCaseStatus(String(status ?? DASH))
 }
 
@@ -74,7 +127,7 @@ function mapSettlement(status: string | null | undefined): string {
   const u = String(status ?? '').toUpperCase()
   if (u === 'SETTLED') return 'Settled'
   if (u.includes('FAIL') || u.includes('UNMATCH')) return 'Unmatched'
-  if (u === 'PENDING' || !u) return 'Pending'
+  if (u === 'PENDING' || u === 'PENDING_SETTLEMENT' || !u) return 'Pending Settlement'
   return titleCaseStatus(String(status ?? DASH))
 }
 
@@ -96,6 +149,8 @@ export type BlotterTradeRow = {
   id: string
   apiId: string
   order: string
+  orderId: string | null
+  fundId: string | null
   portfolio: string
   ticker: string
   name: string
@@ -115,6 +170,8 @@ export type BlotterTradeRow = {
   settlement: string
   accounting: string
   confirmation: string
+  createdAt: string
+  sortKey: number
 }
 
 export function mapBlotterTrades(data: unknown, fundNameById?: Record<string, string>): BlotterTradeRow[] {
@@ -130,6 +187,8 @@ export function mapBlotterTrades(data: unknown, fundNameById?: Record<string, st
       id: String(t.tradeRef ?? t.id ?? DASH),
       apiId: String(t.id ?? ''),
       order: String(t.orderRef ?? t.orderId ?? DASH),
+      orderId: t.orderId != null ? String(t.orderId) : null,
+      fundId: t.fundId != null ? String(t.fundId) : null,
       portfolio: String(t.fund?.name ?? ext.fundName ?? fundNameById?.[t.fundId] ?? DASH),
       ticker: String(t.security?.symbol ?? DASH),
       name: String(t.security?.name ?? DASH),
@@ -142,12 +201,14 @@ export function mapBlotterTrades(data: unknown, fundNameById?: Record<string, st
       net,
       broker: String(t.brokerName ?? t.brokerProfileId ?? DASH),
       custodian: String(t.custodianName ?? t.custodianProfileId ?? DASH),
-      tradeDate: fmtDate(t.executedAt ?? t.createdAt),
+      tradeDate: fmtDateTime(t.executedAt ?? t.createdAt),
       valueDate: fmtDate(t.valueDate ?? t.settledAt),
       status: mapTradeUiStatus(t.status),
       settlement: mapSettlement(t.settlementStatus),
       accounting: mapAccounting(t.accountingStatus),
       confirmation: mapConfirmation(t.confirmationStatus),
+      createdAt: String(t.createdAt ?? t.executedAt ?? ''),
+      sortKey: new Date(String(t.executedAt ?? t.createdAt ?? 0)).getTime() || 0,
     }
   })
 }
@@ -155,6 +216,7 @@ export function mapBlotterTrades(data: unknown, fundNameById?: Record<string, st
 export type OrderbookRow = {
   ref: string
   apiId: string
+  tradeId: string | null
   masterRef: string
   blotter: string
   portfolio: string
@@ -175,9 +237,95 @@ export type OrderbookRow = {
   approval: string
   routing: string
   created: string
+  createdAt: string
   status: string
   rawStatus: string
   version: number
+}
+
+/** Deep-link to Accounting Events focused on this trade (no resolve API). */
+export function accountingDeepLink(trade: Pick<BlotterTradeRow, 'id' | 'apiId' | 'fundId'>): string {
+  const q = new URLSearchParams()
+  q.set('tab', 'events')
+  if (trade.id && trade.id !== DASH) q.set('tradeRef', trade.id)
+  if (trade.apiId) q.set('tradeId', trade.apiId)
+  if (trade.fundId) q.set('fundId', trade.fundId)
+  q.set('select', '1')
+  return `/investments-v2/accounting?${q.toString()}`
+}
+
+/** Deep-link to Trade Blotter focused on this order's trade. */
+export function blotterDeepLink(order: Pick<OrderbookRow, 'tradeId' | 'apiId' | 'ref'>): string {
+  const q = new URLSearchParams()
+  if (order.tradeId) q.set('tradeId', order.tradeId)
+  if (order.apiId) q.set('orderId', order.apiId)
+  if (order.ref && order.ref !== DASH) q.set('orderRef', order.ref)
+  // Always select detail panel on arrival
+  q.set('select', '1')
+  return `/investments-v2/orders/blotter?${q.toString()}`
+}
+
+export function orderHasBlotterLink(order: Pick<OrderbookRow, 'tradeId' | 'rawStatus' | 'apiId'>): boolean {
+  return Boolean(order.tradeId && String(order.tradeId).trim())
+}
+
+/**
+ * Resolve the listed-equity trade id for an orderbook row.
+ * Needed because GET /trades often returns orderRef: null.
+ */
+export async function resolveOrderTradeId(order: {
+  tradeId?: string | null
+  apiId?: string | null
+  ref?: string | null
+}): Promise<{ tradeId: string | null; orderId: string | null; reason?: string }> {
+  if (order.tradeId && String(order.tradeId).trim()) {
+    return { tradeId: String(order.tradeId), orderId: order.apiId ?? null }
+  }
+
+  let orderId = order.apiId ?? null
+
+  // Fresh GET — list rows can lag / omit tradeId after execute
+  if (orderId) {
+    try {
+      const res = await investmentOpsApi.getOrder(orderId)
+      if (res.success !== false && res.data) {
+        const tid = res.data.tradeId
+        if (tid != null && String(tid).trim()) {
+          return { tradeId: String(tid), orderId }
+        }
+      }
+    } catch {
+      /* fall through */
+    }
+  }
+
+  // Lookup by orderRef when id missing or tradeId still empty
+  if (order.ref && order.ref !== DASH) {
+    try {
+      const list = await investmentOpsApi.listOrders({ page: 1, pageSize: 200 })
+      if (list.success !== false && list.data) {
+        const items = unwrapPaged<Order>(list.data).items.length
+          ? unwrapPaged<Order>(list.data).items
+          : unwrapList<Order>(list.data)
+        const hit = items.find((o) => String(o.orderRef ?? '') === order.ref || String(o.id) === order.ref)
+        if (hit) {
+          orderId = String(hit.id)
+          if (hit.tradeId != null && String(hit.tradeId).trim()) {
+            return { tradeId: String(hit.tradeId), orderId }
+          }
+        }
+      }
+    } catch {
+      /* fall through */
+    }
+  }
+
+  return {
+    tradeId: null,
+    orderId,
+    reason:
+      'Order has no tradeId yet (seeded PENDING_SETTLEMENT without a trade, or execute not finished).',
+  }
 }
 
 function mapApprovalLabel(order: Order): string {
@@ -244,14 +392,64 @@ export function mapOrderbookOrders(data: unknown, fundNameById?: Record<string, 
       grossValue,
       broker: String(o.brokerName ?? o.brokerProfileId ?? DASH),
       trader: String(o.ownerName ?? o.createdByName ?? o.createdById ?? DASH),
-      tradeDate: fmtDate(o.tradeDate ?? o.submittedAt ?? o.createdAt),
+      tradeDate: fmtDateTime(o.tradeDate ?? o.submittedAt ?? o.createdAt),
       valueDate: fmtDate(o.valueDate),
       approval: mapApprovalLabel(o),
       routing: mapRoutingLabel(String(o.status ?? '')),
       created: fmtDate(o.createdAt),
+      createdAt: String(o.createdAt ?? ''),
       status: uiStatus,
       rawStatus: String(o.status ?? ''),
+      tradeId: o.tradeId != null && String(o.tradeId).trim() ? String(o.tradeId) : null,
       version: Number(o.version ?? o.auditVersion ?? 1) || 1,
+    }
+  })
+}
+
+/**
+ * When BE leaves order.status at PENDING_SETTLEMENT after blotter settle,
+ * promote the orderbook row to Settled using the linked trade's settlement.
+ */
+export function syncOrderbookStatusFromTrades(
+  orders: OrderbookRow[],
+  trades: BlotterTradeRow[],
+): OrderbookRow[] {
+  if (!orders.length || !trades.length) return orders
+  const byTradeId = new Map(trades.map((t) => [t.apiId, t]))
+  const byOrderId = new Map<string, BlotterTradeRow>()
+  const byOrderRef = new Map<string, BlotterTradeRow>()
+  for (const t of trades) {
+    if (t.orderId) byOrderId.set(t.orderId, t)
+    if (t.order && t.order !== DASH) byOrderRef.set(t.order.toLowerCase(), t)
+  }
+
+  return orders.map((order) => {
+    const trade =
+      (order.tradeId ? byTradeId.get(order.tradeId) : undefined) ||
+      byOrderId.get(order.apiId) ||
+      (order.ref !== DASH ? byOrderRef.get(order.ref.toLowerCase()) : undefined)
+    if (!trade) return order
+
+    const tradeSettled = trade.settlement === 'Settled' || trade.status === 'Settled'
+    if (!tradeSettled) return order
+    if (order.status === 'Settled') return order
+
+    // Only promote late lifecycle statuses — never overwrite Cancelled/Failed/etc.
+    const late =
+      order.status === 'Pending Settlement' ||
+      order.status === 'Executed' ||
+      order.status === 'Partially Executed' ||
+      order.rawStatus.toUpperCase().includes('SETTLE') ||
+      order.rawStatus.toUpperCase() === 'EXECUTED' ||
+      order.rawStatus.toUpperCase().includes('PARTIAL')
+    if (!late) return order
+
+    return {
+      ...order,
+      status: 'Settled',
+      rawStatus: 'SETTLED',
+      tradeId: order.tradeId || trade.apiId,
+      routing: 'Settled',
     }
   })
 }
@@ -275,19 +473,22 @@ export function mapTradingPositions(
   portfolioName: string,
   fundId: string,
 ): TradingPositionRow[] {
-  return unwrapList<Holding>(holdings).map((h) => ({
-    portfolio: portfolioName || DASH,
-    fundId,
-    reference: String(h.security?.symbol ?? h.securityId ?? DASH),
-    shortName: String(h.security?.name ?? h.security?.symbol ?? DASH),
-    quantity: fmtInt(h.quantity),
-    open: DASH,
-    price: h.currentPrice != null ? fmtNum(h.currentPrice) : DASH,
-    tr: h.unrealizedPnl != null ? fmtNum(h.unrealizedPnl) : DASH,
-    currency: String(h.wacCurrencyCode ?? h.security?.listingCurrencyCode ?? DASH),
-    industry: DASH,
-    type: h.security ? 'Equity' : DASH,
-  }))
+  return unwrapList<Holding>(holdings).map((h) => {
+    const sec = (h.instrument ?? h.security) as { symbol?: string; name?: string; listingCurrencyCode?: string } | undefined
+    return {
+      portfolio: portfolioName || DASH,
+      fundId,
+      reference: String(sec?.symbol ?? h.securityId ?? DASH),
+      shortName: String(sec?.name ?? sec?.symbol ?? DASH),
+      quantity: fmtInt(h.quantity),
+      open: qtyField(h.openQuantity, h.quantity),
+      price: h.currentPrice != null ? fmtNum(h.currentPrice) : DASH,
+      tr: h.unrealizedPnl != null ? fmtNum(h.unrealizedPnl) : DASH,
+      currency: String(h.wacCurrencyCode ?? sec?.listingCurrencyCode ?? DASH),
+      industry: DASH,
+      type: sec ? 'Equity' : DASH,
+    }
+  })
 }
 
 export function mapPortfolioNavSummary(overview: PortfolioOverview | null | undefined) {
@@ -358,27 +559,70 @@ export type ComplianceResultRow = {
   limitDisplay: string
   currentDisplay: string
   afterTradeDisplay: string
+  /** Display label (prefers API `srdLabel`) */
   outcome: string
+  /** Canonical API outcome code when present */
+  outcomeCode: string
   createdAt: string
 }
 
+/** BA-T1 — map API outcomes / legacy BREACH to SRD six labels. */
+export function mapComplianceOutcomeLabel(outcome: string | null | undefined, srdLabel?: string | null): string {
+  if (srdLabel != null && String(srdLabel).trim()) return String(srdLabel).trim()
+  const raw = String(outcome ?? '').toUpperCase().replace(/\s+/g, '_')
+  const map: Record<string, string> = {
+    PASSED: 'Passed',
+    PASS: 'Passed',
+    WARNING: 'Warning',
+    WARN: 'Warning',
+    FAILED: 'Failed',
+    FAIL: 'Failed',
+    BREACH: 'Failed',
+    REQUIRES_OVERRIDE: 'Requires Override',
+    APPROVED_WITH_EXCEPTION: 'Approved with Exception',
+    REJECTED: 'Rejected',
+  }
+  return map[raw] ?? (outcome ? titleCaseStatus(String(outcome)) : DASH)
+}
+
+export function normalizeComplianceOutcomeCode(outcome: string | null | undefined): string {
+  const raw = String(outcome ?? '').toUpperCase().replace(/\s+/g, '_')
+  if (raw === 'PASS') return 'PASSED'
+  if (raw === 'WARN') return 'WARNING'
+  if (raw === 'FAIL' || raw === 'BREACH') return 'FAILED'
+  return raw
+}
+
 export function mapComplianceResults(data: unknown): ComplianceResultRow[] {
-  return unwrapList<ComplianceResultItem>(data).map((r) => ({
-    id: String(r.id ?? ''),
-    orderId: r.orderId ? String(r.orderId) : null,
-    orderRef: String(r.orderRef ?? r.orderId ?? DASH),
-    fundId: String(r.fundId ?? DASH),
-    ticker: String(r.instrumentTicker ?? DASH),
-    side: String(r.side ?? DASH),
-    ruleName: String(r.ruleName ?? r.ruleId ?? DASH),
-    ruleType: String(r.ruleType ?? DASH),
-    limitDisplay: r.limitDisplay != null && r.limitDisplay !== '' ? String(r.limitDisplay) : DASH,
-    currentDisplay: r.currentDisplay != null && r.currentDisplay !== '' ? String(r.currentDisplay) : DASH,
-    afterTradeDisplay:
-      r.afterTradeDisplay != null && r.afterTradeDisplay !== '' ? String(r.afterTradeDisplay) : DASH,
-    outcome: String(r.outcome ?? DASH),
-    createdAt: fmtDate(r.createdAt),
-  }))
+  return unwrapList<ComplianceResultItem>(data).map((r) => {
+    const nested =
+      r.result && typeof r.result === 'object' && r.result !== null
+        ? (r.result as { id?: string | null })
+        : null
+    const resultId =
+      (r.complianceResultId != null && String(r.complianceResultId).trim()
+        ? String(r.complianceResultId)
+        : null) ||
+      (nested?.id != null && String(nested.id).trim() ? String(nested.id) : null) ||
+      String(r.id ?? '')
+    return {
+      id: resultId,
+      orderId: r.orderId ? String(r.orderId) : null,
+      orderRef: String(r.orderRef ?? r.orderId ?? DASH),
+      fundId: String(r.fundId ?? DASH),
+      ticker: String(r.instrumentTicker ?? DASH),
+      side: String(r.side ?? DASH),
+      ruleName: String(r.ruleName ?? r.ruleId ?? DASH),
+      ruleType: String(r.ruleType ?? DASH),
+      limitDisplay: r.limitDisplay != null && r.limitDisplay !== '' ? String(r.limitDisplay) : DASH,
+      currentDisplay: r.currentDisplay != null && r.currentDisplay !== '' ? String(r.currentDisplay) : DASH,
+      afterTradeDisplay:
+        r.afterTradeDisplay != null && r.afterTradeDisplay !== '' ? String(r.afterTradeDisplay) : DASH,
+      outcome: mapComplianceOutcomeLabel(r.outcome, r.srdLabel),
+      outcomeCode: normalizeComplianceOutcomeCode(r.outcome),
+      createdAt: fmtDate(r.createdAt),
+    }
+  })
 }
 
 export type ModelAllocationRow = {
@@ -479,7 +723,7 @@ export function mapSimulationResult(run: SimulationRun | null | undefined) {
     navImpact: r.navImpact,
     cashImpact: r.cashImpact,
     estimatedFees: r.estimatedFees,
-    exposureImpactPct: r.exposureImpactPct,
+    exposureImpactPct: n(r.exposureImpactPct) ?? 0,
     complianceOutcome: String(r.compliance?.outcome ?? DASH),
     complianceMessage: String(r.compliance?.message ?? DASH),
     checks: (r.compliance?.checks ?? []).map((c) => ({

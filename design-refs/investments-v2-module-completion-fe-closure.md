@@ -30,8 +30,13 @@
 - F12 approval-route edit/delete  
 - F13 client cash account create form (seed covers T0)  
 
-## Verify
+## UX polish (2026-07-20 batch)
 
-1. Static: re-read call sites above — methods exist on client; no local-only create on these paths.  
-2. Trace A17: Orderbook Execute → `POST /orders/:id/execute` → order `tradeId` → Blotter Confirm/Settle.  
-3. UAT: seed with `npm run db:seed:investments-v2-t0` against `nts` (clear `DATABASE_URL` first on PowerShell).
+| Ask | Change |
+| --- | --- |
+| Nested `instrument` on holdings | `Holding.instrument`; adapters use `instrument ?? security` |
+| `createdByName` | `displayPersonName` in `mapInstrumentRow` |
+| Import `canSubmit` | Fund-cash GET import detail before submit |
+| Overview / exposure / reviewable | Already wired; confirmed against BE UAT script |
+
+**UAT:** `npm run uat:investments-v2:ux-polish` · **Seed:** `npm run db:reset:investments-v2-demo`

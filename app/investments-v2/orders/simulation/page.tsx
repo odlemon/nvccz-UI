@@ -227,15 +227,15 @@ export default function SimulationPage() {
                 <Metric label="NAV before" value={formatCompact(result.navBefore)} />
                 <Metric label="Cash impact" value={formatCompact(result.cashImpact)} tone={result.cashImpact < 0 ? 'text-amber-300' : 'text-emerald-300'} />
                 <Metric label="Est. fees" value={formatMoneyDisplay(result.estimatedFees)} />
-                <Metric label="Exposure impact" value={`${result.exposureImpactPct.toFixed(2)}%`} />
+                <Metric label="Exposure impact" value={`${(Number(result.exposureImpactPct) || 0).toFixed(2)}%`} />
                 <Metric label="Compliance" value={result.complianceOutcome} tone={result.complianceOutcome === 'PASSED' ? 'text-emerald-300' : 'text-amber-300'} />
               </div>
-              <OrdersCard title="Before vs after" eyebrow={`Run ${result.id} · ${result.createdAt}`}>
+              <OrdersCard title="Before vs after" eyebrow={`Simulation · ${result.createdAt}`}>
                 <div className="grid gap-3 p-4 md:grid-cols-2">
                   {[
                     ['NAV', formatCompact(result.navBefore), formatCompact(result.navAfter), formatCompact(result.navImpact)],
                     ['Cash impact', '—', formatCompact(result.cashImpact), formatCompact(result.cashImpact)],
-                    ['Exposure', '—', `${result.exposureImpactPct.toFixed(2)}%`, `${result.exposureImpactPct >= 0 ? '+' : ''}${result.exposureImpactPct.toFixed(2)}%`],
+                    ['Exposure', '—', `${(Number(result.exposureImpactPct) || 0).toFixed(2)}%`, `${(Number(result.exposureImpactPct) || 0) >= 0 ? '+' : ''}${(Number(result.exposureImpactPct) || 0).toFixed(2)}%`],
                     ['Mode', mode, scenario, type],
                   ].map(([label, before, after, delta]) => (
                     <div key={label} className="rounded-[18px] border border-white/[0.06] bg-black/15 p-4">

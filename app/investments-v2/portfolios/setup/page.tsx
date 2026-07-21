@@ -1,7 +1,7 @@
 ﻿'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { CheckCircle2, Loader2, Save, ShieldCheck } from 'lucide-react'
+import { CheckCircle2, ChevronDown, ChevronRight, Loader2, Save, ShieldCheck } from 'lucide-react'
 import { OpsPageSkeleton } from '@/components/investments-v2/loading-skeletons'
 import { DenseTable, SetupCard, SetupHeader, SetupSelect, Toggle, buttonClass, fieldClass } from '@/components/investments-v2/setup-workspace'
 import { formatOpsError, investmentOpsApi, type FundSetupLimits } from '@/lib/api/investment-ops-api'
@@ -113,6 +113,8 @@ export default function PortfolioSetupPage() {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [limitsOpen, setLimitsOpen] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -254,13 +256,15 @@ export default function PortfolioSetupPage() {
   const custodianName = custodians.find((c) => c.id === custodianId)?.name || custodianOptions[0]
 
   const loading = portfoliosLoading || setupFundsLoading || setupCurrenciesLoading || brokersLoading || custodiansLoading || setupSettingsLoading || limitsLoading
-  const saving = fundConfigSaving || setupSettingsSaving || limitsSaving
+  const saving = isSaving || fundConfigSaving || setupSettingsSaving || limitsSaving
 
   const save = async () => {
     setSaveError(null)
     setSaved(false)
+    setIsSaving(true)
     if (!fundId) {
       setSaveError('Select a portfolio before saving.')
+      setIsSaving(false)
       return
     }
     try {
@@ -311,6 +315,7 @@ export default function PortfolioSetupPage() {
     } catch (e) {
       setSaveError(e instanceof Error ? e.message : 'Failed to save portfolio setup')
     } finally {
+      setIsSaving(false)
       setLimitsSaving(false)
     }
   }
@@ -352,9 +357,9 @@ export default function PortfolioSetupPage() {
             <button type="button" className={buttonClass} onClick={() => { setCreateError(null); setCreateOpen(true) }}>
               New portfolio
             </button>
-            <button type="button" className={buttonClass} disabled={saving || !fundId} onClick={save}>
+            <button type="button" className={buttonClass} disabled={saving || !fundId} onClick={() => void save()}>
               {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-              Save changes
+              {saving ? 'Saving…' : 'Save changes'}
             </button>
           </div>
         }
@@ -384,7 +389,7 @@ export default function PortfolioSetupPage() {
                   if (found) setFundId(found.id)
                 }}
               />
-              <Field label="Fund id" value={fundId || '—'} readOnly />
+              <Field label="Display name" value={selectedFund?.name ?? '—'} readOnly />
               <SetupSelect label="Status" value={status} options={['Active', 'Restricted', 'Closed']} onChange={setStatus} />
               <SetupSelect label="Base currency" value={currency || currencyOptions[0]} options={currencyOptions} onChange={setCurrency} />
             </div>
@@ -426,7 +431,7 @@ export default function PortfolioSetupPage() {
                   if (found) setCustodianId(found.id)
                 }}
               />
-              <Field label="Cash ledger" value="—" readOnly />
+              <Field label="Cash ledger" value="Coming soon" readOnly />
             </div>
           </SetupCard>
           <SetupCard title="Four-eye Controls">
@@ -438,17 +443,35 @@ export default function PortfolioSetupPage() {
           </SetupCard>
         </div>
         <SetupCard title="Portfolio Limits" className="mt-4">
-          <DenseTable columns={['Limit', 'Measure', 'Warning', 'Hard limit', 'Action']} rows={limitRows} />
-          <p className="border-t border-white/[.06] px-5 py-3 text-[10px] text-[#718095]">
-            {limitsLoading ? 'Loading fund limits…' : limitRows.length ? 'Limits loaded from setup/funds limits API.' : 'No portfolio limits returned for this fund.'}
-          </p>
+          <button
+            type="button"
+            onClick={() => setLimitsOpen((v) => !v)}
+            className="flex w-full items-center justify-between border-b border-white/[.06] px-5 py-3 text-left"
+          >
+            <div>
+              <p className="text-[11px] font-medium text-white">Limit editor</p>
+              <p className="mt-1 text-[9px] text-[#718095]">Read-only view today — inline editing coming soon.</p>
+            </div>
+            <span className="inline-flex items-center gap-2 text-[10px] text-[#8290a4]">
+              Coming soon
+              {limitsOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+            </span>
+          </button>
+          {limitsOpen && (
+            <>
+              <DenseTable columns={['Limit', 'Measure', 'Warning', 'Hard limit', 'Action']} rows={limitRows} />
+              <p className="border-t border-white/[.06] px-5 py-3 text-[10px] text-[#718095]">
+                {limitsLoading ? 'Loading fund limits…' : limitRows.length ? 'Limits loaded from setup/funds limits API.' : 'No portfolio limits returned for this fund.'}
+              </p>
+            </>
+          )}
         </SetupCard>
         </>
         )}
       </div>
 
       {createOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onMouseDown={() => setCreateOpen(false)}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4" onMouseDown={() => setCreateOpen(false)}>
           <div className="w-full max-w-md rounded-[24px] border border-white/10 bg-[#101a29] p-5" onMouseDown={(e) => e.stopPropagation()}>
             <h2 className="text-[15px] font-semibold text-white">New portfolio</h2>
             <p className="mt-1 text-[10px] text-[#8290a4]">Creates via POST /portfolios then reloads the selector.</p>
@@ -459,7 +482,15 @@ export default function PortfolioSetupPage() {
             </label>
             <label className="mt-3 block text-[10px] text-[#8290a4]">
               Base currency
-              <input value={createCurrency} onChange={(e) => setCreateCurrency(e.target.value.toUpperCase())} className={`${fieldClass} mt-1`} />
+              <select
+                value={createCurrency}
+                onChange={(e) => setCreateCurrency(e.target.value)}
+                className={`${fieldClass} mt-1`}
+              >
+                {(currencyOptions.filter((c) => c !== '—').length ? currencyOptions.filter((c) => c !== '—') : ['USD']).map((code) => (
+                  <option key={code} value={code}>{code}</option>
+                ))}
+              </select>
             </label>
             <div className="mt-5 flex justify-end gap-2">
               <button type="button" className={buttonClass} onClick={() => setCreateOpen(false)}>Cancel</button>

@@ -54,7 +54,7 @@ class ApiClient {
   private baseURL: string
 
   constructor(baseURL?: string) {
-    this.baseURL = baseURL || process.env.NEXT_PUBLIC_API_BASE_URL || 'http://31.220.82.129:3009/api'
+    this.baseURL = baseURL || process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3009/api'
   }
 
   // Get authentication headers

@@ -1,23 +1,38 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Loader2, Plus, Search } from 'lucide-react'
+import { ExternalLink, Loader2, Plus, Search } from 'lucide-react'
 import { OpsCardGridSkeleton, OpsTableSkeleton } from '@/components/investments-v2/loading-skeletons'
+import { ConfirmReasonDialog } from '@/components/investments-v2/ui/confirm-reason-dialog'
+import { DetailPanel } from '@/components/investments-v2/ui/detail-panel'
 import { PlaceEquityOrderModal } from '@/components/investments-v2/place-equity-order-modal'
 import { buttonClass, Field, inputClass, Modal, OrdersCard, OrdersPage, Pill, SelectField, tableClass, tableWrapClass } from '@/components/investments-v2/orders-ui'
 import { formatOpsError, investmentOpsApi, unwrapList, type OpsBlotter } from '@/lib/api/investment-ops-api'
 import {
+  blotterDeepLink,
   fundNameMap,
+  mapBlotterTrades,
   mapFundOptions,
   mapOrderbookOrders,
+  ORDERBOOK_LIFECYCLE_TABS,
+  orderHasBlotterLink,
+  orderMatchesLifecycleTab,
+  syncOrderbookStatusFromTrades,
   type OrderbookRow,
 } from '@/lib/investments-v2/adapters/orders-adapter'
 import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
+import type { OrderApproval } from '@/lib/api/investment-ops-api'
 
-const tabs = ['Orderbook', 'New', 'Pending', 'Executed', 'Cancelled', 'Failed', 'Rejected', 'Settled']
+const tabs = [...ORDERBOOK_LIFECYCLE_TABS]
 
-const tone = (status: string) =>
-  status === 'Executed' || status === 'Settled' ? 'green' : status === 'Pending' ? 'amber' : status === 'New' ? 'blue' : 'red'
+const tone = (status: string) => {
+  if (status === 'Executed' || status === 'Settled' || status === 'Approved') return 'green'
+  if (status === 'Draft' || status === 'Submitted' || status === 'Sent to Broker' || status === 'Pending Settlement' || status === 'Partially Executed')
+    return 'amber'
+  if (status === 'Cancelled' || status === 'Failed' || status === 'Rejected') return 'red'
+  return 'blue'
+}
 
 type BlotterCard = {
   id: string
@@ -63,17 +78,29 @@ export default function OrderbookPage() {
   const [defaultPortfolioId, setDefaultPortfolioId] = useState('')
   const [createBusy, setCreateBusy] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
-  const [lifeBusy, setLifeBusy] = useState(false)
+  const [lifeBusy, setLifeBusy] = useState<
+    null | 'submit' | 'approve' | 'cancel' | 'send' | 'execute' | 'reject' | 'fail' | 'archive'
+  >(null)
   const [lifeError, setLifeError] = useState<string | null>(null)
+  const [rejectOpen, setRejectOpen] = useState(false)
+  const [cancelOpen, setCancelOpen] = useState(false)
+  const [failOpen, setFailOpen] = useState(false)
+  const [archiveOpen, setArchiveOpen] = useState(false)
+  const [executeOpen, setExecuteOpen] = useState(false)
+  const [execQty, setExecQty] = useState('')
+  const [execPrice, setExecPrice] = useState('')
+  const [approvals, setApprovals] = useState<OrderApproval[]>([])
+  const [timelineLoading, setTimelineLoading] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const [ordersRes, portfoliosRes, blottersRes] = await Promise.all([
+      const [ordersRes, portfoliosRes, blottersRes, tradesRes] = await Promise.all([
         investmentOpsApi.listOrders({ page: 1, pageSize: 200 }),
         investmentOpsApi.listPortfolios(),
         investmentOpsApi.listBlotters({ pageSize: 100 }),
+        investmentOpsApi.listTrades(),
       ])
       if (ordersRes.success === false) {
         throw new Error(formatOpsError(ordersRes, 'Failed to load orders'))
@@ -85,7 +112,16 @@ export default function OrderbookPage() {
       const funds = mapFundOptions(portfoliosRes.data)
       setFundOptions(funds)
       setDefaultPortfolioId((prev) => prev || funds[0]?.id || '')
-      const rows = mapOrderbookOrders(ordersRes.data, names)
+      const trades =
+        tradesRes.success === false ? [] : mapBlotterTrades(tradesRes.data, names)
+      const rows = syncOrderbookStatusFromTrades(
+        mapOrderbookOrders(ordersRes.data, names),
+        trades,
+      ).sort((a, b) => {
+        const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0
+        const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0
+        return tb - ta
+      })
       setOrders(rows)
       setSelected((prev) => (prev ? rows.find((r) => r.apiId === prev.apiId) ?? null : null))
       setBlotters(mapBlotterCards(blottersRes.data, names))
@@ -105,19 +141,43 @@ export default function OrderbookPage() {
   const filtered = useMemo(() => {
     const rows = orders.filter(
       (order) =>
-        (tab === 'Orderbook' || order.status === tab) &&
-        `${order.ref} ${order.ticker} ${order.portfolio} ${order.blotter}`.toLowerCase().includes(search.toLowerCase()),
+        orderMatchesLifecycleTab(order.status, tab) &&
+        `${order.ref} ${order.ticker} ${order.portfolio} ${order.blotter} ${order.status}`.toLowerCase().includes(search.toLowerCase()),
     )
-    return [...rows].sort((a, b) =>
-      sort === 'Oldest first'
-        ? a.ref.localeCompare(b.ref)
-        : sort === 'Largest value'
-          ? b.grossValue - a.grossValue
-          : sort === 'Status'
-            ? a.status.localeCompare(b.status)
-            : b.ref.localeCompare(a.ref),
-    )
+    return [...rows].sort((a, b) => {
+      if (sort === 'Oldest first') {
+        return (a.createdAt || '').localeCompare(b.createdAt || '')
+      }
+      if (sort === 'Largest value') return b.grossValue - a.grossValue
+      if (sort === 'Status') return a.status.localeCompare(b.status)
+      return (b.createdAt || '').localeCompare(a.createdAt || '')
+    })
   }, [orders, tab, search, sort])
+
+  useEffect(() => {
+    if (!selected?.apiId) {
+      setApprovals([])
+      return
+    }
+    let cancelled = false
+    setTimelineLoading(true)
+    void investmentOpsApi
+      .getOrder(selected.apiId)
+      .then((res) => {
+        if (cancelled) return
+        const list = res.data?.approvals ?? []
+        setApprovals(Array.isArray(list) ? list : [])
+      })
+      .catch(() => {
+        if (!cancelled) setApprovals([])
+      })
+      .finally(() => {
+        if (!cancelled) setTimelineLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [selected?.apiId, selected?.version])
 
   const pageSize = 4
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize))
@@ -149,9 +209,18 @@ export default function OrderbookPage() {
     }
   }
 
-  const runLifecycle = async (action: 'submit' | 'approve' | 'cancel' | 'send' | 'execute' | 'reject') => {
-    if (!selected?.apiId) return
-    setLifeBusy(true)
+  const runLifecycle = async (
+    action: 'submit' | 'approve' | 'cancel' | 'send' | 'execute' | 'reject' | 'fail' | 'archive',
+    reason?: string,
+  ): Promise<boolean> => {
+    if (!selected?.apiId || lifeBusy) return false
+    if (
+      (action === 'reject' || action === 'fail' || action === 'cancel') &&
+      !reason?.trim()
+    ) {
+      return false
+    }
+    setLifeBusy(action)
     setLifeError(null)
     try {
       const body = { expectedVersion: selected.version }
@@ -163,39 +232,92 @@ export default function OrderbookPage() {
           expectedVersion: selected.version,
         })
       } else if (action === 'execute') {
-        const price = selected.execPrice ?? selected.limitPrice
+        const qty = Number(execQty) || selected.qty
+        const price = execPrice ? Number(execPrice) : selected.execPrice ?? selected.limitPrice
         res = await investmentOpsApi.executeOrder(selected.apiId, {
           expectedVersion: selected.version,
-          quantity: selected.qty,
-          ...(price != null ? { price } : {}),
+          quantity: qty,
+          ...(price != null && Number.isFinite(price)
+            ? { executionPrice: price, price }
+            : {}),
         })
+        setExecuteOpen(false)
       } else if (action === 'reject') {
-        const reason = window.prompt('Reject reason (required):')
-        if (!reason?.trim()) return
         res = await investmentOpsApi.rejectOrder(selected.apiId, {
-          reason: reason.trim(),
+          reason: reason!.trim(),
+          expectedVersion: selected.version,
+        })
+      } else if (action === 'fail') {
+        res = await investmentOpsApi.failOrder(selected.apiId, {
+          reason: reason!.trim(),
+          expectedVersion: selected.version,
+        })
+      } else if (action === 'archive') {
+        res = await investmentOpsApi.archiveOrder(selected.apiId, {
+          ...(reason?.trim() ? { reason: reason.trim() } : {}),
           expectedVersion: selected.version,
         })
       } else {
-        const reason = window.prompt('Cancel reason (required):')
-        if (!reason?.trim()) return
-        res = await investmentOpsApi.cancelOrder(selected.apiId, reason.trim())
+        res = await investmentOpsApi.cancelOrder(selected.apiId, reason!.trim())
       }
       if (res.success === false) throw new Error(formatOpsError(res, `Failed to ${action} order`))
+      if (action === 'execute') {
+        const tradeId =
+          (res.data as { tradeId?: string | null } | undefined)?.tradeId ??
+          (res.data as { order?: { tradeId?: string | null } } | undefined)?.order?.tradeId ??
+          null
+        const href = blotterDeepLink({
+          tradeId: tradeId ? String(tradeId) : selected.tradeId,
+          apiId: selected.apiId,
+          ref: selected.ref,
+        })
+        toast.success(tradeId ? `Trade created (${tradeId})` : 'Trade created', {
+          action: {
+            label: 'Open blotter',
+            onClick: () => window.open(href, '_blank', 'noopener,noreferrer'),
+          },
+        })
+      } else if (action === 'approve') {
+        toast.success('Order approved.')
+      } else if (action === 'submit') {
+        toast.success('Order submitted for approval.')
+      } else if (action === 'send') {
+        toast.success('Order sent to broker.')
+      } else if (action === 'fail') {
+        toast.success('Order marked Failed.')
+      } else if (action === 'archive') {
+        toast.success('Order archived.')
+      }
       await load()
+      return true
     } catch (e) {
-      setLifeError(formatOpsError(e, `Failed to ${action} order`))
+      const msg = formatOpsError(e, `Failed to ${action} order`)
+      setLifeError(msg)
+      toast.error(msg)
+      return false
     } finally {
-      setLifeBusy(false)
+      setLifeBusy(null)
     }
   }
 
   const raw = selected?.rawStatus?.toUpperCase() ?? ''
+  const anyLifeBusy = Boolean(lifeBusy)
+
+  /** Open blotter tab only — no extra API; requires order.tradeId on the row. */
+  const openBlotterForOrder = (order: OrderbookRow) => {
+    if (!order.tradeId) {
+      toast.error(
+        `No tradeId on ${order.ref}. Backend must seed/return tradeId on the order (Execute first, or fix seed).`,
+      )
+      return
+    }
+    window.open(blotterDeepLink(order), '_blank', 'noopener,noreferrer')
+  }
 
   return (
     <OrdersPage
       title="Orderbook"
-      description="Review the full order lifecycle, blotters and immutable status history."
+      description="SRD lifecycle: Draft → Submitted → Approved → Sent to Broker → Executed → Settled. Alternate outcomes: Cancelled, Rejected, Failed, Archived."
       actions={
         <div className="flex flex-wrap gap-2">
           <button className={cn(buttonClass, 'border-blue-500/40 bg-blue-600 text-white hover:bg-blue-500')} onClick={() => setShowOrder(true)}>
@@ -232,7 +354,7 @@ export default function OrderbookPage() {
                 setTab('Orderbook')
                 setPage(1)
               }}
-              className="rounded-full border border-white/[0.07] bg-[#070d17] p-3 text-left transition hover:border-blue-400/30 hover:bg-blue-500/[0.06]"
+              className="rounded-[24px] border border-white/[0.06] bg-[linear-gradient(135deg,#172333_0%,#101a29_58%,#0b1420_100%)] p-4 text-left transition hover:border-blue-400/30 hover:bg-blue-500/[0.06]"
             >
               <div className="flex justify-between">
                 <span className="text-[11px] font-semibold">{item.name}</span>
@@ -287,7 +409,7 @@ export default function OrderbookPage() {
           <table className={tableClass}>
             <thead>
               <tr>
-                {['Ref', 'Portfolio', 'Instrument', 'Side', 'Qty', 'Px', 'Gross', 'Broker', 'Trader', 'Dates', 'Approval', 'Routing'].map((h) => (
+                {['Ref', 'Portfolio', 'Instrument', 'Side', 'Qty', 'Filled', 'Px', 'Gross', 'Broker', 'Trader', 'Dates', 'Status', 'Approval', 'Routing', 'Blotter'].map((h) => (
                   <th key={h}>{h}</th>
                 ))}
               </tr>
@@ -295,7 +417,7 @@ export default function OrderbookPage() {
             <tbody>
               {loading && (
                 <tr>
-                  <td colSpan={12} className="p-0">
+                  <td colSpan={15} className="p-0">
                     <OpsTableSkeleton rows={8} cols={8} />
                   </td>
                 </tr>
@@ -318,6 +440,7 @@ export default function OrderbookPage() {
                     </td>
                     <td>{order.side}</td>
                     <td className="text-right font-mono">{order.qty.toLocaleString()}</td>
+                    <td className="text-right font-mono">{order.filled.toLocaleString()}</td>
                     <td className="text-right font-mono">
                       {order.execPrice?.toFixed(2) ?? '—'} / {order.limitPrice?.toFixed(2) ?? 'MKT'}
                     </td>
@@ -329,9 +452,27 @@ export default function OrderbookPage() {
                       <div className="text-[9px] text-slate-600">VD {order.valueDate}</div>
                     </td>
                     <td>
+                      <Pill tone={tone(order.status) as 'green' | 'amber' | 'blue' | 'red'}>{order.status}</Pill>
+                    </td>
+                    <td>
                       <Pill tone={order.approval.includes('Rejected') ? 'red' : order.approval.includes('Not') ? 'slate' : 'green'}>{order.approval}</Pill>
                     </td>
                     <td>{order.routing}</td>
+                    <td onClick={(e) => e.stopPropagation()}>
+                      {orderHasBlotterLink(order) ? (
+                        <button
+                          type="button"
+                          onClick={() => openBlotterForOrder(order)}
+                          className="inline-flex items-center gap-1 rounded-full border border-blue-400/30 px-2 py-1 text-[9px] text-blue-300 hover:bg-blue-500/10"
+                          title="Open linked trade on Trade Blotter"
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                          Open
+                        </button>
+                      ) : (
+                        <span className="text-[9px] text-slate-600">—</span>
+                      )}
+                    </td>
                   </tr>
                 ))}
             </tbody>
@@ -352,7 +493,7 @@ export default function OrderbookPage() {
       </OrdersCard>
 
       {selected && (
-        <div className="fixed inset-y-0 right-0 z-40 w-full max-w-md overflow-y-auto border-l border-white/10 bg-[#09111e] p-5 shadow-2xl">
+        <DetailPanel open={!!selected} onClose={() => setSelected(null)} width="max-w-md">
           <div className="flex items-start justify-between">
             <div>
               <p className="text-[9px] uppercase tracking-widest text-blue-400">Order detail</p>
@@ -362,6 +503,16 @@ export default function OrderbookPage() {
               Close
             </button>
           </div>
+          {orderHasBlotterLink(selected) && (
+            <button
+              type="button"
+              onClick={() => openBlotterForOrder(selected)}
+              className={cn(buttonClass, 'mt-4 w-full border-blue-400/40 bg-blue-600/20 text-blue-200 hover:bg-blue-600/30')}
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+              Open on Trade Blotter
+            </button>
+          )}
           <div className="mt-6 grid grid-cols-2 gap-3">
             {Object.entries({
               Portfolio: selected.portfolio,
@@ -375,6 +526,7 @@ export default function OrderbookPage() {
               'Trade date': selected.tradeDate,
               'Value date': selected.valueDate,
               Status: selected.status,
+              'Trade id': selected.tradeId ?? '—',
               Version: String(selected.version),
             }).map(([label, value]) => (
               <div key={label} className="rounded-[16px] bg-white/[0.035] p-3">
@@ -388,61 +540,189 @@ export default function OrderbookPage() {
           {lifeError && <p className="mt-2 text-[10px] text-rose-300">{lifeError}</p>}
           <div className="mt-3 flex flex-wrap gap-2">
             {raw === 'DRAFT' && (
-              <button type="button" disabled={lifeBusy} className={cn(buttonClass, 'bg-blue-600 text-white')} onClick={() => void runLifecycle('submit')}>
-                {lifeBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+              <button type="button" disabled={anyLifeBusy} className={cn(buttonClass, 'bg-blue-600 text-white')} onClick={() => void runLifecycle('submit')}>
+                {lifeBusy === 'submit' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
                 Submit
               </button>
             )}
             {raw === 'SUBMITTED' && (
-              <button type="button" disabled={lifeBusy} className={cn(buttonClass, 'border-emerald-400/40 text-emerald-300')} onClick={() => void runLifecycle('approve')}>
-                {lifeBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+              <button type="button" disabled={anyLifeBusy} className={cn(buttonClass, 'border-emerald-400/40 text-emerald-300')} onClick={() => void runLifecycle('approve')}>
+                {lifeBusy === 'approve' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
                 Approve
               </button>
             )}
-            {(raw === 'APPROVED' || raw === 'SUBMITTED' || raw === 'SENT_TO_BROKER' || raw === 'ROUTED') && (
-              <button type="button" disabled={lifeBusy} className={cn(buttonClass)} onClick={() => void runLifecycle('send')}>
+            {raw === 'APPROVED' && (
+              <button type="button" disabled={anyLifeBusy} className={cn(buttonClass)} onClick={() => void runLifecycle('send')}>
+                {lifeBusy === 'send' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
                 Send to broker
               </button>
             )}
-            {(raw === 'APPROVED' || raw === 'SENT_TO_BROKER' || raw === 'ROUTED') && (
+            {(raw === 'APPROVED' ||
+              raw === 'SENT_TO_BROKER' ||
+              raw === 'ROUTED' ||
+              raw === 'PARTIALLY_EXECUTED' ||
+              raw.includes('PARTIAL')) && (
               <button
                 type="button"
-                disabled={lifeBusy}
+                disabled={anyLifeBusy}
                 className={cn(buttonClass, 'bg-emerald-600 text-white')}
-                onClick={() => void runLifecycle('execute')}
+                onClick={() => {
+                  setExecQty(String(Math.max(0, selected.qty - selected.filled) || selected.qty))
+                  setExecPrice(String(selected.execPrice ?? selected.limitPrice ?? ''))
+                  setExecuteOpen(true)
+                }}
               >
-                {lifeBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-                Execute (create trade)
+                {lifeBusy === 'execute' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                {lifeBusy === 'execute'
+                  ? 'Executing…'
+                  : selected.filled > 0 && selected.filled < selected.qty
+                    ? 'Record fill'
+                    : 'Execute (create trade)'}
               </button>
             )}
             {(raw === 'SUBMITTED' || raw === 'APPROVED') && (
-              <button type="button" disabled={lifeBusy} className={cn(buttonClass, 'border-rose-400/30 text-rose-300')} onClick={() => void runLifecycle('reject')}>
+              <button type="button" disabled={anyLifeBusy} className={cn(buttonClass, 'border-rose-400/30 text-rose-300')} onClick={() => setRejectOpen(true)}>
                 Reject
               </button>
             )}
-            {!['CANCELLED', 'EXECUTED', 'SETTLED', 'REJECTED'].includes(raw) && (
-              <button type="button" disabled={lifeBusy} className={cn(buttonClass, 'border-rose-400/30 text-rose-300')} onClick={() => void runLifecycle('cancel')}>
+            {(raw === 'SENT_TO_BROKER' ||
+              raw === 'PARTIALLY_EXECUTED' ||
+              raw === 'EXECUTED' ||
+              raw === 'PENDING_SETTLEMENT' ||
+              raw.includes('PARTIAL')) && (
+              <button type="button" disabled={anyLifeBusy} className={cn(buttonClass, 'border-rose-400/30 text-rose-300')} onClick={() => setFailOpen(true)}>
+                Fail
+              </button>
+            )}
+            {(raw === 'SETTLED' || raw === 'REJECTED' || raw === 'CANCELLED' || raw === 'FAILED') && (
+              <button type="button" disabled={anyLifeBusy} className={cn(buttonClass)} onClick={() => setArchiveOpen(true)}>
+                Archive
+              </button>
+            )}
+            {!['CANCELLED', 'EXECUTED', 'SETTLED', 'REJECTED', 'FAILED', 'ARCHIVED', 'PENDING_SETTLEMENT'].includes(raw) && (
+              <button type="button" disabled={anyLifeBusy} className={cn(buttonClass, 'border-rose-400/30 text-rose-300')} onClick={() => setCancelOpen(true)}>
                 Cancel
               </button>
             )}
           </div>
-          {(raw === 'APPROVED' || raw === 'SENT_TO_BROKER' || raw === 'ROUTED') && (
+          {(raw === 'APPROVED' || raw === 'SENT_TO_BROKER' || raw === 'ROUTED' || raw === 'PARTIALLY_EXECUTED') && (
             <p className="mt-2 text-[9px] text-slate-500">
-              Send to broker alone does not create a blotter trade. Use Execute to create the trade, then Confirm/Settle on the blotter.
+              Send to broker alone does not create a blotter trade. Use Execute to create the trade (partial qty OK), then Confirm/Settle on the blotter. Fail marks the order Failed; Archive is for terminal statuses.
             </p>
           )}
 
-          <h3 className="mt-6 text-[11px] font-semibold">Status</h3>
-          <div className="mt-3 space-y-4 border-l border-white/10 pl-4">
+          <h3 className="mt-6 text-[11px] font-semibold">Status timeline</h3>
+          <p className="mt-1 text-[9px] text-slate-500">Every transition should log user, timestamp, reason, old → new (SRD 8.4).</p>
+          <div className="mt-3 space-y-3 border-l border-white/10 pl-4">
             <div className="relative">
               <span className="absolute -left-[20px] top-1 h-2 w-2 rounded-full bg-blue-400" />
-              <Pill tone={tone(selected.status) as 'green' | 'amber' | 'blue' | 'red'}>{selected.rawStatus || selected.status}</Pill>
-              <div className="mt-1 text-[10px] text-slate-300">Current API status</div>
-              <div className="mt-1 text-[9px] text-slate-600">Created {selected.created}</div>
+              <Pill tone={tone(selected.status) as 'green' | 'amber' | 'blue' | 'red'}>{selected.status}</Pill>
+              <div className="mt-1 text-[9px] text-slate-600">Current · Created {selected.created}</div>
             </div>
+            {timelineLoading && <p className="text-[10px] text-slate-500">Loading transitions…</p>}
+            {!timelineLoading &&
+              approvals.map((a) => (
+                <div key={a.id} className="relative">
+                  <span className="absolute -left-[20px] top-1 h-2 w-2 rounded-full bg-slate-500" />
+                  <div className="text-[10px] font-medium">
+                    {a.oldStatus || '—'} → {a.newStatus || a.status}
+                  </div>
+                  <div className="mt-0.5 text-[9px] text-slate-500">
+                    {a.approvalType || 'Transition'}
+                    {a.reason ? ` · ${a.reason}` : ''}
+                    {a.createdAt ? ` · ${new Date(a.createdAt).toLocaleString()}` : ''}
+                  </div>
+                </div>
+              ))}
+            {!timelineLoading && approvals.length === 0 && (
+              <p className="text-[9px] text-slate-600">No transition history returned for this order yet.</p>
+            )}
           </div>
-        </div>
+        </DetailPanel>
       )}
+
+      <ConfirmReasonDialog
+        open={rejectOpen}
+        onOpenChange={setRejectOpen}
+        title="Reject order"
+        description={`Reject order ${selected?.ref ?? ''}? This cannot be undone.`}
+        reasonLabel="Rejection reason"
+        confirmLabel="Reject order"
+        onConfirm={(reason) => runLifecycle('reject', reason)}
+      />
+      <ConfirmReasonDialog
+        open={cancelOpen}
+        onOpenChange={setCancelOpen}
+        title="Cancel order"
+        description={`Cancel order ${selected?.ref ?? ''}?`}
+        reasonLabel="Cancellation reason"
+        confirmLabel="Cancel order"
+        onConfirm={(reason) => runLifecycle('cancel', reason)}
+      />
+      <ConfirmReasonDialog
+        open={failOpen}
+        onOpenChange={setFailOpen}
+        title="Fail order"
+        description={`Mark order ${selected?.ref ?? ''} as Failed? Reason is required for audit.`}
+        reasonLabel="Failure reason"
+        confirmLabel="Fail order"
+        onConfirm={(reason) => runLifecycle('fail', reason)}
+      />
+      <ConfirmReasonDialog
+        open={archiveOpen}
+        onOpenChange={setArchiveOpen}
+        title="Archive order"
+        description={`Archive order ${selected?.ref ?? ''}? Optional reason is recorded.`}
+        reasonLabel="Archive reason (optional)"
+        confirmLabel="Archive order"
+        reasonRequired={false}
+        onConfirm={(reason) => runLifecycle('archive', reason)}
+      />
+
+      <Modal
+        open={executeOpen}
+        onClose={() => {
+          if (lifeBusy === 'execute') return
+          setExecuteOpen(false)
+        }}
+        title="Execute order"
+        subtitle="Record broker fill. Enter a partial quantity for Partially Executed; full qty may land in Pending Settlement until GL posts."
+        footer={
+          <>
+            <button
+              type="button"
+              className={buttonClass}
+              disabled={lifeBusy === 'execute'}
+              onClick={() => setExecuteOpen(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={anyLifeBusy || !Number(execQty)}
+              className={cn(buttonClass, 'bg-emerald-600 text-white')}
+              onClick={() => void runLifecycle('execute')}
+            >
+              {lifeBusy === 'execute' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+              {lifeBusy === 'execute' ? 'Executing…' : 'Confirm execution'}
+            </button>
+          </>
+        }
+      >
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Fill quantity">
+            <input className={inputClass} value={execQty} onChange={(e) => setExecQty(e.target.value)} inputMode="decimal" />
+          </Field>
+          <Field label="Execution price">
+            <input className={inputClass} value={execPrice} onChange={(e) => setExecPrice(e.target.value)} inputMode="decimal" placeholder="Optional if market" />
+          </Field>
+        </div>
+        {selected && Number(execQty) > 0 && Number(execQty) < selected.qty && (
+          <p className="mt-3 text-[10px] text-amber-200">
+            Partial fill — remaining {(selected.qty - Number(execQty)).toLocaleString()} stays open as PARTIALLY_EXECUTED.
+          </p>
+        )}
+      </Modal>
 
       <Modal
         open={newBlotter}

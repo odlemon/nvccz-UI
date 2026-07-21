@@ -7,8 +7,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock3,
-  Columns3,
   FilePenLine,
+  Loader2,
   Lock,
   Search,
   Send,
@@ -16,21 +16,26 @@ import {
   Upload,
 } from 'lucide-react'
 import { ReconApiBanner, ReconNavTabs } from '@/components/investments-v2/recon-ui'
+import { useRefetchLoading } from '@/components/investments-v2/hooks/use-refetch-loading'
+import { RefetchOverlay } from '@/components/investments-v2/ui/refetch-overlay'
 import { OpsListSkeleton, ReconTableSkeleton } from '@/components/investments-v2/loading-skeletons'
 import { stockPickerCashApi } from '@/lib/api/stock-picker-cash-api'
 import { formatOpsError, investmentOpsApi, unwrapList } from '@/lib/api/investment-ops-api'
 import {
+  mapCashAccountOptions,
   mapExceptionTimeline,
   mapExceptions,
   mapExceptionsSummary,
   opsErrorMessage,
   requireOpsData,
+  resolveCashAccountLabel,
+  resolvePortfolioName,
 } from '@/lib/investments-v2/adapters/cash-recon-adapter'
 import { R as C, ReconAccent } from '@/lib/investments-v2/recon-tokens'
 import { cn } from '@/lib/utils'
 
 type ExceptionSeverity = 'Critical' | 'High' | 'Medium' | 'Low'
-type ExceptionStatus = 'Pending Approval' | 'Investigating' | 'Overdue'
+type ExceptionStatus = 'Pending Approval' | 'Investigating' | 'Overdue' | 'Resolved' | 'Closed' | 'Rejected'
 type ExceptionRow = ReturnType<typeof mapExceptions>['items'][number]
 type TimelineItem = ReturnType<typeof mapExceptionTimeline>[number]
 type PanelTab = 'Timeline' | 'Comments' | 'Attachments' | 'Audit Trail'
@@ -48,6 +53,9 @@ const statusStyle: Record<ExceptionStatus, { bg: string; color: string; border: 
   'Pending Approval': { bg: 'rgba(245,158,11,0.08)', color: ReconAccent.amberSoft, border: 'rgba(245,158,11,0.45)' },
   Investigating: { bg: 'rgba(59,130,246,0.08)', color: ReconAccent.blueSoft, border: 'rgba(59,130,246,0.45)' },
   Overdue: { bg: 'rgba(244,63,94,0.08)', color: ReconAccent.redSoft, border: 'rgba(244,63,94,0.45)' },
+  Resolved: { bg: 'rgba(34,197,94,0.08)', color: ReconAccent.greenSoft, border: 'rgba(34,197,94,0.45)' },
+  Closed: { bg: 'rgba(100,116,139,0.08)', color: C.muted2, border: 'rgba(100,116,139,0.45)' },
+  Rejected: { bg: 'rgba(244,63,94,0.08)', color: ReconAccent.redSoft, border: 'rgba(244,63,94,0.45)' },
 }
 
 const ageColor = (severity: ExceptionSeverity) => severityStyle[severity].color
@@ -73,15 +81,20 @@ export default function ExceptionsApprovalsPage() {
   const [notes, setNotes] = useState('')
   const [decision, setDecision] = useState<'approve' | 'info' | 'reject' | null>(null)
   const [loading, setLoading] = useState(true)
+  const { isRefetching, withRefetch } = useRefetchLoading()
   const [error, setError] = useState<string | null>(null)
   const [actionMsg, setActionMsg] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [rows, setRows] = useState<ExceptionRow[]>([])
+  const [cashAccounts, setCashAccounts] = useState<{ id: string; label: string }[]>([])
+  const [portfolios, setPortfolios] = useState<{ id: string; name: string }[]>([])
   const [total, setTotal] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
   const [summary, setSummary] = useState(mapExceptionsSummary(null))
   const [timeline, setTimeline] = useState<TimelineItem[]>([])
   const [search, setSearch] = useState('')
+  const [severityFilter, setSeverityFilter] = useState('All severities')
+  const [statusFilter, setStatusFilter] = useState('All statuses')
   const [comments, setComments] = useState<ExceptionComment[]>([])
   const [attachments, setAttachments] = useState<ExceptionAttachment[]>([])
   const [auditEvents, setAuditEvents] = useState<TimelineItem[]>([])
@@ -95,17 +108,69 @@ export default function ExceptionsApprovalsPage() {
   const [collabSubmitting, setCollabSubmitting] = useState(false)
   const pageSize = 20
 
+  useEffect(() => {
+    stockPickerCashApi.listClientCashAccounts({ page: 1, pageSize: 200 }).then((res) => {
+      if (res.success && res.data) {
+        const next = mapCashAccountOptions(res.data)
+        setCashAccounts((prev) =>
+          prev.length === next.length && prev.every((p, i) => p.id === next[i]?.id && p.label === next[i]?.label)
+            ? prev
+            : next,
+        )
+      }
+    }).catch(() => undefined)
+    investmentOpsApi.listPortfolios().then((res) => {
+      if (res.success !== false) {
+        setPortfolios(
+          unwrapList<{ id?: string; name?: string }>(res.data).map((p) => ({
+            id: String(p.id ?? ''),
+            name: String(p.name ?? p.id ?? 'Fund'),
+          })).filter((p) => p.id),
+        )
+      }
+    }).catch(() => undefined)
+  }, [])
+
   const loadList = useCallback(async (p = page) => {
     setLoading(true)
     setError(null)
     try {
+      const severity =
+        severityFilter === 'All severities'
+          ? undefined
+          : severityFilter.toUpperCase()
+      const status =
+        statusFilter === 'All statuses'
+          ? undefined
+          : statusFilter === 'Pending Approval'
+            ? 'PENDING_APPROVAL'
+            : statusFilter === 'Overdue'
+              ? 'OVERDUE'
+              : 'OPEN'
       const [listRes, sumRes] = await Promise.all([
-        stockPickerCashApi.listExceptions({ page: p, pageSize }),
+        stockPickerCashApi.listExceptions({
+          page: p,
+          pageSize,
+          ...(severity ? { severity } : {}),
+          ...(status ? { status } : {}),
+        }),
         stockPickerCashApi.getExceptionsSummary().catch(() => null),
       ])
       const listData = requireOpsData(listRes, 'exceptions')
       const mapped = mapExceptions(listData)
-      setRows(mapped.items)
+      setRows(
+        mapped.items.map((row) => ({
+          ...row,
+          account:
+            row.account !== '—'
+              ? row.account
+              : resolveCashAccountLabel(row.cashAccountId, cashAccounts),
+          portfolio:
+            row.portfolio !== '—'
+              ? row.portfolio
+              : resolvePortfolioName(row.portfolioId, portfolios),
+        })),
+      )
       setTotal(mapped.total)
       setTotalPages(Math.max(1, mapped.totalPages || 1))
       setSelectedId((prev) => prev || mapped.items[0]?.id || '')
@@ -121,11 +186,11 @@ export default function ExceptionsApprovalsPage() {
     } finally {
       setLoading(false)
     }
-  }, [page])
+  }, [cashAccounts, page, portfolios, severityFilter, statusFilter])
 
   useEffect(() => {
-    void loadList(page)
-  }, [loadList, page])
+    void withRefetch(() => loadList(page))
+  }, [loadList, page, withRefetch])
 
   useEffect(() => {
     if (!selectedId) {
@@ -303,7 +368,13 @@ export default function ExceptionsApprovalsPage() {
     return `${r.id} ${r.account} ${r.client} ${r.reason} ${r.title}`.toLowerCase().includes(q)
   })
   const selected = filtered.find((r) => r.id === selectedId) ?? filtered[0]
-  const canSubmit = decision !== null && !!selected && !busy
+  const isTerminal =
+    selected != null &&
+    (['Resolved', 'Closed', 'Rejected'].includes(selected.status) ||
+      String((selected.raw as { status?: string } | undefined)?.status ?? '').toUpperCase().includes('RESOLV') ||
+      String((selected.raw as { status?: string } | undefined)?.status ?? '').toUpperCase().includes('REJECT') ||
+      String((selected.raw as { status?: string } | undefined)?.status ?? '').toUpperCase().includes('CLOS'))
+  const canSubmit = decision !== null && !!selected && !busy && !isTerminal
 
   const submitDecision = async () => {
     if (!selected || !decision) return
@@ -351,11 +422,22 @@ export default function ExceptionsApprovalsPage() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2.5">
-            <button type="button" className="inline-flex h-9 items-center gap-2 rounded-full border px-3 text-[12px]" style={{ background: C.control, borderColor: C.controlBorder, color: C.text }}>
-              <Calendar className="h-3.5 w-3.5" style={{ color: C.muted }} />
-              <span>All dates</span>
-              <ChevronDown className="h-3.5 w-3.5" style={{ color: C.muted2 }} />
-            </button>
+            <FilterSelect
+              value={severityFilter}
+              options={['All severities', 'Critical', 'High', 'Medium', 'Low']}
+              onChange={(v) => {
+                setSeverityFilter(v)
+                setPage(1)
+              }}
+            />
+            <FilterSelect
+              value={statusFilter}
+              options={['All statuses', 'Pending Approval', 'Investigating', 'Overdue']}
+              onChange={(v) => {
+                setStatusFilter(v)
+                setPage(1)
+              }}
+            />
           </div>
         </header>
 
@@ -382,7 +464,8 @@ export default function ExceptionsApprovalsPage() {
               </div>
             </div>
 
-            <div className="overflow-x-auto">
+            <div className="relative overflow-x-auto">
+              <RefetchOverlay active={isRefetching} rows={7} cols={9} />
               <table className="w-full min-w-[1080px] text-left text-[12px]">
                 <thead>
                   <tr style={{ color: C.muted2, borderBottom: `1px solid ${C.rowBorder}` }}>
@@ -392,7 +475,7 @@ export default function ExceptionsApprovalsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {loading ? (
+                  {loading && rows.length === 0 ? (
                     <tr>
                       <td colSpan={9} className="p-0">
                         <ReconTableSkeleton rows={7} cols={9} />
@@ -505,6 +588,32 @@ export default function ExceptionsApprovalsPage() {
   )
 }
 
+function FilterSelect({
+  value,
+  options,
+  onChange,
+}: {
+  value: string
+  options: string[]
+  onChange: (value: string) => void
+}) {
+  return (
+    <label className="relative inline-flex">
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-9 appearance-none rounded-full border py-0 pl-3 pr-8 text-[12px] outline-none"
+        style={{ background: C.control, borderColor: C.controlBorder, color: C.text }}
+      >
+        {options.map((option) => (
+          <option key={option} value={option}>{option}</option>
+        ))}
+      </select>
+      <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2" style={{ color: C.muted2 }} />
+    </label>
+  )
+}
+
 function KpiCard({
   icon,
   iconBg,
@@ -605,7 +714,12 @@ function DetailPanel({
   busy: boolean
 }) {
   const sev = severityStyle[row.severity]
-  const st = statusStyle[row.status]
+  const st = statusStyle[row.status] ?? statusStyle.Investigating
+  const isTerminal =
+    ['Resolved', 'Closed', 'Rejected'].includes(row.status) ||
+    String((row.raw as { status?: string } | undefined)?.status ?? '').toUpperCase().includes('RESOLV') ||
+    String((row.raw as { status?: string } | undefined)?.status ?? '').toUpperCase().includes('REJECT') ||
+    String((row.raw as { status?: string } | undefined)?.status ?? '').toUpperCase().includes('CLOS')
   const tabs: { id: PanelTab; label: string }[] = [
     { id: 'Timeline', label: 'Timeline' },
     { id: 'Comments', label: 'Comments' },
@@ -618,7 +732,6 @@ function DetailPanel({
       <div className="border-b px-4 py-4" style={{ borderColor: C.rowBorder }}>
         <div className="flex flex-wrap items-center gap-2">
           <span className="inline-flex rounded-full border px-2 py-0.5 text-[11px] font-medium" style={{ background: sev.bg, color: sev.color, borderColor: sev.border }}>{row.severity}</span>
-          <span className="inline-flex rounded-full border px-2 py-0.5 font-mono text-[11px]" style={{ background: C.muted, borderColor: C.cardBorder, color: C.muted }}>{row.id}</span>
           <span className="inline-flex rounded-full border px-2 py-0.5 text-[11px] font-medium" style={{ background: st.bg, color: st.color, borderColor: st.border }}>{row.status}</span>
         </div>
         <div className="mt-3 flex items-start justify-between gap-3">
@@ -634,6 +747,7 @@ function DetailPanel({
         <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-[12px]">
           {[
             ['Source', row.source],
+            ['Portfolio', row.portfolio],
             ['Custodian', row.custodian],
             ['Instrument', row.instrument],
             ['Quantity', row.quantity],
@@ -817,19 +931,19 @@ function DetailPanel({
       <div className="mt-auto space-y-3 border-t px-4 py-4" style={{ borderColor: C.rowBorder }}>
         <p className="text-[12px] font-semibold">Approval Actions</p>
         <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={() => onDecision('approve')} className={cn('inline-flex h-9 items-center rounded-full px-4 text-[12px] font-medium text-white')} style={{ background: decision === 'approve' ? '#059669' : '#10B981' }}>
+          <button type="button" disabled={isTerminal || busy} onClick={() => onDecision('approve')} className={cn('inline-flex h-9 items-center rounded-full px-4 text-[12px] font-medium text-white disabled:opacity-50')} style={{ background: decision === 'approve' ? '#059669' : '#10B981' }}>
             Approve & Adjust
           </button>
-          <button type="button" onClick={() => onDecision('info')} className="inline-flex h-9 items-center rounded-full border px-4 text-[12px] font-medium" style={{ background: decision === 'info' ? 'rgba(59,130,246,0.15)' : 'transparent', borderColor: '#3B82F6', color: '#60A5FA' }}>
+          <button type="button" disabled={isTerminal || busy} onClick={() => onDecision('info')} className="inline-flex h-9 items-center rounded-full border px-4 text-[12px] font-medium disabled:opacity-50" style={{ background: decision === 'info' ? 'rgba(59,130,246,0.15)' : 'transparent', borderColor: '#3B82F6', color: '#60A5FA' }}>
             Request More Info
           </button>
-          <button type="button" onClick={() => onDecision('reject')} className="inline-flex h-9 items-center rounded-full border px-4 text-[12px] font-medium" style={{ background: decision === 'reject' ? 'rgba(244,63,94,0.12)' : 'transparent', borderColor: '#F43F5E', color: '#FB7185' }}>
+          <button type="button" disabled={isTerminal || busy} onClick={() => onDecision('reject')} className="inline-flex h-9 items-center rounded-full border px-4 text-[12px] font-medium disabled:opacity-50" style={{ background: decision === 'reject' ? 'rgba(244,63,94,0.12)' : 'transparent', borderColor: '#F43F5E', color: '#FB7185' }}>
             Reject
           </button>
         </div>
         <label className="block">
           <span className="mb-1.5 block text-[12px]" style={{ color: C.muted }}>Approval Notes (optional)</span>
-          <textarea value={notes} onChange={(e) => onNotesChange(e.target.value)} rows={3} placeholder="Add notes for your decision..." className="w-full resize-none rounded-[10px] border px-3 py-2.5 text-[12px] outline-none" style={{ background: C.control, borderColor: C.controlBorder, color: C.text }} />
+          <textarea value={notes} onChange={(e) => onNotesChange(e.target.value)} rows={3} disabled={isTerminal || busy} placeholder="Add notes for your decision..." className="w-full resize-none rounded-[10px] border px-3 py-2.5 text-[12px] outline-none disabled:opacity-50" style={{ background: C.control, borderColor: C.controlBorder, color: C.text }} />
         </label>
         <button
           type="button"
@@ -838,7 +952,7 @@ function DetailPanel({
           className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-full text-[13px] font-medium disabled:opacity-60"
           style={{ background: canSubmit ? ReconAccent.blue : C.cardBorder, color: canSubmit ? '#F8FAFC' : C.muted2 }}
         >
-          {!canSubmit && !busy ? <Lock className="h-3.5 w-3.5" /> : null}
+          {!canSubmit && !busy ? <Lock className="h-3.5 w-3.5" /> : busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
           {busy ? 'Submitting…' : 'Submit Decision'}
         </button>
       </div>

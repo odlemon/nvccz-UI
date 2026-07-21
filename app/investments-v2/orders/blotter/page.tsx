@@ -1,20 +1,56 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Check, FileCheck, Loader2, Plus, Search } from 'lucide-react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { Check, ExternalLink, FileCheck, Loader2, Plus, Search } from 'lucide-react'
 import { OpsKpiSkeleton, OpsTableSkeleton } from '@/components/investments-v2/loading-skeletons'
+import { DetailPanel } from '@/components/investments-v2/ui/detail-panel'
 import { NewEquityOrderModal } from '@/components/investments-v2/new-equity-order-modal'
 import { buttonClass, inputClass, Metric, OrdersCard, OrdersPage, Pill, SelectField, tableClass, tableWrapClass } from '@/components/investments-v2/orders-ui'
 import { formatOpsError, investmentOpsApi } from '@/lib/api/investment-ops-api'
 import {
+  accountingDeepLink,
   formatCompact,
   fundNameMap,
   mapBlotterTrades,
   type BlotterTradeRow,
 } from '@/lib/investments-v2/adapters/orders-adapter'
 import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
 
-export default function TradeBlotterPage() {
+function findTradeFromDeepLink(
+  rows: BlotterTradeRow[],
+  params: { tradeId: string | null; orderId: string | null; orderRef: string | null },
+): BlotterTradeRow | null {
+  if (params.tradeId) {
+    const tid = params.tradeId
+    const byTrade = rows.find((r) => r.apiId === tid || r.id === tid)
+    if (byTrade) return byTrade
+  }
+  if (params.orderId) {
+    const byOrderId = rows.find((r) => r.orderId === params.orderId)
+    if (byOrderId) return byOrderId
+  }
+  if (params.orderRef) {
+    const ref = params.orderRef.toLowerCase()
+    const byRef = rows.find(
+      (r) =>
+        (r.order && r.order !== '—' && r.order.toLowerCase() === ref) ||
+        (r.order && r.order.toLowerCase().includes(ref)),
+    )
+    if (byRef) return byRef
+  }
+  return null
+}
+
+function TradeBlotterPageInner() {
+  const searchParams = useSearchParams()
+  const deepTradeId = searchParams.get('tradeId')
+  const deepOrderId = searchParams.get('orderId')
+  const deepOrderRef = searchParams.get('orderRef')
+  const wantSelect = searchParams.get('select') === '1' || Boolean(deepTradeId || deepOrderId || deepOrderRef)
+  const hasDeepLink = Boolean(deepTradeId || deepOrderId || deepOrderRef)
+
   const [trades, setTrades] = useState<BlotterTradeRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -22,8 +58,13 @@ export default function TradeBlotterPage() {
   const [query, setQuery] = useState('')
   const [selected, setSelected] = useState<BlotterTradeRow | null>(null)
   const [showOrder, setShowOrder] = useState(false)
-  const [actionBusy, setActionBusy] = useState(false)
+  const [actionBusy, setActionBusy] = useState<'confirm' | 'settle' | 'post' | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [deepLinkMsg, setDeepLinkMsg] = useState<string | null>(null)
+  const deepLinkApplied = useRef<string | null>(null)
+  const deepLinkFailed = useRef<string | null>(null)
+  /** Keep detail panel on the deep-linked trade across list refresh. */
+  const preferredTradeId = useRef<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -37,9 +78,16 @@ export default function TradeBlotterPage() {
         throw new Error(tradesRes.message || tradesRes.error || 'Failed to load trades')
       }
       const names = fundNameMap(portfoliosRes.data)
-      const rows = mapBlotterTrades(tradesRes.data, names)
+      const rows = mapBlotterTrades(tradesRes.data, names).sort((a, b) => b.sortKey - a.sortKey)
       setTrades(rows)
-      setSelected((prev) => (prev ? rows.find((r) => r.apiId === prev.apiId) ?? null : null))
+      setSelected((prev) => {
+        const prefer = preferredTradeId.current
+        if (prefer) {
+          const hit = rows.find((r) => r.apiId === prefer || r.id === prefer)
+          if (hit) return hit
+        }
+        return prev ? rows.find((r) => r.apiId === prev.apiId) ?? null : null
+      })
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load trades')
       setTrades([])
@@ -52,22 +100,70 @@ export default function TradeBlotterPage() {
     void load()
   }, [load])
 
+  // Focus from Orderbook deep-link using URL tradeId only (no GET /orders).
+  useEffect(() => {
+    if (loading || !hasDeepLink) return
+    const key = `${deepTradeId ?? ''}|${deepOrderId ?? ''}|${deepOrderRef ?? ''}`
+    if (deepLinkApplied.current === key || deepLinkFailed.current === key) return
+
+    const match = findTradeFromDeepLink(trades, {
+      tradeId: deepTradeId,
+      orderId: deepOrderId,
+      orderRef: deepOrderRef,
+    })
+    if (match) {
+      deepLinkApplied.current = key
+      preferredTradeId.current = match.apiId
+      setStatus('All')
+      if (wantSelect) {
+        setSelected(match)
+        setQuery(match.id)
+      }
+      setDeepLinkMsg(
+        `Focused trade ${match.id}${deepOrderRef ? ` · order ${deepOrderRef}` : ''}`,
+      )
+      return
+    }
+
+    if (trades.length === 0) return
+    deepLinkFailed.current = key
+    setDeepLinkMsg(
+      `Could not find trade${deepTradeId ? ` ${deepTradeId}` : ''} on blotter. ` +
+        `Need order.tradeId + trade.orderId/orderRef populated (BA-T5 / seed).`,
+    )
+  }, [loading, trades, hasDeepLink, deepTradeId, deepOrderId, deepOrderRef, wantSelect])
+
+  useEffect(() => {
+    if (!selected?.apiId) return
+    const el = document.getElementById(`blotter-trade-${selected.apiId}`)
+    el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }, [selected?.apiId])
+
   const visible = useMemo(
     () =>
-      trades.filter(
-        (trade) =>
-          (status === 'All' || trade.status === status) &&
-          `${trade.id} ${trade.order} ${trade.ticker} ${trade.portfolio}`.toLowerCase().includes(query.toLowerCase()),
-      ),
+      trades.filter((trade) => {
+        const statusOk =
+          status === 'All' ||
+          trade.status === status ||
+          (status === 'Pending Settlement' && trade.settlement === 'Pending Settlement') ||
+          (status === 'Settled' && (trade.status === 'Settled' || trade.settlement === 'Settled'))
+        return (
+          statusOk &&
+          `${trade.id} ${trade.order} ${trade.ticker} ${trade.portfolio}`.toLowerCase().includes(query.toLowerCase())
+        )
+      }),
     [trades, status, query],
   )
 
   const money = (value: number | null | undefined) =>
     value == null || !Number.isFinite(value) ? '—' : value.toLocaleString('en-US', { minimumFractionDigits: 2 })
 
-  const runTradeAction = async (action: () => Promise<{ success?: boolean; message?: string; error?: string; code?: string }>) => {
+  const runTradeAction = async (
+    kind: 'confirm' | 'settle' | 'post',
+    action: () => Promise<{ success?: boolean; message?: string; error?: string; code?: string }>,
+  ) => {
     if (!selected?.apiId || actionBusy) return
-    setActionBusy(true)
+    setActionBusy(kind)
     setActionError(null)
     try {
       const res = await action()
@@ -79,25 +175,56 @@ export default function TradeBlotterPage() {
     } catch (e) {
       setActionError(formatOpsError(e, 'Trade action failed'))
     } finally {
-      setActionBusy(false)
+      setActionBusy(null)
     }
   }
 
   const confirmSelectedTrade = () =>
-    runTradeAction(() => investmentOpsApi.confirmTrade(selected!.apiId))
+    runTradeAction('confirm', () => investmentOpsApi.confirmTrade(selected!.apiId))
 
-  const settleSelectedTrade = (allowDeferredAccounting: boolean) =>
-    runTradeAction(() => investmentOpsApi.settleTrade(selected!.apiId, { allowDeferredAccounting }))
+  /** Settle with deferred accounting (custodian settle; books may post later). */
+  const settleSelectedTrade = () =>
+    runTradeAction('settle', () =>
+      investmentOpsApi.settleTrade(selected!.apiId, { allowDeferredAccounting: true }),
+    )
+
+  /**
+   * Settle requiring immediate accounting, or re-call settle after deferred settle
+   * so books move to Posted (same settle endpoint, allowDeferredAccounting: false).
+   */
+  const postSelectedTrade = () =>
+    runTradeAction('post', () =>
+      investmentOpsApi.settleTrade(selected!.apiId, { allowDeferredAccounting: false }),
+    )
 
   const grossTotal = trades.reduce((sum, t) => sum + t.gross, 0)
   const executedCount = trades.filter((t) => t.status === 'Executed').length
   const pendingCount = trades.filter((t) => t.status === 'Pending' || t.status === 'Partial').length
   const unmatchedCount = trades.filter((t) => t.settlement === 'Unmatched').length
 
+  const isConfirmed = selected?.confirmation === 'Confirmed'
+  const isSettled = selected?.settlement === 'Settled'
+  const isPosted = selected?.accounting === 'Posted'
+  // Blotter post-trade sequence: Confirm → Settle → Post
+  const canConfirm = Boolean(selected) && !isConfirmed
+  const canSettle = Boolean(selected) && isConfirmed && !isSettled
+  const canPost = Boolean(selected) && isConfirmed && isSettled && !isPosted
+  const settleHint = !isConfirmed
+    ? 'Confirm the trade first'
+    : isSettled
+      ? 'Already settled'
+      : null
+  const postHint = !isConfirmed
+    ? 'Confirm the trade first'
+    : !isSettled
+      ? 'Mark settled first'
+      : isPosted
+        ? 'Already posted'
+        : null
+
   return (
     <OrdersPage
       title="Trade Blotter"
-      description="Executed and pending trades with API confirmation and settlement actions."
       actions={
         <button className={cn(buttonClass, 'border-blue-500/40 bg-blue-600 text-white')} onClick={() => setShowOrder(true)}>
           <Plus className="h-3.5 w-3.5" /> New order
@@ -109,6 +236,14 @@ export default function TradeBlotterPage() {
           {error}
           <button type="button" className={cn(buttonClass, 'ml-3 h-7 px-3')} onClick={() => void load()}>
             Retry
+          </button>
+        </div>
+      )}
+      {deepLinkMsg && (
+        <div className="rounded-2xl border border-blue-500/30 bg-blue-500/10 px-4 py-2 text-[12px] text-blue-100">
+          {deepLinkMsg}
+          <button type="button" className={cn(buttonClass, 'ml-3 h-7 px-3')} onClick={() => setDeepLinkMsg(null)}>
+            Dismiss
           </button>
         </div>
       )}
@@ -126,17 +261,18 @@ export default function TradeBlotterPage() {
 
       <OrdersCard
         title="Trades"
-        eyebrow="Settlement workspace"
         actions={
           <div className="flex gap-2">
             <div className="relative">
               <Search className="absolute left-3 top-3 h-3 w-3 text-slate-500" />
               <input className={cn(inputClass, 'w-56 pl-8')} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search trade or ticker" />
             </div>
-            <SelectField className="w-36" value={status} onChange={setStatus}>
+            <SelectField className="w-44" value={status} onChange={setStatus}>
               <option>All</option>
               <option>Executed</option>
-              <option>Partial</option>
+              <option>Partially Executed</option>
+              <option>Pending Settlement</option>
+              <option>Settled</option>
               <option>Pending</option>
             </SelectField>
           </div>
@@ -183,7 +319,18 @@ export default function TradeBlotterPage() {
               )}
               {!loading &&
                 visible.map((trade) => (
-                  <tr key={trade.apiId || trade.id} className="cursor-pointer" onClick={() => setSelected(trade)}>
+                  <tr
+                    key={trade.apiId || trade.id}
+                    id={trade.apiId ? `blotter-trade-${trade.apiId}` : undefined}
+                    className={cn(
+                      'cursor-pointer hover:bg-white/[0.03]',
+                      selected?.apiId === trade.apiId && 'bg-blue-500/10 ring-1 ring-inset ring-blue-400/30',
+                    )}
+                    onClick={() => {
+                      preferredTradeId.current = trade.apiId
+                      setSelected(trade)
+                    }}
+                  >
                     <td>
                       <div className="font-mono text-blue-300">{trade.id}</div>
                       <div className="text-[9px] text-slate-600">{trade.order}</div>
@@ -226,13 +373,26 @@ export default function TradeBlotterPage() {
       </OrdersCard>
 
       {selected && (
-        <div className="fixed inset-y-0 right-0 z-40 w-full max-w-lg overflow-y-auto border-l border-white/10 bg-[#09111e] p-5 shadow-2xl">
+        <DetailPanel
+          open={!!selected}
+          onClose={() => {
+            preferredTradeId.current = null
+            setSelected(null)
+          }}
+          width="max-w-lg"
+        >
           <div className="flex justify-between">
             <div>
               <div className="text-[9px] uppercase tracking-widest text-blue-400">Trade detail</div>
               <h2 className="mt-1 font-mono text-base">{selected.id}</h2>
             </div>
-            <button className={buttonClass} onClick={() => setSelected(null)}>
+            <button
+              className={buttonClass}
+              onClick={() => {
+                preferredTradeId.current = null
+                setSelected(null)
+              }}
+            >
               Close
             </button>
           </div>
@@ -267,28 +427,45 @@ export default function TradeBlotterPage() {
             </div>
           )}
           <h3 className="mt-6 text-[11px] font-semibold">Settlement & confirmation</h3>
+          <p className="mt-1 text-[9px] text-slate-500">
+            Do these in order: <span className="text-slate-300">1. Confirm</span>
+            {' → '}
+            <span className="text-slate-300">2. Mark settled</span>
+            {' → '}
+            <span className="text-slate-300">3. Mark posted</span>
+          </p>
           <div className="mt-3 space-y-3">
             <div className="rounded-[18px] border border-white/[0.07] p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[11px] font-medium">Broker confirmation</p>
+                  <p className="text-[11px] font-medium">1. Broker confirmation</p>
                   <p className="mt-1 text-[9px] text-slate-500">Match price, quantity and broker reference.</p>
                 </div>
                 <Pill tone={selected.confirmation === 'Confirmed' ? 'green' : 'amber'}>{selected.confirmation}</Pill>
               </div>
               <button
-                disabled={actionBusy || selected.confirmation === 'Confirmed'}
-                className={cn(buttonClass, 'mt-3 w-full')}
+                type="button"
+                disabled={Boolean(actionBusy) || !canConfirm}
+                title={isConfirmed ? 'Already confirmed' : undefined}
+                className={cn(
+                  buttonClass,
+                  'mt-3 w-full',
+                  (Boolean(actionBusy) || !canConfirm) && 'cursor-not-allowed opacity-40',
+                )}
                 onClick={() => void confirmSelectedTrade()}
               >
-                {actionBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileCheck className="h-3.5 w-3.5" />}
-                Confirm trade
+                {actionBusy === 'confirm' ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <FileCheck className="h-3.5 w-3.5" />
+                )}
+                {isConfirmed ? 'Confirmed' : 'Confirm trade'}
               </button>
             </div>
             <div className="rounded-[18px] border border-white/[0.07] p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[11px] font-medium">Custodian settlement</p>
+                  <p className="text-[11px] font-medium">2. Custodian settlement</p>
                   <p className="mt-1 text-[9px] text-slate-500">
                     {selected.custodian} · {selected.valueDate}
                   </p>
@@ -296,46 +473,97 @@ export default function TradeBlotterPage() {
                 <Pill tone={selected.settlement === 'Settled' ? 'green' : 'amber'}>{selected.settlement}</Pill>
               </div>
               <button
-                disabled={actionBusy || selected.settlement === 'Settled'}
-                className={cn(buttonClass, 'mt-3 w-full border-emerald-400/30 text-emerald-300')}
-                onClick={() => void settleSelectedTrade(true)}
+                type="button"
+                disabled={Boolean(actionBusy) || !canSettle}
+                title={settleHint ?? undefined}
+                className={cn(
+                  buttonClass,
+                  'mt-3 w-full border-emerald-400/30 text-emerald-300',
+                  (Boolean(actionBusy) || !canSettle) && 'cursor-not-allowed opacity-40',
+                )}
+                onClick={() => void settleSelectedTrade()}
               >
-                {actionBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-                Mark settled
+                {actionBusy === 'settle' ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Check className="h-3.5 w-3.5" />
+                )}
+                {isSettled ? 'Settled' : 'Mark settled'}
               </button>
+              {settleHint && !isSettled && (
+                <p className="mt-2 text-[9px] text-amber-400/80">{settleHint}</p>
+              )}
             </div>
             <div className="rounded-[18px] border border-white/[0.07] p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[11px] font-medium">Accounting posting</p>
-                  <p className="mt-1 text-[9px] text-slate-500">Settle with immediate accounting via the trades API.</p>
+                  <p className="text-[11px] font-medium">3. Accounting posting</p>
+                  <p className="mt-1 text-[9px] text-slate-500">
+                    After settlement, post books via settle with immediate accounting.
+                  </p>
                 </div>
                 <Pill tone={selected.accounting === 'Posted' ? 'green' : 'slate'}>{selected.accounting}</Pill>
               </div>
               <button
-                disabled={
-                  actionBusy ||
-                  (selected.settlement === 'Settled' && selected.accounting === 'Posted') ||
-                  selected.accounting === 'Posted'
-                }
-                className={cn(buttonClass, 'mt-3 w-full border-blue-400/30 text-blue-300')}
-                onClick={() => void settleSelectedTrade(false)}
+                type="button"
+                disabled={Boolean(actionBusy) || !canPost}
+                title={postHint ?? undefined}
+                className={cn(
+                  buttonClass,
+                  'mt-3 w-full border-blue-400/30 text-blue-300',
+                  (Boolean(actionBusy) || !canPost) && 'cursor-not-allowed opacity-40',
+                )}
+                onClick={() => void postSelectedTrade()}
               >
-                {actionBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-                Mark posted
+                {actionBusy === 'post' ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Check className="h-3.5 w-3.5" />
+                )}
+                {isPosted ? 'Posted' : 'Mark posted'}
               </button>
+              {postHint && !isPosted && (
+                <p className="mt-2 text-[9px] text-amber-400/80">{postHint}</p>
+              )}
+              {isPosted && (
+                <button
+                  type="button"
+                  className={cn(buttonClass, 'mt-3 w-full border-blue-400/40 bg-blue-600/20 text-blue-200 hover:bg-blue-600/30')}
+                  onClick={() =>
+                    window.open(accountingDeepLink(selected), '_blank', 'noopener,noreferrer')
+                  }
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  Open accounting event
+                </button>
+              )}
             </div>
           </div>
-        </div>
+        </DetailPanel>
       )}
       <NewEquityOrderModal
         open={showOrder}
         onClose={() => setShowOrder(false)}
         onOrderCreated={() => {
+          toast.success('Order submitted. View pending orders in Orderbook until executed.')
           setShowOrder(false)
           void load()
         }}
       />
     </OrdersPage>
+  )
+}
+
+export default function TradeBlotterPage() {
+  return (
+    <Suspense
+      fallback={
+        <OrdersPage title="Trade Blotter">
+          <OpsKpiSkeleton count={4} />
+        </OrdersPage>
+      }
+    >
+      <TradeBlotterPageInner />
+    </Suspense>
   )
 }

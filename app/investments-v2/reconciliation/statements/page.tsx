@@ -1,6 +1,6 @@
 'use client'
 
-import { type ReactNode, useCallback, useEffect, useState } from 'react'
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Check,
   CheckCircle2,
@@ -14,20 +14,25 @@ import {
   FileStack,
   FileText,
   Info,
+  Loader2,
   Mail,
-  MoreVertical,
   Network,
   Upload,
   Wallet,
 } from 'lucide-react'
 import { ReconApiBanner, ReconNavTabs, ViewSegment } from '@/components/investments-v2/recon-ui'
+import { useRefetchLoading } from '@/components/investments-v2/hooks/use-refetch-loading'
+import { RefetchOverlay } from '@/components/investments-v2/ui/refetch-overlay'
 import { OpsListSkeleton, ReconTableSkeleton } from '@/components/investments-v2/loading-skeletons'
 import { stockPickerCashApi } from '@/lib/api/stock-picker-cash-api'
 import {
+  mapCashAccountOptions,
   mapStatements,
   mapStatementsSummary,
   opsErrorMessage,
   requireOpsData,
+  resolveCashAccountLabel,
+  displayLabel,
 } from '@/lib/investments-v2/adapters/cash-recon-adapter'
 import { formatMoneyDisplay, unwrapList } from '@/lib/api/investment-ops-helpers'
 import { R as C, ReconAccent } from '@/lib/investments-v2/recon-tokens'
@@ -46,12 +51,10 @@ const investorFilters = [
 ]
 
 const clientFilters = [
-  { label: 'Client', value: 'All clients' },
-  { label: 'Account', value: 'All accounts' },
-  { label: 'Currency', value: 'All' },
-  { label: 'Period', value: 'All periods' },
-  { label: 'Delivery Channel', value: 'Email' },
-  { label: 'Status', value: 'All' },
+  { label: 'Client', key: 'client' as const, value: 'All clients' },
+  { label: 'Account', key: 'account' as const, value: 'All accounts' },
+  { label: 'Currency', key: 'currency' as const, value: 'All' },
+  { label: 'Status', key: 'status' as const, value: 'All' },
 ]
 
 function defaultPeriodRange() {
@@ -67,18 +70,48 @@ export default function StatementsPage() {
   const [selectedId, setSelectedId] = useState('')
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
+  const { isRefetching, withRefetch } = useRefetchLoading()
   const [error, setError] = useState<string | null>(null)
   const [actionMsg, setActionMsg] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
+  const [busyAction, setBusyAction] = useState<
+    'generate' | 'preview' | 'approve' | 'email' | 'download' | null
+  >(null)
+  const busy = busyAction !== null
   const [rows, setRows] = useState<StatementRow[]>([])
   const [total, setTotal] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
   const [summary, setSummary] = useState(mapStatementsSummary(null))
   const [previewHtml, setPreviewHtml] = useState<string | null>(null)
   const [detail, setDetail] = useState<StatementRow | null>(null)
+  const [cashAccounts, setCashAccounts] = useState<{ id: string; label: string; clientOrVehicleId?: string }[]>([])
+  const [accountFilter, setAccountFilter] = useState('All accounts')
+  const [statusFilter, setStatusFilter] = useState('All')
+  const [currencyFilter, setCurrencyFilter] = useState('All')
   const pageSize = 8
   const isInvestor = statementView === 'investor'
-  const filters = isInvestor ? investorFilters : clientFilters
+
+  useEffect(() => {
+    stockPickerCashApi.listClientCashAccounts({ page: 1, pageSize: 100 }).then((res) => {
+      if (res.success && res.data) {
+        const raw = unwrapList<{ id?: string; clientOrVehicleId?: string }>(res.data)
+        const byId = new Map(raw.map((r) => [String(r.id ?? ''), r]))
+        setCashAccounts(
+          mapCashAccountOptions(res.data).map((a) => {
+            const hit = byId.get(a.id)
+            return {
+              ...a,
+              clientOrVehicleId: hit?.clientOrVehicleId != null ? String(hit.clientOrVehicleId) : undefined,
+            }
+          }),
+        )
+      }
+    }).catch(() => undefined)
+  }, [])
+
+  const selectedAccountId = useMemo(() => {
+    if (accountFilter === 'All accounts') return undefined
+    return cashAccounts.find((a) => a.label === accountFilter)?.id
+  }, [accountFilter, cashAccounts])
 
   const loadList = useCallback(
     async (p = page) => {
@@ -92,6 +125,9 @@ export default function StatementsPage() {
         // Investor segment uses INVESTOR_CAPITAL statementType when supported.
         if (isInvestor) params.statementType = 'INVESTOR_CAPITAL'
         else params.statementType = 'PERIODIC'
+        if (selectedAccountId) params.cashAccountId = selectedAccountId
+        if (statusFilter !== 'All') params.status = statusFilter.toUpperCase().replace(/\s+/g, '_')
+        if (currencyFilter !== 'All') params.currency = currencyFilter
 
         const [listRes, sumRes] = await Promise.all([
           stockPickerCashApi.listClientStatements(params),
@@ -99,7 +135,15 @@ export default function StatementsPage() {
         ])
         const listData = requireOpsData(listRes, 'client statements')
         const mapped = mapStatements(listData)
-        setRows(mapped.items)
+        setRows(
+          mapped.items.map((row) => ({
+            ...row,
+            account:
+              row.account !== '—'
+                ? row.account
+                : resolveCashAccountLabel(row.cashAccountId, cashAccounts),
+          })),
+        )
         setTotal(mapped.total)
         setTotalPages(Math.max(1, mapped.totalPages || Math.ceil((mapped.total || 0) / pageSize) || 1))
         setSelectedId((prev) => {
@@ -126,12 +170,37 @@ export default function StatementsPage() {
         setLoading(false)
       }
     },
-    [isInvestor, page],
+    [cashAccounts, currencyFilter, isInvestor, page, selectedAccountId, statusFilter],
   )
 
+  const loadPreview = useCallback(async (id: string) => {
+    setBusyAction('preview')
+    setActionMsg(null)
+    try {
+      const previewRes = await stockPickerCashApi.previewClientStatement(id)
+      const data = requireOpsData(previewRes, 'statement preview') as Record<string, unknown>
+      const html =
+        (typeof data.previewHtml === 'string' && data.previewHtml) ||
+        (typeof data.html === 'string' && data.html) ||
+        null
+      if (html) {
+        setPreviewHtml(html)
+        setActionMsg('Preview loaded.')
+      } else {
+        setPreviewHtml(null)
+        setActionMsg('No preview HTML returned — showing summary panel.')
+      }
+    } catch (e) {
+      setPreviewHtml(null)
+      setActionMsg(opsErrorMessage(e, 'Preview failed'))
+    } finally {
+      setBusyAction(null)
+    }
+  }, [])
+
   useEffect(() => {
-    void loadList(page)
-  }, [loadList, page])
+    void withRefetch(() => loadList(page))
+  }, [loadList, page, withRefetch])
 
   const selected = rows.find((r) => r.id === selectedId) ?? rows[0] ?? null
 
@@ -179,7 +248,7 @@ export default function StatementsPage() {
   const to = Math.min(page * pageSize, total || rows.length)
 
   const generateBatch = async () => {
-    setBusy(true)
+    setBusyAction('generate')
     setActionMsg(null)
     try {
       let clientOrVehicleId = selected?.clientOrVehicleId
@@ -226,13 +295,13 @@ export default function StatementsPage() {
     } catch (e) {
       setActionMsg(opsErrorMessage(e, 'Generate failed'))
     } finally {
-      setBusy(false)
+      setBusyAction(null)
     }
   }
 
   const approveSelected = async () => {
     if (!selected) return
-    setBusy(true)
+    setBusyAction('approve')
     setActionMsg(null)
     try {
       await stockPickerCashApi.approveClientStatement(selected.id, { expectedVersion: selected.version })
@@ -241,13 +310,13 @@ export default function StatementsPage() {
     } catch (e) {
       setActionMsg(opsErrorMessage(e, 'Approve failed'))
     } finally {
-      setBusy(false)
+      setBusyAction(null)
     }
   }
 
   const emailSelected = async () => {
     if (!selected) return
-    setBusy(true)
+    setBusyAction('email')
     setActionMsg(null)
     try {
       await stockPickerCashApi.emailClientStatement(selected.id, {})
@@ -256,60 +325,102 @@ export default function StatementsPage() {
     } catch (e) {
       setActionMsg(opsErrorMessage(e, 'Email failed'))
     } finally {
-      setBusy(false)
+      setBusyAction(null)
     }
   }
 
   const downloadSelected = async () => {
     if (!selected) return
-    setBusy(true)
+    setBusyAction('download')
     setActionMsg(null)
     try {
       const result = await stockPickerCashApi.downloadClientStatement(selected.id, { acceptPdf: true })
+
+      const defaultFileName =
+        selected.period && selected.period !== '—'
+          ? `statement-${selected.period.replace(/\s+/g, '-')}.pdf`
+          : `statement-${selected.id}.pdf`
 
       const triggerBlobDownload = (blob: Blob, fileName?: string) => {
         const url = URL.createObjectURL(blob)
         const a = document.createElement('a')
         a.href = url
-        a.download = fileName ?? `statement-${selected.id}.pdf`
+        a.download = fileName ?? defaultFileName
         a.click()
         URL.revokeObjectURL(url)
         setActionMsg('Download started.')
       }
 
-      if (result instanceof Blob) {
-        triggerBlobDownload(result)
-        return
+      const decodeBase64Pdf = (raw: string, fileName?: string) => {
+        const cleaned = raw.replace(/^data:application\/pdf;base64,/i, '').replace(/\s+/g, '')
+        const binary = atob(cleaned)
+        const bytes = new Uint8Array(binary.length)
+        for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i)
+        // Guard against non-PDF payloads labeled as base64
+        const head = String.fromCharCode(...bytes.slice(0, 5))
+        if (!head.startsWith('%PDF')) {
+          setActionMsg('Download did not contain a valid PDF.')
+          return
+        }
+        triggerBlobDownload(new Blob([bytes], { type: 'application/pdf' }), fileName ?? defaultFileName)
       }
 
-      const envelope = result as {
+      const handleJsonPayload = (parsed: {
         success?: boolean
         data?: { contentBase64?: string; downloadUrl?: string | null; fileName?: string }
         contentBase64?: string
         downloadUrl?: string | null
         fileName?: string
+        message?: string
+      }) => {
+        if (parsed.success === false) {
+          setActionMsg(parsed.message || 'Download failed')
+          return
+        }
+        const payload = parsed.data ?? parsed
+        if (payload.contentBase64) {
+          decodeBase64Pdf(String(payload.contentBase64), payload.fileName)
+          return
+        }
+        if (payload.downloadUrl) {
+          window.open(String(payload.downloadUrl), '_blank', 'noopener,noreferrer')
+          setActionMsg('Download link opened.')
+          return
+        }
+        setActionMsg('Download response did not include a file or URL.')
       }
-      const payload = envelope.data ?? envelope
-      const base64 = payload.contentBase64
-      if (base64) {
-        const binary = atob(base64)
-        const bytes = new Uint8Array(binary.length)
-        for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i)
-        triggerBlobDownload(new Blob([bytes], { type: 'application/pdf' }), payload.fileName)
+
+      if (result instanceof Blob) {
+        const buf = await result.arrayBuffer()
+        const bytes = new Uint8Array(buf)
+        const head = String.fromCharCode(...bytes.slice(0, 5))
+        const type = (result.type || '').toLowerCase()
+        if (head.startsWith('%PDF') || type.includes('pdf')) {
+          triggerBlobDownload(new Blob([buf], { type: 'application/pdf' }), defaultFileName)
+          return
+        }
+        // JSON (or mislabeled) envelope — common when Accept asks for pdf but BE returns base64 JSON
+        const text = new TextDecoder().decode(bytes)
+        try {
+          handleJsonPayload(JSON.parse(text))
+        } catch {
+          setActionMsg('Download returned unreadable content.')
+        }
         return
       }
 
-      const href = payload.downloadUrl ?? undefined
-      if (href) {
-        window.open(href, '_blank', 'noopener,noreferrer')
-        setActionMsg('Download link opened.')
-      } else {
-        setActionMsg('Download response did not include a file or URL.')
-      }
+      handleJsonPayload(result as {
+        success?: boolean
+        data?: { contentBase64?: string; downloadUrl?: string | null; fileName?: string }
+        contentBase64?: string
+        downloadUrl?: string | null
+        fileName?: string
+        message?: string
+      })
     } catch (e) {
       setActionMsg(opsErrorMessage(e, 'Download failed'))
     } finally {
-      setBusy(false)
+      setBusyAction(null)
     }
   }
 
@@ -365,29 +476,43 @@ export default function StatementsPage() {
           </div>
         ) : null}
 
-        {/* Filters */}
-        <section className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-[repeat(6,minmax(0,1fr))_auto] xl:items-end">
-          {filters.map((filter) => (
-            <label key={filter.label} className="block min-w-0">
-              <span className="mb-1.5 block text-[11px]" style={{ color: C.muted2 }}>
-                {filter.label}
-              </span>
-              <span
-                className="flex h-9 items-center justify-between gap-2 rounded-[8px] border px-3 text-[12px]"
-                style={{ background: C.control, borderColor: C.controlBorder, color: C.text }}
-              >
-                <span className="truncate">{filter.value}</span>
-                <ChevronDown className="h-3.5 w-3.5 shrink-0" style={{ color: C.muted2 }} />
-              </span>
-            </label>
-          ))}
+        <section className="grid grid-cols-2 gap-3 lg:grid-cols-4 xl:items-end">
+          <FilterField
+            label="Account"
+            value={accountFilter}
+            options={['All accounts', ...cashAccounts.map((a) => a.label)]}
+            onChange={(v) => {
+              setAccountFilter(v)
+              setPage(1)
+            }}
+          />
+          <FilterField
+            label="Currency"
+            value={currencyFilter}
+            options={['All', 'USD', 'ZWL', 'ZWG']}
+            onChange={(v) => {
+              setCurrencyFilter(v)
+              setPage(1)
+            }}
+          />
+          <FilterField
+            label="Status"
+            value={statusFilter}
+            options={['All', 'Draft', 'Pending Approval', 'Approved', 'Delivered']}
+            onChange={(v) => {
+              setStatusFilter(v)
+              setPage(1)
+            }}
+          />
           <button
             type="button"
-            className="h-9 justify-self-start text-[12px] font-medium xl:mb-0 xl:self-end"
+            className="h-9 justify-self-start text-[12px] font-medium"
             style={{ color: C.blueLink }}
             onClick={() => {
+              setAccountFilter('All accounts')
+              setCurrencyFilter('All')
+              setStatusFilter('All')
               setPage(1)
-              void loadList(1)
             }}
           >
             Reset
@@ -537,13 +662,14 @@ export default function StatementsPage() {
               </span>
             </div>
 
-            <div className="flex-1 overflow-x-auto">
+            <div className="relative flex-1 overflow-x-auto">
+              <RefetchOverlay active={isRefetching} rows={6} cols={6} />
               <table className="w-full min-w-[640px] text-left">
                 <thead>
                   <tr style={{ borderBottom: `1px solid ${C.rowBorder}` }}>
                     {(isInvestor
-                      ? ['Period', 'As At Date', 'Status', 'Investors', 'Generated By', 'Generated On']
-                      : ['Period', 'As At Date', 'Status', 'Clients', 'Generated By', 'Generated On']
+                      ? ['Period', 'As At Date', 'Account', 'Status', 'Investors', 'Generated By', 'Generated On']
+                      : ['Period', 'As At Date', 'Account', 'Status', 'Clients', 'Generated By', 'Generated On']
                     ).map((h) => (
                       <th key={h} className="px-3 py-3 text-[11px] font-medium" style={{ color: C.muted2 }}>
                         {h}
@@ -552,16 +678,16 @@ export default function StatementsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {loading ? (
+                  {loading && rows.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="p-0">
+                      <td colSpan={7} className="p-0">
                         <ReconTableSkeleton rows={6} cols={6} />
                       </td>
                     </tr>
                   ) : null}
                   {!loading && rows.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-3 py-10 text-center text-[12px]" style={{ color: C.muted2 }}>
+                      <td colSpan={7} className="px-3 py-10 text-center text-[12px]" style={{ color: C.muted2 }}>
                         {error
                           ? 'Unable to load statements.'
                           : isInvestor
@@ -586,6 +712,9 @@ export default function StatementsPage() {
                       </td>
                       <td className="px-3 py-3 text-[12px]" style={{ color: C.muted }}>
                         {row.asAt}
+                      </td>
+                      <td className="px-3 py-3 text-[12px]" style={{ color: C.muted }}>
+                        {row.account}
                       </td>
                       <td className="px-3 py-3">
                         <RunStatus status={row.status} />
@@ -654,49 +783,42 @@ export default function StatementsPage() {
             <div className="mb-4 flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                disabled={busy}
+                disabled={busyAction === 'generate'}
                 onClick={() => void generateBatch()}
                 className="inline-flex h-9 items-center gap-2 rounded-full px-4 text-[12px] font-semibold text-white disabled:opacity-50"
                 style={{ background: C.blue }}
               >
-                <FileStack className="h-3.5 w-3.5" />
-                Generate Batch
+                {busyAction === 'generate' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileStack className="h-3.5 w-3.5" />}
+                {busyAction === 'generate' ? 'Generating…' : 'Generate Batch'}
               </button>
               <OutlineBtn
                 icon={<Eye className="h-3.5 w-3.5" />}
                 label="Preview"
-                disabled={!selected || busy}
-                onClick={() => {
-                  if (previewHtml) setActionMsg('Preview loaded in panel below.')
-                  else setActionMsg(selected ? 'No preview HTML from API — showing cash summary.' : 'Select a statement.')
-                }}
+                loading={busyAction === 'preview'}
+                disabled={!selected || (busyAction !== null && busyAction !== 'preview')}
+                onClick={() => selected && void loadPreview(selected.id)}
               />
               <OutlineBtn
                 icon={<Check className="h-3.5 w-3.5" />}
                 label="Approve"
-                disabled={!selected || busy}
+                loading={busyAction === 'approve'}
+                disabled={!selected || (busyAction !== null && busyAction !== 'approve')}
                 onClick={() => void approveSelected()}
               />
               <OutlineBtn
                 icon={<Mail className="h-3.5 w-3.5" />}
                 label="Email"
-                disabled={!selected || busy}
+                loading={busyAction === 'email'}
+                disabled={!selected || (busyAction !== null && busyAction !== 'email')}
                 onClick={() => void emailSelected()}
               />
               <OutlineBtn
                 icon={<Download className="h-3.5 w-3.5" />}
                 label="Download PDF"
-                disabled={!selected || busy}
+                loading={busyAction === 'download'}
+                disabled={!selected || (busyAction !== null && busyAction !== 'download')}
                 onClick={() => void downloadSelected()}
               />
-              <button
-                type="button"
-                className="ml-auto inline-flex h-9 w-9 items-center justify-center rounded-full border"
-                style={{ borderColor: C.controlBorder, color: C.muted }}
-                aria-label="More actions"
-              >
-                <MoreVertical className="h-4 w-4" />
-              </button>
             </div>
 
             <div
@@ -761,7 +883,7 @@ export default function StatementsPage() {
                         Opening {formatMoneyDisplay(preview.openingCashRaw ?? preview.openingCash)} · Closing{' '}
                         {formatMoneyDisplay(preview.closingCashRaw ?? preview.closingCash)} {preview.currency}
                       </p>
-                      <p>Account: {preview.cashAccountId || '—'} · Type: {preview.statementType}</p>
+                      <p>Account: {resolveCashAccountLabel(preview.cashAccountId, cashAccounts)} · Type: {preview.statementType}</p>
                     </div>
                   ) : (
                     <>
@@ -771,10 +893,10 @@ export default function StatementsPage() {
                             Client / Account
                           </p>
                           <p className="mt-1.5 text-[12px] font-semibold" style={{ color: C.text }}>
-                            {preview.clientOrVehicleId || '—'}
+                            {preview.clientName !== '—' ? preview.clientName : displayLabel(preview.clientOrVehicleId, 'Client account')}
                           </p>
                           <p className="mt-1 text-[11px] leading-relaxed" style={{ color: C.muted2 }}>
-                            Account {preview.cashAccountId || '—'}
+                            Account {resolveCashAccountLabel(preview.cashAccountId, cashAccounts)}
                             <br />
                             Base currency {preview.currency}
                           </p>
@@ -868,6 +990,34 @@ export default function StatementsPage() {
   )
 }
 
+function FilterField({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string
+  value: string
+  options: string[]
+  onChange: (value: string) => void
+}) {
+  return (
+    <label className="block min-w-0">
+      <span className="mb-1.5 block text-[11px]" style={{ color: C.muted2 }}>{label}</span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="flex h-9 w-full items-center rounded-[8px] border px-3 text-[12px] outline-none"
+        style={{ background: C.control, borderColor: C.controlBorder, color: C.text }}
+      >
+        {options.map((option) => (
+          <option key={option} value={option}>{option}</option>
+        ))}
+      </select>
+    </label>
+  )
+}
+
 function Kpi({
   icon,
   iconBg,
@@ -909,12 +1059,14 @@ function OutlineBtn({
   chevron,
   onClick,
   disabled,
+  loading,
 }: {
   icon: ReactNode
   label: string
   chevron?: boolean
   onClick?: () => void
   disabled?: boolean
+  loading?: boolean
 }) {
   return (
     <button
@@ -924,28 +1076,33 @@ function OutlineBtn({
       className="inline-flex h-9 items-center gap-1.5 rounded-full border px-3 text-[12px] disabled:opacity-50"
       style={{ background: C.control, borderColor: C.controlBorder, color: C.text }}
     >
-      <span style={{ color: C.muted }}>{icon}</span>
+      <span style={{ color: C.muted }}>{loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : icon}</span>
       {label}
       {chevron && <ChevronDown className="h-3 w-3" style={{ color: C.muted2 }} />}
     </button>
   )
 }
 
-function RunStatus({ status }: { status: 'Ready for Release' | 'Released' }) {
-  if (status === 'Ready for Release') {
-    return (
-      <span
-        className="inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-medium"
-        style={{ background: 'rgba(16,185,129,0.15)', color: ReconAccent.greenSoft }}
-      >
-        Ready for Release
-      </span>
-    )
+type StatementRunStatus = 'Draft' | 'Pending Approval' | 'Approved' | 'Delivered' | 'Ready for Release' | 'Released'
+
+function RunStatus({ status }: { status: StatementRunStatus }) {
+  const styles: Record<StatementRunStatus, { bg: string; color: string; label: string }> = {
+    Draft: { bg: 'rgba(148,163,184,0.15)', color: '#94A3B8', label: 'Draft' },
+    'Pending Approval': { bg: 'rgba(245,158,11,0.15)', color: '#FBBF24', label: 'Pending Approval' },
+    Approved: { bg: 'rgba(59,130,246,0.15)', color: '#60A5FA', label: 'Approved' },
+    Delivered: { bg: 'rgba(16,185,129,0.15)', color: ReconAccent.greenSoft, label: 'Delivered' },
+    'Ready for Release': { bg: 'rgba(16,185,129,0.15)', color: ReconAccent.greenSoft, label: 'Ready for Release' },
+    Released: { bg: 'rgba(16,185,129,0.15)', color: ReconAccent.greenSoft, label: 'Released' },
   }
+  const tone = styles[status] ?? styles['Ready for Release']
+  const showCheck = status === 'Released' || status === 'Delivered' || status === 'Approved'
   return (
-    <span className="inline-flex items-center gap-1 text-[11px] font-medium" style={{ color: ReconAccent.greenSoft }}>
-      <CheckCircle2 className="h-3.5 w-3.5" />
-      Released
+    <span
+      className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-medium"
+      style={{ background: tone.bg, color: tone.color }}
+    >
+      {showCheck ? <CheckCircle2 className="h-3.5 w-3.5" /> : null}
+      {tone.label}
     </span>
   )
 }

@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Check, ChevronDown, RotateCcw, Search, X } from 'lucide-react'
 import { OpsPanelSkeleton, OpsTableSkeleton } from '@/components/investments-v2/loading-skeletons'
 import { useAppDispatch, useAppSelector } from '@/lib/store'
@@ -11,7 +12,9 @@ import {
   fetchPortfolios,
   reverseAccountingEvent,
 } from '@/lib/store/slices/investmentOpsSlice'
+import { ConfirmReasonDialog } from '@/components/investments-v2/ui/confirm-reason-dialog'
 import { formatMoneyDisplay, formatOpsError, investmentOpsApi, unwrapList, type AccountingEvent, type JournalEntry } from '@/lib/api/investment-ops-api'
+import { cn } from '@/lib/utils'
 
 const tabs = ['Accounting Events', 'Journals', 'Posting Statuses', 'Reversals', 'Ledger Exports']
 
@@ -79,7 +82,15 @@ function Badge({ value }: { value: string }) {
   return <span className={`rounded-full px-2 py-1 text-[9px] ${tone}`}>{formatStatus(value)}</span>
 }
 
-export default function AccountingPage() {
+function AccountingPageInner() {
+  const searchParams = useSearchParams()
+  const deepTab = searchParams.get('tab')
+  const deepTradeRef = searchParams.get('tradeRef')
+  const deepTradeId = searchParams.get('tradeId')
+  const deepFundId = searchParams.get('fundId')
+  const wantSelect = searchParams.get('select') === '1' || Boolean(deepTradeRef || deepTradeId)
+  const hasDeepLink = Boolean(deepTradeRef || deepTradeId || deepTab === 'events' || deepTab === 'journals')
+
   const dispatch = useAppDispatch()
   const {
     portfolios,
@@ -103,6 +114,7 @@ export default function AccountingPage() {
   const [reason, setReason] = useState('')
   const [journalPosting, setJournalPosting] = useState(false)
   const [journalLifecycleBusy, setJournalLifecycleBusy] = useState(false)
+  const [journalRejectOpen, setJournalRejectOpen] = useState(false)
   const [ledgerCreating, setLedgerCreating] = useState(false)
   const [exportFrom, setExportFrom] = useState(() => {
     const d = new Date()
@@ -123,11 +135,23 @@ export default function AccountingPage() {
   } | null>(null)
   const [postingStatusLoading, setPostingStatusLoading] = useState(false)
   const [postingStatusError, setPostingStatusError] = useState<string | null>(null)
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
+  const [deepLinkMsg, setDeepLinkMsg] = useState<string | null>(null)
+  const deepLinkApplied = useRef<string | null>(null)
+  const deepLinkFailed = useRef<string | null>(null)
+  const preferredJournalId = useRef<string | null>(null)
 
   const selectedFundId = useMemo(() => {
     if (portfolioFilter === 'All portfolios') return undefined
     return portfolios.find((p) => p.name === portfolioFilter)?.id
   }, [portfolioFilter, portfolios])
+
+  // Apply fund filter from blotter deep-link once portfolios are loaded
+  useEffect(() => {
+    if (!deepFundId || portfolios.length === 0) return
+    const fund = portfolios.find((p) => p.id === deepFundId)
+    if (fund) setPortfolioFilter(fund.name)
+  }, [deepFundId, portfolios])
 
   useEffect(() => {
     let cancelled = false
@@ -148,11 +172,104 @@ export default function AccountingPage() {
   }, [dispatch, selectedFundId])
 
   useEffect(() => {
+    // Don't steal focus when deep-linking a specific journal/trade
+    if (preferredJournalId.current || deepTradeRef || deepTradeId) return
     if (journalEntries[0] && !selectedJournalEntry) {
       dispatch(fetchJournalEntryDetail(journalEntries[0].id))
     }
-  }, [dispatch, journalEntries, selectedJournalEntry])
+  }, [dispatch, journalEntries, selectedJournalEntry, deepTradeRef, deepTradeId])
 
+  // Focus accounting event / journal from Blotter deep-link
+  useEffect(() => {
+    if (!hasDeepLink || accountingEventsLoading) return
+    const key = `${deepTab ?? ''}|${deepTradeRef ?? ''}|${deepTradeId ?? ''}|${deepFundId ?? ''}`
+    if (deepLinkApplied.current === key || deepLinkFailed.current === key) return
+
+    if (deepTab === 'journals' && !deepTradeRef && !deepTradeId) {
+      deepLinkApplied.current = key
+      setTab('Journals')
+      return
+    }
+
+    if (!deepTradeRef && !deepTradeId) {
+      if (deepTab === 'events') {
+        deepLinkApplied.current = key
+        setTab('Accounting Events')
+      }
+      return
+    }
+
+    if (accountingEvents.length === 0 && !accountingEventsLoading) {
+      const fundReady =
+        !deepFundId || portfolios.some((p) => p.id === deepFundId && p.name === portfolioFilter)
+      if (!fundReady) return
+      deepLinkFailed.current = key
+      setTab('Accounting Events')
+      setDeepLinkMsg(
+        `No accounting event found for trade ${deepTradeRef || deepTradeId}. It may still be posting.`,
+      )
+      return
+    }
+
+    const match =
+      accountingEvents.find(
+        (e) =>
+          (deepTradeRef &&
+            (e.tradeRef === deepTradeRef ||
+              e.tradeRef?.toLowerCase() === deepTradeRef.toLowerCase() ||
+              e.sourceId === deepTradeRef)) ||
+          (deepTradeId && (e.sourceId === deepTradeId || e.id === deepTradeId)),
+      ) ?? null
+
+    if (!match) {
+      const fundReady =
+        !deepFundId || portfolios.some((p) => p.id === deepFundId && p.name === portfolioFilter)
+      if (!fundReady || accountingEventsLoading) return
+      deepLinkFailed.current = key
+      setTab('Accounting Events')
+      if (deepTradeRef) setSearch(deepTradeRef)
+      setDeepLinkMsg(
+        `Could not find accounting event for ${deepTradeRef || deepTradeId}. Check portfolio filter or wait for settle/post.`,
+      )
+      return
+    }
+
+    deepLinkApplied.current = key
+    setSelectedEventId(match.id)
+    setStatus('All statuses')
+    if (wantSelect) {
+      setSearch(match.tradeRef || deepTradeRef || match.id)
+    }
+    if (match.journalEntryId && wantSelect) {
+      preferredJournalId.current = match.journalEntryId
+      dispatch(fetchJournalEntryDetail(match.journalEntryId))
+      setTab('Journals')
+      setDeepLinkMsg(
+        `Opened journal for ${match.tradeRef || match.id} (${match.eventType}). Switch to Accounting Events to see the event row.`,
+      )
+    } else {
+      setTab('Accounting Events')
+      setDeepLinkMsg(`Focused accounting event for ${match.tradeRef || match.id} (${match.eventType}).`)
+    }
+  }, [
+    hasDeepLink,
+    accountingEventsLoading,
+    accountingEvents,
+    deepTab,
+    deepTradeRef,
+    deepTradeId,
+    deepFundId,
+    wantSelect,
+    dispatch,
+    portfolios,
+    portfolioFilter,
+  ])
+
+  useEffect(() => {
+    if (!selectedEventId || tab !== 'Accounting Events') return
+    const el = document.getElementById(selectedEventId)
+    el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }, [selectedEventId, tab])
   useEffect(() => {
     if (tab !== 'Reversals') return
     let cancelled = false
@@ -233,7 +350,7 @@ export default function AccountingPage() {
     }
   }, [tab, selectedFundId])
 
-  const fundName = (id: string) => portfolios.find((p) => p.id === id)?.name ?? id
+  const fundName = (id: string) => portfolios.find((p) => p.id === id)?.name ?? '—'
 
   const statusOptions = useMemo(() => {
     const fromApi = Array.from(new Set(accountingEvents.map((e) => e.status).filter(Boolean)))
@@ -244,7 +361,7 @@ export default function AccountingPage() {
     return accountingEvents.filter((e) => {
       if (status !== 'All statuses' && e.status !== status) return false
       if (!search) return true
-      const hay = `${e.id} ${e.tradeRef} ${e.eventType} ${e.sourceType}`.toLowerCase()
+      const hay = `${e.id} ${e.tradeRef} ${e.sourceId} ${e.eventType} ${e.sourceType}`.toLowerCase()
       return hay.includes(search.toLowerCase())
     })
   }, [accountingEvents, search, status])
@@ -280,7 +397,7 @@ export default function AccountingPage() {
   const journalVersion = (j: JournalEntry) =>
     Number((j as JournalEntry & { version?: number; auditVersion?: number }).version ?? (j as JournalEntry & { auditVersion?: number }).auditVersion ?? j.auditTrailSequenceNumber ?? 0) || undefined
 
-  const runJournalLifecycle = async (action: 'submit' | 'approve' | 'reject' | 'post') => {
+  const runJournalLifecycle = async (action: 'submit' | 'approve' | 'reject' | 'post', rejectReason?: string) => {
     if (!journal) return
     setActionError(null)
     setJournalLifecycleBusy(true)
@@ -290,9 +407,8 @@ export default function AccountingPage() {
       if (action === 'submit') res = await investmentOpsApi.submitJournal(journal.id, { expectedVersion })
       else if (action === 'approve') res = await investmentOpsApi.approveJournal(journal.id, { expectedVersion })
       else if (action === 'reject') {
-        const reason = window.prompt('Reject reason (required):')
-        if (!reason?.trim()) return
-        res = await investmentOpsApi.rejectJournal(journal.id, { reason: reason.trim(), expectedVersion })
+        if (!rejectReason?.trim()) return
+        res = await investmentOpsApi.rejectJournal(journal.id, { reason: rejectReason.trim(), expectedVersion })
       } else {
         res = await investmentOpsApi.postJournal(journal.id, { expectedVersion })
       }
@@ -418,6 +534,14 @@ export default function AccountingPage() {
 
         {loadError && <div className="rounded-2xl border border-rose-400/20 bg-rose-400/[.08] px-4 py-3 text-[11px] text-rose-200">{loadError}</div>}
         {actionError && <div className="rounded-2xl border border-rose-400/20 bg-rose-400/[.08] px-4 py-3 text-[11px] text-rose-200">{actionError}</div>}
+        {deepLinkMsg && (
+          <div className="rounded-2xl border border-blue-500/30 bg-blue-500/10 px-4 py-2 text-[12px] text-blue-100">
+            {deepLinkMsg}
+            <button type="button" className="ml-3 rounded-full border border-white/10 px-3 py-1 text-[10px]" onClick={() => setDeepLinkMsg(null)}>
+              Dismiss
+            </button>
+          </div>
+        )}
 
         {tab === 'Accounting Events' && (
           <Card title="Accounting event register" subtitle="Trade Settlement · Dividend · Coupon Accrual · Fee · FX Revaluation · Corporate Action">
@@ -437,25 +561,39 @@ export default function AccountingPage() {
               headers={['Event ID', 'Event type', 'Portfolio', 'Reference', 'Event date', 'Amount', 'Journal', 'Status', '']}
               loading={accountingEventsLoading}
               empty="No accounting events returned by the API."
-              rows={filtered.map((e) => [
-                e.id,
-                e.eventType,
-                fundName(e.fundId),
-                e.tradeRef || e.sourceId || '—',
-                formatDate(e.postedAt || e.createdAt),
-                money(e.amount, e.currencyCode),
-                e.journalEntryId || '—',
-                <Badge key="s" value={e.status} />,
-                <button
-                  key="r"
-                  type="button"
-                  disabled={e.status?.toUpperCase() === 'REVERSED' || !!accountingEventActionLoadingById[e.id]}
-                  onClick={() => setReverseEvent(e)}
-                  className="rounded-full border border-white/10 px-3 py-1.5 text-[9px] hover:bg-white/10 disabled:opacity-40"
-                >
-                  {e.status?.toUpperCase() === 'REVERSED' ? 'Reversed' : accountingEventActionLoadingById[e.id] ? '…' : 'Reverse'}
-                </button>,
-              ])}
+              rows={filtered.map((e) => ({
+                key: e.id,
+                selected: selectedEventId === e.id,
+                cells: [
+                  `${e.eventType} · ${formatDate(e.postedAt || e.createdAt)}`,
+                  e.eventType,
+                  fundName(e.fundId),
+                  e.tradeRef || e.sourceId || '—',
+                  formatDate(e.postedAt || e.createdAt),
+                  money(e.amount, e.currencyCode),
+                  e.journalEntryId ? 'Linked journal' : '—',
+                  <Badge key="s" value={e.status} />,
+                  <button
+                    key="r"
+                    type="button"
+                    disabled={e.status?.toUpperCase() === 'REVERSED' || !!accountingEventActionLoadingById[e.id]}
+                    onClick={(ev) => {
+                      ev.stopPropagation()
+                      setReverseEvent(e)
+                    }}
+                    className="rounded-full border border-white/10 px-3 py-1.5 text-[9px] hover:bg-white/10 disabled:opacity-40"
+                  >
+                    {e.status?.toUpperCase() === 'REVERSED' ? 'Reversed' : accountingEventActionLoadingById[e.id] ? '…' : 'Reverse'}
+                  </button>,
+                ],
+                onClick: () => {
+                  setSelectedEventId(e.id)
+                  if (e.journalEntryId) {
+                    preferredJournalId.current = e.journalEntryId
+                    dispatch(fetchJournalEntryDetail(e.journalEntryId))
+                  }
+                },
+              }))}
             />
           </Card>
         )}
@@ -467,16 +605,21 @@ export default function AccountingPage() {
                 headers={['Journal', 'Reference', 'Description', 'Currency', 'Total', 'Status']}
                 loading={journalEntriesLoading}
                 empty="No journal entries returned by the API."
-                rows={journalEntries.map((j) => [
-                  <button key="j" type="button" onClick={() => selectJournal(j.id)} className="font-mono text-[#68a9ff]">
-                    {j.id}
-                  </button>,
-                  j.referenceNumber || '—',
-                  j.description || '—',
-                  j.currency?.code || '—',
-                  money(j.totalAmount, j.currency?.code || 'USD'),
-                  <Badge key="s" value={j.status} />,
-                ])}
+                rows={journalEntries.map((j) => ({
+                  key: j.id,
+                  selected: selectedJournalEntry?.id === j.id,
+                  onClick: () => selectJournal(j.id),
+                  cells: [
+                    <span key="j" className="text-[#68a9ff]">
+                      {j.referenceNumber || j.description || 'Journal entry'}
+                    </span>,
+                    j.referenceNumber || '—',
+                    j.description || '—',
+                    j.currency?.code || '—',
+                    money(j.totalAmount, j.currency?.code || 'USD'),
+                    <Badge key="s" value={j.status} />,
+                  ],
+                }))}
               />
             </Card>
             <section className="rounded-[24px] border border-white/[.04] bg-[linear-gradient(145deg,#142030,#0d1623)] p-5">
@@ -488,7 +631,7 @@ export default function AccountingPage() {
                 <>
                   <div className="flex items-start justify-between">
                     <div>
-                      <p className="font-mono text-[10px] text-[#68a9ff]">{journal.id}</p>
+                      <p className="text-[10px] text-[#8290a4]">{journal.referenceNumber || 'Journal entry'}</p>
                       <h2 className="mt-1 text-[12px] font-semibold">{journal.description || 'Journal entry'}</h2>
                     </div>
                     <Badge value={lines.length === 0 ? journal.status : isBalanced ? 'Balanced' : 'Out of balance'} />
@@ -572,7 +715,7 @@ export default function AccountingPage() {
                         <button
                           type="button"
                           disabled={journalLifecycleBusy}
-                          onClick={() => void runJournalLifecycle('reject')}
+                          onClick={() => setJournalRejectOpen(true)}
                           className="h-10 w-full rounded-full border border-rose-400/30 text-[10px] font-semibold text-rose-300 disabled:opacity-50"
                         >
                           Reject journal
@@ -709,8 +852,9 @@ export default function AccountingPage() {
               empty="No ledger exports returned by the API."
               rows={ledgerExports.map((row) => {
                 const id = cellValue(row, ['id'])
+                const exportLabel = cellValue(row, ['exportBatchRef', 'reference', 'batchRef']) || 'Ledger export'
                 return [
-                  id,
+                  exportLabel,
                   fundName(cellValue(row, ['fundId'])),
                   cellValue(row, ['exportBatchRef', 'reference']),
                   <Badge key="s" value={cellValue(row, ['status'])} />,
@@ -731,13 +875,13 @@ export default function AccountingPage() {
       </div>
 
       {reverseEvent && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onMouseDown={() => setReverseEvent(null)}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onMouseDown={() => setReverseEvent(null)}>
           <div onMouseDown={(e) => e.stopPropagation()} className="w-full max-w-lg rounded-[24px] border border-white/10 bg-[#111a28]">
             <div className="flex items-center justify-between border-b border-white/[.07] p-5">
               <div>
                 <h2 className="text-sm font-semibold">Reverse accounting event</h2>
-                <p className="mt-1 font-mono text-[10px] text-[#7890ad]">
-                  {reverseEvent.id} · {reverseEvent.eventType}
+                <p className="mt-1 text-[10px] text-[#7890ad]">
+                  {reverseEvent.eventType} · {reverseEvent.tradeRef || formatDate(reverseEvent.postedAt || reverseEvent.createdAt)}
                 </p>
               </div>
               <button type="button" onClick={() => setReverseEvent(null)} className="rounded-full p-2 hover:bg-white/10">
@@ -775,7 +919,31 @@ export default function AccountingPage() {
           </div>
         </div>
       )}
+
+      <ConfirmReasonDialog
+        open={journalRejectOpen}
+        onOpenChange={setJournalRejectOpen}
+        title="Reject journal"
+        description={journal ? `Reject journal ${journal.journalRef ?? journal.id}?` : ''}
+        reasonLabel="Rejection reason"
+        confirmLabel="Reject journal"
+        onConfirm={(r) => void runJournalLifecycle('reject', r)}
+      />
     </main>
+  )
+}
+
+export default function AccountingPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-[#070b12] p-6 text-white">
+          <OpsPanelSkeleton />
+        </main>
+      }
+    >
+      <AccountingPageInner />
+    </Suspense>
   )
 }
 
@@ -802,10 +970,24 @@ function Table({
   empty,
 }: {
   headers: string[]
-  rows: React.ReactNode[][]
+  rows:
+    | React.ReactNode[][]
+    | Array<{
+        key: string
+        cells: React.ReactNode[]
+        selected?: boolean
+        onClick?: () => void
+      }>
   loading?: boolean
   empty?: string
 }) {
+  const normalized = rows.map((row, i) => {
+    if (Array.isArray(row)) {
+      return { key: String(i), cells: row, selected: false, onClick: undefined as (() => void) | undefined }
+    }
+    return row
+  })
+
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[820px] text-left text-[10px]">
@@ -825,16 +1007,25 @@ function Table({
                 <OpsTableSkeleton rows={6} cols={headers.length} />
               </td>
             </tr>
-          ) : rows.length === 0 ? (
+          ) : normalized.length === 0 ? (
             <tr>
               <td colSpan={headers.length} className="px-4 py-10 text-center text-[#8290a4]">
                 {empty || 'No rows.'}
               </td>
             </tr>
           ) : (
-            rows.map((row, i) => (
-              <tr key={i} className="transition hover:bg-white/[.035]">
-                {row.map((cell, j) => (
+            normalized.map((row) => (
+              <tr
+                key={row.key}
+                id={row.key}
+                className={cn(
+                  'transition hover:bg-white/[.035]',
+                  row.onClick && 'cursor-pointer',
+                  row.selected && 'bg-blue-500/10 ring-1 ring-inset ring-blue-400/30',
+                )}
+                onClick={row.onClick}
+              >
+                {row.cells.map((cell, j) => (
                   <td key={j} className="px-4 py-3 text-[#c5cfdb] first:font-mono first:text-[#68a9ff]">
                     {cell}
                   </td>

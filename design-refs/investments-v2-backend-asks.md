@@ -202,3 +202,20 @@ FE adapts API DTOs into designed Investments V2 + cash recon UIs. Do not invent 
 - `lib/api/stock-picker-cash-api.ts`
 - `lib/investments-v2/adapters/cash-recon-adapter.ts`
 - `app/investments-v2/reconciliation/**`
+
+---
+
+## UX polish — BE enrichment asks (2026-07-20) — **CLOSED**
+
+All six items shipped by BE and consumed on FE. See **[`investments-v2-module-completion.md`](./investments-v2-module-completion.md)** § UX polish enrichments.
+
+| # | Surface | Status | FE consumer |
+|---|---------|--------|-------------|
+| 1 | Nested `instrument` on holdings/positions | **FE closed** | `mapHoldingsToPositions`, `mapValuedPositionsPayload`, `mapTradingPositions` |
+| 2 | `createdByName` on instruments | **FE closed** | `mapInstrumentRow` → `displayPersonName` |
+| 3 | Overview income KPIs | **FE closed** | `mapOverviewMetrics` |
+| 4 | Exposure `bySector`, `byCountry` | **FE closed** | `app/investments-v2/portfolios/page.tsx` |
+| 5 | Price queue `reviewable` | **FE closed** | `mapPriceTick` + prices page gating |
+| 6 | Import `canSubmit` on GET | **FE closed** | `fund-cash/page.tsx` before submit |
+
+**Verify:** `npm run uat:investments-v2:ux-polish` (DEV `nts`)

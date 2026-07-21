@@ -5,6 +5,20 @@ import type { OpsFund, PortfolioOverview, PortfolioTransaction } from '@/lib/api
 
 export type FundTab = { id: string; name: string }
 
+function looksLikeDbId(value: string): boolean {
+  const s = value.trim()
+  if (!s) return false
+  return /^c[a-z0-9]{10,}$/i.test(s) || /^[0-9a-f-]{36}$/i.test(s) || /^cm[a-z0-9]{10,}$/i.test(s)
+}
+
+function displayPersonName(...candidates: unknown[]): string {
+  for (const raw of candidates) {
+    const s = String(raw ?? '').trim()
+    if (s && !looksLikeDbId(s)) return s
+  }
+  return '—'
+}
+
 export function mapFundTabs(raw: unknown): FundTab[] {
   const list = Array.isArray(raw)
     ? raw
@@ -92,6 +106,36 @@ export type OverviewMetrics = {
   positions: number
   valueDate: string
   hasNav: boolean
+  interest: string
+  dividend: string
+  margin: string
+}
+
+function overviewMoneyField(overview: PortfolioOverview | null, keys: string[]): string {
+  if (!overview) return '—'
+  for (const key of keys) {
+    const raw = overview[key]
+    if (raw != null && raw !== '' && Number.isFinite(Number(raw))) {
+      return formatMoneyDisplay(raw)
+    }
+  }
+  return '—'
+}
+
+export function mapExposureSlices(
+  items: Array<{ key: string; pct: number }> | undefined,
+  colors: string[],
+): Array<{ label: string; value: number; color: string; visual?: number }> {
+  if (!items?.length) return []
+  return items.map((item, i) => {
+    const pct = Number(item.pct) || 0
+    return {
+      label: item.key,
+      value: Math.round(pct),
+      visual: Math.max(pct, 1),
+      color: colors[i % colors.length],
+    }
+  })
 }
 
 export function mapOverviewMetrics(
@@ -135,11 +179,15 @@ export function mapOverviewMetrics(
     positions: holdings.length,
     valueDate: formatShortDate(overview?.valuationDate),
     hasNav: hasNav,
+    interest: overviewMoneyField(overview, ['interestIncome', 'interest', 'accruedInterest']),
+    dividend: overviewMoneyField(overview, ['dividendIncome', 'dividend', 'dividends']),
+    margin: overviewMoneyField(overview, ['marginUsed', 'marginBalance', 'margin', 'marginExposure']),
   }
 }
 
 export type PositionRow = {
   id: string
+  instrumentId?: string
   portfolioId: string
   portfolio: string
   ticker: string
@@ -156,6 +204,38 @@ export type PositionRow = {
   date: string
 }
 
+export function enrichPositionsWithInstruments(
+  rows: PositionRow[],
+  instruments: Array<{ id: string; name: string; symbol: string }>,
+): PositionRow[] {
+  if (!instruments.length) return rows
+  const byId = new Map(instruments.map((i) => [i.id, i]))
+  const bySymbol = new Map(instruments.map((i) => [i.symbol.toUpperCase(), i]))
+  return rows.map((row) => {
+    const match =
+      (row.instrumentId ? byId.get(row.instrumentId) : undefined) ??
+      byId.get(row.ticker) ??
+      bySymbol.get(row.ticker.toUpperCase())
+    if (!match) return row
+    const displayName = match.name || match.symbol
+    const looksLikeId =
+      !row.name ||
+      row.name === '—' ||
+      row.name === row.ticker ||
+      row.name === row.instrumentId ||
+      row.name === row.id
+    if (looksLikeId) {
+      return {
+        ...row,
+        name: displayName,
+        ticker: match.symbol || row.ticker,
+        instrumentId: row.instrumentId ?? match.id,
+      }
+    }
+    return row
+  })
+}
+
 export function mapHoldingsToPositions(
   holdings: Holding[],
   fund: FundTab,
@@ -166,13 +246,14 @@ export function mapHoldingsToPositions(
   const denom = totalNav != null && totalNav > 0 ? totalNav : sum
 
   return holdings.map((h, idx) => {
-    const sec = h.security as Security | undefined
+    const sec = (h.instrument ?? h.security) as Security | undefined
     const value = values[idx] ?? 0
     const cost = h.wac
     const price = h.currentPrice ?? h.wac
     const pnl = h.unrealizedPnl ?? (price - cost) * h.quantity
     return {
       id: h.id,
+      instrumentId: h.securityId || sec?.id,
       portfolioId: fund.id,
       portfolio: fund.name,
       ticker: sec?.symbol ?? h.securityId ?? '—',
@@ -187,6 +268,17 @@ export function mapHoldingsToPositions(
       pnl: Number(pnl) || 0,
       weight: denom > 0 ? (value / denom) * 100 : 0,
       date: formatShortDate(h.lastValuationAt ?? h.updatedAt ?? h.createdAt),
+    }
+  })
+}
+
+export function mapInstrumentsLookup(raw: unknown[]): Array<{ id: string; name: string; symbol: string }> {
+  return raw.map((item) => {
+    const row = item as Record<string, unknown>
+    return {
+      id: String(row.id ?? ''),
+      name: String(row.fullName ?? row.shortName ?? row.ticker ?? '—'),
+      symbol: String(row.ticker ?? row.instrumentCode ?? '—'),
     }
   })
 }
@@ -232,12 +324,19 @@ export function mapValuedPositionsPayload(
         : 0
     const cost = Number(row.averageCost ?? row.wac ?? row.cost ?? 0)
     const pnl = Number(row.unrealizedPnl ?? row.unrealizedPnlBase ?? value - cost * (Number.isFinite(qty) ? qty : 0))
+    const instrumentId = String(row.instrumentId ?? row.securityId ?? '')
     const ticker = String(
-      instrument.symbol ?? instrument.ticker ?? row.symbol ?? row.instrumentId ?? row.securityId ?? '—',
+      instrument.symbol ?? instrument.ticker ?? row.symbol ?? (instrumentId || '—'),
     )
-    const name = String(instrument.name ?? instrument.shortName ?? instrument.fullName ?? ticker)
+    const name = String(
+      instrument.name ??
+        instrument.shortName ??
+        instrument.fullName ??
+        (instrumentId ? instrumentId : ticker),
+    )
     return {
       id: String(row.id ?? `pos-${index}`),
+      instrumentId: instrumentId || undefined,
       portfolioId: fund.id,
       portfolio: fund.name,
       ticker,
@@ -396,17 +495,36 @@ function formatInstrumentStatus(status: string): string {
   }
 }
 
+function formatInstrumentIdentifiers(raw: Record<string, unknown>): { primary: string; secondary: string } {
+  const isin = String(raw.isin ?? '').trim()
+  const bloomberg = String(raw.bloombergCode ?? '').trim()
+  const reuters = String(raw.reutersCode ?? '').trim()
+  const internal = String(raw.internalRef ?? '').trim()
+  const primary = isin && isin !== '—' ? isin : bloomberg || reuters || internal || '—'
+  const secondary =
+    bloomberg && primary !== bloomberg
+      ? `BBG ${bloomberg}`
+      : reuters && primary !== reuters
+        ? `RIC ${reuters}`
+        : internal && primary !== internal
+          ? internal
+          : ''
+  return { primary, secondary }
+}
+
 export function mapInstrumentRow(raw: Record<string, unknown>): InstrumentRow {
   const typeCode = String(raw.instrumentTypeCode ?? raw.type ?? '—')
   const status = String(raw.status ?? '—')
   const restriction = String(raw.complianceRestriction ?? 'None')
   const auditVersionRaw = raw.auditVersion ?? raw.version ?? raw.expectedVersion
+  const ids = formatInstrumentIdentifiers(raw)
+  const createdBy = displayPersonName(raw.createdByName, raw.createdBy, raw.createdById)
   return {
     id: String(raw.id ?? ''),
     symbol: String(raw.ticker ?? raw.instrumentCode ?? '—'),
     name: String(raw.fullName ?? raw.shortName ?? raw.ticker ?? '—'),
-    isin: String(raw.isin ?? '—'),
-    sedol: String(raw.bloombergCode ?? raw.reutersCode ?? '—'),
+    isin: ids.primary,
+    sedol: ids.secondary || '—',
     type: typeCode.replace(/_/g, ' '),
     category: String(raw.subCategory ?? typeCode),
     sector: String(raw.sector ?? '—'),
@@ -424,7 +542,7 @@ export function mapInstrumentRow(raw: Record<string, unknown>): InstrumentRow {
     issuer: String(raw.issuerName ?? '—'),
     country: String(raw.countryCode ?? '—'),
     source: String(raw.pricingSource ?? '—'),
-    createdBy: String(raw.createdById ?? '—'),
+    createdBy,
     updated: formatDateTime(String(raw.updatedAt ?? raw.createdAt ?? '')),
     coupon: raw.couponRate != null ? Number(raw.couponRate) : undefined,
     maturity: raw.maturityDate ? formatShortDate(String(raw.maturityDate)) : undefined,
@@ -497,7 +615,13 @@ export function mapLatestPriceRow(raw: Record<string, unknown>, index: number): 
   if (!Number.isFinite(price)) return null
 
   const apiId = String(tick.id ?? raw.id ?? '').trim()
-  const canReview = Boolean(apiId)
+  const validationStatus = String(tick.validationStatus ?? tick.validation_status ?? '').toUpperCase()
+  const reviewableFlag = tick.reviewable ?? tick.isReviewable
+  const canReview =
+    Boolean(apiId) &&
+    (reviewableFlag === true ||
+      (reviewableFlag !== false &&
+        ['PENDING', 'PENDING_REVIEW', 'VALIDATED'].includes(validationStatus)))
   const versionRaw = tick.version ?? tick.auditVersion ?? raw.version ?? raw.auditVersion
   const prevRaw = tick.previousClose ?? tick.previous_close
   const previous = prevRaw != null && prevRaw !== '' ? Number(prevRaw) : null
@@ -521,7 +645,7 @@ export function mapLatestPriceRow(raw: Record<string, unknown>, index: number): 
     priceDate: classifyPriceDate(pricedAt),
     canReview,
     auditVersion: Number.isFinite(Number(versionRaw)) ? Number(versionRaw) : 1,
-    issue: status === 'Stale' ? 'Stale price' : status === 'Pending' ? 'Four-eye review' : undefined,
+    issue: status === 'Stale' ? 'Stale price' : status === 'Pending' ? 'Pending approval' : undefined,
     flag:
       deviation != null && Number.isFinite(deviation) && Math.abs(deviation) >= 5
         ? `${deviation.toFixed(2)}% movement exceeds tolerance.`

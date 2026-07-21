@@ -3,6 +3,9 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, ChevronDown, ChevronLeft, ChevronRight, FileUp, Loader2, Plus, Search, ShieldAlert, X } from 'lucide-react'
 import { OpsKpiSkeleton, OpsListSkeleton, OpsTableSkeleton } from '@/components/investments-v2/loading-skeletons'
+import { ConfirmDialog } from '@/components/investments-v2/ui/confirm-dialog'
+import { ConfirmReasonDialog } from '@/components/investments-v2/ui/confirm-reason-dialog'
+import { TablePagination } from '@/components/investments-v2/ui/table-pagination'
 import {
   formatOpsError,
   investmentOpsApi,
@@ -70,6 +73,8 @@ export default function PricesPage() {
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [uploadSourceCode, setUploadSourceCode] = useState('MANUAL')
   const [reviewActionId, setReviewActionId] = useState<string | null>(null)
+  const [approveTarget, setApproveTarget] = useState<PriceRow | null>(null)
+  const [rejectTarget, setRejectTarget] = useState<PriceRow | null>(null)
   const uploadInputRef = useRef<HTMLInputElement>(null)
 
   const loadData = useCallback(async () => {
@@ -175,13 +180,11 @@ export default function PricesPage() {
     }
   }
 
-  const handleReject = async (row: PriceRow) => {
+  const handleReject = async (row: PriceRow, reason: string) => {
     if (!row.canReview) {
-      flash('Cannot reject — queue row missing API tick id', true)
+      flash('This price tick cannot be reviewed', true)
       return
     }
-    const reason = window.prompt('Rejection reason (required):')
-    if (!reason?.trim()) return
     setReviewActionId(row.id)
     try {
       const res = await investmentOpsApi.rejectValidationTick(row.id, {
@@ -189,12 +192,13 @@ export default function PricesPage() {
         expectedVersion: row.auditVersion,
       })
       if (!res.success) throw new Error(formatOpsError(res, 'Failed to reject price'))
-      flash('Price rejected via API')
+      flash('Price rejected')
       await loadData()
     } catch (e) {
       flash(formatOpsError(e, 'Failed to reject price'), true)
     } finally {
       setReviewActionId(null)
+      setRejectTarget(null)
     }
   }
 
@@ -363,18 +367,22 @@ export default function PricesPage() {
 
           {view === 'ingest' ? (
             <div className="grid gap-4 p-4 lg:grid-cols-[1fr_1fr_1.25fr]">
-              <button type="button" onClick={() => setUploadOpen(true)} className="group min-h-44 rounded-full border border-dashed border-[#2f87fa]/35 bg-[#2f87fa]/[0.04] p-5 text-left transition hover:border-[#2f87fa]/60 hover:bg-[#2f87fa]/[0.08]">
+              <div className="rounded-[24px] border border-white/[0.07] bg-black/10 p-5">
                 <FileUp className="h-6 w-6 text-[#66a5fa]" />
-                <p className="mt-5 text-sm font-semibold">Upload market prices</p>
+                <p className="mt-4 text-sm font-semibold">Upload market prices</p>
                 <p className="mt-2 text-[10px] leading-5 text-[#7d8ca0]">Upload CSV price rows to the Investment Ops ingest pipeline.</p>
-                <span className="mt-4 inline-flex rounded-full bg-[#2f87fa]/15 px-3 py-1.5 text-[9px] text-[#8ebcff] group-hover:bg-[#2f87fa]/25">Choose file</span>
-              </button>
-              <button type="button" onClick={() => setManualOpen(true)} className="group min-h-44 rounded-full border border-white/[0.07] bg-black/10 p-5 text-left transition hover:border-[#2f87fa]/35 hover:bg-[#2f87fa]/[0.05]">
+                <button type="button" onClick={() => setUploadOpen(true)} className={`${pill} mt-4 border-[#2f87fa] bg-[#2f87fa] text-white`}>
+                  Upload prices
+                </button>
+              </div>
+              <div className="rounded-[24px] border border-white/[0.07] bg-black/10 p-5">
                 <Plus className="h-6 w-6 text-[#66a5fa]" />
-                <p className="mt-5 text-sm font-semibold">Enter a manual price</p>
-                <p className="mt-2 text-[10px] leading-5 text-[#7d8ca0]">Create a controlled override with mandatory independent review before approval.</p>
-                <span className="mt-4 inline-flex rounded-full bg-fuchsia-400/10 px-3 py-1.5 text-[9px] text-fuchsia-300 group-hover:bg-fuchsia-400/15">Create override</span>
-              </button>
+                <p className="mt-4 text-sm font-semibold">Enter a manual price</p>
+                <p className="mt-2 text-[10px] leading-5 text-[#7d8ca0]">Create a controlled override with mandatory review before approval.</p>
+                <button type="button" onClick={() => setManualOpen(true)} className={`${pill} mt-4 border-white/20 bg-white/[0.06] text-white`}>
+                  Manual entry
+                </button>
+              </div>
               <div className="rounded-[24px] border border-white/[0.07] bg-black/10 p-5">
                 <div className="flex items-center justify-between">
                   <div>
@@ -446,28 +454,27 @@ export default function PricesPage() {
                               <div>
                                 <p className="mb-1 text-[9px] font-semibold uppercase tracking-wider text-amber-300">{row.issue || 'Ready for approval'}</p>
                                 <p className="mb-2 flex items-start gap-1.5 text-[9px] text-amber-200/80"><ShieldAlert className="mt-0.5 h-3 w-3 shrink-0" />{row.flag || 'Validated and ready for approval.'}</p>
-                                {row.canReview ? (
-                                  <div className="flex gap-1.5">
-                                    <button
-                                      type="button"
-                                      disabled={reviewActionId === row.id}
-                                      onClick={() => void handleApprove(row)}
-                                      className={`${pill} h-7 border-emerald-400/30 px-3 text-emerald-300 disabled:opacity-50`}
-                                    >
-                                      {reviewActionId === row.id ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
-                                      Four-eye approve
-                                    </button>
-                                    <button
-                                      type="button"
-                                      disabled={reviewActionId === row.id}
-                                      onClick={() => void handleReject(row)}
-                                      className={`${pill} h-7 border-rose-400/30 px-3 text-rose-300 disabled:opacity-50`}
-                                    >
-                                      Reject
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <p className="text-[9px] text-rose-300">Missing API tick id — cannot approve/reject this row.</p>
+                                <div className="flex gap-1.5">
+                                  <button
+                                    type="button"
+                                    disabled={!row.canReview || reviewActionId === row.id}
+                                    onClick={() => setApproveTarget(row)}
+                                    className={`${pill} h-7 border-emerald-400/30 px-3 text-emerald-300 disabled:cursor-not-allowed disabled:opacity-40`}
+                                  >
+                                    {reviewActionId === row.id ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+                                    Approve
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={!row.canReview || reviewActionId === row.id}
+                                    onClick={() => setRejectTarget(row)}
+                                    className={`${pill} h-7 border-rose-400/30 px-3 text-rose-300 disabled:cursor-not-allowed disabled:opacity-40`}
+                                  >
+                                    Reject
+                                  </button>
+                                </div>
+                                {!row.canReview && (
+                                  <p className="mt-1 text-[9px] text-[#78879a]">Already reviewed or not eligible for approval.</p>
                                 )}
                               </div>
                             ) : (
@@ -490,14 +497,14 @@ export default function PricesPage() {
                   </tbody>
                 </table>
               </div>
-              <footer className="flex items-center justify-between px-4 py-3 text-[10px] text-[#718096]">
-                <span>Showing {rows.length} of {filtered.length} {view === 'queue' ? 'queue items' : 'prices'}</span>
-                <div className="flex items-center gap-2">
-                  <button type="button" disabled={page === 1} onClick={() => setPage((p) => p - 1)} className={`${pill} h-8 w-8 px-0 disabled:opacity-30`}><ChevronLeft className="h-3.5 w-3.5" /></button>
-                  <span>{page} / {totalPages}</span>
-                  <button type="button" disabled={page === totalPages} onClick={() => setPage((p) => p + 1)} className={`${pill} h-8 w-8 px-0 disabled:opacity-30`}><ChevronRight className="h-3.5 w-3.5" /></button>
-                </div>
-              </footer>
+              <TablePagination
+                page={page}
+                totalPages={totalPages}
+                onPageChange={setPage}
+                rowsShown={rows.length}
+                totalRows={filtered.length}
+                pageSize={6}
+              />
             </>
           )}
         </section>
@@ -512,7 +519,7 @@ export default function PricesPage() {
       )}
 
       {manualOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onMouseDown={() => setManualOpen(false)}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onMouseDown={() => setManualOpen(false)}>
           <form onSubmit={(e) => void addManual(e)} onMouseDown={(e) => e.stopPropagation()} className={`${card} w-full max-w-md p-6`}>
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold">Enter manual price</h2>
@@ -561,7 +568,7 @@ export default function PricesPage() {
       )}
 
       {uploadOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onMouseDown={() => setUploadOpen(false)}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onMouseDown={() => setUploadOpen(false)}>
           <div onMouseDown={(e) => e.stopPropagation()} className={`${card} w-full max-w-lg p-6`}>
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold">Upload price file</h2>
@@ -607,6 +614,30 @@ export default function PricesPage() {
           </div>
         </div>
       )}
+      <ConfirmDialog
+        open={!!approveTarget}
+        onOpenChange={(open) => !open && setApproveTarget(null)}
+        title="Approve price"
+        description={approveTarget ? `Approve ${approveTarget.ticker} at ${approveTarget.price.toFixed(4)}?` : ''}
+        confirmLabel="Approve"
+        destructive={false}
+        onConfirm={() => {
+          const row = approveTarget
+          setApproveTarget(null)
+          if (row) void handleApprove(row)
+        }}
+      />
+      <ConfirmReasonDialog
+        open={!!rejectTarget}
+        onOpenChange={(open) => !open && setRejectTarget(null)}
+        title="Reject price"
+        description={rejectTarget ? `Reject price for ${rejectTarget.ticker}?` : ''}
+        reasonLabel="Rejection reason"
+        confirmLabel="Reject price"
+        onConfirm={(reason) => {
+          if (rejectTarget) void handleReject(rejectTarget, reason)
+        }}
+      />
     </main>
   )
 }

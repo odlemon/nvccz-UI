@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { CalendarDays, Check, ChevronDown, MoreVertical, Plus } from 'lucide-react'
+import { CalendarDays, Check, ChevronDown, Loader2, MoreVertical, Plus } from 'lucide-react'
 import { OpsTableSkeleton } from '@/components/investments-v2/loading-skeletons'
 import { PlaceEquityOrderModal } from '@/components/investments-v2/place-equity-order-modal'
 import { investmentOpsApi } from '@/lib/api/investment-ops-api'
@@ -126,9 +126,10 @@ export default function TradingPage() {
   const [currency, setCurrency] = useState('No filter')
   const [industry, setIndustry] = useState('No filter')
   const [view, setView] = useState('Default View')
-  const [fromDate, setFromDate] = useState('From: —')
-  const [asOfDate, setAsOfDate] = useState('As of: —')
+  const [fromDate, setFromDate] = useState('')
+  const [asOfDate, setAsOfDate] = useState('')
   const [recalculated, setRecalculated] = useState(false)
+  const [recalculating, setRecalculating] = useState(false)
   const [selectedPosition, setSelectedPosition] = useState<string | null>(null)
   const [showOrder, setShowOrder] = useState(false)
 
@@ -170,8 +171,10 @@ export default function TradingPage() {
         if (overviewRes.success !== false && overviewRes.data) {
           const summary = mapPortfolioNavSummary(overviewRes.data)
           setNavSummary(summary)
-          setAsOfDate(summary.asOf !== '—' ? `As of: ${summary.asOf}` : 'As of: —')
-          setFromDate(overviewRes.data.startDate ? `From: ${overviewRes.data.startDate}` : 'From: —')
+          const asOfRaw = overviewRes.data.valuationDate ?? overviewRes.data.asOfDate
+          const fromRaw = overviewRes.data.startDate
+          setAsOfDate(asOfRaw ? String(asOfRaw).slice(0, 10) : '')
+          setFromDate(fromRaw ? String(fromRaw).slice(0, 10) : '')
         }
       } catch {
         /* overview optional */
@@ -209,18 +212,24 @@ export default function TradingPage() {
       if (currency !== 'No filter' && position.currency !== currency) return false
       if (industry !== 'No filter' && position.industry !== industry) return false
       if (instrumentType !== 'No filter' && position.type !== instrumentType) return false
+      const qtyNum = Number(position.quantity.replaceAll(',', ''))
+      const isClosed = Number.isFinite(qtyNum) && qtyNum === 0
+      if (closedPositions === 'Exclude' && isClosed) return false
+      if (closedPositions === 'Only closed' && !isClosed) return false
       if (quantity && !position.quantity.replaceAll(',', '').includes(quantity)) return false
       if (side === 'Short') {
-        const qty = Number(position.quantity.replaceAll(',', ''))
-        if (!(Number.isFinite(qty) && qty < 0)) return false
+        if (!(Number.isFinite(qtyNum) && qtyNum < 0)) return false
+      } else if (side === 'Long' && Number.isFinite(qtyNum) && qtyNum < 0) {
+        return false
       }
       return true
     })
-  }, [currency, industry, instrumentType, portfolio, quantitySearch, positions, side])
+  }, [closedPositions, currency, industry, instrumentType, portfolio, quantitySearch, positions, side])
 
   const recalculate = async () => {
     const fund = funds.find((f) => f.name === portfolio) || funds[0]
-    if (!fund) return
+    if (!fund || recalculating) return
+    setRecalculating(true)
     try {
       await investmentOpsApi.recalculatePortfolio(fund.id)
       setRecalculated(true)
@@ -228,6 +237,8 @@ export default function TradingPage() {
       window.setTimeout(() => setRecalculated(false), 1800)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Recalculate failed')
+    } finally {
+      setRecalculating(false)
     }
   }
 
@@ -271,11 +282,16 @@ export default function TradingPage() {
             </button>
             <button
               type="button"
+              disabled={recalculating}
               onClick={() => void recalculate()}
-              className="inline-flex h-8 min-w-[98px] items-center justify-center gap-1.5 rounded-full bg-white px-4 text-[11px] font-semibold text-[#111722] transition hover:bg-[#edf2f8]"
+              className="inline-flex h-8 min-w-[98px] items-center justify-center gap-1.5 rounded-full bg-white px-4 text-[11px] font-semibold text-[#111722] transition hover:bg-[#edf2f8] disabled:opacity-60"
             >
-              {recalculated && <Check className="h-3.5 w-3.5" />}
-              {recalculated ? 'Updated' : 'Recalculate'}
+              {recalculating ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : recalculated ? (
+                <Check className="h-3.5 w-3.5" />
+              ) : null}
+              {recalculating ? 'Recalculating…' : recalculated ? 'Updated' : 'Recalculate'}
             </button>
           </div>
         </header>
@@ -283,8 +299,28 @@ export default function TradingPage() {
         <div className="flex flex-wrap items-center justify-end gap-2 border-b border-[#2a3547] px-4 py-3 sm:px-5">
           <FilterDropdown label="Portfolio scope" value={portfolio === 'No filter' ? 'All Portfolios' : portfolio} options={['All Portfolios', ...funds.map((f) => f.name)]} onChange={(value) => setPortfolio(value === 'All Portfolios' ? 'All Portfolios' : value)} compact />
           <FilterDropdown label="View" value={view} options={['Default View', 'Exposure View', 'Cash View', 'Compact View']} onChange={setView} compact />
-          <FilterDropdown label="From date" value={fromDate} options={[fromDate]} onChange={setFromDate} compact />
-          <FilterDropdown label="As of date" value={asOfDate} options={[asOfDate, 'As of: Today']} onChange={setAsOfDate} compact />
+          <label className="inline-flex h-8 items-center gap-2 rounded-full border border-[#344054] bg-[#101927]/85 px-4 text-[10px] text-[#d4dbe5]">
+            <CalendarDays className="h-3 w-3 shrink-0 text-[#78879b]" />
+            <span className="text-[#78879b]">From</span>
+            <input
+              type="date"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+              className="w-[108px] bg-transparent text-[10px] outline-none"
+              aria-label="From date"
+            />
+          </label>
+          <label className="inline-flex h-8 items-center gap-2 rounded-full border border-[#344054] bg-[#101927]/85 px-4 text-[10px] text-[#d4dbe5]">
+            <CalendarDays className="h-3 w-3 shrink-0 text-[#78879b]" />
+            <span className="text-[#78879b]">As of</span>
+            <input
+              type="date"
+              value={asOfDate}
+              onChange={(e) => setAsOfDate(e.target.value)}
+              className="w-[108px] bg-transparent text-[10px] outline-none"
+              aria-label="As of date"
+            />
+          </label>
           <ActionMenu onAction={handleMenuAction} />
         </div>
 
@@ -340,7 +376,8 @@ export default function TradingPage() {
 
           <label className="block">
             <span className="mb-2 block text-[10.5px] text-[#c4ccd7]">Folder</span>
-            <FilterDropdown label="Folder" value={folder} options={['No filter', 'Core Holdings', 'Cash', 'Alternatives']} onChange={setFolder} />
+            <FilterDropdown label="Folder" value={folder} options={['No filter']} onChange={setFolder} />
+            <p className="mt-1 text-[9px] text-[#718095]">Folder tagging is configured under Portfolios → Folder setup.</p>
           </label>
 
           <label className="block">

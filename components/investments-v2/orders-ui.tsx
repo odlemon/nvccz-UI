@@ -139,9 +139,9 @@ export function Modal({ open, title, subtitle, onClose, children, footer, width 
   }, [open, onClose])
   if (!open) return null
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6">
-      <button aria-label="Close modal" className="absolute inset-0 bg-black/75 backdrop-blur-sm" onClick={onClose} />
-      <div className={cn('iv2-modal-surface relative max-h-[94vh] w-full overflow-hidden rounded-[28px] border border-white/10 bg-[#0b1322] shadow-2xl', width)}>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6">
+      <button aria-label="Close modal" className="absolute inset-0 bg-black/60 dark:bg-black/75" onClick={onClose} />
+      <div className={cn('iv2-modal-surface relative z-[1] max-h-[94vh] w-full overflow-hidden rounded-[28px] border border-white/10 bg-[#0b1322] shadow-2xl', width)}>
         <div className="flex items-center justify-between border-b border-white/[0.07] px-5 py-4">
           <div>
             <h2 className="text-sm font-semibold">{title}</h2>

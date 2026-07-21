@@ -1,0 +1,63 @@
+{
+  "layoutCode": "CBZ_CSV_V1",
+  "providerCode": "CBZ_CUSTODY",
+  "providerDisplayName": "CBZ Custody / CBZ Bank",
+  "status": "ACTIVE",
+  "format": "CSV",
+  "delimiter": ",",
+  "headerRow": true,
+  "encoding": "UTF-8",
+  "signMap": {
+    "Debit": "NEGATIVE",
+    "Credit": "POSITIVE"
+  },
+  "dateMap": {
+    "valueDate": "value_date",
+    "tradeDate": "trade_date"
+  },
+  "columnMap": {
+    "valueDate": "value_date",
+    "tradeDate": "trade_date",
+    "amount": "amount",
+    "debitCredit": "debit_credit",
+    "reference": "reference",
+    "counterparty": "counterparty",
+    "description": "description"
+  },
+  "optionalAlternateColumnMap": {
+    "note": "Only if BE also supports split debit/credit columns — see cbz-csv-v1-debit-credit-columns.csv",
+    "debitAmount": "debit_amount",
+    "creditAmount": "credit_amount"
+  },
+  "demoFiles": [
+    "cbz-csv-v1-happy-path.csv",
+    "cbz-csv-v1-breaks-demo.csv",
+    "cbz-csv-v1-validation-fail.csv",
+    "cbz-csv-v1-debit-credit-columns.csv"
+  ],
+  "sampleHeader": "value_date,trade_date,amount,debit_credit,reference,counterparty,description",
+  "sampleLines": [
+    "2026-07-01,2026-07-01,10000.00,Credit,OPEN-BAL-DEMO,CBZ Bank,Opening credit / funding",
+    "2026-07-03,2026-07-03,2450.00,Debit,TRD-BUY-EQ-001,CBZ Custody,Equity purchase settlement"
+  ],
+  "importApi": {
+    "create": "POST /api/investment-ops/external-statements/imports",
+    "bodyFields": [
+      "providerId",
+      "cashAccountId",
+      "currency",
+      "fileName",
+      "fileHash",
+      "layoutId",
+      "rawContent",
+      "controlOpening?",
+      "controlClosing?"
+    ]
+  },
+  "acceptance": [
+    "Happy-path CSV validates with zero blocking line errors against CBZ_CSV_V1",
+    "Validation-fail CSV returns lineNumber + stable error codes (not generic failure)",
+    "Same fileHash re-upload returns DUPLICATE_SOURCE / blocked",
+    "Unknown debit_credit values rejected via signMap (no silent default)"
+  ]
+}

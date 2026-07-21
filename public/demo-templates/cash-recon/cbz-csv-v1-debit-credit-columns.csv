@@ -1,0 +1,5 @@
+value_date,trade_date,debit_amount,credit_amount,reference,counterparty,description
+2026-07-01,2026-07-01,,10000.00,OPEN-BAL-DEMO,CBZ Bank,Opening credit (split debit/credit columns)
+2026-07-03,2026-07-03,2450.00,,TRD-BUY-EQ-001,CBZ Custody,Equity purchase settlement
+2026-07-08,2026-07-08,,5000.00,DEP-CLIENT-014,CBZ Bank,Client deposit
+2026-07-15,2026-07-15,,3200.00,DIV-XYZ-2026Q2,CBZ Custody,Dividend receipt

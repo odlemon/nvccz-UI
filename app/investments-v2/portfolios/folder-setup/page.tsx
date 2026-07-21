@@ -199,7 +199,7 @@ export default function FolderSetupPage() {
     <div className="flex h-full flex-col overflow-hidden bg-[#05090f]">
       <SetupHeader
         title="Portfolio Folder Setup"
-        description="Organise portfolio groups and navigation hierarchy per fund"
+        description="Organise how portfolios appear in the Investments sidebar — folders group funds and sub-portfolios into a navigation hierarchy."
         action={
           <div className="flex flex-wrap items-center gap-2">
             <SetupSelect
@@ -227,6 +227,9 @@ export default function FolderSetupPage() {
 
       <div className="grid flex-1 gap-4 overflow-y-auto p-3 lg:grid-cols-[320px_minmax(0,1fr)] sm:p-5">
         <SetupCard title="Hierarchy">
+          <p className="border-b border-white/[.06] px-4 py-3 text-[10px] leading-relaxed text-[#8290a4]">
+            Folders control the left-hand navigation tree under Portfolios. Use parent folders to group related books (e.g. core vs satellite) and reorder entries to match how dealers browse holdings day to day.
+          </p>
           <div className="p-3">
             <label className="mb-3 flex items-center gap-2 text-[10px] text-[#8b99ad]">
               <input type="checkbox" checked={includeArchived} onChange={(e) => setIncludeArchived(e.target.checked)} className="rounded" />

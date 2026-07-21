@@ -1,12 +1,14 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Check, ChevronDown, Folder } from 'lucide-react'
+import { Check, ChevronDown, Folder, Loader2 } from 'lucide-react'
 import { OpsPageSkeleton, OpsTableSkeleton } from '@/components/investments-v2/loading-skeletons'
 import { PageHeader } from '@/components/investments-v2/page-header'
+import { RefetchOverlay } from '@/components/investments-v2/ui/refetch-overlay'
 import { investmentOpsApi, unwrapList, type PortfolioOverview } from '@/lib/api/investment-ops-api'
 import type { Holding } from '@/lib/api/investments-api'
 import {
+  mapExposureSlices,
   mapFundTabs,
   mapHoldingToOrderRow,
   mapOverviewMetrics,
@@ -188,7 +190,9 @@ export default function PortfoliosPage() {
   const [activeCurrency, setActiveCurrency] = useState('')
   const [expanded, setExpanded] = useState(true)
   const [recalculated, setRecalculated] = useState(false)
+  const [recalculating, setRecalculating] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState('')
+  const [hasLoadedDetail, setHasLoadedDetail] = useState(false)
 
   const activeFund = funds.find((f) => f.id === activeFundId) ?? funds[0]
   const metrics = mapOverviewMetrics(overview, holdings)
@@ -241,38 +245,48 @@ export default function PortfoliosPage() {
       setOrders(rows)
       setSelectedOrder(rows[0]?.transaction ?? '')
 
-      if (exposureRes.success && exposureRes.data?.byExchange?.length) {
-        const countrySlices = exposureRes.data.byExchange.map((item, i) => ({
-          label: item.key,
-          value: Number(item.pct) || 0,
-          color: CHART_COLORS[i % CHART_COLORS.length],
-        }))
+      if (exposureRes.success && exposureRes.data) {
+        const exposure = exposureRes.data
+        const countrySlices = mapExposureSlices(exposure.byCountry ?? exposure.byExchange, CHART_COLORS)
         setCountries(countrySlices)
         setActiveCountry(countrySlices[0]?.label ?? '')
+
+        const sectorSlices = mapExposureSlices(exposure.bySector, CHART_COLORS).map(({ visual, ...rest }) => rest)
+        setSectors(sectorSlices)
+        setActiveSector(sectorSlices[0]?.label ?? '')
+
+        if (exposure.byCurrency?.length) {
+          const currencySlices = mapExposureSlices(exposure.byCurrency, CURRENCY_COLORS)
+          setCurrencies(currencySlices)
+          setActiveCurrency(currencySlices[0]?.label ?? '')
+        } else {
+          const currencyBuckets = new Map<string, number>()
+          for (const h of nextHoldings) {
+            const ccy = h.wacCurrencyCode || h.security?.listingCurrencyCode || 'USD'
+            currencyBuckets.set(ccy, (currencyBuckets.get(ccy) ?? 0) + (h.marketValue ?? h.wac * h.quantity))
+          }
+          const currencyTotal = Array.from(currencyBuckets.values()).reduce((a, b) => a + b, 0)
+          const currencySlices = Array.from(currencyBuckets.entries()).map(([label, value], i) => {
+            const pct = currencyTotal > 0 ? (value / currencyTotal) * 100 : 0
+            return {
+              label,
+              value: Math.round(pct),
+              visual: Math.max(pct, 1),
+              color: CURRENCY_COLORS[i % CURRENCY_COLORS.length],
+            }
+          })
+          setCurrencies(currencySlices)
+          setActiveCurrency(currencySlices[0]?.label ?? '')
+        }
       } else {
         setCountries([])
         setActiveCountry('')
+        setSectors([])
+        setActiveSector('')
+        setCurrencies([])
+        setActiveCurrency('')
       }
-
-      const currencyBuckets = new Map<string, number>()
-      for (const h of nextHoldings) {
-        const ccy = h.wacCurrencyCode || h.security?.listingCurrencyCode || 'USD'
-        currencyBuckets.set(ccy, (currencyBuckets.get(ccy) ?? 0) + (h.marketValue ?? h.wac * h.quantity))
-      }
-      const currencyTotal = Array.from(currencyBuckets.values()).reduce((a, b) => a + b, 0)
-      const currencySlices = Array.from(currencyBuckets.entries()).map(([label, value], i) => {
-        const pct = currencyTotal > 0 ? (value / currencyTotal) * 100 : 0
-        return {
-          label,
-          value: Math.round(pct),
-          visual: Math.max(pct, 1),
-          color: CURRENCY_COLORS[i % CURRENCY_COLORS.length],
-        }
-      })
-      setCurrencies(currencySlices)
-      setActiveCurrency(currencySlices[0]?.label ?? '')
-      setSectors([])
-      setActiveSector('')
+      setHasLoadedDetail(true)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load portfolio detail')
       setOverview(null)
@@ -300,7 +314,9 @@ export default function PortfoliosPage() {
   )
 
   const recalculate = async () => {
-    if (!activeFundId) return
+    if (!activeFundId || recalculating) return
+    setRecalculating(true)
+    setError(null)
     try {
       const res = await investmentOpsApi.recalculatePortfolio(activeFundId)
       if (!res.success) throw new Error(res.error || res.message || 'Recalculate failed')
@@ -309,8 +325,12 @@ export default function PortfoliosPage() {
       window.setTimeout(() => setRecalculated(false), 1800)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Recalculate failed')
+    } finally {
+      setRecalculating(false)
     }
   }
+
+  const showDetailRefetch = detailLoading && hasLoadedDetail
 
   return (
     <div className="flex min-h-full w-full flex-col bg-[#05090f] text-[#eef2f8]">
@@ -355,11 +375,15 @@ export default function PortfoliosPage() {
             <button
               type="button"
               onClick={() => void recalculate()}
-              disabled={!activeFundId}
+              disabled={!activeFundId || recalculating}
               className="inline-flex h-8 min-w-[96px] items-center justify-center gap-1.5 rounded-full bg-white px-4 text-[11px] font-semibold text-[#111722] transition hover:bg-[#edf2f8] disabled:opacity-40"
             >
-              {recalculated && <Check className="h-3.5 w-3.5" />}
-              {recalculated ? 'Updated' : 'Recalculate'}
+              {recalculating ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : recalculated ? (
+                <Check className="h-3.5 w-3.5" />
+              ) : null}
+              {recalculating ? 'Updating…' : recalculated ? 'Updated' : 'Recalculate'}
             </button>
           </header>
 
@@ -391,11 +415,11 @@ export default function PortfoliosPage() {
                   </td>
                   <td className="px-4 py-4 text-[11px]"><span className="inline-flex items-center gap-1.5"><Coin />{metrics.total}</span></td>
                   <td className="px-4 py-4 text-[11px]">{metrics.securityPct}</td>
-                  <td className="px-4 py-4 text-[11px]">—</td>
-                  <td className="px-4 py-4 text-[11px]">—</td>
+                  <td className="px-4 py-4 text-[11px]">{metrics.interest}</td>
+                  <td className="px-4 py-4 text-[11px]">{metrics.dividend}</td>
                   <td className="px-4 py-4 text-[11px]">{metrics.positions}</td>
                   <td className="px-4 py-4 text-[11px]">{metrics.total}</td>
-                  <td className="px-4 py-4 text-[11px]">—</td>
+                  <td className="px-4 py-4 text-[11px]">{metrics.margin}</td>
                   <td className="px-5 py-4 text-[11px]">{metrics.valueDate}</td>
                 </tr>
               </tbody>
@@ -403,7 +427,8 @@ export default function PortfoliosPage() {
           </div>
 
           {expanded && (
-            <div className="grid min-h-[245px] grid-cols-1 border-b border-[#243044] bg-[radial-gradient(circle_at_50%_30%,rgba(34,84,145,.17),transparent_62%)] lg:grid-cols-3">
+            <div className="relative grid min-h-[245px] grid-cols-1 border-b border-[#243044] bg-[radial-gradient(circle_at_50%_30%,rgba(34,84,145,.17),transparent_62%)] lg:grid-cols-3">
+              <RefetchOverlay active={showDetailRefetch} rows={4} cols={3} />
               <div className="flex min-h-[220px] items-center justify-start gap-2 border-b border-[#243044] px-3 py-4 sm:gap-3 sm:px-5 lg:border-b-0 lg:border-r">
                 <CountryRings countries={countries} active={activeCountry} onActive={setActiveCountry} />
                 <div className="space-y-1.5">
@@ -421,7 +446,7 @@ export default function PortfoliosPage() {
                       {country.label}({country.value}%)
                     </button>
                   ))}
-                  {countries.length === 0 && <p className="px-2 text-[9px] text-[#6f7e92]">No exchange exposure</p>}
+                  {countries.length === 0 && <p className="px-2 text-[9px] text-[#6f7e92]">No country exposure</p>}
                 </div>
               </div>
 
@@ -520,7 +545,8 @@ export default function PortfoliosPage() {
           <header className="flex min-h-[54px] items-center justify-between gap-3 px-5 py-3">
             <h2 className="text-[14px] font-medium text-white">Holdings({orders.length})</h2>
           </header>
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
+            <RefetchOverlay active={showDetailRefetch} rows={8} cols={9} />
             <table className="w-full min-w-[900px] border-collapse">
               <thead className="bg-white/[0.035] text-left text-[9px] text-[#738095]">
                 <tr>
@@ -536,7 +562,7 @@ export default function PortfoliosPage() {
                 </tr>
               </thead>
               <tbody>
-                {detailLoading && (
+                {detailLoading && !hasLoadedDetail && (
                   <tr>
                     <td colSpan={9} className="p-0">
                       <OpsTableSkeleton rows={8} cols={9} />

@@ -26,10 +26,111 @@ export function requireOpsData<T>(res: OpsEnvelope<T> | undefined | null, label:
   return res.data
 }
 
+/** Prefer ApiError.response.code / envelope code for recon import gates. */
+export function opsErrorCode(err: unknown): string | undefined {
+  if (err == null || typeof err !== 'object') return undefined
+  const o = err as { code?: unknown; response?: { code?: unknown; error?: unknown } }
+  if (o.code != null && String(o.code).trim()) return String(o.code)
+  const r = o.response
+  if (r?.code != null && String(r.code).trim()) return String(r.code)
+  if (typeof r?.error === 'string' && r.error.trim()) return r.error
+  return undefined
+}
+
 export function opsErrorMessage(err: unknown, fallback = 'Request failed') {
-  if (err instanceof Error && err.message) return err.message
-  if (typeof err === 'object' && err && 'message' in err) return String((err as { message: unknown }).message)
-  return fallback
+  const code = opsErrorCode(err)
+  let message = fallback
+  if (err instanceof Error && err.message) message = err.message
+  else if (typeof err === 'object' && err && 'message' in err) {
+    message = String((err as { message: unknown }).message)
+  }
+  if (typeof err === 'object' && err && 'response' in err) {
+    const r = (err as { response?: { message?: unknown } }).response
+    if (r?.message != null && String(r.message).trim()) message = String(r.message)
+  }
+  if (code === 'MAKER_CHECKER_CONFLICT') {
+    return `${message} — maker and checker must differ (admins may bypass). (${code})`
+  }
+  if (code === 'DUPLICATE_SOURCE') {
+    return `${message} — same file hash already imported/committed (SRD 11.4). (${code})`
+  }
+  if (code === 'CONTROL_TOTAL_FAILED' || code === 'CONTROL_MISMATCH') {
+    return `${message} — opening + movements must equal closing (±0.01). (${code})`
+  }
+  if (code) return message.includes(`(${code})`) ? message : `${message} (${code})`
+  return message
+}
+
+/** BA-R1 — normalize controlTotals from validate/commit/detail payloads. */
+export function mapImportControlTotals(payload: Record<string, unknown> | null | undefined) {
+  if (!payload) return null
+  const ct = (payload.controlTotals ?? {}) as Record<string, unknown>
+  const opening = ct.opening ?? payload.controlOpening ?? payload.openingBalance
+  const closing = ct.closing ?? payload.controlClosing ?? payload.closingBalance
+  const movements = ct.movements ?? payload.movementTotal
+  const expectedMovement = ct.expectedMovement
+  const balanced =
+    ct.balanced === true || payload.controlBalanced === true || payload.arithmeticOk === true
+      ? true
+      : ct.balanced === false || payload.controlBalanced === false || payload.arithmeticOk === false
+        ? false
+        : undefined
+  return {
+    opening: opening != null && String(opening) !== '' ? String(opening) : undefined,
+    closing: closing != null && String(closing) !== '' ? String(closing) : undefined,
+    movements: movements != null && String(movements) !== '' ? String(movements) : undefined,
+    expectedMovement:
+      expectedMovement != null && String(expectedMovement) !== '' ? String(expectedMovement) : undefined,
+    balanced,
+  }
+}
+
+/** Merge control totals without wiping a known `balanced` with undefined from a sparser payload. */
+export function mergeImportControlTotals(
+  prev: ReturnType<typeof mapImportControlTotals>,
+  next: ReturnType<typeof mapImportControlTotals>,
+): ReturnType<typeof mapImportControlTotals> {
+  if (!next) return prev
+  if (!prev) return next
+  return {
+    opening: next.opening ?? prev.opening,
+    closing: next.closing ?? prev.closing,
+    movements: next.movements ?? prev.movements,
+    expectedMovement: next.expectedMovement ?? prev.expectedMovement,
+    balanced: next.balanced !== undefined ? next.balanced : prev.balanced,
+  }
+}
+
+/** BA-R6 — validate inline errors + GET /errors `{ errors: [] }`. */
+export function mapImportLineErrors(data: unknown): {
+  line?: string
+  field?: string
+  code?: string
+  message: string
+}[] {
+  let list: unknown[] = []
+  if (Array.isArray(data)) list = data
+  else if (data && typeof data === 'object') {
+    const root = data as Record<string, unknown>
+    if (Array.isArray(root.errors)) list = root.errors
+    else list = unwrapList(root)
+  }
+  return list.map((row) => {
+    const e = (row ?? {}) as Record<string, unknown>
+    return {
+      line: e.lineNumber != null ? String(e.lineNumber) : e.line != null ? String(e.line) : undefined,
+      field: e.field != null ? String(e.field) : undefined,
+      code: e.code != null ? String(e.code) : undefined,
+      message: String(e.message ?? e.detail ?? e.requiredAction ?? 'Validation error'),
+    }
+  })
+}
+
+function score01(value: unknown): number | undefined {
+  if (value == null || value === '') return undefined
+  const num = Number(value)
+  if (!Number.isFinite(num)) return undefined
+  return num > 1 ? num / 100 : num
 }
 
 export function mapCashOverviewKpis(data: CashOverview | null | undefined) {
@@ -64,8 +165,8 @@ export function mapClientAccounts(data: unknown) {
     const currency = String(a.baseCurrency ?? 'USD')
     return {
       id: a.id,
-      accountNumber: String(a.accountNumber ?? a.id),
-      clientName: String(a.clientName ?? a['clientOrVehicleName'] ?? '—'),
+      accountNumber: cashAccountDisplayLabel(a),
+      clientName: displayLabel(a.clientName ?? a['clientOrVehicleName'], '—'),
       baseCurrency: currency,
       accountType: String(a.accountType ?? '—'),
       provider: String(a.provider ?? a['custodianName'] ?? '—'),
@@ -83,11 +184,14 @@ export function mapClientAccounts(data: unknown) {
   return { ...page, items: mapped, total: page.total || mapped.length }
 }
 
-function formatActivity(value: unknown) {
+export function formatActivity(value: unknown) {
   if (value == null || value === '') return '—'
-  const s = String(value)
+  const s = String(value).trim()
   const d = new Date(s)
-  if (Number.isNaN(d.getTime())) return s
+  if (Number.isNaN(d.getTime())) {
+    const isoDay = s.match(/^(\d{4}-\d{2}-\d{2})/)
+    return isoDay ? shortDate(isoDay[1]) : '—'
+  }
   return d.toLocaleString('en-GB', {
     day: '2-digit',
     month: 'short',
@@ -99,9 +203,12 @@ function formatActivity(value: unknown) {
 
 function shortDate(value: unknown) {
   if (value == null || value === '') return '—'
-  const s = String(value)
+  const s = String(value).trim()
   const d = new Date(s)
-  if (Number.isNaN(d.getTime())) return s.slice(0, 10)
+  if (Number.isNaN(d.getTime())) {
+    const isoDay = s.match(/^(\d{4}-\d{2}-\d{2})/)
+    return isoDay ? isoDay[1] : '—'
+  }
   return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
@@ -164,10 +271,14 @@ export function mapCashLedgerRows(data: unknown) {
       return {
       date: shortDate(r.valueDate ?? r.postedAt),
       fund: String(r['fundName'] ?? r.portfolioId ?? '—'),
-      client: String(r['clientName'] ?? '—'),
-      account: String(r['accountNumber'] ?? r.cashAccountId ?? '—'),
-      cashAccount: String(r['cashAccountName'] ?? r.cashAccountId ?? '—'),
-      bank: String(r['providerName'] ?? r['bankName'] ?? '—'),
+      client: displayLabel(r['clientName'], '—'),
+      account: displayLabel(r['accountNumber'] ?? r['accountNumberMasked'], '—'),
+      cashAccount: displayLabel(
+        r['cashAccountName'] ?? r['cashAccountLabel'] ?? r['accountNumber'],
+        '—',
+      ),
+      cashAccountId: String(r.cashAccountId ?? ''),
+      bank: displayLabel(r['providerName'] ?? r['bankName'], '—'),
       type: mapLedgerType(r.type),
       description: String(r.description ?? '—'),
       debit: r.debit && r.debit !== '0' && r.debit !== '0.00' ? formatMoneyDisplay(r.debit) : '—',
@@ -213,8 +324,54 @@ export type FundSuggestion = {
   bank: string
   reason: string
   confidence: number
+  /** 0–1 score total when available */
+  scoreTotal: number
+  band: 'auto' | 'suggested' | 'weak' | 'none'
+  scoreAmount?: number
+  scoreDate?: number
+  scoreReference?: number
+  scoreCounterparty?: number
+  /** BA-R2 policy weights (typically 0.5 / 0.2 / 0.2 / 0.1) */
+  weightAmount?: number
+  weightDate?: number
+  weightReference?: number
+  weightCounterparty?: number
+  weightedAmount?: number
+  weightedDate?: number
+  weightedReference?: number
+  weightedCounterparty?: number
+  hardRuleFailed?: boolean
+  hardRuleReason?: string
+  hardFailures?: string[]
+  matchedAmount?: string
   internalLineId?: string
   externalLineId?: string
+}
+
+/** SRD 12.5 score bands (amount 50 / date 20 / ref 20 / counterparty 10 when BE sends components). */
+export function suggestionBand(score01: number): FundSuggestion['band'] {
+  if (score01 >= 0.95) return 'auto'
+  if (score01 >= 0.85) return 'suggested'
+  if (score01 >= 0.65) return 'weak'
+  return 'none'
+}
+
+export function mapBatchReconcileLabels(status: string | null | undefined, openBreaks: number, unmatched: number) {
+  const u = String(status ?? '').toUpperCase()
+  const fully =
+    u.includes('RECONCILED') ||
+    u === 'CLOSED' ||
+    (u.includes('BALANCED') && openBreaks === 0 && unmatched === 0)
+  const balanced =
+    fully ||
+    u.includes('BALANCED') ||
+    u === 'BALANCED_WITH_OPEN_ITEMS' ||
+    (openBreaks === 0 && unmatched === 0 && (u.includes('MATCH') || u === 'COMPLETE' || u === 'DONE'))
+  return {
+    balanced: balanced ? 'Balanced' : 'Not balanced',
+    fullyReconciled: fully ? 'Fully reconciled' : 'Not fully reconciled',
+    raw: String(status ?? '—'),
+  }
 }
 
 export function mapFundWorkspace(data: BatchWorkspace | null | undefined) {
@@ -274,22 +431,77 @@ export function mapFundWorkspace(data: BatchWorkspace | null | undefined) {
       id: String(r.linkId ?? r.id ?? `m_${i}`),
       date: shortDate(r.createdAt ?? r.date),
       type: String(r.method ?? r.topology ?? 'Match'),
-      details: `${r.internalLineId ?? '—'} ↔ ${r.externalLineId ?? '—'}`,
+      details: `${formatWorkspaceLineRef(r.details, r.internalLineId)} ↔ ${formatWorkspaceLineRef(r.details, r.externalLineId)}`,
       amount: Number(String(r.matchedAmount ?? 0).replace(/,/g, '')) || 0,
     }
   })
-  const suggestions = unwrapList(data.suggested).map((row) => {
+  const suggestions = [
+    ...unwrapList(data.suggested),
+    ...unwrapList((data as { suggestions?: unknown }).suggestions),
+    ...unwrapList((data as { matchSuggestions?: unknown }).matchSuggestions),
+  ].map((row) => {
     const r = (row ?? {}) as Record<string, unknown>
-    const score = Number(r.scoreTotal ?? r.confidence ?? 0)
-    const confidence = score <= 1 ? Math.round(score * 100) : Math.round(score)
+    const scoreRaw = Number(r.scoreTotal ?? r.confidence ?? 0)
+    const scoreTotal = scoreRaw > 1 ? scoreRaw / 100 : scoreRaw
+    const confidence = Math.round(scoreTotal * 100)
+    const internalDesc = internal.find((e) => e.id === String(r.internalLineId ?? ''))?.description
+    const externalDesc = external.find((e) => e.id === String(r.externalLineId ?? ''))?.description
+    const comps = (r.scoreComponents ?? r.components ?? {}) as Record<string, unknown>
+    const weights = (r.weights ?? {}) as Record<string, unknown>
+    const weighted = (r.weighted ?? r.weightedContributions ?? {}) as Record<string, unknown>
+    const hardList = [
+      ...unwrapList(r.hardRuleFailures),
+      ...unwrapList(r.hardFailures),
+    ].map((h) => {
+      if (typeof h === 'string') return h
+      const hr = (h ?? {}) as Record<string, unknown>
+      return String(hr.message ?? hr.code ?? hr.rule ?? h)
+    }).filter(Boolean)
+    const hardRuleFailed =
+      r.hardRuleFailed === true ||
+      String(r.hardRuleStatus ?? '').toUpperCase().includes('FAIL') ||
+      String(r.blockReason ?? '').length > 0 ||
+      hardList.length > 0
+    const amt =
+      r.matchedAmount != null
+        ? String(r.matchedAmount)
+        : r.amount != null
+          ? String(r.amount)
+          : undefined
+    const hardRuleReason =
+      r.hardRuleReason != null
+        ? String(r.hardRuleReason)
+        : r.blockReason != null
+          ? String(r.blockReason)
+          : hardList.length
+            ? hardList.join('; ')
+            : undefined
     return {
-      internal: String(r.internalLineId ?? '—'),
-      bank: String(r.externalLineId ?? '—'),
-      reason: String(r.reason ?? 'Suggested match'),
+      internal: formatWorkspaceLineRef(internalDesc ?? r.reason, r.internalLineId),
+      bank: formatWorkspaceLineRef(externalDesc ?? r.reason, r.externalLineId),
+      reason: String(r.reason ?? hardRuleReason ?? 'Suggested match'),
       confidence,
+      scoreTotal,
+      band: hardRuleFailed ? 'none' : suggestionBand(scoreTotal),
+      scoreAmount: score01(comps.amount ?? r.scoreAmount),
+      scoreDate: score01(comps.date ?? r.scoreDate),
+      scoreReference: score01(comps.reference ?? comps.ref ?? r.scoreReference ?? r.scoreRef),
+      scoreCounterparty: score01(comps.counterparty ?? comps.cpty ?? r.scoreCounterparty),
+      weightAmount: score01(weights.amount),
+      weightDate: score01(weights.date),
+      weightReference: score01(weights.reference ?? weights.ref),
+      weightCounterparty: score01(weights.counterparty ?? weights.cpty),
+      weightedAmount: score01(weighted.amount),
+      weightedDate: score01(weighted.date),
+      weightedReference: score01(weighted.reference ?? weighted.ref),
+      weightedCounterparty: score01(weighted.counterparty ?? weighted.cpty),
+      hardRuleFailed,
+      hardRuleReason,
+      hardFailures: hardList.length ? hardList : undefined,
+      matchedAmount: amt,
       internalLineId: r.internalLineId != null ? String(r.internalLineId) : undefined,
       externalLineId: r.externalLineId != null ? String(r.externalLineId) : undefined,
-    }
+    } satisfies FundSuggestion
   })
 
   return {
@@ -323,6 +535,7 @@ export function mapFundWorkspace(data: BatchWorkspace | null | undefined) {
 export function mapFundSummaryKpis(
   summary: FundCashSummary | null | undefined,
   batchSummary?: Record<string, unknown> | null,
+  fundName?: string | null,
 ) {
   const s = (summary ?? {}) as Record<string, unknown>
   const b = batchSummary ?? {}
@@ -343,7 +556,7 @@ export function mapFundSummaryKpis(
   const totalCash = s.totalCash ?? s.postedSettledCash
   const variance = s.openBreakVariance ?? b.variance
   return {
-    fundsLabel: s.fundId ? String(s.fundId) : '—',
+    fundsLabel: fundName || displayLabel(s.fundName ?? s.fundId, '—'),
     openBreaks,
     unmatchedCount: Number(s.unmatchedCount ?? unmatched),
     matchedCount: Number(s.matchedCount ?? 0),
@@ -379,8 +592,23 @@ export function mapExceptions(data: unknown) {
             : 'Medium'
       const statusRaw = String(e.status ?? 'OPEN').toUpperCase()
       const overdueFlag = e.overdue === true
-      let status: 'Pending Approval' | 'Investigating' | 'Overdue' = 'Investigating'
-      if (overdueFlag) {
+      let status:
+        | 'Pending Approval'
+        | 'Investigating'
+        | 'Overdue'
+        | 'Resolved'
+        | 'Closed'
+        | 'Rejected' = 'Investigating'
+      if (
+        statusRaw.includes('RESOLV') ||
+        statusRaw.includes('APPROVED') ||
+        statusRaw === 'ADJUSTED' ||
+        statusRaw === 'CLOSED'
+      ) {
+        status = statusRaw.includes('CLOS') ? 'Closed' : 'Resolved'
+      } else if (statusRaw.includes('REJECT')) {
+        status = 'Rejected'
+      } else if (overdueFlag) {
         status = 'Overdue'
       } else if (
         statusRaw.includes('PENDING') ||
@@ -407,24 +635,31 @@ export function mapExceptions(data: unknown) {
       return {
         id: String(e.id ?? e['exceptionId'] ?? ''),
         severity: severity as 'Critical' | 'High' | 'Medium' | 'Low',
-        account: String(e['accountNumber'] ?? e['cashAccountId'] ?? '—'),
-        client: String(e['clientName'] ?? e['clientOrVehicleId'] ?? '—'),
+        cashAccountId: String(e['cashAccountId'] ?? ''),
+        portfolioId: String(e['portfolioId'] ?? e['fundId'] ?? ''),
+        portfolio: displayLabel(e['fundName'] ?? e['portfolioName'], '—'),
+        account: displayLabel(
+          e['accountNumber'] ?? e['cashAccountLabel'] ?? e['cashAccountName'] ?? e['accountLabel'],
+          '—',
+        ),
+        client: displayLabel(e['clientName'] ?? e['clientOrVehicleName'], '—'),
         source: String(e['source'] ?? e.category ?? '—'),
         reason: String(e['reason'] ?? e.category ?? e['title'] ?? 'Exception'),
         diffUsd: formatMoneyDisplay(diffTxn),
         diffZwl: formatMoneyDisplay(diffLocal),
         ageDays: Number(e['ageDays'] ?? 0),
-        assignee: String(e['assigneeName'] ?? e['assignedTo'] ?? e.assignedToId ?? '—'),
+        assignee: personDisplayLabel(e['assigneeName'] ?? e['assignedTo'], 'Unassigned'),
         status,
         title: String(e['title'] ?? e.category ?? 'Exception'),
-        custodian: String(e['custodianName'] ?? '—'),
-        instrument: String(e['instrument'] ?? e['instrumentName'] ?? '—'),
+        custodian: displayLabel(e['custodianName'], '—'),
+        instrument: instrumentDisplayLabel(e['instrument'] ?? e['instrumentName']),
         quantity: String(e['quantity'] ?? '—'),
         tradeDate: shortDate(e['tradeDate']),
         settleDate: shortDate(e['settleDate']),
-        approver: String(e['approverName'] ?? e['approver'] ?? e['approverId'] ?? '—'),
+        approver: personDisplayLabel(e['approverName'] ?? e['approver'], '—'),
         version: e.version,
         raw: e,
+        statusRaw,
       }
     }),
   }
@@ -472,24 +707,21 @@ export function mapExceptionsSummary(data: Record<string, unknown> | null | unde
 }
 
 export function mapExceptionTimeline(data: unknown) {
-  const items = unwrapList<Record<string, unknown>>(data)
-  if (!items.length && data && typeof data === 'object' && Array.isArray((data as { events?: unknown }).events)) {
-    return ((data as { events: Record<string, unknown>[] }).events).map((item, i) => ({
-      title: String(item.title ?? item.eventType ?? item.action ?? `Event ${i + 1}`),
-      when: formatActivity(item.at ?? item.createdAt ?? item.when),
-      who: String(item.actorName ?? item.actorId ?? item.who ?? 'System'),
-      tone: String(item.tone ?? item.severity ?? '').toLowerCase().includes('warn') ||
-        String(item.eventType ?? '').toUpperCase().includes('OVERDUE')
+  const mapItem = (item: Record<string, unknown>, i: number) => ({
+    title: humanizeEventTitle(item.title ?? item.eventType ?? item.action, `Event ${i + 1}`),
+    when: formatActivity(item.at ?? item.createdAt ?? item.when),
+    who: personDisplayLabel(item.actorName ?? item.actor ?? item.who ?? item.actorId, 'System'),
+    tone:
+      String(item.tone ?? item.severity ?? '').toLowerCase().includes('warn') ||
+      String(item.eventType ?? '').toUpperCase().includes('OVERDUE')
         ? ('amber' as const)
         : ('blue' as const),
-    }))
+  })
+  const items = unwrapList<Record<string, unknown>>(data)
+  if (!items.length && data && typeof data === 'object' && Array.isArray((data as { events?: unknown }).events)) {
+    return ((data as { events: Record<string, unknown>[] }).events).map(mapItem)
   }
-  return items.map((item, i) => ({
-    title: String(item.title ?? item.eventType ?? item.action ?? `Event ${i + 1}`),
-    when: formatActivity(item.at ?? item.createdAt ?? item.when),
-    who: String(item.actorName ?? item.actorId ?? item.who ?? 'System'),
-    tone: String(item.tone ?? '').toLowerCase().includes('amber') ? ('amber' as const) : ('blue' as const),
-  }))
+  return items.map(mapItem)
 }
 
 export function mapStatements(data: unknown) {
@@ -507,10 +739,13 @@ export function mapStatements(data: unknown) {
       const statementType = String(s.statementType ?? run.statementType ?? 'PERIODIC')
       const clientOrVehicleId = String(s['clientOrVehicleId'] ?? run.clientOrVehicleId ?? '')
       const statusUpper = String(s.status ?? run.status ?? '').toUpperCase()
-      const status =
-        statusUpper.includes('DELIVER') || statusUpper.includes('APPROV') || statusUpper.includes('RELEASE')
-          ? ('Released' as const)
-          : ('Ready for Release' as const)
+      let status: 'Draft' | 'Pending Approval' | 'Approved' | 'Delivered' | 'Ready for Release' | 'Released'
+      if (statusUpper.includes('DELIVER')) status = 'Delivered'
+      else if (statusUpper.includes('APPROV')) status = 'Approved'
+      else if (statusUpper.includes('PEND')) status = 'Pending Approval'
+      else if (statusUpper.includes('DRAFT')) status = 'Draft'
+      else if (statusUpper.includes('RELEASE')) status = 'Released'
+      else status = 'Ready for Release'
       const recipients = s['recipientCount'] ?? s['clientCount'] ?? s['investorCount']
       const sections = (s['sections'] && typeof s['sections'] === 'object'
         ? s['sections']
@@ -519,16 +754,33 @@ export function mapStatements(data: unknown) {
       return {
         id: s.id,
         period: `${shortDate(periodFrom)} – ${shortDate(periodTo)}`.replace(/^— – | – —$/g, '') || '—',
-        periodFrom: periodFrom != null ? String(periodFrom) : '',
-        periodTo: periodTo != null ? String(periodTo) : '',
+        periodFrom: periodFrom != null ? String(periodFrom).slice(0, 10) : '',
+        periodTo: periodTo != null ? String(periodTo).slice(0, 10) : '',
         asAt: shortDate(periodTo),
         status,
         clients: recipients != null ? String(recipients) : '—',
         investors: recipients != null ? String(recipients) : '—',
-        generatedBy: String(s['generatedByName'] ?? s['approvedById'] ?? '—'),
+        generatedBy: personDisplayLabel(
+          s['generatedByName'] ??
+            s['approvedByName'] ??
+            s['createdByName'] ??
+            s['generatedByEmail'] ??
+            s['createdByEmail'] ??
+            s['generatedBy'] ??
+            s['approvedBy'],
+        ),
         generatedOn: formatActivity(s['generatedAt'] ?? s['createdAt']),
         version: s.version,
         cashAccountId: cashAccountId || undefined,
+        account: displayLabel(
+          s['accountNumber'] ??
+            s['cashAccountLabel'] ??
+            s['cashAccountName'] ??
+            run.accountNumber ??
+            run.cashAccountLabel,
+          '—',
+        ),
+        clientName: displayLabel(s['clientName'] ?? run.clientName ?? s['clientOrVehicleName'], '—'),
         clientOrVehicleId: clientOrVehicleId || undefined,
         currency,
         statementType,
@@ -797,6 +1049,222 @@ export function buildBrokerQueueColumns(
       'escalated',
     ),
   ]
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+const OPAQUE_ID_RE = /^(cm[a-z]?_|cca_|creb_|cimp_|cjl_|cjnl_|ccst_|usr_|prov_|clay_)/i
+/** Prisma/cuid style: e.g. cmrsujspx008tunlofkog32jx */
+const CUID_LIKE_RE = /^c[a-z0-9]{20,}$/i
+
+/** True when a value looks like a DB / opaque identifier rather than a human label. */
+export function isOpaqueId(value: unknown): boolean {
+  if (value == null || value === '') return false
+  const s = String(value).trim()
+  if (!s) return false
+  if (UUID_RE.test(s)) return true
+  if (OPAQUE_ID_RE.test(s)) return true
+  if (CUID_LIKE_RE.test(s)) return true
+  if (/^[a-z]{2,5}_[0-9a-z]{6,}$/i.test(s)) return true
+  return s.length >= 24 && !/\s/.test(s) && /^[a-z0-9_-]+$/i.test(s)
+}
+
+/** Prefer a readable label; hide opaque ids from UI surfaces. */
+export function displayLabel(value: unknown, fallback = '—'): string {
+  if (value == null || value === '') return fallback
+  if (typeof value === 'object') {
+    const o = value as Record<string, unknown>
+    return displayLabel(
+      o.name ?? o.fullName ?? o.displayName ?? o.label ?? o.email ?? o.symbol ?? o.ticker ?? o.accountNumber,
+      fallback,
+    )
+  }
+  const s = String(value).trim()
+  return isOpaqueId(s) ? fallback : s
+}
+
+/** Prefer a person name/email; hide opaque user ids. */
+export function personDisplayLabel(value: unknown, fallback = '—'): string {
+  if (value == null || value === '') return fallback
+  if (typeof value === 'object') {
+    const o = value as Record<string, unknown>
+    return displayLabel(o.name ?? o.fullName ?? o.email ?? o.displayName, fallback)
+  }
+  return displayLabel(value, fallback)
+}
+
+/** Instrument / security label from string or nested object. */
+export function instrumentDisplayLabel(value: unknown, fallback = '—'): string {
+  if (value == null || value === '') return fallback
+  if (typeof value === 'object') {
+    const o = value as Record<string, unknown>
+    return displayLabel(o.name ?? o.instrumentName ?? o.symbol ?? o.ticker ?? o.isin, fallback)
+  }
+  return displayLabel(value, fallback)
+}
+
+export function humanizeEventTitle(value: unknown, fallback = 'Event'): string {
+  if (value == null || value === '') return fallback
+  const s = String(value).trim()
+  if (!s) return fallback
+  if (isOpaqueId(s)) return fallback
+  return s
+    .replace(/_/g, ' ')
+    .toLowerCase()
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+export function resolvePortfolioName(
+  id: unknown,
+  portfolios: { id: string; name: string }[],
+  fallback = '—',
+): string {
+  if (id == null || id === '') return fallback
+  const s = String(id)
+  const hit = portfolios.find((p) => p.id === s)
+  if (hit?.name) return hit.name
+  return displayLabel(s, fallback)
+}
+
+export function resolveCashAccountLabel(
+  id: unknown,
+  accounts: { id: string; label: string }[],
+  fallback = '—',
+): string {
+  if (id == null || id === '') return fallback
+  const s = String(id)
+  const hit = accounts.find((a) => a.id === s)
+  if (hit?.label && !isOpaqueId(hit.label)) return hit.label
+  return displayLabel(s, fallback)
+}
+
+/** Human label for a cash account row — never falls back to a DB id. */
+export function cashAccountDisplayLabel(a: {
+  accountNumber?: unknown
+  accountNumberMasked?: unknown
+  maskedIdentifier?: unknown
+  clientName?: unknown
+  clientOrVehicleName?: unknown
+  name?: unknown
+  label?: unknown
+}): string {
+  const number = displayLabel(
+    a.accountNumber ?? a.accountNumberMasked ?? a.maskedIdentifier ?? a.label ?? a.name,
+    '',
+  )
+  if (number) return number
+  const client = displayLabel(a.clientName ?? a.clientOrVehicleName, '')
+  if (client) return client
+  return 'Account'
+}
+
+/** Map listClientCashAccounts payload into id/label options for resolveCashAccountLabel. */
+export function mapCashAccountOptions(data: unknown): { id: string; label: string }[] {
+  return unwrapList<Record<string, unknown>>(data)
+    .map((a) => ({
+      id: String(a.id ?? ''),
+      label: cashAccountDisplayLabel(a),
+    }))
+    .filter((a) => a.id)
+}
+
+export function formatBatchLabel(
+  batch: {
+    periodFrom?: unknown
+    periodTo?: unknown
+    currency?: unknown
+    status?: unknown
+    cashAccountId?: unknown
+  },
+  accountLabel?: string,
+): string {
+  const from = shortDate(batch.periodFrom)
+  const to = shortDate(batch.periodTo)
+  const period = from !== '—' && to !== '—' ? `${from} – ${to}` : from !== '—' ? from : to
+  const parts = [period !== '—' ? period : null, batch.currency ? String(batch.currency) : null, accountLabel]
+    .filter(Boolean)
+    .join(' · ')
+  const status = batch.status ? String(batch.status).replace(/_/g, ' ') : ''
+  return parts ? `${parts}${status ? ` (${status})` : ''}` : status || 'Reconciliation batch'
+}
+
+export function formatWorkspaceLineRef(
+  description: unknown,
+  id: unknown,
+  index?: number,
+): string {
+  const desc = String(description ?? '').trim()
+  if (desc && desc !== '—' && !isOpaqueId(desc)) return desc
+  if (index != null) return `Line ${index + 1}`
+  return displayLabel(id, 'Entry')
+}
+
+export function mapActiveReconciliationRules(data: unknown): { label: string; mode: string }[] {
+  if (!data || typeof data !== 'object') return []
+  const root = data as Record<string, unknown>
+  const policy = (root.matchWeightPolicy ?? root.policy) as Record<string, unknown> | undefined
+  const hardRules = unwrapList<string>(root.hardRules ?? root.rules)
+  const rows: { label: string; mode: string }[] = []
+
+  if (policy) {
+    const auto = policy.autoMatchThreshold
+    const suggest = policy.suggestThreshold
+  if (auto != null) {
+      rows.push({
+        label: 'Auto-match threshold',
+        mode: `${Number(auto) <= 1 ? Math.round(Number(auto) * 100) : Number(auto)}%`,
+      })
+    }
+    if (suggest != null) {
+      rows.push({
+        label: 'Suggest threshold',
+        mode: `${Number(suggest) <= 1 ? Math.round(Number(suggest) * 100) : Number(suggest)}%`,
+      })
+    }
+    if (policy.dateToleranceDays != null) {
+      rows.push({ label: 'Date tolerance', mode: `${policy.dateToleranceDays} days` })
+    }
+    if (policy.amountTolerance != null) {
+      rows.push({ label: 'Amount tolerance', mode: String(policy.amountTolerance) })
+    }
+  }
+
+  for (const rule of hardRules) {
+    const label = String(rule)
+      .replace(/_/g, ' ')
+      .toLowerCase()
+      .replace(/\b\w/g, (c) => c.toUpperCase())
+    rows.push({ label, mode: 'Hard rule' })
+  }
+
+  const list = unwrapList<Record<string, unknown>>(data)
+  if (!rows.length && list.length) {
+    return list.map((r) => ({
+      label: String(r.name ?? r.label ?? r.ruleKey ?? 'Rule'),
+      mode: String(r.mode ?? r.action ?? (r.autoMatch ? 'Auto-match' : 'Review')),
+    }))
+  }
+
+  return rows
+}
+
+export function formatValuationRunLabel(run: {
+  id?: string
+  asOf?: string | null
+  status?: string | null
+  parametersJson?: { costBasisMethod?: string } | null
+}): string {
+  const date = formatActivity(run.asOf).split(',')[0] || shortDate(run.asOf)
+  const method = run.parametersJson?.costBasisMethod
+  const status = run.status ? formatStatusLabel(run.status) : null
+  const parts = [date !== '—' ? date : null, method, status].filter(Boolean)
+  return parts.length ? parts.join(' · ') : displayLabel(run.id, 'Valuation run')
+}
+
+function formatStatusLabel(raw: string) {
+  return String(raw)
+    .replace(/_/g, ' ')
+    .toLowerCase()
+    .replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
 export type { OpsPaged }

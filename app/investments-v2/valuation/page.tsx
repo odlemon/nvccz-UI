@@ -17,6 +17,7 @@ import {
   unwrapList,
   type ValuationRun,
 } from '@/lib/api/investment-ops-api'
+import { formatValuationRunLabel } from '@/lib/investments-v2/adapters/cash-recon-adapter'
 
 const tabs = ['NAV Runs', 'P&L Runs', 'Price Validation', 'FX Conversion', 'Valuation Exceptions']
 
@@ -218,19 +219,23 @@ export default function ValuationPage() {
     }
   }, [tab, selectedRunId])
 
-  const fundName = (id: string) => portfolios.find((p) => p.id === id)?.name ?? id
+  const fundName = (id: string) => portfolios.find((p) => p.id === id)?.name ?? '—'
+  const runLabel = (run: ValuationRun) => formatValuationRunLabel(run)
 
   const fundOptions = useMemo(
     () => (portfolios.length ? portfolios.map((p) => p.name) : ['No portfolios available']),
     [portfolios],
   )
   const selectedFundName = portfolios.find((p) => p.id === fundId)?.name ?? fundOptions[0]
-  const selectedRunLabel = (valuationRuns.find((r) => r.id === selectedRunId)?.id ?? selectedRunId) || 'Select run'
+  const selectedRunLabel = runLabel(valuationRuns.find((r) => r.id === selectedRunId) ?? valuationRuns[0] ?? { id: selectedRunId })
   const runOptions = useMemo(
-    () => (valuationRuns.length ? valuationRuns.map((r) => r.id) : ['No runs available']),
+    () => (valuationRuns.length ? valuationRuns.map((r) => runLabel(r)) : ['No runs available']),
     [valuationRuns],
   )
-  const methodValue = METHOD_OPTIONS.find((m) => m.label === method)?.value ?? 'WAC'
+  const selectRunByLabel = (label: string) => {
+    const run = valuationRuns.find((r) => runLabel(r) === label)
+    if (run) setSelectedRunId(run.id)
+  }
 
   const openExceptions = valuationExceptions.filter((e) => e.status?.toUpperCase() === 'OPEN' || !e.resolvedAt)
   const completedRuns = valuationRuns.filter((r) => r.status?.toUpperCase().includes('COMPLETED')).length
@@ -468,7 +473,7 @@ export default function ValuationPage() {
               {lastCreated && (
                 <div className="mt-3 rounded-2xl border border-emerald-400/15 bg-emerald-400/[.05] p-4 text-[10px]">
                   <div className="flex items-center justify-between">
-                    <span className="font-mono text-emerald-300">{lastCreated.id}</span>
+                    <span className="font-mono text-emerald-300">{runLabel(lastCreated)}</span>
                     <Badge value={lastCreated.status} />
                   </div>
                   <div className="mt-3 grid grid-cols-2 gap-3 text-[#8290a4]">
@@ -528,7 +533,7 @@ export default function ValuationPage() {
                     ) : (
                       valuationRuns.map((row) => (
                         <tr key={row.id} className="transition hover:bg-white/[.035]">
-                          <td className="px-4 py-3 font-mono text-[#68a9ff]">{row.id}</td>
+                          <td className="px-4 py-3">{runLabel(row)}</td>
                           <td className="px-4 py-3">{fundName(row.fundId)}</td>
                           <td className="px-4 py-3 text-[#8290a4]">{formatDate(row.asOf)}</td>
                           <td className="px-4 py-3">{row.parametersJson?.costBasisMethod ?? '—'}</td>
@@ -557,7 +562,7 @@ export default function ValuationPage() {
             empty="No valuation runs returned by GET /valuation/runs."
             loading={valuationRunsLoading}
             rows={valuationRuns.map((r) => [
-              r.id,
+              runLabel(r),
               fundName(r.fundId),
               formatDate(r.asOf),
               r.parametersJson?.costBasisMethod ?? '—',
@@ -579,13 +584,13 @@ export default function ValuationPage() {
               </div>
               <label className="flex items-center gap-2 text-[10px] text-[#9ba8b8]">
                 Run
-                <Dropdown value={selectedRunLabel} options={runOptions} onChange={setSelectedRunId} />
+                <Dropdown value={selectedRunLabel} options={runOptions} onChange={selectRunByLabel} />
               </label>
             </div>
             {runInputsError && <div className="rounded-2xl border border-rose-400/20 bg-rose-400/[.08] px-4 py-3 text-[10px] text-rose-200">{runInputsError}</div>}
             <TableCard
               title="Price inputs"
-              subtitle={`Run ${selectedRunId || '—'}`}
+              subtitle={`Run ${selectedRunLabel}`}
               headers={['Instrument', 'Price', 'Source', 'As of', 'Status']}
               empty="No price inputs returned for the selected run."
               loading={runInputsLoading}
@@ -609,13 +614,13 @@ export default function ValuationPage() {
               </div>
               <label className="flex items-center gap-2 text-[10px] text-[#9ba8b8]">
                 Run
-                <Dropdown value={selectedRunLabel} options={runOptions} onChange={setSelectedRunId} />
+                <Dropdown value={selectedRunLabel} options={runOptions} onChange={selectRunByLabel} />
               </label>
             </div>
             {runInputsError && <div className="rounded-2xl border border-rose-400/20 bg-rose-400/[.08] px-4 py-3 text-[10px] text-rose-200">{runInputsError}</div>}
             <TableCard
               title="FX inputs"
-              subtitle={`Run ${selectedRunId || '—'}`}
+              subtitle={`Run ${selectedRunLabel}`}
               headers={['Pair', 'Rate', 'Source', 'As of']}
               empty="No FX inputs returned for the selected run."
               loading={runInputsLoading}
@@ -637,11 +642,13 @@ export default function ValuationPage() {
             empty="No valuation exceptions returned by the API."
             loading={valuationExceptionsLoading}
             rows={valuationExceptions.map((r) => [
-              r.id,
+              r.message || r.exceptionType,
               r.exceptionType,
               fundName(r.fundId),
               r.message || '—',
-              r.valuationRunId,
+              r.valuationRunId
+                ? runLabel(valuationRuns.find((run) => run.id === r.valuationRunId) ?? { id: r.valuationRunId })
+                : '—',
               <Badge key="b" value={r.status} />,
               <button
                 key="a"
@@ -657,13 +664,13 @@ export default function ValuationPage() {
       </div>
 
       {modal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onMouseDown={() => setModal(null)}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onMouseDown={() => setModal(null)}>
           <div onMouseDown={(e) => e.stopPropagation()} className="w-full max-w-xl rounded-[24px] border border-white/10 bg-[#111a28] shadow-2xl">
             <div className="flex items-center justify-between border-b border-white/[.07] p-5">
               <div>
                 <h2 className="text-sm font-semibold">Valuation exception</h2>
-                <p className="mt-1 font-mono text-[10px] text-[#7890ad]">
-                  {modal.id} · {modal.exceptionType}
+                <p className="mt-1 text-[10px] text-[#7890ad]">
+                  {modal.exceptionType} · {fundName(modal.fundId)}
                 </p>
               </div>
               <button type="button" onClick={() => setModal(null)} className="rounded-full p-2 hover:bg-white/10">
@@ -675,7 +682,12 @@ export default function ValuationPage() {
                 <ShieldAlert className="mb-2 h-4 w-4 text-amber-300" />
                 {modal.message || 'No additional message from the API.'}
                 <p className="mt-2 text-[#d4dce7]">Fund: {fundName(modal.fundId)}</p>
-                <p className="mt-1 text-[#d4dce7]">Run: {modal.valuationRunId}</p>
+                <p className="mt-1 text-[#d4dce7]">
+                  Run:{' '}
+                  {modal.valuationRunId
+                    ? runLabel(valuationRuns.find((run) => run.id === modal.valuationRunId) ?? { id: modal.valuationRunId })
+                    : '—'}
+                </p>
                 <p className="mt-1">
                   Status: <Badge value={modal.status} />
                 </p>

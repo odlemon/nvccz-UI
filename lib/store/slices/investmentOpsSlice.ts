@@ -1328,9 +1328,18 @@ const investmentOpsSlice = createSlice({
       })
       .addCase(createComplianceRule.rejected, (state) => { state.complianceRuleCreating = false })
 
-      .addCase(createComplianceOverride.pending, (state, action) => { state.complianceOverrideSubmittingByOrderId[action.meta.arg.orderId] = true })
-      .addCase(createComplianceOverride.fulfilled, (state, action) => { state.complianceOverrideSubmittingByOrderId[action.meta.arg.orderId] = false })
-      .addCase(createComplianceOverride.rejected, (state, action) => { state.complianceOverrideSubmittingByOrderId[action.meta.arg.orderId] = false })
+      .addCase(createComplianceOverride.pending, (state, action) => {
+        const key = action.meta.arg.orderId || action.meta.arg.complianceResultId || action.meta.arg.resultId || 'pending'
+        state.complianceOverrideSubmittingByOrderId[key] = true
+      })
+      .addCase(createComplianceOverride.fulfilled, (state, action) => {
+        const key = action.meta.arg.orderId || action.meta.arg.complianceResultId || action.meta.arg.resultId || 'pending'
+        state.complianceOverrideSubmittingByOrderId[key] = false
+      })
+      .addCase(createComplianceOverride.rejected, (state, action) => {
+        const key = action.meta.arg.orderId || action.meta.arg.complianceResultId || action.meta.arg.resultId || 'pending'
+        state.complianceOverrideSubmittingByOrderId[key] = false
+      })
 
       .addCase(runSimulation.pending, (state) => { state.simulationRunning = true })
       .addCase(runSimulation.fulfilled, (state, action) => { state.simulationRunning = false; state.simulationRun = action.payload })

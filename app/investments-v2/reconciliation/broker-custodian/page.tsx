@@ -14,6 +14,7 @@ import {
   FileText,
   Filter,
   Info,
+  Loader2,
   Search,
   Settings,
   Upload,
@@ -21,6 +22,9 @@ import {
 } from 'lucide-react'
 import { Cell, Pie, PieChart, ResponsiveContainer } from 'recharts'
 import { ReconApiBanner, ReconNavTabs } from '@/components/investments-v2/recon-ui'
+import { useRefetchLoading } from '@/components/investments-v2/hooks/use-refetch-loading'
+import { RefetchOverlay } from '@/components/investments-v2/ui/refetch-overlay'
+import { investmentOpsApi, unwrapList } from '@/lib/api/investment-ops-api'
 import { ReconTableSkeleton } from '@/components/investments-v2/loading-skeletons'
 import { stockPickerCashApi } from '@/lib/api/stock-picker-cash-api'
 import {
@@ -50,6 +54,7 @@ export default function BrokerCustodianPage() {
   const [panelOpen, setPanelOpen] = useState(true)
   const [comment, setComment] = useState('')
   const [loading, setLoading] = useState(true)
+  const { isRefetching, withRefetch } = useRefetchLoading()
   const [error, setError] = useState<string | null>(null)
   const [actionMsg, setActionMsg] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -57,12 +62,46 @@ export default function BrokerCustodianPage() {
   const [total, setTotal] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
   const [counts, setCounts] = useState({ new: 0, potential: 0, matched: 0, exception: 0, escalated: 0, total: 0 })
+  const [portfolios, setPortfolios] = useState<{ id: string; name: string }[]>([])
+  const [portfolioFilter, setPortfolioFilter] = useState('All Accounts')
+  const [statusFilter, setStatusFilter] = useState('All Statuses')
+
+  useEffect(() => {
+    investmentOpsApi.listPortfolios().then((res) => {
+      if (res.success !== false) {
+        setPortfolios(
+          unwrapList<{ id?: string; name?: string }>(res.data).map((p) => ({
+            id: String(p.id ?? ''),
+            name: String(p.name ?? p.id ?? 'Portfolio'),
+          })).filter((p) => p.id),
+        )
+      }
+    }).catch(() => undefined)
+  }, [])
+
+  const selectedPortfolioId = useMemo(() => {
+    if (portfolioFilter === 'All Accounts') return undefined
+    return portfolios.find((p) => p.name === portfolioFilter)?.id
+  }, [portfolioFilter, portfolios])
+
+  const statusApiValue = useMemo(() => {
+    if (statusFilter === 'All Statuses') return undefined
+    if (statusFilter === 'Matched') return 'MATCHED'
+    if (statusFilter === 'Potential') return 'POTENTIAL'
+    if (statusFilter === 'Exception') return 'EXCEPTION'
+    return undefined
+  }, [statusFilter])
 
   const load = useCallback(async (p = page) => {
     setLoading(true)
     setError(null)
     try {
-      const res = await stockPickerCashApi.getBrokerCustodianWorkspace({ page: p, pageSize: 50 })
+      const res = await stockPickerCashApi.getBrokerCustodianWorkspace({
+        page: p,
+        pageSize: 50,
+        ...(selectedPortfolioId ? { portfolioId: selectedPortfolioId } : {}),
+        ...(statusApiValue ? { overallStatus: statusApiValue } : {}),
+      })
       const data = requireOpsData(res, 'broker-custodian workspace')
       const mapped = mapBrokerWorkspace(data)
       setRows(mapped.items)
@@ -78,11 +117,11 @@ export default function BrokerCustodianPage() {
     } finally {
       setLoading(false)
     }
-  }, [page])
+  }, [page, selectedPortfolioId, statusApiValue])
 
   useEffect(() => {
-    void load(page)
-  }, [load, page])
+    void withRefetch(() => load(page))
+  }, [load, page, withRefetch])
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase()
@@ -155,12 +194,23 @@ export default function BrokerCustodianPage() {
         {actionMsg ? <div className="rounded-[10px] border border-border bg-muted/40 px-3 py-2 text-[12px] text-muted-foreground">{actionMsg}</div> : null}
 
         <section className="flex flex-wrap items-center gap-2.5">
-          <Control icon={<Calendar className="h-3.5 w-3.5" style={{ color: C.muted }} />} value="All dates" wide />
-          <Control value="All Accounts" />
-          <Control value="All Brokers" />
-          <Control value="All Custodians" />
-          <Control value="All Currencies" />
-          <Control value="All Statuses" />
+          <FilterControl
+            value={portfolioFilter}
+            options={['All Accounts', ...portfolios.map((p) => p.name)]}
+            onChange={(v) => {
+              setPortfolioFilter(v)
+              setPage(1)
+            }}
+            wide
+          />
+          <FilterControl
+            value={statusFilter}
+            options={['All Statuses', 'Matched', 'Potential', 'Exception']}
+            onChange={(v) => {
+              setStatusFilter(v)
+              setPage(1)
+            }}
+          />
           <div className="ml-auto flex items-center gap-3">
             <label className="inline-flex items-center gap-2 text-[12px]" style={{ color: C.muted }}>
               Auto-match
@@ -215,8 +265,9 @@ export default function BrokerCustodianPage() {
                 </label>
               </div>
 
-              <div className="overflow-x-auto">
-                {loading ? (
+              <div className="relative overflow-x-auto">
+                <RefetchOverlay active={isRefetching} rows={8} cols={6} />
+                {loading && rows.length === 0 ? (
                   <ReconTableSkeleton rows={8} cols={6} className="px-4 py-6" />
                 ) : filtered.length === 0 ? (
                   <p className="px-4 py-10 text-center text-[12px]" style={{ color: C.muted2 }}>
@@ -299,6 +350,33 @@ export default function BrokerCustodianPage() {
         </section>
       </div>
     </main>
+  )
+}
+
+function FilterControl({
+  value,
+  options,
+  onChange,
+  wide,
+}: {
+  value: string
+  options: string[]
+  onChange: (value: string) => void
+  wide?: boolean
+}) {
+  return (
+    <label className={cn('inline-flex h-9 items-center gap-2 rounded-full border px-3 text-[12px]', wide && 'min-w-[230px]')} style={{ background: C.control, borderColor: C.controlBorder, color: C.text }}>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full appearance-none bg-transparent outline-none"
+      >
+        {options.map((option) => (
+          <option key={option} value={option}>{option}</option>
+        ))}
+      </select>
+      <ChevronDown className="ml-auto h-3.5 w-3.5 shrink-0" style={{ color: C.muted2 }} />
+    </label>
   )
 }
 
@@ -507,15 +585,17 @@ function ExceptionPanel({
 
       <div className="space-y-2 border-t px-4 py-4" style={{ borderColor: C.rowBorder }}>
         <div className="flex flex-wrap gap-2">
-          <button type="button" disabled={busy} onClick={onConfirm} className="inline-flex h-9 flex-1 items-center justify-center rounded-full px-3 text-[12px] font-medium text-white disabled:opacity-50" style={{ background: '#2563EB' }}>
+          <button type="button" disabled={busy} onClick={onConfirm} className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-full px-3 text-[12px] font-medium text-white disabled:opacity-50" style={{ background: '#2563EB' }}>
+            {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
             Match
           </button>
-          <button type="button" disabled={busy} onClick={onEscalate} className="inline-flex h-9 flex-1 items-center justify-center rounded-full px-3 text-[12px] font-medium text-white disabled:opacity-50" style={{ background: '#D97706' }}>
+          <button type="button" disabled={busy} onClick={onEscalate} className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-full px-3 text-[12px] font-medium text-white disabled:opacity-50" style={{ background: '#D97706' }}>
+            {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
             Escalate
           </button>
         </div>
         <button type="button" disabled={busy} onClick={onClear} className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-full text-[13px] font-medium text-white disabled:opacity-50" style={{ background: '#059669' }}>
-          <Check className="h-4 w-4" />
+          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
           Mark Cleared
         </button>
       </div>

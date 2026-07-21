@@ -137,7 +137,7 @@ export default function DocumentationPage() {
     if (!uploadFundId && portfolios[0]?.id) setUploadFundId(portfolios[0].id)
   }, [portfolios, uploadFundId])
 
-  const fundName = (id: string) => portfolios.find((p) => p.id === id)?.name ?? id
+  const fundName = (id: string) => portfolios.find((p) => p.id === id)?.name ?? '—'
 
   const filtered = useMemo(() => {
     return documents.filter((document) => {
@@ -309,14 +309,14 @@ export default function DocumentationPage() {
                           </span>
                           <div>
                             <p className="max-w-[230px] truncate text-[#d9e1eb]">{document.title}</p>
-                            <p className="mt-1 font-mono text-[9px] text-[#68a9ff]">{document.id}</p>
+                            <p className="mt-1 text-[9px] text-[#8290a4]">{document.documentType}</p>
                           </div>
                         </div>
                       </td>
                       <td className="px-4 py-3 text-[#aeb9c7]">{document.documentType}</td>
                       <td className="px-4 py-3">{fundName(document.fundId)}</td>
-                      <td className="px-4 py-3 font-mono text-[#89a7ca]">{document.tradeId || document.orderId || '—'}</td>
-                      <td className="px-4 py-3 text-[#9eabbc]">{document.uploadedById || '—'}</td>
+                      <td className="px-4 py-3 font-mono text-[#89a7ca]">{document.tradeId || document.orderId ? 'Linked' : '—'}</td>
+                      <td className="px-4 py-3 text-[#9eabbc]">{document.uploadedById ? 'Uploader' : '—'}</td>
                       <td className="px-4 py-3 text-[#7f8da1]">{formatDate(document.createdAt)}</td>
                       <td className="px-4 py-3">
                         <Badge value={document.approvalStatus} />
@@ -363,7 +363,7 @@ export default function DocumentationPage() {
       </div>
 
       {uploadOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onMouseDown={() => setUploadOpen(false)}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onMouseDown={() => setUploadOpen(false)}>
           <div onMouseDown={(event) => event.stopPropagation()} className="w-full max-w-2xl rounded-[24px] border border-white/10 bg-[#111a28] shadow-2xl">
             <div className="flex items-center justify-between border-b border-white/[.07] p-5">
               <div>
@@ -434,11 +434,11 @@ export default function DocumentationPage() {
       )}
 
       {drawer && (
-        <div className="fixed inset-0 z-50 bg-black/45" onMouseDown={() => setDrawer(null)}>
+        <div className="fixed inset-0 z-[100] bg-black/45" onMouseDown={() => setDrawer(null)}>
           <aside onMouseDown={(event) => event.stopPropagation()} className="absolute inset-y-0 right-0 w-full max-w-lg overflow-y-auto border-l border-white/10 bg-[#0e1724] p-5 shadow-2xl">
             <div className="flex items-start justify-between">
               <div>
-                <p className="font-mono text-[10px] text-[#68a9ff]">{drawer.id}</p>
+                <p className="text-[10px] uppercase tracking-widest text-[#68a9ff]">{drawer.documentType}</p>
                 <h2 className="mt-1 text-sm font-semibold">{drawer.title}</h2>
                 <p className="mt-1 text-[10px] text-[#7f8da1]">
                   {drawer.documentType} · {fundName(drawer.fundId)}
@@ -455,7 +455,7 @@ export default function DocumentationPage() {
               <p>Version: v{drawer.versionNo}</p>
               <p>File ref: {drawer.fileRef || '—'}</p>
               <p>Created: {formatDate(drawer.createdAt)}</p>
-              <p>Uploaded by: {drawer.uploadedById || '—'}</p>
+              <p>Uploaded by: Staff member</p>
             </div>
             {downloadError && (
               <div className="mt-4 rounded-2xl border border-rose-400/20 bg-rose-400/[.08] p-3 text-[10px] text-rose-200">{downloadError}</div>

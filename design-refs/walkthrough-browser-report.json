@@ -1,0 +1,35 @@
+{
+  "pass": [
+    "Login (UI — email, password, Sign in)",
+    "Static assets OK",
+    "Recon Overview",
+    "Cash Ledger",
+    "Fund Cash New batch button",
+    "Fund Cash",
+    "Broker Custodian",
+    "Exceptions row select",
+    "Exceptions",
+    "Client Statements",
+    "Trade Blotter",
+    "Orderbook row select",
+    "Orderbook",
+    "Trading positions loaded",
+    "Trading",
+    "Compliance"
+  ],
+  "feFix": [
+    {
+      "area": "Recon Overview",
+      "issue": "Expected overview content missing"
+    }
+  ],
+  "beAsk": [
+    {
+      "area": "Statements",
+      "issue": "No statement rows in table"
+    }
+  ],
+  "at": "2026-07-20T14:40:25.665Z",
+  "base": "http://localhost:3001",
+  "api": "http://localhost:3009/api"
+}

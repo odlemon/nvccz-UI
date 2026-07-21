@@ -1,18 +1,24 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ArrowDownUp, Check, ChevronDown, ChevronLeft, ChevronRight, Folder, FolderOpen, Search, SlidersHorizontal, X } from 'lucide-react'
+import { ArrowDownUp, Check, ChevronDown, Folder, FolderOpen, Search, SlidersHorizontal, X } from 'lucide-react'
 import { OpsKpiSkeleton, OpsTableSkeleton } from '@/components/investments-v2/loading-skeletons'
+import { DetailPanel } from '@/components/investments-v2/ui/detail-panel'
+import { TablePagination } from '@/components/investments-v2/ui/table-pagination'
 import { investmentOpsApi, unwrapList } from '@/lib/api/investment-ops-api'
 import type { Holding } from '@/lib/api/investments-api'
 import {
+  enrichPositionsWithInstruments,
   formatMoneyDisplay,
   mapFundTabs,
   mapHoldingsToPositions,
+  mapInstrumentsLookup,
   mapValuedPositionsPayload,
   type FundTab,
   type PositionRow,
 } from '@/lib/investments-v2/adapters/portfolio-adapter'
+
+const PAGE_SIZE = 5
 
 const card = 'rounded-[24px] border border-white/[0.06] bg-[linear-gradient(135deg,#172333_0%,#101a29_58%,#0b1420_100%)] shadow-[0_20px_60px_rgba(0,0,0,.2)]'
 const pill = 'inline-flex h-9 items-center justify-center gap-2 rounded-full border border-white/10 px-4 text-[11px] font-medium transition hover:border-white/20 hover:bg-white/[0.06]'
@@ -67,20 +73,31 @@ export default function PositionsPage() {
     setLoading(true)
     setError(null)
     try {
-      const [positionsRes, holdingsRes, overviewRes] = await Promise.all([
+      const [positionsRes, holdingsRes, overviewRes, instrumentsRes] = await Promise.all([
         investmentOpsApi.getPortfolioPositions(id),
         investmentOpsApi.getPortfolioHoldings(id),
         investmentOpsApi.getPortfolioOverview(id),
+        investmentOpsApi.listInstruments({ page: 1, pageSize: 500 }),
       ])
+
+      const instrumentLookup =
+        instrumentsRes.success !== false
+          ? mapInstrumentsLookup(unwrapList<Record<string, unknown>>(instrumentsRes.data))
+          : []
 
       const fromPositions =
         positionsRes.success ? mapValuedPositionsPayload(positionsRes.data, fund) : []
       if (fromPositions.length > 0) {
-        setPositions(fromPositions)
+        setPositions(enrichPositionsWithInstruments(fromPositions, instrumentLookup))
       } else if (holdingsRes.success) {
         const holdings = unwrapList<Holding>(holdingsRes.data)
         const nav = overviewRes.success ? overviewRes.data?.nav : null
-        setPositions(mapHoldingsToPositions(holdings, fund, nav != null ? Number(nav) : null))
+        setPositions(
+          enrichPositionsWithInstruments(
+            mapHoldingsToPositions(holdings, fund, nav != null ? Number(nav) : null),
+            instrumentLookup,
+          ),
+        )
       } else if (!positionsRes.success) {
         throw new Error(
           positionsRes.error ||
@@ -127,8 +144,8 @@ export default function PositionsPage() {
   const totalValue = positions.reduce((sum, row) => sum + row.value, 0)
   const totalPnl = positions.reduce((sum, row) => sum + row.pnl, 0)
   const cashValue = positions.filter((row) => row.type === 'Cash').reduce((sum, row) => sum + row.value, 0)
-  const totalPages = Math.max(1, Math.ceil(filtered.length / 5))
-  const rows = filtered.slice((page - 1) * 5, page * 5)
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const rows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   return (
     <main className="min-h-full bg-[#05090f] p-3 text-[#edf3fa] sm:p-5">
@@ -242,7 +259,7 @@ export default function PositionsPage() {
                     onClick={() => setSelected(row)}
                     className={`cursor-pointer border-b border-white/[0.045] transition hover:bg-white/[0.035] ${selected?.id === row.id ? 'bg-[#2f87fa]/10' : ''}`}
                   >
-                    <td className="px-4 py-3"><p className="font-semibold text-white">{row.ticker}</p><p className="mt-1 text-[9px] text-[#78879a]">{row.name}</p></td>
+                    <td className="px-4 py-3"><p className="font-semibold text-white">{row.name}</p><p className="mt-1 font-mono text-[9px] text-[#78879a]">{row.ticker}</p></td>
                     <td className="px-4 py-3"><span className={`rounded-full px-2.5 py-1 text-[9px] ${row.type === 'Cash' ? 'bg-cyan-400/10 text-cyan-300' : 'bg-[#2f87fa]/15 text-[#70adff]'}`}>{row.type}</span></td>
                     <td className="px-4 py-3 text-[#a5b0bf]">{row.sector}</td>
                     <td className="px-4 py-3 font-mono text-[#a5b0bf]">{row.currency}</td>
@@ -273,20 +290,20 @@ export default function PositionsPage() {
               </tfoot>
             </table>
           </div>
-          <footer className="flex items-center justify-between px-4 py-3 text-[10px] text-[#718096]">
-            <span>Showing {rows.length} of {filtered.length} positions</span>
-            <div className="flex items-center gap-2">
-              <button type="button" disabled={page === 1} onClick={() => setPage((p) => p - 1)} className={`${pill} h-8 w-8 px-0 disabled:opacity-30`}><ChevronLeft className="h-3.5 w-3.5" /></button>
-              <span>{page} / {totalPages}</span>
-              <button type="button" disabled={page === totalPages} onClick={() => setPage((p) => p + 1)} className={`${pill} h-8 w-8 px-0 disabled:opacity-30`}><ChevronRight className="h-3.5 w-3.5" /></button>
-            </div>
-          </footer>
+          <TablePagination
+            page={page}
+            totalPages={totalPages}
+            onPageChange={setPage}
+            rowsShown={rows.length}
+            totalRows={filtered.length}
+            pageSize={PAGE_SIZE}
+          />
         </section>
       </div>
 
-      {selected && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" onMouseDown={() => setSelected(null)}>
-          <aside onMouseDown={(e) => e.stopPropagation()} className="absolute right-0 top-0 h-full w-full max-w-lg overflow-y-auto border-l border-white/10 bg-[linear-gradient(145deg,#172333,#0b1420_70%)] p-6 shadow-2xl">
+      <DetailPanel open={Boolean(selected)} onClose={() => setSelected(null)} width="max-w-lg">
+        {selected && (
+          <>
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-[9px] uppercase tracking-[.2em] text-[#64758b]">Position detail</p>
@@ -328,9 +345,9 @@ export default function PositionsPage() {
                 ))}
               </dl>
             </section>
-          </aside>
-        </div>
-      )}
+          </>
+        )}
+      </DetailPanel>
     </main>
   )
 }

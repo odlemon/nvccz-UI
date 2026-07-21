@@ -91,7 +91,7 @@ export function SetupModal({ title, description, children, onClose, onSubmit, su
   title: string; description?: string; children: ReactNode; onClose: () => void; onSubmit: () => void; submitLabel?: string; submitDisabled?: boolean
 }) {
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm" onMouseDown={onClose}>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 dark:bg-black/75" onMouseDown={onClose}>
       <div role="dialog" aria-modal="true" onMouseDown={e => e.stopPropagation()} className="w-full max-w-lg rounded-[24px] border border-white/10 bg-[#111b29] p-5 shadow-[0_28px_90px_rgba(0,0,0,.65)]">
         <div className="mb-5 flex items-start justify-between"><div><h2 className="text-sm font-semibold text-white">{title}</h2>{description && <p className="mt-1 text-[10px] text-[#76859a]">{description}</p>}</div>
           <button type="button" onClick={onClose} className="rounded-full p-2 text-[#8391a4] hover:bg-white/10 hover:text-white"><X className="h-4 w-4" /></button>
@@ -393,16 +393,39 @@ export function ModuleSetupWorkspace({ orderSetupContent }: { orderSetupContent:
 
   const settingsRows = useMemo(() => {
     if (!setupSettings) return [] as [string, string][]
-    return Object.entries(setupSettings).map(([key, value]) => {
-      const display =
-        value == null
-          ? '—'
-          : typeof value === 'object'
-            ? JSON.stringify(value)
-            : String(value)
-      return [key.replace(/_/g, ' '), display] as [string, string]
-    })
+    const rows: [string, string][] = []
+    for (const [key, value] of Object.entries(setupSettings)) {
+      const label = key.replace(/_/g, ' ')
+      if (value == null) {
+        rows.push([label, '—'])
+      } else if (typeof value === 'boolean') {
+        rows.push([label, value ? 'Enabled' : 'Disabled'])
+      } else if (typeof value === 'object') {
+        const obj = value as Record<string, unknown>
+        if ('enabled' in obj) {
+          rows.push([label, obj.enabled ? 'Enabled' : 'Disabled'])
+        } else if ('method' in obj) {
+          rows.push([label, String(obj.method)])
+        } else {
+          for (const [subKey, subVal] of Object.entries(obj)) {
+            rows.push([
+              `${label} · ${subKey.replace(/_/g, ' ')}`,
+              subVal == null ? '—' : String(subVal),
+            ])
+          }
+        }
+      } else {
+        rows.push([label, String(value)])
+      }
+    }
+    return rows
   }, [setupSettings])
+
+  const instrumentTypeCodeOptions = useMemo(() => {
+    const fromApi = instrumentTypes.map((t) => t.typeCode).filter(Boolean)
+    const defaults = ['EQUITY', 'BOND', 'ETF', 'FUND', 'CASH', 'DERIVATIVE', 'COMMODITY']
+    return Array.from(new Set([...fromApi, ...defaults]))
+  }, [instrumentTypes])
 
   const data = referenceData[activeTab]
   const liveRows =
@@ -629,9 +652,9 @@ export function ModuleSetupWorkspace({ orderSetupContent }: { orderSetupContent:
             ) : setupIcons.length === 0 ? (
               <p className="p-5 text-[11px] text-[#8290a4]">No icons returned by the API.</p>
             ) : (
-              <div className="overflow-x-auto"><table className="w-full"><thead><tr>{['Name', 'Icon', 'ID'].map(h => <th key={h} className="bg-white/[.035] px-5 py-2.5 text-left text-[9px] font-normal text-[#738095]">{h}</th>)}</tr></thead><tbody>{setupIcons.map((row) => {
+              <div className="overflow-x-auto"><table className="w-full"><thead><tr>{['Name', 'Icon'].map(h => <th key={h} className="bg-white/[.035] px-5 py-2.5 text-left text-[9px] font-normal text-[#738095]">{h}</th>)}</tr></thead><tbody>{setupIcons.map((row) => {
                 const name = String(row.name ?? row.label ?? row.code ?? '—')
-                return <tr key={String(row.id ?? name)} className="border-b border-[#243044] last:border-0"><td className="px-5 py-3 text-[11px] text-[#e2e8f0]">{name}</td><td className="px-5 py-3 text-[#dce4ee]"><StatusIcon name={name} /></td><td className="px-5 py-3 text-[11px] text-[#8793a5]">{String(row.id ?? '—')}</td></tr>
+                return <tr key={String(row.id ?? name)} className="border-b border-[#243044] last:border-0"><td className="px-5 py-3 text-[11px] text-[#e2e8f0]">{name}</td><td className="px-5 py-3 text-[#dce4ee]"><StatusIcon name={name} /></td></tr>
               })}</tbody></table></div>
             )}
           </SetupCard>
@@ -913,9 +936,31 @@ export function ModuleSetupWorkspace({ orderSetupContent }: { orderSetupContent:
         <div className="grid gap-4 sm:grid-cols-2">
           <label>
             <span className="mb-1.5 block text-[10px] text-[#8b99ad]">
-              {modal === 'type' ? 'Type code' : modal === 'corporate' ? 'Code' : modal === 'tag' ? 'Tag code' : activeTab === 'Broker/Counterparties' ? 'Contact email' : activeTab === 'Commissions' ? 'Stakeholder profile id' : 'Code'}
+              {modal === 'type' ? 'Type code' : modal === 'subcategory' ? 'Instrument type' : modal === 'corporate' ? 'Code' : modal === 'tag' ? 'Tag code' : activeTab === 'Broker/Counterparties' ? 'Contact email' : activeTab === 'Commissions' ? 'Stakeholder profile id' : 'Code'}
             </span>
-            <input autoFocus value={draft.code} onChange={e => setDraft(v => ({ ...v, code: e.target.value }))} className={fieldClass} placeholder={modal === 'type' ? 'e.g. EQUITY' : modal === 'corporate' ? 'e.g. DIV' : modal === 'tag' ? 'e.g. CORE' : activeTab === 'Broker/Counterparties' ? 'ops@broker.com' : activeTab === 'Commissions' ? 'profile uuid' : 'e.g. EQ'} />
+            {modal === 'type' ? (
+              <select
+                value={draft.code || instrumentTypeCodeOptions[0] || 'EQUITY'}
+                onChange={(e) => setDraft((v) => ({ ...v, code: e.target.value }))}
+                className={fieldClass}
+              >
+                {instrumentTypeCodeOptions.map((code) => (
+                  <option key={code} value={code}>{code.replace(/_/g, ' ')}</option>
+                ))}
+              </select>
+            ) : modal === 'subcategory' ? (
+              <select
+                value={draft.extra || category || instrumentTypeCodeOptions[0] || ''}
+                onChange={(e) => setDraft((v) => ({ ...v, extra: e.target.value }))}
+                className={fieldClass}
+              >
+                {(categories.length ? categories : instrumentTypeCodeOptions).map((code) => (
+                  <option key={code} value={code}>{code}</option>
+                ))}
+              </select>
+            ) : (
+              <input autoFocus value={draft.code} onChange={e => setDraft(v => ({ ...v, code: e.target.value }))} className={fieldClass} placeholder={modal === 'corporate' ? 'e.g. DIV' : modal === 'tag' ? 'e.g. CORE' : activeTab === 'Broker/Counterparties' ? 'ops@broker.com' : activeTab === 'Commissions' ? 'profile uuid' : 'e.g. EQ'} />
+            )}
           </label>
           <label>
             <span className="mb-1.5 block text-[10px] text-[#8b99ad]">{activeTab === 'Commissions' ? 'Rate (bps)' : modal === 'corporate' || modal === 'tag' ? 'Display name' : 'Name'}</span>
