@@ -1,7 +1,8 @@
 'use client'
 
-import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
+import { type ReactNode, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import {
   ArrowUpRight,
   Banknote,
@@ -16,6 +17,7 @@ import {
   MoreVertical,
   Percent,
   Wallet,
+  X,
 } from 'lucide-react'
 import { useRefetchLoading } from '@/components/investments-v2/hooks/use-refetch-loading'
 import { RefetchOverlay } from '@/components/investments-v2/ui/refetch-overlay'
@@ -79,6 +81,26 @@ const FUND_ACTIVITY_LINKS: Record<
 }
 
 export default function CashLedgerPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-full bg-background p-5 sm:p-6" style={{ background: C.page, color: C.text }}>
+          <p className="text-[13px]" style={{ color: C.muted }}>
+            Loading cash ledger…
+          </p>
+        </main>
+      }
+    >
+      <CashLedgerPageInner />
+    </Suspense>
+  )
+}
+
+function CashLedgerPageInner() {
+  const searchParams = useSearchParams()
+  const deepTradeId = searchParams.get('tradeId')
+  const deepFundId = searchParams.get('fundId')
+
   const [ledgerView, setLedgerView] = useState<LedgerView>('fund')
   const [tab, setTab] = useState<(typeof tabs)[number]>('Ledger')
   const [page, setPage] = useState(1)
@@ -96,19 +118,27 @@ export default function CashLedgerPage() {
   const [cashAccounts, setCashAccounts] = useState<{ id: string; label: string }[]>([])
   const [portfolioFilter, setPortfolioFilter] = useState('All')
   const [currencyFilter, setCurrencyFilter] = useState('All')
+  const [tradeIdFilter, setTradeIdFilter] = useState(deepTradeId ?? '')
   const [asOfDate, setAsOfDate] = useState(() => new Date().toISOString().slice(0, 10))
   const isFund = ledgerView === 'fund'
   const pageSize = 20
 
   useEffect(() => {
+    if (deepTradeId) setTradeIdFilter(deepTradeId)
+  }, [deepTradeId])
+
+  useEffect(() => {
     investmentOpsApi.listPortfolios().then((res) => {
       if (res.success !== false) {
-        setPortfolios(
-          unwrapList<{ id?: string; name?: string }>(res.data).map((p) => ({
-            id: String(p.id ?? ''),
-            name: String(p.name ?? p.id ?? 'Fund'),
-          })).filter((p) => p.id),
-        )
+        const rows = unwrapList<{ id?: string; name?: string }>(res.data).map((p) => ({
+          id: String(p.id ?? ''),
+          name: String(p.name ?? p.id ?? 'Fund'),
+        })).filter((p) => p.id)
+        setPortfolios(rows)
+        if (deepFundId) {
+          const hit = rows.find((p) => p.id === deepFundId)
+          if (hit) setPortfolioFilter(hit.name)
+        }
       }
     }).catch(() => undefined)
     stockPickerCashApi.listClientCashAccounts({ page: 1, pageSize: 200 }).then((res) => {
@@ -121,7 +151,7 @@ export default function CashLedgerPage() {
         )
       }
     }).catch(() => undefined)
-  }, [])
+  }, [deepFundId])
 
   const selectedPortfolioId = useMemo(() => {
     if (portfolioFilter === 'All') return undefined
@@ -141,6 +171,7 @@ export default function CashLedgerPage() {
           accountPurpose: isFund ? 'FUND' : 'TRADING',
           ...(selectedPortfolioId ? { portfolioId: selectedPortfolioId } : {}),
           ...(currencyFilter !== 'All' ? { currency: currencyFilter } : {}),
+          ...(tradeIdFilter.trim() ? { tradeId: tradeIdFilter.trim() } : {}),
           to: asOfDate,
         }),
         stockPickerCashApi.getCashOverview().catch(() => null),
@@ -205,7 +236,7 @@ export default function CashLedgerPage() {
     } finally {
       setLoading(false)
     }
-  }, [asOfDate, cashAccounts, currencyFilter, ledgerView, page, portfolios, selectedPortfolioId])
+  }, [asOfDate, cashAccounts, currencyFilter, isFund, ledgerView, page, portfolios, selectedPortfolioId, tradeIdFilter])
 
   useEffect(() => {
     void withRefetch(loadLedger)
@@ -246,6 +277,11 @@ export default function CashLedgerPage() {
                 ? 'Track and manage cash movements and balances across your funds.'
                 : 'Track client trading cash movements, settlements, and available balances.'}
             </p>
+            {tradeIdFilter.trim() ? (
+              <p className="mt-1 text-[11px]" style={{ color: C.blueLink }}>
+                Filtered by trade {tradeIdFilter.trim()} (BA-RC-2)
+              </p>
+            ) : null}
           </div>
           <div className="flex flex-wrap items-end gap-2.5">
             <FilterSelect
@@ -276,6 +312,34 @@ export default function CashLedgerPage() {
                 setPage(1)
               }}
             />
+            <label className="flex flex-col gap-1 text-[10px] uppercase tracking-wide" style={{ color: C.muted2 }}>
+              Trade id
+              <span className="relative inline-flex">
+                <input
+                  className="h-9 w-[180px] rounded-full border px-3 text-[12px] outline-none"
+                  style={{ background: C.control, borderColor: C.controlBorder, color: C.text }}
+                  value={tradeIdFilter}
+                  onChange={(e) => {
+                    setTradeIdFilter(e.target.value)
+                    setPage(1)
+                  }}
+                  placeholder="Filter by trade…"
+                />
+                {tradeIdFilter ? (
+                  <button
+                    type="button"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
+                    aria-label="Clear trade filter"
+                    onClick={() => {
+                      setTradeIdFilter('')
+                      setPage(1)
+                    }}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                ) : null}
+              </span>
+            </label>
           </div>
         </header>
 
@@ -333,8 +397,8 @@ export default function CashLedgerPage() {
                   <thead>
                     <tr style={{ borderBottom: `1px solid ${C.rowBorder}` }}>
                       {(isFund
-                        ? ['Date', 'Fund', 'Cash Account', 'Bank', 'Transaction Type', 'Description', 'Debit (USD)', 'Credit (USD)', 'Running Balance (USD)', 'Currency', 'Approval Status', '']
-                        : ['Date', 'Client', 'Account', 'Cash Account', 'Bank', 'Transaction Type', 'Description', 'Debit', 'Credit', 'Running Balance', 'Currency', 'Approval Status', '']
+                        ? ['Date', 'Fund', 'Cash Account', 'Bank', 'Transaction Type', 'Description', 'Trade', 'Debit (USD)', 'Credit (USD)', 'Running Balance (USD)', 'Currency', 'Approval Status', '']
+                        : ['Date', 'Client', 'Account', 'Cash Account', 'Bank', 'Transaction Type', 'Description', 'Trade', 'Debit', 'Credit', 'Running Balance', 'Currency', 'Approval Status', '']
                       ).map((h) => (
                         <th key={h || 'more'} className="px-3 py-3 text-[11px] font-medium" style={{ color: C.muted2 }}>
                           {h}
@@ -345,15 +409,19 @@ export default function CashLedgerPage() {
                   <tbody>
                     {tableBusy ? (
                       <tr>
-                        <td colSpan={13} className="p-0">
+                        <td colSpan={14} className="p-0">
                           <ReconTableSkeleton rows={8} cols={13} />
                         </td>
                       </tr>
                     ) : null}
                     {!tableBusy && rows.length === 0 ? (
                       <tr>
-                        <td colSpan={13} className="px-3 py-10 text-center text-[12px]" style={{ color: C.muted2 }}>
-                          {error ? 'Unable to load ledger.' : 'No ledger entries for this segment.'}
+                        <td colSpan={14} className="px-3 py-10 text-center text-[12px]" style={{ color: C.muted2 }}>
+                          {error
+                            ? 'Unable to load ledger.'
+                            : tradeIdFilter.trim()
+                              ? `No cash lines linked to trade ${tradeIdFilter.trim()}.`
+                              : 'No ledger entries for this segment.'}
                         </td>
                       </tr>
                     ) : null}
@@ -373,6 +441,9 @@ export default function CashLedgerPage() {
                         <td className="px-3 py-3 text-[12px]" style={{ color: C.muted }}>{row.bank}</td>
                         <td className="px-3 py-3"><TypePill type={row.type} /></td>
                         <td className="max-w-[220px] truncate px-3 py-3 text-[12px]" style={{ color: C.muted }}>{row.description}</td>
+                        <td className="px-3 py-3 font-mono text-[11px]" style={{ color: C.muted }}>
+                          {row.tradeId ?? '—'}
+                        </td>
                         <td className="px-3 py-3 text-right font-mono text-[12px]" style={{ color: row.debit === '—' ? C.muted2 : C.text }}>{row.debit}</td>
                         <td className="px-3 py-3 text-right font-mono text-[12px]" style={{ color: row.credit === '—' ? C.muted2 : C.text }}>{row.credit}</td>
                         <td className="px-3 py-3 text-right font-mono text-[12px] font-medium">{row.balance}</td>

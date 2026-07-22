@@ -1,6 +1,7 @@
 'use client'
 
-import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
+import { type ReactNode, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import {
   AlertTriangle,
   Building2,
@@ -47,6 +48,27 @@ const statusTone: Record<ReconStatus, string> = {
 }
 
 export default function BrokerCustodianPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-full bg-background p-5 sm:p-6" style={{ background: C.page, color: C.text }}>
+          <p className="text-[13px]" style={{ color: C.muted }}>
+            Loading trade recon…
+          </p>
+        </main>
+      }
+    >
+      <BrokerCustodianPageInner />
+    </Suspense>
+  )
+}
+
+function BrokerCustodianPageInner() {
+  const searchParams = useSearchParams()
+  const deepTradeId = searchParams.get('tradeId')
+  const deepFundId = searchParams.get('fundId')
+  const deepLinkApplied = useRef<string | null>(null)
+
   const [autoMatch, setAutoMatch] = useState(true)
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
@@ -67,6 +89,10 @@ export default function BrokerCustodianPage() {
   const [statusFilter, setStatusFilter] = useState('All Statuses')
 
   useEffect(() => {
+    if (deepTradeId) setSearch(deepTradeId)
+  }, [deepTradeId])
+
+  useEffect(() => {
     investmentOpsApi.listPortfolios().then((res) => {
       if (res.success !== false) {
         setPortfolios(
@@ -78,6 +104,12 @@ export default function BrokerCustodianPage() {
       }
     }).catch(() => undefined)
   }, [])
+
+  useEffect(() => {
+    if (!deepFundId || portfolios.length === 0) return
+    const hit = portfolios.find((p) => p.id === deepFundId)
+    if (hit) setPortfolioFilter(hit.name)
+  }, [deepFundId, portfolios])
 
   const selectedPortfolioId = useMemo(() => {
     if (portfolioFilter === 'All Accounts') return undefined
@@ -101,6 +133,7 @@ export default function BrokerCustodianPage() {
         pageSize: 50,
         ...(selectedPortfolioId ? { portfolioId: selectedPortfolioId } : {}),
         ...(statusApiValue ? { overallStatus: statusApiValue } : {}),
+        ...(deepTradeId ? { tradeId: deepTradeId } : {}),
       })
       const data = requireOpsData(res, 'broker-custodian workspace')
       const mapped = mapBrokerWorkspace(data)
@@ -110,14 +143,14 @@ export default function BrokerCustodianPage() {
       setCounts(mapped.counts)
       setSelectedId((prev) => prev || mapped.items[0]?.id || '')
     } catch (e) {
-      setError(opsErrorMessage(e, 'Unable to load broker & custodian workspace'))
+      setError(opsErrorMessage(e, 'Unable to load trade recon workspace'))
       setRows([])
       setTotal(0)
       setCounts({ new: 0, potential: 0, matched: 0, exception: 0, escalated: 0, total: 0 })
     } finally {
       setLoading(false)
     }
-  }, [page, selectedPortfolioId, statusApiValue])
+  }, [page, selectedPortfolioId, statusApiValue, deepTradeId])
 
   useEffect(() => {
     void withRefetch(() => load(page))
@@ -127,11 +160,32 @@ export default function BrokerCustodianPage() {
     const q = search.toLowerCase()
     if (!q) return rows
     return rows.filter((r) =>
-      `${r.internal.security} ${r.internal.reference} ${r.broker.reference} ${r.custodian.reference} ${r.detail?.isin ?? ''}`
+      `${r.id} ${r.internal.security} ${r.internal.reference} ${r.broker.reference} ${r.custodian.reference} ${r.detail?.isin ?? ''} ${String(r.raw.tradeId ?? '')}`
         .toLowerCase()
         .includes(q),
     )
   }, [rows, search])
+
+  useEffect(() => {
+    if (!deepTradeId || loading || rows.length === 0) return
+    if (deepLinkApplied.current === deepTradeId) return
+    const match = rows.find(
+      (r) =>
+        r.id === deepTradeId ||
+        String(r.raw.tradeId ?? '') === deepTradeId ||
+        r.internal.reference.includes(deepTradeId) ||
+        r.broker.reference.includes(deepTradeId),
+    )
+    if (match) {
+      deepLinkApplied.current = deepTradeId
+      setSelectedId(match.id)
+      setPanelOpen(true)
+      setActionMsg(`Focused trade recon for ${deepTradeId}`)
+    } else {
+      deepLinkApplied.current = deepTradeId
+      setActionMsg(`No recon row matched trade ${deepTradeId} yet — filter applied; ingest statements if empty.`)
+    }
+  }, [deepTradeId, loading, rows])
 
   const selected = filtered.find((r) => r.id === selectedId) ?? filtered[0]
   const queueColumns = useMemo(() => buildBrokerQueueColumns(rows, counts), [rows, counts])
@@ -174,11 +228,11 @@ export default function BrokerCustodianPage() {
         <header className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-[22px] font-semibold leading-tight tracking-[-0.01em]">Broker & Custodian Reconciliation</h1>
+              <h1 className="text-[22px] font-semibold leading-tight tracking-[-0.01em]">Trade recon</h1>
               <Info className="h-4 w-4 shrink-0" style={{ color: C.muted2 }} />
             </div>
             <p className="mt-1.5 text-[13px] leading-snug" style={{ color: C.muted }}>
-              Reconcile internal ledger positions with broker and custodian statements.
+              Three-way match: internal blotter trade × broker statement × custodian statement.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2.5">

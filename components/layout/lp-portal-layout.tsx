@@ -1,10 +1,12 @@
 "use client"
 
 import type React from "react"
-import { useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useEffect, useState } from "react"
+import { usePathname, useRouter } from "next/navigation"
+import { SharedTopbar } from "./shared-topbar"
 import { LpPortalTopbar } from "./lp-portal-topbar"
 import { LpPortalSidebar } from "./lp-portal-sidebar"
+import { MODULE_CONFIG, getModuleByPath } from "@/lib/config/modules"
 import { useRolePermissions } from "@/lib/hooks/useRolePermissions"
 import { toast } from "sonner"
 
@@ -14,8 +16,15 @@ interface LpPortalLayoutProps {
 
 export function LpPortalLayout({ children }: LpPortalLayoutProps) {
   const router = useRouter()
+  const pathname = usePathname()
+  const [currentModule, setCurrentModule] = useState("lp-portal")
   const { hasModuleAccess, isLoading, isAuthenticated } = useRolePermissions()
   const canAccessPortal = isAuthenticated && hasModuleAccess("lp-portal")
+
+  useEffect(() => {
+    const module = getModuleByPath(pathname)
+    if (module) setCurrentModule(module.id)
+  }, [pathname])
 
   useEffect(() => {
     if (isLoading) return
@@ -29,9 +38,15 @@ export function LpPortalLayout({ children }: LpPortalLayoutProps) {
     }
   }, [isLoading, isAuthenticated, hasModuleAccess, router])
 
+  const handleModuleSelect = (module: string) => {
+    setCurrentModule(module)
+    const moduleConfig = MODULE_CONFIG.find((m) => m.id === module)
+    if (moduleConfig) window.location.href = moduleConfig.path
+  }
+
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+      <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="size-8 animate-spin rounded-full border-2 border-slate-200 border-t-blue-600" />
       </div>
     )
@@ -40,16 +55,15 @@ export function LpPortalLayout({ children }: LpPortalLayoutProps) {
   if (!canAccessPortal) return null
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-950">
+    <div className="flex min-h-screen flex-col bg-background">
+      <SharedTopbar onModuleSelect={handleModuleSelect} currentModule={currentModule} />
       <LpPortalTopbar />
-      <div className="flex h-[calc(100vh-3.5rem)] min-h-0 sm:h-[calc(100vh-4rem)]">
-        <div className="hidden h-full lg:block">
+      <div className="flex min-h-0 flex-1">
+        <div className="hidden h-full shrink-0 lg:block">
           <LpPortalSidebar />
         </div>
         <main className="min-w-0 flex-1 overflow-y-auto bg-[#f5f7fb]">
-          <div className="mx-auto min-h-full w-full max-w-[1500px] p-3 lg:p-4">
-            {children}
-          </div>
+          <div className="mx-auto min-h-full w-full max-w-[1500px] p-3 lg:p-4">{children}</div>
         </main>
       </div>
     </div>

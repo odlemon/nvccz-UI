@@ -1,8 +1,8 @@
 "use client"
 
 import { useRef, useEffect, useMemo } from "react"
-import { MODULE_CONFIG, ModuleConfig } from "@/lib/config/modules"
-import { useRouter } from "next/navigation"
+import { createPortal } from "react-dom"
+import { MODULE_CONFIG } from "@/lib/config/modules"
 import { useRolePermissions } from "@/lib/hooks/useRolePermissions"
 
 interface AppSwitcherDropdownProps {
@@ -14,23 +14,11 @@ interface AppSwitcherDropdownProps {
 
 export function AppSwitcherDropdown({ isOpen, onClose, onModuleSelect, currentModule }: AppSwitcherDropdownProps) {
   const dropdownRef = useRef<HTMLDivElement>(null)
-  const router = useRouter()
-  const { accessibleModules, hasModuleAccess, isLoading, isAuthenticated } = useRolePermissions()
+  const { hasModuleAccess, isLoading, isAuthenticated } = useRolePermissions()
 
-  // Filter modules based on user's role permissions
-  // Must be called before any conditional returns
   const modulesToDisplay = useMemo(() => {
-    if (!isAuthenticated || isLoading) {
-      // If not authenticated or still loading, show no modules
-      return []
-    }
-
-    // Filter modules based on accessible modules from role permissions
-    return MODULE_CONFIG.filter((module) => {
-      // Check if module ID is in accessible modules
-      // We use hasModuleAccess which is already reactive to the user's role
-      return hasModuleAccess(module.id)
-    })
+    if (!isAuthenticated || isLoading) return []
+    return MODULE_CONFIG.filter((module) => hasModuleAccess(module.id))
   }, [isAuthenticated, isLoading, hasModuleAccess])
 
   useEffect(() => {
@@ -39,33 +27,50 @@ export function AppSwitcherDropdown({ isOpen, onClose, onModuleSelect, currentMo
         onClose()
       }
     }
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose()
+    }
 
     if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside)
+      document.addEventListener("mousedown", handleClickOutside)
+      document.addEventListener("keydown", handleEscape)
     }
 
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener("mousedown", handleClickOutside)
+      document.removeEventListener("keydown", handleEscape)
     }
   }, [isOpen, onClose])
 
-  if (!isOpen) return null
+  useEffect(() => {
+    if (!isOpen) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+    return () => {
+      document.body.style.overflow = prev
+    }
+  }, [isOpen])
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-20">
-      {/* Background Blur Overlay - starts below topbar */}
-      <div className="absolute top-20 left-0 right-0 bottom-0 bg-black/20 backdrop-blur-sm" />
+  if (!isOpen || typeof document === "undefined") return null
+
+  return createPortal(
+    <div className="fixed inset-0 z-[120] flex items-start justify-center pt-16 sm:pt-20 px-3 sm:px-4 pb-4">
+      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} aria-hidden />
 
       <div
         ref={dropdownRef}
-        className="relative bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-2xl p-6 w-[90vw] max-w-4xl mx-4"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Select Module"
+        className="relative z-10 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col max-h-[calc(100vh-5.5rem)] sm:max-h-[calc(100vh-6.5rem)]"
       >
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-medium text-gray-900 dark:text-white">Select Module</h2>
+        <div className="flex items-center justify-between gap-3 shrink-0 px-4 sm:px-6 pt-4 sm:pt-6 pb-3 sm:pb-4 border-b border-gray-100 dark:border-gray-800">
+          <h2 className="text-lg sm:text-xl font-medium text-gray-900 dark:text-white">Select Module</h2>
           <button
+            type="button"
             onClick={onClose}
-            className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center justify-center"
+            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex items-center justify-center shrink-0"
+            aria-label="Close"
           >
             <svg className="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -73,82 +78,73 @@ export function AppSwitcherDropdown({ isOpen, onClose, onModuleSelect, currentMo
           </button>
         </div>
 
-        {/* Loading State */}
-        {isLoading && (
-          <div className="flex items-center justify-center py-12">
-            <div className="w-8 h-8 border-4 border-gray-200 border-t-blue-500 rounded-full animate-spin" />
-          </div>
-        )}
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 sm:px-6 py-4 sm:py-5">
+          {isLoading && (
+            <div className="flex items-center justify-center py-12">
+              <div className="w-8 h-8 border-4 border-gray-200 border-t-blue-500 rounded-full animate-spin" />
+            </div>
+          )}
 
-        {/* Grid of Module Cards */}
-        {!isLoading && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-            {modulesToDisplay.map((module) => {
-              const Icon = module.icon
-              const isActive = currentModule === module.id
+          {!isLoading && (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+              {modulesToDisplay.map((module) => {
+                const Icon = module.icon
+                const isActive = currentModule === module.id
 
-              return (
-                <div
-                  key={module.id}
-                  onClick={(e) => {
-                    window.location.href = module.path
-                  }}
-                  className={`
-                    group relative p-4 rounded-xl cursor-pointer transition-all duration-200
-                    hover:shadow-lg hover:scale-105 hover:bg-gray-50 dark:hover:bg-gray-800
-                    ${isActive
-                      ? 'bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-500 shadow-md'
-                      : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-                    }
-                  `}
-                >
-                  {/* Icon Container */}
-                  <div
-                    className="w-16 h-16 mx-auto mb-3 rounded-xl flex items-center justify-center shadow-sm group-hover:shadow-md transition-all duration-200 relative overflow-hidden"
-                    style={{
-                      background: `linear-gradient(135deg, ${module.color} 0%, ${module.color}CC 100%)`,
-                      border: `2px solid ${module.color}`
+                return (
+                  <button
+                    type="button"
+                    key={module.id}
+                    onClick={() => {
+                      onModuleSelect(module.id)
+                      window.location.href = module.path
                     }}
+                    className={`
+                      group relative p-3 sm:p-4 rounded-xl text-left cursor-pointer transition-all duration-200
+                      hover:shadow-md hover:bg-gray-50 dark:hover:bg-gray-800
+                      ${
+                        isActive
+                          ? "bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-500 shadow-md"
+                          : "bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
+                      }
+                    `}
                   >
-                    <Icon
-                      size={32}
-                      style={{
-                        color: module.color,
-                        filter: `drop-shadow(0 0 0 ${module.color})`
-                      }}
-                    />
-                  </div>
-
-                  {/* Label */}
-                  <div className="text-center">
-                    <span className={`
-                      text-sm leading-tight text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white
-                      ${isActive ? 'font-medium text-blue-700 dark:text-blue-300' : 'font-normal'}
-                    `}>
-                      {module.name}
-                    </span>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      {module.description}
+                    <div
+                      className="w-12 h-12 sm:w-14 sm:h-14 mx-auto mb-2.5 sm:mb-3 rounded-xl flex items-center justify-center shadow-sm group-hover:shadow-md transition-all duration-200 border-2 bg-white"
+                      style={{ borderColor: module.color }}
+                    >
+                      <Icon className="h-6 w-6 sm:h-7 sm:w-7" style={{ color: module.color }} />
                     </div>
-                  </div>
 
-                  {/* Active Indicator */}
-                  {isActive && (
-                    <div className="absolute top-2 right-2 w-3 h-3 bg-blue-500 rounded-full"></div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        )}
+                    <div className="text-center">
+                      <span
+                        className={`
+                        block text-xs sm:text-sm leading-tight text-gray-700 dark:text-gray-300 group-hover:text-gray-900 dark:group-hover:text-white
+                        ${isActive ? "font-medium text-blue-700 dark:text-blue-300" : "font-normal"}
+                      `}
+                      >
+                        {module.name}
+                      </span>
+                      <div className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">
+                        {module.description}
+                      </div>
+                    </div>
 
-        {/* Empty State */}
-        {!isLoading && modulesToDisplay.length === 0 && (
-          <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-            <p>No modules available</p>
-          </div>
-        )}
+                    {isActive && <div className="absolute top-2 right-2 w-2.5 h-2.5 sm:w-3 sm:h-3 bg-blue-500 rounded-full" />}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+
+          {!isLoading && modulesToDisplay.length === 0 && (
+            <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+              <p>No modules available</p>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

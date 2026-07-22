@@ -234,7 +234,7 @@ class FundPerformanceReportingApiService {
    * intentionally NOT routed through apiClient. Returns a bare URL for <a href>/window.open.
    */
   getDownloadUrl(token: string): string {
-    const base = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3009/api'
+    const base = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://31.220.82.129:3009/api'
     return `${base}${this.BASE}/download/${token}`
   }
 }

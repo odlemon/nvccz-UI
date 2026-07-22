@@ -1,6 +1,8 @@
 "use client"
 
 import * as React from "react"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
 import {
   CalendarDays,
   Check,
@@ -20,12 +22,23 @@ import {
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { useLpPortal } from "@/components/lp-portal/lp-portal-context"
+import { useLpFundScope, useLpPortal } from "@/components/lp-portal/lp-portal-context"
+import { lpPortalApi } from "@/lib/api/lp-portal-api"
+import { createIdempotencyKey, downloadBlob, formatMoneyCompact, parseDecimal } from "@/lib/lp-portal/format"
+import { resolveDocumentHref } from "@/lib/lp-portal/navigation"
+import { useLpCapitalCallDetail, useLpCapitalCalls, useLpDistributions } from "@/lib/lp-portal/hooks"
 import { cn } from "@/lib/utils"
 
 type CallStatus = "Issued" | "Paid" | "Overdue"
@@ -44,6 +57,7 @@ interface CapitalCallRow {
   status: CallStatus
   dueSoon?: boolean
   daysUntilDue?: number
+  acknowledgedAt?: string | null
 }
 
 interface DistributionRow {
@@ -55,154 +69,8 @@ interface DistributionRow {
   adjustments: number
   netPaid: number
   paymentDate: string
+  documentId?: string | null
 }
-
-const MOCK_CALLS: CapitalCallRow[] = [
-  {
-    id: "cc-7",
-    callNo: 7,
-    fund: "Arcus Growth Fund V, L.P.",
-    issueDate: "May 20, 2025",
-    dueDate: "Jun 5, 2025",
-    amount: 6_250_000,
-    paid: 0,
-    outstanding: 6_250_000,
-    status: "Issued",
-    dueSoon: true,
-    daysUntilDue: 5,
-  },
-  {
-    id: "cc-6",
-    callNo: 6,
-    fund: "Arcus Growth Fund V, L.P.",
-    issueDate: "Feb 12, 2025",
-    dueDate: "Feb 28, 2025",
-    amount: 4_100_000,
-    paid: 4_100_000,
-    outstanding: 0,
-    status: "Paid",
-  },
-  {
-    id: "cc-5",
-    callNo: 5,
-    fund: "Arcus Growth Fund V, L.P.",
-    issueDate: "Jan 8, 2025",
-    dueDate: "Jan 22, 2025",
-    amount: 2_850_000,
-    paid: 1_200_000,
-    outstanding: 1_650_000,
-    status: "Overdue",
-    dueSoon: true,
-  },
-  {
-    id: "cc-4",
-    callNo: 4,
-    fund: "Arcus Growth Fund V, L.P.",
-    issueDate: "Nov 3, 2024",
-    dueDate: "Nov 20, 2024",
-    amount: 5_000_000,
-    paid: 5_000_000,
-    outstanding: 0,
-    status: "Paid",
-  },
-  {
-    id: "cc-3b",
-    callNo: 3,
-    fund: "Arcus Growth Fund V, L.P.",
-    issueDate: "Sep 15, 2024",
-    dueDate: "Sep 30, 2024",
-    amount: 3_750_000,
-    paid: 3_750_000,
-    outstanding: 0,
-    status: "Paid",
-  },
-  {
-    id: "cc-3a",
-    callNo: 3,
-    fund: "Arcus Growth Fund V, L.P.",
-    issueDate: "Jul 2, 2024",
-    dueDate: "Jul 18, 2024",
-    amount: 2_200_000,
-    paid: 2_200_000,
-    outstanding: 0,
-    status: "Paid",
-  },
-  {
-    id: "cc-2",
-    callNo: 2,
-    fund: "Arcus Growth Fund V, L.P.",
-    issueDate: "Apr 10, 2024",
-    dueDate: "Apr 25, 2024",
-    amount: 1_800_000,
-    paid: 1_800_000,
-    outstanding: 0,
-    status: "Paid",
-  },
-  {
-    id: "cc-1",
-    callNo: 1,
-    fund: "Arcus Buyout Fund IV, L.P.",
-    issueDate: "Jan 15, 2024",
-    dueDate: "Jan 30, 2024",
-    amount: 3_000_000,
-    paid: 3_000_000,
-    outstanding: 0,
-    status: "Paid",
-  },
-]
-
-const MOCK_DISTRIBUTIONS: DistributionRow[] = [
-  {
-    id: "d-1",
-    ref: "DIST-2025-041",
-    fund: "Arcus Growth Fund V, L.P.",
-    type: "Return of Capital",
-    gross: 1_250_000,
-    adjustments: 25_000,
-    netPaid: 1_225_000,
-    paymentDate: "Apr 18, 2025",
-  },
-  {
-    id: "d-2",
-    ref: "DIST-2025-028",
-    fund: "Arcus Credit Opportunities II",
-    type: "Income",
-    gross: 420_000,
-    adjustments: 8_400,
-    netPaid: 411_600,
-    paymentDate: "Mar 12, 2025",
-  },
-  {
-    id: "d-3",
-    ref: "DIST-2025-015",
-    fund: "Arcus Growth Fund IV, L.P.",
-    type: "Return of Capital",
-    gross: 980_000,
-    adjustments: 0,
-    netPaid: 980_000,
-    paymentDate: "Feb 4, 2025",
-  },
-  {
-    id: "d-4",
-    ref: "DIST-2024-112",
-    fund: "Arcus Growth Fund V, L.P.",
-    type: "Income",
-    gross: 315_000,
-    adjustments: 6_300,
-    netPaid: 308_700,
-    paymentDate: "Dec 20, 2024",
-  },
-  {
-    id: "d-5",
-    ref: "DIST-2024-098",
-    fund: "Arcus Credit Opportunities II",
-    type: "Return of Capital",
-    gross: 760_000,
-    adjustments: 15_200,
-    netPaid: 744_800,
-    paymentDate: "Oct 8, 2024",
-  },
-]
 
 function money(value: number) {
   return new Intl.NumberFormat("en-US", {
@@ -210,15 +78,6 @@ function money(value: number) {
     currency: "USD",
     maximumFractionDigits: 0,
   }).format(value)
-}
-
-function downloadMockFile(filename: string, body: string) {
-  const url = URL.createObjectURL(new Blob([body], { type: "text/plain;charset=utf-8" }))
-  const anchor = document.createElement("a")
-  anchor.href = url
-  anchor.download = filename
-  anchor.click()
-  URL.revokeObjectURL(url)
 }
 
 function StatusBadge({ status }: { status: CallStatus }) {
@@ -377,42 +236,90 @@ function PrimaryAction({
 
 export function LpCapitalActivityScreen({
   initialTab = "calls",
+  initialCallId,
 }: {
   initialTab?: ActivityTab
+  initialCallId?: string
 }) {
-  const { asOfDate } = useLpPortal()
+  const router = useRouter()
+  const { asOfDate, lpRole } = useLpPortal()
+  const { fundId } = useLpFundScope()
+  const { data: callsData, loading: callsLoading, error: callsError, reload: reloadCalls } = useLpCapitalCalls()
+  const { data: distributionsData, loading: distributionsLoading, error: distributionsError, reload: reloadDistributions } = useLpDistributions()
   const [activeTab, setActiveTab] = React.useState<ActivityTab>(initialTab)
-  const [selectedCallId, setSelectedCallId] = React.useState<string | null>(MOCK_CALLS[0]?.id ?? null)
+  const [selectedCallId, setSelectedCallId] = React.useState<string | null>(null)
+  const { data: callDetailData, reload: reloadCallDetail } = useLpCapitalCallDetail(selectedCallId)
   const [acknowledged, setAcknowledged] = React.useState<Record<string, boolean>>({})
   const [copied, setCopied] = React.useState(false)
   const [showAllCalls, setShowAllCalls] = React.useState(false)
   const [showAllDistributions, setShowAllDistributions] = React.useState(false)
+  const [wiringDialogOpen, setWiringDialogOpen] = React.useState(false)
+  const [actionLoading, setActionLoading] = React.useState<string | null>(null)
   const paymentInputRef = React.useRef<HTMLInputElement>(null)
+  const canWrite = lpRole !== "VIEWER"
 
   React.useEffect(() => {
     setActiveTab(initialTab)
   }, [initialTab])
 
-  const selectedCall = MOCK_CALLS.find((call) => call.id === selectedCallId) ?? null
-  const isAcknowledged = selectedCall ? Boolean(acknowledged[selectedCall.id]) : false
+  const calls = callsData?.calls ?? []
+  const distributions = distributionsData?.items ?? []
+  const summary = callsData?.summary
+
+  React.useEffect(() => {
+    if (initialCallId) {
+      setSelectedCallId(initialCallId)
+      setActiveTab("calls")
+    }
+  }, [initialCallId])
+
+  React.useEffect(() => {
+    if (!initialCallId && !selectedCallId && calls.length > 0) {
+      setSelectedCallId(calls[0].id)
+    }
+  }, [calls, selectedCallId, initialCallId])
+
+  const selectedCall = calls.find((call) => call.id === selectedCallId) ?? null
+  const callDetail = callDetailData?.detail ?? null
+  const callDocuments = callDetailData?.documents ?? []
+  const isAcknowledged = selectedCall
+    ? Boolean(acknowledged[selectedCall.id] || selectedCall.acknowledgedAt || callDetail?.acknowledgedAt)
+    : false
   const showDetailPanel = activeTab === "calls" && Boolean(selectedCall)
 
-  const visibleCalls = showAllCalls ? MOCK_CALLS : MOCK_CALLS.slice(0, 8)
+  const visibleCalls = showAllCalls ? calls : calls.slice(0, 8)
   const visibleDistributions =
-    activeTab === "distributions" || showAllDistributions
-      ? MOCK_DISTRIBUTIONS
-      : MOCK_DISTRIBUTIONS.slice(0, 3)
+    activeTab === "distributions" || showAllDistributions ? distributions : distributions.slice(0, 3)
 
-  const wiringReference = selectedCall
-    ? `AGFV Call ${selectedCall.callNo} – Investor ID ACC-001234`
-    : ""
+  const wiringReference = callDetail?.wiring.reference ?? ""
 
-  const acknowledgeCall = (callId: string) => {
-    setAcknowledged((current) => ({ ...current, [callId]: true }))
-    toast.success("Capital call acknowledged")
+  const paidCallCount = summary?.paidCallCount ?? 0
+  const dueSoonCount = summary?.dueSoonCount ?? 0
+  const dueSoonAmount = parseDecimal(summary?.dueSoonAmount)
+  const totalDistributions = parseDecimal(summary?.totalDistributions)
+  const upcomingDistributionNotices = summary?.upcomingDistributionNotices
+
+  const loading = callsLoading || distributionsLoading
+  const error = callsError ?? distributionsError
+
+  const acknowledgeCall = async (callId: string) => {
+    if (!canWrite) return
+    setActionLoading(`ack-${callId}`)
+    try {
+      await lpPortalApi.acknowledgeCapitalCall(callId, createIdempotencyKey())
+      setAcknowledged((current) => ({ ...current, [callId]: true }))
+      toast.success("Capital call acknowledged")
+      void reloadCalls()
+      void reloadCallDetail()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to acknowledge capital call")
+    } finally {
+      setActionLoading(null)
+    }
   }
 
   const copyReference = async () => {
+    if (!wiringReference) return
     try {
       await navigator.clipboard.writeText(wiringReference)
       setCopied(true)
@@ -423,73 +330,140 @@ export function LpCapitalActivityScreen({
     }
   }
 
-  const downloadNotice = (call: CapitalCallRow) => {
-    downloadMockFile(
-      `Call-Notice-No-${call.callNo}.txt`,
-      [
-        `Capital Call Notice`,
-        `Call No. ${call.callNo}`,
-        `Fund: ${call.fund}`,
-        `Issue Date: ${call.issueDate}`,
-        `Due Date: ${call.dueDate}`,
-        `Amount Due: ${money(call.outstanding)}`,
-        ``,
-        `This is a mock portal download for UI demonstration.`,
-      ].join("\n"),
-    )
-    toast.success(`Downloaded Call Notice — Call No. ${call.callNo}`)
+  const downloadNotice = async (call: CapitalCallRow) => {
+    setActionLoading(`notice-${call.id}`)
+    try {
+      const blob = await lpPortalApi.downloadCapitalCallNotice(call.id)
+      downloadBlob(blob, `Call-Notice-No-${call.callNo}.pdf`)
+      toast.success(`Downloaded Call Notice — Call No. ${call.callNo}`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to download notice")
+    } finally {
+      setActionLoading(null)
+    }
   }
 
-  const downloadStatement = () => {
-    downloadMockFile(
-      "Distribution-Statement.txt",
-      [
-        "Distribution Statement",
-        `As of: ${asOfDate}`,
-        "",
-        ...MOCK_DISTRIBUTIONS.map(
-          (row) =>
-            `${row.ref} | ${row.fund} | ${row.type} | Gross ${money(row.gross)} | Adj (${money(row.adjustments)}) | Net ${money(row.netPaid)} | ${row.paymentDate}`,
-        ),
-        "",
-        "This is a mock portal download for UI demonstration.",
-      ].join("\n"),
-    )
-    toast.success("Downloaded distribution statement")
+  const viewNotice = async (call: CapitalCallRow) => {
+    setSelectedCallId(call.id)
+    setActionLoading(`view-${call.id}`)
+    try {
+      const docsRes = await lpPortalApi.getCapitalCallDocuments(call.id)
+      const doc = docsRes.data[0]
+      if (doc?.id) {
+        router.push(resolveDocumentHref(doc.id))
+        return
+      }
+      const blob = await lpPortalApi.downloadCapitalCallNotice(call.id)
+      const url = URL.createObjectURL(blob)
+      window.open(url, "_blank", "noopener,noreferrer")
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not open notice")
+    } finally {
+      setActionLoading(null)
+    }
   }
 
-  const downloadDistributionPdf = (row: DistributionRow) => {
-    downloadMockFile(
-      `${row.ref}.txt`,
-      [
-        `Distribution Document`,
-        `Reference: ${row.ref}`,
-        `Fund: ${row.fund}`,
-        `Type: ${row.type}`,
-        `Gross: ${money(row.gross)}`,
-        `Adjustments: (${money(row.adjustments)})`,
-        `Net Paid: ${money(row.netPaid)}`,
-        `Payment Date: ${row.paymentDate}`,
-        "",
-        "This is a mock portal download for UI demonstration.",
-      ].join("\n"),
-    )
-    toast.success(`Downloaded ${row.ref}`)
+  const downloadStatement = async () => {
+    setActionLoading("statement")
+    try {
+      const blob = await lpPortalApi.downloadDistributionStatement({ fundId, asOfDate })
+      downloadBlob(blob, "Distribution-Statement.pdf")
+      toast.success("Downloaded distribution statement")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to download statement")
+    } finally {
+      setActionLoading(null)
+    }
   }
 
-  const downloadLinkedDocument = (name: string) => {
-    downloadMockFile(
-      `${name.replace(/[^\w.-]+/g, "-")}.txt`,
-      `${name}\n\nThis is a mock portal download for UI demonstration.`,
-    )
-    toast.success(`Downloaded ${name}`)
+  const downloadDistributionPdf = async (row: DistributionRow) => {
+    setActionLoading(`dist-${row.id}`)
+    try {
+      const blob = await lpPortalApi.downloadDistribution(row.id)
+      downloadBlob(blob, `${row.ref}.pdf`)
+      toast.success(`Downloaded ${row.ref}`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to download distribution")
+    } finally {
+      setActionLoading(null)
+    }
   }
 
-  const onPaymentConfirmation = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const downloadLinkedDocument = async (docId: string, name: string) => {
+    setActionLoading(`doc-${docId}`)
+    try {
+      const blob = await lpPortalApi.downloadDocument(docId)
+      downloadBlob(blob, `${name.replace(/[^\w.-]+/g, "-")}.pdf`)
+      toast.success(`Downloaded ${name}`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to download document")
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  const onPaymentConfirmation = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
-    if (!file || !selectedCall) return
-    toast.success(`Payment confirmation uploaded for Call No. ${selectedCall.callNo}: ${file.name}`)
-    event.target.value = ""
+    if (!file || !selectedCall || !canWrite) return
+    setActionLoading(`payment-${selectedCall.id}`)
+    try {
+      const formData = new FormData()
+      formData.append("file", file)
+      await lpPortalApi.uploadPaymentConfirmation(selectedCall.id, formData, createIdempotencyKey())
+      toast.success(`Payment confirmation uploaded for Call No. ${selectedCall.callNo}: ${file.name}`)
+      void reloadCalls()
+      void reloadCallDetail()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to upload payment confirmation")
+    } finally {
+      setActionLoading(null)
+      event.target.value = ""
+    }
+  }
+
+  const timelineSteps = React.useMemo(() => {
+    if (callDetail?.timeline?.length) {
+      return callDetail.timeline.map((step) => ({
+        label: step.code.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+        detail: step.at ? new Date(step.at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : step.completed ? "Complete" : "Pending",
+        state: step.completed ? ("complete" as const) : ("pending" as const),
+      }))
+    }
+    if (!selectedCall) return []
+    return [
+      { label: "Call Issued", detail: selectedCall.issueDate, state: "complete" as const },
+      { label: "Acknowledged", detail: isAcknowledged ? "Confirmed" : "Pending", state: isAcknowledged ? ("complete" as const) : ("pending" as const) },
+      { label: "Payment Received", detail: selectedCall.status === "Paid" ? "Matched" : "Pending", state: selectedCall.status === "Paid" ? ("complete" as const) : ("pending" as const) },
+      { label: "Call Closed", detail: selectedCall.status === "Paid" ? "Complete" : "Pending", state: selectedCall.status === "Paid" ? ("complete" as const) : ("pending" as const) },
+    ]
+  }, [callDetail?.timeline, isAcknowledged, selectedCall])
+
+  if (loading && !callsData && !distributionsData) {
+    return (
+      <div className="space-y-4">
+        <div className="h-8 w-72 animate-pulse rounded bg-slate-100" />
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="h-24 animate-pulse rounded-xl bg-slate-100" />
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  if (error && !callsData && !distributionsData) {
+    return (
+      <div className="space-y-4">
+        <h1 className="text-2xl font-bold tracking-tight text-slate-950">Capital Calls & Distributions</h1>
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-6 text-center">
+          <p className="text-sm text-red-700">{error}</p>
+          <Button type="button" variant="outline" className="mt-4 rounded-full" onClick={() => { void reloadCalls(); void reloadDistributions() }}>
+            Try Again
+          </Button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -545,8 +519,8 @@ export function LpCapitalActivityScreen({
               iconBg="bg-[#e8f1ff]"
               iconColor="text-[#2563eb]"
               label="Outstanding Calls"
-              value="$24.68M"
-              footer="8 Calls"
+              value={formatMoneyCompact(summary?.outstanding ?? 0, summary?.currencyCode)}
+              footer={`${summary?.openCount ?? 0} Calls`}
               onFooterClick={() => setActiveTab("calls")}
             />
             <KpiCard
@@ -554,8 +528,8 @@ export function LpCapitalActivityScreen({
               iconBg="bg-[#e7f8ef]"
               iconColor="text-[#16a34a]"
               label="Paid Calls"
-              value="$156.42M"
-              footer="42 Calls"
+              value={formatMoneyCompact(summary?.paidYtd ?? 0, summary?.currencyCode)}
+              footer={`${paidCallCount} Calls`}
               onFooterClick={() => setActiveTab("calls")}
             />
             <KpiCard
@@ -563,8 +537,8 @@ export function LpCapitalActivityScreen({
               iconBg="bg-[#fff1e8]"
               iconColor="text-[#f97316]"
               label="Upcoming Due Amount"
-              value="$6.35M"
-              footer="3 Calls Due"
+              value={formatMoneyCompact(dueSoonAmount, summary?.currencyCode)}
+              footer={`${dueSoonCount} Calls Due`}
               onFooterClick={() => setActiveTab("calls")}
             />
             <KpiCard
@@ -572,19 +546,22 @@ export function LpCapitalActivityScreen({
               iconBg="bg-[#f3e8ff]"
               iconColor="text-[#7c3aed]"
               label="Total Distributions"
-              value="$78.34M"
-              footer="Since Inception"
+              value={formatMoneyCompact(totalDistributions, summary?.currencyCode)}
+              footer={
+                upcomingDistributionNotices
+                  ? `${upcomingDistributionNotices.count} Upcoming Notice${upcomingDistributionNotices.count === 1 ? "" : "s"}`
+                  : "Since Inception"
+              }
               onFooterClick={() => setActiveTab("distributions")}
             />
             <KpiCard
               icon={<FileText className="size-4" strokeWidth={2} />}
               iconBg="bg-[#e6faf8]"
               iconColor="text-[#0d9488]"
-              label="Upcoming Distribution Notices"
-              value="$3.25M"
-              footer="TVPI"
-              footerExtra={<span className="text-[#ef4444]"> (Net)</span>}
-              onFooterClick={() => setActiveTab("distributions")}
+              label="Overdue Calls"
+              value={formatMoneyCompact(summary?.overdue ?? 0, summary?.currencyCode)}
+              footer={`${calls.filter((call) => call.status === "Overdue").length} Overdue`}
+              onFooterClick={() => setActiveTab("calls")}
             />
           </div>
 
@@ -597,33 +574,28 @@ export function LpCapitalActivityScreen({
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <OutlineAction
-                    disabled={!selectedCall}
-                    onClick={() => {
-                      if (!selectedCall) return
-                      toast.message(`Viewing notice for Call No. ${selectedCall.callNo}`, {
-                        description: selectedCall.fund,
-                      })
-                    }}
+                    disabled={!selectedCall || Boolean(actionLoading)}
+                    onClick={() => selectedCall && void viewNotice(selectedCall)}
                   >
                     <Eye className="size-3.5" />
                     View Notice
                   </OutlineAction>
                   <OutlineAction
-                    disabled={!selectedCall}
-                    onClick={() => selectedCall && downloadNotice(selectedCall)}
+                    disabled={!selectedCall || Boolean(actionLoading)}
+                    onClick={() => selectedCall && void downloadNotice(selectedCall)}
                   >
                     <Download className="size-3.5" />
                     Download Notice
                   </OutlineAction>
                   <PrimaryAction
-                    disabled={!selectedCall || isAcknowledged}
-                    onClick={() => selectedCall && acknowledgeCall(selectedCall.id)}
+                    disabled={!selectedCall || isAcknowledged || !canWrite || Boolean(actionLoading)}
+                    onClick={() => selectedCall && void acknowledgeCall(selectedCall.id)}
                   >
                     <Download className="size-3.5" />
                     Acknowledge
                   </PrimaryAction>
                   <OutlineAction
-                    disabled={!selectedCall}
+                    disabled={!selectedCall || !canWrite || Boolean(actionLoading)}
                     onClick={() => paymentInputRef.current?.click()}
                   >
                     <Sparkles className="size-3.5" />
@@ -703,24 +675,25 @@ export function LpCapitalActivityScreen({
                                 <DropdownMenuItem
                                   onClick={() => {
                                     setSelectedCallId(row.id)
-                                    toast.message(`Viewing notice for Call No. ${row.callNo}`)
+                                    void viewNotice(row)
                                   }}
                                 >
                                   <Eye className="size-3.5" />
                                   View Notice
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => downloadNotice(row)}>
+                                <DropdownMenuItem onClick={() => void downloadNotice(row)}>
                                   <Download className="size-3.5" />
                                   Download Notice
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
-                                  disabled={Boolean(acknowledged[row.id]) || row.status === "Paid"}
-                                  onClick={() => acknowledgeCall(row.id)}
+                                  disabled={!canWrite || Boolean(acknowledged[row.id] || row.acknowledgedAt) || row.status === "Paid"}
+                                  onClick={() => void acknowledgeCall(row.id)}
                                 >
                                   <Check className="size-3.5" />
                                   Acknowledge
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
+                                  disabled={!canWrite}
                                   onClick={() => {
                                     setSelectedCallId(row.id)
                                     window.setTimeout(() => paymentInputRef.current?.click(), 0)
@@ -743,10 +716,7 @@ export function LpCapitalActivityScreen({
                 <button
                   type="button"
                   className="inline-flex items-center gap-1 text-[12px] font-semibold text-[#2563eb] hover:underline"
-                  onClick={() => {
-                    setShowAllCalls(true)
-                    toast.message("Showing all capital calls")
-                  }}
+                  onClick={() => setShowAllCalls(true)}
                 >
                   View all Capital Calls
                   <span aria-hidden>→</span>
@@ -766,7 +736,7 @@ export function LpCapitalActivityScreen({
                 <h2 className="text-sm font-semibold text-slate-900">Distributions</h2>
                 <Info className="size-3.5 text-slate-400" aria-hidden />
               </div>
-              <OutlineAction onClick={downloadStatement}>
+              <OutlineAction disabled={Boolean(actionLoading)} onClick={() => void downloadStatement()}>
                 <Download className="size-3.5" />
                 Download Statement
               </OutlineAction>
@@ -806,8 +776,11 @@ export function LpCapitalActivityScreen({
                         <button
                           type="button"
                           className="inline-flex items-center justify-center"
-                          aria-label={`Download ${row.ref} PDF`}
-                          onClick={() => downloadDistributionPdf(row)}
+                          aria-label={`Open ${row.ref} document`}
+                          onClick={() => {
+                            if (row.documentId) router.push(resolveDocumentHref(row.documentId))
+                            else void downloadDistributionPdf(row)
+                          }}
                         >
                           <PdfIcon />
                         </button>
@@ -825,7 +798,6 @@ export function LpCapitalActivityScreen({
                 onClick={() => {
                   setActiveTab("distributions")
                   setShowAllDistributions(true)
-                  toast.message("Showing all distributions")
                 }}
               >
                 View all Distributions →
@@ -891,20 +863,16 @@ export function LpCapitalActivityScreen({
                   <button
                     type="button"
                     className="shrink-0 text-[11px] font-semibold text-[#2563eb] hover:underline"
-                    onClick={() =>
-                      toast.message("Full wiring details", {
-                        description: "Complete banking instructions are available in the call notice.",
-                      })
-                    }
+                    onClick={() => setWiringDialogOpen(true)}
                   >
                     View full details →
                   </button>
                 </div>
                 <div className="space-y-0">
-                  <DetailRow label="Bank" value="JPMorgan Chase Bank, N.A." />
-                  <DetailRow label="Account Name" value="Arcus Growth Fund V, L.P." />
-                  <DetailRow label="Account Number" value="123456789" />
-                  <DetailRow label="ABA / Routing" value="021000021" />
+                  <DetailRow label="Bank" value={callDetail?.wiring.bankName ?? "—"} />
+                  <DetailRow label="Account Name" value={callDetail?.wiring.accountName ?? "—"} />
+                  <DetailRow label="Account Number" value={callDetail?.wiring.accountNumberMasked ?? callDetail?.wiring.accountNumber ?? "—"} />
+                  <DetailRow label="ABA / Routing" value={callDetail?.wiring.abaRouting ?? "—"} />
                   <div className="flex items-start justify-between gap-2 py-2 text-[12px]">
                     <span className="shrink-0 text-[#64748b]">Reference / Memo</span>
                     <span className="flex max-w-[62%] items-start justify-end gap-1.5 text-right font-semibold leading-4 text-[#0f172a]">
@@ -927,28 +895,7 @@ export function LpCapitalActivityScreen({
                   <h3 className="mb-3 text-[13px] font-semibold text-[#0f172a]">Timeline</h3>
                   <div className="space-y-0">
                     {(
-                      [
-                        {
-                          label: "Call Issued",
-                          detail: selectedCall.issueDate,
-                          state: "complete" as const,
-                        },
-                        {
-                          label: "Acknowledged",
-                          detail: isAcknowledged ? "Confirmed" : "Pending",
-                          state: isAcknowledged ? ("complete" as const) : ("pending" as const),
-                        },
-                        {
-                          label: "Payment Received",
-                          detail: selectedCall.status === "Paid" ? "Matched" : "Pending",
-                          state: selectedCall.status === "Paid" ? ("complete" as const) : ("pending" as const),
-                        },
-                        {
-                          label: "Call Closed",
-                          detail: selectedCall.status === "Paid" ? "Complete" : "Pending",
-                          state: selectedCall.status === "Paid" ? ("complete" as const) : ("pending" as const),
-                        },
-                      ]
+                      timelineSteps
                     ).map((step, index, all) => (
                       <div key={step.label} className="flex gap-2.5">
                         <div className="flex flex-col items-center">
@@ -1004,13 +951,14 @@ export function LpCapitalActivityScreen({
                         {isAcknowledged ? "Acknowledged" : "Pending"}
                       </span>
                     </div>
-                    {!isAcknowledged && (
+                    {!isAcknowledged && canWrite && (
                       <Button
                         type="button"
                         variant="outline"
                         size="sm"
+                        disabled={Boolean(actionLoading)}
                         className="mt-3 h-8 w-full rounded-full border-[#93c5fd] bg-white px-3 text-[11px] font-semibold text-[#2563eb] shadow-none hover:bg-[#eff6ff]"
-                        onClick={() => acknowledgeCall(selectedCall.id)}
+                        onClick={() => void acknowledgeCall(selectedCall.id)}
                       >
                         Acknowledge Call
                       </Button>
@@ -1022,38 +970,73 @@ export function LpCapitalActivityScreen({
               <div className="mt-3 border-t border-[#eef2f7] pt-3">
                 <h3 className="mb-2.5 text-[13px] font-semibold text-[#0f172a]">Linked Documents</h3>
                 <div className="space-y-1">
-                  {[
-                    {
-                      name: `Call Notice – Call No. ${selectedCall.callNo}`,
-                      date: selectedCall.issueDate,
-                    },
-                    { name: "Subscription Agreement", date: "Jun 15, 2022" },
-                    { name: "Fund Governing Documents", date: "Jun 15, 2022" },
-                  ].map((doc) => (
-                    <div key={doc.name} className="flex items-center gap-2.5 py-1.5">
-                      <PdfIcon className="size-5" />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-[12px] font-semibold text-[#2563eb]">{doc.name}</p>
-                        <p className="mt-0.5 text-[11px] text-[#94a3b8]">
-                          PDF <span className="mx-1">·</span> {doc.date}
-                        </p>
+                  {callDocuments.length > 0 ? (
+                    callDocuments.map((doc) => (
+                      <div key={doc.id} className="flex items-center gap-2.5 py-1.5">
+                        <PdfIcon className="size-5" />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[12px] font-semibold text-[#2563eb]">
+                            <Link href={resolveDocumentHref(doc.id)} className="hover:underline">
+                              {doc.name}
+                            </Link>
+                          </p>
+                          <p className="mt-0.5 text-[11px] text-[#94a3b8]">
+                            PDF <span className="mx-1">·</span> {doc.publishedDate}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          className="inline-flex size-7 shrink-0 items-center justify-center rounded-full text-[#2563eb] hover:bg-blue-50"
+                          aria-label={`Download ${doc.name}`}
+                          disabled={Boolean(actionLoading)}
+                          onClick={() => void downloadLinkedDocument(doc.id, doc.name)}
+                        >
+                          <Download className="size-3.5" />
+                        </button>
                       </div>
-                      <button
-                        type="button"
-                        className="inline-flex size-7 shrink-0 items-center justify-center rounded-full text-[#2563eb] hover:bg-blue-50"
-                        aria-label={`Download ${doc.name}`}
-                        onClick={() => downloadLinkedDocument(doc.name)}
-                      >
-                        <Download className="size-3.5" />
-                      </button>
-                    </div>
-                  ))}
+                    ))
+                  ) : (
+                    <p className="py-2 text-[12px] text-[#94a3b8]">No linked documents</p>
+                  )}
                 </div>
               </div>
             </div>
           </aside>
         )}
       </div>
+
+      <Dialog open={wiringDialogOpen} onOpenChange={setWiringDialogOpen}>
+        <DialogContent className="max-w-lg rounded-xl">
+          <DialogHeader>
+            <DialogTitle>Wiring instructions</DialogTitle>
+            <DialogDescription>
+              Call No. {selectedCall?.callNo} · {selectedCall?.fund}
+            </DialogDescription>
+          </DialogHeader>
+          {callDetail?.wiring.raw ? (
+            <pre className="max-h-[50vh] overflow-auto rounded-lg border border-[#e5e7eb] bg-[#f9fafb] p-3 text-[11px] leading-5 whitespace-pre-wrap text-[#374151]">
+              {callDetail.wiring.raw}
+            </pre>
+          ) : callDetail?.wiring ? (
+            <dl className="space-y-2 text-[12px]">
+              {[
+                ["Bank", callDetail.wiring.bankName],
+                ["Account name", callDetail.wiring.accountName],
+                ["Account number", callDetail.wiring.accountNumber ?? callDetail.wiring.accountNumberMasked],
+                ["ABA / Routing", callDetail.wiring.abaRouting],
+                ["Reference / Memo", callDetail.wiring.reference],
+              ].map(([label, value]) => (
+                <div key={label} className="grid grid-cols-[120px_1fr] gap-2">
+                  <dt className="text-[#64748b]">{label}</dt>
+                  <dd className="font-medium text-[#0f172a]">{value || "—"}</dd>
+                </div>
+              ))}
+            </dl>
+          ) : (
+            <p className="text-[13px] text-[#6b7280]">Wiring details are not available for this call.</p>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

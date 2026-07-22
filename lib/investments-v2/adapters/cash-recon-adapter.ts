@@ -250,6 +250,10 @@ export function mapCashLedgerRows(data: unknown) {
           runningBalance: String(line.runningBalance ?? line.balance ?? item.balance ?? '0'),
           status: String(item.status ?? ''),
           approvalStatus: String(item.status ?? ''),
+          tradeId:
+            line.tradeId != null || item.tradeId != null || item.trade_id != null
+              ? String(line.tradeId ?? item.tradeId ?? item.trade_id)
+              : null,
           fundName: item.fundName,
           clientName: item.clientName,
           accountNumber: item.accountNumber,
@@ -286,6 +290,12 @@ export function mapCashLedgerRows(data: unknown) {
       balance: formatMoneyDisplay(bal),
       currency: String(r.currency ?? 'USD'),
       approval: mapApproval(r.approvalStatus ?? r.status),
+      tradeId:
+        r.tradeId != null && String(r.tradeId).trim()
+          ? String(r.tradeId)
+          : r['trade_id'] != null && String(r['trade_id']).trim()
+            ? String(r['trade_id'])
+            : null,
     }}),
   }
 }

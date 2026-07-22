@@ -4,6 +4,8 @@
 **Audience:** Backend + Frontend  
 **Base path FE uses:** `/api/investment-ops` via `NEXT_PUBLIC_API_BASE_URL`
 
+> **2026-07-21 client retune (trading + recon):** Target flow with **broker outside the system**, orderbook vs blotter split, and 3-way recon — product asks in [`investments-trading-recon-client-retune-backend-asks.md`](./investments-trading-recon-client-retune-backend-asks.md); **API contract** in [`investments-trading-recon-retune-api.md`](./investments-trading-recon-retune-api.md).
+
 > **2026-07-20 full-module audit:** Reads ≠ full create path. See **[`investments-v2-end-to-end-gaps.md`](./investments-v2-end-to-end-gaps.md)**.  
 > **E2E BE answers applied on FE:** **[`investments-v2-e2e-be-answers-fe-closure.md`](./investments-v2-e2e-be-answers-fe-closure.md)**.  
 > **Finish the module (single source of truth):** **[`investments-v2-module-completion.md`](./investments-v2-module-completion.md)** — BE A1–A18 + FE F1–F13 + product P1–P5.

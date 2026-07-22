@@ -3,7 +3,12 @@ import { LpCapitalActivityScreen } from "@/components/lp-portal/screens/lp-capit
 export default function CapitalActivityPage({
   searchParams,
 }: {
-  searchParams?: { tab?: string }
+  searchParams?: { tab?: string; call?: string }
 }) {
-  return <LpCapitalActivityScreen initialTab={searchParams?.tab === "distributions" ? "distributions" : "calls"} />
+  return (
+    <LpCapitalActivityScreen
+      initialTab={searchParams?.tab === "distributions" ? "distributions" : "calls"}
+      initialCallId={searchParams?.call}
+    />
+  )
 }

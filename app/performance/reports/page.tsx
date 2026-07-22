@@ -1,18 +1,13 @@
-"use client"
+import { PerformanceLayout } from "@/components/layout/performance-layout"
+import { ReportsMockScreen } from "@/components/performance-mock/screens/reports-screen"
+import { ModuleGuard } from "@/lib/permissions"
 
-import { useEffect } from "react"
-import { useRouter } from "next/navigation"
-
-export default function ReportsRedirect() {
-  const router = useRouter()
-
-  useEffect(() => {
-    router.replace("/performance/reviews?tab=reports")
-  }, [router])
-
+export default function ReportsPage() {
   return (
-    <div className="flex items-center justify-center min-h-screen">
-      <div className="animate-pulse text-gray-400">Redirecting to Reviews...</div>
-    </div>
+    <ModuleGuard moduleId="performance-management" subModuleId="reports">
+      <PerformanceLayout>
+        <ReportsMockScreen />
+      </PerformanceLayout>
+    </ModuleGuard>
   )
 }

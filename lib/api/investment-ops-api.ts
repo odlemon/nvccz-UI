@@ -216,10 +216,103 @@ export type OrderStatus =
   | "SUBMITTED"
   | "APPROVED"
   | "SENT_TO_BROKER"
+  | "BROKER_CONFIRMATION_RECORDED"
+  | "PARTIALLY_EXECUTED"
   | "EXECUTED"
+  | "PENDING_SETTLEMENT"
+  | "SETTLED"
   | "REJECTED"
   | "CANCELLED"
+  | "FAILED"
+  | "ARCHIVED"
   | string
+
+export type BrokerConfirmationOutcome = "FILLED" | "COUNTER" | "UNABLE" | "PARTIAL"
+
+export type BrokerConfirmationStatus = "RECORDED" | "ACCEPTED" | "REJECTED" | string
+
+/** BA-TR-2 — external broker confirmation entity */
+export interface BrokerConfirmation {
+  id: string
+  orderId: string
+  outcome: BrokerConfirmationOutcome | string
+  status?: BrokerConfirmationStatus
+  quantity: string | number
+  price: string | number
+  currencyCode?: string | null
+  brokerReference?: string | null
+  tradeDate?: string | null
+  valueDate?: string | null
+  notes?: string | null
+  attachmentFileId?: string | null
+  createdAt?: string
+  updatedAt?: string
+  [key: string]: unknown
+}
+
+/** BA-TR-2 accept envelope */
+export type BrokerConfirmationAcceptResult = {
+  order?: Order
+  trade?: OpsTrade | Record<string, unknown>
+  confirmation?: BrokerConfirmation
+  tradeId?: string | null
+  status?: string
+}
+
+/** BA-TR-4 blotter → recon handoff */
+export type TradeReconciliationSummary = {
+  tradeId: string
+  internalMatched?: boolean
+  brokerStatementMatched?: boolean
+  custodianMatched?: boolean
+  openExceptionIds?: string[]
+  deepLink?: string
+  [key: string]: unknown
+}
+
+/** BA-RC-1 trade 3-way recon */
+export type TradeReconTemplate = {
+  code: string
+  name?: string
+  side?: "BROKER" | "CUSTODIAN" | string
+  [key: string]: unknown
+}
+
+export type TradeReconBatch = {
+  id: string
+  fundId?: string
+  asOfDate?: string
+  status?: string
+  brokerTemplateCode?: string
+  custodianTemplateCode?: string
+  matchedCount?: number
+  exceptionCount?: number
+  brokerLineCount?: number
+  custodianLineCount?: number
+  exceptions?: TradeReconException[]
+  summary?: Record<string, unknown>
+  [key: string]: unknown
+}
+
+export type TradeReconException = {
+  id: string
+  code?: string
+  status?: string
+  symbol?: string
+  side?: string
+  message?: string
+  internalQty?: string | number
+  brokerQty?: string | number
+  custodianQty?: string | number
+  tradeId?: string | null
+  [key: string]: unknown
+}
+
+export type ClientAccountReconciliation = {
+  fundId?: string
+  breaks?: Array<Record<string, unknown>>
+  [key: string]: unknown
+}
 
 export interface OrderApproval {
   id: string
@@ -265,6 +358,9 @@ export interface Order {
   custodianProfileId: string | null
   brokerName?: string | null
   custodianName?: string | null
+  /** Settlement / cash account used for custodian authorisation (Phase 1). */
+  settlementAccountId?: string | null
+  settlementAccountName?: string | null
   valueDate: string | null
   tradeDate: string | null
   status: OrderStatus
@@ -276,6 +372,10 @@ export interface Order {
   createdById: string
   submittedAt: string | null
   approvedAt: string | null
+  /** BA-TR-1 */
+  sentToBrokerAt?: string | null
+  sentToBrokerChannel?: string | null
+  sentToBrokerNotes?: string | null
   createdAt: string
   updatedAt: string
   /** Optimistic concurrency — present on create/lifecycle responses. */
@@ -386,14 +486,18 @@ export interface OpsTrade {
   routingHops: RoutingHop[]
   accountingStatus: "NOT_POSTED" | "POSTED" | string
   confirmationStatus: "DISPATCHED" | "CONFIRMED" | string
-  settlementStatus: "SETTLED" | "SETTLEMENT_FAILED" | "PENDING" | string
+  settlementStatus: "SETTLED" | "SETTLEMENT_FAILED" | "PENDING" | "PENDING_SETTLEMENT" | string
   grossConsideration: number | string
   netConsideration: number | string
   brokerProfileId: string | null
   custodianProfileId: string | null
+  brokerId?: string | null
+  custodianId?: string | null
   brokerName?: string | null
   custodianName?: string | null
   valueDate: string | null
+  tradeDate?: string | null
+  price?: string | number | null
 }
 
 /** Flat pre-trade compliance result from GET /compliance/results */
@@ -419,7 +523,7 @@ export interface ComplianceResultItem {
   [key: string]: unknown
 }
 
-/** POST /orders/:id/execute envelope (BA-2 / BA-T2) */
+/** POST /orders/:id/execute envelope (legacy / internal accept). Prefer BA-TR-2 accept. */
 export type OrderExecuteResult = Order & {
   order?: Order
   trade?: unknown
@@ -427,6 +531,7 @@ export type OrderExecuteResult = Order & {
   status?: string
   filledQuantity?: string | number | null
   remainingQuantity?: string | number | null
+  confirmation?: BrokerConfirmation
 }
 
 export interface OpsBlotter {
@@ -1279,10 +1384,17 @@ class InvestmentOpsApiService {
     id: string,
     body: {
       expectedVersion?: number | string
+      sentAt?: string
+      channel?: string
+      notes?: string
       venueCode?: string
-      brokerProfileId?: string
+      brokerProfileId?: string | null
+      /** Phase-1 custodian authorisation (confirm at send). */
+      custodianProfileId?: string | null
+      settlementAccountId?: string | null
+      valueDate?: string | null
     } = {},
-  ): Promise<InvestmentOpsResponse<Order>> {
+  ): Promise<InvestmentOpsResponse<{ order?: Order; route?: unknown } & Order>> {
     return apiClient.post(`${this.BASE}/orders/${id}/send-to-broker`, body, {
       headers: idempotencyHeaders(),
     })
@@ -1318,6 +1430,61 @@ class InvestmentOpsApiService {
     return apiClient.post(`${this.BASE}/orders/${id}/execute`, body, { headers: idempotencyHeaders() })
   }
 
+  /**
+   * BA-TR-2 — record external broker confirmation (primary path; prefer over ad-hoc execute).
+   */
+  async recordBrokerConfirmation(
+    orderId: string,
+    body: {
+      expectedVersion?: number | string
+      outcome: BrokerConfirmationOutcome
+      quantity: string | number
+      price: string | number
+      currencyCode?: string
+      brokerReference?: string
+      tradeDate?: string
+      valueDate?: string
+      notes?: string
+      attachmentFileId?: string | null
+    },
+  ): Promise<InvestmentOpsResponse<BrokerConfirmation | { confirmation?: BrokerConfirmation; order?: Order }>> {
+    return apiClient.post(`${this.BASE}/orders/${orderId}/broker-confirmations`, body, {
+      headers: idempotencyHeaders(),
+    })
+  }
+
+  async listBrokerConfirmations(
+    orderId: string,
+  ): Promise<InvestmentOpsResponse<BrokerConfirmation[] | OpsPaged<BrokerConfirmation>>> {
+    return apiClient.get(`${this.BASE}/orders/${orderId}/broker-confirmations`)
+  }
+
+  /** BA-TR-2 — accept confirmation → create trade on blotter. */
+  async acceptBrokerConfirmation(
+    orderId: string,
+    confirmationId: string,
+    body: { expectedVersion?: number | string } = {},
+  ): Promise<InvestmentOpsResponse<BrokerConfirmationAcceptResult | OrderExecuteResult>> {
+    return apiClient.post(
+      `${this.BASE}/orders/${orderId}/broker-confirmations/${confirmationId}/accept`,
+      body,
+      { headers: idempotencyHeaders() },
+    )
+  }
+
+  /** BA-TR-2 — reject confirmation / keep looking → order SENT_TO_BROKER. */
+  async rejectBrokerConfirmation(
+    orderId: string,
+    confirmationId: string,
+    body: { reason: string; expectedVersion?: number | string },
+  ): Promise<InvestmentOpsResponse<{ order?: Order; confirmation?: BrokerConfirmation } | Order>> {
+    return apiClient.post(
+      `${this.BASE}/orders/${orderId}/broker-confirmations/${confirmationId}/reject`,
+      body,
+      { headers: idempotencyHeaders() },
+    )
+  }
+
   /** BA-T4 — fail order (reason required). */
   async failOrder(
     id: string,
@@ -1341,9 +1508,17 @@ class InvestmentOpsApiService {
   }
 
   // ── Trades ───────────────────────────────────────────────────────────────────
-  async listTrades(params?: { fundId?: string }): Promise<InvestmentOpsResponse<OpsTrade[]>> {
+  async listTrades(params?: {
+    fundId?: string
+    status?: string
+    page?: number
+    pageSize?: number
+  }): Promise<InvestmentOpsResponse<OpsTrade[] | OpsPaged<OpsTrade>>> {
     const q = new URLSearchParams()
     if (params?.fundId) q.append("fundId", params.fundId)
+    if (params?.status) q.append("status", params.status)
+    if (params?.page != null) q.append("page", String(params.page))
+    if (params?.pageSize != null) q.append("pageSize", String(params.pageSize))
     const qs = q.toString()
     return apiClient.get(`${this.BASE}/trades${qs ? `?${qs}` : ""}`)
   }
@@ -1363,15 +1538,28 @@ class InvestmentOpsApiService {
     return apiClient.post(`${this.BASE}/trades/${id}/confirm`, data, { headers: idempotencyHeaders() })
   }
 
+  /** BA-TR-3 — custodian settlement. */
   async settleTrade(
     id: string,
-    data: { allowDeferredAccounting?: boolean; expectedVersion?: number | string } = {},
-  ): Promise<InvestmentOpsResponse<OpsTrade>> {
+    data: {
+      allowDeferredAccounting?: boolean
+      expectedVersion?: number | string
+      settledAt?: string
+      custodianReference?: string
+    } = {},
+  ): Promise<InvestmentOpsResponse<{ order?: Order; trade?: OpsTrade } | OpsTrade>> {
     return apiClient.post(
       `${this.BASE}/trades/${id}/settle`,
       { allowDeferredAccounting: true, ...data },
       { headers: idempotencyHeaders() },
     )
+  }
+
+  /** BA-TR-4 — blotter → recon handoff. */
+  async getTradeReconciliationSummary(
+    tradeId: string,
+  ): Promise<InvestmentOpsResponse<TradeReconciliationSummary>> {
+    return apiClient.get(`${this.BASE}/trades/${tradeId}/reconciliation-summary`)
   }
 
   async getTradeRoutingHops(id: string): Promise<InvestmentOpsResponse<RoutingHop[]>> {
@@ -2277,6 +2465,88 @@ class InvestmentOpsApiService {
 
   async updateSettings(data: SetupSettings): Promise<InvestmentOpsResponse<SetupSettings>> {
     return apiClient.put(`${this.BASE}/setup/settings`, data)
+  }
+
+  // ── BA-RC-1 — Trade 3-way reconciliation ─────────────────────────────────────
+  async listTradeReconTemplates(): Promise<InvestmentOpsResponse<TradeReconTemplate[]>> {
+    return apiClient.get(`${this.BASE}/trade-reconciliation/templates`)
+  }
+
+  async createTradeReconBatch(body: {
+    fundId: string
+    asOfDate: string
+    brokerTemplateCode?: string
+    custodianTemplateCode?: string
+  }): Promise<InvestmentOpsResponse<TradeReconBatch>> {
+    return apiClient.post(`${this.BASE}/trade-reconciliation/batches`, body, {
+      headers: idempotencyHeaders(),
+    })
+  }
+
+  async getTradeReconBatch(id: string): Promise<InvestmentOpsResponse<TradeReconBatch>> {
+    return apiClient.get(`${this.BASE}/trade-reconciliation/batches/${id}`)
+  }
+
+  async ingestTradeReconBroker(
+    batchId: string,
+    body: { csvText: string; templateCode?: string },
+  ): Promise<InvestmentOpsResponse<TradeReconBatch>> {
+    return apiClient.post(`${this.BASE}/trade-reconciliation/batches/${batchId}/ingest-broker`, body, {
+      headers: idempotencyHeaders(),
+    })
+  }
+
+  async ingestTradeReconCustodian(
+    batchId: string,
+    body: { csvText: string; templateCode?: string },
+  ): Promise<InvestmentOpsResponse<TradeReconBatch>> {
+    return apiClient.post(`${this.BASE}/trade-reconciliation/batches/${batchId}/ingest-custodian`, body, {
+      headers: idempotencyHeaders(),
+    })
+  }
+
+  async runTradeReconMatch(batchId: string): Promise<InvestmentOpsResponse<TradeReconBatch>> {
+    return apiClient.post(`${this.BASE}/trade-reconciliation/batches/${batchId}/run-match`, {}, {
+      headers: idempotencyHeaders(),
+    })
+  }
+
+  async completeTradeReconBatch(batchId: string): Promise<InvestmentOpsResponse<TradeReconBatch>> {
+    return apiClient.post(`${this.BASE}/trade-reconciliation/batches/${batchId}/complete`, {}, {
+      headers: idempotencyHeaders(),
+    })
+  }
+
+  async manualMatchTradeReconException(
+    exceptionId: string,
+    body: Record<string, unknown> = {},
+  ): Promise<InvestmentOpsResponse<TradeReconException>> {
+    return apiClient.post(
+      `${this.BASE}/trade-reconciliation/exceptions/${exceptionId}/manual-match`,
+      body,
+      { headers: idempotencyHeaders() },
+    )
+  }
+
+  async writeOffTradeReconException(
+    exceptionId: string,
+    body: { reason: string },
+  ): Promise<InvestmentOpsResponse<TradeReconException>> {
+    return apiClient.post(
+      `${this.BASE}/trade-reconciliation/exceptions/${exceptionId}/write-off`,
+      body,
+      { headers: idempotencyHeaders() },
+    )
+  }
+
+  /** BA-RC-3 — client account recon (holdings vs settled trades). */
+  async getClientAccountReconciliation(params?: {
+    fundId?: string
+  }): Promise<InvestmentOpsResponse<ClientAccountReconciliation>> {
+    const q = new URLSearchParams()
+    if (params?.fundId) q.append("fundId", params.fundId)
+    const qs = q.toString()
+    return apiClient.get(`${this.BASE}/client-account-reconciliation${qs ? `?${qs}` : ""}`)
   }
 }
 

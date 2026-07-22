@@ -1,7 +1,8 @@
 'use client'
 
-import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
+import { type ReactNode, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   Banknote,
   Calendar,
@@ -50,6 +51,38 @@ import { cn } from '@/lib/utils'
 type AccountRow = ReturnType<typeof mapClientAccounts>['items'][number]
 
 export default function ClientAccountsOverviewPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-full bg-background p-5 sm:p-6" style={{ background: C.page, color: C.text }}>
+          <p className="text-[13px]" style={{ color: C.muted }}>
+            Loading reconciliation…
+          </p>
+        </main>
+      }
+    >
+      <ClientAccountsOverviewInner />
+    </Suspense>
+  )
+}
+
+function ClientAccountsOverviewInner() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+
+  // BA-TR-4 deepLink: prefer /trade wizard; also accept legacy ?tab=trade on overview
+  useEffect(() => {
+    const tab = searchParams.get('tab')
+    if (tab !== 'trade') return
+    const q = new URLSearchParams()
+    const tradeId = searchParams.get('tradeId')
+    const fundId = searchParams.get('fundId')
+    if (tradeId) q.set('tradeId', tradeId)
+    if (fundId) q.set('fundId', fundId)
+    const qs = q.toString()
+    router.replace(`/investments-v2/reconciliation/trade${qs ? `?${qs}` : ''}`)
+  }, [router, searchParams])
+
   const [search, setSearch] = useState('')
   const [accountType, setAccountType] = useState('All Account Types')
   const [status, setStatus] = useState('All Statuses')
@@ -253,10 +286,10 @@ export default function ClientAccountsOverviewPage() {
         <header className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div>
             <h1 className="text-[22px] font-semibold leading-tight tracking-[-0.01em]" style={{ color: C.text }}>
-              Client Accounts Overview
+              Client recon overview
             </h1>
             <p className="mt-1.5 text-[13px] leading-snug" style={{ color: C.muted }}>
-              Real-time summary of client cash positions, activity and exceptions.
+              Client cash positions and exceptions. Use Trade / Cash tabs for statement matching after settlement.
             </p>
           </div>
 
@@ -309,6 +342,40 @@ export default function ClientAccountsOverviewPage() {
 
         <ReconNavTabs variant="terminal-dark" />
         <ReconApiBanner loading={loading} error={error} />
+
+        <section className="grid gap-3 md:grid-cols-3">
+          {[
+            {
+              href: '/investments-v2/reconciliation/trade',
+              title: 'Trade recon',
+              body: 'Internal × broker statement × custodian statement for executed trades.',
+            },
+            {
+              href: '/investments-v2/reconciliation/fund-cash',
+              title: 'Cash recon',
+              body: 'Fund cash positions vs custodian / bank movements.',
+            },
+            {
+              href: '/investments-v2/reconciliation',
+              title: 'Client overview',
+              body: 'Client cash accounts, activity and exceptions at a glance.',
+            },
+          ].map((card) => (
+            <Link
+              key={card.href + card.title}
+              href={card.href}
+              className="rounded-[16px] border px-4 py-4 transition hover:opacity-95"
+              style={{ background: C.card, borderColor: C.cardBorder }}
+            >
+              <p className="text-[13px] font-semibold" style={{ color: C.text }}>
+                {card.title}
+              </p>
+              <p className="mt-1.5 text-[12px] leading-snug" style={{ color: C.muted }}>
+                {card.body}
+              </p>
+            </Link>
+          ))}
+        </section>
 
         {/* KPI row */}
         <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">

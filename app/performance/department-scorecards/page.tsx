@@ -1,15 +1,12 @@
 import { PerformanceLayout } from "@/components/layout/performance-layout"
-import { DepartmentScorecardsPage } from "@/components/performance/department-scorecard-page"
+import { DepartmentScorecardMockScreen } from "@/components/performance-mock/screens/department-scorecard-screen"
 import { ModuleGuard } from "@/lib/permissions"
-// import { DepartmentScorecardsPage } from "@/components/performance/department-scorecards-page"
 
 export default function DepartmentScorecardsRoute() {
   return (
     <ModuleGuard moduleId="performance-management" subModuleId="department-scorecards">
       <PerformanceLayout>
-        <div className="p-6">
-          <DepartmentScorecardsPage />
-        </div>
+        <DepartmentScorecardMockScreen />
       </PerformanceLayout>
     </ModuleGuard>
   )

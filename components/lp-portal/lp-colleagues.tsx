@@ -2,7 +2,6 @@
 
 import { useEffect } from "react"
 import { toast } from "sonner"
-import { formatDistanceToNow } from "date-fns"
 import { Mail, Users2 } from "lucide-react"
 import { useAppDispatch, useAppSelector } from "@/lib/store"
 import { fetchLpColleagues, revokeLpColleague } from "@/lib/store/slices/lpPortalSlice"
@@ -89,7 +88,7 @@ export function LpColleagues() {
                   </div>
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-gray-900 truncate">
-                      {[c.firstName, c.lastName].filter(Boolean).join(" ") || c.email}
+                      {c.name || c.email}
                     </p>
                     <p className="text-xs text-muted-foreground truncate">{c.email}</p>
                   </div>
@@ -98,7 +97,7 @@ export function LpColleagues() {
                   <Badge variant="outline">{c.lpRole}</Badge>
                   <Badge variant={statusVariant(c.status)}>{c.status}</Badge>
                   <span className="text-xs text-muted-foreground">
-                    Invited {c.invitedAt ? formatDistanceToNow(new Date(c.invitedAt), { addSuffix: true }) : "—"}
+                    {c.status}
                   </span>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>

@@ -7,7 +7,7 @@ import { ConfirmReasonDialog } from '@/components/investments-v2/ui/confirm-reas
 import { DetailPanel } from '@/components/investments-v2/ui/detail-panel'
 import { PlaceEquityOrderModal } from '@/components/investments-v2/place-equity-order-modal'
 import { buttonClass, Field, inputClass, Modal, OrdersCard, OrdersPage, Pill, SelectField, tableClass, tableWrapClass } from '@/components/investments-v2/orders-ui'
-import { formatOpsError, investmentOpsApi, unwrapList, type OpsBlotter } from '@/lib/api/investment-ops-api'
+import { formatOpsError, investmentOpsApi, unwrapList, type BrokerConfirmation, type BrokerConfirmationOutcome, type OpsBlotter } from '@/lib/api/investment-ops-api'
 import {
   blotterDeepLink,
   fundNameMap,
@@ -27,11 +27,48 @@ import type { OrderApproval } from '@/lib/api/investment-ops-api'
 const tabs = [...ORDERBOOK_LIFECYCLE_TABS]
 
 const tone = (status: string) => {
-  if (status === 'Executed' || status === 'Settled' || status === 'Approved') return 'green'
-  if (status === 'Draft' || status === 'Submitted' || status === 'Sent to Broker' || status === 'Pending Settlement' || status === 'Partially Executed')
+  if (status === 'Executed' || status === 'Settled' || status === 'Approved' || status === 'Confirmation Recorded')
+    return 'green'
+  if (
+    status === 'Draft' ||
+    status === 'Submitted' ||
+    status === 'Sent to Broker' ||
+    status === 'Pending Settlement' ||
+    status === 'Partially Executed'
+  )
     return 'amber'
   if (status === 'Cancelled' || status === 'Failed' || status === 'Rejected') return 'red'
   return 'blue'
+}
+
+function isOpenConfirmation(c: BrokerConfirmation): boolean {
+  const s = String(c.status ?? 'RECORDED').toUpperCase()
+  return s !== 'ACCEPTED' && s !== 'REJECTED'
+}
+
+function pickOpenConfirmation(list: BrokerConfirmation[]): BrokerConfirmation | null {
+  return list.find(isOpenConfirmation) ?? null
+}
+
+function unwrapRecordedConfirmation(data: unknown): BrokerConfirmation | null {
+  if (!data || typeof data !== 'object') return null
+  const d = data as Record<string, unknown>
+  if (d.confirmation && typeof d.confirmation === 'object') {
+    return d.confirmation as BrokerConfirmation
+  }
+  if (d.id != null && d.orderId != null) return data as BrokerConfirmation
+  return null
+}
+
+function extractAcceptTradeId(data: unknown): string | null {
+  if (!data || typeof data !== 'object') return null
+  const d = data as Record<string, unknown>
+  if (d.tradeId != null) return String(d.tradeId)
+  const order = d.order as { tradeId?: string | null } | undefined
+  if (order?.tradeId) return String(order.tradeId)
+  const trade = d.trade as { id?: string } | undefined
+  if (trade?.id) return String(trade.id)
+  return null
 }
 
 type BlotterCard = {
@@ -79,16 +116,29 @@ export default function OrderbookPage() {
   const [createBusy, setCreateBusy] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
   const [lifeBusy, setLifeBusy] = useState<
-    null | 'submit' | 'approve' | 'cancel' | 'send' | 'execute' | 'reject' | 'fail' | 'archive'
+    null | 'submit' | 'approve' | 'cancel' | 'send' | 'accept' | 'record' | 'rejectConf' | 'reject' | 'fail' | 'archive'
   >(null)
   const [lifeError, setLifeError] = useState<string | null>(null)
   const [rejectOpen, setRejectOpen] = useState(false)
   const [cancelOpen, setCancelOpen] = useState(false)
   const [failOpen, setFailOpen] = useState(false)
   const [archiveOpen, setArchiveOpen] = useState(false)
-  const [executeOpen, setExecuteOpen] = useState(false)
-  const [execQty, setExecQty] = useState('')
-  const [execPrice, setExecPrice] = useState('')
+  const [rejectConfOpen, setRejectConfOpen] = useState(false)
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [sendOpen, setSendOpen] = useState(false)
+  const [sendCustodianId, setSendCustodianId] = useState('')
+  const [sendValueDate, setSendValueDate] = useState('')
+  const [sendNotes, setSendNotes] = useState('')
+  const [custodians, setCustodians] = useState<{ id: string; name: string }[]>([])
+  const [confOutcome, setConfOutcome] = useState<BrokerConfirmationOutcome>('FILLED')
+  const [confQty, setConfQty] = useState('')
+  const [confPrice, setConfPrice] = useState('')
+  const [confBrokerRef, setConfBrokerRef] = useState('')
+  const [confTradeDate, setConfTradeDate] = useState('')
+  const [confValueDate, setConfValueDate] = useState('')
+  const [confNotes, setConfNotes] = useState('')
+  const [confirmations, setConfirmations] = useState<BrokerConfirmation[]>([])
+  const [confirmationsLoading, setConfirmationsLoading] = useState(false)
   const [approvals, setApprovals] = useState<OrderApproval[]>([])
   const [timelineLoading, setTimelineLoading] = useState(false)
 
@@ -138,12 +188,28 @@ export default function OrderbookPage() {
     void load()
   }, [load])
 
+  useEffect(() => {
+    void investmentOpsApi
+      .listCustodians()
+      .then((res) => {
+        if (res.success === false) return
+        setCustodians(
+          unwrapList<{ id?: string; name?: string }>(res.data)
+            .map((c) => ({ id: String(c.id ?? ''), name: String(c.name ?? c.id ?? 'Custodian') }))
+            .filter((c) => c.id),
+        )
+      })
+      .catch(() => undefined)
+  }, [])
+
   const filtered = useMemo(() => {
-    const rows = orders.filter(
-      (order) =>
-        orderMatchesLifecycleTab(order.status, tab) &&
-        `${order.ref} ${order.ticker} ${order.portfolio} ${order.blotter} ${order.status}`.toLowerCase().includes(search.toLowerCase()),
-    )
+    const rows = orders.filter((order) => {
+      const status = order.status
+      return (
+        orderMatchesLifecycleTab(status, tab) &&
+        `${order.ref} ${order.ticker} ${order.portfolio} ${order.blotter} ${status}`.toLowerCase().includes(search.toLowerCase())
+      )
+    })
     return [...rows].sort((a, b) => {
       if (sort === 'Oldest first') {
         return (a.createdAt || '').localeCompare(b.createdAt || '')
@@ -153,6 +219,37 @@ export default function OrderbookPage() {
       return (b.createdAt || '').localeCompare(a.createdAt || '')
     })
   }, [orders, tab, search, sort])
+
+  const openConfirmation = pickOpenConfirmation(confirmations)
+  const selectedDisplayStatus = selected?.status ?? null
+
+  useEffect(() => {
+    if (!selected?.apiId) {
+      setConfirmations([])
+      return
+    }
+    let cancelled = false
+    setConfirmationsLoading(true)
+    void investmentOpsApi
+      .listBrokerConfirmations(selected.apiId)
+      .then((res) => {
+        if (cancelled) return
+        if (res.success === false) {
+          setConfirmations([])
+          return
+        }
+        setConfirmations(unwrapList<BrokerConfirmation>(res.data))
+      })
+      .catch(() => {
+        if (!cancelled) setConfirmations([])
+      })
+      .finally(() => {
+        if (!cancelled) setConfirmationsLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [selected?.apiId, selected?.version])
 
   useEffect(() => {
     if (!selected?.apiId) {
@@ -210,7 +307,7 @@ export default function OrderbookPage() {
   }
 
   const runLifecycle = async (
-    action: 'submit' | 'approve' | 'cancel' | 'send' | 'execute' | 'reject' | 'fail' | 'archive',
+    action: 'submit' | 'approve' | 'cancel' | 'send' | 'reject' | 'fail' | 'archive',
     reason?: string,
   ): Promise<boolean> => {
     if (!selected?.apiId || lifeBusy) return false
@@ -218,6 +315,10 @@ export default function OrderbookPage() {
       (action === 'reject' || action === 'fail' || action === 'cancel') &&
       !reason?.trim()
     ) {
+      return false
+    }
+    if (action === 'send' && !sendCustodianId.trim()) {
+      toast.error('Select a custodian before sending (Phase-1 authorisation).')
       return false
     }
     setLifeBusy(action)
@@ -230,18 +331,14 @@ export default function OrderbookPage() {
       else if (action === 'send') {
         res = await investmentOpsApi.sendOrderToBroker(selected.apiId, {
           expectedVersion: selected.version,
+          channel: 'EMAIL',
+          sentAt: new Date().toISOString(),
+          notes: sendNotes.trim() || undefined,
+          custodianProfileId: sendCustodianId.trim(),
+          valueDate: sendValueDate || undefined,
+          settlementAccountId: selected.settlementAccountId || undefined,
         })
-      } else if (action === 'execute') {
-        const qty = Number(execQty) || selected.qty
-        const price = execPrice ? Number(execPrice) : selected.execPrice ?? selected.limitPrice
-        res = await investmentOpsApi.executeOrder(selected.apiId, {
-          expectedVersion: selected.version,
-          quantity: qty,
-          ...(price != null && Number.isFinite(price)
-            ? { executionPrice: price, price }
-            : {}),
-        })
-        setExecuteOpen(false)
+        setSendOpen(false)
       } else if (action === 'reject') {
         res = await investmentOpsApi.rejectOrder(selected.apiId, {
           reason: reason!.trim(),
@@ -261,28 +358,12 @@ export default function OrderbookPage() {
         res = await investmentOpsApi.cancelOrder(selected.apiId, reason!.trim())
       }
       if (res.success === false) throw new Error(formatOpsError(res, `Failed to ${action} order`))
-      if (action === 'execute') {
-        const tradeId =
-          (res.data as { tradeId?: string | null } | undefined)?.tradeId ??
-          (res.data as { order?: { tradeId?: string | null } } | undefined)?.order?.tradeId ??
-          null
-        const href = blotterDeepLink({
-          tradeId: tradeId ? String(tradeId) : selected.tradeId,
-          apiId: selected.apiId,
-          ref: selected.ref,
-        })
-        toast.success(tradeId ? `Trade created (${tradeId})` : 'Trade created', {
-          action: {
-            label: 'Open blotter',
-            onClick: () => window.open(href, '_blank', 'noopener,noreferrer'),
-          },
-        })
-      } else if (action === 'approve') {
+      if (action === 'approve') {
         toast.success('Order approved.')
       } else if (action === 'submit') {
         toast.success('Order submitted for approval.')
       } else if (action === 'send') {
-        toast.success('Order sent to broker.')
+        toast.success('Order sent to broker. Custodian authorisation recorded — no blotter row yet.')
       } else if (action === 'fail') {
         toast.success('Order marked Failed.')
       } else if (action === 'archive') {
@@ -300,14 +381,152 @@ export default function OrderbookPage() {
     }
   }
 
+  const openSendToBroker = () => {
+    if (!selected) return
+    setSendCustodianId(selected.custodianProfileId ?? '')
+    setSendValueDate(selected.valueDateIso ?? '')
+    setSendNotes('')
+    setSendOpen(true)
+  }
+
+  const openRecordConfirmation = () => {
+    if (!selected) return
+    const existing = openConfirmation
+    const remaining = Math.max(0, selected.qty - selected.filled) || selected.qty
+    setConfOutcome((existing?.outcome as BrokerConfirmationOutcome) || 'FILLED')
+    setConfQty(existing?.quantity != null ? String(existing.quantity) : String(remaining))
+    setConfPrice(
+      existing?.price != null
+        ? String(existing.price)
+        : String(selected.execPrice ?? selected.limitPrice ?? ''),
+    )
+    setConfBrokerRef(existing?.brokerReference != null ? String(existing.brokerReference) : '')
+    setConfTradeDate(
+      existing?.tradeDate
+        ? String(existing.tradeDate).slice(0, 10)
+        : new Date().toISOString().slice(0, 10),
+    )
+    setConfValueDate(existing?.valueDate ? String(existing.valueDate).slice(0, 10) : '')
+    setConfNotes(existing?.notes != null ? String(existing.notes) : '')
+    setConfirmOpen(true)
+  }
+
+  const saveConfirmation = async () => {
+    if (!selected?.apiId || lifeBusy) return
+    if (!confQty.trim() || !confPrice.trim()) {
+      toast.error('Quantity and price from the broker are required.')
+      return
+    }
+    setLifeBusy('record')
+    setLifeError(null)
+    try {
+      const res = await investmentOpsApi.recordBrokerConfirmation(selected.apiId, {
+        expectedVersion: selected.version,
+        outcome: confOutcome,
+        quantity: confQty.trim(),
+        price: confPrice.trim(),
+        currencyCode: 'USD',
+        brokerReference: confBrokerRef.trim() || undefined,
+        tradeDate: confTradeDate || undefined,
+        valueDate: confValueDate || undefined,
+        notes: confNotes.trim() || undefined,
+        attachmentFileId: null,
+      })
+      if (res.success === false) throw new Error(formatOpsError(res, 'Failed to record confirmation'))
+      const recorded = unwrapRecordedConfirmation(res.data)
+      if (recorded) {
+        setConfirmations((prev) => {
+          const without = prev.filter((c) => c.id !== recorded.id)
+          return [recorded, ...without]
+        })
+      }
+      setConfirmOpen(false)
+      toast.success('Broker confirmation recorded. Accept to create the trade on the blotter.')
+      await load()
+    } catch (e) {
+      const msg = formatOpsError(e, 'Failed to record confirmation')
+      setLifeError(msg)
+      toast.error(msg)
+    } finally {
+      setLifeBusy(null)
+    }
+  }
+
+  const acceptConfirmation = async () => {
+    if (!selected?.apiId || !openConfirmation?.id || lifeBusy) return
+    setLifeBusy('accept')
+    setLifeError(null)
+    try {
+      const res = await investmentOpsApi.acceptBrokerConfirmation(selected.apiId, openConfirmation.id, {
+        expectedVersion: selected.version,
+      })
+      if (res.success === false) throw new Error(formatOpsError(res, 'Failed to accept confirmation'))
+      const tradeId = extractAcceptTradeId(res.data) ?? selected.tradeId
+      const href = blotterDeepLink({
+        tradeId: tradeId ? String(tradeId) : null,
+        apiId: selected.apiId,
+        ref: selected.ref,
+      })
+      toast.success(tradeId ? `Trade executed (${tradeId})` : 'Trade executed — now on blotter', {
+        action: {
+          label: 'Open blotter',
+          onClick: () => window.open(href, '_blank', 'noopener,noreferrer'),
+        },
+      })
+      setConfirmations([])
+      await load()
+    } catch (e) {
+      const msg = formatOpsError(e, 'Failed to accept confirmation')
+      setLifeError(msg)
+      toast.error(msg)
+    } finally {
+      setLifeBusy(null)
+    }
+  }
+
+  const rejectConfirmation = async (reason: string): Promise<boolean> => {
+    if (!selected?.apiId || !openConfirmation?.id || lifeBusy) return false
+    setLifeBusy('rejectConf')
+    setLifeError(null)
+    try {
+      const res = await investmentOpsApi.rejectBrokerConfirmation(selected.apiId, openConfirmation.id, {
+        reason: reason.trim(),
+        expectedVersion: selected.version,
+      })
+      if (res.success === false) throw new Error(formatOpsError(res, 'Failed to reject confirmation'))
+      toast.message('Confirmation rejected. Order back with broker (outside system) — no blotter row.')
+      setConfirmations([])
+      await load()
+      return true
+    } catch (e) {
+      const msg = formatOpsError(e, 'Failed to reject confirmation')
+      setLifeError(msg)
+      toast.error(msg)
+      return false
+    } finally {
+      setLifeBusy(null)
+    }
+  }
+
   const raw = selected?.rawStatus?.toUpperCase() ?? ''
   const anyLifeBusy = Boolean(lifeBusy)
+  const awaitingBroker = raw === 'SENT_TO_BROKER' || raw === 'ROUTED'
+  const confirmationRecorded =
+    raw === 'BROKER_CONFIRMATION_RECORDED' ||
+    raw === 'CONFIRMATION_RECORDED' ||
+    Boolean(openConfirmation)
+  const canRecordConfirmation =
+    awaitingBroker ||
+    confirmationRecorded ||
+    raw === 'PARTIALLY_EXECUTED' ||
+    raw.includes('PARTIAL')
+  const hasOpenConfirmation = Boolean(openConfirmation)
 
   /** Open blotter tab only — no extra API; requires order.tradeId on the row. */
   const openBlotterForOrder = (order: OrderbookRow) => {
     if (!order.tradeId) {
       toast.error(
-        `No tradeId on ${order.ref}. Backend must seed/return tradeId on the order (Execute first, or fix seed).`,
+        `No trade on ${order.ref} yet. Record broker confirmation and Accept first.`,
       )
       return
     }
@@ -317,7 +536,7 @@ export default function OrderbookPage() {
   return (
     <OrdersPage
       title="Orderbook"
-      description="SRD lifecycle: Draft → Submitted → Approved → Sent to Broker → Executed → Settled. Alternate outcomes: Cancelled, Rejected, Failed, Archived."
+      description="Pending orders only: Draft → Approve → Send to broker → Record confirmation → Accept (trade moves to blotter). Broker negotiation is outside this system."
       actions={
         <div className="flex flex-wrap gap-2">
           <button className={cn(buttonClass, 'border-blue-500/40 bg-blue-600 text-white hover:bg-blue-500')} onClick={() => setShowOrder(true)}>
@@ -520,14 +739,24 @@ export default function OrderbookPage() {
               Side: selected.side,
               Quantity: selected.qty.toLocaleString(),
               Broker: selected.broker,
+              Custodian: selected.custodian,
+              'Settlement account': selected.settlementAccount,
               Trader: selected.trader,
               Approval: selected.approval,
               Routing: selected.routing,
               'Trade date': selected.tradeDate,
               'Value date': selected.valueDate,
-              Status: selected.status,
+              Status: selectedDisplayStatus ?? selected.status,
               'Trade id': selected.tradeId ?? '—',
               Version: String(selected.version),
+              ...(openConfirmation
+                ? {
+                    'Broker qty': String(openConfirmation.quantity),
+                    'Broker px': String(openConfirmation.price),
+                    'Broker ref': String(openConfirmation.brokerReference || '—'),
+                    Outcome: String(openConfirmation.outcome),
+                  }
+                : {}),
             }).map(([label, value]) => (
               <div key={label} className="rounded-[16px] bg-white/[0.035] p-3">
                 <div className="text-[9px] uppercase text-slate-600">{label}</div>
@@ -552,40 +781,62 @@ export default function OrderbookPage() {
               </button>
             )}
             {raw === 'APPROVED' && (
-              <button type="button" disabled={anyLifeBusy} className={cn(buttonClass)} onClick={() => void runLifecycle('send')}>
+              <button type="button" disabled={anyLifeBusy} className={cn(buttonClass)} onClick={openSendToBroker}>
                 {lifeBusy === 'send' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
                 Send to broker
               </button>
             )}
-            {(raw === 'APPROVED' ||
-              raw === 'SENT_TO_BROKER' ||
-              raw === 'ROUTED' ||
-              raw === 'PARTIALLY_EXECUTED' ||
-              raw.includes('PARTIAL')) && (
+            {canRecordConfirmation && !hasOpenConfirmation && (
               <button
                 type="button"
                 disabled={anyLifeBusy}
                 className={cn(buttonClass, 'bg-emerald-600 text-white')}
-                onClick={() => {
-                  setExecQty(String(Math.max(0, selected.qty - selected.filled) || selected.qty))
-                  setExecPrice(String(selected.execPrice ?? selected.limitPrice ?? ''))
-                  setExecuteOpen(true)
-                }}
+                onClick={openRecordConfirmation}
               >
-                {lifeBusy === 'execute' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-                {lifeBusy === 'execute'
-                  ? 'Executing…'
-                  : selected.filled > 0 && selected.filled < selected.qty
-                    ? 'Record fill'
-                    : 'Execute (create trade)'}
+                {lifeBusy === 'record' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                Record confirmation
               </button>
+            )}
+            {canRecordConfirmation && hasOpenConfirmation && (
+              <>
+                <button
+                  type="button"
+                  disabled={anyLifeBusy}
+                  className={cn(buttonClass)}
+                  onClick={openRecordConfirmation}
+                >
+                  Record another
+                </button>
+                <button
+                  type="button"
+                  disabled={anyLifeBusy || String(openConfirmation?.outcome).toUpperCase() === 'UNABLE'}
+                  className={cn(buttonClass, 'bg-emerald-600 text-white')}
+                  onClick={() => void acceptConfirmation()}
+                >
+                  {lifeBusy === 'accept' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                  {lifeBusy === 'accept' ? 'Accepting…' : 'Accept confirmation'}
+                </button>
+                <button
+                  type="button"
+                  disabled={anyLifeBusy}
+                  className={cn(buttonClass, 'border-amber-400/30 text-amber-200')}
+                  onClick={() => setRejectConfOpen(true)}
+                >
+                  {lifeBusy === 'rejectConf' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                  Reject / keep looking
+                </button>
+              </>
+            )}
+            {confirmationsLoading && (
+              <span className="text-[9px] text-slate-500">Loading confirmations…</span>
             )}
             {(raw === 'SUBMITTED' || raw === 'APPROVED') && (
               <button type="button" disabled={anyLifeBusy} className={cn(buttonClass, 'border-rose-400/30 text-rose-300')} onClick={() => setRejectOpen(true)}>
                 Reject
               </button>
             )}
-            {(raw === 'SENT_TO_BROKER' ||
+            {(awaitingBroker ||
+              confirmationRecorded ||
               raw === 'PARTIALLY_EXECUTED' ||
               raw === 'EXECUTED' ||
               raw === 'PENDING_SETTLEMENT' ||
@@ -605,18 +856,25 @@ export default function OrderbookPage() {
               </button>
             )}
           </div>
-          {(raw === 'APPROVED' || raw === 'SENT_TO_BROKER' || raw === 'ROUTED' || raw === 'PARTIALLY_EXECUTED') && (
+          {(raw === 'APPROVED' || awaitingBroker || confirmationRecorded || raw === 'PARTIALLY_EXECUTED') && (
             <p className="mt-2 text-[9px] text-slate-500">
-              Send to broker alone does not create a blotter trade. Use Execute to create the trade (partial qty OK), then Confirm/Settle on the blotter. Fail marks the order Failed; Archive is for terminal statuses.
+              Broker negotiation is outside this system. After Send, record the broker&apos;s confirmation, then Accept to create the executed trade on the blotter. Custodian settlement and recon follow on the blotter / recon screens.
+            </p>
+          )}
+          {hasOpenConfirmation && String(openConfirmation?.outcome).toUpperCase() === 'UNABLE' && (
+            <p className="mt-2 text-[9px] text-amber-200">
+              Broker unable — Reject confirmation and keep looking, or Fail the order.
             </p>
           )}
 
           <h3 className="mt-6 text-[11px] font-semibold">Status timeline</h3>
-          <p className="mt-1 text-[9px] text-slate-500">Every transition should log user, timestamp, reason, old → new (SRD 8.4).</p>
+          <p className="mt-1 text-[9px] text-slate-500">Every transition should log user, timestamp, reason, old → new.</p>
           <div className="mt-3 space-y-3 border-l border-white/10 pl-4">
             <div className="relative">
               <span className="absolute -left-[20px] top-1 h-2 w-2 rounded-full bg-blue-400" />
-              <Pill tone={tone(selected.status) as 'green' | 'amber' | 'blue' | 'red'}>{selected.status}</Pill>
+              <Pill tone={tone(selectedDisplayStatus ?? selected.status) as 'green' | 'amber' | 'blue' | 'red'}>
+                {selectedDisplayStatus ?? selected.status}
+              </Pill>
               <div className="mt-1 text-[9px] text-slate-600">Current · Created {selected.created}</div>
             </div>
             {timelineLoading && <p className="text-[10px] text-slate-500">Loading transitions…</p>}
@@ -679,47 +937,170 @@ export default function OrderbookPage() {
         onConfirm={(reason) => runLifecycle('archive', reason)}
       />
 
+      <ConfirmReasonDialog
+        open={rejectConfOpen}
+        onOpenChange={setRejectConfOpen}
+        title="Reject broker confirmation"
+        description={`Reject confirmation on ${selected?.ref ?? ''}? Order returns to Sent to Broker — no blotter trade.`}
+        reasonLabel="Reason"
+        confirmLabel="Reject confirmation"
+        onConfirm={(reason) => rejectConfirmation(reason)}
+      />
+
       <Modal
-        open={executeOpen}
+        open={sendOpen}
         onClose={() => {
-          if (lifeBusy === 'execute') return
-          setExecuteOpen(false)
+          if (lifeBusy === 'send') return
+          setSendOpen(false)
         }}
-        title="Execute order"
-        subtitle="Record broker fill. Enter a partial quantity for Partially Executed; full qty may land in Pending Settlement until GL posts."
+        title="Send to broker"
+        subtitle="Confirm custodian authorisation (Phase 1). Broker negotiation stays outside this system — no blotter row until you Accept a confirmation."
         footer={
           <>
             <button
               type="button"
               className={buttonClass}
-              disabled={lifeBusy === 'execute'}
-              onClick={() => setExecuteOpen(false)}
+              disabled={lifeBusy === 'send'}
+              onClick={() => setSendOpen(false)}
             >
               Cancel
             </button>
             <button
               type="button"
-              disabled={anyLifeBusy || !Number(execQty)}
-              className={cn(buttonClass, 'bg-emerald-600 text-white')}
-              onClick={() => void runLifecycle('execute')}
+              disabled={anyLifeBusy || !sendCustodianId.trim()}
+              className={cn(buttonClass, 'bg-blue-600 text-white')}
+              onClick={() => void runLifecycle('send')}
             >
-              {lifeBusy === 'execute' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-              {lifeBusy === 'execute' ? 'Executing…' : 'Confirm execution'}
+              {lifeBusy === 'send' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+              {lifeBusy === 'send' ? 'Sending…' : 'Send instruction'}
             </button>
           </>
         }
       >
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Fill quantity">
-            <input className={inputClass} value={execQty} onChange={(e) => setExecQty(e.target.value)} inputMode="decimal" />
+          <Field label="Custodian">
+            <select
+              className={inputClass}
+              value={sendCustodianId}
+              onChange={(e) => setSendCustodianId(e.target.value)}
+            >
+              <option value="">Select custodian…</option>
+              {custodians.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
           </Field>
-          <Field label="Execution price">
-            <input className={inputClass} value={execPrice} onChange={(e) => setExecPrice(e.target.value)} inputMode="decimal" placeholder="Optional if market" />
+          <Field label="Settlement / value date">
+            <input
+              className={inputClass}
+              type="date"
+              value={sendValueDate}
+              onChange={(e) => setSendValueDate(e.target.value)}
+            />
+          </Field>
+          <Field label="Settlement account">
+            <input
+              className={inputClass}
+              value={selected?.settlementAccount ?? '—'}
+              readOnly
+              disabled
+            />
+          </Field>
+          <Field label="Broker">
+            <input className={inputClass} value={selected?.broker ?? '—'} readOnly disabled />
           </Field>
         </div>
-        {selected && Number(execQty) > 0 && Number(execQty) < selected.qty && (
+        <div className="mt-4">
+          <Field label="Notes (optional)">
+            <textarea
+              className={cn(inputClass, 'min-h-[64px]')}
+              value={sendNotes}
+              onChange={(e) => setSendNotes(e.target.value)}
+              placeholder="e.g. Instruction emailed to ABC Brokers"
+            />
+          </Field>
+        </div>
+        {!sendCustodianId.trim() && (
           <p className="mt-3 text-[10px] text-amber-200">
-            Partial fill — remaining {(selected.qty - Number(execQty)).toLocaleString()} stays open as PARTIALLY_EXECUTED.
+            Custodian is required before send — AM authorises cash/securities prep at the custodian.
+          </p>
+        )}
+      </Modal>
+
+      <Modal
+        open={confirmOpen}
+        onClose={() => {
+          if (lifeBusy === 'record') return
+          setConfirmOpen(false)
+        }}
+        title="Record broker confirmation"
+        subtitle="Broker negotiation happened outside this system. Capture what they confirmed so you can Accept and create the trade on the blotter."
+        footer={
+          <>
+            <button
+              type="button"
+              className={buttonClass}
+              disabled={lifeBusy === 'record'}
+              onClick={() => setConfirmOpen(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={anyLifeBusy || !confQty.trim() || !confPrice.trim()}
+              className={cn(buttonClass, 'bg-emerald-600 text-white')}
+              onClick={() => void saveConfirmation()}
+            >
+              {lifeBusy === 'record' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+              {lifeBusy === 'record' ? 'Saving…' : 'Save confirmation'}
+            </button>
+          </>
+        }
+      >
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Outcome">
+            <select
+              className={inputClass}
+              value={confOutcome}
+              onChange={(e) => setConfOutcome(e.target.value as BrokerConfirmationOutcome)}
+            >
+              <option value="FILLED">Filled</option>
+              <option value="PARTIAL">Partial</option>
+              <option value="COUNTER">Counter</option>
+              <option value="UNABLE">Unable</option>
+            </select>
+          </Field>
+          <Field label="Broker reference">
+            <input className={inputClass} value={confBrokerRef} onChange={(e) => setConfBrokerRef(e.target.value)} placeholder="Optional" />
+          </Field>
+          <Field label="Confirmed quantity">
+            <input className={inputClass} value={confQty} onChange={(e) => setConfQty(e.target.value)} inputMode="decimal" />
+          </Field>
+          <Field label="Confirmed price">
+            <input className={inputClass} value={confPrice} onChange={(e) => setConfPrice(e.target.value)} inputMode="decimal" />
+          </Field>
+          <Field label="Trade date">
+            <input className={inputClass} type="date" value={confTradeDate} onChange={(e) => setConfTradeDate(e.target.value)} />
+          </Field>
+          <Field label="Value date">
+            <input className={inputClass} type="date" value={confValueDate} onChange={(e) => setConfValueDate(e.target.value)} />
+          </Field>
+        </div>
+        <div className="mt-4">
+          <Field label="Notes">
+            <textarea
+              className={cn(inputClass, 'min-h-[72px]')}
+              value={confNotes}
+              onChange={(e) => setConfNotes(e.target.value)}
+              placeholder="Optional notes from broker / ops"
+            />
+          </Field>
+        </div>
+        {selected && Number(confQty) > 0 && Number(confQty) < selected.qty && (
+          <p className="mt-3 text-[10px] text-amber-200">
+            Partial — remaining {(selected.qty - Number(confQty)).toLocaleString()} stays open after Accept.
           </p>
         )}
       </Modal>

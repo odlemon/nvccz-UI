@@ -1,18 +1,13 @@
-"use client"
+import { PerformanceLayout } from "@/components/layout/performance-layout"
+import { ReviewsMockScreen } from "@/components/performance-mock/screens/reviews-screen"
+import { ModuleGuard } from "@/lib/permissions"
 
-import { useEffect } from "react"
-import { useRouter } from "next/navigation"
-
-export default function CyclesRedirect() {
-  const router = useRouter()
-
-  useEffect(() => {
-    router.replace("/performance/reviews?tab=cycles")
-  }, [router])
-
+export default function CyclesPage() {
   return (
-    <div className="flex items-center justify-center min-h-screen">
-      <div className="animate-pulse text-gray-400">Redirecting to Reviews...</div>
-    </div>
+    <ModuleGuard moduleId="performance-management" subModuleId="performance-reviews">
+      <PerformanceLayout>
+        <ReviewsMockScreen />
+      </PerformanceLayout>
+    </ModuleGuard>
   )
 }

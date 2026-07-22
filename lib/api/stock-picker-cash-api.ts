@@ -50,6 +50,8 @@ export type CashLedgerLine = {
   accountPurpose?: string
   status?: string
   approvalStatus?: string
+  /** BA-RC-2 — linked trade when journal was backfilled from settle */
+  tradeId?: string | null
   [key: string]: unknown
 }
 
@@ -231,7 +233,19 @@ class StockPickerCashApi {
   }
 
   // ── Ledger / journals ──────────────────────────────────────────────────────
-  async getCashLedger(params?: Record<string, string | number | undefined>) {
+  /** BA-RC-2: pass `tradeId` to filter journals linked from trade settle. */
+  async getCashLedger(params?: {
+    page?: number
+    pageSize?: number
+    view?: string
+    accountPurpose?: string
+    portfolioId?: string
+    currency?: string
+    to?: string
+    from?: string
+    tradeId?: string
+    [key: string]: string | number | undefined
+  }) {
     return apiClient.get<OpsEnvelope<OpsPaged<CashLedgerLine> | CashLedgerLine[]>>(
       `${BASE}/cash-ledger${qs(params ?? {})}`,
     )

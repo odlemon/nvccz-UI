@@ -7,16 +7,12 @@ import {
   Bell,
   Building2,
   CalendarDays,
-  ChevronDown,
   FileText,
-  LogOut,
+  Landmark,
   Menu,
   Search,
-  Settings,
-  UserRound,
   X,
 } from "lucide-react"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -32,9 +28,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { useLpPortal } from "@/components/lp-portal/lp-portal-context"
 import { LpPortalSidebar } from "@/components/layout/lp-portal-sidebar"
-import { portalDocuments } from "@/lib/lp-portal/mock-data"
-import { useAppDispatch } from "@/lib/store"
-import { logoutUser } from "@/lib/store/slices/authSlice"
+import { lpPortalApi } from "@/lib/api/lp-portal-api"
+import { formatDate } from "@/lib/lp-portal/format"
+import { mapDocumentRow } from "@/lib/lp-portal/mappers"
 
 const navigationResults = [
   { label: "Dashboard", detail: "Portfolio overview", href: "/lp-portal", icon: Building2 },
@@ -49,21 +45,43 @@ function PortalSearch({ mobile = false }: { mobile?: boolean }) {
   const router = useRouter()
   const [query, setQuery] = React.useState("")
   const [open, setOpen] = React.useState(false)
+  const [docResults, setDocResults] = React.useState<
+    Array<{ label: string; detail: string; href: string; icon: typeof FileText }>
+  >([])
+
+  React.useEffect(() => {
+    const term = query.trim()
+    if (!term) {
+      setDocResults([])
+      return
+    }
+    const timer = window.setTimeout(() => {
+      void lpPortalApi
+        .getDocuments({ q: term, pageSize: 5 })
+        .then((res) =>
+          setDocResults(
+            res.data.items.map((doc) => {
+              const row = mapDocumentRow(doc)
+              return {
+                label: row.title,
+                detail: row.category,
+                href: `/lp-portal/documents?document=${row.id}`,
+                icon: FileText,
+              }
+            }),
+          ),
+        )
+        .catch(() => setDocResults([]))
+    }, 300)
+    return () => window.clearTimeout(timer)
+  }, [query])
 
   const results = React.useMemo(() => {
     const term = query.trim().toLowerCase()
     if (!term) return navigationResults.slice(0, 4)
     const pages = navigationResults.filter((item) => `${item.label} ${item.detail}`.toLowerCase().includes(term))
-    const documents = portalDocuments
-      .filter((document) => `${document.name} ${document.category}`.toLowerCase().includes(term))
-      .map((document) => ({
-        label: document.name,
-        detail: document.category,
-        href: `/lp-portal/documents?document=${document.id}`,
-        icon: FileText,
-      }))
-    return [...pages, ...documents].slice(0, 6)
-  }, [query])
+    return [...pages, ...docResults].slice(0, 6)
+  }, [query, docResults])
 
   const goTo = (href: string) => {
     setOpen(false)
@@ -86,17 +104,17 @@ function PortalSearch({ mobile = false }: { mobile?: boolean }) {
               if (event.key === "Enter" && results[0]) goTo(results[0].href)
             }}
             type="search"
-            aria-label="Global portal search"
-            placeholder={mobile ? "Search portal..." : "Search funds, investments, documents..."}
-            className="h-9 rounded-full border-slate-200 bg-white pl-4 pr-10 text-[11px] shadow-none placeholder:text-slate-400"
+            aria-label="Search investor portal"
+            placeholder={mobile ? "Search portal..." : "Search funds, documents, pages..."}
+            className="h-9 rounded-full border-border bg-background pl-4 pr-10 text-xs shadow-none placeholder:text-muted-foreground"
           />
-          <Search className="pointer-events-none absolute right-3.5 top-1/2 size-3.5 -translate-y-1/2 text-slate-400" />
+          <Search className="pointer-events-none absolute right-3.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
         </div>
       </PopoverTrigger>
       <PopoverContent
         align="start"
         sideOffset={7}
-        className="w-[var(--radix-popover-trigger-width)] rounded-xl border-slate-200 p-1.5 shadow-lg"
+        className="w-[var(--radix-popover-trigger-width)] rounded-xl border-border p-1.5 shadow-lg"
       >
         {results.length ? (
           results.map((result) => {
@@ -106,30 +124,31 @@ function PortalSearch({ mobile = false }: { mobile?: boolean }) {
                 key={`${result.href}-${result.label}`}
                 type="button"
                 onClick={() => goTo(result.href)}
-                className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left hover:bg-slate-50"
+                className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left hover:bg-accent"
               >
                 <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600">
                   <Icon className="size-3.5" />
                 </span>
                 <span className="min-w-0">
-                  <span className="block truncate text-[11px] font-semibold text-slate-800">{result.label}</span>
-                  <span className="block truncate text-[9px] text-slate-500">{result.detail}</span>
+                  <span className="block truncate text-[11px] font-semibold">{result.label}</span>
+                  <span className="block truncate text-[9px] text-muted-foreground">{result.detail}</span>
                 </span>
               </button>
             )
           })
         ) : (
-          <p className="px-3 py-5 text-center text-[11px] text-slate-500">No matching results</p>
+          <p className="px-3 py-5 text-center text-[11px] text-muted-foreground">No matching results</p>
         )}
       </PopoverContent>
     </Popover>
   )
 }
 
+/** Module context strip — sits below SharedTopbar (LP fund/as-of controls only). */
 export function LpPortalTopbar() {
   const [mobileNavigationOpen, setMobileNavigationOpen] = React.useState(false)
-  const dispatch = useAppDispatch()
   const {
+    client,
     funds,
     selectedFundId,
     setSelectedFundId,
@@ -137,24 +156,38 @@ export function LpPortalTopbar() {
     setAsOfDate,
     valuationStatus,
     unreadCounts,
+    notifications,
+    notificationsLoading,
   } = useLpPortal()
 
-  const handleLogout = async () => {
-    await dispatch(logoutUser())
-    window.location.href = "/login"
-  }
+  const orgName = client?.legalName ?? "Investor Portal"
 
   const formattedAsOfDate = React.useMemo(
-    () => new Date(`${asOfDate}T00:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+    () =>
+      asOfDate
+        ? new Date(`${asOfDate}T00:00:00`).toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+          })
+        : "—",
     [asOfDate],
   )
 
+  const portalUnreadTotal =
+    unreadCounts.requests + unreadCounts.messages + unreadCounts.notices
+
   return (
-    <header className="sticky top-0 z-40 border-b border-slate-200 bg-white">
-      <div className="flex h-14 items-center gap-2 px-3 sm:h-16 sm:px-4 lg:gap-3 lg:px-5">
+    <div className="shrink-0 border-b border-border bg-card/80 backdrop-blur-sm">
+      <div className="flex h-12 items-center gap-2 px-3 sm:px-4 lg:gap-3 lg:px-6">
         <Sheet open={mobileNavigationOpen} onOpenChange={setMobileNavigationOpen}>
           <SheetTrigger asChild>
-            <Button variant="ghost" size="icon" className="shrink-0 rounded-full lg:hidden" aria-label="Open navigation">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="shrink-0 rounded-full lg:hidden"
+              aria-label="Open portal navigation"
+            >
               <Menu className="size-5" />
             </Button>
           </SheetTrigger>
@@ -163,7 +196,12 @@ export function LpPortalTopbar() {
               <SheetTitle>Investor Portal navigation</SheetTitle>
             </SheetHeader>
             <SheetClose asChild>
-              <Button variant="ghost" size="icon" className="absolute right-2 top-2 z-10 rounded-full" aria-label="Close navigation">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute right-2 top-2 z-10 rounded-full"
+                aria-label="Close navigation"
+              >
                 <X className="size-4" />
               </Button>
             </SheetClose>
@@ -171,28 +209,43 @@ export function LpPortalTopbar() {
           </SheetContent>
         </Sheet>
 
-        <div className="hidden min-w-[240px] max-w-[420px] flex-1 md:block">
+        <div className="hidden min-w-0 items-center gap-2 sm:flex lg:min-w-[200px]">
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <Landmark className="size-4" />
+          </span>
+          <div className="min-w-0 leading-tight">
+            <p className="truncate text-xs font-semibold text-foreground">Investor Portal</p>
+            <p className="truncate text-[10px] text-muted-foreground">{orgName}</p>
+          </div>
+        </div>
+
+        <div className="hidden min-w-[200px] max-w-md flex-1 md:block">
           <PortalSearch />
         </div>
 
-        <div className="ml-auto flex min-w-0 items-center gap-1.5 lg:gap-2.5">
+        <div className="ml-auto flex min-w-0 items-center gap-1.5 lg:gap-2">
           <Select value={selectedFundId} onValueChange={setSelectedFundId}>
-            <SelectTrigger size="sm" className="h-9 w-[132px] rounded-full border-slate-200 px-3 text-[11px] shadow-none sm:w-[154px]">
-              <Building2 className="size-3.5 shrink-0 text-blue-600" />
+            <SelectTrigger
+              size="sm"
+              className="h-9 w-[128px] rounded-full border-border px-3 text-[11px] shadow-none sm:w-[150px]"
+            >
+              <Building2 className="size-3.5 shrink-0 text-primary" />
               <SelectValue placeholder="Select fund" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Funds</SelectItem>
               {funds.map((fund) => (
-                <SelectItem key={fund.id} value={fund.id}>{fund.shortName}</SelectItem>
+                <SelectItem key={fund.id} value={fund.id}>
+                  {fund.shortName}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
 
-          <label className="relative hidden h-9 cursor-pointer items-center gap-2 rounded-full border border-slate-200 bg-white px-3 text-[10px] text-slate-600 md:flex">
+          <label className="relative hidden h-9 cursor-pointer items-center gap-2 rounded-full border border-border bg-background px-3 text-[10px] text-muted-foreground md:flex">
             <span className="font-medium">As of</span>
-            <span className="min-w-[86px] text-[11px] font-semibold text-slate-800">{formattedAsOfDate}</span>
-            <CalendarDays className="size-3.5 text-slate-400" />
+            <span className="min-w-[82px] text-[11px] font-semibold text-foreground">{formattedAsOfDate}</span>
+            <CalendarDays className="size-3.5 text-muted-foreground" />
             <input
               type="date"
               value={asOfDate}
@@ -202,9 +255,9 @@ export function LpPortalTopbar() {
             />
           </label>
 
-          <div className="hidden h-9 min-w-[118px] flex-col justify-center rounded-lg border border-slate-200 bg-white px-3 lg:flex">
-            <span className="text-[7px] font-medium uppercase tracking-[0.04em] text-slate-400">Valuation status</span>
-            <span className="flex items-center gap-1.5 text-[10px] font-bold text-slate-800">
+          <div className="hidden h-9 min-w-[108px] flex-col justify-center rounded-full border border-border bg-background px-3 lg:flex">
+            <span className="text-[7px] font-medium uppercase tracking-wide text-muted-foreground">Valuation</span>
+            <span className="flex items-center gap-1.5 text-[10px] font-bold text-foreground">
               <i className="size-1.5 rounded-full bg-emerald-500" />
               {valuationStatus}
             </span>
@@ -212,87 +265,95 @@ export function LpPortalTopbar() {
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="relative size-9 shrink-0 rounded-full" aria-label={`${unreadCounts.notifications} unread notifications`}>
-                <Bell className="size-[18px] text-slate-600" />
-                <span className="absolute -right-0.5 -top-0.5 flex size-4 items-center justify-center rounded-full bg-red-500 text-[8px] font-bold leading-none text-white">
-                  {unreadCounts.notifications}
-                </span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="relative size-9 shrink-0 rounded-full"
+                aria-label={`${portalUnreadTotal} portal items need attention`}
+              >
+                <Bell className="size-[18px] text-muted-foreground" />
+                {portalUnreadTotal > 0 && (
+                  <span className="absolute -right-0.5 -top-0.5 flex size-4 items-center justify-center rounded-full bg-red-500 text-[8px] font-bold leading-none text-white">
+                    {portalUnreadTotal > 9 ? "9+" : portalUnreadTotal}
+                  </span>
+                )}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-72 rounded-xl">
               <DropdownMenuLabel className="flex items-center justify-between">
-                <span>Notifications</span>
-                <span className="text-[10px] font-normal text-blue-600">{unreadCounts.notifications} new</span>
+                <span>Portal alerts</span>
+                {portalUnreadTotal > 0 && (
+                  <span className="text-[10px] font-normal text-primary">{portalUnreadTotal} open</span>
+                )}
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <Link href="/lp-portal/capital-activity" className="items-start py-2.5">
-                  <span>
-                    <b className="block text-xs">Capital call due</b>
-                    <span className="text-[10px] text-slate-500">Arcus Growth Fund V, L.P.</span>
-                  </span>
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href="/lp-portal/documents" className="items-start py-2.5">
-                  <span>
-                    <b className="block text-xs">New document available</b>
-                    <span className="text-[10px] text-slate-500">Q1 2025 report</span>
-                  </span>
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href="/lp-portal/requests" className="items-start py-2.5">
-                  <span>
-                    <b className="block text-xs">KYC update required</b>
-                    <span className="text-[10px] text-slate-500">Organisation profile</span>
-                  </span>
-                </Link>
-              </DropdownMenuItem>
+              {notificationsLoading ? (
+                <DropdownMenuItem disabled className="text-xs text-muted-foreground">
+                  Loading alerts…
+                </DropdownMenuItem>
+              ) : notifications.length > 0 ? (
+                notifications.map((item) => (
+                  <DropdownMenuItem key={item.id} asChild>
+                    <Link href={item.href} className="items-start py-2.5">
+                      <span>
+                        <b className="block text-xs">{item.title}</b>
+                        <span className="text-[10px] text-muted-foreground">
+                          {[item.fundName, formatDate(item.createdAt, "datetime")].filter(Boolean).join(" · ")}
+                        </span>
+                      </span>
+                    </Link>
+                  </DropdownMenuItem>
+                ))
+              ) : portalUnreadTotal > 0 ? (
+                <>
+                  {unreadCounts.requests > 0 && (
+                    <DropdownMenuItem asChild>
+                      <Link href="/lp-portal/requests" className="items-start py-2.5">
+                        <span>
+                          <b className="block text-xs">Open requests</b>
+                          <span className="text-[10px] text-muted-foreground">{unreadCounts.requests} awaiting action</span>
+                        </span>
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
+                  {unreadCounts.messages > 0 && (
+                    <DropdownMenuItem asChild>
+                      <Link href="/lp-portal/requests?tab=messages" className="items-start py-2.5">
+                        <span>
+                          <b className="block text-xs">Unread messages</b>
+                          <span className="text-[10px] text-muted-foreground">{unreadCounts.messages} new</span>
+                        </span>
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
+                  {unreadCounts.notices > 0 && (
+                    <DropdownMenuItem asChild>
+                      <Link href="/lp-portal/notices" className="items-start py-2.5">
+                        <span>
+                          <b className="block text-xs">Notices</b>
+                          <span className="text-[10px] text-muted-foreground">{unreadCounts.notices} unread</span>
+                        </span>
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
+                </>
+              ) : (
+                <DropdownMenuItem disabled className="text-xs text-muted-foreground">
+                  No open portal alerts
+                </DropdownMenuItem>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
-                <Link href="/lp-portal/notices">View all notifications</Link>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-11 min-w-0 rounded-full px-1 sm:pr-2">
-                <Avatar className="size-8 shrink-0">
-                  <AvatarFallback className="bg-blue-700 text-[10px] font-semibold text-white">JS</AvatarFallback>
-                </Avatar>
-                <span className="hidden min-w-0 text-left lg:block">
-                  <span className="block truncate text-[11px] font-semibold leading-4 text-slate-800">Jane Smith</span>
-                  <span className="block max-w-[158px] truncate text-[8px] font-normal leading-3 text-slate-500">Arcus Capital Partners LP</span>
-                </span>
-                <ChevronDown className="hidden size-3.5 shrink-0 text-slate-400 lg:block" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-60 rounded-xl">
-              <DropdownMenuLabel>
-                <p className="text-sm font-semibold">Jane Smith</p>
-                <p className="text-xs font-normal text-slate-500">Arcus Capital Partners LP</p>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <Link href="/lp-portal/settings"><UserRound className="mr-2 size-4" />My profile</Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href="/lp-portal/settings"><Settings className="mr-2 size-4" />Settings</Link>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleLogout} className="text-red-600">
-                <LogOut className="mr-2 size-4" />Sign out
+                <Link href="/lp-portal/notices">View all notices</Link>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
       </div>
 
-      <div className="flex items-center gap-2 border-t border-slate-100 px-3 py-2 md:hidden">
+      <div className="flex items-center gap-2 border-t border-border/60 px-3 py-2 md:hidden">
         <PortalSearch mobile />
-        <label className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full border border-slate-200 text-slate-500">
+        <label className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full border border-border text-muted-foreground">
           <CalendarDays className="size-4" />
           <input
             type="date"
@@ -303,6 +364,6 @@ export function LpPortalTopbar() {
           />
         </label>
       </div>
-    </header>
+    </div>
   )
 }

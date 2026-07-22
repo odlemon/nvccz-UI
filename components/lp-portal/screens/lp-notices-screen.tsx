@@ -8,38 +8,35 @@ import {
   Clock3,
   FileText,
   Filter,
-  Info,
+  Loader2,
   Search,
 } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { InfoHint } from "@/components/lp-portal/info-hint"
+import { lpPortalApi } from "@/lib/api/lp-portal-api"
+import { createIdempotencyKey } from "@/lib/lp-portal/format"
+import { useLpNotices } from "@/lib/lp-portal/hooks"
+import { mapNoticeRow } from "@/lib/lp-portal/mappers"
+import { subscribeLpRealtime } from "@/lib/lp-portal/realtime"
+import { getApiErrorMessage } from "@/lib/lp-portal/use-lp-api"
 import { cn } from "@/lib/utils"
 
 type NoticeStatus = "Unread" | "Opened" | "Acknowledged"
-type NoticeKind =
-  | "Report Available"
-  | "AGM Notice"
-  | "Valuation Update"
-  | "Capital Call"
-  | "Distribution"
-  | "Policy Update"
 
-type Notice = {
-  id: string
-  title: string
-  summary: string
-  kind: NoticeKind
-  fund: string
-  audience: string
-  publishedAt: string
-  status: NoticeStatus
-  requiresAck: boolean
-  body: string
-}
+type Notice = ReturnType<typeof mapNoticeRow>
 
-const KIND_STYLE: Record<NoticeKind, string> = {
+const KIND_STYLE: Record<string, string> = {
   "Report Available": "bg-[#dbeafe] text-[#1d4ed8]",
   "AGM Notice": "bg-[#ede9fe] text-[#6d28d9]",
   "Valuation Update": "bg-[#ccfbf1] text-[#0f766e]",
@@ -48,124 +45,120 @@ const KIND_STYLE: Record<NoticeKind, string> = {
   "Policy Update": "bg-[#f3f4f6] text-[#4b5563]",
 }
 
+function getKindStyle(kind: string): string {
+  return KIND_STYLE[kind] ?? "bg-[#f3f4f6] text-[#4b5563]"
+}
+
 const STATUS_STYLE: Record<NoticeStatus, string> = {
   Unread: "bg-[#dbeafe] text-[#1d4ed8]",
   Opened: "bg-[#fef9c3] text-[#a16207]",
   Acknowledged: "bg-[#dcfce7] text-[#15803d]",
 }
 
-const SEED: Notice[] = [
-  {
-    id: "n-1",
-    title: "Capital Call #7 Issued — Due Jun 5, 2025",
-    summary: "Arcus Growth Fund V capital call notice is available for acknowledgment.",
-    kind: "Capital Call",
-    fund: "Arcus Growth Fund V, L.P.",
-    audience: "Fund investors",
-    publishedAt: "May 20, 2025 11:30 AM",
-    status: "Unread",
-    requiresAck: true,
-    body: "Call #7 for US$6,250,000 has been issued. Please review the notice and acknowledge receipt. Payment due by Jun 5, 2025.",
-  },
-  {
-    id: "n-2",
-    title: "Q1 2025 Investor Report Published",
-    summary: "Quarterly investor report is now available in Document Centre.",
-    kind: "Report Available",
-    fund: "Arcus Growth Fund V, L.P.",
-    audience: "All investors",
-    publishedAt: "May 15, 2025 8:00 AM",
-    status: "Opened",
-    requiresAck: false,
-    body: "The Q1 2025 investor report has been published. Download from Documents → Fund Reports.",
-  },
-  {
-    id: "n-3",
-    title: "May 31, 2025 Valuation Status: FINAL",
-    summary: "Valuation marks are now FINAL for the May 31 reporting snapshot.",
-    kind: "Valuation Update",
-    fund: "All Funds",
-    audience: "Organisation",
-    publishedAt: "Jun 3, 2025 9:00 AM",
-    status: "Unread",
-    requiresAck: false,
-    body: "Reporting metrics as of May 31, 2025 are FINAL. Provisional figures have been replaced across Performance and Account Activity.",
-  },
-  {
-    id: "n-4",
-    title: "Distribution DIST-000128 Paid",
-    summary: "Net distribution credited to your registered bank account.",
-    kind: "Distribution",
-    fund: "Arcus Opportunities Fund II, L.P.",
-    audience: "Fund investors",
-    publishedAt: "May 15, 2025 2:40 PM",
-    status: "Acknowledged",
-    requiresAck: false,
-    body: "Distribution DIST-000128 for US$1,850,000 has been paid. Payment advice is available in Documents.",
-  },
-  {
-    id: "n-5",
-    title: "2025 Annual General Meeting Notice",
-    summary: "AGM details and registration instructions for Growth Fund V.",
-    kind: "AGM Notice",
-    fund: "Arcus Growth Fund V, L.P.",
-    audience: "Limited Partners",
-    publishedAt: "Apr 18, 2025 4:00 PM",
-    status: "Opened",
-    requiresAck: true,
-    body: "Please acknowledge receipt of the AGM notice. Attendance options and proxy forms are attached in Documents → Notices.",
-  },
-  {
-    id: "n-6",
-    title: "Holiday Schedule — June 2025",
-    summary: "Dealing and settlement calendar update for US and regional holidays.",
-    kind: "Policy Update",
-    fund: "All Funds",
-    audience: "All investors",
-    publishedAt: "May 16, 2025 10:15 AM",
-    status: "Acknowledged",
-    requiresAck: false,
-    body: "Dealing dates for open-ended funds may shift around the published holiday schedule. See policy memo for details.",
-  },
-]
-
-export function LpNoticesScreen() {
-  const [notices, setNotices] = React.useState(SEED)
+export function LpNoticesScreen({ initialNoticeId }: { initialNoticeId?: string } = {}) {
+  const { data, loading, error, reload } = useLpNotices()
+  const notices = data ?? []
   const [statusFilter, setStatusFilter] = React.useState("all")
   const [kindFilter, setKindFilter] = React.useState("all")
+  const [fundFilter, setFundFilter] = React.useState("all")
+  const [ackOnly, setAckOnly] = React.useState(false)
+  const [publishedFrom, setPublishedFrom] = React.useState("")
+  const [publishedTo, setPublishedTo] = React.useState("")
+  const [filtersOpen, setFiltersOpen] = React.useState(false)
   const [query, setQuery] = React.useState("")
-  const [selectedId, setSelectedId] = React.useState(SEED[0].id)
+  const [selectedId, setSelectedId] = React.useState<string | null>(initialNoticeId ?? null)
+  const [detail, setDetail] = React.useState<Notice | null>(null)
+  const [detailLoading, setDetailLoading] = React.useState(false)
+  const [acknowledging, setAcknowledging] = React.useState(false)
+
+  React.useEffect(() => {
+    if (initialNoticeId) setSelectedId(initialNoticeId)
+    else if (notices.length && !selectedId) setSelectedId(notices[0].id)
+  }, [notices, selectedId, initialNoticeId])
+
+  const advancedFilterCount = [
+    fundFilter !== "all",
+    ackOnly,
+    publishedFrom.length > 0,
+    publishedTo.length > 0,
+  ].filter(Boolean).length
+
+  React.useEffect(() => {
+    const unsub = subscribeLpRealtime("lp_notice_updated", () => {
+      void reload()
+    })
+    return unsub
+  }, [reload])
+
+  React.useEffect(() => {
+    if (!selectedId) {
+      setDetail(null)
+      return
+    }
+    let cancelled = false
+    setDetailLoading(true)
+    void lpPortalApi
+      .getNotice(selectedId)
+      .then((res) => {
+        if (!cancelled) setDetail(mapNoticeRow(res.data))
+      })
+      .catch((err) => {
+        if (!cancelled) toast.error(getApiErrorMessage(err, "Failed to load notice"))
+      })
+      .finally(() => {
+        if (!cancelled) setDetailLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [selectedId])
 
   const filtered = React.useMemo(() => {
     return notices.filter((n) => {
       if (statusFilter !== "all" && n.status !== statusFilter) return false
       if (kindFilter !== "all" && n.kind !== kindFilter) return false
+      if (fundFilter !== "all" && n.fund !== fundFilter) return false
+      if (ackOnly && (!n.requiresAck || n.status === "Acknowledged")) return false
+      if (publishedFrom && n.publishedAtRaw && n.publishedAtRaw.slice(0, 10) < publishedFrom) return false
+      if (publishedTo && n.publishedAtRaw && n.publishedAtRaw.slice(0, 10) > publishedTo) return false
       if (query.trim()) {
         const q = query.toLowerCase()
         if (!`${n.title} ${n.summary} ${n.fund}`.toLowerCase().includes(q)) return false
       }
       return true
     })
-  }, [kindFilter, notices, query, statusFilter])
+  }, [ackOnly, fundFilter, kindFilter, notices, publishedFrom, publishedTo, query, statusFilter])
 
-  const selected = filtered.find((n) => n.id === selectedId) ?? filtered[0] ?? null
+  const fundOptions = React.useMemo(
+    () => Array.from(new Set(notices.map((n) => n.fund))).sort(),
+    [notices],
+  )
+
+  const selected = detail ?? filtered.find((n) => n.id === selectedId) ?? filtered[0] ?? null
 
   React.useEffect(() => {
     if (selected && selected.id !== selectedId) setSelectedId(selected.id)
   }, [selected, selectedId])
 
-  const markOpened = (id: string) => {
-    setNotices((prev) =>
-      prev.map((n) => (n.id === id && n.status === "Unread" ? { ...n, status: "Opened" } : n)),
-    )
+  const acknowledge = async (id: string) => {
+    setAcknowledging(true)
+    try {
+      await lpPortalApi.acknowledgeNotice(id, createIdempotencyKey())
+      toast.success("Notice acknowledged.")
+      await reload()
+      const res = await lpPortalApi.getNotice(id)
+      setDetail(mapNoticeRow(res.data))
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Failed to acknowledge notice"))
+    } finally {
+      setAcknowledging(false)
+    }
   }
 
-  const acknowledge = (id: string) => {
-    setNotices((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, status: "Acknowledged" } : n)),
-    )
-    toast.success("Notice acknowledged (mock).")
-  }
+  const kindOptions = React.useMemo(
+    () => Array.from(new Set(notices.map((n) => n.kind))).sort(),
+    [notices],
+  )
 
   const counts = {
     total: notices.length,
@@ -179,19 +172,19 @@ export function LpNoticesScreen() {
       <div>
         <div className="flex items-center gap-1.5">
           <h1 className="text-[24px] font-bold tracking-tight text-[#0f172a]">Notices</h1>
-          <button
-            type="button"
-            className="rounded-full text-[#94a3b8] hover:text-[#64748b]"
-            onClick={() => toast.message("Fund and organisation announcements")}
-            aria-label="Notices info"
-          >
-            <Info className="size-3.5" />
-          </button>
+          <InfoHint
+            label="Notices"
+            description="Fund and organisation announcements requiring review or acknowledgement."
+          />
         </div>
         <p className="mt-1.5 text-[13px] leading-5 text-[#6b7280]">
           Announcements, valuation updates, and actions requiring your attention.
         </p>
       </div>
+
+      {error && (
+        <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-700">{error}</p>
+      )}
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {[
@@ -233,7 +226,7 @@ export function LpNoticesScreen() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Types</SelectItem>
-                {(Object.keys(KIND_STYLE) as NoticeKind[]).map((k) => (
+                {kindOptions.map((k) => (
                   <SelectItem key={k} value={k}>
                     {k}
                   </SelectItem>
@@ -243,11 +236,16 @@ export function LpNoticesScreen() {
             <Button
               type="button"
               variant="outline"
-              className="h-9 rounded-full border-[#e5e7eb] px-3 text-[12px] shadow-none"
-              onClick={() => toast.message("More filters (mock).")}
+              className="relative h-9 rounded-full border-[#e5e7eb] px-3 text-[12px] shadow-none"
+              onClick={() => setFiltersOpen(true)}
             >
               <Filter className="size-3.5" />
               Filters
+              {advancedFilterCount > 0 ? (
+                <span className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-[#2563eb] text-[9px] font-bold text-white">
+                  {advancedFilterCount}
+                </span>
+              ) : null}
             </Button>
             <div className="relative min-w-[200px] flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-[#9ca3af]" />
@@ -260,65 +258,69 @@ export function LpNoticesScreen() {
             </div>
           </div>
 
-          <ul className="divide-y divide-[#f3f4f6]">
-            {filtered.map((notice) => {
-              const active = selected?.id === notice.id
-              return (
-                <li key={notice.id}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedId(notice.id)
-                      markOpened(notice.id)
-                    }}
-                    className={cn(
-                      "flex w-full gap-3 px-4 py-3.5 text-left transition",
-                      active
-                        ? "bg-[#eff6ff] shadow-[inset_3px_0_0_0_#2563eb]"
-                        : "hover:bg-[#f9fafb]",
-                    )}
-                  >
-                    <span
+          {loading ? (
+            <div className="flex items-center justify-center gap-2 px-4 py-10 text-[13px] text-[#6b7280]">
+              <Loader2 className="size-4 animate-spin" />
+              Loading notices…
+            </div>
+          ) : (
+            <ul className="divide-y divide-[#f3f4f6]">
+              {filtered.map((notice) => {
+                const active = selected?.id === notice.id
+                return (
+                  <li key={notice.id}>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedId(notice.id)}
                       className={cn(
-                        "mt-1 size-2 shrink-0 rounded-full",
-                        notice.status === "Unread" ? "bg-[#2563eb]" : "bg-transparent",
-                      )}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-[13px] font-semibold text-[#111827]">{notice.title}</p>
-                        <span
-                          className={cn(
-                            "rounded-full px-2 py-0.5 text-[10px] font-semibold",
-                            KIND_STYLE[notice.kind],
-                          )}
-                        >
-                          {notice.kind}
-                        </span>
-                      </div>
-                      <p className="mt-1 line-clamp-1 text-[12px] text-[#6b7280]">{notice.summary}</p>
-                      <p className="mt-1.5 text-[11px] text-[#9ca3af]">
-                        {notice.fund} · {notice.publishedAt}
-                      </p>
-                    </div>
-                    <span
-                      className={cn(
-                        "shrink-0 self-start rounded-full px-2.5 py-0.5 text-[11px] font-semibold",
-                        STATUS_STYLE[notice.status],
+                        "flex w-full gap-3 px-4 py-3.5 text-left transition",
+                        active
+                          ? "bg-[#eff6ff] shadow-[inset_3px_0_0_0_#2563eb]"
+                          : "hover:bg-[#f9fafb]",
                       )}
                     >
-                      {notice.status}
-                    </span>
-                  </button>
+                      <span
+                        className={cn(
+                          "mt-1 size-2 shrink-0 rounded-full",
+                          notice.status === "Unread" ? "bg-[#2563eb]" : "bg-transparent",
+                        )}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-[13px] font-semibold text-[#111827]">{notice.title}</p>
+                          <span
+                            className={cn(
+                              "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                              getKindStyle(notice.kind),
+                            )}
+                          >
+                            {notice.kind}
+                          </span>
+                        </div>
+                        <p className="mt-1 line-clamp-1 text-[12px] text-[#6b7280]">{notice.summary}</p>
+                        <p className="mt-1.5 text-[11px] text-[#9ca3af]">
+                          {notice.fund} · {notice.publishedAt}
+                        </p>
+                      </div>
+                      <span
+                        className={cn(
+                          "shrink-0 self-start rounded-full px-2.5 py-0.5 text-[11px] font-semibold",
+                          STATUS_STYLE[notice.status],
+                        )}
+                      >
+                        {notice.status}
+                      </span>
+                    </button>
+                  </li>
+                )
+              })}
+              {filtered.length === 0 && (
+                <li className="px-4 py-10 text-center text-[13px] text-[#9ca3af]">
+                  No notices match your filters.
                 </li>
-              )
-            })}
-            {filtered.length === 0 && (
-              <li className="px-4 py-10 text-center text-[13px] text-[#9ca3af]">
-                No notices match your filters.
-              </li>
-            )}
-          </ul>
+              )}
+            </ul>
+          )}
         </section>
 
         {selected && (
@@ -350,15 +352,17 @@ export function LpNoticesScreen() {
               ))}
             </dl>
             <p className="mt-4 rounded-lg border border-[#e5e7eb] bg-[#f9fafb] px-3 py-3 text-[12px] leading-5 text-[#374151]">
-              {selected.body}
+              {detailLoading ? "Loading notice…" : selected.body || "No content available."}
             </p>
             <div className="mt-4 flex flex-col gap-2">
               {selected.requiresAck && selected.status !== "Acknowledged" && (
                 <Button
                   type="button"
+                  disabled={acknowledging}
                   className="h-10 rounded-full bg-[#2563eb] text-[13px] font-semibold text-white shadow-sm hover:bg-[#1d4ed8]"
-                  onClick={() => acknowledge(selected.id)}
+                  onClick={() => void acknowledge(selected.id)}
                 >
+                  {acknowledging ? <Loader2 className="size-4 animate-spin" /> : null}
                   Acknowledge Notice
                 </Button>
               )}
@@ -374,6 +378,80 @@ export function LpNoticesScreen() {
           </aside>
         )}
       </div>
+
+      <Dialog open={filtersOpen} onOpenChange={setFiltersOpen}>
+        <DialogContent className="max-w-md rounded-xl">
+          <DialogHeader>
+            <DialogTitle>Notice filters</DialogTitle>
+            <DialogDescription>Filter by fund, acknowledgement requirement, or publish date.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-2">
+            <div>
+              <label className="mb-1.5 block text-[11px] font-semibold text-[#374151]">Fund</label>
+              <Select value={fundFilter} onValueChange={setFundFilter}>
+                <SelectTrigger className="h-9 w-full rounded-lg border-[#e5e7eb] text-[12px] shadow-none">
+                  <SelectValue placeholder="All funds" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All funds</SelectItem>
+                  {fundOptions.map((fund) => (
+                    <SelectItem key={fund} value={fund}>
+                      {fund}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <label className="flex items-center gap-2 text-[12px] text-[#374151]">
+              <input
+                type="checkbox"
+                checked={ackOnly}
+                onChange={(e) => setAckOnly(e.target.checked)}
+                className="size-4 rounded border-[#cbd5e1]"
+              />
+              Acknowledgement required only
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1.5 block text-[11px] font-semibold text-[#374151]">Published from</label>
+                <Input
+                  type="date"
+                  value={publishedFrom}
+                  onChange={(e) => setPublishedFrom(e.target.value)}
+                  className="h-9 rounded-lg border-[#e5e7eb] text-[12px] shadow-none"
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-[11px] font-semibold text-[#374151]">Published to</label>
+                <Input
+                  type="date"
+                  value={publishedTo}
+                  onChange={(e) => setPublishedTo(e.target.value)}
+                  className="h-9 rounded-lg border-[#e5e7eb] text-[12px] shadow-none"
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-full"
+              onClick={() => {
+                setFundFilter("all")
+                setAckOnly(false)
+                setPublishedFrom("")
+                setPublishedTo("")
+              }}
+            >
+              Reset
+            </Button>
+            <Button type="button" className="rounded-full" onClick={() => setFiltersOpen(false)}>
+              Apply
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

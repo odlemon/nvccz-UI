@@ -71,6 +71,7 @@ export function Topbar({ onModuleSelect, currentModule }: TopbarProps) {
 
   return (
     <TooltipProvider>
+      <>
       <header className="h-20 border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="flex items-center justify-between h-full px-6">
           {/* Left Section - Logo and Breadcrumb */}
@@ -207,19 +208,18 @@ export function Topbar({ onModuleSelect, currentModule }: TopbarProps) {
             </DropdownMenu>
           </div>
         </div>
-
-        {/* App Switcher Dropdown */}
-        <AppSwitcherDropdown
-          isOpen={showAppSwitcher}
-          onClose={() => setShowAppSwitcher(false)}
-          onModuleSelect={(module) => {
-            console.log('Topbar onModuleSelect called with:', module)
-            onModuleSelect(module)
-            setShowAppSwitcher(false)
-          }}
-          currentModule={currentModule}
-        />
       </header>
+
+      <AppSwitcherDropdown
+        isOpen={showAppSwitcher}
+        onClose={() => setShowAppSwitcher(false)}
+        onModuleSelect={(module) => {
+          onModuleSelect(module)
+          setShowAppSwitcher(false)
+        }}
+        currentModule={currentModule}
+      />
+      </>
     </TooltipProvider>
   )
 }

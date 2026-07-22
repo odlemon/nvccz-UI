@@ -3,7 +3,12 @@ import { LpAccountActivityScreen } from "@/components/lp-portal/screens/lp-accou
 export default function AccountActivityPage({
   searchParams,
 }: {
-  searchParams?: { structure?: string }
+  searchParams?: { structure?: string; entry?: string }
 }) {
-  return <LpAccountActivityScreen initialStructure={searchParams?.structure} />
+  return (
+    <LpAccountActivityScreen
+      initialStructure={searchParams?.structure}
+      initialEntryId={searchParams?.entry}
+    />
+  )
 }

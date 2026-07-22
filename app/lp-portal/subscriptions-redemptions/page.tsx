@@ -12,5 +12,10 @@ export default function SubscriptionsRedemptionsPage({
         ? "subscriptions"
         : undefined
 
-  return <LpSubscriptionsRedemptionsScreen highlight={highlight} />
+  return (
+    <LpSubscriptionsRedemptionsScreen
+      highlight={highlight}
+      initialRequestId={searchParams?.request}
+    />
+  )
 }

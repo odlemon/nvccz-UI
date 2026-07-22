@@ -1,6 +1,8 @@
 "use client"
 
 import * as React from "react"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
 import {
   AlertCircle,
   CheckCircle2,
@@ -20,8 +22,17 @@ import {
   UserRound,
 } from "lucide-react"
 import { toast } from "sonner"
+import { useLpPortal } from "@/components/lp-portal/lp-portal-context"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,6 +42,19 @@ import {
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { lpPortalApi, type LpMessageThreadDetail, type LpServiceRequestAttachment } from "@/lib/api/lp-portal-api"
+import { createIdempotencyKey, formatDate, formatFileSize } from "@/lib/lp-portal/format"
+import { useLpOrganisation, useLpRequestsMessages } from "@/lib/lp-portal/hooks"
+import { resolveLpLinkedRecordHref, resolveRequestTypeHref } from "@/lib/lp-portal/navigation"
+import { mapServiceRequestRow, mapThreadParticipants } from "@/lib/lp-portal/mappers"
+import {
+  joinLpRequestRoom,
+  joinLpThreadRoom,
+  leaveLpRequestRoom,
+  leaveLpThreadRoom,
+  subscribeLpRealtime,
+} from "@/lib/lp-portal/realtime"
+import { getApiErrorMessage } from "@/lib/lp-portal/use-lp-api"
 import { cn } from "@/lib/utils"
 
 type PortalTab = "requests" | "messages"
@@ -47,7 +71,9 @@ type ServiceRequest = {
   id: string
   reference: string
   type: string
+  apiType: string
   fund: string
+  fundId: string
   subject: string
   submittedBy: string
   lastUpdated: string
@@ -55,10 +81,10 @@ type ServiceRequest = {
   priority: Priority
   linkedTo: string
   description: string
-  attachments: Array<{ name: string; size: string }>
+  attachments: Array<{ id?: string; name: string; size: string; downloadUrl?: string }>
 }
 
-type ChatAttachment = { name: string; size: string }
+type ChatAttachment = { name: string; size: string; downloadUrl?: string }
 
 type ThreadMessage = {
   id: string
@@ -75,6 +101,9 @@ type Conversation = {
   requestId: string
   title: string
   fund: string
+  fundId: string
+  relatedType: string
+  relatedId: string
   preview: string
   updated: string
   unread?: number
@@ -84,18 +113,10 @@ type Conversation = {
 }
 
 const REQUEST_TYPES = [
-  "Account / Statement",
-  "Capital Activity",
-  "Open-Ended Activity",
-  "Profile / Access",
-]
-
-const FUNDS = [
-  "Arcus Growth Fund V, L.P.",
-  "Arcus Growth Fund IV, L.P.",
-  "Arcus Opportunities Fund II, L.P.",
-  "Arcus Strategic Income Fund L.P.",
-  "Arcus Credit Opportunities Fund II L.P.",
+  { label: "Account / Statement", apiType: "ACCOUNT_STATEMENT" },
+  { label: "Capital Activity", apiType: "CAPITAL_ACTIVITY" },
+  { label: "Open-Ended Activity", apiType: "OPEN_ENDED_ACTIVITY" },
+  { label: "Profile / Access", apiType: "PROFILE_ACCESS" },
 ]
 
 const STATUS_STYLE: Record<Status, string> = {
@@ -113,293 +134,53 @@ const PRIORITY_DOT: Record<Priority, string> = {
   Low: "bg-[#22c55e]",
 }
 
-const SEED_REQUESTS: ServiceRequest[] = [
-  {
-    id: "req-1",
-    reference: "REQ-000845",
-    type: "Capital Activity",
-    fund: "Arcus Growth Fund V, L.P.",
-    subject: "Capital Call #12 – Payment Applied",
-    submittedBy: "Jane Smith",
-    lastUpdated: "May 28, 2025 2:18 PM",
-    status: "Awaiting Investor",
-    priority: "High",
-    linkedTo: "Capital Call #12",
-    description: "Please confirm wire application for Capital Call #12.",
-    attachments: [
-      { name: "CC-012 Wire Confirmation.pdf", size: "248 KB" },
-      { name: "CC-012 Remittance Confirmation.pdf", size: "196 KB" },
-    ],
-  },
-  {
-    id: "req-2",
-    reference: "REQ-000839",
-    type: "Account / Statement",
-    fund: "Arcus Opportunities Fund II, L.P.",
-    subject: "Q1 2025 statement fee line inquiry",
-    submittedBy: "Jane Smith",
-    lastUpdated: "May 27, 2025 11:40 AM",
-    status: "Under Review",
-    priority: "Medium",
-    linkedTo: "Q1 2025 Investor Statement",
-    description: "Clarification needed on the administration fee line.",
-    attachments: [{ name: "Q1_2025_Statement.pdf", size: "1.1 MB" }],
-  },
-  {
-    id: "req-3",
-    reference: "REQ-000831",
-    type: "Profile / Access",
-    fund: "Arcus Growth Fund V, L.P.",
-    subject: "Add viewer access for finance reviewer",
-    submittedBy: "Tawanda Moyo",
-    lastUpdated: "May 26, 2025 4:05 PM",
-    status: "Assigned",
-    priority: "Low",
-    linkedTo: "Organisation Access",
-    description: "Grant read-only access for quarterly reports.",
-    attachments: [],
-  },
-  {
-    id: "req-4",
-    reference: "REQ-000822",
-    type: "Open-Ended Activity",
-    fund: "Arcus Strategic Income Fund L.P.",
-    subject: "Subscription SUB-000089 settlement",
-    submittedBy: "Jane Smith",
-    lastUpdated: "May 22, 2025 9:12 AM",
-    status: "Submitted",
-    priority: "Medium",
-    linkedTo: "Subscription SUB-000089",
-    description: "Confirm final units after May dealing date.",
-    attachments: [{ name: "SUB-000089 Confirmation.pdf", size: "156 KB" }],
-  },
-  {
-    id: "req-5",
-    reference: "REQ-000810",
-    type: "Capital Activity",
-    fund: "Arcus Growth Fund IV, L.P.",
-    subject: "Distribution notice DIST-000119 FX rate",
-    submittedBy: "David Lee",
-    lastUpdated: "May 18, 2025 3:33 PM",
-    status: "Resolved",
-    priority: "High",
-    linkedTo: "Distribution DIST-000119",
-    description: "Please share the historical FX used for EUR distribution.",
-    attachments: [{ name: "FX Memo DIST-000119.pdf", size: "64 KB" }],
-  },
-  {
-    id: "req-6",
-    reference: "REQ-000798",
-    type: "Account / Statement",
-    fund: "Arcus Credit Opportunities Fund II L.P.",
-    subject: "2024 tax package availability",
-    submittedBy: "Jane Smith",
-    lastUpdated: "May 10, 2025 10:20 AM",
-    status: "Closed",
-    priority: "Low",
-    linkedTo: "2024 K-1 Tax Package",
-    description: "Request for final 2024 tax package.",
-    attachments: [{ name: "2024_K1_Tax_Package.xlsx", size: "1.1 MB" }],
-  },
-  {
-    id: "req-7",
-    reference: "REQ-000791",
-    type: "Capital Activity",
-    fund: "Arcus Growth Fund V, L.P.",
-    subject: "Bank instruction change status",
-    submittedBy: "Michael Chen",
-    lastUpdated: "May 8, 2025 1:05 PM",
-    status: "Under Review",
-    priority: "High",
-    linkedTo: "Bank Instruction Request",
-    description: "Status update on bank detail change verification.",
-    attachments: [],
-  },
-  {
-    id: "req-8",
-    reference: "REQ-000776",
-    type: "Open-Ended Activity",
-    fund: "Arcus Strategic Income Fund L.P.",
-    subject: "Redemption RED-000041 dealing date",
-    submittedBy: "Jane Smith",
-    lastUpdated: "May 2, 2025 8:44 AM",
-    status: "Awaiting Investor",
-    priority: "Medium",
-    linkedTo: "Redemption RED-000041",
-    description: "Need confirmation of documents for redemption review.",
-    attachments: [{ name: "RED-000041 Request.pdf", size: "134 KB" }],
-  },
-]
+function mapPriorityToApi(priority: Priority): string {
+  if (priority === "High") return "HIGH"
+  if (priority === "Low") return "LOW"
+  return "MEDIUM"
+}
 
-const SEED_CONVERSATIONS: Conversation[] = [
-  {
-    id: "conv-1",
-    requestId: "req-1",
-    title: "Capital Call #12 – Payment Applied",
-    fund: "Arcus Growth Fund V, L.P.",
-    preview: "The wire has been matched. Please review the attached remittance confirmation.",
-    updated: "2:18 PM",
-    unread: 2,
-    linkedLabel: "Capital Call #12",
-    participants: [
-      { name: "Jane Smith", initials: "JS", color: "bg-[#2563eb]" },
-      { name: "Michael Dube", initials: "MD", color: "bg-[#0f172a]" },
-      { name: "Priya Ndlovu", initials: "PN", color: "bg-[#7c3aed]" },
-    ],
-    messages: [
-      {
-        id: "m1",
-        sender: "Jane Smith",
-        initials: "JS",
-        role: "investor",
-        timestamp: "May 28, 2025 9:12 AM",
-        body: "We sent the CC-012 wire yesterday. Could you confirm that it has been received and applied to our investor account?",
-        attachments: [{ name: "CC-012 Wire Confirmation.pdf", size: "248 KB" }],
-      },
-      {
-        id: "m2",
-        sender: "Arcus Team",
-        initials: "A",
-        role: "team",
-        timestamp: "May 28, 2025 2:18 PM",
-        body: "The wire has been matched and applied. Please review the remittance confirmation attached below.",
-        attachments: [{ name: "CC-012 Remittance Confirmation.pdf", size: "196 KB" }],
-      },
-    ],
-  },
-  {
-    id: "conv-2",
-    requestId: "req-2",
-    title: "Q1 2025 statement fee line inquiry",
-    fund: "Arcus Opportunities Fund II, L.P.",
-    preview: "Investor Accounting is reviewing the fee calculation.",
-    updated: "Yesterday",
-    unread: 0,
-    linkedLabel: "Q1 2025 Investor Statement",
-    participants: [
-      { name: "Jane Smith", initials: "JS", color: "bg-[#2563eb]" },
-      { name: "Priya Ndlovu", initials: "PN", color: "bg-[#7c3aed]" },
-    ],
-    messages: [
-      {
-        id: "m3",
-        sender: "Jane Smith",
-        initials: "JS",
-        role: "investor",
-        timestamp: "May 27, 2025 11:40 AM",
-        body: "Please explain the administration fee adjustment on the Q1 statement.",
-      },
-      {
-        id: "m4",
-        sender: "Arcus Team",
-        initials: "A",
-        role: "team",
-        timestamp: "May 27, 2025 3:05 PM",
-        body: "We are reviewing the approved calculation and will reply with the supporting schedule.",
-      },
-    ],
-  },
-  {
-    id: "conv-3",
-    requestId: "req-4",
-    title: "Subscription SUB-000089 settlement",
-    fund: "Arcus Strategic Income Fund L.P.",
-    preview: "Final units and dealing NAV confirmation pending.",
-    updated: "May 22",
-    linkedLabel: "Subscription SUB-000089",
-    participants: [
-      { name: "Jane Smith", initials: "JS", color: "bg-[#2563eb]" },
-      { name: "Michael Dube", initials: "MD", color: "bg-[#0f172a]" },
-    ],
-    messages: [
-      {
-        id: "m5",
-        sender: "Jane Smith",
-        initials: "JS",
-        role: "investor",
-        timestamp: "May 22, 2025 9:12 AM",
-        body: "Could you confirm final units allocated for SUB-000089?",
-      },
-    ],
-  },
-  {
-    id: "conv-4",
-    requestId: "req-8",
-    title: "Redemption RED-000041 dealing date",
-    fund: "Arcus Strategic Income Fund L.P.",
-    preview: "Additional documentation requested before dealing date.",
-    updated: "May 2",
-    unread: 1,
-    linkedLabel: "Redemption RED-000041",
-    participants: [
-      { name: "Jane Smith", initials: "JS", color: "bg-[#2563eb]" },
-      { name: "Priya Ndlovu", initials: "PN", color: "bg-[#7c3aed]" },
-    ],
-    messages: [
-      {
-        id: "m6",
-        sender: "Arcus Team",
-        initials: "A",
-        role: "team",
-        timestamp: "May 2, 2025 8:44 AM",
-        body: "Please upload the signed redemption notice to continue review.",
-      },
-    ],
-  },
-]
+function mapThreadMessage(msg: {
+  id: string
+  authorType: string
+  body: string
+  createdAt: string
+  attachments?: LpServiceRequestAttachment[]
+}): ThreadMessage {
+  const isInvestor = msg.authorType.toUpperCase() === "INVESTOR"
+  return {
+    id: msg.id,
+    sender: isInvestor ? "You" : "Arcus Team",
+    initials: isInvestor ? "Y" : "A",
+    role: isInvestor ? "investor" : "team",
+    timestamp: formatDate(msg.createdAt, "datetime"),
+    body: msg.body,
+    attachments: (msg.attachments ?? []).map((a) => ({
+      name: a.name,
+      size: formatFileSize(a.size),
+      downloadUrl: a.downloadUrl,
+    })),
+  }
+}
 
-const KPIS = [
-  {
-    id: "open",
-    label: "Open Requests",
-    value: "8",
-    link: "View all open",
-    linkTone: "blue" as const,
-    iconBg: "bg-[#dbeafe]",
-    iconColor: "text-[#2563eb]",
-    icon: <Inbox className="size-4" strokeWidth={2.25} />,
-  },
-  {
-    id: "awaiting",
-    label: "Awaiting Investor",
-    value: "3",
-    link: "Action required",
-    linkTone: "red" as const,
-    iconBg: "bg-[#ede9fe]",
-    iconColor: "text-[#7c3aed]",
-    icon: <AlertCircle className="size-4" strokeWidth={2.25} />,
-  },
-  {
-    id: "review",
-    label: "Under Review",
-    value: "5",
-    link: "In progress",
-    linkTone: "blue" as const,
-    iconBg: "bg-[#ffedd5]",
-    iconColor: "text-[#ea580c]",
-    icon: <Clock3 className="size-4" strokeWidth={2.25} />,
-  },
-  {
-    id: "unread",
-    label: "Unread Messages",
-    value: "2",
-    link: "View messages",
-    linkTone: "blue" as const,
-    iconBg: "bg-[#dcfce7]",
-    iconColor: "text-[#16a34a]",
-    icon: <MessageSquare className="size-4" strokeWidth={2.25} />,
-  },
-  {
-    id: "closed",
-    label: "Closed This Month",
-    value: "12",
-    link: "View history",
-    linkTone: "blue" as const,
-    iconBg: "bg-[#ccfbf1]",
-    iconColor: "text-[#0d9488]",
-    icon: <CheckCircle2 className="size-4" strokeWidth={2.25} />,
-  },
-]
+async function uploadAttachmentFiles(files: File[]): Promise<string[]> {
+  const ids: string[] = []
+  for (const file of files) {
+    const formData = new FormData()
+    formData.append("file", file)
+    const res = await lpPortalApi.uploadRequestAttachment(formData, createIdempotencyKey())
+    ids.push(res.data.id)
+  }
+  return ids
+}
+
+function downloadAttachment(url: string | undefined, name: string) {
+  if (!url) {
+    toast.error("Download URL not available.")
+    return
+  }
+  window.open(url, "_blank", "noopener,noreferrer")
+}
 
 function StatusBadge({ status }: { status: Status }) {
   return (
@@ -423,46 +204,155 @@ function PriorityCell({ priority }: { priority: Priority }) {
   )
 }
 
-function downloadMock(name: string) {
-  const url = URL.createObjectURL(
-    new Blob([`Mock attachment: ${name}\nLP Portal demo file.`], { type: "text/plain" }),
-  )
-  const a = document.createElement("a")
-  a.href = url
-  a.download = name.replace(/\.pdf$/i, ".txt")
-  a.click()
-  URL.revokeObjectURL(url)
-  toast.success("Attachment downloaded (mock).")
-}
-
 export function LpRequestsMessagesScreen({
   initialTab = "requests",
+  initialRequestRef,
 }: {
   initialTab?: PortalTab
+  initialRequestRef?: string
 }) {
+  const router = useRouter()
+  const { funds, lpRole } = useLpPortal()
+  const { data, loading, error, reload } = useLpRequestsMessages()
+  const { data: organisation } = useLpOrganisation()
+  const requests = data?.requests ?? []
+  const conversations = data?.messages ?? []
+
   const [tab, setTab] = React.useState<PortalTab>(initialTab)
-  const [requests, setRequests] = React.useState(SEED_REQUESTS)
   const [statusFilter, setStatusFilter] = React.useState("all")
   const [query, setQuery] = React.useState("")
-  const [selectedRequestId, setSelectedRequestId] = React.useState(SEED_REQUESTS[0].id)
-  const [conversations, setConversations] = React.useState(SEED_CONVERSATIONS)
-  const [activeConversationId, setActiveConversationId] = React.useState(SEED_CONVERSATIONS[0].id)
+  const [selectedRequestId, setSelectedRequestId] = React.useState<string | null>(null)
+  const [activeConversationId, setActiveConversationId] = React.useState<string | null>(null)
+  const [threadDetail, setThreadDetail] = React.useState<LpMessageThreadDetail | null>(null)
+  const [threadMessages, setThreadMessages] = React.useState<ThreadMessage[]>([])
+  const [threadLoading, setThreadLoading] = React.useState(false)
+  const [requestDetail, setRequestDetail] = React.useState<ServiceRequest | null>(null)
   const [convQuery, setConvQuery] = React.useState("")
   const [reply, setReply] = React.useState("")
+  const [submitting, setSubmitting] = React.useState(false)
+  const [sendingReply, setSendingReply] = React.useState(false)
   const [form, setForm] = React.useState({
-    type: REQUEST_TYPES[0],
-    fund: FUNDS[0],
+    type: REQUEST_TYPES[0].label,
+    fundId: "",
     subject: "",
     priority: "Medium" as Priority,
     description: "",
   })
   const [formFiles, setFormFiles] = React.useState<File[]>([])
+  const [replyFiles, setReplyFiles] = React.useState<File[]>([])
+  const [threadParticipants, setThreadParticipants] = React.useState<
+    Array<{ name: string; initials: string; color: string }>
+  >([])
+  const [addParticipantOpen, setAddParticipantOpen] = React.useState(false)
+  const [selectedColleagueId, setSelectedColleagueId] = React.useState<string | null>(null)
+  const [addingParticipant, setAddingParticipant] = React.useState(false)
   const formFileRef = React.useRef<HTMLInputElement>(null)
   const replyFileRef = React.useRef<HTMLInputElement>(null)
 
   React.useEffect(() => {
+    if (funds.length && !form.fundId) {
+      setForm((f) => ({ ...f, fundId: funds[0].id }))
+    }
+  }, [funds, form.fundId])
+
+  React.useEffect(() => {
+    if (requests.length && !selectedRequestId) setSelectedRequestId(requests[0].id)
+  }, [requests, selectedRequestId])
+
+  React.useEffect(() => {
+    if (conversations.length && !activeConversationId) setActiveConversationId(conversations[0].id)
+  }, [conversations, activeConversationId])
+
+  React.useEffect(() => {
     setTab(initialTab)
   }, [initialTab])
+
+  React.useEffect(() => {
+    if (!initialRequestRef || requests.length === 0) return
+    const match = requests.find((r) => r.reference === initialRequestRef)
+    if (match) {
+      setSelectedRequestId(match.id)
+      setTab("requests")
+    }
+  }, [initialRequestRef, requests])
+
+  const navigateLinkedRecord = (relatedType: string, relatedId: string) => {
+    const href = resolveLpLinkedRecordHref(relatedType, relatedId)
+    if (href) router.push(href)
+    else toast.message("Linked record", { description: `${relatedType} ${relatedId}` })
+  }
+
+  React.useEffect(() => {
+    const unsubs = [
+      subscribeLpRealtime("lp_request_created", () => void reload()),
+      subscribeLpRealtime("lp_request_message", () => void reload()),
+      subscribeLpRealtime("lp_thread_message", () => void reload()),
+    ]
+    return () => {
+      for (const unsub of unsubs) unsub()
+    }
+  }, [reload])
+
+  React.useEffect(() => {
+    const req = requests.find((r) => r.id === selectedRequestId)
+    if (!req?.reference) return
+    joinLpRequestRoom(req.reference)
+    return () => leaveLpRequestRoom(req.reference)
+  }, [selectedRequestId, requests])
+
+  React.useEffect(() => {
+    if (!activeConversationId) return
+    joinLpThreadRoom(activeConversationId)
+    return () => leaveLpThreadRoom(activeConversationId)
+  }, [activeConversationId])
+
+  React.useEffect(() => {
+    if (!activeConversationId) {
+      setThreadDetail(null)
+      setThreadMessages([])
+      return
+    }
+    let cancelled = false
+    setThreadLoading(true)
+    void lpPortalApi
+      .getMessageThread(activeConversationId)
+      .then((res) => {
+        if (cancelled) return
+        setThreadDetail(res.data)
+        setThreadMessages(res.data.messages.map(mapThreadMessage))
+        setThreadParticipants(mapThreadParticipants(res.data))
+        void lpPortalApi.markMessageThreadRead(activeConversationId)
+      })
+      .catch((err) => {
+        if (!cancelled) toast.error(getApiErrorMessage(err, "Failed to load conversation"))
+      })
+      .finally(() => {
+        if (!cancelled) setThreadLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [activeConversationId])
+
+  React.useEffect(() => {
+    const req = requests.find((r) => r.id === selectedRequestId)
+    if (!req?.reference) {
+      setRequestDetail(null)
+      return
+    }
+    let cancelled = false
+    void lpPortalApi
+      .getRequest(req.reference)
+      .then((res) => {
+        if (!cancelled) setRequestDetail(mapServiceRequestRow(res.data))
+      })
+      .catch((err) => {
+        if (!cancelled) toast.error(getApiErrorMessage(err, "Failed to load request"))
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [selectedRequestId, requests])
 
   const filteredRequests = React.useMemo(() => {
     return requests.filter((row) => {
@@ -484,6 +374,7 @@ export function LpRequestsMessagesScreen({
   }, [query, requests, statusFilter])
 
   const selectedRequest =
+    requestDetail ??
     filteredRequests.find((r) => r.id === selectedRequestId) ??
     requests.find((r) => r.id === selectedRequestId) ??
     filteredRequests[0] ??
@@ -500,8 +391,62 @@ export function LpRequestsMessagesScreen({
     )
   }, [convQuery, conversations])
 
-  const activeConversation =
-    conversations.find((c) => c.id === activeConversationId) ?? conversations[0]
+  const activeConversation = React.useMemo(() => {
+    const summary = conversations.find((c) => c.id === activeConversationId) ?? conversations[0]
+    if (!summary) return null
+    return {
+      ...summary,
+      participants: threadParticipants.length ? threadParticipants : summary.participants,
+      messages: threadMessages.length ? threadMessages : summary.messages,
+    }
+  }, [activeConversationId, conversations, threadMessages, threadParticipants])
+
+  const availableColleagues = React.useMemo(() => {
+    const participantNames = new Set(
+      (activeConversation?.participants ?? []).map((p) => p.name.trim().toLowerCase()),
+    )
+    return (organisation?.colleagues ?? []).filter(
+      (c) =>
+        c.isActive &&
+        !c.revokedAt &&
+        !participantNames.has(c.name.trim().toLowerCase()) &&
+        !participantNames.has(c.email.trim().toLowerCase()),
+    )
+  }, [activeConversation?.participants, organisation?.colleagues])
+
+  const requestParticipantAccess = async () => {
+    if (!selectedColleagueId || !activeConversation) return
+    const colleague = availableColleagues.find((c) => c.membershipId === selectedColleagueId)
+    if (!colleague) return
+
+    const fundMatch = funds.find((f) => f.name === activeConversation.fund)
+    setAddingParticipant(true)
+    try {
+      await lpPortalApi.createRequest(
+        {
+          type: "PROFILE_ACCESS",
+          fundId: fundMatch?.id ?? funds[0]?.id,
+          subject: `Add participant to conversation: ${activeConversation.title}`,
+          description: [
+            `Please add ${colleague.name} (${colleague.email}) to the message thread "${activeConversation.title}".`,
+            `Linked record: ${activeConversation.linkedLabel}`,
+            `Thread ID: ${activeConversation.id}`,
+            `Current participants: ${activeConversation.participants.map((p) => p.name).join(", ") || "None listed"}`,
+          ].join("\n"),
+          priority: "MEDIUM",
+        },
+        createIdempotencyKey(),
+      )
+      toast.success(`Access request submitted for ${colleague.name}.`)
+      setAddParticipantOpen(false)
+      setSelectedColleagueId(null)
+      await reload()
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Could not submit participant request"))
+    } finally {
+      setAddingParticipant(false)
+    }
+  }
 
   const selectRequest = (id: string) => {
     setSelectedRequestId(id)
@@ -509,81 +454,80 @@ export function LpRequestsMessagesScreen({
     if (linked) setActiveConversationId(linked.id)
   }
 
-  const submitRequest = () => {
+  const submitRequest = async () => {
     if (!form.subject.trim()) {
       toast.error("Subject is required.")
       return
     }
-    const now = new Date()
-    const stamp = now.toLocaleString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-    })
-    const next: ServiceRequest = {
-      id: `req-${Date.now()}`,
-      reference: `REQ-${String(845 + requests.length).padStart(6, "0")}`,
-      type: form.type,
-      fund: form.fund,
-      subject: form.subject.trim(),
-      submittedBy: "Jane Smith",
-      lastUpdated: stamp,
-      status: "Submitted",
-      priority: form.priority,
-      linkedTo: form.fund,
-      description: form.description.trim() || "No description provided.",
-      attachments: formFiles.map((f) => ({
-        name: f.name,
-        size: `${Math.max(1, Math.round(f.size / 1024))} KB`,
-      })),
+    const typeDef = REQUEST_TYPES.find((t) => t.label === form.type) ?? REQUEST_TYPES[0]
+    setSubmitting(true)
+    try {
+      const attachmentIds = formFiles.length ? await uploadAttachmentFiles(formFiles) : undefined
+      const res = await lpPortalApi.createRequest(
+        {
+          type: typeDef.apiType,
+          fundId: form.fundId || undefined,
+          subject: form.subject.trim(),
+          description: form.description.trim() || "No description provided.",
+          priority: mapPriorityToApi(form.priority),
+          attachmentIds,
+        },
+        createIdempotencyKey(),
+      )
+      toast.success("Request submitted.")
+      await reload()
+      setSelectedRequestId(res.data.id)
+      setForm({
+        type: REQUEST_TYPES[0].label,
+        fundId: funds[0]?.id ?? "",
+        subject: "",
+        priority: "Medium",
+        description: "",
+      })
+      setFormFiles([])
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Failed to submit request"))
+    } finally {
+      setSubmitting(false)
     }
-    setRequests((prev) => [next, ...prev])
-    setSelectedRequestId(next.id)
-    setForm({
-      type: REQUEST_TYPES[0],
-      fund: FUNDS[0],
-      subject: "",
-      priority: "Medium",
-      description: "",
-    })
-    setFormFiles([])
-    toast.success("Request submitted (mock).")
   }
 
-  const sendReply = () => {
-    if (!reply.trim() || !activeConversation) return
-    const stamp = new Date().toLocaleString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-    })
-    const message: ThreadMessage = {
-      id: `m-${Date.now()}`,
-      sender: "Jane Smith",
-      initials: "JS",
-      role: "investor",
-      timestamp: stamp,
-      body: reply.trim(),
+  const sendReply = async () => {
+    if (!reply.trim() || !activeConversationId) return
+    setSendingReply(true)
+    try {
+      const attachmentIds = replyFiles.length ? await uploadAttachmentFiles(replyFiles) : undefined
+      const isRequestThread = threadDetail?.relatedType?.toUpperCase().includes("REQUEST")
+      if (isRequestThread) {
+        const req =
+          requests.find((r) => r.id === threadDetail?.relatedId) ??
+          requests.find((r) => r.reference === threadDetail?.relatedId)
+        if (req?.reference) {
+          await lpPortalApi.replyToRequest(req.reference, { body: reply.trim(), attachmentIds })
+        } else if (threadDetail?.relatedId) {
+          await lpPortalApi.replyToRequest(threadDetail.relatedId, { body: reply.trim(), attachmentIds })
+        } else {
+          throw new Error("Could not resolve request reference for reply")
+        }
+      } else {
+        await lpPortalApi.replyToMessageThread(activeConversationId, {
+          body: reply.trim(),
+          attachmentIds,
+        })
+      }
+      toast.success("Message sent.")
+      setReply("")
+      setReplyFiles([])
+      await reload()
+      const res = await lpPortalApi.getMessageThread(activeConversationId)
+      setThreadDetail(res.data)
+      setThreadMessages(res.data.messages.map(mapThreadMessage))
+      setThreadParticipants(mapThreadParticipants(res.data))
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Failed to send message"))
+    } finally {
+      setSendingReply(false)
     }
-    setConversations((prev) =>
-      prev.map((c) =>
-        c.id === activeConversation.id
-          ? {
-              ...c,
-              preview: message.body,
-              updated: "Just now",
-              unread: 0,
-              messages: [...c.messages, message],
-            }
-          : c,
-      ),
-    )
-    setReply("")
-    toast.success("Message sent (mock).")
   }
 
   const onKpiClick = (id: string) => {
@@ -600,6 +544,59 @@ export function LpRequestsMessagesScreen({
 
   const unreadCount = conversations.reduce((sum, c) => sum + (c.unread ?? 0), 0)
 
+  const kpis = [
+    {
+      id: "open",
+      label: "Open Requests",
+      value: String(requests.filter((r) => r.status !== "Resolved" && r.status !== "Closed").length),
+      link: "View all open",
+      linkTone: "blue" as const,
+      iconBg: "bg-[#dbeafe]",
+      iconColor: "text-[#2563eb]",
+      icon: <Inbox className="size-4" strokeWidth={2.25} />,
+    },
+    {
+      id: "awaiting",
+      label: "Awaiting Investor",
+      value: String(requests.filter((r) => r.status === "Awaiting Investor").length),
+      link: "Action required",
+      linkTone: "red" as const,
+      iconBg: "bg-[#ede9fe]",
+      iconColor: "text-[#7c3aed]",
+      icon: <AlertCircle className="size-4" strokeWidth={2.25} />,
+    },
+    {
+      id: "review",
+      label: "Under Review",
+      value: String(requests.filter((r) => r.status === "Under Review").length),
+      link: "In progress",
+      linkTone: "blue" as const,
+      iconBg: "bg-[#ffedd5]",
+      iconColor: "text-[#ea580c]",
+      icon: <Clock3 className="size-4" strokeWidth={2.25} />,
+    },
+    {
+      id: "unread",
+      label: "Unread Messages",
+      value: String(unreadCount),
+      link: "View messages",
+      linkTone: "blue" as const,
+      iconBg: "bg-[#dcfce7]",
+      iconColor: "text-[#16a34a]",
+      icon: <MessageSquare className="size-4" strokeWidth={2.25} />,
+    },
+    {
+      id: "closed",
+      label: "Closed / Resolved",
+      value: String(requests.filter((r) => r.status === "Closed" || r.status === "Resolved").length),
+      link: "View history",
+      linkTone: "blue" as const,
+      iconBg: "bg-[#ccfbf1]",
+      iconColor: "text-[#0d9488]",
+      icon: <CheckCircle2 className="size-4" strokeWidth={2.25} />,
+    },
+  ]
+
   return (
     <div className="space-y-5 pb-8">
       <div>
@@ -609,9 +606,13 @@ export function LpRequestsMessagesScreen({
         </p>
       </div>
 
+      {error && (
+        <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-700">{error}</p>
+      )}
+
       {/* KPI strip */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
-        {KPIS.map((kpi) => (
+        {kpis.map((kpi) => (
           <button
             key={kpi.id}
             type="button"
@@ -653,7 +654,7 @@ export function LpRequestsMessagesScreen({
               {(
                 [
                   ["requests", `Requests (${requests.length})`],
-                  ["messages", `Messages (${unreadCount || 2})`],
+                  ["messages", `Messages (${unreadCount})`],
                 ] as const
               ).map(([id, label]) => (
                 <button
@@ -691,7 +692,6 @@ export function LpRequestsMessagesScreen({
                     type="button"
                     variant="outline"
                     className="h-9 rounded-full border-[#e5e7eb] px-3 text-[12px] font-medium text-[#374151] shadow-none"
-                    onClick={() => toast.message("Additional filters (mock).")}
                   >
                     <SlidersHorizontal className="size-3.5" />
                     Filters
@@ -709,13 +709,15 @@ export function LpRequestsMessagesScreen({
                     type="button"
                     className="flex size-9 items-center justify-center rounded-full border border-[#e5e7eb] text-[#6b7280] hover:bg-[#f9fafb]"
                     aria-label="Export"
-                    onClick={() => toast.success("Requests exported (mock).")}
                   >
                     <Download className="size-3.5" />
                   </button>
                 </div>
 
                 <div className="overflow-x-auto">
+                  {loading ? (
+                    <div className="px-4 py-10 text-center text-[13px] text-[#6b7280]">Loading requests…</div>
+                  ) : (
                   <table className="w-full min-w-[900px] text-left text-[12px]">
                     <thead>
                       <tr className="border-b border-[#e5e7eb] bg-[#fafafa] text-[11px] font-semibold text-[#6b7280]">
@@ -808,6 +810,7 @@ export function LpRequestsMessagesScreen({
                       )}
                     </tbody>
                   </table>
+                  )}
                 </div>
                 <div className="border-t border-[#f1f5f9] px-4 py-3 text-[12px] text-[#6b7280]">
                   Showing{" "}
@@ -853,9 +856,6 @@ export function LpRequestsMessagesScreen({
                         onClick={() => {
                           setActiveConversationId(conv.id)
                           setSelectedRequestId(conv.requestId)
-                          setConversations((prev) =>
-                            prev.map((c) => (c.id === conv.id ? { ...c, unread: 0 } : c)),
-                          )
                         }}
                         className={cn(
                           "w-full border-b border-[#f3f4f6] px-3 py-3 text-left transition last:border-0",
@@ -894,7 +894,7 @@ export function LpRequestsMessagesScreen({
               <button
                 type="button"
                 className="w-full border-t border-[#f1f5f9] px-3 py-2.5 text-left text-[12px] font-medium text-[#2563eb] hover:bg-[#f8fafc]"
-                onClick={() => toast.message("All conversations (mock).")}
+                onClick={() => setTab("messages")}
               >
                 View all conversations
               </button>
@@ -910,8 +910,13 @@ export function LpRequestsMessagesScreen({
                     <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-[#6b7280]">
                       <button
                         type="button"
-                        className="rounded-full bg-[#eff6ff] px-2 py-0.5 font-medium text-[#2563eb]"
-                        onClick={() => toast.message(activeConversation.linkedLabel)}
+                        className="rounded-full bg-[#eff6ff] px-2 py-0.5 font-medium text-[#2563eb] hover:underline"
+                        onClick={() => {
+                          const conv = conversations.find((c) => c.id === activeConversationId)
+                          if (conv?.relatedType && conv?.relatedId) {
+                            navigateLinkedRecord(conv.relatedType, conv.relatedId)
+                          }
+                        }}
                       >
                         Linked to {activeConversation.linkedLabel}
                       </button>
@@ -936,9 +941,14 @@ export function LpRequestsMessagesScreen({
                     </div>
                     <button
                       type="button"
-                      className="flex size-7 items-center justify-center rounded-full border border-dashed border-[#cbd5e1] text-[#9ca3af] hover:bg-[#f9fafb]"
+                      className="flex size-7 items-center justify-center rounded-full border border-dashed border-[#cbd5e1] text-[#9ca3af] hover:bg-[#f9fafb] disabled:cursor-not-allowed disabled:opacity-40"
                       aria-label="Add participant"
-                      onClick={() => toast.message("Add participant (mock).")}
+                      disabled={lpRole === "VIEWER"}
+                      title={lpRole === "VIEWER" ? "Viewers cannot request participant changes" : "Request to add colleague"}
+                      onClick={() => {
+                        setSelectedColleagueId(availableColleagues[0]?.membershipId ?? null)
+                        setAddParticipantOpen(true)
+                      }}
                     >
                       <Plus className="size-3.5" />
                     </button>
@@ -946,7 +956,10 @@ export function LpRequestsMessagesScreen({
                 </div>
 
                 <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
-                  {activeConversation.messages.map((msg) => (
+                  {threadLoading ? (
+                    <p className="text-center text-[13px] text-[#6b7280]">Loading messages…</p>
+                  ) : (
+                  activeConversation.messages.map((msg) => (
                     <div key={msg.id} className="flex gap-2.5">
                       <Avatar className="size-8 shrink-0">
                         <AvatarFallback
@@ -988,7 +1001,7 @@ export function LpRequestsMessagesScreen({
                                 type="button"
                                 className="rounded-full p-1 text-[#2563eb] hover:bg-[#eff6ff]"
                                 aria-label={`Download ${file.name}`}
-                                onClick={() => downloadMock(file.name)}
+                                onClick={() => downloadAttachment(file.downloadUrl, file.name)}
                               >
                                 <Download className="size-3.5" />
                               </button>
@@ -997,10 +1010,20 @@ export function LpRequestsMessagesScreen({
                         </div>
                       </div>
                     </div>
-                  ))}
+                  ))
+                  )}
                 </div>
 
                 <div className="border-t border-[#f1f5f9] px-4 py-3">
+                  {replyFiles.length > 0 && (
+                    <ul className="mb-2 space-y-1">
+                      {replyFiles.map((f) => (
+                        <li key={f.name + f.size} className="truncate text-[11px] text-[#4b5563]">
+                          {f.name}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                   <div className="flex items-end gap-2">
                     <div className="relative min-w-0 flex-1">
                       <Textarea
@@ -1024,15 +1047,16 @@ export function LpRequestsMessagesScreen({
                         className="hidden"
                         onChange={(e) => {
                           const file = e.target.files?.[0]
-                          if (file) toast.message(`Attached ${file.name} (mock).`)
+                          if (file) setReplyFiles((prev) => [...prev, file])
                           e.target.value = ""
                         }}
                       />
                     </div>
                     <Button
                       type="button"
+                      disabled={sendingReply}
                       className="h-10 rounded-full bg-[#93c5fd] px-5 text-[12px] font-semibold text-[#1e3a8a] shadow-none hover:bg-[#60a5fa]"
-                      onClick={sendReply}
+                      onClick={() => void sendReply()}
                     >
                       <Send className="size-3.5" />
                       Send
@@ -1062,8 +1086,8 @@ export function LpRequestsMessagesScreen({
                   </SelectTrigger>
                   <SelectContent>
                     {REQUEST_TYPES.map((t) => (
-                      <SelectItem key={t} value={t}>
-                        {t}
+                      <SelectItem key={t.label} value={t.label}>
+                        {t.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1074,16 +1098,16 @@ export function LpRequestsMessagesScreen({
                   Linked Fund
                 </label>
                 <Select
-                  value={form.fund}
-                  onValueChange={(v) => setForm((f) => ({ ...f, fund: v }))}
+                  value={form.fundId}
+                  onValueChange={(v) => setForm((f) => ({ ...f, fundId: v }))}
                 >
                   <SelectTrigger className="h-9 rounded-lg border-[#e5e7eb] text-[12px] shadow-none">
-                    <SelectValue />
+                    <SelectValue placeholder="Select fund" />
                   </SelectTrigger>
                   <SelectContent>
-                    {FUNDS.map((f) => (
-                      <SelectItem key={f} value={f}>
-                        {f}
+                    {funds.map((f) => (
+                      <SelectItem key={f.id} value={f.id}>
+                        {f.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1177,8 +1201,9 @@ export function LpRequestsMessagesScreen({
               </div>
               <Button
                 type="button"
+                disabled={submitting}
                 className="h-10 w-full rounded-full bg-[#2563eb] text-[13px] font-semibold text-white shadow-sm hover:bg-[#1d4ed8]"
-                onClick={submitRequest}
+                onClick={() => void submitRequest()}
               >
                 Submit Request
               </Button>
@@ -1202,7 +1227,7 @@ export function LpRequestsMessagesScreen({
                       key="l"
                       type="button"
                       className="font-medium text-[#2563eb] hover:underline"
-                      onClick={() => toast.message(selectedRequest.linkedTo)}
+                      onClick={() => router.push(resolveRequestTypeHref(selectedRequest.apiType))}
                     >
                       {selectedRequest.linkedTo}
                     </button>,
@@ -1223,13 +1248,6 @@ export function LpRequestsMessagesScreen({
                   <h3 className="text-[12px] font-semibold text-[#111827]">
                     Attachments ({selectedRequest.attachments.length})
                   </h3>
-                  <button
-                    type="button"
-                    className="text-[12px] font-medium text-[#2563eb]"
-                    onClick={() => toast.message("All attachments (mock).")}
-                  >
-                    View all
-                  </button>
                 </div>
                 {selectedRequest.attachments.length === 0 ? (
                   <p className="mt-2 text-[12px] text-[#9ca3af]">No attachments.</p>
@@ -1251,7 +1269,7 @@ export function LpRequestsMessagesScreen({
                           type="button"
                           className="rounded-full p-1 text-[#2563eb] hover:bg-[#eff6ff]"
                           aria-label={`Download ${file.name}`}
-                          onClick={() => downloadMock(file.name)}
+                          onClick={() => downloadAttachment(file.downloadUrl, file.name)}
                         >
                           <Download className="size-3.5" />
                         </button>
@@ -1264,6 +1282,79 @@ export function LpRequestsMessagesScreen({
           )}
         </div>
       </div>
+
+      <Dialog open={addParticipantOpen} onOpenChange={setAddParticipantOpen}>
+        <DialogContent className="max-w-md rounded-xl">
+          <DialogHeader>
+            <DialogTitle>Add participant</DialogTitle>
+            <DialogDescription>
+              Select a colleague from your organisation. We will submit a profile access request to your fund
+              administrator to add them to this conversation.
+            </DialogDescription>
+          </DialogHeader>
+          {availableColleagues.length === 0 ? (
+            <p className="py-4 text-[13px] text-[#6b7280]">
+              All active colleagues are already on this thread, or no eligible colleagues were found. Invite new
+              colleagues from Organisation settings.
+            </p>
+          ) : (
+            <ul className="max-h-56 space-y-2 overflow-y-auto py-1">
+              {availableColleagues.map((colleague) => {
+                const selected = selectedColleagueId === colleague.membershipId
+                return (
+                  <li key={colleague.membershipId}>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedColleagueId(colleague.membershipId)}
+                      className={cn(
+                        "flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition",
+                        selected
+                          ? "border-[#93c5fd] bg-[#eff6ff]"
+                          : "border-[#e5e7eb] bg-white hover:border-[#cbd5e1]",
+                      )}
+                    >
+                      <Avatar className="size-8">
+                        <AvatarFallback className="bg-[#2563eb] text-[11px] text-white">
+                          {colleague.name
+                            .split(" ")
+                            .map((part) => part[0])
+                            .join("")
+                            .slice(0, 2)
+                            .toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="min-w-0">
+                        <span className="block truncate text-[12px] font-semibold text-[#111827]">
+                          {colleague.name}
+                        </span>
+                        <span className="block truncate text-[11px] text-[#6b7280]">{colleague.email}</span>
+                      </span>
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-full"
+              onClick={() => setAddParticipantOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              className="rounded-full"
+              disabled={!selectedColleagueId || addingParticipant || availableColleagues.length === 0}
+              onClick={() => void requestParticipantAccess()}
+            >
+              {addingParticipant ? "Submitting…" : "Request access"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

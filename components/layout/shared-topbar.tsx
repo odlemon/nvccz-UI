@@ -76,6 +76,7 @@ export function SharedTopbar({ onModuleSelect, currentModule, moduleActions }: S
 
   return (
     <TooltipProvider>
+      <>
       <header className="h-20 border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="flex items-center justify-between h-full px-6">
           {/* Left Section - Logo and Breadcrumb */}
@@ -213,21 +214,21 @@ export function SharedTopbar({ onModuleSelect, currentModule, moduleActions }: S
             </DropdownMenu>
           </div>
         </div>
-
-        {/* App Switcher Dropdown - Only show if not applicant */}
-        {!isApplicant && (
-          <AppSwitcherDropdown
-            isOpen={showAppSwitcher}
-            onClose={() => setShowAppSwitcher(false)}
-            onModuleSelect={(module) => {
-              console.log('SharedTopbar onModuleSelect called with:', module)
-              onModuleSelect(module)
-              setShowAppSwitcher(false)
-            }}
-            currentModule={currentModule}
-          />
-        )}
       </header>
+
+      {/* Portaled overlay — keep outside blurred header so it is not clipped */}
+      {!isApplicant && (
+        <AppSwitcherDropdown
+          isOpen={showAppSwitcher}
+          onClose={() => setShowAppSwitcher(false)}
+          onModuleSelect={(module) => {
+            onModuleSelect(module)
+            setShowAppSwitcher(false)
+          }}
+          currentModule={currentModule}
+        />
+      )}
+      </>
     </TooltipProvider>
   )
 }

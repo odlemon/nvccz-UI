@@ -59,10 +59,10 @@ const navItems = [
     icon: Scale,
     href: '/investments-v2/reconciliation',
     children: [
-      { label: 'Overview', href: '/investments-v2/reconciliation' },
+      { label: 'Client', href: '/investments-v2/reconciliation' },
+      { label: 'Trade', href: '/investments-v2/reconciliation/trade' },
+      { label: 'Cash', href: '/investments-v2/reconciliation/fund-cash' },
       { label: 'Cash Ledger', href: '/investments-v2/reconciliation/cash-ledger' },
-      { label: 'Fund Cash', href: '/investments-v2/reconciliation/fund-cash' },
-      { label: 'Broker & Custodian', href: '/investments-v2/reconciliation/broker-custodian' },
       { label: 'Exceptions', href: '/investments-v2/reconciliation/exceptions' },
       { label: 'Statements', href: '/investments-v2/reconciliation/statements' },
     ],

@@ -1,12 +1,12 @@
 import { PerformanceLayout } from "@/components/layout/performance-layout"
-import { OrgBscPage } from "@/components/performance/org-bsc-page"
+import { OrgBscMockScreen } from "@/components/performance-mock/screens/org-bsc-screen"
 import { ModuleGuard } from "@/lib/permissions"
 
 export default function OrgBscRoute() {
   return (
-    <ModuleGuard moduleId="performance-management" subModuleId="performance-dashboard">
+    <ModuleGuard moduleId="performance-management" subModuleId="org-bsc">
       <PerformanceLayout>
-        <OrgBscPage />
+        <OrgBscMockScreen />
       </PerformanceLayout>
     </ModuleGuard>
   )

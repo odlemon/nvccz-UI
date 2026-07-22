@@ -34,104 +34,38 @@ import {
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Skeleton } from "@/components/ui/skeleton"
+import { useLpFundScope, useLpPortal } from "@/components/lp-portal/lp-portal-context"
+import { lpPortalApi } from "@/lib/api/lp-portal-api"
+import {
+  downloadBlob,
+  formatDate,
+  formatMoneyCompact,
+  formatMultiple,
+  formatPercent,
+  formatUnits,
+  parseDecimal,
+} from "@/lib/lp-portal/format"
+import { useLpPerformanceBundle } from "@/lib/lp-portal/hooks"
+import { InfoHint } from "@/components/lp-portal/info-hint"
+import { mapHistoryChartPoint, mapPerformanceStructure } from "@/lib/lp-portal/mappers"
 import { cn } from "@/lib/utils"
 
 type ChartPeriod = "SI" | "1Y" | "3Y" | "5Y" | "10Y" | "MAX"
 type BenchmarkMetric = "Net IRR" | "TVPI"
 
-const AS_OF = "May 31, 2025"
+const PERIOD_TO_API: Record<string, string> = {
+  si: "SI",
+  "5y": "5Y",
+  "3y": "3Y",
+  "1y": "1Y",
+  ytd: "YTD",
+}
 
-const historyFull = [
-  { label: "Jun '20", nav: 28, paidIn: 32, dist: 0 },
-  { label: "Dec '20", nav: 38, paidIn: 42, dist: 2 },
-  { label: "Jun '21", nav: 52, paidIn: 58, dist: 6 },
-  { label: "Dec '21", nav: 68, paidIn: 74, dist: 12 },
-  { label: "Jun '22", nav: 86, paidIn: 92, dist: 20 },
-  { label: "Dec '22", nav: 104, paidIn: 110, dist: 30 },
-  { label: "Jun '23", nav: 128, paidIn: 125, dist: 42 },
-  { label: "Dec '23", nav: 148, paidIn: 138, dist: 54 },
-  { label: "Jun '24", nav: 168, paidIn: 148, dist: 64 },
-  { label: "Dec '24", nav: 182, paidIn: 152, dist: 72 },
-  { label: "May '25", nav: 198.76, paidIn: 156.42, dist: 78.34 },
-]
-
-const benchmarkBars = [
-  { name: "Arcus Growth Fund V L.P.", value: 18.7, fill: "#0055d4" },
-  { name: "Cambridge Associates U.S. PE Index", value: 14.2, fill: "#06b6d4" },
-  { name: "Russell 3000 Index", value: 12.7, fill: "#8b5cf6" },
-  { name: "S&P 500 Index", value: 11.9, fill: "#f97316" },
-]
-
-const capitalFlow = [
-  { name: "Paid-In Capital", value: -156.42, fill: "#0046b5", kind: "paidIn" },
-  { name: "Capital Calls", value: -156.42, fill: "#00aeef", kind: "inflow" },
-  { name: "Distributions", value: 78.34, fill: "#34a853", kind: "outflow" },
-  { name: "Current NAV", value: 198.76, fill: "#0046b5", kind: "nav" },
-]
-
-const fundRows = [
-  {
-    fund: "Arcus Growth Fund V L.P.",
-    structure: "Closed-End",
-    netIrr: "18.7%",
-    tvpi: "1.27x",
-    nav: "$198.76M",
-    benchmark: "CA U.S. PE Index",
-    asOf: "May 31, 2025",
-  },
-  {
-    fund: "Arcus Growth Fund IV L.P.",
-    structure: "Closed-End",
-    netIrr: "22.1%",
-    tvpi: "1.45x",
-    nav: "$142.38M",
-    benchmark: "CA U.S. PE Index",
-    asOf: "May 31, 2025",
-  },
-  {
-    fund: "Arcus Opportunities Fund II L.P.",
-    structure: "Closed-End",
-    netIrr: "16.3%",
-    tvpi: "1.18x",
-    nav: "$67.29M",
-    benchmark: "CA U.S. PE Index",
-    asOf: "May 31, 2025",
-  },
-  {
-    fund: "Arcus Credit Opportunities Fund II L.P.",
-    structure: "Credit",
-    netIrr: "9.8%",
-    tvpi: "1.09x",
-    nav: "$95.00M",
-    benchmark: "CA U.S. Direct Lending Index",
-    asOf: "May 31, 2025",
-  },
-  {
-    fund: "Arcus Strategic Income Fund L.P.",
-    structure: "Open-End",
-    netIrr: "8.6%",
-    tvpi: "—",
-    nav: "$24.68M",
-    benchmark: "HFRI Fund Weighted Comp. Index",
-    asOf: "May 31, 2025",
-  },
-]
+const BENCHMARK_COLORS = ["#0055d4", "#06b6d4", "#8b5cf6", "#f97316", "#10b981"]
 
 function moneyM(value: number) {
   return `$${value.toFixed(2)}M`
-}
-
-function InfoHint({ label, className }: { label: string; className?: string }) {
-  return (
-    <button
-      type="button"
-      className={cn("rounded-full text-[#94a3b8] hover:text-[#64748b]", className)}
-      aria-label={`${label} info`}
-      onClick={() => toast.message(label)}
-    >
-      <Info className="size-3.5" />
-    </button>
-  )
 }
 
 function KpiCard({
@@ -167,7 +101,7 @@ function KpiCard({
           <div className="flex items-start justify-between gap-2">
             <div className="flex min-w-0 items-center gap-1">
               <p className="truncate text-[12px] font-semibold text-[#0f172a]">{label}</p>
-              <InfoHint label={label} />
+              <InfoHint label={label} description={helper} />
             </div>
             {trend && (
               <ArrowUp className="mt-0.5 size-3.5 shrink-0 text-[#10b981]" strokeWidth={2.75} />
@@ -291,11 +225,22 @@ function EndLabel({
   )
 }
 
-function SectionLink({ href, children }: { href: string; children: React.ReactNode }) {
+function SectionLink({
+  href,
+  children,
+  className,
+}: {
+  href: string
+  children: React.ReactNode
+  className?: string
+}) {
   return (
     <Link
       href={href}
-      className="inline-flex items-center gap-1 text-[12px] font-medium text-[#2563eb] hover:text-[#1d4ed8]"
+      className={cn(
+        "inline-flex items-center gap-1 text-[12px] font-medium text-[#2563eb] hover:text-[#1d4ed8]",
+        className,
+      )}
     >
       {children}
       <ArrowRight className="size-3.5" />
@@ -304,36 +249,175 @@ function SectionLink({ href, children }: { href: string; children: React.ReactNo
 }
 
 export function LpPerformanceScreen() {
-  const [fund, setFund] = React.useState("growth-v")
+  const { funds, selectedFundId, setSelectedFundId, asOfDate, presentationCurrency } = useLpPortal()
+  const { fundId } = useLpFundScope()
   const [period, setPeriod] = React.useState("si")
   const [benchmark, setBenchmark] = React.useState("cambridge")
   const [chartPeriod, setChartPeriod] = React.useState<ChartPeriod>("SI")
   const [benchMetric, setBenchMetric] = React.useState<BenchmarkMetric>("Net IRR")
+  const [benchmarkBars, setBenchmarkBars] = React.useState<Array<{ name: string; value: number; fill: string }>>([])
+  const [benchmarkLoading, setBenchmarkLoading] = React.useState(false)
+  const [reportLoading, setReportLoading] = React.useState(false)
+
+  const apiPeriod = PERIOD_TO_API[period] ?? "SI"
+  const { data, loading, error, reload } = useLpPerformanceBundle(apiPeriod, benchmark)
+
+  const performance = data?.performance
+  const metrics = performance?.metrics
+  const openEndedMetrics = performance?.openEndedMetrics
+  const asOfLabel = formatDate(performance?.asOfDate ?? asOfDate, "long")
+  const valuationStatus = performance?.valuationStatus ?? "FINAL"
+  const reportingCurrency = performance?.reportingCurrency ?? presentationCurrency
+
+  const historyFull = React.useMemo(
+    () => (data?.history ?? []).map((point) => mapHistoryChartPoint(point)),
+    [data?.history],
+  )
 
   const chartData = React.useMemo(() => {
     if (chartPeriod === "1Y") return historyFull.slice(-4)
     if (chartPeriod === "3Y") return historyFull.slice(-7)
     if (chartPeriod === "5Y") return historyFull.slice(-9)
     return historyFull
-  }, [chartPeriod])
+  }, [chartPeriod, historyFull])
 
-  const lastIndex = chartData.length - 1
+  const chartYMax = React.useMemo(() => {
+    const maxVal = Math.max(...chartData.flatMap((p) => [p.nav, p.paidIn, p.dist]), 1)
+    return Math.ceil(maxVal / 50) * 50 || 250
+  }, [chartData])
 
-  const downloadReport = () => {
-    const body = [
-      "Arcus Investor Performance Report",
-      `As of: ${AS_OF}`,
-      "Valuation Status: FINAL",
-      "Mock report — LP Portal.",
-    ].join("\n")
-    const url = URL.createObjectURL(new Blob([body], { type: "text/plain" }))
-    const a = document.createElement("a")
-    a.href = url
-    a.download = "lp-performance-report.txt"
-    a.click()
-    URL.revokeObjectURL(url)
-    toast.success("Performance report downloaded (mock).")
+  const lastIndex = Math.max(chartData.length - 1, 0)
+
+  const capitalFlow = React.useMemo(() => {
+    if (!metrics) return []
+    const paidIn = parseDecimal(metrics.paidIn) / 1_000_000
+    const distributions = parseDecimal(metrics.distributions) / 1_000_000
+    const nav = parseDecimal(metrics.currentNav) / 1_000_000
+    return [
+      { name: "Paid-In Capital", value: -paidIn, fill: "#0046b5", kind: "paidIn" },
+      { name: "Capital Calls", value: -paidIn, fill: "#00aeef", kind: "inflow" },
+      { name: "Distributions", value: distributions, fill: "#34a853", kind: "outflow" },
+      { name: "Current NAV", value: nav, fill: "#0046b5", kind: "nav" },
+    ]
+  }, [metrics])
+
+  const capitalYMax = React.useMemo(() => {
+    const maxAbs = Math.max(...capitalFlow.map((item) => Math.abs(item.value)), 1)
+    return Math.ceil(maxAbs / 50) * 50 || 200
+  }, [capitalFlow])
+
+  const fundRows = React.useMemo(
+    () =>
+      (data?.byFund ?? []).map((row) => ({
+        fundId: row.fundId,
+        fund: row.fundName,
+        structure: mapPerformanceStructure(row),
+        netIrr: formatPercent(row.netIrr),
+        tvpi: formatMultiple(row.tvpi),
+        nav: formatMoneyCompact(row.nav, reportingCurrency),
+        benchmark: data?.benchmarks.note ?? "—",
+        asOf: asOfLabel,
+      })),
+    [asOfLabel, data?.benchmarks.note, data?.byFund, reportingCurrency],
+  )
+
+  React.useEffect(() => {
+    let cancelled = false
+    setBenchmarkLoading(true)
+    void lpPortalApi
+      .getPerformanceBenchmarks({
+        fundId,
+        metric: benchMetric === "TVPI" ? "TVPI" : "NET_IRR",
+        benchmarkId: benchmark,
+      })
+      .then((res) => {
+        if (cancelled) return
+        setBenchmarkBars(
+          res.data.series.map((item, index) => ({
+            name: item.label,
+            value:
+              benchMetric === "TVPI"
+                ? parseDecimal(item.value)
+                : parseDecimal(item.value) <= 1
+                  ? parseDecimal(item.value) * 100
+                  : parseDecimal(item.value),
+            fill: BENCHMARK_COLORS[index % BENCHMARK_COLORS.length],
+          })),
+        )
+      })
+      .catch(() => {
+        if (!cancelled) setBenchmarkBars([])
+      })
+      .finally(() => {
+        if (!cancelled) setBenchmarkLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [benchMetric, benchmark, fundId])
+
+  const downloadReport = async () => {
+    setReportLoading(true)
+    try {
+      const res = await lpPortalApi.downloadPerformanceReport({ fundId })
+      let job = await lpPortalApi.getJob(res.data.jobId)
+      let attempts = 0
+      while (
+        !["COMPLETED", "FAILED", "CANCELLED"].includes(job.data.status.toUpperCase()) &&
+        attempts < 30
+      ) {
+        await new Promise((resolve) => window.setTimeout(resolve, 2000))
+        job = await lpPortalApi.getJob(res.data.jobId)
+        attempts += 1
+      }
+      if (job.data.status.toUpperCase() === "FAILED") {
+        toast.error(job.data.errorMessage ?? "Report generation failed")
+        return
+      }
+      const blob = await lpPortalApi.downloadReport(res.data.jobId)
+      downloadBlob(blob, "lp-performance-report.pdf")
+      toast.success("Performance report downloaded")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to download performance report")
+    } finally {
+      setReportLoading(false)
+    }
   }
+
+  if (loading && !data) {
+    return (
+      <div className="space-y-5 pb-8">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-4 w-96" />
+        <div className="grid gap-3 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-10 rounded-lg" />
+          ))}
+        </div>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-24 rounded-lg" />
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  if (error && !data) {
+    return (
+      <div className="space-y-5 pb-8">
+        <h1 className="text-[24px] font-bold tracking-tight text-[#0f172a]">Performance</h1>
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-6 text-center">
+          <p className="text-sm text-red-700">{error}</p>
+          <Button type="button" variant="outline" className="mt-4 rounded-full" onClick={() => void reload()}>
+            Try Again
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  const benchmarkMax = Math.max(...benchmarkBars.map((row) => row.value), benchMetric === "TVPI" ? 2 : 30)
 
   return (
     <div className="space-y-5 pb-8">
@@ -350,14 +434,20 @@ export function LpPerformanceScreen() {
           <label className="mb-1.5 block text-[12px] font-semibold text-[#374151]">
             Fund / Account
           </label>
-          <Select value={fund} onValueChange={setFund}>
+          <Select
+            value={selectedFundId}
+            onValueChange={(value) => setSelectedFundId(value as typeof selectedFundId)}
+          >
             <SelectTrigger className="h-10 w-full rounded-lg border-[#e5e7eb] bg-white text-[13px] text-[#0f172a] shadow-none">
-              <SelectValue />
+              <SelectValue placeholder="All Funds" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="growth-v">Arcus Growth Fund V L.P.</SelectItem>
-              <SelectItem value="buyout-iv">Arcus Buyout Fund IV, L.P.</SelectItem>
               <SelectItem value="all">All Funds</SelectItem>
+              {funds.map((fund) => (
+                <SelectItem key={fund.id} value={fund.id}>
+                  {fund.name}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -395,7 +485,7 @@ export function LpPerformanceScreen() {
           </span>
           <span className="mt-0.5 flex items-center gap-1.5 text-[13px] font-bold text-[#0f172a]">
             <span className="size-2 shrink-0 rounded-full bg-[#10b981]" />
-            FINAL
+            {valuationStatus}
           </span>
         </div>
       </div>
@@ -407,7 +497,7 @@ export function LpPerformanceScreen() {
           iconBg="bg-[#dcfce7]"
           iconColor="text-[#16a34a]"
           label="Net IRR"
-          value="18.7%"
+          value={formatPercent(metrics?.netIrr)}
           helper="Since Inception"
           trend
         />
@@ -416,7 +506,7 @@ export function LpPerformanceScreen() {
           iconBg="bg-[#ffedd5]"
           iconColor="text-[#ea580c]"
           label="TVPI"
-          value="1.27x"
+          value={formatMultiple(metrics?.tvpi)}
           helper="Since Inception"
           trend
         />
@@ -425,7 +515,7 @@ export function LpPerformanceScreen() {
           iconBg="bg-[#dbeafe]"
           iconColor="text-[#2563eb]"
           label="DPI"
-          value="0.50x"
+          value={formatMultiple(metrics?.dpi)}
           helper="Since Inception"
           trend
         />
@@ -434,7 +524,7 @@ export function LpPerformanceScreen() {
           iconBg="bg-[#ffedd5]"
           iconColor="text-[#ea580c]"
           label="RVPI"
-          value="0.77x"
+          value={formatMultiple(metrics?.rvpi)}
           helper="Since Inception"
           trend
         />
@@ -443,60 +533,51 @@ export function LpPerformanceScreen() {
           iconBg="bg-[#dbeafe]"
           iconColor="text-[#2563eb]"
           label="Current NAV"
-          value="$198.76M"
-          helper={`As of ${AS_OF}`}
+          value={formatMoneyCompact(metrics?.currentNav, reportingCurrency)}
+          helper={`As of ${asOfLabel}`}
         />
         <KpiCard
           icon={<Landmark className="size-4" strokeWidth={2.25} />}
           iconBg="bg-[#dbeafe]"
           iconColor="text-[#1d4ed8]"
           label="Paid-In Capital"
-          value="$156.42M"
+          value={formatMoneyCompact(metrics?.paidIn, reportingCurrency)}
           helper="Since Inception"
         />
       </div>
 
-      {/* Open-ended metrics */}
-      <section className="rounded-lg border border-[#e5e7eb] bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-        <div className="flex items-center justify-between gap-3 px-5 pt-4">
-          <div className="flex items-center gap-1.5">
-            <h2 className="text-[14px] font-semibold text-[#0f172a]">
-              Open-Ended / Hedge Fund Account Metrics
-            </h2>
-            <InfoHint label="Open-Ended Metrics" />
-          </div>
-          <span className="shrink-0 text-[12px] text-[#9ca3af]">As of {AS_OF}</span>
-        </div>
-        <div className="mt-4 grid gap-0 border-t border-[#f3f4f6] sm:grid-cols-2 lg:grid-cols-4">
-          {[
-            { label: "YTD Return", value: "8.6%", helper: "Year to Date", trend: true },
-            { label: "NAV per Unit", value: "$10.4539", helper: `As of ${AS_OF}` },
-            { label: "Units Held", value: "2,468,311.45", helper: `As of ${AS_OF}` },
-            { label: "Account Value", value: "$24.68M", helper: `As of ${AS_OF}` },
-          ].map((item, i) => (
-            <div
-              key={item.label}
-              className={cn(
-                "px-5 py-4",
-                i > 0 && "lg:border-l lg:border-[#e5e7eb]",
-                i % 2 === 1 && "sm:border-l sm:border-[#e5e7eb]",
-              )}
-            >
-              <div className="flex items-center gap-1">
-                <p className="text-[12px] font-medium text-[#6b7280]">{item.label}</p>
-                <InfoHint label={item.label} />
-              </div>
-              <p className="mt-1.5 flex items-center gap-1.5 text-[20px] font-bold tabular-nums tracking-[-0.03em] text-[#0f172a]">
-                {item.value}
-                {item.trend && (
-                  <ArrowUp className="size-3.5 text-[#10b981]" strokeWidth={2.75} />
-                )}
+      {openEndedMetrics ? (
+        <section className="rounded-xl border border-[#e5e7eb] bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+          <h2 className="text-[14px] font-semibold text-[#111827]">Open-Ended Account Metrics</h2>
+          <p className="mt-1 text-[11px] text-[#9ca3af]">As of {asOfLabel}</p>
+          <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
+            <div>
+              <p className="text-[11px] text-[#6b7280]">Account Value</p>
+              <p className="mt-1 text-[18px] font-bold tabular-nums text-[#0f172a]">
+                {formatMoneyCompact(openEndedMetrics.accountValue, reportingCurrency)}
               </p>
-              <p className="mt-1 text-[11px] text-[#9ca3af]">{item.helper}</p>
             </div>
-          ))}
-        </div>
-      </section>
+            <div>
+              <p className="text-[11px] text-[#6b7280]">Units Held</p>
+              <p className="mt-1 text-[18px] font-bold tabular-nums text-[#0f172a]">
+                {formatUnits(openEndedMetrics.unitsHeld)}
+              </p>
+            </div>
+            <div>
+              <p className="text-[11px] text-[#6b7280]">NAV Per Unit</p>
+              <p className="mt-1 text-[18px] font-bold tabular-nums text-[#0f172a]">
+                {formatMoneyCompact(openEndedMetrics.navPerUnit, reportingCurrency)}
+              </p>
+            </div>
+            <div>
+              <p className="text-[11px] text-[#6b7280]">YTD Return</p>
+              <p className="mt-1 text-[18px] font-bold tabular-nums text-[#0f172a]">
+                {formatPercent(openEndedMetrics.ytdReturn)}
+              </p>
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       {/* Charts row */}
       <div className="grid items-stretch gap-5 xl:grid-cols-[minmax(0,1.75fr)_minmax(0,1fr)]">
@@ -505,7 +586,7 @@ export function LpPerformanceScreen() {
             <div>
               <div className="flex items-center gap-1.5">
                 <h2 className="text-[14px] font-semibold text-[#111827]">Performance History</h2>
-                <InfoHint label="Performance History" />
+                <InfoHint label="Performance History" description="Investment value over the selected period." />
               </div>
               <div className="mt-2.5 flex flex-wrap items-center gap-4 text-[11px] text-[#6b7280]">
                 <span className="inline-flex items-center gap-1.5">
@@ -560,8 +641,8 @@ export function LpPerformanceScreen() {
                   interval="preserveStartEnd"
                 />
                 <YAxis
-                  domain={[0, 250]}
-                  ticks={[0, 50, 100, 150, 200, 250]}
+                  domain={[0, chartYMax]}
+                  ticks={Array.from({ length: 6 }, (_, i) => (chartYMax / 5) * i)}
                   tickFormatter={(v) => (v === 0 ? "$0" : `$${v}M`)}
                   tick={{ fontSize: 10, fill: "#9ca3af" }}
                   axisLine={false}
@@ -653,7 +734,7 @@ export function LpPerformanceScreen() {
           <div className="flex items-center justify-between gap-2 px-5 pt-5">
             <div className="flex items-center gap-1.5">
               <h2 className="text-[14px] font-semibold text-[#111827]">Benchmark Comparison</h2>
-              <InfoHint label="Benchmark Comparison" />
+              <InfoHint label="Benchmark Comparison" description="Compare fund performance against selected benchmarks." />
             </div>
             <Select
               value={benchMetric}
@@ -671,46 +752,45 @@ export function LpPerformanceScreen() {
 
           <div className="mt-5 flex min-h-0 flex-1 flex-col px-5">
             <div className="flex flex-1 flex-col justify-center gap-5">
-              {benchmarkBars.map((row) => (
-                <div key={row.name} className="grid grid-cols-1 gap-1.5">
-                  <div className="flex items-center justify-between gap-3 text-[12px]">
-                    <span className="inline-flex min-w-0 items-center gap-2 text-[#374151]">
-                      <span
-                        className="size-2.5 shrink-0 rounded-full"
-                        style={{ backgroundColor: row.fill }}
-                      />
-                      <span
-                        className={cn(
-                          "truncate",
-                          row.name.startsWith("Arcus") ? "font-semibold text-[#111827]" : "",
-                        )}
-                      >
-                        {row.name}
-                      </span>
-                    </span>
-                    <span className="shrink-0 font-semibold tabular-nums text-[#111827]">
-                      {row.value}%
-                    </span>
-                  </div>
-                  <div className="relative h-3.5">
-                    <div className="absolute inset-0 flex">
-                      {[0, 1, 2, 3].map((n) => (
-                        <div
-                          key={n}
-                          className="h-full flex-1 border-l border-[#f3f4f6] first:border-l-0"
+              {benchmarkLoading ? (
+                Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-8 w-full" />)
+              ) : benchmarkBars.length === 0 ? (
+                <p className="text-center text-[12px] text-[#9ca3af]">No benchmark data available</p>
+              ) : (
+                benchmarkBars.map((row) => (
+                  <div key={row.name} className="grid grid-cols-1 gap-1.5">
+                    <div className="flex items-center justify-between gap-3 text-[12px]">
+                      <span className="inline-flex min-w-0 items-center gap-2 text-[#374151]">
+                        <span
+                          className="size-2.5 shrink-0 rounded-full"
+                          style={{ backgroundColor: row.fill }}
                         />
-                      ))}
+                        <span className="truncate font-semibold text-[#111827]">{row.name}</span>
+                      </span>
+                      <span className="shrink-0 font-semibold tabular-nums text-[#111827]">
+                        {benchMetric === "TVPI" ? `${row.value.toFixed(2)}x` : `${row.value.toFixed(1)}%`}
+                      </span>
                     </div>
-                    <div
-                      className="relative h-full rounded-full"
-                      style={{
-                        width: `${(row.value / 30) * 100}%`,
-                        backgroundColor: row.fill,
-                      }}
-                    />
+                    <div className="relative h-3.5">
+                      <div className="absolute inset-0 flex">
+                        {[0, 1, 2, 3].map((n) => (
+                          <div
+                            key={n}
+                            className="h-full flex-1 border-l border-[#f3f4f6] first:border-l-0"
+                          />
+                        ))}
+                      </div>
+                      <div
+                        className="relative h-full rounded-full"
+                        style={{
+                          width: `${Math.min((row.value / benchmarkMax) * 100, 100)}%`,
+                          backgroundColor: row.fill,
+                        }}
+                      />
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
 
             <div className="mt-4 border-t border-transparent pt-1">
@@ -739,7 +819,7 @@ export function LpPerformanceScreen() {
                 <h2 className="text-[14px] font-semibold text-[#111827]">
                   Capital Activity (Cash Flow)
                 </h2>
-                <InfoHint label="Capital Activity" />
+                <InfoHint label="Capital Activity" description="Capital calls and distributions over time." />
               </div>
               <p className="mt-1 text-[11px] text-[#9ca3af]">USD (Millions)</p>
             </div>
@@ -763,15 +843,15 @@ export function LpPerformanceScreen() {
                   height={40}
                 />
                 <YAxis
-                  domain={[-200, 200]}
-                  ticks={[-200, -100, 0, 100, 200]}
+                  domain={[-capitalYMax, capitalYMax]}
+                  ticks={[-capitalYMax, -capitalYMax / 2, 0, capitalYMax / 2, capitalYMax]}
                   tickFormatter={formatCapitalY}
                   tick={{ fontSize: 10, fill: "#9ca3af" }}
                   axisLine={false}
                   tickLine={false}
                   width={56}
                 />
-                <ReferenceLine y={78.34} stroke="#cbd5e1" strokeDasharray="4 4" />
+                <ReferenceLine y={capitalFlow.find((item) => item.kind === "outflow")?.value ?? 0} stroke="#cbd5e1" strokeDasharray="4 4" />
                 <ReferenceLine y={0} stroke="#d1d5db" />
                 <RechartsTooltip
                   formatter={(value: number) => formatCapitalY(value)}
@@ -791,12 +871,12 @@ export function LpPerformanceScreen() {
             <span className="inline-flex items-center gap-1.5">
               <span className="size-2.5 shrink-0 rounded-[2px] bg-[#00aeef]" />
               Inflows (Calls)
-              <InfoHint label="Inflows (Calls)" />
+              <InfoHint label="Inflows (Calls)" description="Capital called from investors." />
             </span>
             <span className="inline-flex items-center gap-1.5">
               <span className="size-2.5 shrink-0 rounded-[2px] bg-[#34a853]" />
               Outflows (Distributions)
-              <InfoHint label="Outflows (Distributions)" />
+              <InfoHint label="Outflows (Distributions)" description="Cash distributed to investors." />
             </span>
             <span className="inline-flex items-center gap-1.5">
               <span className="size-2.5 shrink-0 rounded-[2px] bg-[#0046b5]" />
@@ -813,7 +893,7 @@ export function LpPerformanceScreen() {
           <div className="flex items-center justify-between gap-2 px-5 pb-3 pt-4">
             <div className="flex items-center gap-1.5">
               <h2 className="text-[14px] font-semibold text-[#111827]">Performance by Fund</h2>
-              <InfoHint label="Performance by Fund" />
+              <InfoHint label="Performance by Fund" description="Fund-level metrics for your entitled investments." />
             </div>
             <SectionLink href="/lp-portal/investments">View All Funds</SectionLink>
           </div>
@@ -832,12 +912,12 @@ export function LpPerformanceScreen() {
               </thead>
               <tbody>
                 {fundRows.map((row) => (
-                  <tr key={row.fund} className="border-b border-[#f3f4f6] last:border-0">
+                  <tr key={row.fundId} className="border-b border-[#f3f4f6] last:border-0">
                     <td className="px-5 py-3">
                       <button
                         type="button"
                         className="text-left font-medium text-[#0056d2] hover:underline"
-                        onClick={() => toast.message(row.fund)}
+                        onClick={() => setSelectedFundId(row.fundId)}
                       >
                         {row.fund}
                       </button>
@@ -867,19 +947,15 @@ export function LpPerformanceScreen() {
           </div>
           <div className="mt-3 flex items-center gap-1.5">
             <h3 className="text-[14px] font-semibold text-[#111827]">Performance Methodology</h3>
-            <InfoHint label="Performance Methodology" />
+            <InfoHint label="Performance Methodology" description="Read the fund's performance calculation methodology." />
           </div>
           <p className="mt-2 text-[12px] leading-5 text-[#6b7280]">
             Performance is calculated in accordance with the Global Investment Performance Standards
             (GIPS®) and based on capital flows and valuations as of the valuation date.
           </p>
-          <button
-            type="button"
-            className="mt-auto inline-flex items-center gap-1 pt-4 text-[12px] font-medium text-[#2563eb] hover:text-[#1d4ed8]"
-            onClick={() => toast.message("Opening methodology (mock).")}
-          >
-            View Methodology <ArrowRight className="size-3.5" />
-          </button>
+          <SectionLink href="/lp-portal/documents?category=Fund%20Reports" className="mt-auto pt-4">
+            View Methodology
+          </SectionLink>
         </section>
 
         <section className="flex flex-col rounded-xl border border-[#e5e7eb] bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
@@ -888,19 +964,15 @@ export function LpPerformanceScreen() {
           </div>
           <div className="mt-3 flex items-center gap-1.5">
             <h3 className="text-[14px] font-semibold text-[#111827]">Valuation Notes</h3>
-            <InfoHint label="Valuation Notes" />
+            <InfoHint label="Valuation Notes" description="Notes on valuation basis and as-of dates." />
           </div>
           <p className="mt-2 text-[12px] leading-5 text-[#6b7280]">
             All investments are valued in good faith pursuant to the fund&apos;s valuation policy.
-            The most recent valuation is as of {AS_OF}.
+            The most recent valuation is as of {asOfLabel}.
           </p>
-          <button
-            type="button"
-            className="mt-auto inline-flex items-center gap-1 pt-4 text-[12px] font-medium text-[#2563eb] hover:text-[#1d4ed8]"
-            onClick={() => toast.message("Opening valuation notes (mock).")}
-          >
-            View Valuation Notes <ArrowRight className="size-3.5" />
-          </button>
+          <SectionLink href="/lp-portal/documents?category=Fund%20Reports" className="mt-auto pt-4">
+            View Valuation Notes
+          </SectionLink>
         </section>
 
         <section className="flex flex-col rounded-xl border border-[#e5e7eb] bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
@@ -909,7 +981,7 @@ export function LpPerformanceScreen() {
           </div>
           <div className="mt-3 flex items-center gap-1.5">
             <h3 className="text-[14px] font-semibold text-[#111827]">Download Performance Report</h3>
-            <InfoHint label="Download Performance Report" />
+            <InfoHint label="Download Performance Report" description="Generate and download a performance report PDF." />
           </div>
           <p className="mt-2 text-[12px] leading-5 text-[#6b7280]">
             Download the comprehensive performance report including detailed returns, cash flows and
@@ -919,8 +991,9 @@ export function LpPerformanceScreen() {
             <Button
               type="button"
               variant="outline"
+              disabled={reportLoading}
               className="h-9 rounded-full border-[#d1d5db] bg-white px-4 text-[12px] font-medium text-[#2563eb] shadow-none hover:bg-[#f9fafb] hover:text-[#1d4ed8]"
-              onClick={downloadReport}
+              onClick={() => void downloadReport()}
             >
               <Download className="size-3.5 text-[#2563eb]" />
               Download Report

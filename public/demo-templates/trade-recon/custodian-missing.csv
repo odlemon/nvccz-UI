@@ -1,0 +1,2 @@
+symbol,side,quantity,price,trade_date,custodian_ref,currency
+XYZ,BUY,500,5.00,2026-07-21,CSD-MISSING,USD

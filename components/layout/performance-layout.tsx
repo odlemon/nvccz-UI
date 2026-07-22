@@ -4,9 +4,8 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { usePathname } from "next/navigation"
 import { SharedTopbar } from "./shared-topbar"
-import { PerformanceSidebar } from "./performance-sidebar"
+import { PerformanceMockSidebar } from "@/components/performance-mock/shell"
 import { MODULE_CONFIG, getModuleByPath } from "@/lib/config/modules"
-import { GlobalRealtimeMount } from "@/components/performance/collaboration/global-realtime-mount"
 
 interface PerformanceLayoutProps {
   children: React.ReactNode
@@ -24,26 +23,19 @@ export function PerformanceLayout({ children }: PerformanceLayoutProps) {
   }, [pathname])
 
   const handleModuleSelect = (module: string) => {
-    console.log('PerformanceLayout handleModuleSelect called with:', module)
     setCurrentModule(module)
-    
-    const moduleConfig = MODULE_CONFIG.find(m => m.id === module)
+    const moduleConfig = MODULE_CONFIG.find((m) => m.id === module)
     if (moduleConfig) {
-      console.log('Navigating to:', moduleConfig.path)
       window.location.href = moduleConfig.path
     }
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <GlobalRealtimeMount />
+    <div className="min-h-screen bg-[#F9FAFB]">
       <SharedTopbar onModuleSelect={handleModuleSelect} currentModule={currentModule} />
-
       <div className="flex">
-        <PerformanceSidebar />
-        <main className="flex-1 overflow-auto">
-          {children}
-        </main>
+        <PerformanceMockSidebar />
+        <main className="flex-1 min-w-0 overflow-auto">{children}</main>
       </div>
     </div>
   )

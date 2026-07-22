@@ -2,8 +2,8 @@ import { createSlice, createAsyncThunk } from "@reduxjs/toolkit"
 import {
   lpPortalApi,
   LpDashboard,
-  LpLedgerEntry,
-  LpLedgerEntryDetail,
+  LpLedgerEntry as LpLedgerEntryApi,
+  LpLedgerDetail,
   LpVaultDocument,
   LpVaultCategory,
   LpVaultVerifyResult,
@@ -11,6 +11,68 @@ import {
   LpReportsPagination,
   LpColleague,
 } from "@/lib/api/lp-portal-api"
+import { parseDecimal } from "@/lib/lp-portal/format"
+
+/** Legacy ledger row shape used by lp-ledger.tsx */
+export interface LpLedgerEntry {
+  id: string
+  fundId: string
+  type: string
+  amount: number
+  currencyCode: string
+  valueDate: string
+  description: string
+  createdAt: string
+}
+
+export interface LpLedgerEntryDetail extends LpLedgerEntry {
+  bankConfirmationRef?: string
+  bankConfirmationDate?: string
+  callNoticeDocumentId?: string
+}
+
+function mapLedgerRow(entry: LpLedgerEntryApi): LpLedgerEntry {
+  return {
+    id: entry.entryId,
+    fundId: entry.fundId,
+    type: entry.entryType,
+    amount: parseDecimal(entry.amount),
+    currencyCode: entry.currency,
+    valueDate: entry.transactionDate,
+    description: entry.description,
+    createdAt: entry.transactionDate,
+  }
+}
+
+async function fetchLegacyDashboard(params: {
+  fundId?: string
+  presentationCurrency?: "USD" | "ZIG"
+}): Promise<LpDashboard> {
+  const [session, byFund] = await Promise.all([
+    lpPortalApi.getSession(),
+    lpPortalApi.getPerformanceByFund(),
+  ])
+  return {
+    client: session.data.client,
+    lpRole: session.data.lpRole,
+    presentationCurrency: (params.presentationCurrency ?? session.data.presentationCurrency) as "USD" | "ZIG",
+    funds: byFund.data.funds.map((fund) => ({
+      fundId: fund.fundId,
+      fundName: fund.fundName,
+      commitment: parseDecimal(fund.paidIn),
+      paidIn: parseDecimal(fund.paidIn),
+      distributions: parseDecimal(fund.distributions),
+      nav: parseDecimal(fund.nav),
+      dpi: parseDecimal(fund.dpi),
+      tvpi: parseDecimal(fund.tvpi),
+      rvpi: parseDecimal(fund.rvpi),
+      netIrr: parseDecimal(fund.netIrr),
+      currencyCode: session.data.presentationCurrency,
+    })),
+    exchangeRateWidget: null,
+    latestReports: [],
+  }
+}
 
 interface LpPortalState {
   dashboard: LpDashboard | null
@@ -93,8 +155,7 @@ export const fetchLpDashboard = createAsyncThunk(
   'lpPortal/fetchLpDashboard',
   async (params: { fundId?: string; presentationCurrency?: 'USD' | 'ZIG' } = {}, { rejectWithValue }) => {
     try {
-      const response = await lpPortalApi.getDashboard(params)
-      return response.data
+      return await fetchLegacyDashboard(params)
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to fetch dashboard')
     }
@@ -105,8 +166,11 @@ export const fetchLpLedger = createAsyncThunk(
   'lpPortal/fetchLpLedger',
   async (params: { fundId?: string; currencyCode?: string } = {}, { rejectWithValue }) => {
     try {
-      const response = await lpPortalApi.getLedger(params)
-      return response.data
+      const response = await lpPortalApi.getLedger({
+        fundId: params.fundId,
+        currency: params.currencyCode,
+      })
+      return response.data.map(mapLedgerRow)
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to fetch capital account ledger')
     }
@@ -118,7 +182,19 @@ export const fetchLpLedgerEntry = createAsyncThunk(
   async (entryId: string, { rejectWithValue }) => {
     try {
       const response = await lpPortalApi.getLedgerEntry(entryId)
-      return response.data
+      const detail = response.data as LpLedgerDetail
+      const base: LpLedgerEntryDetail = {
+        id: entryId,
+        fundId: detail.allocation?.clientId ?? "",
+        type: detail.entryType,
+        amount: parseDecimal(detail.allocation?.currentCallAmount),
+        currencyCode: "USD",
+        valueDate: "",
+        description: detail.entryType,
+        createdAt: "",
+        callNoticeDocumentId: detail.callNoticeDocumentId ?? undefined,
+      }
+      return base
     } catch (error: any) {
       return rejectWithValue(error.message || 'Ledger entry not found')
     }
@@ -166,8 +242,11 @@ export const fetchLpReports = createAsyncThunk(
   'lpPortal/fetchLpReports',
   async (fundId: string | undefined, { rejectWithValue }) => {
     try {
-      const response = await lpPortalApi.getReports(fundId)
-      return { reports: response.data, pagination: response.pagination }
+      const response = await lpPortalApi.getReports({ fundId })
+      return {
+        reports: response.data.data,
+        pagination: response.data.pagination,
+      }
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to fetch performance reports')
     }
@@ -201,9 +280,20 @@ export const fetchLpColleagues = createAsyncThunk(
 
 export const inviteLpColleague = createAsyncThunk(
   'lpPortal/inviteLpColleague',
-  async (email: string, { dispatch, rejectWithValue }) => {
+  async (
+    payload: string | { email: string; role?: string; fundIds?: string[] },
+    { dispatch, rejectWithValue },
+  ) => {
     try {
-      const response = await lpPortalApi.inviteColleague(email)
+      const body =
+        typeof payload === "string"
+          ? { email: payload, role: "VIEWER", fundIds: [] as string[] }
+          : {
+              email: payload.email,
+              role: payload.role ?? "VIEWER",
+              fundIds: payload.fundIds ?? [],
+            }
+      const response = await lpPortalApi.inviteColleague(body)
       dispatch(fetchLpColleagues())
       return response.data
     } catch (error: any) {

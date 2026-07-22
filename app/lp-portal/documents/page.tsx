@@ -3,7 +3,12 @@ import { LpDocumentCentreScreen } from "@/components/lp-portal/screens/lp-docume
 export default function DocumentsPage({
   searchParams,
 }: {
-  searchParams?: { category?: string }
+  searchParams?: { category?: string; document?: string }
 }) {
-  return <LpDocumentCentreScreen initialCategory={searchParams?.category} />
+  return (
+    <LpDocumentCentreScreen
+      initialCategory={searchParams?.category}
+      initialDocumentId={searchParams?.document}
+    />
+  )
 }

@@ -4,6 +4,8 @@
 **Module:** Investments V2 → Orders & Investment Accounting  
 **Login:** Use your demo tenant credentials  
 
+> **Retuned client flow (broker outside):** for the current product journey see **[`walkthrough-trading-retune-user-flow.md`](./walkthrough-trading-retune-user-flow.md)** (Send → Record confirmation → Accept → blotter → custodian settle → trade/cash recon).
+
 This guide walks through the **listed equity trading journey** in presentation order. Each section explains **why you are on the screen**, **what you should see**, **what you can do**, and **what success looks like**.
 
 > Labels are human-readable: order references, tickers, portfolio names, broker and custodian names — not internal database IDs. Where a deep link is available, the app opens the correct trade or accounting record in a new tab with the detail panel already focused.

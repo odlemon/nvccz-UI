@@ -782,7 +782,7 @@ export default function FundCashReconciliationPage() {
       <div className="mx-auto max-w-[1680px] space-y-4">
         <header className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div>
-            <h1 className="text-[22px] font-semibold leading-tight tracking-[-0.01em]">Fund Cash Reconciliation</h1>
+            <h1 className="text-[22px] font-semibold leading-tight tracking-[-0.01em]">Cash recon</h1>
             <p className="mt-1.5 text-[13px]" style={{ color: C.muted }}>
               Reconcile internal fund cash ledger against bank and custodian statements.
             </p>

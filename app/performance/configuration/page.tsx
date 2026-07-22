@@ -1,12 +1,13 @@
-"use client"
-
-import { useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { PerformanceLayout } from "@/components/layout/performance-layout"
+import { ConfigurationHubMockScreen } from "@/components/performance-mock/screens/configuration-hub-screen"
+import { ModuleGuard } from "@/lib/permissions"
 
 export default function PerformanceConfigurationPage() {
-  const router = useRouter()
-  useEffect(() => {
-    router.replace("/performance/configuration/pillars")
-  }, [router])
-  return null
+  return (
+    <ModuleGuard moduleId="performance-management">
+      <PerformanceLayout>
+        <ConfigurationHubMockScreen />
+      </PerformanceLayout>
+    </ModuleGuard>
+  )
 }

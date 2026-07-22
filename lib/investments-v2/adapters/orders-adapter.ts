@@ -71,13 +71,14 @@ function titleCaseStatus(raw: string): string {
     .join(' ')
 }
 
-/** Map API order status → SRD lifecycle labels (Section 8.4). */
+/** Map API order status → client lifecycle labels (broker outside system). */
 export function mapOrderUiStatus(status: string | null | undefined): string {
   const u = String(status ?? '').toUpperCase()
   if (u === 'DRAFT') return 'Draft'
   if (u === 'SUBMITTED' || u === 'COMPLIANCE_REVIEW' || u === 'CHECKED') return 'Submitted'
   if (u === 'APPROVED') return 'Approved'
   if (u === 'SENT_TO_BROKER' || u === 'ROUTED') return 'Sent to Broker'
+  if (u === 'BROKER_CONFIRMATION_RECORDED' || u === 'CONFIRMATION_RECORDED') return 'Confirmation Recorded'
   if (u.includes('PARTIAL')) return 'Partially Executed'
   if (u === 'EXECUTED') return 'Executed'
   if (u === 'PENDING_SETTLEMENT' || u === 'PENDING SETTLEMENT') return 'Pending Settlement'
@@ -90,13 +91,17 @@ export function mapOrderUiStatus(status: string | null | undefined): string {
   return titleCaseStatus(String(status ?? DASH))
 }
 
-/** Tabs aligned to SRD order lifecycle + alternate outcomes. */
+/**
+ * Orderbook tabs — pending instructions until executed.
+ * Trade blotter holds executed trades only (separate screen).
+ */
 export const ORDERBOOK_LIFECYCLE_TABS = [
   'Orderbook',
   'Draft',
   'Submitted',
   'Approved',
   'Sent to Broker',
+  'Confirmation Recorded',
   'Partially Executed',
   'Executed',
   'Pending Settlement',
@@ -110,7 +115,27 @@ export const ORDERBOOK_LIFECYCLE_TABS = [
 export function orderMatchesLifecycleTab(uiStatus: string, tab: string): boolean {
   if (tab === 'Orderbook') return true
   if (tab === 'Submitted') return uiStatus === 'Submitted' || uiStatus === 'Compliance Review'
+  if (tab === 'Sent to Broker') return uiStatus === 'Sent to Broker'
+  if (tab === 'Confirmation Recorded') return uiStatus === 'Confirmation Recorded'
   return uiStatus === tab
+}
+
+/** Deep link from blotter trade → cash ledger filtered by trade (BA-RC-2). */
+export function cashLedgerDeepLink(opts: { tradeId?: string | null; fundId?: string | null }): string {
+  const q = new URLSearchParams()
+  if (opts.tradeId) q.set('tradeId', opts.tradeId)
+  if (opts.fundId) q.set('fundId', opts.fundId)
+  const qs = q.toString()
+  return `/investments-v2/reconciliation/cash-ledger${qs ? `?${qs}` : ''}`
+}
+
+/** Deep link from blotter trade → reconciliation (BA-TR-4). */
+export function reconDeepLink(opts: { tradeId?: string | null; fundId?: string | null }): string {
+  const q = new URLSearchParams()
+  q.set('tab', 'trade')
+  if (opts.tradeId) q.set('tradeId', opts.tradeId)
+  if (opts.fundId) q.set('fundId', opts.fundId)
+  return `/investments-v2/reconciliation/trade?${q.toString()}`
 }
 
 function mapTradeUiStatus(status: string | null | undefined): string {
@@ -231,6 +256,12 @@ export type OrderbookRow = {
   gross: string
   grossValue: number
   broker: string
+  custodian: string
+  custodianProfileId: string | null
+  settlementAccountId: string | null
+  settlementAccount: string
+  /** ISO date yyyy-mm-dd when known */
+  valueDateIso: string | null
   trader: string
   tradeDate: string
   valueDate: string
@@ -391,6 +422,14 @@ export function mapOrderbookOrders(data: unknown, fundNameById?: Record<string, 
       gross: formatMoneyDisplay(grossValue, 0),
       grossValue,
       broker: String(o.brokerName ?? o.brokerProfileId ?? DASH),
+      custodian: String(o.custodianName ?? o.custodianProfileId ?? DASH),
+      custodianProfileId: o.custodianProfileId != null && String(o.custodianProfileId).trim() ? String(o.custodianProfileId) : null,
+      settlementAccountId:
+        o.settlementAccountId != null && String(o.settlementAccountId).trim()
+          ? String(o.settlementAccountId)
+          : null,
+      settlementAccount: String(o.settlementAccountName ?? o.settlementAccountId ?? DASH),
+      valueDateIso: o.valueDate ? String(o.valueDate).slice(0, 10) : null,
       trader: String(o.ownerName ?? o.createdByName ?? o.createdById ?? DASH),
       tradeDate: fmtDateTime(o.tradeDate ?? o.submittedAt ?? o.createdAt),
       valueDate: fmtDate(o.valueDate),

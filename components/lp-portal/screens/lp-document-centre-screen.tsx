@@ -12,7 +12,6 @@ import {
   FileText,
   FolderOpen,
   History,
-  Info,
   Lock,
   Maximize2,
   Minus,
@@ -28,6 +27,13 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -36,7 +42,14 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { InfoHint } from "@/components/lp-portal/info-hint"
 import { cn } from "@/lib/utils"
+import { useLpPortal } from "@/components/lp-portal/lp-portal-context"
+import { lpPortalApi, type LpDocument } from "@/lib/api/lp-portal-api"
+import { downloadBlob, formatDate } from "@/lib/lp-portal/format"
+import { useLpDocuments } from "@/lib/lp-portal/hooks"
+import { API_DOC_CATEGORY, mapDocumentCategory } from "@/lib/lp-portal/mappers"
+import { getApiErrorMessage } from "@/lib/lp-portal/use-lp-api"
 
 type DocCategory =
   | "Statements"
@@ -71,21 +84,20 @@ type DocRow = {
   checksum: string
   documentType: string
   permissions: string[]
-  history: Array<{ user: string; at: string; ip: string }>
+  history: Array<{ user: string; at: string; ip: string; action?: string }>
 }
 
-const TOTAL_DOCS = 238
 const PAGE_SIZE = 10
 
-const CATEGORY_TABS: Array<{ id: string; label: string; count: number }> = [
-  { id: "all", label: "All Documents", count: 238 },
-  { id: "Statements", label: "Statements", count: 24 },
-  { id: "Capital Calls", label: "Capital Calls", count: 18 },
-  { id: "Distributions", label: "Distributions", count: 42 },
-  { id: "Fund Reports", label: "Fund Reports", count: 31 },
-  { id: "Tax", label: "Tax", count: 14 },
-  { id: "Legal", label: "Legal", count: 26 },
-  { id: "Governance", label: "Governance", count: 16 },
+const CATEGORY_TABS: Array<{ id: string; label: string }> = [
+  { id: "all", label: "All Documents" },
+  { id: "Statements", label: "Statements" },
+  { id: "Capital Calls", label: "Capital Calls" },
+  { id: "Distributions", label: "Distributions" },
+  { id: "Fund Reports", label: "Fund Reports" },
+  { id: "Tax", label: "Tax" },
+  { id: "Legal", label: "Legal" },
+  { id: "Governance", label: "Governance" },
 ]
 
 const MORE_CATEGORIES: DocCategory[] = ["Subscription Documents", "Notices", "Other"]
@@ -111,326 +123,11 @@ const STATUS_STYLE: Record<DocStatus, string> = {
   Paid: "bg-[#dcfce7] text-[#15803d]",
 }
 
-const SEED: DocRow[] = [
-  {
-    id: "doc-001",
-    title: "LPA Amendment No. 2",
-    fileName: "LPA_Amendment_No2_GFV.pdf",
-    fund: "Arcus Growth Fund V, L.P.",
-    category: "Legal",
-    period: "May 2025",
-    publishedDate: "May 28, 2025",
-    publishedAt: "May 28, 2025 10:32 AM",
-    version: "2.0",
-    accessScope: "Investors",
-    status: "New",
-    fileKind: "pdf",
-    fileSize: "1.3 MB",
-    pages: 14,
-    checksum: "b6c5d4a59e8f21c03a7741d8be6c2f90a1d34e57c8b29f06e4a5d718c3b0e2fa",
-    documentType: "PDF Document",
-    permissions: ["View", "Download", "Investors (organisation-wide)"],
-    history: [
-      { user: "Jane Smith", at: "May 28, 2025 10:33 AM", ip: "203.0.113.24" },
-      { user: "David Lee", at: "May 28, 2025 11:02 AM", ip: "198.51.100.17" },
-      { user: "Michael Chen", at: "May 28, 2025 2:18 PM", ip: "192.0.2.44" },
-    ],
-  },
-  {
-    id: "doc-002",
-    title: "Subscription Booklet",
-    fileName: "Subscription_Booklet_SIF.docx",
-    fund: "Arcus Strategic Income Fund L.P.",
-    category: "Subscription Documents",
-    period: "Q2 2025",
-    publishedDate: "May 22, 2025",
-    publishedAt: "May 22, 2025 · 03:40 PM",
-    version: "1.1",
-    accessScope: "Authorised Signatories",
-    status: "Requires Signature",
-    fileKind: "docx",
-    fileSize: "860 KB",
-    pages: 22,
-    checksum: "b1c92e48…a0ff21de",
-    documentType: "Word",
-    permissions: ["View", "Download", "Sign", "Authorised signatories only"],
-    history: [{ user: "Jane Smith", at: "May 23, 2025 09:11 AM", ip: "203.0.113.24" }],
-  },
-  {
-    id: "doc-003",
-    title: "Q1 2025 Investor Report",
-    fileName: "Q1_2025_Investor_Report_GFV.pdf",
-    fund: "Arcus Growth Fund V, L.P.",
-    category: "Fund Reports",
-    period: "Q1 2025",
-    publishedDate: "May 15, 2025",
-    publishedAt: "May 15, 2025 · 08:00 AM",
-    version: "1.0",
-    accessScope: "Investors",
-    status: "Published",
-    fileKind: "pdf",
-    fileSize: "4.2 MB",
-    pages: 48,
-    checksum: "91dd0af2…77bc4410",
-    documentType: "PDF",
-    permissions: ["View", "Download", "Investors (organisation-wide)"],
-    history: [
-      { user: "Jane Smith", at: "May 15, 2025 10:05 AM", ip: "203.0.113.24" },
-      { user: "Rudo Maposa", at: "May 16, 2025 04:22 PM", ip: "196.44.177.24" },
-    ],
-  },
-  {
-    id: "doc-004",
-    title: "Capital Call Notice #7",
-    fileName: "Capital_Call_Notice_7_GFV.pdf",
-    fund: "Arcus Growth Fund V, L.P.",
-    category: "Capital Calls",
-    period: "May 2025",
-    publishedDate: "May 20, 2025",
-    publishedAt: "May 20, 2025 · 11:30 AM",
-    version: "1.0",
-    accessScope: "Investors",
-    status: "Active",
-    fileKind: "pdf",
-    fileSize: "248 KB",
-    pages: 6,
-    checksum: "44ab19c0…e912ff03",
-    documentType: "PDF",
-    permissions: ["View", "Download", "Investors (organisation-wide)"],
-    history: [
-      { user: "Jane Smith", at: "May 20, 2025 12:01 PM", ip: "203.0.113.24" },
-      { user: "Tawanda Moyo", at: "May 21, 2025 08:44 AM", ip: "41.175.88.102" },
-    ],
-  },
-  {
-    id: "doc-005",
-    title: "Board Consent Resolution",
-    fileName: "Board_Consent_Resolution_OFII.pdf",
-    fund: "Arcus Opportunities Fund II, L.P.",
-    category: "Governance",
-    period: "Apr 2025",
-    publishedDate: "Apr 30, 2025",
-    publishedAt: "Apr 30, 2025 · 05:15 PM",
-    version: "1.0",
-    accessScope: "Advisory Board",
-    status: "Requires Signature",
-    fileKind: "pdf",
-    fileSize: "512 KB",
-    pages: 9,
-    checksum: "c80e11fa…55d9aa18",
-    documentType: "PDF",
-    permissions: ["View", "Download", "Sign", "Advisory Board only"],
-    history: [{ user: "Jane Smith", at: "May 1, 2025 09:30 AM", ip: "203.0.113.24" }],
-  },
-  {
-    id: "doc-006",
-    title: "Distribution Notice DIST-000128",
-    fileName: "Distribution_Notice_DIST-000128.pdf",
-    fund: "Arcus Opportunities Fund II, L.P.",
-    category: "Distributions",
-    period: "May 2025",
-    publishedDate: "May 5, 2025",
-    publishedAt: "May 5, 2025 · 10:00 AM",
-    version: "1.0",
-    accessScope: "Investors",
-    status: "Paid",
-    fileKind: "pdf",
-    fileSize: "182 KB",
-    pages: 4,
-    checksum: "19fe6621…aa091bcc",
-    documentType: "PDF",
-    permissions: ["View", "Download", "Investors (organisation-wide)"],
-    history: [{ user: "Jane Smith", at: "May 15, 2025 02:40 PM", ip: "203.0.113.24" }],
-  },
-  {
-    id: "doc-007",
-    title: "2024 K-1 Tax Package",
-    fileName: "2024_K1_Tax_Package_GFIV.xlsx",
-    fund: "Arcus Growth Fund IV, L.P.",
-    category: "Tax",
-    period: "Year 2024",
-    publishedDate: "Apr 12, 2025",
-    publishedAt: "Apr 12, 2025 · 01:20 PM",
-    version: "1.0",
-    accessScope: "Authorised Signatories",
-    status: "Published",
-    fileKind: "xlsx",
-    fileSize: "1.1 MB",
-    pages: 1,
-    checksum: "77ac0d44…b201eed9",
-    documentType: "Excel",
-    permissions: ["View", "Download", "Authorised signatories only"],
-    history: [{ user: "Tawanda Moyo", at: "Apr 14, 2025 11:18 AM", ip: "41.175.88.102" }],
-  },
-  {
-    id: "doc-008",
-    title: "Monthly Investor Statement",
-    fileName: "Monthly_Statement_Apr_2025_SIF.pdf",
-    fund: "Arcus Strategic Income Fund L.P.",
-    category: "Statements",
-    period: "Apr 2025",
-    publishedDate: "May 2, 2025",
-    publishedAt: "May 2, 2025 · 07:45 AM",
-    version: "1.0",
-    accessScope: "Investors",
-    status: "Published",
-    fileKind: "pdf",
-    fileSize: "640 KB",
-    pages: 8,
-    checksum: "5d2b90aa…cc1190fe",
-    documentType: "PDF",
-    permissions: ["View", "Download", "Investors (organisation-wide)"],
-    history: [{ user: "Jane Smith", at: "May 2, 2025 08:12 AM", ip: "203.0.113.24" }],
-  },
-  {
-    id: "doc-009",
-    title: "AGM Notice 2025",
-    fileName: "AGM_Notice_2025_GFV.pdf",
-    fund: "Arcus Growth Fund V, L.P.",
-    category: "Notices",
-    period: "Year 2025",
-    publishedDate: "Apr 18, 2025",
-    publishedAt: "Apr 18, 2025 · 04:00 PM",
-    version: "1.0",
-    accessScope: "Investors",
-    status: "New",
-    fileKind: "pdf",
-    fileSize: "390 KB",
-    pages: 5,
-    checksum: "aa1188ff…0091bbcd",
-    documentType: "PDF",
-    permissions: ["View", "Download", "Investors (organisation-wide)"],
-    history: [],
-  },
-  {
-    id: "doc-010",
-    title: "Side Letter — Preferential Terms",
-    fileName: "Side_Letter_Preferential_Terms.pdf",
-    fund: "Arcus Credit Opportunities Fund II L.P.",
-    category: "Legal",
-    period: "Current",
-    publishedDate: "Mar 28, 2025",
-    publishedAt: "Mar 28, 2025 · 12:10 PM",
-    version: "1.2",
-    accessScope: "Authorised Signatories",
-    status: "Active",
-    fileKind: "pdf",
-    fileSize: "720 KB",
-    pages: 11,
-    checksum: "e0f1a2b3…c4d5e6f7",
-    documentType: "PDF",
-    permissions: ["View", "Download", "Authorised signatories only"],
-    history: [{ user: "Jane Smith", at: "Apr 1, 2025 03:33 PM", ip: "203.0.113.24" }],
-  },
-]
-
-function buildDocuments(): DocRow[] {
-  const funds = [
-    "Arcus Growth Fund V, L.P.",
-    "Arcus Growth Fund IV, L.P.",
-    "Arcus Opportunities Fund II, L.P.",
-    "Arcus Credit Opportunities Fund II L.P.",
-    "Arcus Strategic Income Fund L.P.",
-    "Arcus Buyout Fund III, L.P.",
-  ]
-  const cats = Object.keys(CATEGORY_STYLE) as DocCategory[]
-  const statuses: DocStatus[] = ["New", "Requires Signature", "Published", "Active", "Paid"]
-  const kinds: FileKind[] = ["pdf", "pdf", "pdf", "xlsx", "docx"]
-  const rows = [...SEED]
-  let i = SEED.length
-  while (rows.length < TOTAL_DOCS) {
-    const category = cats[i % cats.length]
-    const fund = funds[i % funds.length]
-    const status = statuses[i % statuses.length]
-    const fileKind = kinds[i % kinds.length]
-    const month = ((i * 2) % 12) + 1
-    const day = ((i * 3) % 27) + 1
-    const year = i % 3 === 0 ? 2024 : 2025
-    const date = new Date(Date.UTC(year, month - 1, day))
-    const publishedDate = date.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-      timeZone: "UTC",
-    })
-    const title = `${category} Document ${String(i + 1).padStart(3, "0")}`
-    const ext = fileKind === "pdf" ? "pdf" : fileKind === "xlsx" ? "xlsx" : "docx"
-    rows.push({
-      id: `doc-gen-${i}`,
-      title,
-      fileName: `${title.replaceAll(/\s+/g, "_")}.${ext}`,
-      fund,
-      category,
-      period: year === 2025 ? `Q${(i % 4) + 1} 2025` : `Year ${year}`,
-      publishedDate,
-      publishedAt: `${publishedDate} · 09:00 AM`,
-      version: `${1 + (i % 3)}.${i % 5}`,
-      accessScope: i % 5 === 0 ? "Advisory Board" : i % 4 === 0 ? "Authorised Signatories" : "Investors",
-      status,
-      fileKind,
-      fileSize: `${200 + (i % 50) * 20} KB`,
-      pages: 2 + (i % 40),
-      checksum: `${(i * 7919).toString(16)}…${(i * 9973).toString(16)}`,
-      documentType: fileKind === "pdf" ? "PDF" : fileKind === "xlsx" ? "Excel" : "Word",
-      permissions: ["View", "Download", i % 5 === 0 ? "Advisory Board only" : "Investors (organisation-wide)"],
-      history:
-        i % 3 === 0
-          ? []
-          : [{ user: "Jane Smith", at: `${publishedDate} 10:00 AM`, ip: "203.0.113.24" }],
-    })
-    i += 1
+function InfoHintLoose({ label }: { label: string }) {
+  const descriptions: Record<string, string> = {
+    "Document Centre": "Secure repository for fund documents and communications.",
   }
-  return rows
-}
-
-const ALL_DOCS = buildDocuments()
-
-const KPIS = [
-  {
-    label: "Total Documents",
-    value: "238",
-    helper: "Across 6 Funds",
-    iconBg: "bg-[#dbeafe]",
-    iconColor: "text-[#2563eb]",
-    icon: <FileText className="size-4" strokeWidth={2.25} />,
-  },
-  {
-    label: "New This Week",
-    value: "12",
-    helper: "Published in last 7 days",
-    iconBg: "bg-[#dcfce7]",
-    iconColor: "text-[#16a34a]",
-    icon: <Sparkles className="size-4" strokeWidth={2.25} />,
-  },
-  {
-    label: "Requires Signature",
-    value: "3",
-    helper: "Awaiting your action",
-    iconBg: "bg-[#ffedd5]",
-    iconColor: "text-[#ea580c]",
-    icon: <PenLine className="size-4" strokeWidth={2.25} />,
-  },
-  {
-    label: "Secure Downloads",
-    value: "1,264",
-    helper: "This Year",
-    iconBg: "bg-[#ede9fe]",
-    iconColor: "text-[#7c3aed]",
-    icon: <Lock className="size-4" strokeWidth={2.25} />,
-  },
-]
-
-function InfoHint({ label }: { label: string }) {
-  return (
-    <button
-      type="button"
-      className="rounded-full text-[#94a3b8] hover:text-[#64748b]"
-      aria-label={`${label} info`}
-      onClick={() => toast.message(label)}
-    >
-      <Info className="size-3.5" />
-    </button>
-  )
+  return <InfoHint label={label} description={descriptions[label] ?? label} />
 }
 
 function FileIcon({ kind }: { kind: FileKind }) {
@@ -468,12 +165,14 @@ function StatusBadge({ status }: { status: DocStatus }) {
   )
 }
 
-function CategoryBadge({ category }: { category: DocCategory }) {
+function CategoryBadge({ category }: { category: string }) {
+  const style =
+    CATEGORY_STYLE[category as DocCategory] ?? "bg-[#f3f4f6] text-[#4b5563]"
   return (
     <span
       className={cn(
         "inline-flex whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-semibold",
-        CATEGORY_STYLE[category],
+        style,
       )}
     >
       {category}
@@ -481,100 +180,227 @@ function CategoryBadge({ category }: { category: DocCategory }) {
   )
 }
 
-function downloadDoc(doc: DocRow) {
-  const body = [
-    "ARCUS LP PORTAL — SECURE DOCUMENT DOWNLOAD",
-    "",
-    doc.title,
-    `File: ${doc.fileName}`,
-    `Fund: ${doc.fund}`,
-    `Category: ${doc.category}`,
-    `Version: ${doc.version}`,
-    `Published: ${doc.publishedAt}`,
-    `SHA-256: ${doc.checksum}`,
-    "",
-    "Mock download for UI demonstration.",
-  ].join("\n")
-  const url = URL.createObjectURL(new Blob([body], { type: "text/plain;charset=utf-8" }))
-  const a = document.createElement("a")
-  a.href = url
-  a.download = `${doc.title.replaceAll(/[^a-zA-Z0-9 -]/g, "")}.txt`
-  a.click()
-  URL.revokeObjectURL(url)
-  toast.success("Document downloaded (mock).")
+function StatusBadgeLoose({ status }: { status: string }) {
+  const style = STATUS_STYLE[status as DocStatus] ?? "bg-[#f3f4f6] text-[#4b5563]"
+  return (
+    <span
+      className={cn(
+        "inline-flex whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-semibold",
+        style,
+      )}
+    >
+      {status}
+    </span>
+  )
+}
+
+async function handleDownload(doc: Pick<DocRow, "id" | "fileName" | "title">) {
+  try {
+    const blob = await lpPortalApi.downloadDocument(doc.id)
+    downloadBlob(blob, doc.fileName || `${doc.title}.pdf`)
+    toast.success("Document downloaded.")
+  } catch (err) {
+    toast.error(getApiErrorMessage(err, "Download failed"))
+  }
 }
 
 export function LpDocumentCentreScreen({
   initialCategory = "All Documents",
+  initialDocumentId,
 }: {
   initialCategory?: string
+  initialDocumentId?: string
 }) {
+  const { funds } = useLpPortal()
   const resolvedTab =
     CATEGORY_TABS.find((t) => t.label === initialCategory || t.id === initialCategory)?.id ??
     (MORE_CATEGORIES.includes(initialCategory as DocCategory) ? "more" : "all")
 
   const [tab, setTab] = React.useState(resolvedTab)
+  const [moreCategory, setMoreCategory] = React.useState<DocCategory | null>(
+    MORE_CATEGORIES.includes(initialCategory as DocCategory) ? (initialCategory as DocCategory) : null,
+  )
   const [query, setQuery] = React.useState("")
+  const [debouncedQuery, setDebouncedQuery] = React.useState("")
   const [sort, setSort] = React.useState("recent")
   const [page, setPage] = React.useState(1)
-  const [selectedId, setSelectedId] = React.useState<string | null>("doc-001")
+  const [selectedId, setSelectedId] = React.useState<string | null>(initialDocumentId ?? null)
   const [detailTab, setDetailTab] = React.useState<"details" | "permissions">("details")
   const [previewPage, setPreviewPage] = React.useState(1)
   const [zoom, setZoom] = React.useState(100)
+  const [detailDoc, setDetailDoc] = React.useState<LpDocument | null>(null)
+  const [detailLoading, setDetailLoading] = React.useState(false)
+  const [previewUrl, setPreviewUrl] = React.useState<string | null>(null)
+  const [fullscreenPreviewOpen, setFullscreenPreviewOpen] = React.useState(false)
+  const [historyDialogOpen, setHistoryDialogOpen] = React.useState(false)
+
+  React.useEffect(() => {
+    if (initialDocumentId) setSelectedId(initialDocumentId)
+  }, [initialDocumentId])
 
   React.useEffect(() => {
     setTab(resolvedTab)
   }, [resolvedTab])
 
-  const filtered = React.useMemo(() => {
-    let rows = ALL_DOCS
-    if (tab === "more") {
-      rows = rows.filter((d) => MORE_CATEGORIES.includes(d.category))
-    } else if (tab !== "all") {
-      rows = rows.filter((d) => d.category === tab)
-    }
-    if (query.trim()) {
-      const q = query.toLowerCase()
-      rows = rows.filter(
-        (d) =>
-          d.title.toLowerCase().includes(q) ||
-          d.fileName.toLowerCase().includes(q) ||
-          d.fund.toLowerCase().includes(q) ||
-          d.category.toLowerCase().includes(q),
-      )
-    }
-    const sorted = [...rows]
-    if (sort === "recent") {
-      // Already roughly newest-first in seed; keep stable order
-    } else if (sort === "name") {
-      sorted.sort((a, b) => a.title.localeCompare(b.title))
-    } else if (sort === "fund") {
-      sorted.sort((a, b) => a.fund.localeCompare(b.fund))
-    }
-    return sorted
-  }, [query, sort, tab])
+  React.useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 300)
+    return () => window.clearTimeout(timer)
+  }, [query])
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
-  const safePage = Math.min(page, totalPages)
+  const apiCategory = React.useMemo(() => {
+    if (tab === "all") return undefined
+    if (tab === "more") return moreCategory ? API_DOC_CATEGORY[moreCategory] : undefined
+    return API_DOC_CATEGORY[tab]
+  }, [moreCategory, tab])
+
+  const { data, loading, error, reload } = useLpDocuments({
+    category: apiCategory,
+    q: debouncedQuery || undefined,
+    page,
+  })
+
+  const pageRows = data?.items ?? []
+  const docSummary = data?.summary
+  const totalPages = data?.totalPages ?? 1
+  const totalDocs = docSummary?.total ?? data?.total ?? 0
+  const safePage = Math.min(page, Math.max(1, totalPages))
   const start = (safePage - 1) * PAGE_SIZE
-  const pageRows = filtered.slice(start, start + PAGE_SIZE)
-  const selected = filtered.find((d) => d.id === selectedId) ?? null
+  const selected = pageRows.find((d) => d.id === selectedId) ?? null
+
+  const categoryCounts = React.useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const row of docSummary?.byCategory ?? []) {
+      counts.set(mapDocumentCategory(row.category), row.count)
+    }
+    return counts
+  }, [docSummary?.byCategory])
+
+  const tabCount = React.useCallback(
+    (tabId: string) => {
+      if (tabId === "all") return totalDocs
+      if (tabId === "more" && moreCategory) return categoryCounts.get(moreCategory) ?? 0
+      return categoryCounts.get(tabId) ?? 0
+    },
+    [categoryCounts, moreCategory, totalDocs],
+  )
+
+  const sortedRows = React.useMemo(() => {
+    const rows = [...pageRows]
+    if (sort === "name") rows.sort((a, b) => a.title.localeCompare(b.title))
+    if (sort === "fund") rows.sort((a, b) => a.fund.localeCompare(b.fund))
+    return rows
+  }, [pageRows, sort])
 
   React.useEffect(() => {
     if (safePage !== page) setPage(safePage)
   }, [page, safePage])
 
   React.useEffect(() => {
-    if (selectedId && !filtered.some((d) => d.id === selectedId)) {
-      setSelectedId(filtered[0]?.id ?? null)
+    if (selectedId && !pageRows.some((d) => d.id === selectedId)) {
+      setSelectedId(pageRows[0]?.id ?? null)
     }
-  }, [filtered, selectedId])
+  }, [pageRows, selectedId])
+
+  React.useEffect(() => {
+    if (!selectedId && pageRows[0]) setSelectedId(pageRows[0].id)
+  }, [pageRows, selectedId])
 
   React.useEffect(() => {
     setPreviewPage(1)
     setZoom(100)
     setDetailTab("details")
+    setPreviewUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev)
+      return null
+    })
+    if (!selectedId) {
+      setDetailDoc(null)
+      return
+    }
+    setDetailLoading(true)
+    lpPortalApi
+      .getDocument(selectedId)
+      .then((res) => setDetailDoc(res.data))
+      .catch((err) => {
+        setDetailDoc(null)
+        toast.error(getApiErrorMessage(err, "Could not load document detail"))
+      })
+      .finally(() => setDetailLoading(false))
+
+    void lpPortalApi
+      .previewDocument(selectedId)
+      .then((blob) => {
+        setPreviewUrl((prev) => {
+          if (prev) URL.revokeObjectURL(prev)
+          return URL.createObjectURL(blob)
+        })
+      })
+      .catch((err) => {
+        const status = err && typeof err === "object" && "status" in err ? (err as { status: number }).status : undefined
+        if (status === 415) {
+          toast.error("Preview is not available for this file type.")
+          return
+        }
+        toast.error(getApiErrorMessage(err, "Preview unavailable for this document"))
+      })
   }, [selectedId])
+
+  React.useEffect(
+    () => () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl)
+    },
+    [previewUrl],
+  )
+
+  const selectedDetail = selected
+    ? {
+        ...selected,
+        checksum: detailDoc?.checksumSha256 ?? selected.checksum,
+        history: detailDoc?.history?.map((h) => ({
+          user: h.user,
+          at: formatDate(h.at, "datetime"),
+          ip: h.ip,
+          action: h.action,
+        })) ?? selected.history,
+        permissions: detailDoc?.permissions ?? selected.permissions,
+        publishedAt: detailDoc?.publishedDate ?? selected.publishedAt,
+      }
+    : null
+
+  const kpiCards = [
+    {
+      label: "Total Documents",
+      value: String(docSummary?.total ?? totalDocs),
+      helper: `Across ${funds.length} fund${funds.length === 1 ? "" : "s"}`,
+      iconBg: "bg-[#dbeafe]",
+      iconColor: "text-[#2563eb]",
+      icon: <FileText className="size-4" strokeWidth={2.25} />,
+    },
+    {
+      label: "New This Week",
+      value: String(docSummary?.newThisWeek ?? 0),
+      helper: "Published in the last 7 days",
+      iconBg: "bg-[#dcfce7]",
+      iconColor: "text-[#16a34a]",
+      icon: <Sparkles className="size-4" strokeWidth={2.25} />,
+    },
+    {
+      label: "Requires Signature",
+      value: String(docSummary?.requiresSignature ?? 0),
+      helper: "Awaiting your signature",
+      iconBg: "bg-[#ffedd5]",
+      iconColor: "text-[#ea580c]",
+      icon: <PenLine className="size-4" strokeWidth={2.25} />,
+    },
+    {
+      label: "Secure Downloads YTD",
+      value: String(docSummary?.secureDownloadsYtd ?? 0),
+      helper: "Verified downloads this year",
+      iconBg: "bg-[#ede9fe]",
+      iconColor: "text-[#7c3aed]",
+      icon: <Shield className="size-4" strokeWidth={2.25} />,
+    },
+  ]
 
   const pageNumbers = React.useMemo(() => {
     if (totalPages <= 5) return Array.from({ length: totalPages }, (_, i) => i + 1)
@@ -590,12 +416,25 @@ export function LpDocumentCentreScreen({
       <div>
         <div className="flex items-center gap-1.5">
           <h1 className="text-[24px] font-bold tracking-tight text-[#0f172a]">Document Centre</h1>
-          <InfoHint label="Document Centre" />
+          <InfoHintLoose label="Document Centre" />
         </div>
         <p className="mt-1.5 text-[13px] leading-5 text-[#6b7280]">
           Secure repository for all fund documents and communications.
         </p>
       </div>
+
+      {error ? (
+        <div className="rounded-xl border border-[#fecaca] bg-[#fef2f2] p-4 text-center">
+          <p className="text-[13px] text-[#dc2626]">{error}</p>
+          <button
+            type="button"
+            className="mt-3 rounded-full bg-[#2563eb] px-4 py-2 text-[12px] font-medium text-white"
+            onClick={() => void reload()}
+          >
+            Retry
+          </button>
+        </div>
+      ) : null}
 
       {/* Category tabs */}
       <div className="flex flex-wrap items-center gap-2 border-b border-[#e5e7eb] pb-0">
@@ -617,14 +456,16 @@ export function LpDocumentCentreScreen({
               )}
             >
               {item.label}
-              <span
-                className={cn(
-                  "rounded-full px-2 py-0.5 text-[11px] font-semibold",
-                  active ? "bg-[#dbeafe] text-[#1d4ed8]" : "bg-[#f3f4f6] text-[#6b7280]",
-                )}
-              >
-                {item.count}
-              </span>
+              {tabCount(item.id) > 0 ? (
+                <span
+                  className={cn(
+                    "rounded-full px-2 py-0.5 text-[11px] font-semibold",
+                    active ? "bg-[#dbeafe] text-[#1d4ed8]" : "bg-[#f3f4f6] text-[#6b7280]",
+                  )}
+                >
+                  {tabCount(item.id)}
+                </span>
+              ) : null}
             </button>
           )
         })}
@@ -648,8 +489,8 @@ export function LpDocumentCentreScreen({
                 key={cat}
                 onClick={() => {
                   setTab("more")
+                  setMoreCategory(cat)
                   setPage(1)
-                  toast.message(`Showing ${cat} and other More categories`)
                 }}
               >
                 {cat}
@@ -661,7 +502,7 @@ export function LpDocumentCentreScreen({
 
       {/* KPI cards */}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {KPIS.map((kpi) => (
+        {kpiCards.map((kpi) => (
           <div
             key={kpi.label}
             className="rounded-xl border border-[#e5e7eb] bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
@@ -691,7 +532,7 @@ export function LpDocumentCentreScreen({
       <div
         className={cn(
           "grid items-start gap-4",
-          selected ? "xl:grid-cols-[minmax(0,1fr)_340px]" : "grid-cols-1",
+          selectedDetail ? "xl:grid-cols-[minmax(0,1fr)_340px]" : "grid-cols-1",
         )}
       >
         <section className="min-w-0 overflow-hidden rounded-xl border border-[#e5e7eb] bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
@@ -739,8 +580,15 @@ export function LpDocumentCentreScreen({
                 </tr>
               </thead>
               <tbody>
-                {pageRows.map((doc) => {
-                  const isSelected = selected?.id === doc.id
+                {loading ? (
+                  <tr>
+                    <td colSpan={9} className="px-4 py-10 text-center text-[13px] text-[#9ca3af]">
+                      Loading documents…
+                    </td>
+                  </tr>
+                ) : (
+                  sortedRows.map((doc) => {
+                  const isSelected = selectedDetail?.id === doc.id
                   return (
                     <tr
                       key={doc.id}
@@ -777,7 +625,7 @@ export function LpDocumentCentreScreen({
                         </span>
                       </td>
                       <td className="px-3 py-3">
-                        <StatusBadge status={doc.status} />
+                        <StatusBadgeLoose status={doc.status} />
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1">
@@ -787,7 +635,7 @@ export function LpDocumentCentreScreen({
                             aria-label={`Download ${doc.title}`}
                             onClick={(e) => {
                               e.stopPropagation()
-                              downloadDoc(doc)
+                              void handleDownload(doc)
                             }}
                           >
                             <Download className="size-3.5" />
@@ -805,20 +653,15 @@ export function LpDocumentCentreScreen({
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="rounded-xl">
                               <DropdownMenuItem
-                                onClick={() => {
-                                  setSelectedId(doc.id)
-                                  toast.message("Opening preview")
-                                }}
+                                onClick={() => setSelectedId(doc.id)}
                               >
                                 Open preview
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => downloadDoc(doc)}>
+                              <DropdownMenuItem onClick={() => void handleDownload(doc)}>
                                 Download
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                onClick={() => toast.message("Opening access details (mock).")}
-                              >
+                              <DropdownMenuItem onClick={() => setDetailTab("permissions")}>
                                 View permissions
                               </DropdownMenuItem>
                             </DropdownMenuContent>
@@ -827,8 +670,9 @@ export function LpDocumentCentreScreen({
                       </td>
                     </tr>
                   )
-                })}
-                {pageRows.length === 0 && (
+                  })
+                )}
+                {!loading && sortedRows.length === 0 && (
                   <tr>
                     <td colSpan={9} className="px-4 py-10 text-center text-[13px] text-[#9ca3af]">
                       No documents match your filters.
@@ -843,13 +687,13 @@ export function LpDocumentCentreScreen({
             <p className="text-[12px] text-[#6b7280]">
               Showing{" "}
               <span className="font-medium text-[#111827]">
-                {filtered.length === 0 ? 0 : start + 1}
+                {totalDocs === 0 ? 0 : start + 1}
               </span>{" "}
               to{" "}
               <span className="font-medium text-[#111827]">
-                {Math.min(start + PAGE_SIZE, filtered.length)}
+                {Math.min(start + sortedRows.length, totalDocs)}
               </span>{" "}
-              of <span className="font-medium text-[#111827]">{filtered.length}</span> documents
+              of <span className="font-medium text-[#111827]">{totalDocs}</span> documents
             </p>
             <div className="flex items-center gap-1">
               <button
@@ -901,7 +745,7 @@ export function LpDocumentCentreScreen({
           </div>
         </section>
 
-        {selected && (
+        {selectedDetail && (
           <aside className="sticky top-4 flex max-h-[calc(100vh-6rem)] flex-col gap-3 overflow-y-auto">
             {/* Card 1 — document preview + details */}
             <div className="overflow-hidden rounded-xl border border-[#e5e7eb] bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
@@ -909,13 +753,13 @@ export function LpDocumentCentreScreen({
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="text-[15px] font-semibold text-[#111827]">{selected.title}</h2>
-                      <StatusBadge status={selected.status} />
+                      <h2 className="text-[15px] font-semibold text-[#111827]">{selectedDetail.title}</h2>
+                      <StatusBadgeLoose status={selectedDetail.status} />
                     </div>
                     <p className="mt-1.5 flex min-w-0 items-center gap-1.5 text-[12px] text-[#6b7280]">
                       <FolderOpen className="size-3.5 shrink-0 text-[#2563eb]" />
                       <span className="truncate">
-                        {selected.fund} · {selected.category}
+                        {selectedDetail.fund} · {selectedDetail.category}
                       </span>
                     </p>
                   </div>
@@ -946,13 +790,13 @@ export function LpDocumentCentreScreen({
                         <ChevronLeft className="size-3.5" />
                       </button>
                       <span>
-                        {previewPage} / {selected.pages}
+                        {previewPage} / {selectedDetail.pages}
                       </span>
                       <button
                         type="button"
                         className="rounded p-0.5 hover:bg-[#e5e7eb] disabled:opacity-40"
-                        disabled={previewPage >= selected.pages}
-                        onClick={() => setPreviewPage((p) => Math.min(selected.pages, p + 1))}
+                        disabled={previewPage >= selectedDetail.pages}
+                        onClick={() => setPreviewPage((p) => Math.min(selectedDetail.pages, p + 1))}
                         aria-label="Next preview page"
                       >
                         <ChevronRight className="size-3.5" />
@@ -987,7 +831,13 @@ export function LpDocumentCentreScreen({
                       <button
                         type="button"
                         className="rounded p-1 hover:bg-[#e5e7eb]"
-                        onClick={() => toast.message("Fullscreen preview (mock).")}
+                        onClick={() => {
+                          if (!previewUrl) {
+                            toast.error("Preview is not available for this document.")
+                            return
+                          }
+                          setFullscreenPreviewOpen(true)
+                        }}
                         aria-label="Fullscreen"
                       >
                         <Maximize2 className="size-3.5" />
@@ -995,24 +845,27 @@ export function LpDocumentCentreScreen({
                     </div>
                   </div>
                   <div className="flex h-[200px] items-center justify-center p-4">
+                    {previewUrl ? (
+                      <iframe
+                        title={`Preview ${selectedDetail.title}`}
+                        src={previewUrl}
+                        className="h-full w-full rounded-sm border border-[#e5e7eb] bg-white"
+                        style={{ transform: `scale(${zoom / 100})`, transformOrigin: "center" }}
+                      />
+                    ) : (
                     <div
                       className="flex h-full w-[78%] origin-center flex-col items-center justify-center rounded-sm border border-[#e5e7eb] bg-white px-4 py-5 text-center shadow-sm"
                       style={{ transform: `scale(${zoom / 100})` }}
                     >
-                      <p className="text-[8px] font-semibold tracking-[0.14em] text-[#2563eb]">
-                        ARCUS CAPITAL PARTNERS
-                      </p>
-                      <div className="my-2 h-px w-10 bg-[#dbeafe]" />
                       <p className="text-[10px] font-semibold leading-snug text-[#111827]">
-                        {selected.id === "doc-001"
-                          ? "Fourth Amendment to the Limited Partnership Agreement of Arcus Growth Fund V, L.P."
-                          : selected.title}
+                        {selectedDetail.title}
                       </p>
-                      <p className="mt-3 text-[9px] text-[#6b7280]">{selected.publishedDate}</p>
-                      <p className="mt-1 text-[8px] font-medium uppercase tracking-wide text-[#9ca3af]">
-                        Confidential
-                      </p>
+                      <p className="mt-3 text-[9px] text-[#6b7280]">{selectedDetail.publishedDate}</p>
+                      {detailLoading ? (
+                        <p className="mt-2 text-[9px] text-[#9ca3af]">Loading detail…</p>
+                      ) : null}
                     </div>
+                    )}
                   </div>
                 </div>
 
@@ -1046,22 +899,22 @@ export function LpDocumentCentreScreen({
                       {
                         icon: <FileText className="size-3.5" />,
                         label: "Document Type",
-                        value: selected.documentType === "PDF" ? "PDF Document" : selected.documentType,
+                        value: selectedDetail.documentType === "PDF" ? "PDF Document" : selectedDetail.documentType,
                       },
                       {
                         icon: <CalendarDays className="size-3.5" />,
                         label: "Published Date",
-                        value: selected.publishedAt,
+                        value: selectedDetail.publishedAt,
                       },
                       {
                         icon: <History className="size-3.5" />,
                         label: "Version",
-                        value: selected.version,
+                        value: selectedDetail.version,
                       },
                       {
                         icon: <FileText className="size-3.5" />,
                         label: "File Size",
-                        value: selected.fileSize,
+                        value: selectedDetail.fileSize,
                       },
                     ].map((row) => (
                       <div key={row.label} className="flex items-start gap-2.5">
@@ -1080,14 +933,14 @@ export function LpDocumentCentreScreen({
                         <p className="text-[11px] text-[#9ca3af]">Checksum (SHA-256)</p>
                         <div className="mt-0.5 flex items-start gap-1.5">
                           <p className="break-all font-mono text-[10px] font-medium leading-4 text-[#111827]">
-                            {selected.checksum}
+                            {selectedDetail.checksum}
                           </p>
                           <button
                             type="button"
                             className="shrink-0 rounded p-0.5 text-[#2563eb] hover:bg-[#eff6ff]"
                             aria-label="Copy checksum"
                             onClick={() => {
-                              void navigator.clipboard.writeText(selected.checksum)
+                              void navigator.clipboard.writeText(selectedDetail.checksum)
                               toast.success("Checksum copied")
                             }}
                           >
@@ -1099,7 +952,7 @@ export function LpDocumentCentreScreen({
                   </div>
                 ) : (
                   <ul className="space-y-2">
-                    {selected.permissions.map((item) => (
+                    {selectedDetail.permissions.map((item) => (
                       <li
                         key={item}
                         className="rounded-lg border border-[#e5e7eb] bg-[#f9fafb] px-3 py-2 text-[12px] text-[#374151]"
@@ -1118,17 +971,18 @@ export function LpDocumentCentreScreen({
                 <h3 className="text-[13px] font-semibold text-[#111827]">Download History</h3>
                 <button
                   type="button"
-                  className="text-[12px] font-medium text-[#2563eb] hover:text-[#1d4ed8]"
-                  onClick={() => toast.message("Full download history (mock).")}
+                  className="text-[12px] font-medium text-[#2563eb] hover:text-[#1d4ed8] disabled:text-[#9ca3af]"
+                  disabled={!selectedDetail.history.length}
+                  onClick={() => setHistoryDialogOpen(true)}
                 >
                   View All
                 </button>
               </div>
-              {selected.history.length === 0 ? (
+              {selectedDetail.history.length === 0 ? (
                 <p className="mt-3 text-[12px] text-[#9ca3af]">No downloads recorded yet.</p>
               ) : (
                 <ul className="mt-3 space-y-3">
-                  {selected.history.map((entry, idx) => (
+                  {selectedDetail.history.slice(0, 3).map((entry, idx) => (
                     <li key={`${entry.user}-${entry.at}-${idx}`} className="flex items-start gap-2.5">
                       <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-[#f3f4f6] text-[#9ca3af]">
                         <User className="size-3.5" />
@@ -1144,12 +998,112 @@ export function LpDocumentCentreScreen({
                       </div>
                     </li>
                   ))}
+                  {selectedDetail.history.length > 3 ? (
+                    <li>
+                      <button
+                        type="button"
+                        className="text-[12px] font-medium text-[#2563eb] hover:text-[#1d4ed8]"
+                        onClick={() => setHistoryDialogOpen(true)}
+                      >
+                        +{selectedDetail.history.length - 3} more downloads
+                      </button>
+                    </li>
+                  ) : null}
                 </ul>
               )}
             </div>
           </aside>
         )}
       </div>
+
+      <Dialog open={fullscreenPreviewOpen} onOpenChange={setFullscreenPreviewOpen}>
+        <DialogContent className="flex h-[92vh] max-w-[96vw] flex-col gap-0 overflow-hidden rounded-xl p-0">
+          <DialogHeader className="shrink-0 border-b border-[#e5e7eb] px-4 py-3">
+            <DialogTitle className="text-[14px]">{selectedDetail?.title ?? "Document preview"}</DialogTitle>
+            <DialogDescription className="sr-only">Fullscreen document preview</DialogDescription>
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                className="rounded-full px-2 py-1 text-[11px] text-[#6b7280] hover:bg-[#f3f4f6]"
+                onClick={() => setZoom((z) => Math.max(60, z - 10))}
+              >
+                Zoom out
+              </button>
+              <span className="text-[11px] tabular-nums text-[#6b7280]">{zoom}%</span>
+              <button
+                type="button"
+                className="rounded-full px-2 py-1 text-[11px] text-[#6b7280] hover:bg-[#f3f4f6]"
+                onClick={() => setZoom((z) => Math.min(200, z + 10))}
+              >
+                Zoom in
+              </button>
+              <button
+                type="button"
+                className="rounded-full px-2 py-1 text-[11px] text-[#6b7280] hover:bg-[#f3f4f6]"
+                onClick={() => setZoom(100)}
+              >
+                Reset
+              </button>
+            </div>
+          </DialogHeader>
+          <div className="min-h-0 flex-1 bg-[#f8fafc] p-4">
+            {previewUrl ? (
+              <iframe
+                title={`Fullscreen preview ${selectedDetail?.title ?? ""}`}
+                src={previewUrl}
+                className="h-full w-full rounded-lg border border-[#e5e7eb] bg-white"
+                style={{ transform: `scale(${zoom / 100})`, transformOrigin: "center" }}
+              />
+            ) : (
+              <div className="flex h-full items-center justify-center text-[13px] text-[#6b7280]">
+                Preview unavailable
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
+        <DialogContent className="max-h-[85vh] max-w-lg overflow-hidden rounded-xl">
+          <DialogHeader>
+            <DialogTitle>Download history</DialogTitle>
+            <DialogDescription>
+              {selectedDetail?.title ?? "Document"} — {selectedDetail?.history.length ?? 0} recorded
+              download{selectedDetail?.history.length === 1 ? "" : "s"}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto pr-1">
+            {selectedDetail?.history.length ? (
+              <ul className="space-y-3">
+                {selectedDetail.history.map((entry, idx) => (
+                  <li
+                    key={`${entry.user}-${entry.at}-${idx}`}
+                    className="flex items-start gap-2.5 rounded-lg border border-[#e5e7eb] bg-[#f9fafb] p-3"
+                  >
+                    <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-white text-[#9ca3af]">
+                      <User className="size-3.5" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-[12px] font-semibold text-[#111827]">{entry.user}</p>
+                          {entry.action ? (
+                            <p className="mt-0.5 text-[11px] font-medium text-[#2563eb]">{entry.action}</p>
+                          ) : null}
+                          <p className="mt-0.5 text-[11px] text-[#6b7280]">{entry.at}</p>
+                        </div>
+                        <p className="shrink-0 text-[11px] text-[#9ca3af]">IP: {entry.ip}</p>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="py-6 text-center text-[13px] text-[#9ca3af]">No downloads recorded yet.</p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

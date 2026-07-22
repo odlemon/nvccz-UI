@@ -1,12 +1,12 @@
 import { PerformanceLayout } from "@/components/layout/performance-layout"
-import { ContractScorecardPage } from "@/components/performance/contract-scorecard-page"
+import { ContractScorecardMockScreen } from "@/components/performance-mock/screens/contract-scorecard-screen"
 import { ModuleGuard } from "@/lib/permissions"
 
 export default function BoardScorecardsRoute() {
   return (
-    <ModuleGuard moduleId="performance-management" subModuleId="performance-dashboard">
+    <ModuleGuard moduleId="performance-management" subModuleId="board-scorecards">
       <PerformanceLayout>
-        <ContractScorecardPage type="BOARD" />
+        <ContractScorecardMockScreen type="BOARD" />
       </PerformanceLayout>
     </ModuleGuard>
   )

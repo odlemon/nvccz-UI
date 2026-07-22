@@ -25,10 +25,10 @@ export const reconSubtle = 'text-muted-foreground'
 export const reconDivider = 'border-border'
 
 const navLinks = [
-  { href: '/investments-v2/reconciliation', label: 'Overview', exact: true },
+  { href: '/investments-v2/reconciliation', label: 'Client', exact: true },
+  { href: '/investments-v2/reconciliation/trade', label: 'Trade' },
+  { href: '/investments-v2/reconciliation/fund-cash', label: 'Cash' },
   { href: '/investments-v2/reconciliation/cash-ledger', label: 'Cash ledger' },
-  { href: '/investments-v2/reconciliation/fund-cash', label: 'Fund cash' },
-  { href: '/investments-v2/reconciliation/broker-custodian', label: 'Broker & custodian' },
   { href: '/investments-v2/reconciliation/exceptions', label: 'Exceptions' },
   { href: '/investments-v2/reconciliation/statements', label: 'Statements' },
 ]

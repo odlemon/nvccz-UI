@@ -1,16 +1,16 @@
 "use client"
 
 import * as React from "react"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
 import {
   ArrowDownToLine,
-  ArrowRight,
   ArrowUpFromLine,
   ChevronLeft,
   ChevronRight,
   Download,
   FileSpreadsheet,
   FileText,
-  Info,
   Receipt,
   RefreshCcw,
   SlidersHorizontal,
@@ -18,7 +18,23 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useLpFundScope, useLpPortal } from "@/components/lp-portal/lp-portal-context"
+import { InfoHint } from "@/components/lp-portal/info-hint"
+import { lpPortalApi, type LpLedgerDetail } from "@/lib/api/lp-portal-api"
+import { downloadBlob, formatDate, formatFileSize, formatMoneyCompact } from "@/lib/lp-portal/format"
+import { resolveDocumentHref } from "@/lib/lp-portal/navigation"
+import { useLpAccountActivity } from "@/lib/lp-portal/hooks"
+import { getApiErrorMessage } from "@/lib/lp-portal/use-lp-api"
 import { cn } from "@/lib/utils"
 
 type TxStatus = "Posted" | "Settled" | "Under Review" | "Pending"
@@ -51,423 +67,6 @@ type ActivityRow = {
   documents: Array<{ name: string; date: string; size: string }>
   fxNote: string
 }
-
-const AS_OF = "May 31, 2025"
-const INVESTOR = "Arcus Capital Partners LP"
-
-const SEED_ROWS: ActivityRow[] = [
-  {
-    id: "txn-001",
-    transactionDate: "May 28, 2025",
-    effectiveDate: "May 28, 2025",
-    fund: "Arcus Growth Fund V, L.P.",
-    type: "Capital Call Funded",
-    kind: "contribution",
-    reference: "CC-000345",
-    currency: "USD",
-    originalAmount: 6_250_000,
-    reportingAmount: 6_250_000,
-    exchangeRate: 1,
-    status: "Posted",
-    structure: "LP",
-    investor: INVESTOR,
-    postedDate: "May 28, 2025",
-    postedBy: "System",
-    notes: "Capital call funded via wire on May 28, 2025. Payment received in full.",
-    documents: [
-      { name: "Capital Call Notice CC-000345.pdf", date: "May 20, 2025", size: "248 KB" },
-      { name: "Wire Confirmation CC-000345.pdf", date: "May 28, 2025", size: "96 KB" },
-    ],
-    fxNote: "No FX required",
-  },
-  {
-    id: "txn-002",
-    transactionDate: "May 15, 2025",
-    effectiveDate: "May 15, 2025",
-    fund: "Arcus Opportunities Fund II, L.P.",
-    type: "Distribution Paid",
-    kind: "distribution",
-    reference: "DIST-000128",
-    currency: "USD",
-    originalAmount: 1_850_000,
-    reportingAmount: 1_850_000,
-    exchangeRate: 1,
-    status: "Settled",
-    structure: "LP",
-    investor: INVESTOR,
-    postedDate: "May 15, 2025",
-    postedBy: "Fund Operations",
-    notes: "Q1 distribution paid to registered investor bank account.",
-    documents: [
-      { name: "Distribution Notice DIST-000128.pdf", date: "May 5, 2025", size: "182 KB" },
-      { name: "Payment Advice DIST-000128.pdf", date: "May 15, 2025", size: "74 KB" },
-    ],
-    fxNote: "No FX required",
-  },
-  {
-    id: "txn-003",
-    transactionDate: "May 1, 2025",
-    effectiveDate: "May 1, 2025",
-    fund: "Arcus Strategic Income Fund L.P.",
-    type: "Subscription",
-    kind: "subscription",
-    reference: "SUB-000089",
-    currency: "USD",
-    originalAmount: 5_000_000,
-    reportingAmount: 5_000_000,
-    exchangeRate: 1,
-    status: "Posted",
-    structure: "Open-End",
-    investor: INVESTOR,
-    postedDate: "May 1, 2025",
-    postedBy: "Investor Accounting",
-    notes: "Subscription accepted at May 1 dealing NAV. Units allocated.",
-    documents: [
-      { name: "Subscription Confirmation SUB-000089.pdf", date: "May 1, 2025", size: "156 KB" },
-    ],
-    fxNote: "No FX required",
-  },
-  {
-    id: "txn-004",
-    transactionDate: "Apr 22, 2025",
-    effectiveDate: "Apr 22, 2025",
-    fund: "Arcus Credit Opportunities Fund II L.P.",
-    type: "Management Fee",
-    kind: "fee",
-    reference: "FEE-2025-04",
-    currency: "USD",
-    originalAmount: 214_500,
-    reportingAmount: 214_500,
-    exchangeRate: 1,
-    status: "Posted",
-    structure: "Credit",
-    investor: INVESTOR,
-    postedDate: "Apr 22, 2025",
-    postedBy: "System",
-    notes: "April management fee accrual posted per fund terms.",
-    documents: [{ name: "Fee Statement April 2025.pdf", date: "Apr 22, 2025", size: "112 KB" }],
-    fxNote: "No FX required",
-  },
-  {
-    id: "txn-005",
-    transactionDate: "Apr 10, 2025",
-    effectiveDate: "Apr 10, 2025",
-    fund: "Arcus Growth Fund IV, L.P.",
-    type: "Capital Call Funded",
-    kind: "contribution",
-    reference: "CC-000312",
-    currency: "USD",
-    originalAmount: 3_400_000,
-    reportingAmount: 3_400_000,
-    exchangeRate: 1,
-    status: "Posted",
-    structure: "LP",
-    investor: INVESTOR,
-    postedDate: "Apr 10, 2025",
-    postedBy: "System",
-    notes: "Capital call funded in full before the due date.",
-    documents: [
-      { name: "Capital Call Notice CC-000312.pdf", date: "Mar 28, 2025", size: "236 KB" },
-      { name: "Wire Confirmation CC-000312.pdf", date: "Apr 10, 2025", size: "88 KB" },
-    ],
-    fxNote: "No FX required",
-  },
-  {
-    id: "txn-006",
-    transactionDate: "Mar 31, 2025",
-    effectiveDate: "Mar 31, 2025",
-    fund: "Arcus Strategic Income Fund L.P.",
-    type: "Redemption",
-    kind: "redemption",
-    reference: "RED-000041",
-    currency: "USD",
-    originalAmount: 1_250_000,
-    reportingAmount: 1_250_000,
-    exchangeRate: 1,
-    status: "Under Review",
-    structure: "Open-End",
-    investor: INVESTOR,
-    postedDate: "—",
-    postedBy: "—",
-    notes: "Redemption request under review for March dealing cycle.",
-    documents: [{ name: "Redemption Request RED-000041.pdf", date: "Mar 20, 2025", size: "134 KB" }],
-    fxNote: "No FX required",
-  },
-  {
-    id: "txn-007",
-    transactionDate: "Mar 18, 2025",
-    effectiveDate: "Mar 18, 2025",
-    fund: "Arcus Growth Fund V, L.P.",
-    type: "Distribution Paid",
-    kind: "distribution",
-    reference: "DIST-000119",
-    currency: "EUR",
-    originalAmount: 920_000,
-    reportingAmount: 998_200,
-    exchangeRate: 1.085,
-    status: "Settled",
-    structure: "LP",
-    investor: INVESTOR,
-    postedDate: "Mar 18, 2025",
-    postedBy: "Fund Operations",
-    notes: "EUR distribution converted at historical posting rate.",
-    documents: [
-      { name: "Distribution Notice DIST-000119.pdf", date: "Mar 8, 2025", size: "198 KB" },
-      { name: "FX Memo DIST-000119.pdf", date: "Mar 18, 2025", size: "64 KB" },
-    ],
-    fxNote: "Historical FX rate 1.0850 applied on Mar 18, 2025",
-  },
-  {
-    id: "txn-008",
-    transactionDate: "Feb 28, 2025",
-    effectiveDate: "Feb 28, 2025",
-    fund: "Arcus Growth Fund V, L.P.",
-    type: "Capital Call Funded",
-    kind: "contribution",
-    reference: "CC-000298",
-    currency: "USD",
-    originalAmount: 4_100_000,
-    reportingAmount: 4_100_000,
-    exchangeRate: 1,
-    status: "Posted",
-    structure: "LP",
-    investor: INVESTOR,
-    postedDate: "Feb 28, 2025",
-    postedBy: "System",
-    notes: "Call 6 funded in full.",
-    documents: [
-      { name: "Capital Call Notice CC-000298.pdf", date: "Feb 12, 2025", size: "241 KB" },
-      { name: "Wire Confirmation CC-000298.pdf", date: "Feb 28, 2025", size: "91 KB" },
-    ],
-    fxNote: "No FX required",
-  },
-  {
-    id: "txn-009",
-    transactionDate: "Feb 14, 2025",
-    effectiveDate: "Feb 14, 2025",
-    fund: "Arcus Strategic Income Fund L.P.",
-    type: "Subscription",
-    kind: "subscription",
-    reference: "SUB-000077",
-    currency: "USD",
-    originalAmount: 2_500_000,
-    reportingAmount: 2_500_000,
-    exchangeRate: 1,
-    status: "Posted",
-    structure: "Open-End",
-    investor: INVESTOR,
-    postedDate: "Feb 14, 2025",
-    postedBy: "Investor Accounting",
-    notes: "Additional subscription at February dealing date.",
-    documents: [
-      { name: "Subscription Confirmation SUB-000077.pdf", date: "Feb 14, 2025", size: "149 KB" },
-    ],
-    fxNote: "No FX required",
-  },
-  {
-    id: "txn-010",
-    transactionDate: "Jan 31, 2025",
-    effectiveDate: "Jan 31, 2025",
-    fund: "Arcus Opportunities Fund II, L.P.",
-    type: "Distribution Paid",
-    kind: "distribution",
-    reference: "DIST-000104",
-    currency: "USD",
-    originalAmount: 2_150_000,
-    reportingAmount: 2_150_000,
-    exchangeRate: 1,
-    status: "Settled",
-    structure: "LP",
-    investor: INVESTOR,
-    postedDate: "Jan 31, 2025",
-    postedBy: "Fund Operations",
-    notes: "Year-end distribution settled.",
-    documents: [
-      { name: "Distribution Notice DIST-000104.pdf", date: "Jan 20, 2025", size: "176 KB" },
-    ],
-    fxNote: "No FX required",
-  },
-  {
-    id: "txn-011",
-    transactionDate: "Jan 15, 2025",
-    effectiveDate: "Jan 15, 2025",
-    fund: "Arcus Credit Opportunities Fund II L.P.",
-    type: "Management Fee",
-    kind: "fee",
-    reference: "FEE-2025-01",
-    currency: "GBP",
-    originalAmount: 168_000,
-    reportingAmount: 212_940,
-    exchangeRate: 1.2675,
-    status: "Posted",
-    structure: "Credit",
-    investor: INVESTOR,
-    postedDate: "Jan 15, 2025",
-    postedBy: "System",
-    notes: "GBP fee converted using historical fund FX policy rate.",
-    documents: [{ name: "Fee Statement January 2025.pdf", date: "Jan 15, 2025", size: "118 KB" }],
-    fxNote: "Historical FX rate 1.2675 applied on Jan 15, 2025",
-  },
-  {
-    id: "txn-012",
-    transactionDate: "Dec 20, 2024",
-    effectiveDate: "Dec 20, 2024",
-    fund: "Arcus Growth Fund IV, L.P.",
-    type: "Capital Call Funded",
-    kind: "contribution",
-    reference: "CC-000276",
-    currency: "USD",
-    originalAmount: 2_850_000,
-    reportingAmount: 2_850_000,
-    exchangeRate: 1,
-    status: "Posted",
-    structure: "LP",
-    investor: INVESTOR,
-    postedDate: "Dec 20, 2024",
-    postedBy: "System",
-    notes: "Year-end capital call funded.",
-    documents: [
-      { name: "Capital Call Notice CC-000276.pdf", date: "Dec 5, 2024", size: "229 KB" },
-      { name: "Wire Confirmation CC-000276.pdf", date: "Dec 20, 2024", size: "85 KB" },
-    ],
-    fxNote: "No FX required",
-  },
-  {
-    id: "txn-013",
-    transactionDate: "Dec 2, 2024",
-    effectiveDate: "Dec 2, 2024",
-    fund: "Arcus Strategic Income Fund L.P.",
-    type: "Redemption",
-    kind: "redemption",
-    reference: "RED-000033",
-    currency: "USD",
-    originalAmount: 750_000,
-    reportingAmount: 750_000,
-    exchangeRate: 1,
-    status: "Pending",
-    structure: "Open-End",
-    investor: INVESTOR,
-    postedDate: "—",
-    postedBy: "—",
-    notes: "Pending dealing-date NAV confirmation.",
-    documents: [{ name: "Redemption Request RED-000033.pdf", date: "Nov 22, 2024", size: "128 KB" }],
-    fxNote: "No FX required",
-  },
-  {
-    id: "txn-014",
-    transactionDate: "Nov 15, 2024",
-    effectiveDate: "Nov 15, 2024",
-    fund: "Arcus Growth Fund V, L.P.",
-    type: "Distribution Paid",
-    kind: "distribution",
-    reference: "DIST-000091",
-    currency: "USD",
-    originalAmount: 1_420_000,
-    reportingAmount: 1_420_000,
-    exchangeRate: 1,
-    status: "Settled",
-    structure: "LP",
-    investor: INVESTOR,
-    postedDate: "Nov 15, 2024",
-    postedBy: "Fund Operations",
-    notes: "Interim distribution paid.",
-    documents: [
-      { name: "Distribution Notice DIST-000091.pdf", date: "Nov 5, 2024", size: "171 KB" },
-    ],
-    fxNote: "No FX required",
-  },
-  {
-    id: "txn-015",
-    transactionDate: "Oct 30, 2024",
-    effectiveDate: "Oct 30, 2024",
-    fund: "Arcus Opportunities Fund II, L.P.",
-    type: "Capital Call Funded",
-    kind: "contribution",
-    reference: "CC-000251",
-    currency: "USD",
-    originalAmount: 1_975_000,
-    reportingAmount: 1_975_000,
-    exchangeRate: 1,
-    status: "Posted",
-    structure: "LP",
-    investor: INVESTOR,
-    postedDate: "Oct 30, 2024",
-    postedBy: "System",
-    notes: "Call funded via wire.",
-    documents: [
-      { name: "Capital Call Notice CC-000251.pdf", date: "Oct 15, 2024", size: "220 KB" },
-      { name: "Wire Confirmation CC-000251.pdf", date: "Oct 30, 2024", size: "82 KB" },
-    ],
-    fxNote: "No FX required",
-  },
-  {
-    id: "txn-016",
-    transactionDate: "Sep 12, 2024",
-    effectiveDate: "Sep 12, 2024",
-    fund: "Arcus Strategic Income Fund L.P.",
-    type: "Subscription",
-    kind: "subscription",
-    reference: "SUB-000061",
-    currency: "USD",
-    originalAmount: 3_750_000,
-    reportingAmount: 3_750_000,
-    exchangeRate: 1,
-    status: "Posted",
-    structure: "Open-End",
-    investor: INVESTOR,
-    postedDate: "Sep 12, 2024",
-    postedBy: "Investor Accounting",
-    notes: "Subscription accepted at September dealing NAV.",
-    documents: [
-      { name: "Subscription Confirmation SUB-000061.pdf", date: "Sep 12, 2024", size: "152 KB" },
-    ],
-    fxNote: "No FX required",
-  },
-  {
-    id: "txn-017",
-    transactionDate: "Aug 8, 2024",
-    effectiveDate: "Aug 8, 2024",
-    fund: "Arcus Growth Fund IV, L.P.",
-    type: "Management Fee",
-    kind: "fee",
-    reference: "FEE-2024-08",
-    currency: "USD",
-    originalAmount: 198_400,
-    reportingAmount: 198_400,
-    exchangeRate: 1,
-    status: "Posted",
-    structure: "LP",
-    investor: INVESTOR,
-    postedDate: "Aug 8, 2024",
-    postedBy: "System",
-    notes: "August management fee posted.",
-    documents: [{ name: "Fee Statement August 2024.pdf", date: "Aug 8, 2024", size: "109 KB" }],
-    fxNote: "No FX required",
-  },
-  {
-    id: "txn-018",
-    transactionDate: "Jul 19, 2024",
-    effectiveDate: "Jul 19, 2024",
-    fund: "Arcus Credit Opportunities Fund II L.P.",
-    type: "Distribution Paid",
-    kind: "distribution",
-    reference: "DIST-000072",
-    currency: "USD",
-    originalAmount: 640_000,
-    reportingAmount: 640_000,
-    exchangeRate: 1,
-    status: "Settled",
-    structure: "Credit",
-    investor: INVESTOR,
-    postedDate: "Jul 19, 2024",
-    postedBy: "Fund Operations",
-    notes: "Income distribution settled.",
-    documents: [
-      { name: "Distribution Notice DIST-000072.pdf", date: "Jul 8, 2024", size: "164 KB" },
-    ],
-    fxNote: "No FX required",
-  },
-]
 
 const KIND_META: Record<
   Exclude<TxKind, "net">,
@@ -505,81 +104,7 @@ const KIND_META: Record<
   },
 }
 
-const KPI_CARDS: Array<{
-  id: TxKind
-  label: string
-  value: string
-  count: number
-  iconBg: string
-  iconColor: string
-  icon: React.ReactNode
-}> = [
-  {
-    id: "contribution",
-    label: "Contributions",
-    value: "$212.54M",
-    count: 34,
-    iconBg: "bg-[#dbeafe]",
-    iconColor: "text-[#2563eb]",
-    icon: <ArrowDownToLine className="size-4" strokeWidth={2.25} />,
-  },
-  {
-    id: "distribution",
-    label: "Distributions",
-    value: "$78.34M",
-    count: 18,
-    iconBg: "bg-[#dcfce7]",
-    iconColor: "text-[#16a34a]",
-    icon: <ArrowUpFromLine className="size-4" strokeWidth={2.25} />,
-  },
-  {
-    id: "subscription",
-    label: "Subscriptions",
-    value: "$104.21M",
-    count: 22,
-    iconBg: "bg-[#ede9fe]",
-    iconColor: "text-[#7c3aed]",
-    icon: <Receipt className="size-4" strokeWidth={2.25} />,
-  },
-  {
-    id: "redemption",
-    label: "Redemptions",
-    value: "$36.87M",
-    count: 9,
-    iconBg: "bg-[#ffedd5]",
-    iconColor: "text-[#ea580c]",
-    icon: <RefreshCcw className="size-4" strokeWidth={2.25} />,
-  },
-  {
-    id: "fee",
-    label: "Fees",
-    value: "$2.56M",
-    count: 12,
-    iconBg: "bg-[#fee2e2]",
-    iconColor: "text-[#dc2626]",
-    icon: <FileText className="size-4" strokeWidth={2.25} />,
-  },
-  {
-    id: "net",
-    label: "Net Cash Flow",
-    value: "$277.66M",
-    count: 74,
-    iconBg: "bg-[#ccfbf1]",
-    iconColor: "text-[#0d9488]",
-    icon: <ArrowUpFromLine className="size-4 -rotate-45" strokeWidth={2.25} />,
-  },
-]
-
-const TOTAL_TRANSACTIONS = 74
-
-function buildActivityRows(): ActivityRow[] {
-  const funds = [
-    "Arcus Growth Fund V, L.P.",
-    "Arcus Growth Fund IV, L.P.",
-    "Arcus Opportunities Fund II, L.P.",
-    "Arcus Credit Opportunities Fund II L.P.",
-    "Arcus Strategic Income Fund L.P.",
-  ]
+function buildKpiCards(rows: ActivityRow[]) {
   const kinds: Array<Exclude<TxKind, "net">> = [
     "contribution",
     "distribution",
@@ -587,75 +112,37 @@ function buildActivityRows(): ActivityRow[] {
     "redemption",
     "fee",
   ]
-  const typeByKind: Record<Exclude<TxKind, "net">, string> = {
-    contribution: "Capital Call Funded",
-    distribution: "Distribution Paid",
-    subscription: "Subscription",
-    redemption: "Redemption",
-    fee: "Management Fee",
-  }
-  const statuses: TxStatus[] = ["Posted", "Settled", "Under Review", "Pending"]
-  const currencies = ["USD", "EUR", "GBP", "USD"]
-
-  const rows = [...SEED_ROWS]
-  let i = SEED_ROWS.length
-  while (rows.length < TOTAL_TRANSACTIONS) {
-    const kind = kinds[i % kinds.length]
-    const status = statuses[i % statuses.length]
-    const currency = currencies[i % currencies.length]
-    const amount = 250_000 + (i % 17) * 185_000
-    const rate = currency === "USD" ? 1 : currency === "EUR" ? 1.08 + (i % 5) * 0.01 : 1.25 + (i % 4) * 0.01
-    const month = ((i * 3) % 12) + 1
-    const day = ((i * 5) % 27) + 1
-    const year = i % 2 === 0 ? 2025 : 2024
-    const date = new Date(Date.UTC(year, month - 1, day))
-    const label = date.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-      timeZone: "UTC",
-    })
-    const refPrefix =
-      kind === "contribution"
-        ? "CC"
-        : kind === "distribution"
-          ? "DIST"
-          : kind === "subscription"
-            ? "SUB"
-            : kind === "redemption"
-              ? "RED"
-              : "FEE"
-    const reference = `${refPrefix}-${String(400 + i).padStart(6, "0")}`
-    const fund = funds[i % funds.length]
-    rows.push({
-      id: `txn-gen-${i}`,
-      transactionDate: label,
-      effectiveDate: label,
-      fund,
-      type: typeByKind[kind],
-      kind,
-      reference,
-      currency,
-      originalAmount: amount,
-      reportingAmount: Math.round(amount * rate * 100) / 100,
-      exchangeRate: rate,
-      status,
-      structure: fund.includes("Strategic") ? "Open-End" : fund.includes("Credit") ? "Credit" : "LP",
-      investor: INVESTOR,
-      postedDate: status === "Under Review" || status === "Pending" ? "—" : label,
-      postedBy: status === "Under Review" || status === "Pending" ? "—" : i % 2 ? "Fund Operations" : "System",
-      notes: `${typeByKind[kind]} recorded for investor reporting as of ${label}.`,
-      documents: [
-        { name: `${typeByKind[kind]} ${reference}.pdf`, date: label, size: `${90 + (i % 40)} KB` },
-      ],
-      fxNote: currency === "USD" ? "No FX required" : `Historical FX rate ${rate.toFixed(4)} applied on ${label}`,
-    })
-    i += 1
-  }
-  return rows
+  const cards = kinds.map((kind) => {
+    const subset = rows.filter((row) => row.kind === kind)
+    const total = subset.reduce((sum, row) => sum + row.reportingAmount, 0)
+    return {
+      id: kind as TxKind,
+      label: KIND_META[kind].label,
+      value: formatMoneyCompact(total),
+      count: subset.length,
+      iconBg: KIND_META[kind].iconBg,
+      iconColor: KIND_META[kind].iconColor,
+      icon: KIND_META[kind].icon,
+    }
+  })
+  const netTotal = rows.reduce((sum, row) => {
+    if (row.kind === "contribution" || row.kind === "subscription") return sum + row.reportingAmount
+    if (row.kind === "distribution" || row.kind === "redemption" || row.kind === "fee") {
+      return sum - row.reportingAmount
+    }
+    return sum
+  }, 0)
+  cards.push({
+    id: "net" as TxKind,
+    label: "Net Cash Flow",
+    value: formatMoneyCompact(netTotal),
+    count: rows.length,
+    iconBg: "bg-[#ccfbf1]",
+    iconColor: "text-[#0d9488]",
+    icon: <ArrowUpFromLine className="size-4 -rotate-45" strokeWidth={2.25} />,
+  })
+  return cards
 }
-
-const ALL_ROWS = buildActivityRows()
 
 function money(value: number) {
   return new Intl.NumberFormat("en-US", {
@@ -664,29 +151,16 @@ function money(value: number) {
   }).format(value)
 }
 
-function downloadBlob(contents: BlobPart, filename: string, type: string) {
-  const url = URL.createObjectURL(new Blob([contents], { type }))
-  const a = document.createElement("a")
-  a.href = url
-  a.download = filename
-  a.click()
-  URL.revokeObjectURL(url)
-}
-
-function InfoHint({ label }: { label: string }) {
-  return (
-    <button
-      type="button"
-      className="rounded-full text-[#94a3b8] hover:text-[#64748b]"
-      aria-label={`${label} info`}
-      onClick={(e) => {
-        e.stopPropagation()
-        toast.message(label)
-      }}
-    >
-      <Info className="size-3.5" />
-    </button>
-  )
+function InfoHintKpi({ label }: { label: string }) {
+  const descriptions: Record<string, string> = {
+    Contributions: "Capital paid into fund commitments.",
+    Distributions: "Cash returned from fund investments.",
+    Subscriptions: "Open-ended fund purchase requests.",
+    Redemptions: "Open-ended fund redemption requests.",
+    Fees: "Management and administrative charges.",
+    "Net Cash Flow": "Net of inflows and outflows in reporting currency.",
+  }
+  return <InfoHint label={label} description={descriptions[label]} />
 }
 
 function StatusBadge({ status }: { status: TxStatus }) {
@@ -725,9 +199,18 @@ function FilterField({
 
 export function LpAccountActivityScreen({
   initialStructure = "all",
+  initialEntryId,
 }: {
   initialStructure?: string
+  initialEntryId?: string
 }) {
+  const router = useRouter()
+  const { fundId, asOfDate } = useLpFundScope()
+  const { funds } = useLpPortal()
+  const [fromDate, setFromDate] = React.useState("")
+  const { data, loading, error, reload } = useLpAccountActivity(fromDate || undefined)
+  const allRows = data?.items ?? []
+
   const [metric, setMetric] = React.useState<TxKind | "all">("all")
   const [fund, setFund] = React.useState("all")
   const [txType, setTxType] = React.useState("all")
@@ -738,10 +221,26 @@ export function LpAccountActivityScreen({
     return "all"
   })
   const [status, setStatus] = React.useState("all")
-  const [dateRange] = React.useState("Jun 1, 2024 - May 31, 2025")
+  const [moreFiltersOpen, setMoreFiltersOpen] = React.useState(false)
+  const [investorFilter, setInvestorFilter] = React.useState("all")
+  const [referenceFilter, setReferenceFilter] = React.useState("")
+  const [postedByFilter, setPostedByFilter] = React.useState("all")
+  const [minAmount, setMinAmount] = React.useState("")
+  const [maxAmount, setMaxAmount] = React.useState("")
   const [page, setPage] = React.useState(1)
   const [pageSize, setPageSize] = React.useState(15)
-  const [selectedId, setSelectedId] = React.useState<string | null>("txn-001")
+  const [selectedId, setSelectedId] = React.useState<string | null>(initialEntryId ?? null)
+  const [ledgerDetail, setLedgerDetail] = React.useState<LpLedgerDetail | null>(null)
+  const [ledgerLoading, setLedgerLoading] = React.useState(false)
+  const [exporting, setExporting] = React.useState<string | null>(null)
+
+  const dateRangeLabel = fromDate
+    ? `${formatDate(fromDate, "long")} – ${formatDate(asOfDate, "long")}`
+    : asOfDate
+      ? `Through ${formatDate(asOfDate, "long")}`
+      : "All dates"
+
+  const kpiCards = React.useMemo(() => buildKpiCards(allRows), [allRows])
 
   React.useEffect(() => {
     setStructure(
@@ -754,16 +253,38 @@ export function LpAccountActivityScreen({
   }, [initialStructure])
 
   const filteredRows = React.useMemo(() => {
-    return ALL_ROWS.filter((row) => {
+    return allRows.filter((row) => {
       if (metric !== "all" && metric !== "net" && row.kind !== metric) return false
       if (fund !== "all" && row.fund !== fund) return false
       if (txType !== "all" && row.type !== txType) return false
       if (currency !== "all" && row.currency !== currency) return false
       if (structure !== "all" && row.structure !== structure) return false
       if (status !== "all" && row.status !== status) return false
+      if (investorFilter !== "all" && row.investor !== investorFilter) return false
+      if (referenceFilter.trim() && !row.reference.toLowerCase().includes(referenceFilter.trim().toLowerCase())) {
+        return false
+      }
+      if (postedByFilter !== "all" && row.postedBy !== postedByFilter) return false
+      const min = minAmount.trim() ? Number(minAmount) : null
+      const max = maxAmount.trim() ? Number(maxAmount) : null
+      if (min != null && !Number.isNaN(min) && row.reportingAmount < min) return false
+      if (max != null && !Number.isNaN(max) && row.reportingAmount > max) return false
       return true
     })
-  }, [currency, fund, metric, status, structure, txType])
+  }, [
+    allRows,
+    currency,
+    fund,
+    investorFilter,
+    maxAmount,
+    metric,
+    minAmount,
+    postedByFilter,
+    referenceFilter,
+    status,
+    structure,
+    txType,
+  ])
 
   const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize))
   const safePage = Math.min(page, totalPages)
@@ -771,14 +292,50 @@ export function LpAccountActivityScreen({
   const pageRows = filteredRows.slice(pageStart, pageStart + pageSize)
   const selected = filteredRows.find((row) => row.id === selectedId) ?? null
 
+  const drawerDocuments = React.useMemo(() => {
+    if (ledgerDetail?.documents?.length) {
+      return ledgerDetail.documents.map((doc) => ({
+        id: doc.id,
+        name: doc.name,
+        date: formatDate(doc.publishedDate),
+        size: formatFileSize(doc.size),
+      }))
+    }
+    return selected?.documents ?? []
+  }, [ledgerDetail?.documents, selected?.documents])
+
+  React.useEffect(() => {
+    if (initialEntryId) setSelectedId(initialEntryId)
+  }, [initialEntryId])
+
   React.useEffect(() => {
     if (safePage !== page) setPage(safePage)
   }, [page, safePage])
 
   React.useEffect(() => {
+    if (!selectedId) {
+      setLedgerDetail(null)
+      return
+    }
+    setLedgerLoading(true)
+    lpPortalApi
+      .getLedgerEntry(selectedId)
+      .then((res) => setLedgerDetail(res.data))
+      .catch((err) => {
+        setLedgerDetail(null)
+        toast.error(getApiErrorMessage(err, "Could not load transaction detail"))
+      })
+      .finally(() => setLedgerLoading(false))
+  }, [selectedId])
+
+  React.useEffect(() => {
     if (selectedId && !filteredRows.some((row) => row.id === selectedId)) {
       setSelectedId(filteredRows[0]?.id ?? null)
     }
+  }, [filteredRows, selectedId])
+
+  React.useEffect(() => {
+    if (!selectedId && filteredRows[0]) setSelectedId(filteredRows[0].id)
   }, [filteredRows, selectedId])
 
   const clearFilters = () => {
@@ -788,74 +345,53 @@ export function LpAccountActivityScreen({
     setCurrency("all")
     setStructure("all")
     setStatus("all")
+    setFromDate("")
+    setInvestorFilter("all")
+    setReferenceFilter("")
+    setPostedByFilter("all")
+    setMinAmount("")
+    setMaxAmount("")
     setPage(1)
     toast.message("Filters cleared")
   }
 
-  const exportRows = (format: "csv" | "excel" | "pdf") => {
-    const headers = [
-      "Transaction Date",
-      "Effective Date",
-      "Fund",
-      "Type",
-      "Reference",
-      "Currency",
-      "Original Amount",
-      "Reporting Amount",
-      "Exchange Rate",
-      "Status",
-    ]
-    const data = filteredRows.map((row) => [
-      row.transactionDate,
-      row.effectiveDate,
-      row.fund,
-      row.type,
-      row.reference,
-      row.currency,
-      row.originalAmount,
-      row.reportingAmount,
-      row.exchangeRate,
-      row.status,
-    ])
-    if (format === "csv") {
-      const csv = [headers, ...data]
-        .map((record) => record.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(","))
-        .join("\r\n")
-      downloadBlob(csv, "account-activity.csv", "text/csv;charset=utf-8")
-      toast.success("CSV exported (mock).")
-      return
-    }
-    if (format === "excel") {
-      const table = `<table><thead><tr>${headers.map((h) => `<th>${h}</th>`).join("")}</tr></thead><tbody>${data
-        .map((record) => `<tr>${record.map((v) => `<td>${v}</td>`).join("")}</tr>`)
-        .join("")}</tbody></table>`
-      downloadBlob(table, "account-activity.xls", "application/vnd.ms-excel")
-      toast.success("Excel exported (mock).")
-      return
-    }
-    void import("jspdf").then(({ jsPDF }) => {
-      const pdf = new jsPDF({ orientation: "landscape" })
-      pdf.setFontSize(14)
-      pdf.text("Arcus LP Portal — Account Activity", 14, 14)
-      pdf.setFontSize(8)
-      pdf.text(`As of ${AS_OF} · ${filteredRows.length} transactions`, 14, 22)
-      data.slice(0, 40).forEach((record, index) => {
-        pdf.text(
-          `${record[0]}  ${record[2]}  ${record[3]}  ${record[4]}  ${record[5]} ${record[6]}  ${record[9]}`.slice(
-            0,
-            175,
-          ),
-          14,
-          30 + index * 5.5,
-        )
+  const advancedFilterCount = [
+    investorFilter !== "all",
+    referenceFilter.trim().length > 0,
+    postedByFilter !== "all",
+    minAmount.trim().length > 0,
+    maxAmount.trim().length > 0,
+  ].filter(Boolean).length
+
+  const exportRows = async (format: "csv" | "excel" | "pdf") => {
+    const apiFormat = format === "excel" ? "xlsx" : format
+    setExporting(format)
+    try {
+      const blob = await lpPortalApi.exportAccountActivity({
+        fundId,
+        from: fromDate || undefined,
+        to: asOfDate,
+        format: apiFormat,
       })
-      pdf.save("account-activity.pdf")
-      toast.success("PDF exported (mock).")
-    })
+      const ext = apiFormat === "xlsx" ? "xlsx" : apiFormat
+      downloadBlob(blob, `account-activity.${ext}`)
+      toast.success(`${format.toUpperCase()} exported.`)
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Export failed"))
+    } finally {
+      setExporting(null)
+    }
   }
 
-  const funds = Array.from(new Set(ALL_ROWS.map((r) => r.fund)))
-  const types = Array.from(new Set(ALL_ROWS.map((r) => r.type)))
+  const fundOptions = React.useMemo(() => {
+    const fromRows = Array.from(new Set(allRows.map((r) => r.fund)))
+    if (fromRows.length) return fromRows
+    return funds.map((f) => f.name)
+  }, [allRows, funds])
+
+  const types = Array.from(new Set(allRows.map((r) => r.type)))
+  const investors = Array.from(new Set(allRows.map((r) => r.investor).filter(Boolean)))
+  const postedByOptions = Array.from(new Set(allRows.map((r) => r.postedBy).filter(Boolean)))
 
   const pageNumbers = React.useMemo(() => {
     const max = Math.min(totalPages, 5)
@@ -869,6 +405,15 @@ export function LpAccountActivityScreen({
 
   return (
     <div className="space-y-5 pb-8">
+      {error ? (
+        <div className="rounded-xl border border-[#fecaca] bg-[#fef2f2] p-4 text-center">
+          <p className="text-[13px] text-[#dc2626]">{error}</p>
+          <Button type="button" className="mt-3 rounded-full" onClick={() => void reload()}>
+            Retry
+          </Button>
+        </div>
+      ) : null}
+
       <div>
         <h1 className="text-[24px] font-bold tracking-tight text-[#0f172a]">Account Activity</h1>
         <p className="mt-1.5 text-[13px] leading-5 text-[#6b7280]">
@@ -878,7 +423,7 @@ export function LpAccountActivityScreen({
 
       {/* KPI strip */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-        {KPI_CARDS.map((card) => {
+        {kpiCards.map((card) => {
           const active = metric === card.id
           return (
             <button
@@ -910,7 +455,7 @@ export function LpAccountActivityScreen({
                   </span>
                   <p className="text-[12px] font-medium text-[#6b7280]">{card.label}</p>
                 </div>
-                <InfoHint label={card.label} />
+                <InfoHintKpi label={card.label} />
               </div>
               <p className="mt-3 text-[20px] font-bold tabular-nums tracking-[-0.03em] text-[#0f172a]">
                 {card.value}
@@ -933,7 +478,7 @@ export function LpAccountActivityScreen({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Funds</SelectItem>
-                {funds.map((f) => (
+                {fundOptions.map((f) => (
                   <SelectItem key={f} value={f}>
                     {f}
                   </SelectItem>
@@ -959,8 +504,19 @@ export function LpAccountActivityScreen({
           </FilterField>
 
           <FilterField label="Date Range">
-            <div className="flex h-9 items-center rounded-lg border border-[#e5e7eb] bg-white px-3 text-[12px] text-[#0f172a]">
-              {dateRange}
+            <div className="flex h-9 items-center gap-2 rounded-lg border border-[#e5e7eb] bg-white px-3 text-[12px] text-[#0f172a]">
+              <input
+                type="date"
+                value={fromDate}
+                onChange={(e) => {
+                  setFromDate(e.target.value)
+                  setPage(1)
+                }}
+                className="min-w-0 flex-1 border-0 bg-transparent p-0 text-[12px] outline-none"
+                aria-label="From date"
+              />
+              <span className="shrink-0 text-[#9ca3af]">to</span>
+              <span className="truncate text-[#64748b]">{formatDate(asOfDate, "short")}</span>
             </div>
           </FilterField>
 
@@ -1010,11 +566,16 @@ export function LpAccountActivityScreen({
           <Button
             type="button"
             variant="outline"
-            className="h-9 rounded-full border-[#e5e7eb] px-4 text-[12px] font-medium text-[#374151] shadow-none"
-            onClick={() => toast.message("More filters (mock).")}
+            className="relative h-9 rounded-full border-[#e5e7eb] px-4 text-[12px] font-medium text-[#374151] shadow-none"
+            onClick={() => setMoreFiltersOpen(true)}
           >
             <SlidersHorizontal className="size-3.5" />
             More Filters
+            {advancedFilterCount > 0 ? (
+              <span className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-[#2563eb] text-[9px] font-bold text-white">
+                {advancedFilterCount}
+              </span>
+            ) : null}
           </Button>
 
           <button
@@ -1026,6 +587,107 @@ export function LpAccountActivityScreen({
           </button>
         </div>
       </div>
+
+      <Dialog open={moreFiltersOpen} onOpenChange={setMoreFiltersOpen}>
+        <DialogContent className="max-w-md rounded-xl">
+          <DialogHeader>
+            <DialogTitle>More filters</DialogTitle>
+            <DialogDescription>
+              Narrow transactions by investor, reference, poster, or amount range.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-2">
+            <FilterField label="Investor">
+              <Select value={investorFilter} onValueChange={setInvestorFilter}>
+                <SelectTrigger className="h-9 w-full rounded-lg border-[#e5e7eb] bg-white text-[12px] shadow-none">
+                  <SelectValue placeholder="All investors" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All investors</SelectItem>
+                  {investors.map((name) => (
+                    <SelectItem key={name} value={name}>
+                      {name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FilterField>
+            <FilterField label="Reference contains">
+              <Input
+                value={referenceFilter}
+                onChange={(e) => setReferenceFilter(e.target.value)}
+                placeholder="e.g. CC-2024-07"
+                className="h-9 rounded-lg border-[#e5e7eb] text-[12px] shadow-none"
+              />
+            </FilterField>
+            <FilterField label="Posted by">
+              <Select value={postedByFilter} onValueChange={setPostedByFilter}>
+                <SelectTrigger className="h-9 w-full rounded-lg border-[#e5e7eb] bg-white text-[12px] shadow-none">
+                  <SelectValue placeholder="Anyone" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Anyone</SelectItem>
+                  {postedByOptions.map((name) => (
+                    <SelectItem key={name} value={name}>
+                      {name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FilterField>
+            <div className="grid grid-cols-2 gap-3">
+              <FilterField label="Min amount">
+                <Input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={minAmount}
+                  onChange={(e) => setMinAmount(e.target.value)}
+                  placeholder="0.00"
+                  className="h-9 rounded-lg border-[#e5e7eb] text-[12px] shadow-none"
+                />
+              </FilterField>
+              <FilterField label="Max amount">
+                <Input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={maxAmount}
+                  onChange={(e) => setMaxAmount(e.target.value)}
+                  placeholder="No limit"
+                  className="h-9 rounded-lg border-[#e5e7eb] text-[12px] shadow-none"
+                />
+              </FilterField>
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-full"
+              onClick={() => {
+                setInvestorFilter("all")
+                setReferenceFilter("")
+                setPostedByFilter("all")
+                setMinAmount("")
+                setMaxAmount("")
+              }}
+            >
+              Reset
+            </Button>
+            <Button
+              type="button"
+              className="rounded-full"
+              onClick={() => {
+                setPage(1)
+                setMoreFiltersOpen(false)
+              }}
+            >
+              Apply filters
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Table + detail */}
       <div
@@ -1052,7 +714,8 @@ export function LpAccountActivityScreen({
                 type="button"
                 variant="outline"
                 className="h-8 rounded-full border-[#e5e7eb] px-3 text-[11px] font-medium text-[#374151] shadow-none"
-                onClick={() => exportRows("csv")}
+                onClick={() => void exportRows("csv")}
+                disabled={Boolean(exporting)}
               >
                 <FileSpreadsheet className="size-3.5 text-[#16a34a]" />
                 Export CSV
@@ -1061,7 +724,8 @@ export function LpAccountActivityScreen({
                 type="button"
                 variant="outline"
                 className="h-8 rounded-full border-[#e5e7eb] px-3 text-[11px] font-medium text-[#374151] shadow-none"
-                onClick={() => exportRows("excel")}
+                onClick={() => void exportRows("excel")}
+                disabled={Boolean(exporting)}
               >
                 <FileSpreadsheet className="size-3.5 text-[#2563eb]" />
                 Export Excel
@@ -1070,7 +734,8 @@ export function LpAccountActivityScreen({
                 type="button"
                 variant="outline"
                 className="h-8 rounded-full border-[#e5e7eb] px-3 text-[11px] font-medium text-[#374151] shadow-none"
-                onClick={() => exportRows("pdf")}
+                onClick={() => void exportRows("pdf")}
+                disabled={Boolean(exporting)}
               >
                 <FileText className="size-3.5 text-[#dc2626]" />
                 Export PDF
@@ -1096,7 +761,14 @@ export function LpAccountActivityScreen({
                 </tr>
               </thead>
               <tbody>
-                {pageRows.map((row) => {
+                {loading ? (
+                  <tr>
+                    <td colSpan={11} className="px-4 py-10 text-center text-[13px] text-[#9ca3af]">
+                      Loading account activity…
+                    </td>
+                  </tr>
+                ) : (
+                  pageRows.map((row) => {
                   const kind = KIND_META[row.kind]
                   const isSelected = selected?.id === row.id
                   return (
@@ -1148,22 +820,27 @@ export function LpAccountActivityScreen({
                         <StatusBadge status={row.status} />
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <button
-                          type="button"
-                          className="inline-flex text-[#dc2626] hover:opacity-80"
-                          aria-label={`Document for ${row.reference}`}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            toast.message(`Opening ${row.documents[0]?.name ?? "document"} (mock).`)
-                          }}
-                        >
-                          <FileText className="size-4" />
-                        </button>
+                        {ledgerDetail?.callNoticeDocumentId && selected?.id === row.id ? (
+                          <button
+                            type="button"
+                            className="inline-flex text-[#dc2626] hover:opacity-80"
+                            aria-label={`Document for ${row.reference}`}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              router.push(resolveDocumentHref(ledgerDetail.callNoticeDocumentId!))
+                            }}
+                          >
+                            <FileText className="size-4" />
+                          </button>
+                        ) : (
+                          <span className="text-[#d1d5db]">—</span>
+                        )}
                       </td>
                     </tr>
                   )
-                })}
-                {pageRows.length === 0 && (
+                  })
+                )}
+                {!loading && pageRows.length === 0 && (
                   <tr>
                     <td colSpan={11} className="px-4 py-10 text-center text-[13px] text-[#9ca3af]">
                       No transactions match the selected filters.
@@ -1291,49 +968,86 @@ export function LpAccountActivityScreen({
                 ))}
               </dl>
 
-              <div>
-                <h3 className="text-[12px] font-semibold text-[#111827]">
-                  Linked Documents ({selected.documents.length})
-                </h3>
-                <div className="mt-2 space-y-2">
-                  {selected.documents.map((doc) => (
-                    <div
-                      key={doc.name}
-                      className="flex items-center gap-2 rounded-lg border border-[#e5e7eb] px-2.5 py-2"
-                    >
-                      <FileText className="size-4 shrink-0 text-[#dc2626]" />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-[11px] font-medium text-[#111827]">{doc.name}</p>
-                        <p className="text-[10px] text-[#9ca3af]">
-                          {doc.date} · {doc.size}
-                        </p>
+              {ledgerLoading ? (
+                <p className="text-[12px] text-[#9ca3af]">Loading allocation details…</p>
+              ) : ledgerDetail?.allocation ? (
+                <div>
+                  <h3 className="text-[12px] font-semibold text-[#111827]">Capital Call Allocation</h3>
+                  <dl className="mt-2 space-y-2 text-[12px]">
+                    {[
+                      ["Call Amount", ledgerDetail.allocation.currentCallAmount],
+                      ["Amount Paid", ledgerDetail.allocation.amountPaid],
+                      ["Status", ledgerDetail.allocation.status],
+                    ].map(([label, value]) => (
+                      <div key={label} className="grid grid-cols-[120px_1fr] gap-2">
+                        <dt className="text-[#9ca3af]">{label}</dt>
+                        <dd className="font-medium text-[#111827]">{value}</dd>
                       </div>
-                      <button
-                        type="button"
-                        className="rounded-full p-1.5 text-[#2563eb] hover:bg-[#eff6ff]"
-                        aria-label={`Download ${doc.name}`}
-                        onClick={() => {
-                          downloadBlob(
-                            `Mock document: ${doc.name}\nReference: ${selected.reference}`,
-                            doc.name.replace(/\.pdf$/i, ".txt"),
-                            "text/plain",
-                          )
-                          toast.success("Document downloaded (mock).")
-                        }}
-                      >
-                        <Download className="size-3.5" />
-                      </button>
-                    </div>
-                  ))}
+                    ))}
+                  </dl>
                 </div>
-                <button
-                  type="button"
-                  className="mt-2 inline-flex items-center gap-1 text-[12px] font-medium text-[#2563eb] hover:text-[#1d4ed8]"
-                  onClick={() => toast.message("Opening document centre (mock).")}
-                >
-                  View all documents <ArrowRight className="size-3.5" />
-                </button>
-              </div>
+              ) : null}
+
+              {drawerDocuments.length > 0 ? (
+                <div>
+                  <h3 className="text-[12px] font-semibold text-[#111827]">
+                    Linked Documents ({drawerDocuments.length})
+                  </h3>
+                  <div className="mt-2 space-y-2">
+                    {drawerDocuments.map((doc) => (
+                      <div
+                        key={doc.id ?? doc.name}
+                        className="flex items-center gap-2 rounded-lg border border-[#e5e7eb] px-2.5 py-2"
+                      >
+                        <FileText className="size-4 shrink-0 text-[#dc2626]" />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[11px] font-medium text-[#111827]">{doc.name}</p>
+                          <p className="text-[10px] text-[#9ca3af]">
+                            {doc.date} · {doc.size}
+                          </p>
+                        </div>
+                        {"id" in doc && doc.id ? (
+                          <>
+                            <button
+                              type="button"
+                              className="rounded-full p-1.5 text-[#2563eb] hover:bg-[#eff6ff]"
+                              aria-label={`Open ${doc.name}`}
+                              onClick={() => router.push(resolveDocumentHref(doc.id!))}
+                            >
+                              <FileText className="size-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              className="rounded-full p-1.5 text-[#2563eb] hover:bg-[#eff6ff]"
+                              aria-label={`Download ${doc.name}`}
+                              onClick={() => {
+                                void lpPortalApi.downloadDocument(doc.id!).then((blob) => {
+                                  downloadBlob(blob, doc.name)
+                                  toast.success("Document downloaded.")
+                                }).catch((err) => {
+                                  toast.error(getApiErrorMessage(err, "Download failed"))
+                                })
+                              }}
+                            >
+                              <Download className="size-3.5" />
+                            </button>
+                          </>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : ledgerDetail?.callNoticeDocumentId ? (
+                <div>
+                  <h3 className="text-[12px] font-semibold text-[#111827]">Linked Documents</h3>
+                  <Link
+                    href={resolveDocumentHref(ledgerDetail.callNoticeDocumentId)}
+                    className="mt-2 inline-flex text-[12px] font-medium text-[#2563eb] hover:underline"
+                  >
+                    Open call notice document
+                  </Link>
+                </div>
+              ) : null}
 
               <div>
                 <h3 className="text-[12px] font-semibold text-[#111827]">FX Details</h3>
