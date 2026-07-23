@@ -218,7 +218,7 @@ function TasksMockScreenInner() {
   return (
     <div className="min-h-full">
       <PerformanceMockTopChrome breadcrumbs={["Performance Management", "Tasks"]} searchPlaceholder="Search tasks…" />
-      <div className="p-4 lg:p-6 space-y-5">
+      <div className="p-4 lg:p-5 space-y-3">
         <PmPageHeader
           title="Tasks"
           subtitle="Track personal and department tasks, capture BSC actuals, and manage workflow approvals."
@@ -459,12 +459,12 @@ function TasksMockScreenInner() {
             </PmCard>
 
             <PmCard className="p-0 overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-[#E5E7EB]">
+              <div className="flex items-center justify-between px-3 py-2 border-b border-[#E5E7EB]">
                 <h3 className="text-sm font-semibold text-[#111827]">Entry Log ({bscLog.length})</h3>
               </div>
               <div className="divide-y divide-[#F1F5F9] max-h-[480px] overflow-y-auto">
                 {bscLog.map((entry) => (
-                  <div key={entry.id} className="flex items-start gap-3 px-4 py-3">
+                  <div key={entry.id} className="flex items-start gap-3 px-3 py-2">
                     <div className="h-8 w-8 rounded-lg bg-[#F5F3FF] text-[#7C3AED] flex items-center justify-center shrink-0">
                       <Coins className="h-4 w-4" />
                     </div>

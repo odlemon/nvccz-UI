@@ -80,7 +80,7 @@ function FilterCard({
   onChange: (v: string) => void
 }) {
   return (
-    <label className="flex items-center gap-2.5 h-11 rounded-xl border border-[#E5E7EB] bg-white px-3 shadow-sm cursor-pointer hover:bg-[#F9FAFB] min-w-[150px]">
+    <label className="flex items-center gap-2.5 h-8 rounded-xl border border-[#E5E7EB] bg-white px-3 shadow-sm cursor-pointer hover:bg-[#F9FAFB] min-w-[150px]">
       <span className="h-7 w-7 rounded-lg bg-[#F3E8FF] text-[#8B5CF6] flex items-center justify-center shrink-0">{icon}</span>
       <div className="min-w-0 flex-1">
         <p className="text-[10px] text-[#9CA3AF] font-medium leading-none">{label}</p>
@@ -192,7 +192,7 @@ export function IntegrationsMockScreen() {
   return (
     <div className="min-h-full bg-[#F8FAFC]">
       <PerformanceMockTopChrome breadcrumbs={["Performance Management", "Configuration", "Integration Mapping"]} />
-      <div className="p-5 lg:p-6 space-y-4">
+      <div className="p-4 lg:p-5 space-y-3">
         <PmPageHeader
           title="Integration Mapping"
           subtitle="Map data from source systems to KPI and Scorecard fields."
@@ -247,10 +247,10 @@ export function IntegrationsMockScreen() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search mappings by name or field..."
-              className="w-full h-11 pl-9 pr-3 rounded-xl border border-[#E5E7EB] text-xs outline-none focus:border-[#C4B5FD] bg-white shadow-sm"
+              className="w-full h-8 pl-9 pr-3 rounded-xl border border-[#E5E7EB] text-xs outline-none focus:border-[#C4B5FD] bg-white shadow-sm"
             />
           </div>
-          <button type="button" className="h-11 px-3 rounded-xl border border-[#E5E7EB] bg-white text-xs font-medium text-[#374151] inline-flex items-center gap-1.5 shadow-sm hover:bg-[#F9FAFB]">
+          <button type="button" className="h-8 px-3 rounded-xl border border-[#E5E7EB] bg-white text-xs font-medium text-[#374151] inline-flex items-center gap-1.5 shadow-sm hover:bg-[#F9FAFB]">
             <Filter className="h-3.5 w-3.5" /> Filters
           </button>
         </div>
@@ -259,7 +259,7 @@ export function IntegrationsMockScreen() {
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-start">
           {/* LEFT: Source Systems (~20%) */}
           <PmCard className="overflow-hidden flex flex-col xl:col-span-3 xl:sticky xl:top-24">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-[#E5E7EB]">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-[#E5E7EB]">
               <h3 className="text-sm font-semibold text-[#111827]">Source Systems</h3>
               <button type="button" className="h-7 w-7 rounded-lg flex items-center justify-center text-[#8B5CF6] hover:bg-[#F5F3FF]">
                 <Plus className="h-4 w-4" />
@@ -331,7 +331,7 @@ export function IntegrationsMockScreen() {
 
           {/* MIDDLE: Mapping canvas (~55% with detail, ~75% without) */}
           <PmCard className={cn("overflow-hidden flex flex-col", detailOpen ? "xl:col-span-5" : "xl:col-span-9")}>
-            <div className="px-4 py-3 border-b border-[#E5E7EB] grid grid-cols-[1fr_auto_1fr_auto_1fr_auto] gap-1 text-[10px] uppercase tracking-wide text-[#9CA3AF] font-semibold">
+            <div className="px-3 py-2 border-b border-[#E5E7EB] grid grid-cols-[1fr_auto_1fr_auto_1fr_auto] gap-1 text-[10px] uppercase tracking-wide text-[#9CA3AF] font-semibold">
               <span>Source Field</span>
               <span className="w-8 sm:w-10" />
               <span>Mapping & Transformation</span>
@@ -388,7 +388,7 @@ export function IntegrationsMockScreen() {
               ))}
               {filtered.length === 0 && <p className="text-center text-xs text-[#6B7280] py-10">No mappings match the current filters.</p>}
             </div>
-            <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-t border-[#E5E7EB]">
+            <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 border-t border-[#E5E7EB]">
               <div className="flex items-center gap-3 text-[10px] text-[#6B7280] flex-wrap">
                 <LegendDot color={statusDot.Active} label={`Active (${statusCounts.Active})`} />
                 <LegendDot color={statusDot.Warning} label={`Warning (${statusCounts.Warning})`} />
@@ -462,7 +462,7 @@ export function IntegrationsMockScreen() {
 
               <div className="flex-1 overflow-y-auto p-4">
                 {detailTab === "details" && (
-                  <div className="space-y-4 text-xs">
+                  <div className="space-y-3 text-xs">
                     <div>
                       <p className="text-[10px] uppercase tracking-wide text-[#9CA3AF] font-semibold mb-2">Mapping Details</p>
                       <div className="space-y-2 rounded-xl bg-[#F9FAFB] p-3">

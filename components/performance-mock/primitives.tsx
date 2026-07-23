@@ -44,15 +44,15 @@ export function PmMetricCard({
   iconBg?: string
 }) {
   return (
-    <PmCard className="p-3.5 min-w-0">
+    <PmCard className="p-3 min-w-0">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-[11px] font-medium text-[#6B7280] truncate">{label}</p>
-          <p className="mt-1 text-xl font-bold text-[#111827] tracking-tight truncate">{value}</p>
+          <p className="mt-0.5 text-lg font-bold text-[#111827] tracking-tight truncate">{value}</p>
           {trend && (
             <p
               className={cn(
-                "mt-1 text-[11px] font-medium",
+                "mt-0.5 text-[11px] font-medium",
                 trendPositive === false ? "text-[#EF4444]" : trendPositive ? "text-[#10B981]" : "text-[#6B7280]"
               )}
             >
@@ -62,7 +62,7 @@ export function PmMetricCard({
         </div>
         {icon && (
           <div
-            className="h-8 w-8 rounded-lg flex items-center justify-center shrink-0"
+            className="h-7 w-7 rounded-lg flex items-center justify-center shrink-0"
             style={{ backgroundColor: iconBg || pm.primarySoft, color: pm.primary }}
           >
             {icon}
@@ -107,9 +107,9 @@ export function PmPageHeader({
   breadcrumbs?: string[]
 }) {
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {breadcrumbs && breadcrumbs.length > 0 && (
-        <p className="text-xs text-[#6B7280]">
+        <p className="text-[11px] text-[#6B7280]">
           {breadcrumbs.map((b, i) => (
             <span key={b}>
               {i > 0 && <span className="mx-1.5 text-[#D1D5DB]">›</span>}
@@ -118,12 +118,12 @@ export function PmPageHeader({
           ))}
         </p>
       )}
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+      <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
-          <h1 className="text-2xl font-bold text-[#111827] tracking-tight">{title}</h1>
-          {subtitle && <p className="mt-1 text-sm text-[#6B7280] max-w-2xl">{subtitle}</p>}
+          <h1 className="text-xl font-bold text-[#111827] tracking-tight">{title}</h1>
+          {subtitle && <p className="mt-0.5 text-xs text-[#6B7280] max-w-2xl">{subtitle}</p>}
         </div>
-        {actions && <div className="flex flex-wrap items-center gap-2 shrink-0">{actions}</div>}
+        {actions && <div className="flex flex-wrap items-center gap-1.5 shrink-0">{actions}</div>}
       </div>
     </div>
   )
@@ -155,7 +155,7 @@ export function PmButton({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        "inline-flex items-center justify-center gap-1.5 h-9 px-3.5 text-sm font-medium rounded-lg transition-colors disabled:opacity-50",
+        "inline-flex items-center justify-center gap-1.5 h-8 px-3 text-xs font-medium rounded-lg transition-colors disabled:opacity-50",
         variants[variant],
         className
       )}
@@ -178,7 +178,7 @@ export function PmSelectChip({
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex items-center gap-2 h-9 px-3 rounded-lg border border-[#E5E7EB] bg-white text-sm text-[#374151] hover:bg-[#F9FAFB]"
+      className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg border border-[#E5E7EB] bg-white text-xs text-[#374151] hover:bg-[#F9FAFB]"
     >
       {icon}
       <span>{label}</span>
@@ -207,7 +207,7 @@ export function PmFilterSelect({
   return (
     <div
       className={cn(
-        "relative inline-flex items-center gap-2 h-9 pl-3 pr-7 rounded-lg border border-[#E5E7EB] bg-white text-sm text-[#374151] hover:bg-[#F9FAFB]",
+        "relative inline-flex items-center gap-1.5 h-8 pl-2.5 pr-6 rounded-lg border border-[#E5E7EB] bg-white text-xs text-[#374151] hover:bg-[#F9FAFB]",
         className
       )}
     >
@@ -247,8 +247,8 @@ export function PmAvatar({
   /** CDN / remote photo URL */
   src?: string
 }) {
-  const sizes = { sm: "h-7 w-7 text-[10px]", md: "h-9 w-9 text-xs", lg: "h-11 w-11 text-sm" }
-  const px = { sm: 28, md: 36, lg: 44 }
+  const sizes = { sm: "h-6 w-6 text-[9px]", md: "h-8 w-8 text-[10px]", lg: "h-10 w-10 text-xs" }
+  const px = { sm: 24, md: 32, lg: 40 }
   return (
     <div className="flex items-center gap-2.5 min-w-0">
       {src ? (
@@ -270,8 +270,8 @@ export function PmAvatar({
       )}
       {(name || role) && (
         <div className="min-w-0">
-          {name && <p className="text-sm font-semibold text-[#111827] truncate">{name}</p>}
-          {role && <p className="text-xs text-[#6B7280] truncate">{role}</p>}
+          {name && <p className="text-xs font-semibold text-[#111827] truncate">{name}</p>}
+          {role && <p className="text-[11px] text-[#6B7280] truncate">{role}</p>}
         </div>
       )}
     </div>
@@ -288,9 +288,9 @@ export function PmProgress({ value, className, color = "#7C3AED" }: { value: num
 
 export function PmEmpty({ title, description }: { title: string; description?: string }) {
   return (
-    <div className="py-12 text-center">
+    <div className="py-8 text-center">
       <p className="text-sm font-semibold text-[#111827]">{title}</p>
-      {description && <p className="mt-1 text-sm text-[#6B7280]">{description}</p>}
+      {description && <p className="mt-1 text-xs text-[#6B7280]">{description}</p>}
     </div>
   )
 }
@@ -356,19 +356,19 @@ export function PmModal({
         className={cn("w-full bg-white shadow-xl max-h-[90vh] overflow-y-auto", widthClass)}
         style={{ borderRadius: pm.radius }}
       >
-        <div className="flex items-start justify-between gap-4 px-5 pt-5 pb-3 border-b border-[#E5E7EB]">
+        <div className="flex items-start justify-between gap-3 px-4 pt-4 pb-2.5 border-b border-[#E5E7EB]">
           <div>
-            <h3 className="text-base font-semibold text-[#111827]">{title}</h3>
-            {description && <p className="mt-0.5 text-xs text-[#6B7280]">{description}</p>}
+            <h3 className="text-sm font-semibold text-[#111827]">{title}</h3>
+            {description && <p className="mt-0.5 text-[11px] text-[#6B7280]">{description}</p>}
           </div>
           <button type="button" onClick={onClose} className="text-[#9CA3AF] hover:text-[#111827] shrink-0">
-            <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+            <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
               <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
             </svg>
           </button>
         </div>
-        <div className="px-5 py-4">{children}</div>
-        {footer && <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-[#E5E7EB]">{footer}</div>}
+        <div className="px-4 py-3">{children}</div>
+        {footer && <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-[#E5E7EB]">{footer}</div>}
       </div>
     </div>
   )

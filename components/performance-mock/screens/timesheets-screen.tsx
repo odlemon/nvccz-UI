@@ -141,7 +141,7 @@ export function TimesheetsMockScreen() {
   return (
     <div className="min-h-full">
       <PerformanceMockTopChrome breadcrumbs={["Performance Management", "Operations", "Timesheets"]} searchPlaceholder="Search employee or project…" />
-      <div className="p-4 lg:p-6 space-y-5">
+      <div className="p-4 lg:p-5 space-y-3">
         <PmPageHeader
           title="Timesheet Analytics · July 2026"
           subtitle="Insight into capacity, utilisation and time allocation to drive strategy execution."
@@ -228,7 +228,7 @@ export function TimesheetsMockScreen() {
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-4">
-          <div className="space-y-4">
+          <div className="space-y-3">
             <PmCard className="p-4 overflow-x-auto">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-semibold text-[#111827]">Team capacity heatmap (Logged hours vs capacity %)</h3>
@@ -365,7 +365,7 @@ export function TimesheetsMockScreen() {
             </PmCard>
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-3">
             <PmCard className="p-4">
               <h3 className="text-sm font-semibold text-[#111827] mb-3">Insights & exceptions</h3>
 

@@ -165,7 +165,7 @@ export function KpiDetailMockScreen({ kpiId = "FIN-001" }: { kpiId?: string }) {
   return (
     <div className="min-h-full">
       <PerformanceMockTopChrome breadcrumbs={["Performance Management", "KPIs", kpi.code]} searchPlaceholder="Search KPIs…" />
-      <div className="p-4 lg:p-6 space-y-5">
+      <div className="p-4 lg:p-5 space-y-3">
         <PmPageHeader
           title={`KPI Detail · ${kpi.code} · ${kpi.name}`}
           subtitle={kpi.subtitle}
@@ -217,7 +217,7 @@ export function KpiDetailMockScreen({ kpiId = "FIN-001" }: { kpiId?: string }) {
         </div>
 
         <div className={cn("grid grid-cols-1 gap-4", drawerOpen ? "xl:grid-cols-[1.6fr_1fr_1.1fr]" : "xl:grid-cols-[1fr_340px]")}>
-          <div className="space-y-4">
+          <div className="space-y-3">
             <PmCard className="p-4">
               <div className="flex items-center justify-between mb-1">
                 <h3 className="text-sm font-semibold text-[#111827]">Monthly trend ({kpi.unit})</h3>
@@ -302,7 +302,7 @@ export function KpiDetailMockScreen({ kpiId = "FIN-001" }: { kpiId?: string }) {
             </PmCard>
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-3">
             <PmCard className="p-4">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-semibold text-[#111827]">Data lineage</h3>
@@ -386,7 +386,7 @@ export function KpiDetailMockScreen({ kpiId = "FIN-001" }: { kpiId?: string }) {
                 </button>
               </div>
 
-              <div className="px-4 py-3 border-b border-[#F1F5F9]">
+              <div className="px-3 py-2 border-b border-[#F1F5F9]">
                 <div className="flex items-center">
                   {overrideSteps.map((s, i) => (
                     <div key={s} className="flex items-center flex-1 last:flex-none">
@@ -407,7 +407,7 @@ export function KpiDetailMockScreen({ kpiId = "FIN-001" }: { kpiId?: string }) {
                 </div>
               </div>
 
-              <div className="px-4 py-3 space-y-3.5 max-h-[560px] overflow-y-auto">
+              <div className="px-3 py-2 space-y-3.5 max-h-[560px] overflow-y-auto">
                 <div className="rounded-lg bg-[#F5F3FF] px-3 py-2.5 text-[11px] text-[#6D28D9] leading-snug">
                   Forecasts are sourced from FP&amp;A and cannot be edited in Performance. This workflow is for correcting Accounting actuals only.
                 </div>
@@ -532,7 +532,7 @@ export function KpiDetailMockScreen({ kpiId = "FIN-001" }: { kpiId?: string }) {
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-[#F1F5F9]">
+              <div className="flex items-center justify-end gap-2 px-3 py-2 border-t border-[#F1F5F9]">
                 <PmButton variant="outline" onClick={() => setDrawerOpen(false)}>
                   Cancel
                 </PmButton>

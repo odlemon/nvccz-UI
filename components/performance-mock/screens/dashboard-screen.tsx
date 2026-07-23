@@ -72,7 +72,7 @@ export function DashboardMockScreen() {
   return (
     <div className="min-h-full">
       <PerformanceMockTopChrome breadcrumbs={["Performance Management", "Dashboard"]} searchPlaceholder="Search funds, LPs, reports…" />
-      <div className="p-4 lg:p-6 space-y-5">
+      <div className="p-4 lg:p-5 space-y-3">
         <PmPageHeader
           title="Performance Management Dashboard"
           subtitle="Track portfolio, funds, investor activity and reporting performance in one place."

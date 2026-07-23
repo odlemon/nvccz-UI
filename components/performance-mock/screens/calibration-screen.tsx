@@ -160,7 +160,7 @@ export function CalibrationMockScreen() {
   return (
     <div className="min-h-full">
       <PerformanceMockTopChrome breadcrumbs={["Performance Management", "Operations", "Calibration"]} searchPlaceholder="Search employees…" />
-      <div className="p-4 lg:p-6 space-y-5">
+      <div className="p-4 lg:p-5 space-y-3">
         <PmPageHeader
           title="Performance Calibration · Mid-Year FY2026"
           subtitle="Department: Investment & Portfolio Operations"
@@ -371,9 +371,9 @@ export function CalibrationMockScreen() {
                 <PmTabPills tabs={detailTabs} active={detailTab} onChange={setDetailTab} />
               </div>
 
-              <div className="px-4 py-4">
+              <div className="px-3 py-3">
                 {detailTab === "overview" && (
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     <div>
                       <p className="text-[11px] font-semibold text-[#111827] mb-1.5">Score summary</p>
                       <div className="grid grid-cols-2 gap-2 text-[11px]">

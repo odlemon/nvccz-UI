@@ -86,7 +86,7 @@ export function CheckInsListMockScreen() {
   return (
     <div className="min-h-full">
       <PerformanceMockTopChrome breadcrumbs={["Performance Management", "Operations", "Check-ins"]} searchPlaceholder="Search check-ins…" />
-      <div className="p-4 lg:p-6 space-y-5">
+      <div className="p-4 lg:p-5 space-y-3">
         <PmPageHeader
           title="Check-ins"
           subtitle="Track quarterly check-in progress across objectives, owners and teams."

@@ -332,7 +332,7 @@ export function StrategyMockScreen() {
   return (
     <div className="min-h-full bg-[#F8FAFC]">
       <PerformanceMockTopChrome breadcrumbs={["Performance Management", "Company Strategy"]} />
-      <div className="p-5 lg:p-6 space-y-5">
+      <div className="p-4 lg:p-5 space-y-3">
         <PmPageHeader
           title="Company Strategy"
           subtitle="Visualize our strategic priorities and how they connect to drive long-term value."
@@ -401,8 +401,8 @@ export function StrategyMockScreen() {
           />
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_300px] gap-5">
-          <div className="rounded-xl border border-[#E5E7EB] bg-white p-5 shadow-sm">
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_300px] gap-4">
+          <div className="rounded-xl border border-[#E5E7EB] bg-white p-4 shadow-sm">
             <div className="flex flex-wrap items-start justify-between gap-3 mb-5">
               <div>
                 <div className="flex items-center gap-1.5">
@@ -525,7 +525,7 @@ export function StrategyMockScreen() {
             </div>
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div className="rounded-xl border border-[#E5E7EB] bg-white p-4 shadow-sm">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-semibold text-[#111827]">Key Owners</h3>
@@ -552,7 +552,7 @@ export function StrategyMockScreen() {
                   View all
                 </button>
               </div>
-              <div className="space-y-4 flex-1">
+              <div className="space-y-3 flex-1">
                 {recentUpdatesFixture.map((u, i) => (
                   <div key={i} className="flex items-start gap-2.5">
                     <div
@@ -590,7 +590,7 @@ export function StrategyMockScreen() {
               </div>
               <button
                 type="button"
-                className="mt-5 w-full h-10 rounded-lg border border-[#DDD6FE] bg-[#F5F3FF] text-[#7C3AED] text-sm font-semibold inline-flex items-center justify-center gap-2 hover:bg-[#EDE9FE] transition-colors"
+                className="mt-5 w-full h-8 rounded-lg border border-[#DDD6FE] bg-[#F5F3FF] text-[#7C3AED] text-sm font-semibold inline-flex items-center justify-center gap-2 hover:bg-[#EDE9FE] transition-colors"
               >
                 <FileText className="h-4 w-4" /> View Strategy Reports
               </button>
@@ -608,7 +608,7 @@ export function StrategyMockScreen() {
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <div className="p-5 space-y-3">
+            <div className="p-4 space-y-3">
               <div>
                 <label className="text-xs font-medium text-[#374151]">Perspective</label>
                 <select

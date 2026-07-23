@@ -191,7 +191,7 @@ export function EmployeeScorecardMockScreen() {
   return (
     <div className="min-h-full">
       <PerformanceMockTopChrome breadcrumbs={["Performance Management", "Scorecards", "Employee Scorecard"]} searchPlaceholder="Search employees…" />
-      <div className="p-4 lg:p-6 space-y-5">
+      <div className="p-4 lg:p-5 space-y-3">
         <PmPageHeader
           title={`Employee Scorecard · ${employee.name}`}
           subtitle={`${employee.role} · Manager ${employee.manager} · ${employee.department} · Cycle ${employee.cycle} · ${employee.quarter}`}
@@ -254,7 +254,7 @@ export function EmployeeScorecardMockScreen() {
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-4">
-          <div className="space-y-4">
+          <div className="space-y-3">
             <PmCard className="p-4 overflow-x-auto">
               <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                 <h3 className="text-sm font-semibold text-[#111827]">All perspectives · Score calculation: Weighted average</h3>
@@ -395,7 +395,7 @@ export function EmployeeScorecardMockScreen() {
             </PmCard>
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-3">
             <PmCard className="p-4">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-sm font-semibold text-[#111827]">Role expectations</h3>

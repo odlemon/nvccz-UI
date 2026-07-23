@@ -221,7 +221,7 @@ export function ReportsMockScreen() {
   return (
     <div className="min-h-full bg-[#F8FAFC]">
       <PerformanceMockTopChrome breadcrumbs={["Performance Management", "Reports", "Performance Reports"]} />
-      <div className="p-5 lg:p-6 space-y-4">
+      <div className="p-4 lg:p-5 space-y-3">
         <PmPageHeader
           title="Performance Reports"
           subtitle="Create, schedule and distribute performance insights across the organization."
@@ -263,7 +263,7 @@ export function ReportsMockScreen() {
 
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-start">
           {/* LEFT ~75% */}
-          <div className="xl:col-span-9 space-y-4 min-w-0">
+          <div className="xl:col-span-9 space-y-3 min-w-0">
             {tab === "library" && (
               <>
                 <div className="flex flex-wrap items-center gap-2">
@@ -305,7 +305,7 @@ export function ReportsMockScreen() {
                       <tbody>
                         {pageRows.map((r) => (
                           <tr key={r.id} className="border-b border-[#F8FAFC] hover:bg-[#F9FAFB] transition-colors">
-                            <td className="py-3.5 px-3 max-w-[240px]">
+                            <td className="py-2 px-3 max-w-[240px]">
                               <div className="flex items-start gap-2.5">
                                 <span className="h-9 w-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: r.iconBg, color: r.iconColor }}>
                                   {reportIcon[r.icon]}
@@ -320,21 +320,21 @@ export function ReportsMockScreen() {
                                 </div>
                               </div>
                             </td>
-                            <td className="py-3.5 px-3">
+                            <td className="py-2 px-3">
                               <div className="flex items-center gap-2">
                                 {r.previewCharts.map((t, i) => (
                                   <MiniChart key={`${r.id}-${t}-${i}`} type={t} data={r.previewChartData} color={r.previewChartColor} id={`${r.id}-${i}`} />
                                 ))}
                               </div>
                             </td>
-                            <td className="py-3.5 px-3 whitespace-nowrap">
+                            <td className="py-2 px-3 whitespace-nowrap">
                               <p className="text-xs font-semibold text-[#111827]">{r.scheduleFreq}</p>
                               <p className="text-[11px] text-[#6B7280]">{r.scheduleTime}</p>
                               {r.scheduleActive && (
                                 <span className="inline-flex mt-1 items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-[#D1FAE5] text-[#065F46]">Active</span>
                               )}
                             </td>
-                            <td className="py-3.5 px-3">
+                            <td className="py-2 px-3">
                               <div className="flex items-center gap-1.5">
                                 {r.formats.map((f) => {
                                   const meta = formatMeta[f]
@@ -351,7 +351,7 @@ export function ReportsMockScreen() {
                                 })}
                               </div>
                             </td>
-                            <td className="py-3.5 px-3">
+                            <td className="py-2 px-3">
                               <div className="flex items-center">
                                 <div className="flex -space-x-2">
                                   {r.recipientSrcs.slice(0, 3).map((src, i) => (
@@ -362,11 +362,11 @@ export function ReportsMockScreen() {
                               <p className="text-[11px] text-[#6B7280] mt-1 truncate max-w-[120px]">{r.recipientEmails}</p>
                               {r.recipientsExtra > 0 && <p className="text-[10px] font-medium text-[#8B5CF6]">+{r.recipientsExtra} more</p>}
                             </td>
-                            <td className="py-3.5 px-3 whitespace-nowrap text-xs text-[#6B7280]">{r.lastRun}</td>
-                            <td className="py-3.5 px-3">
+                            <td className="py-2 px-3 whitespace-nowrap text-xs text-[#6B7280]">{r.lastRun}</td>
+                            <td className="py-2 px-3">
                               <PmStatusPill label={r.runStatus} tone={r.runStatus === "Success" ? "success" : r.runStatus === "Failed" ? "danger" : "info"} />
                             </td>
-                            <td className="py-3.5 px-3">
+                            <td className="py-2 px-3">
                               <div className="flex items-center gap-0.5">
                                 <button
                                   type="button"
@@ -392,7 +392,7 @@ export function ReportsMockScreen() {
                       </tbody>
                     </table>
                   </div>
-                  <div className="px-4 py-3 border-t border-[#F1F5F9] flex flex-wrap items-center justify-between gap-3">
+                  <div className="px-3 py-2 border-t border-[#F1F5F9] flex flex-wrap items-center justify-between gap-3">
                     <p className="text-xs text-[#6B7280]">
                       Showing {filtered.length === 0 ? 0 : (page - 1) * pageSize + 1} to {Math.min(page * pageSize, filtered.length)} of {filtered.length} reports
                     </p>
@@ -521,7 +521,7 @@ export function ReportsMockScreen() {
           </div>
 
           {/* RIGHT ~25% sidebar */}
-          <div className="xl:col-span-3 space-y-4 xl:sticky xl:top-24">
+          <div className="xl:col-span-3 space-y-3 xl:sticky xl:top-24">
             <PmCard className="p-4">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-semibold text-[#111827]">Reporting Schedule</h3>
@@ -709,7 +709,7 @@ function QuickExportBtn({ icon, label, onClick }: { icon: ReactNode; label: stri
     <button
       type="button"
       onClick={onClick}
-      className="w-full h-10 px-3 rounded-lg border border-[#E5E7EB] bg-white hover:bg-[#F9FAFB] text-xs font-semibold text-[#374151] inline-flex items-center gap-2.5 transition-colors"
+      className="w-full h-8 px-3 rounded-lg border border-[#E5E7EB] bg-white hover:bg-[#F9FAFB] text-xs font-semibold text-[#374151] inline-flex items-center gap-2.5 transition-colors"
     >
       {icon}
       {label}

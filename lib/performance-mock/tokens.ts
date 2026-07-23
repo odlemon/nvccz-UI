@@ -26,4 +26,9 @@ export const pm = {
   blueSoft: "#EFF6FF",
   radius: "0.75rem",
   radiusSm: "0.5rem",
+  /** Density scale for mock screens */
+  pagePad: "p-4 lg:p-5",
+  sectionGap: "space-y-4",
+  titleSize: "text-xl",
+  controlH: "h-8",
 } as const

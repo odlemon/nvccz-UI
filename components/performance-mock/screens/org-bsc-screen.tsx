@@ -87,7 +87,7 @@ export function OrgBscMockScreen() {
   return (
     <div className="min-h-full">
       <PerformanceMockTopChrome breadcrumbs={["Performance Management", "Scorecards", "Org BSC"]} searchPlaceholder="Search pillars, objectives…" />
-      <div className="p-4 lg:p-6 space-y-5">
+      <div className="p-4 lg:p-5 space-y-3">
         <PmPageHeader
           title="Organizational Balanced Scorecard"
           subtitle="Company-wide scorecard aggregating performance across the four balanced-scorecard perspectives."

@@ -57,7 +57,7 @@ export function NotificationsMockScreen() {
   return (
     <div className="min-h-full">
       <PerformanceMockTopChrome breadcrumbs={["Performance Management", "Notifications"]} searchPlaceholder="Search notifications…" />
-      <div className="p-4 lg:p-6 space-y-5">
+      <div className="p-4 lg:p-5 space-y-3">
         <PmPageHeader
           title="Notifications"
           subtitle="Stay on top of alerts, approvals, comments and goal updates across Performance Management."
@@ -83,7 +83,7 @@ export function NotificationsMockScreen() {
               const meta = typeMeta[n.type]
               const Icon = meta.icon
               return (
-                <div key={n.id} className={cn("flex items-start gap-3 px-4 py-3.5", !n.read && "bg-[#FAF5FF]")}>
+                <div key={n.id} className={cn("flex items-start gap-3 px-3 py-2.5", !n.read && "bg-[#FAF5FF]")}>
                   <div className="h-9 w-9 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: meta.bg, color: meta.color }}>
                     <Icon className="h-4.5 w-4.5" />
                   </div>

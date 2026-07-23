@@ -237,7 +237,7 @@ function StatCard({
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-xs font-medium text-[#6B7280] truncate">{label}</p>
-          <p className="mt-1.5 text-[26px] leading-none font-bold text-[#111827] tracking-tight">{value}</p>
+          <p className="mt-1.5 text-xl leading-none font-bold text-[#111827] tracking-tight">{value}</p>
           <p
             className={cn(
               "mt-2 text-xs font-semibold inline-flex items-center gap-0.5",
@@ -284,7 +284,7 @@ function DashboardCreativeView() {
     { label: "People & Culture", value: "72%", delta: "+2.4%", up: true, data: [64, 66, 68, 69, 70, 72] },
   ]
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
           { label: "Health score", value: "76.4", hint: "Company-wide", color: PURPLE, bg: "#F5F3FF" },
@@ -306,7 +306,7 @@ function DashboardCreativeView() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="rounded-xl border border-[#E5E7EB] bg-white p-5 shadow-sm lg:col-span-2">
+        <div className="rounded-xl border border-[#E5E7EB] bg-white p-4 shadow-sm lg:col-span-2">
           <div className="flex items-center justify-between mb-3">
             <div>
               <h3 className="text-sm font-semibold text-[#111827]">Organisation Pulse</h3>
@@ -332,7 +332,7 @@ function DashboardCreativeView() {
             </ResponsiveContainer>
           </div>
         </div>
-        <div className="rounded-xl border border-[#E5E7EB] bg-white p-5 shadow-sm flex flex-col">
+        <div className="rounded-xl border border-[#E5E7EB] bg-white p-4 shadow-sm flex flex-col">
           <h3 className="text-sm font-semibold text-[#111827] mb-1">Health Score</h3>
           <p className="text-xs text-[#6B7280] mb-2">Live organisational index</p>
           <div className="h-40 w-full relative">
@@ -342,7 +342,7 @@ function DashboardCreativeView() {
               </RadialBarChart>
             </ResponsiveContainer>
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-              <p className="text-3xl font-bold text-[#111827]">76.4</p>
+              <p className="text-2xl font-bold text-[#111827]">76.4</p>
               <p className="text-[10px] text-[#9CA3AF]">/ 100</p>
             </div>
           </div>
@@ -364,7 +364,7 @@ function DashboardCreativeView() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        <div className="lg:col-span-4 rounded-xl border border-[#E5E7EB] bg-white p-5 shadow-sm">
+        <div className="lg:col-span-4 rounded-xl border border-[#E5E7EB] bg-white p-4 shadow-sm">
           <h3 className="text-sm font-semibold text-[#111827] mb-3">Department Snapshot</h3>
           <div className="h-48">
             <ResponsiveContainer width="100%" height="100%">
@@ -382,7 +382,7 @@ function DashboardCreativeView() {
             </ResponsiveContainer>
           </div>
         </div>
-        <div className="lg:col-span-4 rounded-xl border border-[#E5E7EB] bg-white p-5 shadow-sm">
+        <div className="lg:col-span-4 rounded-xl border border-[#E5E7EB] bg-white p-4 shadow-sm">
           <h3 className="text-sm font-semibold text-[#111827] mb-1">Status flow this week</h3>
           <p className="text-xs text-[#6B7280] mb-3">On track · At risk · Off track</p>
           <div className="h-48">
@@ -399,7 +399,7 @@ function DashboardCreativeView() {
             </ResponsiveContainer>
           </div>
         </div>
-        <div className="lg:col-span-4 rounded-xl border border-[#E5E7EB] bg-gradient-to-br from-[#8B5CF6] via-[#7C3AED] to-[#5B21B6] p-5 shadow-sm text-white">
+        <div className="lg:col-span-4 rounded-xl border border-[#E5E7EB] bg-gradient-to-br from-[#8B5CF6] via-[#7C3AED] to-[#5B21B6] p-4 shadow-sm text-white">
           <h3 className="text-sm font-semibold mb-1">This week’s focus</h3>
           <p className="text-xs text-white/80 mb-4">Prioritise the 6 off-track KPIs before month close.</p>
           <div className="space-y-3">
@@ -496,7 +496,7 @@ export function KpiAnalyticsMockScreen() {
   return (
     <div className="min-h-full bg-[#F8FAFC]">
       <PerformanceMockTopChrome breadcrumbs={["Performance Management", "KPI Analytics"]} />
-      <div className="p-5 lg:p-6 space-y-5">
+      <div className="p-4 lg:p-5 space-y-3">
         <PmPageHeader
           title="KPI Analytics"
           subtitle="Track, analyze and optimize performance across the organization."
@@ -603,7 +603,7 @@ export function KpiAnalyticsMockScreen() {
 
             <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
               {/* Trend */}
-              <div className="xl:col-span-5 rounded-xl border border-[#E5E7EB] bg-white p-5 shadow-sm">
+              <div className="xl:col-span-5 rounded-xl border border-[#E5E7EB] bg-white p-4 shadow-sm">
                 <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                   <h3 className="text-sm font-semibold text-[#111827]">KPI Trend Over Time</h3>
                   <PmSelectChip label={metric} onClick={() => setMetric(metric === "Completion Rate" ? "On Track %" : "Completion Rate")} />
@@ -631,9 +631,9 @@ export function KpiAnalyticsMockScreen() {
               </div>
 
               {/* Target vs Actual */}
-              <div className="xl:col-span-3 rounded-xl border border-[#E5E7EB] bg-white p-5 shadow-sm">
+              <div className="xl:col-span-3 rounded-xl border border-[#E5E7EB] bg-white p-4 shadow-sm">
                 <h3 className="text-sm font-semibold text-[#111827] mb-4">Target vs Actual</h3>
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {targetVsActual.map((row) => (
                     <div key={row.dept}>
                       <div className="flex items-center justify-between text-xs mb-1.5 gap-2">
@@ -721,7 +721,7 @@ export function KpiAnalyticsMockScreen() {
 
             <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
               {/* Heatmap */}
-              <div className="xl:col-span-5 rounded-xl border border-[#E5E7EB] bg-white p-5 shadow-sm overflow-x-auto">
+              <div className="xl:col-span-5 rounded-xl border border-[#E5E7EB] bg-white p-4 shadow-sm overflow-x-auto">
                 <h3 className="text-sm font-semibold text-[#111827] mb-3">Department Heatmap</h3>
                 <table className="w-full text-xs min-w-[480px]">
                   <thead>
@@ -863,7 +863,7 @@ export function KpiAnalyticsMockScreen() {
                   <button
                     type="button"
                     onClick={() => setCommentOpen(true)}
-                    className="mt-3 w-full h-11 rounded-xl bg-[#8B5CF6] hover:bg-[#7C3AED] text-white text-sm font-semibold inline-flex items-center justify-center gap-2 shadow-sm transition-colors"
+                    className="mt-3 w-full h-8 rounded-xl bg-[#8B5CF6] hover:bg-[#7C3AED] text-white text-sm font-semibold inline-flex items-center justify-center gap-2 shadow-sm transition-colors"
                   >
                     <Plus className="h-4 w-4" /> Add Commentary
                   </button>
@@ -913,7 +913,7 @@ export function KpiAnalyticsMockScreen() {
                   <thead>
                     <tr className="text-[11px] uppercase tracking-wide text-[#9CA3AF] bg-[#FAFAFB] border-b border-[#F1F5F9]">
                       {["#", "KPI Name", "Owner", "Department", "Target", "Actual", "Variance", "Trend (vs Jun)", "Status", "Last Updated"].map((h) => (
-                        <th key={h} className="px-4 py-3 font-semibold whitespace-nowrap">
+                        <th key={h} className="px-3 py-2 font-semibold whitespace-nowrap">
                           {h}
                         </th>
                       ))}
@@ -922,15 +922,15 @@ export function KpiAnalyticsMockScreen() {
                   <tbody>
                     {pageRows.map((r) => (
                       <tr key={r.id} className="border-b border-[#F8FAFC] hover:bg-[#F9FAFB] transition-colors">
-                        <td className="px-4 py-3 text-[#9CA3AF]">{r.id}</td>
-                        <td className="px-4 py-3 font-semibold text-[#111827] whitespace-nowrap">{r.name}</td>
-                        <td className="px-4 py-3">
+                        <td className="px-3 py-2 text-[#9CA3AF]">{r.id}</td>
+                        <td className="px-3 py-2 font-semibold text-[#111827] whitespace-nowrap">{r.name}</td>
+                        <td className="px-3 py-2">
                           <PmAvatar initials={r.owner.slice(0, 2)} name={r.owner} src={r.ownerSrc} size="sm" />
                         </td>
-                        <td className="px-4 py-3 text-[#6B7280] whitespace-nowrap">{r.department}</td>
-                        <td className="px-4 py-3 text-[#6B7280]">{r.target}</td>
-                        <td className="px-4 py-3 font-semibold text-[#111827]">{r.actual}</td>
-                        <td className="px-4 py-3">
+                        <td className="px-3 py-2 text-[#6B7280] whitespace-nowrap">{r.department}</td>
+                        <td className="px-3 py-2 text-[#6B7280]">{r.target}</td>
+                        <td className="px-3 py-2 font-semibold text-[#111827]">{r.actual}</td>
+                        <td className="px-3 py-2">
                           <span
                             className={cn(
                               "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold",
@@ -941,16 +941,16 @@ export function KpiAnalyticsMockScreen() {
                             {r.variance.toFixed(1)}%
                           </span>
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-3 py-2">
                           <Sparkline data={r.spark} up={r.variance >= 0} />
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-3 py-2">
                           <PmStatusPill
                             label={r.status}
                             tone={r.status === "On Track" ? "success" : r.status === "At Risk" ? "warning" : "danger"}
                           />
                         </td>
-                        <td className="px-4 py-3 text-[#9CA3AF] whitespace-nowrap">{r.updated}</td>
+                        <td className="px-3 py-2 text-[#9CA3AF] whitespace-nowrap">{r.updated}</td>
                       </tr>
                     ))}
                   </tbody>

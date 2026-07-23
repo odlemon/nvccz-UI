@@ -2,10 +2,9 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Check, ExternalLink, FileCheck, Loader2, Plus, Search } from 'lucide-react'
+import { Check, ExternalLink, FileCheck, Loader2, Search } from 'lucide-react'
 import { OpsKpiSkeleton, OpsTableSkeleton } from '@/components/investments-v2/loading-skeletons'
 import { DetailPanel } from '@/components/investments-v2/ui/detail-panel'
-import { NewEquityOrderModal } from '@/components/investments-v2/new-equity-order-modal'
 import { buttonClass, Field, inputClass, Metric, Modal, OrdersCard, OrdersPage, Pill, SelectField, tableClass, tableWrapClass } from '@/components/investments-v2/orders-ui'
 import { formatOpsError, investmentOpsApi } from '@/lib/api/investment-ops-api'
 import {
@@ -59,7 +58,6 @@ function TradeBlotterPageInner() {
   const [status, setStatus] = useState('All')
   const [query, setQuery] = useState('')
   const [selected, setSelected] = useState<BlotterTradeRow | null>(null)
-  const [showOrder, setShowOrder] = useState(false)
   const [actionBusy, setActionBusy] = useState<'confirm' | 'settle' | 'post' | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [settleOpen, setSettleOpen] = useState(false)
@@ -276,11 +274,6 @@ function TradeBlotterPageInner() {
     <OrdersPage
       title="Trade Blotter"
       description="Executed trades only. After Accept on the orderbook, confirm → settle with custodian → post books → reconcile (internal × broker × custodian)."
-      actions={
-        <button className={cn(buttonClass, 'border-blue-500/40 bg-blue-600 text-white')} onClick={() => setShowOrder(true)}>
-          <Plus className="h-3.5 w-3.5" /> New order
-        </button>
-      }
     >
       {error && (
         <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-2 text-[12px] text-rose-200">
@@ -677,16 +670,6 @@ function TradeBlotterPageInner() {
           Value date on trade: {selected?.valueDate ?? '—'} · Custodian: {selected?.custodian ?? '—'}
         </p>
       </Modal>
-
-      <NewEquityOrderModal
-        open={showOrder}
-        onClose={() => setShowOrder(false)}
-        onOrderCreated={() => {
-          toast.success('Order submitted. View pending orders in Orderbook until executed.')
-          setShowOrder(false)
-          void load()
-        }}
-      />
     </OrdersPage>
   )
 }

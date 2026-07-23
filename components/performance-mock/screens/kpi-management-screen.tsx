@@ -312,7 +312,7 @@ export function KpiManagementMockScreen() {
   return (
     <div className="min-h-full bg-[#F8FAFC]">
       <PerformanceMockTopChrome breadcrumbs={["Performance Management", "Configuration", "KPI Management"]} />
-      <div className="p-5 lg:p-6 space-y-4">
+      <div className="p-4 lg:p-5 space-y-3">
         <PmPageHeader
           title="KPI Management"
           subtitle="Manage and configure all KPIs across the organization."
@@ -390,7 +390,7 @@ export function KpiManagementMockScreen() {
 
         <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_300px] gap-4 items-start">
           {/* LEFT COLUMN: registry + bottom widgets */}
-          <div className="min-w-0 space-y-4">
+          <div className="min-w-0 space-y-3">
             <PmCard className="overflow-hidden">
               <div className="px-4 pt-4 pb-2 flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-[#111827]">KPI Registry ({filtered.length})</h3>
@@ -399,7 +399,7 @@ export function KpiManagementMockScreen() {
                 <table className="w-full text-left text-sm min-w-[1100px]">
                   <thead>
                     <tr className="text-[11px] uppercase tracking-wide text-[#9CA3AF] border-y border-[#F1F5F9] bg-[#FAFAFB]">
-                      <th className="px-4 py-3 font-semibold w-10">
+                      <th className="px-3 py-2 font-semibold w-10">
                         <input
                           type="checkbox"
                           checked={allPageSelected}
@@ -423,7 +423,7 @@ export function KpiManagementMockScreen() {
                         className="border-b border-[#F8FAFC] hover:bg-[#F9FAFB] cursor-pointer transition-colors"
                         onClick={() => router.push(`/performance/kpis/${r.id}`)}
                       >
-                        <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                        <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                           <input
                             type="checkbox"
                             checked={selected.has(r.id)}
@@ -477,7 +477,7 @@ export function KpiManagementMockScreen() {
                 </table>
               </div>
 
-              <div className="px-4 py-3 border-t border-[#F1F5F9] flex flex-wrap items-center justify-between gap-3">
+              <div className="px-3 py-2 border-t border-[#F1F5F9] flex flex-wrap items-center justify-between gap-3">
                 <p className="text-xs text-[#6B7280]">
                   Showing {filtered.length === 0 ? 0 : (page - 1) * pageSize + 1} to {Math.min(page * pageSize, filtered.length)} of {filtered.length} results
                 </p>
@@ -617,7 +617,7 @@ export function KpiManagementMockScreen() {
           </div>
 
           {/* RIGHT COLUMN: stacked admin cards */}
-          <div className="space-y-4 xl:sticky xl:top-24">
+          <div className="space-y-3 xl:sticky xl:top-24">
             <PmCard className="p-4">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-semibold text-[#111827]">Integration Mapping</h3>
@@ -749,7 +749,7 @@ export function KpiManagementMockScreen() {
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <div className="p-5 space-y-3">
+            <div className="p-4 space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-medium text-[#374151]">KPI Code</label>

@@ -126,7 +126,7 @@ export function PillarsMockScreen() {
   return (
     <div className="min-h-full">
       <PerformanceMockTopChrome breadcrumbs={["Performance Management", "Configuration", "BSC Pillars"]} searchPlaceholder="Search pillars, goals…" />
-      <div className="p-4 lg:p-6 space-y-5">
+      <div className="p-4 lg:p-5 space-y-3">
         <PmPageHeader
           title="BSC Pillars & Weights"
           subtitle="Configure the weighting of each balanced-scorecard perspective, and how goals within each pillar are weighted."
@@ -150,7 +150,7 @@ export function PillarsMockScreen() {
             </span>
           </div>
           <p className="text-xs text-[#6B7280] mb-4">Adjust sliders so the four pillar weights sum to exactly 100%.</p>
-          <div className="space-y-5">
+          <div className="space-y-3">
             {draft.map((p) => {
               const Icon = p.icon
               return (
@@ -191,7 +191,7 @@ export function PillarsMockScreen() {
                   <button
                     type="button"
                     onClick={() => toggleExpand(p.id)}
-                    className="w-full flex items-center justify-between gap-3 px-4 py-3.5 hover:bg-[#F9FAFB]"
+                    className="w-full flex items-center justify-between gap-3 px-3 py-2.5 hover:bg-[#F9FAFB]"
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
                       <span className="h-8 w-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: p.bg, color: p.color }}>
@@ -210,7 +210,7 @@ export function PillarsMockScreen() {
                     </div>
                   </button>
                   {isOpen && (
-                    <div className="px-4 pb-4 pt-1 space-y-4 border-t border-[#F1F5F9]">
+                    <div className="px-4 pb-4 pt-1 space-y-3 border-t border-[#F1F5F9]">
                       {p.goals.map((g) => (
                         <div key={g.id}>
                           <div className="flex items-center justify-between mb-1.5">

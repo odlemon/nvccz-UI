@@ -180,7 +180,7 @@ export function ThemesMockScreen() {
   return (
     <div className="min-h-full">
       <PerformanceMockTopChrome breadcrumbs={["Performance Management", "Configuration", "Themes"]} searchPlaceholder="Search themes…" />
-      <div className="p-4 lg:p-6 space-y-5">
+      <div className="p-4 lg:p-5 space-y-3">
         <PmPageHeader
           title="Strategic Themes"
           subtitle="Organize company objectives under a small set of strategic themes and tag the goals that advance them."
@@ -321,7 +321,7 @@ export function ThemesMockScreen() {
           <PmCard className="overflow-hidden">
             <div className="divide-y divide-[#F1F5F9]">
               {filtered.map((theme) => (
-                <div key={theme.id} className="flex items-center gap-4 px-4 py-3.5">
+                <div key={theme.id} className="flex items-center gap-4 px-3 py-2.5">
                   <div className="h-9 w-9 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: theme.bg, color: theme.color }}>
                     <Layers className="h-4.5 w-4.5" />
                   </div>

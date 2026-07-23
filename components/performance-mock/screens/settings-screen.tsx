@@ -179,7 +179,7 @@ export function SettingsMockScreen() {
   return (
     <div className="min-h-full bg-[#F8FAFC]">
       <PerformanceMockTopChrome breadcrumbs={["Performance Management", "Configuration", "Settings"]} searchPlaceholder="Search settings…" />
-      <div className="p-5 lg:p-6 space-y-5">
+      <div className="p-4 lg:p-5 space-y-3">
         <PmPageHeader
           title="Settings"
           subtitle="Configure system behavior, workflows, permissions and preferences."
@@ -205,7 +205,7 @@ export function SettingsMockScreen() {
         {/* 3 content columns + audit sidebar */}
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-start">
           {/* Column 1 */}
-          <div className="xl:col-span-3 space-y-4">
+          <div className="xl:col-span-3 space-y-3">
             <SettingsCard title="General Settings" icon={<Settings2 className="h-4 w-4" />}>
               <div className="space-y-3">
                 <LabeledField label="Organization Name">
@@ -374,7 +374,7 @@ export function SettingsMockScreen() {
           </div>
 
           {/* Column 2 */}
-          <div className="xl:col-span-3 space-y-4">
+          <div className="xl:col-span-3 space-y-3">
             <SettingsCard title="Workflow Settings" icon={<GitBranch className="h-4 w-4" />}>
               <div className="grid grid-cols-2 gap-3">
                 <LabeledField label="Performance Cycle">
@@ -542,7 +542,7 @@ export function SettingsMockScreen() {
           </div>
 
           {/* Column 3 */}
-          <div className="xl:col-span-3 space-y-4">
+          <div className="xl:col-span-3 space-y-3">
             <SettingsCard
               title="Rating Scales"
               icon={<Star className="h-4 w-4" />}

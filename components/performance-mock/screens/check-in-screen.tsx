@@ -137,7 +137,7 @@ export function CheckInMockScreen({ id = "CHK-2026-Q3-0048" }: { id?: string }) 
   return (
     <div className="min-h-full">
       <PerformanceMockTopChrome breadcrumbs={["Performance Management", "Check-ins", checkIn.id]} searchPlaceholder="Search check-ins…" />
-      <div className="p-4 lg:p-6 space-y-5">
+      <div className="p-4 lg:p-5 space-y-3">
         <PmPageHeader
           title={`Quarterly Check-In · ${checkIn.id}`}
           subtitle={`Objective: ${checkIn.objective} · Perspective: ${checkIn.perspective} · Owner (Employee): ${checkIn.owner} · Weight: ${checkIn.weight}%`}
@@ -204,7 +204,7 @@ export function CheckInMockScreen({ id = "CHK-2026-Q3-0048" }: { id?: string }) 
         </PmCard>
 
         <div className="grid grid-cols-1 xl:grid-cols-[1fr_300px] gap-4">
-          <div className="space-y-4">
+          <div className="space-y-3">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <PmCard className="p-3.5">
                 <div className="flex items-center justify-between mb-1.5">
@@ -367,7 +367,7 @@ export function CheckInMockScreen({ id = "CHK-2026-Q3-0048" }: { id?: string }) 
             </PmCard>
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-3">
             <PmCard className="p-4">
               <div className="flex items-center justify-between mb-2.5">
                 <h3 className="text-sm font-semibold text-[#111827]">Accountability</h3>

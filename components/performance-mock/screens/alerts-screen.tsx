@@ -144,7 +144,7 @@ export function AlertsMockScreen() {
   return (
     <div className="min-h-full bg-[#F8FAFC]">
       <PerformanceMockTopChrome breadcrumbs={["Performance Management", "Alerts & Escalations"]} />
-      <div className="p-5 lg:p-6 space-y-4">
+      <div className="p-4 lg:p-5 space-y-3">
         {/* Header */}
         <PmPageHeader
           title="Alerts & Escalations"
@@ -204,7 +204,7 @@ export function AlertsMockScreen() {
                   </span>
                   <div className="min-w-0">
                     <p className="text-xs font-medium text-[#6B7280] truncate">{m.label}</p>
-                    <p className="mt-1 text-[26px] leading-none font-bold tracking-tight text-[#111827]">{m.value}</p>
+                    <p className="mt-1 text-xl leading-none font-bold tracking-tight text-[#111827]">{m.value}</p>
                     <p className={cn("mt-2 text-[11px] font-semibold", m.trendPositive ? "text-[#10B981]" : "text-[#EF4444]")}>{m.trend}</p>
                   </div>
                 </div>
@@ -229,7 +229,7 @@ export function AlertsMockScreen() {
         {/* Main: table (~75%) | sidebar (~25%) */}
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-start">
           <PmCard className="xl:col-span-9 overflow-hidden">
-            <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-[#E5E7EB]">
+            <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2 border-b border-[#E5E7EB]">
               <h3 className="text-sm font-semibold text-[#111827]">Alerts ({filtered.length})</h3>
               <div className="flex items-center gap-2">
                 <div className="relative">
@@ -337,7 +337,7 @@ export function AlertsMockScreen() {
               </table>
             </div>
 
-            <div className="px-4 py-3 border-t border-[#F1F5F9] flex flex-wrap items-center justify-between gap-3">
+            <div className="px-3 py-2 border-t border-[#F1F5F9] flex flex-wrap items-center justify-between gap-3">
               <p className="text-xs text-[#6B7280]">
                 Showing {filtered.length === 0 ? 0 : (page - 1) * pageSize + 1} to {Math.min(page * pageSize, filtered.length)} of {filtered.length} results
               </p>
@@ -390,7 +390,7 @@ export function AlertsMockScreen() {
           </PmCard>
 
           {/* Right sidebar */}
-          <div className="xl:col-span-3 space-y-4 xl:sticky xl:top-24">
+          <div className="xl:col-span-3 space-y-3 xl:sticky xl:top-24">
             <PmCard className="p-4">
               <h3 className="text-sm font-semibold text-[#111827] mb-3">Alert Rule Logic</h3>
               {activeRule ? (

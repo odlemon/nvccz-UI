@@ -131,7 +131,7 @@ export function ReviewsMockScreen() {
   return (
     <div className="min-h-full bg-[#F8FAFC]">
       <PerformanceMockTopChrome breadcrumbs={["Performance Management", "Reviews", "Performance Reviews"]} />
-      <div className="p-5 lg:p-6 space-y-4">
+      <div className="p-4 lg:p-5 space-y-3">
         {/* Header */}
         <PmPageHeader
           title="Performance Reviews"
@@ -172,7 +172,7 @@ export function ReviewsMockScreen() {
                       </span>
                       <p className="text-xs font-medium text-[#6B7280] truncate">{m.label}</p>
                     </div>
-                    <p className="mt-2 text-[26px] leading-none font-bold tracking-tight text-[#111827]">
+                    <p className="mt-2 text-xl leading-none font-bold tracking-tight text-[#111827]">
                       {m.value}
                       <span className="ml-1.5 text-sm font-semibold" style={{ color: m.color }}>
                         {m.pct}
@@ -368,7 +368,7 @@ export function ReviewsMockScreen() {
             </div>
 
             {detailTab === "form" && (
-              <div className="p-4 space-y-4">
+              <div className="p-4 space-y-3">
                 {/* Top grid: Competency | KPI | Goals */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                   <div className="rounded-xl border border-[#E5E7EB] bg-white p-4">

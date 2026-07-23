@@ -124,7 +124,7 @@ export function DepartmentScorecardMockScreen() {
   return (
     <div className="min-h-full">
       <PerformanceMockTopChrome breadcrumbs={["Performance Management", "Scorecards", "Department Scorecards"]} searchPlaceholder="Search departments…" />
-      <div className="p-4 lg:p-6 space-y-5">
+      <div className="p-4 lg:p-5 space-y-3">
         <PmPageHeader
           title="Department Scorecards"
           subtitle="Review balanced-scorecard results by department, and capture qualitative context on KPI performance."
@@ -181,7 +181,7 @@ export function DepartmentScorecardMockScreen() {
         </div>
 
         <PmCard className="overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-[#E5E7EB]">
+          <div className="flex items-center justify-between px-3 py-2 border-b border-[#E5E7EB]">
             <h3 className="text-sm font-semibold text-[#111827]">{dept.name} Scorecard Matrix</h3>
             <span className="text-xs text-[#9CA3AF]">{rows.length} KPIs</span>
           </div>

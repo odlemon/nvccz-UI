@@ -1,223 +1,161 @@
-# Trading retune — user flow (go here, do this)
+# Trading flow — simple success path
 
-**Date:** 2026-07-22  
-**Audience:** Ops / PM / UAT / client demo  
-**Module:** Investments V2  
-**Product rule:** Broker negotiation stays **outside** this system. You record intent, send the instruction, capture the broker’s confirmation when it comes back, book the executed trade, settle with the custodian, then reconcile.
+**Where:** Investments V2 → Orders  
+**Rule:** Create orders only on **Orderbook**. Broker work stays outside the system.
 
-**Related:** [`investments-trading-recon-retune-api.md`](./investments-trading-recon-retune-api.md) · older demo walkthrough: [`walkthrough-trading-user-flow.md`](./walkthrough-trading-user-flow.md)
+Use today’s date where a date is needed. If a dropdown name below is missing in your tenant, pick the **first available** option of that type.
 
 ---
 
-## Journey at a glance
+## Step 1 — Create order (Orderbook)
 
-```text
-Orderbook                          Blotter                         Recon
-─────────                          ───────                         ────
-1. New order                       7. Confirm trade                10. Trade recon batch
-2. Submit                          8. Settle with custodian            (ingest → match)
-3. Approve                         9. Post books                   11. Cash ledger by trade
-4. Send to broker (+ custodian)       └─ Open trade recon / cash
-5. Record confirmation
-6. Accept → trade appears on blotter
-   (or Reject → stay on orderbook)
-```
+1. Open **Orders → Orderbook**
+2. Click **New order**
+3. Fill the form like this:
 
-| Screen | URL | What lives here |
-|--------|-----|-----------------|
-| **Orderbook** | `/investments-v2/orders/orderbook` | Pending orders only (until Accept) |
-| **Trade blotter** | `/investments-v2/orders/blotter` | Executed trades only |
-| **Trade recon** | `/investments-v2/reconciliation/trade` | 3-way statement match batch |
-| **Cash ledger** | `/investments-v2/reconciliation/cash-ledger` | Cash lines (filter by `tradeId`) |
-| **Client / Cash** | `/investments-v2/reconciliation` · `/…/fund-cash` | Client overview · fund cash |
+| Field | What to enter / select |
+|--------|-------------------------|
+| Portfolio / fund | First fund in the list (e.g. your demo equity fund) |
+| Instrument | Search and pick a listed equity (e.g. **CBZ** or whatever is seeded) |
+| Side | **BUY** |
+| Order type | **Limit** |
+| Quantity | `1000` |
+| Limit price | `10.00` |
+| Broker | First broker in the list |
+| Custodian | First custodian in the list |
+| Settlement account | Leave blank unless you know a valid fund cash account |
+| Value / validity date | Today + 2 days (e.g. if today is 23 Jul → `2026-07-25`) |
+| Notes | `Demo buy CBZ for trading flow` |
 
----
+4. Under **Portfolio**, check **Available cash** (shown after you pick the fund).
+   - If it is `0` or much lower than qty × price, lower the quantity (e.g. `10`) or pick another fund / ask BE to top up cash.
+   - Leave **Settlement account** empty (Optional) unless you know the fund settlement account.
+5. Run review / place order
+6. Close the modal
 
-## 1. Create the order
-
-1. Go to **Investments V2 → Orders → Orderbook**  
-   (`/investments-v2/orders/orderbook`)
-2. Click **New order**.
-3. Fill ticket: portfolio, instrument, side, qty, prices, **broker**, **custodian**, settlement account, value date.
-4. Run pre-trade review / place (or save draft).
-5. Order appears on the Orderbook as **Draft** (or Submitted if you submitted immediately).
-
-**Success:** Row visible on Orderbook. **No** row on Trade Blotter yet.
+**You should see:** New row on Orderbook. Status **Draft** (or Submitted). Nothing on Trade Blotter yet.
 
 ---
 
-## 2. Submit for approval
+## Step 2 — Submit
 
-1. Stay on **Orderbook**.
-2. Click the order → detail panel opens.
-3. Click **Submit** (when status is Draft).
+1. Click that order row (detail panel opens)
+2. Click **Submit**
 
-**Success:** Status → **Submitted**.
-
----
-
-## 3. Approve
-
-1. Still on Orderbook detail for that order.
-2. Click **Approve** (when status is Submitted).
-
-**Success:** Status → **Approved**. Still no blotter trade.
+**You should see:** Status **Submitted**
 
 ---
 
-## 4. Send to broker (and confirm custodian)
+## Step 3 — Approve
 
-1. On Approved order, click **Send to broker**.
-2. Confirm modal opens — Phase-1 custodian authorisation:
-   - Select / confirm **Custodian** (required)
-   - Set **Settlement / value date**
-   - Check settlement account (from create)
-   - Optional notes (e.g. “emailed to ABC Brokers”)
-3. Click **Send instruction**.
+1. Same detail panel
+2. Click **Approve**
 
-**What this means:** Instruction is marked sent. Broker work happens **outside** Arcus (phone, email, their portal).
-
-**Success:** Status → **Sent to Broker**. Toast says no blotter row yet. Order stays on Orderbook.
+**You should see:** Status **Approved**
 
 ---
 
-## 5. Record broker confirmation (when they come back)
+## Step 4 — Send to broker
 
-1. When the broker confirms (outside the system), open the same order on Orderbook.
-2. Click **Record confirmation**.
-3. Enter what they confirmed:
-   - Outcome: Filled / Partial / Counter / Unable  
-   - Quantity, price  
-   - Broker reference, trade/value dates, notes  
-4. Click **Save confirmation**.
+1. Click **Send to broker**
+2. In the modal, set:
 
-**Success:** Status → **Confirmation Recorded** (or equivalent). Actions show **Accept** and **Reject / keep looking**. Still no blotter trade.
+| Field | What to enter / select |
+|--------|-------------------------|
+| Custodian | Same custodian as on the order (required) |
+| Settlement / value date | Same as order value date (e.g. `2026-07-25`) |
+| Settlement account | Shown from the order (read-only) |
+| Broker | Shown from the order (read-only) |
+| Notes | `Instruction emailed to broker` |
 
----
+3. Click **Send instruction**
 
-## 6a. Accept → create executed trade
-
-1. Review the recorded qty/price.
-2. Click **Accept confirmation**.
-
-**Success:**
-- Order → **Executed** (or Partially Executed if qty &lt; order qty)
-- Toast offers **Open blotter**
-- A **trade** now exists on Trade Blotter only
+**You should see:** Status **Sent to Broker**. Still nothing on Trade Blotter.
 
 ---
 
-## 6b. Reject / keep looking (alternate)
+## Step 5 — Record confirmation
 
-1. Click **Reject / keep looking**.
-2. Enter reason (e.g. “Price too high”).
+*(Pretend the broker called / emailed back with a fill.)*
 
-**Success:** Confirmation rejected; order back to **Sent to Broker**. Still no blotter row. You can record another confirmation later.
+1. Same order → click **Record confirmation**
+2. Fill:
 
----
+| Field | What to enter / select |
+|--------|-------------------------|
+| Outcome | **Filled** |
+| Broker reference | `BRK-8821` |
+| Confirmed quantity | `1000` |
+| Confirmed price | `10.00` |
+| Trade date | Today (e.g. `2026-07-23`) |
+| Value date | `2026-07-25` |
+| Notes | `Filled at limit` |
 
-## 7. Trade Blotter — confirm trade
+3. Click **Save confirmation**
 
-1. Go to **Orders → Trade Blotter**  
-   (`/investments-v2/orders/blotter`)  
-   or use the toast / Orderbook **Open** blotter link.
-2. Select the trade (deep-link may already focus it).
-3. In the detail panel: **1. Confirm trade** → click **Confirm trade**.
-
-**Success:** Confirmation = Confirmed. This is ops checking blotter terms — **not** the earlier broker-outside confirmation.
-
----
-
-## 8. Settle with custodian
-
-1. Still on blotter detail → **2. Custodian settlement**.
-2. Click **Settle with custodian**.
-3. Enter:
-   - Settled at  
-   - **Custodian / CSD reference** (required, e.g. `CSD-99102`)
-4. Click **Confirm settlement**.
-
-**Success:** Settlement = Settled. Cash journals may link `tradeId` (BA-RC-2).
+**You should see:** Confirmation recorded. Buttons **Accept confirmation** and **Reject / keep looking**. Still no blotter trade.
 
 ---
 
-## 9. Post books
+## Step 6 — Accept confirmation
 
-1. Blotter detail → **3. Accounting posting**.
-2. Click **Post books**.
-3. Optionally **Open accounting event**.
+1. Click **Accept confirmation**
+2. If toast says **Open blotter**, click it (or go to **Orders → Trade Blotter**)
 
-**Success:** Accounting = Posted.
-
----
-
-## 10. Reconcile — Trade (3-way)
-
-1. From blotter detail → **4. Reconcile** → **Open trade recon**  
-   (or go to **Reconciliation → Trade**)  
-   (`/investments-v2/reconciliation/trade`)
-2. Step through the batch wizard:
-   1. **Create batch** — fund + as-of date + templates  
-   2. **Ingest broker** CSV (paste, upload, or Demo qty mismatch)  
-   3. **Ingest custodian** CSV  
-   4. **Run match**  
-   5. Review **Exceptions** (`QTY_MISMATCH`, `DUPLICATE`, `MISSING_*`, …) — Manual match / Write off  
-   6. **Complete batch**
-
-Demo files: `/demo-templates/trade-recon/broker-*.csv` and `custodian-*.csv`.
-
-**Success:** Matches and exceptions handled; batch completed.  
-**Story to show:** Internal 1000 vs broker 900 → `QTY_MISMATCH`.
+**You should see:** Order **Executed**. New trade on **Trade Blotter**.
 
 ---
 
-## 11. Reconcile — Cash (optional follow-up)
+## Step 7 — Confirm trade (Blotter)
 
-1. From blotter → **Open cash ledger for trade**  
-   or **Reconciliation → Cash ledger** with Trade id filter  
-   (`/investments-v2/reconciliation/cash-ledger?tradeId=…`)
-2. Confirm cash lines linked to that trade after settle.
+1. On **Trade Blotter**, click your trade
+2. Under **1. Confirm trade** → click **Confirm trade**
 
-For fund vs bank/custodian cash matching, use **Reconciliation → Cash** (`/investments-v2/reconciliation/fund-cash`).
+**You should see:** Confirmation = **Confirmed**
 
 ---
 
-## What you should *not* do in this flow
+## Step 8 — Settle with custodian
 
-| Old habit | New rule |
-|-----------|----------|
-| Type a fill and **Execute (create trade)** on Orderbook | Use **Record confirmation → Accept** |
-| Expect a blotter row after Send to broker | Blotter only after **Accept** |
-| Treat blotter Confirm as “broker fill” | Broker fill was already accepted on Orderbook |
-| Put pending orders on the blotter | Orderbook = pending; Blotter = executed only |
+1. Under **2. Custodian settlement** → click **Settle with custodian**
+2. Fill:
 
----
+| Field | What to enter |
+|--------|----------------|
+| Settled at | Now (leave default datetime) |
+| Custodian / CSD reference | `CSD-99102` |
 
-## Happy-path checklist (UAT)
+3. Click **Confirm settlement**
 
-- [ ] Create → Submit → Approve → Send (custodian set) → **no blotter**
-- [ ] Record counter → Reject → **still no blotter**
-- [ ] Record fill → Accept → **trade on blotter**; order Executed
-- [ ] Confirm → Settle (custodian ref) → Post
-- [ ] Trade recon: ingest mismatch → `QTY_MISMATCH` → complete
-- [ ] Cash ledger `?tradeId=` shows linked lines after settle
+**You should see:** Settlement = **Settled**
 
 ---
 
-## Sidebar map
+## Step 9 — Post books
 
-```text
-Investments V2
-├── Orders
-│   ├── Orderbook          ← steps 1–6
-│   ├── Trade Blotter      ← steps 7–9 (+ links to 10–11)
-│   └── Compliance
-├── Reconciliation
-│   ├── Client             ← overview
-│   ├── Trade              ← step 10 (batch wizard)
-│   ├── Cash               ← fund cash
-│   ├── Cash ledger        ← step 11
-│   ├── Exceptions
-│   └── Statements
-└── …
-```
+1. Under **3. Accounting posting** → click **Post books**
+
+**You should see:** Accounting = **Posted**
+
+---
+
+## Step 10 — Trade recon (optional)
+
+1. On the same trade detail → **Open trade recon**  
+   (or **Reconciliation → Trade**)
+2. Do this in order:
+   1. **Create batch** — pick your fund, as-of = today, leave default templates → **Create batch**
+   2. **Ingest broker** — click **Demo happy** → **Ingest broker**
+   3. **Ingest custodian** — click **Demo happy** → **Ingest custodian**
+   4. **Run match**
+   5. If no exceptions, go to **Complete batch** → **Complete batch**
+
+*(To show a break instead: use **Demo qty mismatch** on broker — expect a qty mismatch exception.)*
+
+---
+
+## Done
+
+Happy path in one line:
+
+**Orderbook:** New order → Submit → Approve → Send → Record confirmation → Accept → **Blotter:** Confirm → Settle (`CSD-99102`) → Post → (optional) Trade recon

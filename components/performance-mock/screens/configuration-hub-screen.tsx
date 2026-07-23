@@ -18,7 +18,7 @@ export function ConfigurationHubMockScreen() {
   return (
     <div className="min-h-full">
       <PerformanceMockTopChrome breadcrumbs={["Performance Management", "Configuration"]} searchPlaceholder="Search configuration…" />
-      <div className="p-4 lg:p-6 space-y-5">
+      <div className="p-4 lg:p-5 space-y-3">
         <PmPageHeader
           title="Configuration"
           subtitle="Set up the building blocks of Performance Management — strategy, themes, KPIs, pillars and integrations."

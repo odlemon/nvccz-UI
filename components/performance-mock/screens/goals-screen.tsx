@@ -324,7 +324,7 @@ function MetricCard({
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-xs font-medium text-[#6B7280]">{label}</p>
-          <p className="mt-1.5 text-[26px] leading-none font-bold text-[#111827] tracking-tight">{value}</p>
+          <p className="mt-1.5 text-xl leading-none font-bold text-[#111827] tracking-tight">{value}</p>
           {trend ? (
             <p className="mt-1.5 text-xs font-semibold text-[#10B981]">{trend}</p>
           ) : (
@@ -432,7 +432,7 @@ export function GoalsMockScreen() {
   return (
     <div className="min-h-full bg-[#F8FAFC]">
       <PerformanceMockTopChrome breadcrumbs={["Performance Management", "Goals"]} />
-      <div className="p-5 lg:p-6 space-y-5">
+      <div className="p-4 lg:p-5 space-y-3">
         <PmPageHeader
           title="Objectives & Key Results"
           subtitle="Align goals, track progress, and drive exceptional outcomes."
@@ -504,7 +504,7 @@ export function GoalsMockScreen() {
           />
         </div>
 
-        <div className={cn("grid grid-cols-1 gap-5 items-start", showPanel && "xl:grid-cols-[minmax(0,1fr)_380px]")}>
+        <div className={cn("grid grid-cols-1 gap-4 items-start", showPanel && "xl:grid-cols-[minmax(0,1fr)_380px]")}>
           {/* Main table card */}
           <div className="rounded-xl border border-[#E5E7EB] bg-white shadow-sm overflow-hidden">
             <div className="px-4 pt-4 pb-3 flex flex-wrap items-center justify-between gap-3 border-b border-[#F1F5F9]">
@@ -569,7 +569,7 @@ export function GoalsMockScreen() {
                       <div key={o.id} className="border-b border-[#F1F5F9] last:border-b-0">
                         <div
                           className={cn(
-                            "grid grid-cols-[minmax(280px,2fr)_180px_140px_110px_110px_120px] gap-3 items-center px-4 py-3.5 cursor-pointer transition-colors",
+                            "grid grid-cols-[minmax(280px,2fr)_180px_140px_110px_110px_120px] gap-3 items-center px-3 py-2.5 cursor-pointer transition-colors",
                             isSelected ? "bg-[#F5F3FF]" : "hover:bg-[#F9FAFB]"
                           )}
                           onClick={() => selectObjective(o.id)}
@@ -650,7 +650,7 @@ export function GoalsMockScreen() {
               </div>
             </div>
 
-            <div className="px-4 py-3 border-t border-[#F1F5F9] flex flex-wrap items-center justify-between gap-3">
+            <div className="px-3 py-2 border-t border-[#F1F5F9] flex flex-wrap items-center justify-between gap-3">
               <p className="text-xs text-[#6B7280]">
                 Showing 1 to {filtered.length} of {filtered.length} objectives
               </p>
@@ -690,7 +690,7 @@ export function GoalsMockScreen() {
           {/* Right detail panel */}
           {showPanel && (
             <aside className="rounded-xl border border-[#E5E7EB] bg-white shadow-sm sticky top-24 max-h-[calc(100vh-7rem)] flex flex-col overflow-hidden">
-              <div className="px-4 py-3 border-b border-[#F1F5F9] flex items-center justify-between gap-2 shrink-0">
+              <div className="px-3 py-2 border-b border-[#F1F5F9] flex items-center justify-between gap-2 shrink-0">
                 <span className="inline-flex items-center h-6 px-2 rounded-md bg-[#F3E8FF] text-[#7C3AED] text-[11px] font-semibold">
                   Objective
                 </span>
@@ -747,12 +747,12 @@ export function GoalsMockScreen() {
                   </div>
                 </div>
 
-                <div className="px-4 py-4 border-b border-[#F1F5F9]">
+                <div className="px-3 py-3 border-b border-[#F1F5F9]">
                   <p className="text-xs font-semibold text-[#111827] mb-1.5">Description</p>
                   <p className="text-sm text-[#6B7280] leading-relaxed">{selected.description}</p>
                 </div>
 
-                <div className="px-4 py-4 border-b border-[#F1F5F9]">
+                <div className="px-3 py-3 border-b border-[#F1F5F9]">
                   <div className="flex items-center justify-between mb-3">
                     <p className="text-xs font-semibold text-[#111827]">
                       Linked Initiatives <span className="text-[#9CA3AF]">({selected.linkedInitiatives.length})</span>
@@ -779,7 +779,7 @@ export function GoalsMockScreen() {
                   </div>
                 </div>
 
-                <div className="px-4 py-4 border-b border-[#F1F5F9]">
+                <div className="px-3 py-3 border-b border-[#F1F5F9]">
                   <div className="flex items-center justify-between mb-3">
                     <p className="text-xs font-semibold text-[#111827]">
                       Related KPIs <span className="text-[#9CA3AF]">({selected.relatedKpis.length})</span>
@@ -811,14 +811,14 @@ export function GoalsMockScreen() {
                   </div>
                 </div>
 
-                <div className="px-4 py-4">
+                <div className="px-3 py-3">
                   <div className="flex items-center justify-between mb-3">
                     <p className="text-xs font-semibold text-[#111827]">Recent Check-ins</p>
                     <button type="button" className="text-xs font-medium text-[#7C3AED] hover:underline">
                       View all
                     </button>
                   </div>
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     {selected.checkins.map((c) => (
                       <div key={c.id} className="flex items-start gap-2.5">
                         <img
@@ -881,7 +881,7 @@ export function GoalsMockScreen() {
                   <button
                     type="button"
                     onClick={() => setCheckinOpen(true)}
-                    className="w-full h-11 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-sm font-semibold inline-flex items-center justify-center gap-2 shadow-sm transition-colors"
+                    className="w-full h-8 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-sm font-semibold inline-flex items-center justify-center gap-2 shadow-sm transition-colors"
                   >
                     <MessageSquare className="h-4 w-4" /> Update Check-in
                   </button>

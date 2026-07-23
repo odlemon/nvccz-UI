@@ -189,7 +189,7 @@ export function DepartmentsMockScreen() {
   return (
     <div className="min-h-full">
       <PerformanceMockTopChrome breadcrumbs={["Performance Management", "Configuration", "Departments"]} searchPlaceholder="Search departments…" />
-      <div className="p-4 lg:p-6 space-y-5">
+      <div className="p-4 lg:p-5 space-y-3">
         <PmPageHeader
           title="Departments"
           subtitle="View organizational structure, ownership and performance across departments."
@@ -307,7 +307,7 @@ export function DepartmentsMockScreen() {
                 </div>
                 <p className="mt-2 text-xs text-[#6B7280] leading-relaxed">{selected.description}</p>
               </div>
-              <div className="px-4 py-4 border-b border-[#F1F5F9]">
+              <div className="px-3 py-3 border-b border-[#F1F5F9]">
                 <p className="text-xs font-semibold text-[#111827] mb-2">Department Head</p>
                 <PmAvatar initials={selected.headInitials} name={selected.head} role="Department Head" color={selected.headColor} />
                 <div className="mt-3 space-y-1.5 text-xs text-[#6B7280]">
@@ -319,14 +319,14 @@ export function DepartmentsMockScreen() {
                   </p>
                 </div>
               </div>
-              <div className="px-4 py-4 border-b border-[#F1F5F9]">
+              <div className="px-3 py-3 border-b border-[#F1F5F9]">
                 <div className="flex items-center justify-between text-xs mb-1.5">
                   <span className="text-[#6B7280]">Performance Score</span>
                   <span className="font-semibold text-[#111827]">{selected.score}%</span>
                 </div>
                 <PmProgress value={selected.score} />
               </div>
-              <div className="px-4 py-4 grid grid-cols-3 gap-3 text-center">
+              <div className="px-3 py-3 grid grid-cols-3 gap-3 text-center">
                 <div>
                   <p className="text-lg font-bold text-[#111827]">{selected.headcount}</p>
                   <p className="text-[10px] text-[#9CA3AF]">Staff</p>
@@ -342,7 +342,7 @@ export function DepartmentsMockScreen() {
               </div>
               <button
                 type="button"
-                className="w-full flex items-center justify-center gap-1.5 px-4 py-3 border-t border-[#F1F5F9] text-xs font-medium text-[#7C3AED] hover:bg-[#F9FAFB]"
+                className="w-full flex items-center justify-center gap-1.5 px-3 py-2 border-t border-[#F1F5F9] text-xs font-medium text-[#7C3AED] hover:bg-[#F9FAFB]"
               >
                 View Department Scorecard <ChevronRight className="h-3.5 w-3.5" />
               </button>

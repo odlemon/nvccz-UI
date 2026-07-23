@@ -117,7 +117,7 @@ export function ContractsMockScreen() {
   return (
     <div className="min-h-full">
       <PerformanceMockTopChrome breadcrumbs={["Performance Management", "Performance Contracts"]} searchPlaceholder="Search contracts…" />
-      <div className="p-4 lg:p-6 space-y-5">
+      <div className="p-4 lg:p-5 space-y-3">
         <PmPageHeader
           title="Performance Contracts"
           subtitle="Manage balanced-scorecard performance contracts across the Board, CEO, Departments and Employees."

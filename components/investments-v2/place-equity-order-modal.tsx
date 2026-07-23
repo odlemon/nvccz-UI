@@ -91,6 +91,10 @@ export function PlaceEquityOrderModal({ open, onClose, onComplete }: PlaceEquity
   const [brokers, setBrokers] = useState<{ id: string; name: string }[]>([])
   const [custodians, setCustodians] = useState<{ id: string; name: string }[]>([])
   const [settlementAccounts, setSettlementAccounts] = useState<{ id: string; name: string }[]>([])
+  const [fundCashAvailable, setFundCashAvailable] = useState<number | null>(null)
+  const [fundCashCurrency, setFundCashCurrency] = useState('USD')
+  const [fundCashLoading, setFundCashLoading] = useState(false)
+  const [fundCashLabel, setFundCashLabel] = useState<string | null>(null)
   const [approvalRoutes, setApprovalRoutes] = useState<{ id: string; name: string }[]>([])
   const [chartPeriod, setChartPeriod] = useState<ChartPeriod>('1D')
   const [skipConfirmation, setSkipConfirmation] = useState(false)
@@ -141,6 +145,11 @@ export function PlaceEquityOrderModal({ open, onClose, onComplete }: PlaceEquity
   const taxes = taxAmount
   const feesAndTaxes = feeAmount + taxAmount
   const consideration = netAmount ?? (side === 'BUY' ? orderValue + feesAndTaxes : Math.max(0, orderValue - feesAndTaxes))
+  const cashShortfall =
+    side === 'BUY' &&
+    fundCashAvailable != null &&
+    Number.isFinite(consideration) &&
+    consideration > fundCashAvailable
   const exposureImpact = n(est.exposure?.exposureImpactPct) ?? n(est.exposureImpactPct)
   const chartPoints = historyPoints.length >= 2 ? historyPoints : lastPrice > 0 ? [lastPrice * 0.99, lastPrice] : []
   const chartChange =
@@ -258,6 +267,73 @@ export function PlaceEquityOrderModal({ open, onClose, onComplete }: PlaceEquity
     setSettlementAccountId('')
     void loadMeta()
   }, [open, loadMeta])
+
+  useEffect(() => {
+    if (!open || !fundId) {
+      setFundCashAvailable(null)
+      setFundCashLabel(null)
+      return
+    }
+    let cancelled = false
+    setFundCashLoading(true)
+    setFundCashLabel(null)
+    void (async () => {
+      try {
+        const [overviewRes, fundCashRes] = await Promise.all([
+          investmentOpsApi.getPortfolioOverview(fundId).catch(() => null),
+          stockPickerCashApi.getFundCashSummary({ fundId }).catch(() => null),
+        ])
+        if (cancelled) return
+
+        const overview =
+          overviewRes && overviewRes.success !== false ? (overviewRes.data as Record<string, unknown> | undefined) : null
+        const fundCash =
+          fundCashRes && fundCashRes.success !== false ? (fundCashRes.data as Record<string, unknown> | undefined) : null
+
+        const pick = (...vals: unknown[]) => {
+          for (const v of vals) {
+            const num = n(v)
+            if (num != null) return num
+          }
+          return null
+        }
+
+        const available = pick(
+          fundCash?.orderEligibleAvailableCash,
+          fundCash?.totalOrderEligibleAvailableCash,
+          fundCash?.availableCash,
+          fundCash?.available,
+          overview?.orderEligibleAvailableCash,
+          overview?.availableCash,
+          overview?.cashBalance,
+        )
+        const ccy = String(
+          fundCash?.currency ??
+            fundCash?.baseCurrency ??
+            overview?.baseCurrency ??
+            fund?.baseCurrencyCode ??
+            'USD',
+        )
+        setFundCashAvailable(available)
+        setFundCashCurrency(ccy)
+        if (available == null) {
+          setFundCashLabel('Available cash not returned for this fund')
+        } else {
+          setFundCashLabel(null)
+        }
+      } catch {
+        if (!cancelled) {
+          setFundCashAvailable(null)
+          setFundCashLabel('Could not load fund cash')
+        }
+      } finally {
+        if (!cancelled) setFundCashLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [open, fundId, fund?.baseCurrencyCode])
 
   useEffect(() => {
     if (!open || !instrument?.listedEquitySecurityId) {
@@ -633,6 +709,7 @@ export function PlaceEquityOrderModal({ open, onClose, onComplete }: PlaceEquity
                   value={fundId}
                   onChange={(value) => {
                     setFundId(value)
+                    setSettlementAccountId('')
                     setReviewed(false)
                     setPreview(null)
                   }}
@@ -644,6 +721,39 @@ export function PlaceEquityOrderModal({ open, onClose, onComplete }: PlaceEquity
                     </option>
                   ))}
                 </SelectField>
+                {fundId ? (
+                  <p
+                    className={cn(
+                      'mt-1.5 text-[9px]',
+                      cashShortfall ? 'text-amber-300' : 'text-slate-400',
+                    )}
+                    title="Order-eligible cash from the fund ledger (what pre-trade uses to check buys). Leave Settlement account empty unless you know the fund’s settlement cash account."
+                  >
+                    {fundCashLoading
+                      ? 'Loading available cash…'
+                      : fundCashAvailable != null
+                        ? `Available cash: ${fundCashCurrency} ${fundCashAvailable.toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}`
+                        : fundCashLabel ?? 'Available cash: —'}
+                    {side === 'BUY' && !fundCashLoading && Number.isFinite(orderValue) && orderValue > 0 ? (
+                      <span className="text-slate-500">
+                        {' '}
+                        · Est. order ~{currency}{' '}
+                        {consideration.toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </span>
+                    ) : null}
+                    {cashShortfall ? (
+                      <span className="block text-amber-200">
+                        Order looks larger than available cash — lower qty/price or ask BE to top up this fund.
+                      </span>
+                    ) : null}
+                  </p>
+                ) : null}
               </div>
               <div>
                 <Label help>Instrument</Label>

@@ -227,7 +227,7 @@ export function CorrectiveActionsMockScreen() {
   return (
     <div className="min-h-full bg-[#F8FAFC]">
       <PerformanceMockTopChrome breadcrumbs={["Performance Management", "Corrective Actions"]} />
-      <div className="p-5 lg:p-6 space-y-4">
+      <div className="p-4 lg:p-5 space-y-3">
         {/* Header */}
         <PmPageHeader
           title="Corrective Actions"
@@ -314,7 +314,7 @@ export function CorrectiveActionsMockScreen() {
                     {m.label}
                     <Info className="h-3 w-3 text-[#D1D5DB]" />
                   </p>
-                  <p className="mt-1.5 text-[26px] leading-none font-bold tracking-tight" style={{ color: m.valueColor }}>
+                  <p className="mt-1.5 text-xl leading-none font-bold tracking-tight" style={{ color: m.valueColor }}>
                     {m.value}
                   </p>
                   <p
@@ -433,7 +433,7 @@ export function CorrectiveActionsMockScreen() {
 
         {/* Table */}
         <PmCard className="overflow-hidden">
-          <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-[#E5E7EB]">
+          <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2 border-b border-[#E5E7EB]">
             <h3 className="text-sm font-semibold text-[#111827]">Corrective Actions ({filtered.length})</h3>
             <div className="flex items-center gap-2 text-xs text-[#6B7280]">
               <select className="h-8 rounded-lg border border-[#E5E7EB] px-2 bg-white text-xs text-[#374151]">
@@ -572,7 +572,7 @@ export function CorrectiveActionsMockScreen() {
             </table>
           </div>
 
-          <div className="px-4 py-3 border-t border-[#F1F5F9] flex flex-wrap items-center justify-between gap-3">
+          <div className="px-3 py-2 border-t border-[#F1F5F9] flex flex-wrap items-center justify-between gap-3">
             <p className="text-xs text-[#6B7280]">
               Showing {filtered.length === 0 ? 0 : (page - 1) * pageSize + 1} to {Math.min(page * pageSize, filtered.length)} of {filtered.length} results
             </p>

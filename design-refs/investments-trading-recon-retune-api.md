@@ -291,3 +291,16 @@ Fund cash engine (`stock-picker-cash-api` / flat cash paths). **`sp_cash_journal
   | `db:migrate:investments-trading-recon-retune` | Idempotent DDL |
   | `db:migrate:investments-trading-recon-retune:all-dbs` | nts + client1_db + demo_env |
   | `uat:investments-v2:trading-recon-retune` | HTTP acceptance on DEV `nts` |
+
+---
+
+## FE follow-up — fund available cash on New order (2026-07-23)
+
+**FE:** New order modal shows **Available cash** under Portfolio (loads `GET …/portfolios/:id` overview + `GET …/fund-cash-summary?fundId=`). Warns when est. BUY cost &gt; available.
+
+**BE ask (if display shows “—” or 0 while ledger has cash):**
+
+- Ensure one of these returns **order-eligible** cash for the fund (same number used by preview insufficient-cash check):
+  - `GET /api/investment-ops/portfolios/:fundId` → `orderEligibleAvailableCash` (preferred) or accurate `cashBalance`
+  - **or** `GET /api/investment-ops/fund-cash-summary?fundId=` → `orderEligibleAvailableCash`
+- Demo seed: top up order-eligible cash for the default equity fund so a `1000 × 10` buy can pass (or document the max qty that fits).

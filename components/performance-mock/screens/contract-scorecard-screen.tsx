@@ -101,7 +101,7 @@ export function ContractScorecardMockScreen({ type }: { type: "BOARD" | "CEO" })
   return (
     <div className="min-h-full">
       <PerformanceMockTopChrome breadcrumbs={["Performance Management", "Scorecards", meta.breadcrumb]} searchPlaceholder="Search objectives…" />
-      <div className="p-4 lg:p-6 space-y-5">
+      <div className="p-4 lg:p-5 space-y-3">
         <PmPageHeader
           title={meta.title}
           subtitle={`Balanced scorecard results for the ${type === "BOARD" ? "Board of Directors" : "Chief Executive Officer"}, with weighted scoring across all four perspectives.`}
@@ -118,7 +118,7 @@ export function ContractScorecardMockScreen({ type }: { type: "BOARD" | "CEO" })
         <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-4">
           <PmCard className="p-5">
             <div className="flex items-center gap-3">
-              <div className="h-11 w-11 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: `${meta.color}1A`, color: meta.color }}>
+              <div className="h-8 w-11 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: `${meta.color}1A`, color: meta.color }}>
                 <Icon className="h-5 w-5" />
               </div>
               <div className="min-w-0">
@@ -155,7 +155,7 @@ export function ContractScorecardMockScreen({ type }: { type: "BOARD" | "CEO" })
         </div>
 
         <PmCard className="overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-[#E5E7EB]">
+          <div className="flex items-center justify-between px-3 py-2 border-b border-[#E5E7EB]">
             <h3 className="text-sm font-semibold text-[#111827]">Balanced Scorecard Detail</h3>
             <PmAvatar initials={type === "BOARD" ? "BD" : "TM"} name={meta.holder.split(",")[0]} color={meta.color} size="sm" />
           </div>

@@ -227,7 +227,7 @@ export function ManagerReviewMockScreen({ reviewId = "REV-2026-Q3-0012" }: { rev
   return (
     <div className="min-h-full">
       <PerformanceMockTopChrome breadcrumbs={["Performance Management", "Reviews", review.id]} searchPlaceholder="Search reviews…" />
-      <div className="p-4 lg:p-6 space-y-5">
+      <div className="p-4 lg:p-5 space-y-3">
         <PmPageHeader
           title={`${review.title} · ${review.cycle} · ${review.employee}`}
           subtitle={review.role}
@@ -526,7 +526,7 @@ export function ManagerReviewMockScreen({ reviewId = "REV-2026-Q3-0012" }: { rev
             )}
           </PmCard>
 
-          <div className="space-y-4">
+          <div className="space-y-3">
             <PmCard className="p-4">
               <h3 className="text-sm font-semibold text-[#111827] mb-2.5">Rating guide (1–5)</h3>
               <div className="space-y-2">
