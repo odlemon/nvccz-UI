@@ -155,7 +155,7 @@ export function PmButton({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        "inline-flex items-center justify-center gap-1.5 h-8 px-3 text-xs font-medium rounded-lg transition-colors disabled:opacity-50",
+        "inline-flex items-center justify-center gap-1.5 h-8 px-3 text-xs font-medium rounded-full transition-colors disabled:opacity-50",
         variants[variant],
         className
       )}

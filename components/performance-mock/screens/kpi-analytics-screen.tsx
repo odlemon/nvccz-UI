@@ -440,7 +440,7 @@ function DashboardCreativeView() {
   )
 }
 
-export function KpiAnalyticsMockScreen() {
+export function KpiAnalyticsMockScreen({ embedded = false }: { embedded?: boolean } = {}) {
   const [view, setView] = useState<"dashboard" | "analytics">("analytics")
   const [month, setMonth] = useState("July 2026")
   const [dept, setDept] = useState("All Departments")
@@ -494,9 +494,10 @@ export function KpiAnalyticsMockScreen() {
   }
 
   return (
-    <div className="min-h-full bg-[#F8FAFC]">
-      <PerformanceMockTopChrome breadcrumbs={["Performance Management", "KPI Analytics"]} />
-      <div className="p-4 lg:p-5 space-y-3">
+    <div className={cn("min-h-full", !embedded && "bg-[#F8FAFC]")}>
+      {!embedded && <PerformanceMockTopChrome breadcrumbs={["Performance Management", "KPI Analytics"]} />}
+      <div className={cn(embedded ? "space-y-3" : "p-4 lg:p-5 space-y-3")}>
+        {!embedded && (
         <PmPageHeader
           title="KPI Analytics"
           subtitle="Track, analyze and optimize performance across the organization."
@@ -518,7 +519,9 @@ export function KpiAnalyticsMockScreen() {
             </>
           }
         />
+        )}
 
+        {!embedded && (
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="inline-flex items-center rounded-full border border-[#E5E7EB] bg-white p-1 shadow-sm">
             <button
@@ -547,8 +550,16 @@ export function KpiAnalyticsMockScreen() {
             <PmSelectChip label={comparedTo} onClick={() => setComparedTo(comparedTo === "June 2026" ? "May 2026" : "June 2026")} />
           </div>
         </div>
+        )}
 
-        {view === "dashboard" ? (
+        {embedded && (
+          <div className="flex items-center justify-end gap-2 text-sm text-[#6B7280]">
+            <span>Compared to</span>
+            <PmSelectChip label={comparedTo} onClick={() => setComparedTo(comparedTo === "June 2026" ? "May 2026" : "June 2026")} />
+          </div>
+        )}
+
+        {!embedded && view === "dashboard" ? (
           <DashboardCreativeView />
         ) : (
           <>

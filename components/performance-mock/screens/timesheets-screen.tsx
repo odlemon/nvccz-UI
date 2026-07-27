@@ -1,509 +1,877 @@
 "use client"
 
-import { useMemo, useState } from "react"
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
+import { useEffect, useMemo, useRef, useState } from "react"
 import {
-  Clock,
-  Gauge,
   Briefcase,
-  Building2,
-  CalendarOff,
-  HelpCircle,
+  Calendar,
   CheckCircle2,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
-  Download,
-  FileClock,
-  AlertTriangle,
-  TrendingDown,
-  Target,
-  Coins,
-  ShieldAlert,
+  Circle,
+  Clock,
+  Copy,
+  ExternalLink,
+  FileText,
+  Plus,
+  RefreshCw,
+  Save,
+  Send,
+  Square,
+  Play,
 } from "lucide-react"
 import { toast } from "sonner"
-import { PerformanceMockTopChrome } from "@/components/performance-mock/shell"
-import { PmButton, PmCard, PmFilterSelect, PmMetricCard, PmPageHeader, PmSelectChip, PmStatusPill } from "@/components/performance-mock/primitives"
+import { PmAvatar, PmButton, PmCard, PmStatusPill } from "@/components/performance-mock/primitives"
+import { PM_PHOTOS } from "@/lib/performance-mock/photos"
 import { cn } from "@/lib/utils"
 
-const departments = ["All Departments", "Investments", "Client Solutions", "Portfolio Monitoring", "Risk & Compliance", "Finance & Operations", "People & Culture"]
-const teamsList = ["All Teams", "Investment Team", "Client Solutions", "Portfolio Monitoring", "Risk & Compliance", "Finance & Operations", "People & Culture"]
-const projectsList = ["All Projects", "Client Reporting Automation", "Valuation Model Upgrade", "New Fund Launch", "ERP Data Migration"]
-const objectivesList = [
-  "All Objectives",
-  "Grow client assets under management",
-  "Improve client experience",
-  "Enhance portfolio performance",
-  "Reduce portfolio reporting turnaround",
-  "Build organisation capability",
-  "Strengthen risk & compliance",
-]
-const employeesFilterList = ["All Employees", "Tariro Ncube", "Rudo Chikore", "Farai Moyo", "Nyasha Moyo", "Chipo Mhlanga", "Tendai Sibanda", "Blessing Dube", "Brandon Mandiza", "Lerato Mutasa", "Vimbai Chitauro"]
+const DAYS = [
+  { key: "mon", label: "Mon", date: "13 Jul", weekend: false },
+  { key: "tue", label: "Tue", date: "14 Jul", weekend: false },
+  { key: "wed", label: "Wed", date: "15 Jul", weekend: false },
+  { key: "thu", label: "Thu", date: "16 Jul", weekend: false },
+  { key: "fri", label: "Fri", date: "17 Jul", weekend: false },
+  { key: "sat", label: "Sat", date: "18 Jul", weekend: true },
+  { key: "sun", label: "Sun", date: "19 Jul", weekend: true },
+] as const
 
-const weeklyCapacity = [
-  { week: "30 Jun–4 Jul", available: 1000, logged: 760 },
-  { week: "7–11 Jul", available: 940, logged: 820 },
-  { week: "14–18 Jul", available: 940, logged: 880 },
-  { week: "21–25 Jul", available: 940, logged: 780 },
-  { week: "26–27 Jul", available: 376, logged: 316 },
-]
+type DayKey = (typeof DAYS)[number]["key"]
 
-const timeAllocationRaw = [
-  { objective: "Grow client assets under management", hours: 842 },
-  { objective: "Improve client experience", hours: 602 },
-  { objective: "Enhance portfolio performance", hours: 514 },
-  { objective: "Reduce portfolio reporting turnaround", hours: 486 },
-  { objective: "Build organisation capability", hours: 276 },
-  { objective: "Strengthen risk & compliance", hours: 152 },
-]
-const timeAllocationTotal = timeAllocationRaw.reduce((s, r) => s + r.hours, 0)
-const timeAllocation = timeAllocationRaw.map((r) => ({ ...r, pct: (r.hours / timeAllocationTotal) * 100 }))
-
-type HeatRow = { team: string; days: number[] }
-const heatDays = ["Mon", "Tue", "Wed", "Thu", "Fri"]
-const heatmapRows: HeatRow[] = [
-  { team: "Investment Team", days: [92, 78, 104, 83, 79] },
-  { team: "Client Solutions", days: [78, 91, 83, 79, 84] },
-  { team: "Portfolio Monitoring", days: [88, 84, 86, 92, 90] },
-  { team: "Risk & Compliance", days: [70, 76, 92, 84, 95] },
-  { team: "Finance & Operations", days: [99, 92, 84, 97, 92] },
-  { team: "People & Culture", days: [64, 68, 84, 66, 67] },
-]
-
-function heatAvg(days: number[]) {
-  return days.reduce((s, v) => s + v, 0) / days.length
-}
-function heatCellStyle(v: number) {
-  if (v >= 100) return { bg: "#FEE2E2", text: "#991B1B" }
-  if (v >= 90) return { bg: "#D1FAE5", text: "#065F46" }
-  if (v >= 75) return { bg: "#F3F4F6", text: "#374151" }
-  return { bg: "#FEF3C7", text: "#92400E" }
-}
-
-type EmployeeRow = {
+type Row = {
   id: string
-  name: string
-  role: string
-  dept: string
-  available: number
-  logged: number
-  util: number
-  projectHours: number
-  internal: number
-  leave: number
-  unclassified: number
-  overtime: number
-  compliance: number
-  status: "Approved" | "Pending" | "Missing Friday"
+  project: string
+  task: string
+  hours: Record<DayKey, number | null>
+  notes: Record<DayKey, string>
 }
 
-const employeeRows: EmployeeRow[] = [
-  { id: "e1", name: "Tariro Ncube", role: "Head of Strategy", dept: "Investments", available: 176, logged: 132, util: 75, projectHours: 68, internal: 160, leave: 8, unclassified: 0, overtime: 0, compliance: 100, status: "Approved" },
-  { id: "e2", name: "Rudo Chikore", role: "Investment Analyst", dept: "Investments", available: 184, logged: 192, util: 104, projectHours: 160, internal: 8, leave: 0, unclassified: 24, overtime: 8, compliance: 100, status: "Approved" },
-  { id: "e3", name: "Farai Moyo", role: "Portfolio Manager", dept: "Portfolio Monitoring", available: 184, logged: 181, util: 98, projectHours: 144, internal: 10, leave: 0, unclassified: 27, overtime: 0, compliance: 100, status: "Approved" },
-  { id: "e4", name: "Nyasha Moyo", role: "Client Solutions Lead", dept: "Client Solutions", available: 184, logged: 156, util: 85, projectHours: 110, internal: 30, leave: 16, unclassified: 0, overtime: 0, compliance: 100, status: "Approved" },
-  { id: "e5", name: "Chipo Mhlanga", role: "Risk & Compliance Mgr", dept: "Risk & Compliance", available: 184, logged: 134, util: 73, projectHours: 58, internal: 76, leave: 0, unclassified: 0, overtime: 0, compliance: 100, status: "Approved" },
-  { id: "e6", name: "Tendai Sibanda", role: "Finance Manager", dept: "Finance & Operations", available: 184, logged: 176, util: 96, projectHours: 100, internal: 68, leave: 8, unclassified: 0, overtime: 0, compliance: 100, status: "Approved" },
-  { id: "e7", name: "Blessing Dube", role: "Operations Lead", dept: "Finance & Operations", available: 188, logged: 192, util: 102, projectHours: 94, internal: 62, leave: 0, unclassified: 36, overtime: 4, compliance: 88, status: "Missing Friday" },
-  { id: "e8", name: "Brandon Mandiza", role: "Data & Reporting Analyst", dept: "Portfolio Monitoring", available: 184, logged: 149, util: 81, projectHours: 88, internal: 42, leave: 0, unclassified: 19, overtime: 0, compliance: 100, status: "Approved" },
-  { id: "e9", name: "Lerato Mutasa", role: "HR Business Partner", dept: "People & Culture", available: 184, logged: 138, util: 75, projectHours: 40, internal: 74, leave: 24, unclassified: 0, overtime: 0, compliance: 100, status: "Approved" },
-  { id: "e10", name: "Vimbai Chitauro", role: "Executive Assistant", dept: "People & Culture", available: 176, logged: 120, util: 68, projectHours: 24, internal: 72, leave: 24, unclassified: 0, overtime: 0, compliance: 100, status: "Approved" },
+type RecentEntry = {
+  id: string
+  date: string
+  project: string
+  task: string
+  duration: string
+  source: "Manual" | "Timer"
+  status: string
+}
+
+const PROJECT_OPTIONS = [
+  "Southern Africa Expansion",
+  "Performance Review Cycle",
+  "Internal Operations",
+  "Administration",
+  "ISO 27001 Readiness",
 ]
 
-const TOTAL_EMPLOYEES = 42
-const PAGE_SIZE = employeeRows.length
+const TASK_OPTIONS: Record<string, string[]> = {
+  "Southern Africa Expansion": [
+    "Enterprise campaign launch",
+    "Partner onboarding playbook",
+    "Pricing localisation model",
+    "Map priority sectors",
+  ],
+  "Performance Review Cycle": ["Launch review cycle", "Calibration pack", "Review reminders"],
+  "Internal Operations": ["Team meeting", "Sprint planning", "Ops standup"],
+  Administration: ["Learning & development", "Admin overhead"],
+  "ISO 27001 Readiness": ["Evidence pack", "Policy review"],
+}
 
-function statusTone(status: EmployeeRow["status"]): "success" | "warning" | "danger" {
-  if (status === "Approved") return "success"
-  if (status === "Pending") return "warning"
-  return "danger"
+const emptyHours = (): Record<DayKey, number | null> => ({
+  mon: null,
+  tue: null,
+  wed: null,
+  thu: null,
+  fri: null,
+  sat: null,
+  sun: null,
+})
+
+const emptyNotes = (): Record<DayKey, string> => ({
+  mon: "",
+  tue: "",
+  wed: "",
+  thu: "",
+  fri: "",
+  sat: "",
+  sun: "",
+})
+
+const initialRows: Row[] = [
+  {
+    id: "r1",
+    project: "Southern Africa Expansion",
+    task: "Enterprise campaign launch",
+    hours: { mon: 7.5, tue: 6, wed: 2.5, thu: 7.5, fri: 5.5, sat: null, sun: null },
+    notes: {
+      mon: "",
+      tue: "",
+      wed: "Working on campaign messaging framework.",
+      thu: "",
+      fri: "",
+      sat: "",
+      sun: "",
+    },
+  },
+  {
+    id: "r2",
+    project: "Southern Africa Expansion",
+    task: "Partner onboarding playbook",
+    hours: { mon: 2, tue: 2, wed: 2, thu: 2, fri: 2, sat: null, sun: null },
+    notes: emptyNotes(),
+  },
+  {
+    id: "r3",
+    project: "Performance Review Cycle",
+    task: "Launch review cycle",
+    hours: { mon: 1.5, tue: 1.5, wed: null, thu: 2, fri: 1.5, sat: null, sun: null },
+    notes: emptyNotes(),
+  },
+  {
+    id: "r4",
+    project: "Internal Operations",
+    task: "Team meeting",
+    hours: { mon: 0.5, tue: 0.5, wed: 0.5, thu: 0.5, fri: 0.5, sat: null, sun: null },
+    notes: emptyNotes(),
+  },
+  {
+    id: "r5",
+    project: "Administration",
+    task: "Learning & development",
+    hours: { mon: 0.5, tue: 0.5, wed: null, thu: 0.5, fri: 0.5, sat: null, sun: null },
+    notes: emptyNotes(),
+  },
+]
+
+const initialRecent: RecentEntry[] = [
+  {
+    id: "e1",
+    date: "15 Jul 2026, 08:45 AM",
+    project: "Southern Africa Expansion",
+    task: "Enterprise campaign launch",
+    duration: "2.5h",
+    source: "Manual",
+    status: "Draft",
+  },
+  {
+    id: "e2",
+    date: "15 Jul 2026, 08:20 AM",
+    project: "Internal Operations",
+    task: "Team meeting",
+    duration: "0.5h",
+    source: "Manual",
+    status: "Draft",
+  },
+  {
+    id: "e3",
+    date: "14 Jul 2026, 02:15 PM",
+    project: "Southern Africa Expansion",
+    task: "Enterprise campaign launch",
+    duration: "1.0h",
+    source: "Timer",
+    status: "Draft",
+  },
+]
+
+function rowTotal(row: Row) {
+  return DAYS.reduce((s, d) => s + (row.hours[d.key] || 0), 0)
+}
+
+function formatHours(val: number | null | undefined) {
+  if (val === null || val === undefined) return "–"
+  return val.toFixed(1)
 }
 
 export function TimesheetsMockScreen() {
-  const [department, setDepartment] = useState(departments[0])
-  const [team, setTeam] = useState(teamsList[0])
-  const [project, setProject] = useState(projectsList[0])
-  const [objective, setObjective] = useState(objectivesList[0])
-  const [employee, setEmployee] = useState(employeesFilterList[0])
-  const [dateRange, setDateRange] = useState("30 Jun – 27 Jul 2026")
-  const [page, setPage] = useState(1)
-  const totalPages = Math.ceil(TOTAL_EMPLOYEES / PAGE_SIZE)
+  const [rows, setRows] = useState<Row[]>(initialRows)
+  const [recentEntries, setRecentEntries] = useState<RecentEntry[]>(initialRecent)
+  const [weekOffset, setWeekOffset] = useState(0)
+  const [activeCell, setActiveCell] = useState<{ rowId: string; day: DayKey } | null>(null)
+  const [cellHours, setCellHours] = useState("2.5")
+  const [cellNotes, setCellNotes] = useState("")
+  const [timerRunning, setTimerRunning] = useState(true)
+  const [timerSeconds, setTimerSeconds] = useState(6138)
+  const [timerTask, setTimerTask] = useState({
+    project: "Southern Africa Expansion",
+    task: "Enterprise campaign launch",
+  })
+  const [submitted, setSubmitted] = useState(false)
+  const [addingRow, setAddingRow] = useState(false)
+  const [newProject, setNewProject] = useState(PROJECT_OPTIONS[0])
+  const [newTask, setNewTask] = useState(TASK_OPTIONS[PROJECT_OPTIONS[0]][0])
+  const popoverRef = useRef<HTMLDivElement>(null)
 
-  const filteredRows = useMemo(() => {
-    return employeeRows.filter((r) => {
-      if (department !== departments[0] && r.dept !== department) return false
-      if (employee !== employeesFilterList[0] && r.name !== employee) return false
-      return true
+  const expected = 40
+  const weekLabel = weekOffset === 0 ? "13–19 Jul 2026" : weekOffset < 0 ? "6–12 Jul 2026" : "20–26 Jul 2026"
+  const weekTitle = weekOffset === 0 ? "13–19 July 2026" : weekOffset < 0 ? "6–12 July 2026" : "20–26 July 2026"
+
+  const dailyTotals = useMemo(() => {
+    const totals: Record<DayKey, number> = { mon: 0, tue: 0, wed: 0, thu: 0, fri: 0, sat: 0, sun: 0 }
+    rows.forEach((r) => DAYS.forEach((d) => (totals[d.key] += r.hours[d.key] || 0)))
+    return totals
+  }, [rows])
+
+  const weeklyTotal = useMemo(() => DAYS.reduce((s, d) => s + dailyTotals[d.key], 0), [dailyTotals])
+  const billable = Math.round(weeklyTotal * 0.767 * 10) / 10
+  const overtime = Math.max(0, Math.round((weeklyTotal - expected) * 10) / 10)
+  const pctOfExpected = Math.min(100, Math.round((weeklyTotal / expected) * 100))
+  const remaining = Math.max(0, Math.round((expected - weeklyTotal) * 10) / 10)
+
+  useEffect(() => {
+    if (!timerRunning) return
+    const id = window.setInterval(() => setTimerSeconds((s) => s + 1), 1000)
+    return () => window.clearInterval(id)
+  }, [timerRunning])
+
+  useEffect(() => {
+    if (!activeCell) return
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as HTMLElement
+      if (popoverRef.current?.contains(t)) return
+      if (t.closest?.("[data-timesheet-cell]")) return
+      setActiveCell(null)
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setActiveCell(null)
+    }
+    document.addEventListener("mousedown", onDown)
+    document.addEventListener("keydown", onKey)
+    return () => {
+      document.removeEventListener("mousedown", onDown)
+      document.removeEventListener("keydown", onKey)
+    }
+  }, [activeCell])
+
+  const openCell = (rowId: string, day: DayKey) => {
+    const row = rows.find((r) => r.id === rowId)
+    if (!row) return
+    setActiveCell({ rowId, day })
+    setCellHours(row.hours[day] !== null && row.hours[day] !== undefined ? String(row.hours[day]) : "0")
+    setCellNotes(row.notes[day] || "")
+  }
+
+  const bumpHours = (delta: number) => {
+    const n = Number(cellHours)
+    const base = Number.isFinite(n) ? n : 0
+    const next = Math.max(0, Math.min(24, Math.round((base + delta) * 10) / 10))
+    setCellHours(String(next))
+  }
+
+  const saveCell = () => {
+    if (!activeCell) return
+    const parsed = cellHours.trim() === "" ? null : Number(cellHours)
+    const val = parsed === null || Number.isNaN(parsed) ? null : Math.max(0, Math.min(24, parsed))
+    const row = rows.find((r) => r.id === activeCell.rowId)
+    setRows((prev) =>
+      prev.map((r) =>
+        r.id === activeCell.rowId
+          ? {
+              ...r,
+              hours: { ...r.hours, [activeCell.day]: val },
+              notes: { ...r.notes, [activeCell.day]: cellNotes.slice(0, 120) },
+            }
+          : r
+      )
+    )
+    if (row && val !== null && val > 0) {
+      const dayMeta = DAYS.find((d) => d.key === activeCell.day)
+      setRecentEntries((prev) => [
+        {
+          id: `e-${Date.now()}`,
+          date: `${dayMeta?.date || ""} 2026, ${new Date().toLocaleTimeString("en-US", {
+            hour: "2-digit",
+            minute: "2-digit",
+          })}`,
+          project: row.project,
+          task: row.task,
+          duration: `${val.toFixed(1)}h`,
+          source: "Manual",
+          status: "Draft",
+        },
+        ...prev,
+      ])
+    }
+    setActiveCell(null)
+    toast.success("Time entry saved")
+  }
+
+  const startTimerFromCell = () => {
+    if (!activeCell) return
+    const row = rows.find((r) => r.id === activeCell.rowId)
+    if (!row) return
+    setTimerTask({ project: row.project, task: row.task })
+    setTimerRunning(true)
+    toast.success("Timer started", { description: row.task })
+  }
+
+  const addRow = () => {
+    setAddingRow(true)
+    setNewProject(PROJECT_OPTIONS[0])
+    setNewTask(TASK_OPTIONS[PROJECT_OPTIONS[0]][0])
+  }
+
+  const confirmAddRow = () => {
+    setRows((prev) => [
+      ...prev,
+      {
+        id: `r${Date.now()}`,
+        project: newProject,
+        task: newTask,
+        hours: emptyHours(),
+        notes: emptyNotes(),
+      },
+    ])
+    setAddingRow(false)
+    toast.success("Row added", { description: `${newProject} · ${newTask}` })
+  }
+
+  const timerLabel = useMemo(() => {
+    const h = Math.floor(timerSeconds / 3600)
+    const m = Math.floor((timerSeconds % 3600) / 60)
+    const s = timerSeconds % 60
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
+  }, [timerSeconds])
+
+  const toggleTimer = () => {
+    setTimerRunning((r) => {
+      const next = !r
+      toast(next ? "Timer started" : "Timer stopped", { description: timerTask.task })
+      if (!next && timerSeconds > 0) {
+        const hoursLogged = Math.round((timerSeconds / 3600) * 10) / 10
+        setRecentEntries((prev) => [
+          {
+            id: `e-timer-${Date.now()}`,
+            date: `15 Jul 2026, ${new Date().toLocaleTimeString("en-US", {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}`,
+            project: timerTask.project,
+            task: timerTask.task,
+            duration: `${hoursLogged.toFixed(1)}h`,
+            source: "Timer",
+            status: "Draft",
+          },
+          ...prev,
+        ])
+      }
+      return next
     })
-  }, [department, employee])
+  }
 
-  const heatWithAvg = heatmapRows.map((r) => ({ ...r, avg: heatAvg(r.days) }))
+  const submissionChecks = [
+    { label: "Daily totals complete", ok: true },
+    { label: "Notes added", ok: Boolean(rows.some((r) => Object.values(r.notes).some(Boolean))) },
+    { label: "No overlapping entries", ok: true },
+    { label: `${remaining.toFixed(1)}h remaining`, ok: remaining === 0 },
+  ]
+
+  const submitForApproval = () => {
+    setSubmitted(true)
+    setActiveCell(null)
+    toast.success("Timesheet submitted for approval", {
+      description: `Week of ${weekLabel} · ${weeklyTotal.toFixed(1)}h`,
+    })
+  }
+
+  const activeRow = activeCell ? rows.find((r) => r.id === activeCell.rowId) : null
 
   return (
-    <div className="min-h-full">
-      <PerformanceMockTopChrome breadcrumbs={["Performance Management", "Operations", "Timesheets"]} searchPlaceholder="Search employee or project…" />
+    <div className="min-h-full bg-[#F8FAFC]">
       <div className="p-4 lg:p-5 space-y-3">
-        <PmPageHeader
-          title="Timesheet Analytics · July 2026"
-          subtitle="Insight into capacity, utilisation and time allocation to drive strategy execution."
-          actions={
-            <>
-              <PmButton variant="outline" onClick={() => toast("Timesheet data", { description: "Sourced from Timesheets module." })}>
-                <FileClock className="h-3.5 w-3.5" /> Timesheet data
-              </PmButton>
-              <PmButton variant="outline" onClick={() => toast("Payroll cost", { description: "Sourced from Payroll (read-only)." })}>
-                <Coins className="h-3.5 w-3.5" /> Payroll cost
-              </PmButton>
-            </>
-          }
-        />
+        <nav className="text-xs text-[#94A3B8]">
+          <span className="font-medium">Timesheets</span>
+          <span className="mx-1.5">/</span>
+          <span className="text-[#64748B]">My weekly timesheet</span>
+        </nav>
 
-        <PmCard className="p-3 flex flex-wrap items-center gap-2">
-          <PmFilterSelect label="Department" value={department} options={departments} onChange={setDepartment} />
-          <PmFilterSelect label="Team" value={team} options={teamsList} onChange={setTeam} />
-          <PmFilterSelect label="Project" value={project} options={projectsList} onChange={setProject} />
-          <PmFilterSelect label="Objective" value={objective} options={objectivesList} onChange={setObjective} />
-          <PmFilterSelect label="Employee" value={employee} options={employeesFilterList} onChange={setEmployee} />
-          <PmSelectChip label={`Date range: ${dateRange}`} onClick={() => setDateRange((d) => (d.startsWith("30 Jun") ? "1 – 28 Jun 2026" : "30 Jun – 27 Jul 2026"))} />
-        </PmCard>
-
-        <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-7 gap-3">
-          <PmMetricCard label="Logged hours" value="2,846h" trend="▲ 7.3% vs Jun 2026" trendPositive icon={<Clock className="h-4 w-4" />} />
-          <PmMetricCard label="Capacity utilisation" value="87%" trend="▲ 4pp" trendPositive icon={<Gauge className="h-4 w-4" />} />
-          <PmMetricCard label="Project / Portfolio work" value="68%" trend="1,937h" icon={<Briefcase className="h-4 w-4" />} />
-          <PmMetricCard label="Internal work" value="19%" trend="540h" icon={<Building2 className="h-4 w-4" />} />
-          <PmMetricCard label="Leave" value="8%" trend="224h" icon={<CalendarOff className="h-4 w-4" />} />
-          <PmMetricCard label="Unclassified" value="5%" trend="145h" trendPositive={false} icon={<HelpCircle className="h-4 w-4" />} iconBg="#FEE2E2" />
-          <PmMetricCard label="Submission compliance" value="94%" trend="▲ 3pp vs Jun 2026" trendPositive icon={<CheckCircle2 className="h-4 w-4" />} />
-        </div>
-
-        <div className="grid grid-cols-1 xl:grid-cols-[1fr_1fr] gap-4">
-          <PmCard className="p-4">
-            <h3 className="text-sm font-semibold text-[#111827] mb-1">Capacity vs logged hours (weekly)</h3>
-            <p className="text-[11px] text-[#6B7280] mb-2">Available capacity (h) vs Logged hours (h)</p>
-            <div className="h-52">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={weeklyCapacity} barGap={4}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
-                  <XAxis dataKey="week" tick={{ fontSize: 9, fill: "#9CA3AF" }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 9, fill: "#9CA3AF" }} axisLine={false} tickLine={false} />
-                  <Tooltip />
-                  <Bar dataKey="available" name="Available capacity (h)" fill="#DDD6FE" radius={[3, 3, 0, 0]} barSize={16} />
-                  <Bar dataKey="logged" name="Logged hours (h)" fill="#7C3AED" radius={[3, 3, 0, 0]} barSize={16} />
-                </BarChart>
-              </ResponsiveContainer>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-[22px] font-bold text-[#0F172A] tracking-tight leading-tight">
+              Weekly Timesheet — {weekTitle}
+            </h1>
+            <div className="mt-2.5">
+              <PmAvatar
+                initials="RC"
+                name="Rumbidzai Chaza"
+                role="Marketing Manager"
+                src={PM_PHOTOS.rumbidzai}
+                size="md"
+              />
             </div>
-          </PmCard>
-
-          <PmCard className="p-4">
-            <h3 className="text-sm font-semibold text-[#111827] mb-3">Time allocation by strategic objective (hours)</h3>
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="text-[10px] uppercase tracking-wide text-[#9CA3AF]">
-                  <th className="pb-2 font-semibold">Strategic Objective</th>
-                  <th className="pb-2 font-semibold text-right">Hours</th>
-                  <th className="pb-2 font-semibold text-right w-16">% of total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {timeAllocation.map((r) => (
-                  <tr key={r.objective} className="border-t border-[#F1F5F9]">
-                    <td className="py-2 pr-2">
-                      <p className="text-[#374151]">{r.objective}</p>
-                      <div className="mt-1 h-1.5 w-full rounded-full bg-[#F3F4F6] overflow-hidden">
-                        <div className="h-full rounded-full bg-[#7C3AED]" style={{ width: `${(r.hours / timeAllocationRaw[0].hours) * 100}%` }} />
-                      </div>
-                    </td>
-                    <td className="py-2 pr-2 text-right font-semibold text-[#111827] whitespace-nowrap">{r.hours}</td>
-                    <td className="py-2 text-right text-[#6B7280] whitespace-nowrap">{r.pct.toFixed(1)}%</td>
-                  </tr>
-                ))}
-                <tr className="border-t border-[#E5E7EB] font-semibold">
-                  <td className="py-2 text-[#111827]">Total</td>
-                  <td className="py-2 text-right text-[#111827]">{timeAllocationTotal.toLocaleString()}</td>
-                  <td className="py-2 text-right text-[#111827]">100%</td>
-                </tr>
-              </tbody>
-            </table>
-          </PmCard>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <PmButton
+              variant="outline"
+              onClick={() => toast.success("Copied previous week", { description: "Rows pre-filled from last week." })}
+            >
+              <Copy className="h-3.5 w-3.5" /> Copy previous week
+            </PmButton>
+            <PmButton variant="outline" onClick={() => toast.success("Draft saved")}>
+              <Save className="h-3.5 w-3.5" /> Save draft
+            </PmButton>
+            <PmButton onClick={submitForApproval} disabled={submitted}>
+              <Send className="h-3.5 w-3.5" /> {submitted ? "Submitted" : "Submit for approval"}
+            </PmButton>
+            <PmStatusPill label={submitted ? "Submitted" : "Draft"} tone={submitted ? "info" : "purple"} />
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-4">
-          <div className="space-y-3">
-            <PmCard className="p-4 overflow-x-auto">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold text-[#111827]">Team capacity heatmap (Logged hours vs capacity %)</h3>
+        <div className="flex justify-center">
+          <div className="inline-flex items-center gap-1.5 h-9 rounded-full border border-[#E2E8F0] bg-white px-2 text-xs text-[#334155] shadow-sm">
+            <button
+              type="button"
+              onClick={() => {
+                setWeekOffset((o) => o - 1)
+                setActiveCell(null)
+              }}
+              className="h-7 w-7 rounded-full flex items-center justify-center text-[#64748B] hover:bg-[#F1F5F9]"
+              aria-label="Previous week"
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />
+            </button>
+            <span className="inline-flex items-center gap-1.5 px-1 font-semibold text-[#0F172A]">
+              <Calendar className="h-3.5 w-3.5 text-[#7C3AED]" />
+              {weekLabel}
+              <ChevronDown className="h-3 w-3 text-[#94A3B8]" />
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setWeekOffset((o) => o + 1)
+                setActiveCell(null)
+              }}
+              className="h-7 w-7 rounded-full flex items-center justify-center text-[#64748B] hover:bg-[#F1F5F9]"
+              aria-label="Next week"
+            >
+              <ChevronRight className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[
+            { label: "Logged", value: `${weeklyTotal.toFixed(1)}h`, icon: Clock },
+            { label: "Expected", value: `${expected}h`, icon: Calendar },
+            { label: "Billable", value: `${billable.toFixed(1)}h`, icon: Briefcase },
+            { label: "Overtime", value: `${overtime}h`, icon: Clock },
+          ].map((m) => (
+            <div
+              key={m.label}
+              className="rounded-xl border border-[#E2E8F0] bg-white p-3.5 flex items-center gap-2.5 shadow-sm"
+            >
+              <span className="h-9 w-9 rounded-full bg-[#F5F3FF] text-[#7C3AED] flex items-center justify-center shrink-0">
+                <m.icon className="h-4 w-4" />
+              </span>
+              <div>
+                <p className="text-[10px] text-[#94A3B8]">{m.label}</p>
+                <p className="text-base font-bold text-[#0F172A] leading-tight">{m.value}</p>
               </div>
-              <table className="w-full text-left text-xs min-w-[520px]">
-                <thead>
-                  <tr className="text-[10px] uppercase tracking-wide text-[#9CA3AF]">
-                    <th className="pb-2 font-semibold pr-2">Team</th>
-                    {heatDays.map((d) => (
-                      <th key={d} className="pb-2 font-semibold text-center px-1">
-                        {d}
-                      </th>
-                    ))}
-                    <th className="pb-2 font-semibold text-center px-1">Avg.</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {heatWithAvg.map((row) => (
-                    <tr key={row.team} className="border-t border-[#F1F5F9]">
-                      <td className="py-2 pr-2 font-medium text-[#111827] whitespace-nowrap">{row.team}</td>
-                      {row.days.map((v, i) => {
-                        const c = heatCellStyle(v)
-                        return (
-                          <td key={i} className="py-1.5 px-1 text-center">
-                            <span className="inline-flex items-center justify-center rounded-md px-1.5 py-1 font-semibold w-full" style={{ backgroundColor: c.bg, color: c.text }}>
-                              {v}%
-                            </span>
-                          </td>
-                        )
-                      })}
-                      <td className="py-1.5 px-1 text-center font-semibold text-[#111827]">{row.avg.toFixed(0)}%</td>
+            </div>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_300px] gap-4 items-start">
+          <div className="space-y-3 min-w-0">
+            <PmCard className="overflow-visible p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs min-w-[860px] border-collapse">
+                  <thead>
+                    <tr className="border-b border-[#E2E8F0]">
+                      <th className="py-3 px-4 font-bold text-[#0F172A] text-[12px] min-w-[200px]">Project</th>
+                      <th className="py-3 px-3 font-bold text-[#0F172A] text-[12px] min-w-[180px]">Task</th>
+                      {DAYS.map((d) => (
+                        <th
+                          key={d.key}
+                          className={cn(
+                            "py-2.5 px-1.5 font-bold text-[#0F172A] text-center w-[72px]",
+                            d.weekend && "bg-[#F5F3FF]"
+                          )}
+                        >
+                          <span className="block text-[12px] leading-tight">{d.label}</span>
+                          <span className="block font-medium text-[10px] text-[#94A3B8] mt-0.5">{d.date}</span>
+                        </th>
+                      ))}
+                      <th className="py-3 px-3 font-bold text-[#0F172A] text-[12px] text-right w-16">Total</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-              <div className="mt-3 pt-2 border-t border-[#F1F5F9] flex items-center gap-3 text-[10px] text-[#6B7280]">
-                <span className="inline-flex items-center gap-1">
-                  <span className="h-2 w-2 rounded-full bg-[#FEF3C7]" /> &lt;75%
-                </span>
-                <span className="inline-flex items-center gap-1">
-                  <span className="h-2 w-2 rounded-full bg-[#F3F4F6]" /> 75–90%
-                </span>
-                <span className="inline-flex items-center gap-1">
-                  <span className="h-2 w-2 rounded-full bg-[#D1FAE5]" /> 90–100%
-                </span>
-                <span className="inline-flex items-center gap-1">
-                  <span className="h-2 w-2 rounded-full bg-[#FEE2E2]" /> &gt;100%
-                </span>
+                  </thead>
+                  <tbody>
+                    {rows.map((row) => (
+                      <tr key={row.id} className="border-b border-[#F1F5F9]">
+                        <td className="py-3 px-4 font-bold text-[#0F172A] whitespace-nowrap align-middle">
+                          {row.project}
+                        </td>
+                        <td className="py-3 px-3 text-[#64748B] whitespace-nowrap align-middle">{row.task}</td>
+                        {DAYS.map((d) => {
+                          const val = row.hours[d.key]
+                          const isActive = activeCell?.rowId === row.id && activeCell?.day === d.key
+                          return (
+                            <td
+                              key={d.key}
+                              className={cn(
+                                "py-2 px-1.5 text-center relative align-middle",
+                                d.weekend && "bg-[#F5F3FF]"
+                              )}
+                            >
+                              <button
+                                type="button"
+                                data-timesheet-cell
+                                disabled={submitted}
+                                onClick={() => openCell(row.id, d.key)}
+                                className={cn(
+                                  "h-8 w-[58px] mx-auto rounded-md border bg-white text-[12px] font-semibold tabular-nums transition-all",
+                                  val !== null && val !== undefined
+                                    ? "text-[#0F172A] border-[#E2E8F0]"
+                                    : "text-[#CBD5E1] border-[#E2E8F0]",
+                                  !submitted && "hover:border-[#C4B5FD] hover:shadow-sm",
+                                  isActive && "border-[#7C3AED] border-2 text-[#0F172A] shadow-sm",
+                                  submitted && "opacity-70 cursor-not-allowed"
+                                )}
+                              >
+                                {val !== null && val !== undefined ? formatHours(val) : "–"}
+                              </button>
+
+                              {isActive && (
+                                <div
+                                  ref={popoverRef}
+                                  className="absolute z-40 top-[calc(100%-2px)] left-1/2 -translate-x-1/2 w-[220px] rounded-xl border border-[#E2E8F0] bg-white shadow-xl p-3.5 text-left"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <p className="text-[11px] font-semibold text-[#334155] mb-1.5">Hours</p>
+                                  <div className="relative mb-2.5">
+                                    <input
+                                      type="number"
+                                      step={0.5}
+                                      min={0}
+                                      max={24}
+                                      value={cellHours}
+                                      onChange={(e) => setCellHours(e.target.value)}
+                                      onKeyDown={(e) => {
+                                        if (e.key === "Enter") saveCell()
+                                      }}
+                                      className="w-full h-9 rounded-lg border border-[#E2E8F0] pl-3 pr-8 text-sm font-semibold text-[#0F172A] outline-none focus:border-[#7C3AED] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                      autoFocus
+                                    />
+                                    <div className="absolute right-1 top-1 bottom-1 flex flex-col">
+                                      <button
+                                        type="button"
+                                        onClick={() => bumpHours(0.5)}
+                                        className="flex-1 w-6 rounded-t text-[#64748B] hover:bg-[#F1F5F9] flex items-center justify-center"
+                                        aria-label="Increase hours"
+                                      >
+                                        <ChevronDown className="h-3 w-3 rotate-180" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => bumpHours(-0.5)}
+                                        className="flex-1 w-6 rounded-b text-[#64748B] hover:bg-[#F1F5F9] flex items-center justify-center"
+                                        aria-label="Decrease hours"
+                                      >
+                                        <ChevronDown className="h-3 w-3" />
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    onClick={startTimerFromCell}
+                                    className="w-full h-9 mb-3 rounded-full border border-[#C4B5FD] text-[12px] font-semibold text-[#7C3AED] inline-flex items-center justify-center gap-1.5 hover:bg-[#F5F3FF]"
+                                  >
+                                    <span className="h-5 w-5 rounded-full border border-[#7C3AED] flex items-center justify-center">
+                                      <Play className="h-2.5 w-2.5 fill-[#7C3AED]" />
+                                    </span>
+                                    Start timer
+                                  </button>
+
+                                  <p className="text-[11px] font-semibold text-[#334155] mb-1.5">Notes (optional)</p>
+                                  <div className="relative mb-3">
+                                    <textarea
+                                      value={cellNotes}
+                                      onChange={(e) => setCellNotes(e.target.value.slice(0, 120))}
+                                      rows={3}
+                                      placeholder="What did you work on?"
+                                      className="w-full rounded-lg border border-[#E2E8F0] px-2.5 py-2 pb-5 text-[11px] text-[#334155] outline-none focus:border-[#7C3AED] resize-none leading-relaxed"
+                                    />
+                                    <p className="absolute bottom-1.5 right-2 text-[9px] text-[#94A3B8]">
+                                      {cellNotes.length}/120
+                                    </p>
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    onClick={saveCell}
+                                    className="w-full h-9 rounded-full bg-[#7C3AED] text-white text-[12px] font-bold hover:bg-[#6D28D9] shadow-sm"
+                                  >
+                                    Save
+                                  </button>
+
+                                  {activeRow && (
+                                    <p className="mt-2 text-[9px] text-[#94A3B8] text-center truncate">
+                                      {activeRow.task} · {DAYS.find((x) => x.key === activeCell.day)?.label}
+                                    </p>
+                                  )}
+                                </div>
+                              )}
+                            </td>
+                          )
+                        })}
+                        <td className="py-3 px-3 text-right font-bold text-[#0F172A] whitespace-nowrap align-middle tabular-nums">
+                          {rowTotal(row).toFixed(1)}h
+                        </td>
+                      </tr>
+                    ))}
+
+                    <tr>
+                      <td colSpan={10} className="py-2.5 px-4">
+                        {addingRow ? (
+                          <div className="flex flex-wrap items-end gap-2 py-1">
+                            <label className="text-[11px] space-y-1">
+                              <span className="font-semibold text-[#64748B]">Project</span>
+                              <select
+                                value={newProject}
+                                onChange={(e) => {
+                                  const p = e.target.value
+                                  setNewProject(p)
+                                  setNewTask(TASK_OPTIONS[p]?.[0] || "")
+                                }}
+                                className="block h-8 min-w-[180px] rounded-full border border-[#E2E8F0] bg-white px-3 text-xs outline-none focus:border-[#C4B5FD]"
+                              >
+                                {PROJECT_OPTIONS.map((p) => (
+                                  <option key={p} value={p}>
+                                    {p}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                            <label className="text-[11px] space-y-1">
+                              <span className="font-semibold text-[#64748B]">Task</span>
+                              <select
+                                value={newTask}
+                                onChange={(e) => setNewTask(e.target.value)}
+                                className="block h-8 min-w-[180px] rounded-full border border-[#E2E8F0] bg-white px-3 text-xs outline-none focus:border-[#C4B5FD]"
+                              >
+                                {(TASK_OPTIONS[newProject] || []).map((t) => (
+                                  <option key={t} value={t}>
+                                    {t}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                            <button
+                              type="button"
+                              onClick={confirmAddRow}
+                              className="h-8 px-4 rounded-full bg-[#7C3AED] text-white text-[11px] font-semibold"
+                            >
+                              Add
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setAddingRow(false)}
+                              className="h-8 px-3 rounded-full text-[11px] font-semibold text-[#64748B] hover:bg-[#F1F5F9]"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={addRow}
+                            disabled={submitted}
+                            className="text-[12px] font-semibold text-[#7C3AED] hover:underline inline-flex items-center gap-1 disabled:opacity-50"
+                          >
+                            <Plus className="h-3.5 w-3.5" /> Add project or task
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+
+                    <tr className="border-t border-[#E2E8F0]">
+                      <td className="py-3 px-4 font-bold text-[#0F172A]" colSpan={2}>
+                        Daily total
+                      </td>
+                      {DAYS.map((d) => (
+                        <td
+                          key={d.key}
+                          className={cn(
+                            "py-3 px-1.5 text-center font-bold text-[#0F172A] tabular-nums",
+                            d.weekend && "bg-[#F5F3FF]"
+                          )}
+                        >
+                          {dailyTotals[d.key] > 0 ? `${dailyTotals[d.key].toFixed(1)}h` : "–"}
+                        </td>
+                      ))}
+                      <td className="py-3 px-3 text-right font-bold text-[#0F172A] tabular-nums">
+                        {weeklyTotal.toFixed(1)}h
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="px-4 py-3.5 border-t border-[#E2E8F0]">
+                <div className="flex flex-wrap items-center gap-3">
+                  <p className="text-[13px] font-bold text-[#0F172A] shrink-0">
+                    Weekly total <span className="font-extrabold">{weeklyTotal.toFixed(1)}h</span>{" "}
+                    <span className="text-[#94A3B8] font-semibold">/ {expected}h</span>
+                  </p>
+                  <div className="flex-1 min-w-[140px] h-2.5 rounded-full bg-[#E2E8F0] overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-[#7C3AED] transition-all"
+                      style={{ width: `${pctOfExpected}%` }}
+                    />
+                  </div>
+                  <span className="text-[13px] font-bold text-[#0F172A] tabular-nums shrink-0">
+                    {pctOfExpected}%
+                  </span>
+                </div>
               </div>
             </PmCard>
 
-            <PmCard className="p-4 overflow-x-auto">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold text-[#111827]">Employee timesheet summary</h3>
-                <PmButton variant="outline" onClick={() => toast.success("Export started", { description: "Utilisation report will download shortly." })}>
-                  <Download className="h-3.5 w-3.5" /> Export
-                </PmButton>
-              </div>
-              <table className="w-full text-left text-xs min-w-[860px]">
-                <thead>
-                  <tr className="text-[10px] uppercase tracking-wide text-[#9CA3AF]">
-                    <th className="pb-2 font-semibold pr-2">Employee</th>
-                    <th className="pb-2 font-semibold pr-2">Role</th>
-                    <th className="pb-2 font-semibold pr-2 text-right">Available</th>
-                    <th className="pb-2 font-semibold pr-2 text-right">Logged</th>
-                    <th className="pb-2 font-semibold pr-2 text-right">Utilisation</th>
-                    <th className="pb-2 font-semibold pr-2 text-right">Project</th>
-                    <th className="pb-2 font-semibold pr-2 text-right">Internal</th>
-                    <th className="pb-2 font-semibold pr-2 text-right">Leave</th>
-                    <th className="pb-2 font-semibold pr-2 text-right">Unclass.</th>
-                    <th className="pb-2 font-semibold pr-2 text-right">Overtime</th>
-                    <th className="pb-2 font-semibold pr-2 text-right">Compl.</th>
-                    <th className="pb-2 font-semibold">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredRows.map((r) => (
-                    <tr key={r.id} className="border-t border-[#F1F5F9] hover:bg-[#FAFAFA]">
-                      <td className="py-2.5 pr-2 font-medium text-[#111827] whitespace-nowrap">{r.name}</td>
-                      <td className="py-2.5 pr-2 text-[#6B7280] whitespace-nowrap">{r.role}</td>
-                      <td className="py-2.5 pr-2 text-right text-[#374151]">{r.available}h</td>
-                      <td className={cn("py-2.5 pr-2 text-right font-semibold", r.util >= 100 ? "text-[#DC2626]" : "text-[#111827]")}>{r.logged}h</td>
-                      <td className={cn("py-2.5 pr-2 text-right font-semibold", r.util >= 100 ? "text-[#DC2626]" : r.util < 75 ? "text-[#D97706]" : "text-[#111827]")}>{r.util}%</td>
-                      <td className="py-2.5 pr-2 text-right text-[#6B7280]">{r.projectHours}h</td>
-                      <td className="py-2.5 pr-2 text-right text-[#6B7280]">{r.internal}h</td>
-                      <td className="py-2.5 pr-2 text-right text-[#6B7280]">{r.leave}h</td>
-                      <td className={cn("py-2.5 pr-2 text-right", r.unclassified > 0 ? "text-[#DC2626] font-medium" : "text-[#6B7280]")}>{r.unclassified}h</td>
-                      <td className="py-2.5 pr-2 text-right text-[#6B7280]">{r.overtime}h</td>
-                      <td className="py-2.5 pr-2 text-right text-[#6B7280]">{r.compliance}%</td>
-                      <td className="py-2.5">
-                        <PmStatusPill label={r.status} tone={statusTone(r.status)} />
-                      </td>
+            <PmCard className="p-4">
+              <h3 className="text-sm font-semibold text-[#0F172A] mb-3">Recent time entries</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs min-w-[560px]">
+                  <thead>
+                    <tr className="text-[10px] font-semibold text-[#94A3B8] border-b border-[#F1F5F9]">
+                      <th className="py-2 pr-2">Date</th>
+                      <th className="py-2 pr-2">Project</th>
+                      <th className="py-2 pr-2">Task</th>
+                      <th className="py-2 pr-2 text-right">Duration</th>
+                      <th className="py-2 pr-2">Entry source</th>
+                      <th className="py-2">Status</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-              <div className="mt-3 pt-3 border-t border-[#F1F5F9] flex flex-wrap items-center justify-between gap-2">
-                <p className="text-xs text-[#6B7280]">
-                  Showing {(page - 1) * PAGE_SIZE + 1} to {Math.min(page * PAGE_SIZE, TOTAL_EMPLOYEES)} of {TOTAL_EMPLOYEES} employees
-                </p>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={page === 1}
-                    className="h-7 w-7 rounded-md border border-[#E5E7EB] flex items-center justify-center text-[#6B7280] disabled:opacity-40"
-                  >
-                    <ChevronLeft className="h-3.5 w-3.5" />
-                  </button>
-                  {Array.from({ length: totalPages }).map((_, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      onClick={() => setPage(i + 1)}
-                      className={cn(
-                        "h-7 w-7 rounded-md text-xs font-semibold flex items-center justify-center",
-                        page === i + 1 ? "bg-[#7C3AED] text-white" : "border border-[#E5E7EB] text-[#6B7280]"
-                      )}
-                    >
-                      {i + 1}
-                    </button>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                    disabled={page === totalPages}
-                    className="h-7 w-7 rounded-md border border-[#E5E7EB] flex items-center justify-center text-[#6B7280] disabled:opacity-40"
-                  >
-                    <ChevronRight className="h-3.5 w-3.5" />
-                  </button>
-                  <span className="text-xs text-[#6B7280] ml-1">10 / page</span>
-                </div>
+                  </thead>
+                  <tbody>
+                    {recentEntries.slice(0, 5).map((e) => (
+                      <tr key={e.id} className="border-b border-[#F8FAFC] last:border-0">
+                        <td className="py-2.5 pr-2 text-[#64748B] whitespace-nowrap">{e.date}</td>
+                        <td className="py-2.5 pr-2 text-[#334155] whitespace-nowrap">{e.project}</td>
+                        <td className="py-2.5 pr-2 text-[#334155] whitespace-nowrap">{e.task}</td>
+                        <td className="py-2.5 pr-2 text-right font-semibold text-[#0F172A]">{e.duration}</td>
+                        <td className="py-2.5 pr-2 text-[#64748B]">{e.source}</td>
+                        <td className="py-2.5">
+                          <PmStatusPill label={e.status} tone="purple" />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
+              <button
+                type="button"
+                onClick={() => toast("Time entries", { description: "Opening full time entry log." })}
+                className="mt-2 text-[11px] font-semibold text-[#7C3AED] hover:underline"
+              >
+                View all time entries →
+              </button>
             </PmCard>
           </div>
 
           <div className="space-y-3">
+            <PmCard className="p-4 text-center">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-[11px] text-[#94A3B8]">Today — Wednesday 15 Jul</p>
+                <span
+                  className={cn(
+                    "inline-flex items-center gap-1 text-[10px] font-semibold",
+                    timerRunning ? "text-[#10B981]" : "text-[#94A3B8]"
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "h-1.5 w-1.5 rounded-full",
+                      timerRunning ? "bg-[#10B981] animate-pulse" : "bg-[#CBD5E1]"
+                    )}
+                  />
+                  {timerRunning ? "Timer running" : "Timer stopped"}
+                </span>
+              </div>
+              <p className="text-3xl font-bold text-[#7C3AED] tracking-tight tabular-nums">{timerLabel}</p>
+              <p className="text-xs font-semibold text-[#0F172A] mt-1">{timerTask.task}</p>
+              <p className="text-[11px] text-[#94A3B8]">{timerTask.project}</p>
+              <button
+                type="button"
+                onClick={toggleTimer}
+                className={cn(
+                  "mt-3 w-full h-10 rounded-full text-sm font-semibold inline-flex items-center justify-center gap-2 transition-colors shadow-sm",
+                  timerRunning
+                    ? "bg-[#7C3AED] text-white hover:bg-[#6D28D9]"
+                    : "bg-[#F5F3FF] text-[#7C3AED] hover:bg-[#EDE9FE]"
+                )}
+              >
+                {timerRunning ? (
+                  <Square className="h-3.5 w-3.5 fill-current" />
+                ) : (
+                  <Play className="h-3.5 w-3.5 fill-current" />
+                )}
+                {timerRunning ? "Stop timer" : "Start timer"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const idx = rows.findIndex((r) => r.task === timerTask.task)
+                  const next = rows[(idx + 1 + rows.length) % rows.length]
+                  setTimerTask({ project: next.project, task: next.task })
+                  toast("Switched task", { description: next.task })
+                }}
+                className="mt-2 text-[11px] font-semibold text-[#7C3AED] hover:underline inline-flex items-center gap-1"
+              >
+                <RefreshCw className="h-3 w-3" /> Switch task
+              </button>
+            </PmCard>
+
             <PmCard className="p-4">
-              <h3 className="text-sm font-semibold text-[#111827] mb-3">Insights & exceptions</h3>
-
-              <div className="mb-4">
-                <div className="flex items-center justify-between mb-1.5">
-                  <p className="text-[11px] font-semibold text-[#991B1B] inline-flex items-center gap-1.5">
-                    <AlertTriangle className="h-3.5 w-3.5" /> Over capacity (&gt;100%)
-                  </p>
-                </div>
-                <div className="space-y-1.5">
-                  {[
-                    { name: "Rudo Chikore", v: "104%", delta: "+8h" },
-                    { name: "Blessing Dube", v: "102%", delta: "+4h" },
-                    { name: "Tatenda Makoni", v: "101%", delta: "+2h" },
-                  ].map((o) => (
-                    <div key={o.name} className="flex items-center justify-between text-[11px]">
-                      <span className="text-[#374151] truncate">{o.name}</span>
-                      <span className="text-[#DC2626] font-semibold shrink-0">
-                        {o.v} <span className="text-[#9CA3AF] font-normal">{o.delta}</span>
-                      </span>
-                    </div>
-                  ))}
-                </div>
-                <button type="button" className="mt-1.5 text-[11px] font-medium text-[#7C3AED] hover:underline">
-                  View all 5 over capacity →
-                </button>
-              </div>
-
-              <div className="mb-4 pt-3 border-t border-[#F1F5F9]">
-                <p className="text-[11px] font-semibold text-[#92400E] inline-flex items-center gap-1.5 mb-1.5">
-                  <TrendingDown className="h-3.5 w-3.5" /> Under recorded time (&lt;75% utilisation)
-                </p>
-                <div className="space-y-1.5">
-                  {[
-                    { name: "Vimbai Chitauro", v: "68%", delta: "-58h" },
-                    { name: "Lerato Mutasa", v: "75%", delta: "-46h" },
-                    { name: "Chipo Mhlanga", v: "75%", delta: "-50h" },
-                  ].map((o) => (
-                    <div key={o.name} className="flex items-center justify-between text-[11px]">
-                      <span className="text-[#374151] truncate">{o.name}</span>
-                      <span className="text-[#D97706] font-semibold shrink-0">
-                        {o.v} <span className="text-[#9CA3AF] font-normal">{o.delta}</span>
-                      </span>
-                    </div>
-                  ))}
-                </div>
-                <button type="button" className="mt-1.5 text-[11px] font-medium text-[#7C3AED] hover:underline">
-                  View all 6 under recorded →
-                </button>
-              </div>
-
-              <div className="mb-4 pt-3 border-t border-[#F1F5F9]">
-                <p className="text-[11px] font-semibold text-[#111827] mb-1.5">Projects exceeding allocation</p>
-                <div className="space-y-1.5">
-                  {[
-                    { name: "Client Reporting Automation", v: "118%" },
-                    { name: "Valuation Model Upgrade", v: "112%" },
-                    { name: "New Fund Launch", v: "104%" },
-                  ].map((p) => (
-                    <div key={p.name} className="flex items-center justify-between text-[11px]">
-                      <span className="text-[#374151] truncate">{p.name}</span>
-                      <span className="text-[#DC2626] font-semibold shrink-0">{p.v}</span>
-                    </div>
-                  ))}
-                </div>
-                <button type="button" className="mt-1.5 text-[11px] font-medium text-[#7C3AED] hover:underline">
-                  View all 4 projects →
-                </button>
-              </div>
-
-              <div className="mb-4 pt-3 border-t border-[#F1F5F9]">
-                <p className="text-[11px] font-semibold text-[#111827] inline-flex items-center gap-1.5 mb-1.5">
-                  <Target className="h-3.5 w-3.5 text-[#7C3AED]" /> Strategic objective focus
-                </p>
-                <p className="text-[11px] text-[#374151] leading-snug">Reduce portfolio reporting turnaround</p>
-                <div className="mt-1.5 flex items-center justify-between text-[11px]">
-                  <span className="text-[#6B7280]">Hours this period</span>
-                  <span className="font-semibold text-[#111827]">486h</span>
-                </div>
-                <div className="flex items-center justify-between text-[11px]">
-                  <span className="text-[#6B7280]">% of total effort</span>
-                  <span className="font-semibold text-[#111827]">17.1%</span>
-                </div>
-                <div className="flex items-center justify-between text-[11px]">
-                  <span className="text-[#6B7280]">vs last period</span>
-                  <span className="font-semibold text-[#10B981]">+2.4pp</span>
-                </div>
-              </div>
-
-              <div className="mb-4 pt-3 border-t border-[#F1F5F9]">
-                <p className="text-[11px] font-semibold text-[#111827] inline-flex items-center gap-1.5 mb-1.5">
-                  <Coins className="h-3.5 w-3.5 text-[#7C3AED]" /> Effort cost context (read-only)
-                </p>
-                <div className="flex items-center justify-between text-[11px]">
-                  <span className="text-[#6B7280]">Payroll cost for logged hours</span>
-                  <span className="font-semibold text-[#111827]">ZIG 9.42M</span>
-                </div>
-                <div className="flex items-center justify-between text-[11px]">
-                  <span className="text-[#6B7280]">Avg cost per hour</span>
-                  <span className="font-semibold text-[#111827]">ZIG 3,310</span>
-                </div>
-                <p className="text-[10px] text-[#9CA3AF] mt-1">Source: Payroll · Jul 2026</p>
-              </div>
-
-              <div className="pt-3 border-t border-[#F1F5F9]">
-                <p className="text-[11px] font-semibold text-[#92400E] inline-flex items-center gap-1.5 mb-1.5">
-                  <ShieldAlert className="h-3.5 w-3.5" /> Data quality exceptions
-                </p>
-                <div className="flex items-center justify-between text-[11px]">
-                  <span className="text-[#6B7280]">Unclassified hours</span>
-                  <span className="font-semibold text-[#DC2626]">145h (5%)</span>
-                </div>
-                <div className="flex items-center justify-between text-[11px]">
-                  <span className="text-[#6B7280]">Missing timesheets</span>
-                  <span className="font-semibold text-[#111827]">3 employees</span>
-                </div>
-                <div className="flex items-center justify-between text-[11px]">
-                  <span className="text-[#6B7280]">Late submissions</span>
-                  <span className="font-semibold text-[#111827]">4 employees</span>
-                </div>
-                <button type="button" className="mt-1.5 text-[11px] font-medium text-[#7C3AED] hover:underline">
-                  View data quality report →
-                </button>
+              <h3 className="text-sm font-semibold text-[#0F172A] mb-3">Submission checks</h3>
+              <div className="space-y-2">
+                {submissionChecks.map((c) => (
+                  <div key={c.label} className="flex items-center gap-2 text-xs">
+                    {c.ok ? (
+                      <CheckCircle2 className="h-3.5 w-3.5 text-[#10B981] shrink-0" />
+                    ) : (
+                      <Circle className="h-3.5 w-3.5 text-[#F59E0B] shrink-0" />
+                    )}
+                    <span className={c.ok ? "text-[#334155]" : "text-[#92400E] font-medium"}>{c.label}</span>
+                  </div>
+                ))}
               </div>
             </PmCard>
 
-            <PmCard className="p-3 space-y-2">
-              <PmButton variant="primary" className="w-full" onClick={() => toast("Employee timesheet", { description: "Opening timesheet detail view." })}>
-                Open employee timesheet
-              </PmButton>
-              <PmButton variant="outline" className="w-full" onClick={() => toast.success("Capacity action created", { description: "Logged to Corrective Actions." })}>
-                Create capacity action
-              </PmButton>
-              <PmButton variant="outline" className="w-full" onClick={() => toast.success("Export started", { description: "Utilisation report will download shortly." })}>
-                Export utilisation report
-              </PmButton>
-              <p className="text-[10px] text-[#9CA3AF] pt-1 leading-snug">Hours inform capacity planning and evidence. They're not used for performance ratings.</p>
+            <PmCard className="p-4">
+              <h3 className="text-sm font-semibold text-[#0F172A] mb-3">Approver</h3>
+              <PmAvatar initials="NM" name="Nyasha Moyo" role="Department Manager" src={PM_PHOTOS.nyasha} size="md" />
+              <button
+                type="button"
+                onClick={() => toast("Message sent", { description: "Nyasha Moyo will be notified." })}
+                className="mt-3 text-[11px] font-semibold text-[#7C3AED] hover:underline inline-flex items-center gap-1.5"
+              >
+                <Send className="h-3.5 w-3.5" /> Send message
+              </button>
             </PmCard>
+
+            <PmCard className="p-4">
+              <h3 className="text-sm font-semibold text-[#0F172A] mb-3">Activity</h3>
+              <div className="space-y-2.5">
+                {[
+                  { text: "Timesheet draft saved", detail: "Rumbidzai Chaza", at: "Today, 09:02 AM" },
+                  { text: "Time adjusted", detail: "Enterprise campaign launch +0.5h", at: "Today, 08:45 AM" },
+                ].map((a, i) => (
+                  <div key={i} className="flex items-start gap-2 text-[11px]">
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#7C3AED] mt-1.5 shrink-0" />
+                    <p className="text-[#334155] leading-snug">
+                      {a.text}
+                      <span className="block text-[#7C3AED] font-medium">{a.detail}</span>
+                      <span className="block text-[10px] text-[#94A3B8] mt-0.5">{a.at}</span>
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </PmCard>
+
+            <button
+              type="button"
+              onClick={() => toast("Timesheet policy", { description: "Opening organisation timesheet policy." })}
+              className="w-full inline-flex items-center justify-center gap-1.5 text-[11px] font-medium text-[#64748B] hover:text-[#0F172A]"
+            >
+              <FileText className="h-3.5 w-3.5" /> Timesheet policy <ExternalLink className="h-3 w-3" />
+            </button>
           </div>
         </div>
       </div>

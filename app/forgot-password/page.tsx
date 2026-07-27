@@ -1,15 +1,13 @@
 "use client"
 
 import { useState } from "react"
-import { motion } from "framer-motion"
-import { Mail, ArrowLeft, Loader2, CheckCircle2 } from "lucide-react"
-import Image from "next/image"
+import { ArrowLeft, Loader2, CheckCircle2, User } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useAppDispatch } from "@/lib/store"
 import { forgotPassword } from "@/lib/store/slices/authSlice"
 import { toast } from "sonner"
-import { Button } from "@/components/ui/button"
+import { MatanhoAuthShell, MATANHO_TEAL } from "@/components/auth/matanho-auth-shell"
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("")
@@ -22,7 +20,7 @@ export default function ForgotPasswordPage() {
     e.preventDefault()
 
     if (!email) {
-      toast.error('Please enter your email address')
+      toast.error("Please enter your email address")
       return
     }
 
@@ -31,229 +29,119 @@ export default function ForgotPasswordPage() {
       const response = await dispatch(forgotPassword(email)).unwrap()
       setSubmitted(true)
 
-      // Display backend message if available, otherwise use default
-      const successMessage = response?.message || 'Reset link sent!'
+      const successMessage = response?.message || "Reset link sent!"
       const successDescription = response?.message
         ? undefined
-        : 'Check your email for password reset instructions'
+        : "Check your email for password reset instructions"
 
       toast.success(successMessage, {
-        description: successDescription
+        description: successDescription,
       })
     } catch (error: any) {
-      // Display backend error message if available, otherwise use default
-      const errorMessage = error?.message || error || 'Failed to send reset email'
-      const errorDescription = error?.message
-        ? undefined
-        : 'Please try again later'
+      const errorMessage = error?.message || error || "Failed to send reset email"
+      const errorDescription = error?.message ? undefined : "Please try again later"
 
       toast.error(errorMessage, {
-        description: errorDescription
+        description: errorDescription,
       })
     } finally {
       setIsSubmitting(false)
     }
   }
 
+  const inputClass =
+    "block w-full h-12 pl-4 pr-11 rounded-xl bg-[#0E1520]/80 border border-white/15 text-white text-sm placeholder:text-white/35 outline-none focus:border-[#14C4CE] focus:ring-1 focus:ring-[#14C4CE]/40 transition-colors disabled:opacity-50"
+
   if (submitted) {
     return (
-      <div className="h-screen bg-white flex items-center justify-center p-4">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="max-w-md w-full"
-        >
-          <div className="rounded-3xl p-8" style={{ backgroundColor: '#F8F8F8' }}>
-            <div className="text-center mb-6">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
-                <CheckCircle2 className="w-8 h-8 text-green-600" />
-              </div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Check Your Email</h1>
-              <p className="text-gray-600">
-                If an account with <span className="font-medium">{email}</span> exists,
-                we've sent password reset instructions to your email.
-              </p>
-            </div>
-
-            <div className="space-y-4">
-              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800">
-                <p className="font-medium mb-1">Didn't receive the email?</p>
-                <ul className="list-disc list-inside space-y-1 text-blue-700">
-                  <li>Check your spam folder</li>
-                  <li>Make sure you entered the correct email</li>
-                  <li>Wait a few minutes and try again</li>
-                </ul>
-              </div>
-
-              <Button
-                onClick={() => router.push('/login')}
-                variant="outline"
-                size="lg"
-                className="w-full rounded-full h-12"
-              >
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Login
-              </Button>
-            </div>
+      <MatanhoAuthShell trustLine="Secure | Compliant | Trusted">
+        <div className="text-center">
+          <div
+            className="inline-flex items-center justify-center w-14 h-14 rounded-full mb-5"
+            style={{ backgroundColor: `${MATANHO_TEAL}22` }}
+          >
+            <CheckCircle2 className="w-7 h-7" style={{ color: MATANHO_TEAL }} />
           </div>
-        </motion.div>
-      </div>
+          <h2 className="text-[26px] font-semibold text-white tracking-tight mb-2">Check your email</h2>
+          <p className="text-[14px] text-white/55 leading-relaxed mb-6">
+            If an account with <span className="text-white/85 font-medium">{email}</span> exists, we&apos;ve
+            sent password reset instructions.
+          </p>
+          <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-left text-[13px] text-white/60 mb-6">
+            <p className="font-medium text-white/80 mb-1.5">Didn&apos;t receive the email?</p>
+            <ul className="list-disc list-inside space-y-1">
+              <li>Check your spam folder</li>
+              <li>Confirm you entered the correct email</li>
+              <li>Wait a few minutes and try again</li>
+            </ul>
+          </div>
+          <button
+            type="button"
+            onClick={() => router.push("/login")}
+            className="w-full h-12 rounded-full text-white text-[15px] font-semibold inline-flex items-center justify-center gap-2"
+            style={{ backgroundColor: MATANHO_TEAL }}
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to login
+          </button>
+        </div>
+      </MatanhoAuthShell>
     )
   }
 
   return (
-    <div className="h-screen bg-white flex overflow-hidden gap-4 p-4">
-      {/* Left Section - Form */}
-      <div className="flex-1 flex items-center justify-center">
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.5 }}
-          className="w-full h-full max-w-2xl"
-        >
-          <div className="rounded-3xl p-8 h-full flex flex-col justify-center" style={{ backgroundColor: '#F8F8F8' }}>
-            {/* Logo */}
-            <div className="text-left mb-8 px-12">
-              <div className="inline-flex items-center justify-center mb-4">
-                <Image
-                  src="/logo.png"
-                  alt="Arcus Logo"
-                  width={200}
-                  height={200}
-                  className="object-contain"
-                />
-              </div>
-              <h1 className="text-4xl text-gray-900 mb-2">Forgot Password?</h1>
-              <p className="text-gray-600 text-lg">
-                No worries, we'll send you reset instructions
-              </p>
-            </div>
-
-            {/* Form */}
-            <form onSubmit={handleSubmit} className="space-y-6 px-12">
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 }}
-                className="relative"
-              >
-                <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter your email"
-                  disabled={isSubmitting}
-                  required
-                  className={`block w-full pl-12 pr-4 py-3 border rounded-full bg-white text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 border-gray-300 ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''
-                    }`}
-                />
-              </motion.div>
-
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-              >
-                <Button
-                  type="submit"
-                  disabled={isSubmitting}
-                  variant="gradient-info"
-                  size="lg"
-                  className="w-full rounded-full h-12 shadow-md"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="animate-spin -ml-1 mr-3 h-5 w-5" />
-                      Sending...
-                    </>
-                  ) : (
-                    'Send Reset Link'
-                  )}
-                </Button>
-              </motion.div>
-
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
-                className="text-center"
-              >
-                <Link
-                  href="/login"
-                  className="text-blue-600 hover:text-blue-700 font-medium text-sm transition-colors inline-flex items-center"
-                >
-                  <ArrowLeft className="w-4 h-4 mr-1" />
-                  Back to Login
-                </Link>
-              </motion.div>
-            </form>
-          </div>
-        </motion.div>
+    <MatanhoAuthShell>
+      <div className="mb-7">
+        <h2 className="text-[28px] sm:text-[30px] font-semibold text-white tracking-tight">Forgot password?</h2>
+        <p className="mt-1.5 text-[14px] text-white/55">
+          Enter your email and we&apos;ll send reset instructions.
+        </p>
       </div>
 
-      {/* Right Section - Same as login */}
-      <div className="hidden lg:flex lg:flex-1 items-center justify-center">
-        <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.5 }}
-          className="w-full h-full max-w-2xl"
-        >
-          <div className="rounded-3xl p-8 h-full flex flex-col justify-center relative overflow-hidden" style={{ backgroundColor: '#F8F8F8' }}>
-            <div className="absolute inset-0 bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600 opacity-90 rounded-3xl"></div>
-
-            <div className="absolute inset-0 opacity-10">
-              <div className="absolute inset-0" style={{
-                backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.1'%3E%3Ccircle cx='30' cy='30' r='4'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-              }}></div>
-            </div>
-
-            <div className="relative z-10 flex flex-col justify-center items-center text-center text-white">
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.8, delay: 0.2 }}
-                className="max-w-md"
-              >
-                <h2 className="text-3xl mb-4 leading-tight">
-                  Secure Password Recovery
-                </h2>
-
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 1, delay: 0.5 }}
-                  className="mb-6"
-                >
-                  <div className="relative w-48 h-48 mx-auto">
-                    <div className="absolute inset-0 transform rotate-12">
-                      <div className="w-full h-full bg-white/20 rounded-2xl transform rotate-45"></div>
-                    </div>
-                    <div className="absolute inset-4 transform -rotate-12">
-                      <div className="w-full h-full bg-white/30 rounded-2xl transform -rotate-45"></div>
-                    </div>
-                    <div className="absolute inset-8 transform rotate-6">
-                      <div className="w-full h-full bg-white/40 rounded-2xl transform rotate-12"></div>
-                    </div>
-                  </div>
-                </motion.div>
-
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.8, delay: 0.8 }}
-                  className="bg-white/10 backdrop-blur-sm rounded-2xl p-4"
-                >
-                  <p className="text-lg leading-relaxed">
-                    We'll send you a secure link to reset your password and regain access to your account.
-                  </p>
-                </motion.div>
-              </motion.div>
-            </div>
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <div>
+          <label className="block text-[13px] text-white/65 mb-1.5">Email address</label>
+          <div className="relative">
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="name@matanho.com"
+              disabled={isSubmitting}
+              required
+              className={inputClass}
+            />
+            <User className="absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40 pointer-events-none" />
           </div>
-        </motion.div>
-      </div>
-    </div>
+        </div>
+
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className="w-full h-12 rounded-full text-white text-[15px] font-semibold shadow-lg shadow-black/25 transition-opacity hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
+          style={{ backgroundColor: MATANHO_TEAL }}
+        >
+          {isSubmitting ? (
+            <>
+              <Loader2 className="animate-spin h-5 w-5" />
+              Sending...
+            </>
+          ) : (
+            "Send reset link"
+          )}
+        </button>
+
+        <div className="text-center pt-1">
+          <Link
+            href="/login"
+            className="text-[13px] font-medium inline-flex items-center gap-1 hover:underline underline-offset-2"
+            style={{ color: MATANHO_TEAL }}
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            Back to login
+          </Link>
+        </div>
+      </form>
+    </MatanhoAuthShell>
   )
 }

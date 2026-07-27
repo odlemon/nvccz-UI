@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { PM_NAV_GROUPS, PM_NAV_ITEMS } from "@/lib/performance-mock/nav"
 import {
@@ -18,27 +18,24 @@ import {
   Users,
   Trophy,
   User,
-  Activity,
   AlertTriangle,
-  Bell,
   Clock,
-  MessageSquare,
-  Scale,
   FileBarChart,
   Settings,
   LineChart,
   PieChart,
-  Coins,
-  GitBranch,
   Building,
   Columns3,
   Network,
   SlidersHorizontal,
   LayoutDashboard,
-  ChevronDown,
+  Calendar,
+  History,
+  ChevronUp,
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
+  Headphones,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
@@ -57,23 +54,19 @@ const ICONS: Record<string, LucideIcon> = {
   Users,
   Trophy,
   User,
-  Activity,
   AlertTriangle,
-  Bell,
   Clock,
-  MessageSquare,
-  Scale,
   FileBarChart,
   Settings,
   LineChart,
   PieChart,
-  Coins,
-  GitBranch,
   Building,
   Columns3,
   Network,
   SlidersHorizontal,
   LayoutDashboard,
+  Calendar,
+  History,
 }
 
 function NavIcon({ name, className }: { name: string; className?: string }) {
@@ -81,8 +74,19 @@ function NavIcon({ name, className }: { name: string; className?: string }) {
   return <Icon className={className} strokeWidth={1.75} />
 }
 
+function hrefPath(href: string) {
+  return href.split("?")[0]
+}
+
+function hrefView(href: string) {
+  const q = href.split("?")[1]
+  if (!q) return null
+  return new URLSearchParams(q).get("view")
+}
+
 export function PerformanceMockSidebar() {
   const pathname = usePathname()
+  const searchParams = useSearchParams()
   const router = useRouter()
   const [groupsCollapsed, setGroupsCollapsed] = useState<Record<string, boolean>>({})
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
@@ -107,31 +111,62 @@ export function PerformanceMockSidebar() {
     })
   }
 
+  const currentView = searchParams.get("view")
+
   const activeId = useMemo(() => {
     let best: { id: string; score: number } | null = null
+
     const consider = (href: string, id: string) => {
-      const base = href.split("?")[0]
-      if (pathname === base) {
-        best = { id, score: Infinity }
+      const base = hrefPath(href)
+      const view = hrefView(href)
+
+      if (pathname !== base && !(base !== "/" && pathname.startsWith(base + "/"))) return
+
+      // Query-backed siblings under the same path (Reports views)
+      if (view) {
+        if (pathname === base && currentView === view) {
+          best = { id, score: Infinity }
+        }
         return
       }
+
+      // Exact path without view query — prefer when no view is active
+      if (pathname === base) {
+        if (!currentView) {
+          best = { id, score: Infinity }
+        } else if (!best || best.score < base.length) {
+          // keep as weak fallback only if nothing better matched
+          if (!best) best = { id, score: base.length }
+        }
+        return
+      }
+
       if (base !== "/" && pathname.startsWith(base + "/")) {
         const score = base.length
         if (!best || score > best.score) best = { id, score }
       }
     }
+
     PM_NAV_ITEMS.forEach((i) => consider(i.href, i.id))
     PM_NAV_GROUPS.forEach((g) => g.items.forEach((i) => consider(i.href, i.id)))
+
+    // Reports default: /performance/reports with no view → Performance Reports
+    if (pathname === "/performance/reports" && !currentView) {
+      return "performance-reports"
+    }
+
     return best?.id ?? null
-  }, [pathname])
+  }, [pathname, currentView])
 
   useEffect(() => {
     setGroupsCollapsed((prev) => {
       const next = { ...prev }
       PM_NAV_GROUPS.forEach((g) => {
-        if (next[g.id] === undefined) {
-          const hasActive = g.items.some((i) => i.id === activeId)
-          next[g.id] = !hasActive
+        const hasActive = g.items.some((i) => i.id === activeId)
+        if (hasActive) {
+          next[g.id] = false
+        } else if (next[g.id] === undefined) {
+          next[g.id] = true
         }
       })
       return next
@@ -143,22 +178,27 @@ export function PerformanceMockSidebar() {
   return (
     <aside
       className={cn(
-        "shrink-0 bg-white border-r border-[#E5E7EB] h-[calc(100vh-5rem)] sticky top-20 flex flex-col z-20 transition-[width] duration-200",
-        sidebarCollapsed ? "w-[68px]" : "w-[212px]"
+        "shrink-0 bg-[#F8FAFC] border-r border-[#E5E7EB] h-[calc(100vh-5rem)] sticky top-20 flex flex-col z-20 transition-[width] duration-200",
+        sidebarCollapsed ? "w-[68px]" : "w-[220px]"
       )}
     >
-      <div className={cn("pt-3 pb-2", sidebarCollapsed ? "px-2" : "px-3")}>
-        <div className={cn("flex items-center gap-2", sidebarCollapsed && "justify-center")}>
-          <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-[#8B5CF6] to-[#7C3AED] flex items-center justify-center shadow-sm shrink-0">
-            <FileText className="h-4 w-4 text-white" />
+      <div className={cn("pt-4 pb-3", sidebarCollapsed ? "px-2" : "px-3.5")}>
+        <div className={cn("flex items-center gap-2.5", sidebarCollapsed && "justify-center")}>
+          <div className="h-8 w-8 rounded-lg bg-[#7C3AED] flex items-center justify-center shadow-sm shrink-0 text-white text-sm font-bold">
+            A
           </div>
           {!sidebarCollapsed && (
-            <p className="text-sm font-semibold text-[#111827] leading-tight truncate">Performance</p>
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-[#7C3AED] leading-none tracking-tight">Arcus</p>
+              <p className="text-[9px] font-semibold text-[#64748B] uppercase tracking-wide mt-0.5 truncate">
+                Performance Management
+              </p>
+            </div>
           )}
         </div>
       </div>
 
-      <nav className={cn("flex-1 overflow-y-auto pb-2 space-y-0.5", sidebarCollapsed ? "px-1.5" : "px-2")}>
+      <nav className={cn("flex-1 overflow-y-auto pb-2 space-y-0.5", sidebarCollapsed ? "px-1.5" : "px-2.5")}>
         {PM_NAV_ITEMS.map((item) => {
           const active = item.id === activeId
           return (
@@ -168,12 +208,12 @@ export function PerformanceMockSidebar() {
               title={sidebarCollapsed ? item.label : undefined}
               onClick={() => go(item.href)}
               className={cn(
-                "w-full flex items-center gap-2 py-1.5 rounded-lg text-xs transition-colors text-left",
+                "w-full flex items-center gap-2.5 py-2 rounded-xl text-xs transition-colors text-left",
                 sidebarCollapsed ? "justify-center px-0" : "px-2.5",
-                active ? "bg-[#F5F3FF] text-[#6D28D9] font-semibold" : "text-[#475569] hover:bg-[#F9FAFB]"
+                active ? "bg-[#F5F3FF] text-[#7C3AED] font-semibold" : "text-[#475569] hover:bg-white/80"
               )}
             >
-              <NavIcon name={item.icon} className={cn("h-3.5 w-3.5 shrink-0", active ? "text-[#6D28D9]" : "text-[#64748B]")} />
+              <NavIcon name={item.icon} className={cn("h-4 w-4 shrink-0", active ? "text-[#7C3AED]" : "text-[#64748B]")} />
               {!sidebarCollapsed && <span className="truncate">{item.label}</span>}
             </button>
           )
@@ -181,9 +221,9 @@ export function PerformanceMockSidebar() {
 
         {PM_NAV_GROUPS.map((group) => {
           const open = !groupsCollapsed[group.id]
+          const groupActive = group.items.some((i) => i.id === activeId)
           return (
-            <div key={group.id} className="pt-1.5">
-              <div className="border-t border-[#E5E7EB] mb-1.5" />
+            <div key={group.id} className="pt-1">
               <button
                 type="button"
                 title={sidebarCollapsed ? group.title : undefined}
@@ -196,25 +236,31 @@ export function PerformanceMockSidebar() {
                       /* ignore */
                     }
                     setGroupsCollapsed((p) => ({ ...p, [group.id]: false }))
+                    if (group.href) go(group.href)
                     return
                   }
                   setGroupsCollapsed((p) => ({ ...p, [group.id]: !p[group.id] }))
                 }}
                 className={cn(
-                  "w-full flex items-center gap-2 py-1.5 rounded-lg text-xs text-[#475569] hover:bg-[#F9FAFB]",
-                  sidebarCollapsed ? "justify-center px-0" : "px-2.5"
+                  "w-full flex items-center gap-2.5 py-2 rounded-xl text-xs transition-colors",
+                  sidebarCollapsed ? "justify-center px-0" : "px-2.5",
+                  groupActive ? "text-[#7C3AED] font-semibold" : "text-[#475569] hover:bg-white/80"
                 )}
               >
-                <NavIcon name={group.icon} className="h-3.5 w-3.5 text-[#64748B] shrink-0" />
+                <NavIcon name={group.icon} className={cn("h-4 w-4 shrink-0", groupActive ? "text-[#7C3AED]" : "text-[#64748B]")} />
                 {!sidebarCollapsed && (
                   <>
-                    <span className="flex-1 text-left font-medium truncate">{group.title}</span>
-                    {open ? <ChevronDown className="h-3 w-3 shrink-0" /> : <ChevronRight className="h-3 w-3 shrink-0" />}
+                    <span className="flex-1 text-left font-semibold truncate">{group.title}</span>
+                    {open ? (
+                      <ChevronUp className={cn("h-3.5 w-3.5 shrink-0", groupActive ? "text-[#7C3AED]" : "text-[#94A3B8]")} />
+                    ) : (
+                      <ChevronRight className={cn("h-3.5 w-3.5 shrink-0", groupActive ? "text-[#7C3AED]" : "text-[#94A3B8]")} />
+                    )}
                   </>
                 )}
               </button>
               {!sidebarCollapsed && open && (
-                <div className="ml-1.5 space-y-0.5">
+                <div className="mt-0.5 space-y-0.5 pl-2">
                   {group.items.map((item) => {
                     const active = item.id === activeId
                     return (
@@ -223,11 +269,13 @@ export function PerformanceMockSidebar() {
                         type="button"
                         onClick={() => go(item.href)}
                         className={cn(
-                          "w-full flex items-center gap-2 px-2.5 py-1 rounded-lg text-[11px] text-left",
-                          active ? "bg-[#F5F3FF] text-[#6D28D9] font-semibold" : "text-[#64748B] hover:bg-[#F9FAFB]"
+                          "w-full flex items-center gap-2 pl-5 pr-2.5 py-2 rounded-xl text-[11px] text-left transition-colors",
+                          active
+                            ? "bg-[#F5F3FF] text-[#7C3AED] font-semibold"
+                            : "text-[#64748B] hover:bg-white/80"
                         )}
                       >
-                        <NavIcon name={item.icon} className={cn("h-3 w-3 shrink-0", active ? "text-[#6D28D9]" : "")} />
+                        <NavIcon name={item.icon} className={cn("h-3.5 w-3.5 shrink-0", active ? "text-[#7C3AED]" : "text-[#94A3B8]")} />
                         <span className="truncate">{item.label}</span>
                       </button>
                     )
@@ -239,13 +287,28 @@ export function PerformanceMockSidebar() {
         })}
       </nav>
 
-      <div className={cn("shrink-0 border-t border-[#E5E7EB] p-1.5", sidebarCollapsed && "px-1")}>
+      <div className={cn("shrink-0 p-2.5 space-y-2", sidebarCollapsed && "px-1.5")}>
+        {!sidebarCollapsed && (
+          <div className="rounded-xl border border-[#E5E7EB] bg-white p-3">
+            <div className="flex items-start gap-2">
+              <div className="h-8 w-8 rounded-lg bg-[#F3E8FF] text-[#7C3AED] flex items-center justify-center shrink-0">
+                <Headphones className="h-4 w-4" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-[#111827]">Need help?</p>
+                <a href="#" className="text-[11px] font-medium text-[#7C3AED] hover:underline" onClick={(e) => e.preventDefault()}>
+                  Visit Arcus Support
+                </a>
+              </div>
+            </div>
+          </div>
+        )}
         <button
           type="button"
           onClick={toggleSidebarCollapsed}
           aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           className={cn(
-            "flex h-8 w-full items-center gap-2 rounded-lg px-2.5 text-[11px] font-medium text-[#64748B] transition-colors hover:bg-[#F9FAFB] hover:text-[#111827]",
+            "flex h-8 w-full items-center gap-2 rounded-xl px-2.5 text-[11px] font-medium text-[#64748B] transition-colors hover:bg-white hover:text-[#111827]",
             sidebarCollapsed && "justify-center px-0"
           )}
         >
@@ -257,15 +320,10 @@ export function PerformanceMockSidebar() {
   )
 }
 
-/**
- * Page context trail only — search / notifications / profile live in SharedTopbar.
- * Kept as a named export so existing screens do not need a bulk rewrite.
- */
 export function PerformanceMockTopChrome({
   breadcrumbs,
 }: {
   breadcrumbs?: string[]
-  /** @deprecated Ignored — global search is in SharedTopbar */
   searchPlaceholder?: string
 }) {
   const crumbs = breadcrumbs?.filter(Boolean) ?? []
@@ -285,7 +343,6 @@ export function PerformanceMockTopChrome({
   )
 }
 
-/** Optional link helper for in-screen navigation */
 export function PmLink({ href, children, className }: { href: string; children: React.ReactNode; className?: string }) {
   return (
     <Link href={href} className={cn("text-sm font-medium text-[#7C3AED] hover:underline", className)}>

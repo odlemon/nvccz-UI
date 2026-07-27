@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState, type ReactNode } from "react"
+import { useRouter } from "next/navigation"
 import {
   Target,
   CheckCircle2,
@@ -348,6 +349,7 @@ function MetricCard({
 }
 
 export function GoalsMockScreen() {
+  const router = useRouter()
   const [objectives, setObjectives] = useState<Objective[]>(initialObjectives)
   const [tab, setTab] = useState<"all" | "company" | "department">("all")
   const [search, setSearch] = useState("")
@@ -572,7 +574,7 @@ export function GoalsMockScreen() {
                             "grid grid-cols-[minmax(280px,2fr)_180px_140px_110px_110px_120px] gap-3 items-center px-3 py-2.5 cursor-pointer transition-colors",
                             isSelected ? "bg-[#F5F3FF]" : "hover:bg-[#F9FAFB]"
                           )}
-                          onClick={() => selectObjective(o.id)}
+                          onClick={() => router.push("/performance/goals/obj-1")}
                         >
                           <div className="flex items-start gap-2.5 min-w-0">
                             <button

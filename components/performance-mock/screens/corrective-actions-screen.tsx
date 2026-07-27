@@ -485,11 +485,16 @@ export function CorrectiveActionsMockScreen() {
               </thead>
               <tbody>
                 {pageRows.map((r) => (
-                  <tr key={r.id} className="border-b border-[#F8FAFC] hover:bg-[#F9FAFB] transition-colors">
+                  <tr
+                    key={r.id}
+                    className="border-b border-[#F8FAFC] hover:bg-[#F9FAFB] transition-colors cursor-pointer"
+                    onClick={() => (window.location.href = `/performance/corrective-actions/${r.id}`)}
+                  >
                     <td className="py-3 px-4">
                       <input
                         type="checkbox"
                         checked={selected.has(r.id)}
+                        onClick={(e) => e.stopPropagation()}
                         onChange={() => toggleSelect(r.id)}
                         className="rounded border-[#D1D5DB] accent-[#8B5CF6]"
                       />

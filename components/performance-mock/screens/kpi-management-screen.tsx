@@ -336,7 +336,7 @@ export function KpiManagementMockScreen() {
               <PmButton variant="outline">
                 <Upload className="h-3.5 w-3.5" /> Export
               </PmButton>
-              <PmButton variant="primary" className="!bg-[#8B5CF6] hover:!bg-[#7C3AED]" onClick={() => setModalOpen(true)}>
+              <PmButton variant="primary" className="!bg-[#8B5CF6] hover:!bg-[#7C3AED]" onClick={() => (window.location.href = "/performance/kpis/new")}>
                 <Plus className="h-3.5 w-3.5" /> New KPI
               </PmButton>
             </>

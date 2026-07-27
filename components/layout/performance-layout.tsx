@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
+import { Suspense, useState, useEffect } from "react"
 import { usePathname } from "next/navigation"
 import { SharedTopbar } from "./shared-topbar"
 import { PerformanceMockSidebar } from "@/components/performance-mock/shell"
@@ -34,7 +34,9 @@ export function PerformanceLayout({ children }: PerformanceLayoutProps) {
     <div className="min-h-screen bg-[#F9FAFB]">
       <SharedTopbar onModuleSelect={handleModuleSelect} currentModule={currentModule} />
       <div className="flex">
-        <PerformanceMockSidebar />
+        <Suspense fallback={<aside className="w-[220px] shrink-0 border-r border-[#E5E7EB] bg-[#F8FAFC]" />}>
+          <PerformanceMockSidebar />
+        </Suspense>
         <main className="flex-1 min-w-0 overflow-auto">{children}</main>
       </div>
     </div>

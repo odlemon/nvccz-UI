@@ -10,7 +10,6 @@ import {
   Download,
   FileSpreadsheet,
   Filter,
-  FunctionSquare,
   Plus,
   RefreshCw,
   Search,
@@ -20,6 +19,7 @@ import {
   XCircle,
   Building2,
   Cloud,
+  Zap,
 } from "lucide-react"
 import { toast } from "sonner"
 import { PerformanceMockTopChrome } from "@/components/performance-mock/shell"
@@ -80,11 +80,17 @@ function FilterCard({
   onChange: (v: string) => void
 }) {
   return (
-    <label className="flex items-center gap-2.5 h-8 rounded-xl border border-[#E5E7EB] bg-white px-3 shadow-sm cursor-pointer hover:bg-[#F9FAFB] min-w-[150px]">
-      <span className="h-7 w-7 rounded-lg bg-[#F3E8FF] text-[#8B5CF6] flex items-center justify-center shrink-0">{icon}</span>
-      <div className="min-w-0 flex-1">
-        <p className="text-[10px] text-[#9CA3AF] font-medium leading-none">{label}</p>
-        <select value={value} onChange={(e) => onChange(e.target.value)} className="w-full appearance-none bg-transparent outline-none text-xs font-semibold text-[#111827] mt-0.5 cursor-pointer">
+    <label className="inline-flex items-center gap-2 h-10 rounded-full border border-[#E2E8F0] bg-white pl-1.5 pr-3 cursor-pointer hover:bg-[#F8FAFC] shrink-0">
+      <span className="h-7 w-7 rounded-full bg-[#F5F3FF] text-[#7C3AED] flex items-center justify-center shrink-0">
+        {icon}
+      </span>
+      <div className="min-w-0 leading-tight pr-1">
+        <p className="text-[9px] text-[#94A3B8] font-medium">{label}</p>
+        <select
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-full appearance-none bg-transparent outline-none text-[12px] font-bold text-[#0F172A] cursor-pointer max-w-[120px] truncate"
+        >
           {options.map((o) => (
             <option key={o} value={o}>
               {o}
@@ -92,6 +98,7 @@ function FilterCard({
           ))}
         </select>
       </div>
+      <ChevronDown className="h-3.5 w-3.5 text-[#94A3B8] shrink-0" />
     </label>
   )
 }
@@ -198,13 +205,13 @@ export function IntegrationsMockScreen() {
           subtitle="Map data from source systems to KPI and Scorecard fields."
           actions={
             <>
-              <PmButton variant="outline" onClick={() => toast.success("Sources refreshed")}>
+              <PmButton variant="outline" className="rounded-full" onClick={() => toast.success("Sources refreshed")}>
                 <RefreshCw className="h-3.5 w-3.5" /> Refresh
               </PmButton>
-              <PmButton variant="outline" onClick={() => toast.success("Export started", { description: "Mapping configuration will download shortly." })}>
+              <PmButton variant="outline" className="rounded-full" onClick={() => toast.success("Export started", { description: "Mapping configuration will download shortly." })}>
                 <Download className="h-3.5 w-3.5" /> Export
               </PmButton>
-              <PmButton className="!bg-[#8B5CF6] hover:!bg-[#7C3AED]" onClick={() => setAddOpen(true)}>
+              <PmButton className="rounded-full !bg-[#7C3AED] hover:!bg-[#6D28D9]" onClick={() => setAddOpen(true)}>
                 <Plus className="h-3.5 w-3.5" /> Add Mapping
               </PmButton>
             </>
@@ -221,7 +228,7 @@ export function IntegrationsMockScreen() {
             onChange={setSourceFilter}
           />
           <FilterCard
-            icon={<FunctionSquare className="h-3.5 w-3.5" />}
+            icon={<Zap className="h-3.5 w-3.5" />}
             label="Source Type"
             value={typeFilter}
             options={mappingTypeOptions}
@@ -241,17 +248,22 @@ export function IntegrationsMockScreen() {
             options={mappingFrequencyOptions}
             onChange={setFreqFilter}
           />
-          <div className="relative flex-1 min-w-[200px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#9CA3AF]" />
+          <div className="relative flex-1 min-w-[220px]">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#94A3B8]" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search mappings by name or field..."
-              className="w-full h-8 pl-9 pr-3 rounded-xl border border-[#E5E7EB] text-xs outline-none focus:border-[#C4B5FD] bg-white shadow-sm"
+              className="w-full h-10 pl-9 pr-4 rounded-full border border-[#E2E8F0] text-[12px] outline-none focus:border-[#7C3AED] bg-white placeholder:text-[#94A3B8]"
             />
           </div>
-          <button type="button" className="h-8 px-3 rounded-xl border border-[#E5E7EB] bg-white text-xs font-medium text-[#374151] inline-flex items-center gap-1.5 shadow-sm hover:bg-[#F9FAFB]">
-            <Filter className="h-3.5 w-3.5" /> Filters
+          <button
+            type="button"
+            onClick={() => toast("More filters", { description: "Advanced filter panel opens here." })}
+            className="h-10 w-10 rounded-full border border-[#E2E8F0] bg-white text-[#64748B] inline-flex items-center justify-center hover:bg-[#F8FAFC] shrink-0"
+            aria-label="More filters"
+          >
+            <Filter className="h-4 w-4" />
           </button>
         </div>
 

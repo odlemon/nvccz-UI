@@ -3,9 +3,7 @@
 import { useState, useEffect } from "react"
 import { useForm, Controller } from "react-hook-form"
 import { yupResolver } from "@hookform/resolvers/yup"
-import { motion } from "framer-motion"
-import { Eye, EyeOff, Mail, Lock, Loader2 } from "lucide-react"
-import Image from "next/image"
+import { Eye, EyeOff, User, Loader2, Lock } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { loginSchema, type LoginFormData } from "@/lib/validations/auth"
@@ -13,10 +11,45 @@ import { useAppDispatch, useAppSelector } from "@/lib/store"
 import { loginUser, clearError } from "@/lib/store/slices/authSlice"
 import { getRoleBasedRedirect } from "@/lib/utils/role-redirect"
 import { toast } from "sonner"
-import { Button } from "@/components/ui/button"
+import { MatanhoAuthShell, MATANHO_TEAL } from "@/components/auth/matanho-auth-shell"
+
+function GoogleIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" aria-hidden>
+      <path
+        fill="#4285F4"
+        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+      />
+      <path
+        fill="#34A853"
+        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+      />
+      <path
+        fill="#EA4335"
+        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+      />
+    </svg>
+  )
+}
+
+function MicrosoftIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 23 23" aria-hidden>
+      <path fill="#F25022" d="M1 1h10v10H1z" />
+      <path fill="#00A4EF" d="M12 1h10v10H12z" />
+      <path fill="#7FBA00" d="M1 12h10v10H1z" />
+      <path fill="#FFB900" d="M12 12h10v10H12z" />
+    </svg>
+  )
+}
 
 function LoginForm() {
   const [showPassword, setShowPassword] = useState(false)
+  const [rememberMe, setRememberMe] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const dispatch = useAppDispatch()
   const { error, isAuthenticated, userDetails, isFetchingDetails, user } = useAppSelector((state) => state.auth)
@@ -28,30 +61,28 @@ function LoginForm() {
     formState: { errors },
   } = useForm<LoginFormData>({
     resolver: yupResolver(loginSchema),
-    mode: 'onBlur',
+    mode: "onBlur",
     defaultValues: {
       email: "",
       password: "",
     },
   })
 
-  // Clear error when component unmounts or when user starts typing
   useEffect(() => {
     return () => {
       dispatch(clearError())
     }
   }, [dispatch])
 
-  // Handle redirect after login (with or without full profile)
   useEffect(() => {
     if (!isAuthenticated || !isSubmitting || isFetchingDetails) return
 
     if (userDetails) {
-      const redirect = getRoleBasedRedirect(userDetails, userDetails.role.name.toLowerCase() === 'applicant')
+      const redirect = getRoleBasedRedirect(userDetails, userDetails.role.name.toLowerCase() === "applicant")
 
       if (redirect.shouldRedirect) {
-        toast.success('Login successful!', {
-          description: `Welcome back, ${userDetails.firstName}!`
+        toast.success("Login successful!", {
+          description: `Welcome back, ${userDetails.firstName}!`,
         })
 
         setTimeout(() => {
@@ -63,10 +94,10 @@ function LoginForm() {
     }
 
     if (user) {
-      const roleName = (user.role || 'admin').toLowerCase()
-      const path = roleName === 'applicant' ? '/application-portal' : '/'
-      toast.success('Login successful!', {
-        description: `Welcome back, ${user.firstName}!`
+      const roleName = (user.role || "admin").toLowerCase()
+      const path = roleName === "applicant" ? "/application-portal" : "/"
+      toast.success("Login successful!", {
+        description: `Welcome back, ${user.firstName}!`,
       })
       setTimeout(() => {
         window.location.href = path
@@ -76,351 +107,180 @@ function LoginForm() {
   }, [isAuthenticated, userDetails, isFetchingDetails, isSubmitting, user, router])
 
   const onSubmit = async (data: LoginFormData) => {
-    if (isSubmitting) return // Prevent double submission
+    if (isSubmitting) return
 
     try {
       setIsSubmitting(true)
-
-      // Login will automatically trigger fetchUserDetails in the authSlice
       await dispatch(loginUser(data)).unwrap()
-
-      // The redirect will be handled by the useEffect above once userDetails are loaded
-      // Don't redirect here, wait for userDetails to be fetched
-
-    } catch (error: any) {
-      // Error toast
-      toast.error('Login failed', {
-        description: error || 'Please check your credentials and try again.'
+    } catch (err: any) {
+      toast.error("Login failed", {
+        description: err || "Please check your credentials and try again.",
       })
-
-      console.error('Login error:', error)
-      setIsSubmitting(false) // Reset on error
+      console.error("Login error:", err)
+      setIsSubmitting(false)
     }
   }
 
-  // Show loading state while fetching user details after successful login
   const isLoading = isSubmitting || (isAuthenticated && isFetchingDetails)
 
+  const inputClass =
+    "block w-full h-12 pl-4 pr-11 rounded-xl bg-[#0E1520]/80 border border-white/15 text-white text-sm placeholder:text-white/35 outline-none focus:border-[#14C4CE] focus:ring-1 focus:ring-[#14C4CE]/40 transition-colors disabled:opacity-50"
+
   return (
-    <div className="h-screen bg-white flex overflow-hidden gap-4 p-4">
-      {/* Left Section - Login Form */}
-      <div className="flex-1 flex items-center justify-center">
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.5 }}
-          className="w-full h-full max-w-2xl"
-        >
-          {/* Form Card */}
-          <div className="rounded-3xl p-8 h-full flex flex-col justify-center" style={{ backgroundColor: '#F8F8F8' }}>
-            {/* Logo */}
-            <div className="text-left mb-8 px-12">
-              <div className="inline-flex items-center justify-center mb-4">
-                <Image
-                  src="/logo_copy.png"
-                  alt="Arcus Logo"
-                  width={200}
-                  height={200}
-                  className=" object-contain"
-                />
-              </div>
-              <h1 className="text-4xl text-gray-900 mb-2">Welcome to Arcus</h1>
-              <p className="text-gray-600 text-lg">
-                Financial intelligence and portfolio management powered by AI
-              </p>
-            </div>
-
-            {/* Error Message */}
-            {error && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm mx-12"
-              >
-                {error}
-              </motion.div>
-            )}
-
-            {/* Loading State - Fetching User Details */}
-            {isAuthenticated && isFetchingDetails && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl text-blue-700 text-sm mx-12 flex items-center"
-              >
-                <Loader2 className="animate-spin mr-2 h-4 w-4" />
-                Loading your profile...
-              </motion.div>
-            )}
-
-            {/* Login Form */}
-            <form
-              method="post"
-              action="#"
-              onSubmit={handleSubmit(onSubmit)}
-              className="space-y-4 px-12"
-            >
-              {/* Email Field */}
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 }}
-                className="relative"
-              >
-                <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <Controller
-                  name="email"
-                  control={control}
-                  render={({ field }) => (
-                    <input
-                      {...field}
-                      type="email"
-                      autoComplete="email"
-                      placeholder="you@example.com"
-                      disabled={isLoading}
-                      className={`block w-full pl-12 pr-4 py-3 border rounded-full bg-white text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${errors.email ? 'border-red-300' : 'border-gray-300'
-                        } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    />
-                  )}
-                />
-                {errors.email && (
-                  <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>
-                )}
-              </motion.div>
-
-              {/* Password Field */}
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-                className="relative"
-              >
-                <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <Controller
-                  name="password"
-                  control={control}
-                  render={({ field }) => (
-                    <input
-                      {...field}
-                      type={showPassword ? 'text' : 'password'}
-                      autoComplete="current-password"
-                      placeholder="••••••••"
-                      disabled={isLoading}
-                      className={`block w-full pl-12 pr-12 py-3 border rounded-full bg-white text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 ${errors.password ? 'border-red-300' : 'border-gray-300'
-                        } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    />
-                  )}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  disabled={isLoading}
-                  className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50"
-                >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-                {errors.password && (
-                  <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>
-                )}
-              </motion.div>
-
-              {/* Remember Me & Forgot Password */}
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
-                className="flex items-center justify-between"
-              >
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    disabled={isLoading}
-                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2 disabled:opacity-50"
-                  />
-                  <span className="ml-2 text-sm text-gray-600">Remember me</span>
-                </label>
-                <Link
-                  href="/forgot-password"
-                  className="text-sm text-blue-600 hover:text-blue-700 transition-colors"
-                >
-                  Forgot password?
-                </Link>
-              </motion.div>
-
-              {/* Sign In Button */}
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 }}
-              >
-                <Button
-                  type="submit"
-                  disabled={isLoading}
-                  variant="gradient-info"
-                  size="lg"
-                  className="w-full rounded-full cursor-pointer h-12 shadow-md"
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="animate-spin -ml-1 mr-3 h-5 w-5" />
-                      {isFetchingDetails ? 'Loading profile...' : 'Signing in...'}
-                    </>
-                  ) : (
-                    'Sign in'
-                  )}
-                </Button>
-              </motion.div>
-
-              {/* Submit Application Button */}
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.5 }}
-              >
-                <Button
-                  type="button"
-                  variant="gradient-info"
-                  size="lg"
-                  className="w-full rounded-full cursor-pointer h-12 shadow-md"
-                  disabled={isLoading}
-                  onClick={() => router.push('/applications/form')}
-                >
-                  Submit Application
-                </Button>
-              </motion.div>
-
-              {/* Vendor Registration Link */}
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.55 }}
-                className="text-center"
-              >
-                <span className="text-gray-600 text-sm">
-                  Are you a supplier?{' '}
-                </span>
-                <Link
-                  href="/vendor-portal/register"
-                  className="text-blue-600 hover:text-blue-700 font-medium text-sm transition-colors"
-                >
-                  Register as Vendor
-                </Link>
-              </motion.div>
-
-              {/* Sign Up Link */}
-              {/* <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.6 }}
-                className="text-center"
-              >
-                <span className="text-gray-600 text-sm">
-                  Don't have an account?{' '}
-                </span>
-                <Link
-                  href="/auth/register"
-                  className="text-blue-600 hover:text-blue-700 font-medium text-sm transition-colors"
-                >
-                  Sign up
-                </Link>
-              </motion.div> */}
-            </form>
-
-            {/* Social Proof */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.6 }}
-              className="mt-6 px-12 flex items-center justify-center space-x-2 text-sm text-gray-500"
-            >
-              <div className="flex -space-x-2">
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 border-2 border-white"></div>
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-400 to-green-600 border-2 border-white"></div>
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-400 to-purple-600 border-2 border-white"></div>
-              </div>
-              <span>Join 10,000+ investors</span>
-            </motion.div>
-          </div>
-        </motion.div>
+    <MatanhoAuthShell>
+      <div className="mb-7">
+        <h2 className="text-[28px] sm:text-[30px] font-semibold text-white tracking-tight">Welcome back</h2>
+        <p className="mt-1.5 text-[14px] text-white/55">Sign in to continue to your account.</p>
       </div>
 
-      {/* Right Section - Promotional Banner */}
-      <div className="hidden lg:flex lg:flex-1 items-center justify-center">
-        <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.5 }}
-          className="w-full h-full max-w-2xl"
-        >
-          <div className="rounded-3xl p-8 h-full flex flex-col justify-center relative overflow-hidden" style={{ backgroundColor: '#F8F8F8' }}>
-            <div className="absolute inset-0 bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600 opacity-90 rounded-3xl"></div>
+      {error && (
+        <div className="mb-5 p-3 rounded-xl bg-red-500/15 border border-red-400/30 text-red-200 text-sm">{error}</div>
+      )}
 
-            {/* Background Pattern */}
-            <div className="absolute inset-0 opacity-10">
-              <div className="absolute inset-0" style={{
-                backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.1'%3E%3Ccircle cx='30' cy='30' r='4'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-              }}></div>
-            </div>
+      {isAuthenticated && isFetchingDetails && (
+        <div className="mb-5 p-3 rounded-xl bg-sky-500/15 border border-sky-400/30 text-sky-100 text-sm flex items-center gap-2">
+          <Loader2 className="animate-spin h-4 w-4 shrink-0" />
+          Loading your profile...
+        </div>
+      )}
 
-            <div className="relative z-10 flex flex-col justify-center items-center text-center text-white">
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.8, delay: 0.2 }}
-                className="max-w-md"
-              >
-                <h2 className="text-3xl mb-4 leading-tight">
-                  AI Revolutionizing the way we create, manage, and experience financial intelligence
-                </h2>
-
-                {/* 3D-like Graphic */}
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 1, delay: 0.5 }}
-                  className="mb-6"
-                >
-                  <div className="relative w-48 h-48 mx-auto">
-                    {/* Abstract 3D-like structure */}
-                    <div className="absolute inset-0 transform rotate-12">
-                      <div className="w-full h-full bg-white/20 rounded-2xl transform rotate-45"></div>
-                    </div>
-                    <div className="absolute inset-4 transform -rotate-12">
-                      <div className="w-full h-full bg-white/30 rounded-2xl transform -rotate-45"></div>
-                    </div>
-                    <div className="absolute inset-8 transform rotate-6">
-                      <div className="w-full h-full bg-white/40 rounded-2xl transform rotate-12"></div>
-                    </div>
-                  </div>
-                </motion.div>
-
-                {/* Feature Description */}
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.8, delay: 0.8 }}
-                  className="bg-white/10 backdrop-blur-sm rounded-2xl p-4"
-                >
-                  <div className="flex items-center justify-center mb-4">
-                    <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mr-4">
-                      <span className="text-lg font-semibold">AI</span>
-                    </div>
-                    <div className="flex space-x-2">
-                      <div className="w-2 h-2 bg-white/60 rounded-full"></div>
-                      <div className="w-2 h-2 bg-white/40 rounded-full"></div>
-                      <div className="w-2 h-2 bg-white/20 rounded-full"></div>
-                    </div>
-                  </div>
-                  <p className="text-lg leading-relaxed">
-                    Create investment strategies with AI voice commands to make intelligent financial decisions that suit your needs.
-                  </p>
-                </motion.div>
-              </motion.div>
-            </div>
+      <form method="post" action="#" onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+        <div>
+          <label className="block text-[13px] text-white/65 mb-1.5">Email address</label>
+          <div className="relative">
+            <Controller
+              name="email"
+              control={control}
+              render={({ field }) => (
+                <input
+                  {...field}
+                  type="email"
+                  autoComplete="email"
+                  placeholder="name@matanho.com"
+                  disabled={isLoading}
+                  className={inputClass}
+                />
+              )}
+            />
+            <User className="absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40 pointer-events-none" />
           </div>
-        </motion.div>
+          {errors.email && <p className="mt-1 text-sm text-red-300">{errors.email.message}</p>}
+        </div>
+
+        <div>
+          <label className="block text-[13px] text-white/65 mb-1.5">Password</label>
+          <div className="relative">
+            <Controller
+              name="password"
+              control={control}
+              render={({ field }) => (
+                <input
+                  {...field}
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  placeholder="Enter your password"
+                  disabled={isLoading}
+                  className={inputClass}
+                />
+              )}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              disabled={isLoading}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/70 transition-colors disabled:opacity-50 p-0.5"
+              aria-label={showPassword ? "Hide password" : "Show password"}
+            >
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
+          {errors.password && <p className="mt-1 text-sm text-red-300">{errors.password.message}</p>}
+        </div>
+
+        <div className="flex items-center justify-between gap-3 pt-0.5">
+          <label className="inline-flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              disabled={isLoading}
+              className="h-4 w-4 rounded border-white/30 accent-[#14C4CE] cursor-pointer disabled:opacity-50"
+            />
+            <span className="text-[13px] text-white/90">Remember me</span>
+          </label>
+          <Link
+            href="/forgot-password"
+            className="text-[13px] font-medium hover:underline underline-offset-2"
+            style={{ color: MATANHO_TEAL }}
+          >
+            Forgot password?
+          </Link>
+        </div>
+
+        <button
+          type="submit"
+          disabled={isLoading}
+          className="w-full h-12 rounded-full text-white text-[15px] font-semibold shadow-lg shadow-black/25 transition-opacity hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
+          style={{ backgroundColor: MATANHO_TEAL }}
+        >
+          {isLoading ? (
+            <>
+              <Loader2 className="animate-spin h-5 w-5" />
+              {isFetchingDetails ? "Loading profile..." : "Signing in..."}
+            </>
+          ) : (
+            "Sign in"
+          )}
+        </button>
+      </form>
+
+      <div className="mt-7 flex items-center gap-3">
+        <div className="h-px flex-1 bg-white/15" />
+        <span className="text-[12px] text-white/45 shrink-0">or continue with</span>
+        <div className="h-px flex-1 bg-white/15" />
       </div>
-    </div>
+
+      <div className="mt-5 flex items-center justify-center gap-4">
+        <button
+          type="button"
+          onClick={() => toast("Google sign-in", { description: "SSO will be available soon." })}
+          className="h-11 w-11 rounded-full border border-white/15 bg-[#0E1520]/70 hover:bg-white/10 inline-flex items-center justify-center transition-colors"
+          aria-label="Continue with Google"
+        >
+          <GoogleIcon className="h-5 w-5" />
+        </button>
+        <button
+          type="button"
+          onClick={() => toast("Microsoft sign-in", { description: "SSO will be available soon." })}
+          className="h-11 w-11 rounded-full border border-white/15 bg-[#0E1520]/70 hover:bg-white/10 inline-flex items-center justify-center transition-colors"
+          aria-label="Continue with Microsoft"
+        >
+          <MicrosoftIcon className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          onClick={() => toast("Secure sign-in", { description: "Additional auth options coming soon." })}
+          className="h-11 w-11 rounded-full border border-white/15 bg-[#0E1520]/70 hover:bg-white/10 inline-flex items-center justify-center transition-colors"
+          aria-label="Secure sign-in"
+        >
+          <Lock className="h-4 w-4 text-white/85" />
+        </button>
+      </div>
+
+      <div className="mt-7 flex flex-col sm:flex-row items-center justify-center gap-x-4 gap-y-2 text-[12px] text-white/45">
+        <button
+          type="button"
+          onClick={() => router.push("/applications/form")}
+          className="hover:text-white/80 transition-colors"
+        >
+          Submit application
+        </button>
+        <span className="hidden sm:inline text-white/20">·</span>
+        <Link href="/vendor-portal/register" className="hover:text-white/80 transition-colors">
+          Register as vendor
+        </Link>
+      </div>
+    </MatanhoAuthShell>
   )
 }
 

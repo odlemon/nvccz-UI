@@ -23,13 +23,13 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-  title: "Arcus - Investment ERP",
-  description: "Professional Investment Management Platform",
+  title: "Matanho — Investment Management ERP",
+  description: "The infrastructure behind every investment.",
   generator: "v0.app",
   icons: {
-    icon: "/logo.png",
-    shortcut: "/logo.png",
-    apple: "/logo.png",
+    icon: "/new_logo.jpeg",
+    shortcut: "/new_logo.jpeg",
+    apple: "/new_logo.jpeg",
   },
 }
 
