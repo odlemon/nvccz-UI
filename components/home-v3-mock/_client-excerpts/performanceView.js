@@ -1,0 +1,6 @@
+function performanceView() {
+    const periods={'Q3 2026':1,'Q2 2026':.91,'Q1 2026':.84}, mult=periods[state.performancePeriod]||1;
+    const tabs=['Overview','Scorecard','Goals','Feedback','Development'];
+    const body=state.performanceTab==='Scorecard'?performanceScorecard():state.performanceTab==='Goals'?performanceGoals(mult):state.performanceTab==='Feedback'?performanceFeedback():state.performanceTab==='Development'?performanceDevelopment():performanceOverview(mult);
+    return `${pageHead('My Performance','A clear view of outcomes, contribution, evidence and growth.',`<button class="secondary-btn" data-action="open-scorecard">${icon('performance')} Balanced scorecard</button><button class="primary-btn" data-action="prepare-review">${icon('edit')} Prepare review</button>`)}<div class="performance-controls"><select class="select-control" id="performancePeriod"><option>Q3 2026</option><option>Q2 2026</option><option>Q1 2026</option></select><div class="performance-tabs">${tabs.map(t=>`<button class="${state.performanceTab===t?'active':''}" data-performance-tab="${t}">${t}</button>`).join('')}</div><span class="live-sync"><i></i> Scorecard synced 4 min ago</span></div>${body}`;
+  }

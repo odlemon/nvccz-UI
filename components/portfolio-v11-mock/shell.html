@@ -1,0 +1,61 @@
+<div id="app" class="app-shell sidebar-collapsed">
+    <aside id="sidebar" class="sidebar" aria-label="Main navigation">
+      <div class="brand-row">
+        <button class="brand brand-image-button" data-action="go-home" aria-label="Go to portfolio dashboard">
+          <img class="brand-logo-full" src="/portfolio-v11/assets/matanho-logo.png" alt="Matanho Investment Management ERP">
+          <img class="brand-logo-collapsed" src="/portfolio-v11/assets/matanho-monogram.png" alt="Matanho">
+        </button>
+      </div>
+
+      <button class="tenant-switcher" data-action="tenant-switch">
+        <span class="tenant-avatar">MC</span>
+        <span class="tenant-copy">
+          <strong>Matanho Capital</strong>
+          <small>Private Markets Workspace</small>
+        </span>
+        <span data-icon="chevrons-up-down"></span>
+      </button>
+
+      <div class="nav-scroll">
+        <div id="primaryNav"></div>
+      </div>
+
+      <div class="sidebar-foot">
+        <button class="user-switcher" data-action="user-menu">
+          <span class="avatar avatar-gradient">TM</span>
+          <span class="user-switcher-copy"><strong>Tariro Moyo</strong><small>Investment Director</small></span>
+          <span data-icon="chevron-right"></span>
+        </button>
+        <button class="sidebar-collapse sidebar-collapse-bottom" data-action="toggle-sidebar" aria-label="Expand sidebar">
+          <span class="sidebar-collapse-icon" aria-hidden="true"></span>
+          <span class="collapse-label">Expand menu</span>
+        </button>
+      </div>
+    </aside>
+
+    <header id="topbar" class="topbar">
+      <div class="topbar-left">
+        <button class="icon-button mobile-menu" data-action="toggle-mobile-nav" aria-label="Open navigation"></button>
+        <button class="search-trigger" data-action="open-search">
+          <span data-icon="search"></span>
+          <span>Search funds, companies, LPs and deals...</span>
+          <kbd>⌘ K</kbd>
+        </button>
+      </div>
+      <div class="topbar-right">
+        <button class="module-pill" data-action="module-switcher"><span data-icon="grid"></span><span>Portfolio Management</span></button>
+        <button class="icon-button" data-action="toggle-theme" aria-label="Toggle theme"><span data-icon="sun"></span></button>
+        <button class="icon-button notification-button" data-action="notifications" aria-label="Notifications"><span data-icon="bell"></span><span class="notification-count">4</span></button>
+        <button class="top-avatar" data-action="user-menu">TM</button>
+      </div>
+    </header>
+
+    <main id="workspace" class="workspace" tabindex="-1"></main>
+
+    <div id="scrim" class="scrim" data-action="close-overlays"></div>
+    <aside id="drawer" class="drawer" aria-label="Detail drawer"></aside>
+    <div id="modalLayer" class="modal-layer" aria-live="polite"></div>
+    <div id="popover" class="popover-layer"></div>
+    <div id="commandPalette" class="command-palette"></div>
+    <div id="toastStack" class="toast-stack" aria-live="polite"></div>
+  </div>

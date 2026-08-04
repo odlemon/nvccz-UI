@@ -1,0 +1,1837 @@
+/* Scoped Matanho Investor KYC styles */
+/*! tailwindcss v4.1.10 | MIT License | https://tailwindcss.com */
+
+@layer theme, base, components, utilities;
+@layer theme {
+  .fundraising-kyc-root, .fundraising-kyc-root{
+    --font-sans: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji",
+      "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+      "Courier New", monospace;
+    --color-red-50: oklch(97.1% 0.013 17.38);
+    --color-red-200: oklch(88.5% 0.062 18.334);
+    --color-red-500: oklch(63.7% 0.237 25.331);
+    --color-red-600: oklch(57.7% 0.245 27.325);
+    --color-red-700: oklch(50.5% 0.213 27.518);
+    --color-red-800: oklch(44.4% 0.177 26.899);
+    --color-amber-50: oklch(98.7% 0.022 95.277);
+    --color-amber-200: oklch(92.4% 0.12 95.746);
+    --color-amber-300: oklch(87.9% 0.169 91.605);
+    --color-amber-500: oklch(76.9% 0.188 70.08);
+    --color-amber-800: oklch(47.3% 0.137 46.201);
+    --color-amber-900: oklch(41.4% 0.112 45.904);
+    --color-amber-950: oklch(27.9% 0.077 45.635);
+    --color-emerald-50: oklch(97.9% 0.021 166.113);
+    --color-emerald-200: oklch(90.5% 0.093 164.15);
+    --color-emerald-950: oklch(26.2% 0.051 172.552);
+    --color-black: #000;
+    --color-white: #fff;
+    --spacing: 0.25rem;
+    --container-lg: 32rem;
+    --container-xl: 36rem;
+    --container-2xl: 42rem;
+    --container-6xl: 72rem;
+    --text-xs: 0.75rem;
+    --text-xs--line-height: calc(1 / 0.75);
+    --text-sm: 0.875rem;
+    --text-sm--line-height: calc(1.25 / 0.875);
+    --text-base: 1rem;
+    --text-base--line-height: calc(1.5 / 1);
+    --text-lg: 1.125rem;
+    --text-lg--line-height: calc(1.75 / 1.125);
+    --text-xl: 1.25rem;
+    --text-xl--line-height: calc(1.75 / 1.25);
+    --text-2xl: 1.5rem;
+    --text-2xl--line-height: calc(2 / 1.5);
+    --text-3xl: 1.875rem;
+    --text-3xl--line-height: calc(2.25 / 1.875);
+    --font-weight-medium: 500;
+    --font-weight-semibold: 600;
+    --font-weight-bold: 700;
+    --tracking-tight: -0.025em;
+    --radius-lg: 0.5rem;
+    --radius-xl: 0.75rem;
+    --radius-2xl: 1rem;
+    --radius-3xl: 1.75rem;
+    --default-transition-duration: 150ms;
+    --default-transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    --default-font-family: var(--font-sans);
+    --default-mono-font-family: var(--font-mono);
+    --color-ink-950: #0b1622;
+    --color-ink-900: #122033;
+    --color-ink-700: #3f5066;
+    --color-ink-600: #55667b;
+    --color-ink-500: #6d7c90;
+    --color-ink-300: #b8c4d2;
+    --color-ink-100: #e9eef4;
+    --color-ink-50: #f6f8fb;
+    --color-matanho-950: #092e29;
+    --color-matanho-900: #0c3c35;
+    --color-matanho-800: #0f4f46;
+    --color-matanho-700: #126455;
+    --color-matanho-600: #167766;
+    --color-matanho-500: #208d78;
+    --color-matanho-100: #dff2ed;
+    --color-matanho-50: #eff9f6;
+  }
+}
+@layer base {
+  .fundraising-kyc-root *, .fundraising-kyc-root ::after, .fundraising-kyc-root ::before, .fundraising-kyc-root ::backdrop, .fundraising-kyc-root ::file-selector-button{
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    border: 0 solid;
+  }
+  .fundraising-kyc-root, .fundraising-kyc-root{
+    line-height: 1.5;
+    -webkit-text-size-adjust: 100%;
+    tab-size: 4;
+    font-family: var(--default-font-family, ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji");
+    font-feature-settings: var(--default-font-feature-settings, normal);
+    font-variation-settings: var(--default-font-variation-settings, normal);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .fundraising-kyc-root hr{
+    height: 0;
+    color: inherit;
+    border-top-width: 1px;
+  }
+  .fundraising-kyc-root abbr:where([title]){
+    -webkit-text-decoration: underline dotted;
+    text-decoration: underline dotted;
+  }
+  .fundraising-kyc-root h1, .fundraising-kyc-root h2, .fundraising-kyc-root h3, .fundraising-kyc-root h4, .fundraising-kyc-root h5, .fundraising-kyc-root h6{
+    font-size: inherit;
+    font-weight: inherit;
+  }
+  .fundraising-kyc-root a{
+    color: inherit;
+    -webkit-text-decoration: inherit;
+    text-decoration: inherit;
+  }
+  .fundraising-kyc-root b, .fundraising-kyc-root strong{
+    font-weight: bolder;
+  }
+  .fundraising-kyc-root code, .fundraising-kyc-root kbd, .fundraising-kyc-root samp, .fundraising-kyc-root pre{
+    font-family: var(--default-mono-font-family, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace);
+    font-feature-settings: var(--default-mono-font-feature-settings, normal);
+    font-variation-settings: var(--default-mono-font-variation-settings, normal);
+    font-size: 1em;
+  }
+  .fundraising-kyc-root small{
+    font-size: 80%;
+  }
+  .fundraising-kyc-root sub, .fundraising-kyc-root sup{
+    font-size: 75%;
+    line-height: 0;
+    position: relative;
+    vertical-align: baseline;
+  }
+  .fundraising-kyc-root sub{
+    bottom: -0.25em;
+  }
+  .fundraising-kyc-root sup{
+    top: -0.5em;
+  }
+  .fundraising-kyc-root table{
+    text-indent: 0;
+    border-color: inherit;
+    border-collapse: collapse;
+  }
+  .fundraising-kyc-root :-moz-focusring{
+    outline: auto;
+  }
+  .fundraising-kyc-root progress{
+    vertical-align: baseline;
+  }
+  .fundraising-kyc-root summary{
+    display: list-item;
+  }
+  .fundraising-kyc-root ol, .fundraising-kyc-root ul, .fundraising-kyc-root menu{
+    list-style: none;
+  }
+  .fundraising-kyc-root img, .fundraising-kyc-root svg, .fundraising-kyc-root video, .fundraising-kyc-root canvas, .fundraising-kyc-root audio, .fundraising-kyc-root iframe, .fundraising-kyc-root embed, .fundraising-kyc-root object{
+    display: block;
+    vertical-align: middle;
+  }
+  .fundraising-kyc-root img, .fundraising-kyc-root video{
+    max-width: 100%;
+    height: auto;
+  }
+  .fundraising-kyc-root button, .fundraising-kyc-root input, .fundraising-kyc-root select, .fundraising-kyc-root optgroup, .fundraising-kyc-root textarea, .fundraising-kyc-root ::file-selector-button{
+    font: inherit;
+    font-feature-settings: inherit;
+    font-variation-settings: inherit;
+    letter-spacing: inherit;
+    color: inherit;
+    border-radius: 0;
+    background-color: transparent;
+    opacity: 1;
+  }
+  .fundraising-kyc-root :where(select:is([multiple], .fundraising-kyc-root [size])) optgroup{
+    font-weight: bolder;
+  }
+  .fundraising-kyc-root :where(select:is([multiple], .fundraising-kyc-root [size])) optgroup option{
+    padding-inline-start: 20px;
+  }
+  .fundraising-kyc-root ::file-selector-button{
+    margin-inline-end: 4px;
+  }
+  .fundraising-kyc-root ::placeholder{
+    opacity: 1;
+  }
+  @supports (not (-webkit-appearance: -apple-pay-button))  or (contain-intrinsic-size: 1px) {
+    .fundraising-kyc-root ::placeholder{
+      color: currentcolor;
+      @supports (color: color-mix(in lab, red, red)) {
+        color: color-mix(in oklab, currentcolor 50%, transparent);
+      }
+    }
+  }
+  .fundraising-kyc-root textarea{
+    resize: vertical;
+  }
+  .fundraising-kyc-root ::-webkit-search-decoration{
+    -webkit-appearance: none;
+  }
+  .fundraising-kyc-root ::-webkit-date-and-time-value{
+    min-height: 1lh;
+    text-align: inherit;
+  }
+  .fundraising-kyc-root ::-webkit-datetime-edit{
+    display: inline-flex;
+  }
+  .fundraising-kyc-root ::-webkit-datetime-edit-fields-wrapper{
+    padding: 0;
+  }
+  .fundraising-kyc-root ::-webkit-datetime-edit, .fundraising-kyc-root ::-webkit-datetime-edit-year-field, .fundraising-kyc-root ::-webkit-datetime-edit-month-field, .fundraising-kyc-root ::-webkit-datetime-edit-day-field, .fundraising-kyc-root ::-webkit-datetime-edit-hour-field, .fundraising-kyc-root ::-webkit-datetime-edit-minute-field, .fundraising-kyc-root ::-webkit-datetime-edit-second-field, .fundraising-kyc-root ::-webkit-datetime-edit-millisecond-field, .fundraising-kyc-root ::-webkit-datetime-edit-meridiem-field{
+    padding-block: 0;
+  }
+  .fundraising-kyc-root :-moz-ui-invalid{
+    box-shadow: none;
+  }
+  .fundraising-kyc-root button, .fundraising-kyc-root input:where([type="button"], .fundraising-kyc-root [type="reset"], .fundraising-kyc-root [type="submit"]), .fundraising-kyc-root ::file-selector-button{
+    appearance: button;
+  }
+  .fundraising-kyc-root ::-webkit-inner-spin-button, .fundraising-kyc-root ::-webkit-outer-spin-button{
+    height: auto;
+  }
+  .fundraising-kyc-root [hidden]:where(:not([hidden="until-found"])){
+    display: none !important;
+  }
+}
+@layer utilities {
+  .fundraising-kyc-root .pointer-events-none{
+    pointer-events: none;
+  }
+  .fundraising-kyc-root .absolute{
+    position: absolute;
+  }
+  .fundraising-kyc-root .fixed{
+    position: fixed;
+  }
+  .fundraising-kyc-root .relative{
+    position: relative;
+  }
+  .fundraising-kyc-root .inset-0{
+    inset: calc(var(--spacing) * 0);
+  }
+  .fundraising-kyc-root .inset-x-8{
+    inset-inline: calc(var(--spacing) * 8);
+  }
+  .fundraising-kyc-root .top-4{
+    top: calc(var(--spacing) * 4);
+  }
+  .fundraising-kyc-root .bottom-4{
+    bottom: calc(var(--spacing) * 4);
+  }
+  .fundraising-kyc-root .bottom-8{
+    bottom: calc(var(--spacing) * 8);
+  }
+  .fundraising-kyc-root .left-1\/2{
+    left: calc(1/2 * 100%);
+  }
+  .fundraising-kyc-root .left-4{
+    left: calc(var(--spacing) * 4);
+  }
+  .fundraising-kyc-root .z-10{
+    z-index: 10;
+  }
+  .fundraising-kyc-root .z-50{
+    z-index: 50;
+  }
+  .fundraising-kyc-root .mx-auto{
+    margin-inline: auto;
+  }
+  .fundraising-kyc-root .mt-0\.5{
+    margin-top: calc(var(--spacing) * 0.5);
+  }
+  .fundraising-kyc-root .mt-1{
+    margin-top: calc(var(--spacing) * 1);
+  }
+  .fundraising-kyc-root .mt-1\.5{
+    margin-top: calc(var(--spacing) * 1.5);
+  }
+  .fundraising-kyc-root .mt-2{
+    margin-top: calc(var(--spacing) * 2);
+  }
+  .fundraising-kyc-root .mt-3{
+    margin-top: calc(var(--spacing) * 3);
+  }
+  .fundraising-kyc-root .mt-4{
+    margin-top: calc(var(--spacing) * 4);
+  }
+  .fundraising-kyc-root .mt-5{
+    margin-top: calc(var(--spacing) * 5);
+  }
+  .fundraising-kyc-root .mt-10{
+    margin-top: calc(var(--spacing) * 10);
+  }
+  .fundraising-kyc-root .mb-2{
+    margin-bottom: calc(var(--spacing) * 2);
+  }
+  .fundraising-kyc-root .mb-5{
+    margin-bottom: calc(var(--spacing) * 5);
+  }
+  .fundraising-kyc-root .ml-2{
+    margin-left: calc(var(--spacing) * 2);
+  }
+  .fundraising-kyc-root .block{
+    display: block;
+  }
+  .fundraising-kyc-root .contents{
+    display: contents;
+  }
+  .fundraising-kyc-root .flex{
+    display: flex;
+  }
+  .fundraising-kyc-root .grid{
+    display: grid;
+  }
+  .fundraising-kyc-root .hidden{
+    display: none;
+  }
+  .fundraising-kyc-root .inline-flex{
+    display: inline-flex;
+  }
+  .fundraising-kyc-root .aspect-\[4\/3\]{
+    aspect-ratio: 4/3;
+  }
+  .fundraising-kyc-root .h-1\.5{
+    height: calc(var(--spacing) * 1.5);
+  }
+  .fundraising-kyc-root .h-2{
+    height: calc(var(--spacing) * 2);
+  }
+  .fundraising-kyc-root .h-4{
+    height: calc(var(--spacing) * 4);
+  }
+  .fundraising-kyc-root .h-8{
+    height: calc(var(--spacing) * 8);
+  }
+  .fundraising-kyc-root .h-9{
+    height: calc(var(--spacing) * 9);
+  }
+  .fundraising-kyc-root .h-10{
+    height: calc(var(--spacing) * 10);
+  }
+  .fundraising-kyc-root .h-12{
+    height: calc(var(--spacing) * 12);
+  }
+  .fundraising-kyc-root .h-14{
+    height: calc(var(--spacing) * 14);
+  }
+  .fundraising-kyc-root .h-\[72\%\]{
+    height: 72%;
+  }
+  .fundraising-kyc-root .h-full{
+    height: 100%;
+  }
+  .fundraising-kyc-root .min-h-28{
+    min-height: calc(var(--spacing) * 28);
+  }
+  .fundraising-kyc-root .min-h-\[280px\]{
+    min-height: 280px;
+  }
+  .fundraising-kyc-root .min-h-screen{
+    min-height: 100vh;
+  }
+  .fundraising-kyc-root .w-2{
+    width: calc(var(--spacing) * 2);
+  }
+  .fundraising-kyc-root .w-4{
+    width: calc(var(--spacing) * 4);
+  }
+  .fundraising-kyc-root .w-8{
+    width: calc(var(--spacing) * 8);
+  }
+  .fundraising-kyc-root .w-10{
+    width: calc(var(--spacing) * 10);
+  }
+  .fundraising-kyc-root .w-12{
+    width: calc(var(--spacing) * 12);
+  }
+  .fundraising-kyc-root .w-14{
+    width: calc(var(--spacing) * 14);
+  }
+  .fundraising-kyc-root .w-\[58\%\]{
+    width: 58%;
+  }
+  .fundraising-kyc-root .w-\[calc\(100\%-2rem\)\]{
+    width: calc(100% - 2rem);
+  }
+  .fundraising-kyc-root .w-auto{
+    width: auto;
+  }
+  .fundraising-kyc-root .w-full{
+    width: 100%;
+  }
+  .fundraising-kyc-root .max-w-2xl{
+    max-width: var(--container-2xl);
+  }
+  .fundraising-kyc-root .max-w-6xl{
+    max-width: var(--container-6xl);
+  }
+  .fundraising-kyc-root .max-w-lg{
+    max-width: var(--container-lg);
+  }
+  .fundraising-kyc-root .max-w-xl{
+    max-width: var(--container-xl);
+  }
+  .fundraising-kyc-root .min-w-0{
+    min-width: calc(var(--spacing) * 0);
+  }
+  .fundraising-kyc-root .flex-1{
+    flex: 1;
+  }
+  .fundraising-kyc-root .shrink-0{
+    flex-shrink: 0;
+  }
+  .fundraising-kyc-root .-translate-x-1\/2{
+    --tw-translate-x: calc(calc(1/2 * 100%) * -1);
+    translate: var(--tw-translate-x) var(--tw-translate-y);
+  }
+  .fundraising-kyc-root .-scale-x-100{
+    --tw-scale-x: calc(100% * -1);
+    scale: var(--tw-scale-x) var(--tw-scale-y);
+  }
+  .fundraising-kyc-root .cursor-default{
+    cursor: default;
+  }
+  .fundraising-kyc-root .cursor-not-allowed{
+    cursor: not-allowed;
+  }
+  .fundraising-kyc-root .cursor-pointer{
+    cursor: pointer;
+  }
+  .fundraising-kyc-root .cursor-wait{
+    cursor: wait;
+  }
+  .fundraising-kyc-root .resize-y{
+    resize: vertical;
+  }
+  .fundraising-kyc-root .flex-col{
+    flex-direction: column;
+  }
+  .fundraising-kyc-root .flex-col-reverse{
+    flex-direction: column-reverse;
+  }
+  .fundraising-kyc-root .flex-wrap{
+    flex-wrap: wrap;
+  }
+  .fundraising-kyc-root .place-items-center{
+    place-items: center;
+  }
+  .fundraising-kyc-root .items-center{
+    align-items: center;
+  }
+  .fundraising-kyc-root .items-start{
+    align-items: flex-start;
+  }
+  .fundraising-kyc-root .justify-between{
+    justify-content: space-between;
+  }
+  .fundraising-kyc-root .gap-1{
+    gap: calc(var(--spacing) * 1);
+  }
+  .fundraising-kyc-root .gap-1\.5{
+    gap: calc(var(--spacing) * 1.5);
+  }
+  .fundraising-kyc-root .gap-2{
+    gap: calc(var(--spacing) * 2);
+  }
+  .fundraising-kyc-root .gap-3{
+    gap: calc(var(--spacing) * 3);
+  }
+  .fundraising-kyc-root .gap-4{
+    gap: calc(var(--spacing) * 4);
+  }
+  .fundraising-kyc-root .gap-5{
+    gap: calc(var(--spacing) * 5);
+  }
+  .fundraising-kyc-root .space-y-1{
+    :where(& > :not(:last-child)) {
+      --tw-space-y-reverse: 0;
+      margin-block-start: calc(calc(var(--spacing) * 1) * var(--tw-space-y-reverse));
+      margin-block-end: calc(calc(var(--spacing) * 1) * calc(1 - var(--tw-space-y-reverse)));
+    }
+  }
+  .fundraising-kyc-root .space-y-2{
+    :where(& > :not(:last-child)) {
+      --tw-space-y-reverse: 0;
+      margin-block-start: calc(calc(var(--spacing) * 2) * var(--tw-space-y-reverse));
+      margin-block-end: calc(calc(var(--spacing) * 2) * calc(1 - var(--tw-space-y-reverse)));
+    }
+  }
+  .fundraising-kyc-root .space-y-3{
+    :where(& > :not(:last-child)) {
+      --tw-space-y-reverse: 0;
+      margin-block-start: calc(calc(var(--spacing) * 3) * var(--tw-space-y-reverse));
+      margin-block-end: calc(calc(var(--spacing) * 3) * calc(1 - var(--tw-space-y-reverse)));
+    }
+  }
+  .fundraising-kyc-root .space-y-5{
+    :where(& > :not(:last-child)) {
+      --tw-space-y-reverse: 0;
+      margin-block-start: calc(calc(var(--spacing) * 5) * var(--tw-space-y-reverse));
+      margin-block-end: calc(calc(var(--spacing) * 5) * calc(1 - var(--tw-space-y-reverse)));
+    }
+  }
+  .fundraising-kyc-root .space-y-6{
+    :where(& > :not(:last-child)) {
+      --tw-space-y-reverse: 0;
+      margin-block-start: calc(calc(var(--spacing) * 6) * var(--tw-space-y-reverse));
+      margin-block-end: calc(calc(var(--spacing) * 6) * calc(1 - var(--tw-space-y-reverse)));
+    }
+  }
+  .fundraising-kyc-root .truncate{
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .fundraising-kyc-root .overflow-hidden{
+    overflow: hidden;
+  }
+  .fundraising-kyc-root .rounded{
+    border-radius: 0.25rem;
+  }
+  .fundraising-kyc-root .rounded-2xl{
+    border-radius: var(--radius-2xl);
+  }
+  .fundraising-kyc-root .rounded-3xl{
+    border-radius: var(--radius-3xl);
+  }
+  .fundraising-kyc-root .rounded-\[48\%\]{
+    border-radius: 48%;
+  }
+  .fundraising-kyc-root .rounded-full{
+    border-radius: calc(infinity * 1px);
+  }
+  .fundraising-kyc-root .rounded-lg{
+    border-radius: var(--radius-lg);
+  }
+  .fundraising-kyc-root .rounded-xl{
+    border-radius: var(--radius-xl);
+  }
+  .fundraising-kyc-root .border{
+    border-style: var(--tw-border-style);
+    border-width: 1px;
+  }
+  .fundraising-kyc-root .border-0{
+    border-style: var(--tw-border-style);
+    border-width: 0px;
+  }
+  .fundraising-kyc-root .border-2{
+    border-style: var(--tw-border-style);
+    border-width: 2px;
+  }
+  .fundraising-kyc-root .border-t{
+    border-top-style: var(--tw-border-style);
+    border-top-width: 1px;
+  }
+  .fundraising-kyc-root .border-b{
+    border-bottom-style: var(--tw-border-style);
+    border-bottom-width: 1px;
+  }
+  .fundraising-kyc-root .border-dashed{
+    --tw-border-style: dashed;
+    border-style: dashed;
+  }
+  .fundraising-kyc-root .border-amber-200{
+    border-color: var(--color-amber-200);
+  }
+  .fundraising-kyc-root .border-amber-300{
+    border-color: var(--color-amber-300);
+  }
+  .fundraising-kyc-root .border-emerald-200{
+    border-color: var(--color-emerald-200);
+  }
+  .fundraising-kyc-root .border-ink-100{
+    border-color: var(--color-ink-100);
+  }
+  .fundraising-kyc-root .border-ink-300{
+    border-color: var(--color-ink-300);
+  }
+  .fundraising-kyc-root .border-matanho-100{
+    border-color: var(--color-matanho-100);
+  }
+  .fundraising-kyc-root .border-matanho-500{
+    border-color: var(--color-matanho-500);
+  }
+  .fundraising-kyc-root .border-matanho-500\/60{
+    border-color: color-mix(in srgb, #208d78 60%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      border-color: color-mix(in oklab, var(--color-matanho-500) 60%, transparent);
+    }
+  }
+  .fundraising-kyc-root .border-red-200{
+    border-color: var(--color-red-200);
+  }
+  .fundraising-kyc-root .border-white\/10{
+    border-color: color-mix(in srgb, #fff 10%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      border-color: color-mix(in oklab, var(--color-white) 10%, transparent);
+    }
+  }
+  .fundraising-kyc-root .border-white\/15{
+    border-color: color-mix(in srgb, #fff 15%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      border-color: color-mix(in oklab, var(--color-white) 15%, transparent);
+    }
+  }
+  .fundraising-kyc-root .border-white\/25{
+    border-color: color-mix(in srgb, #fff 25%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      border-color: color-mix(in oklab, var(--color-white) 25%, transparent);
+    }
+  }
+  .fundraising-kyc-root .border-white\/70{
+    border-color: color-mix(in srgb, #fff 70%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      border-color: color-mix(in oklab, var(--color-white) 70%, transparent);
+    }
+  }
+  .fundraising-kyc-root .bg-amber-50{
+    background-color: var(--color-amber-50);
+  }
+  .fundraising-kyc-root .bg-amber-500{
+    background-color: var(--color-amber-500);
+  }
+  .fundraising-kyc-root .bg-black\/35{
+    background-color: color-mix(in srgb, #000 35%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--color-black) 35%, transparent);
+    }
+  }
+  .fundraising-kyc-root .bg-emerald-50{
+    background-color: var(--color-emerald-50);
+  }
+  .fundraising-kyc-root .bg-ink-50{
+    background-color: var(--color-ink-50);
+  }
+  .fundraising-kyc-root .bg-ink-50\/70{
+    background-color: color-mix(in srgb, #f6f8fb 70%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--color-ink-50) 70%, transparent);
+    }
+  }
+  .fundraising-kyc-root .bg-ink-900{
+    background-color: var(--color-ink-900);
+  }
+  .fundraising-kyc-root .bg-ink-950{
+    background-color: var(--color-ink-950);
+  }
+  .fundraising-kyc-root .bg-matanho-50{
+    background-color: var(--color-matanho-50);
+  }
+  .fundraising-kyc-root .bg-matanho-500{
+    background-color: var(--color-matanho-500);
+  }
+  .fundraising-kyc-root .bg-matanho-500\/25{
+    background-color: color-mix(in srgb, #208d78 25%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--color-matanho-500) 25%, transparent);
+    }
+  }
+  .fundraising-kyc-root .bg-matanho-700{
+    background-color: var(--color-matanho-700);
+  }
+  .fundraising-kyc-root .bg-red-50{
+    background-color: var(--color-red-50);
+  }
+  .fundraising-kyc-root .bg-red-500{
+    background-color: var(--color-red-500);
+  }
+  .fundraising-kyc-root .bg-transparent{
+    background-color: transparent;
+  }
+  .fundraising-kyc-root .bg-white{
+    background-color: var(--color-white);
+  }
+  .fundraising-kyc-root .bg-white\/5{
+    background-color: color-mix(in srgb, #fff 5%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--color-white) 5%, transparent);
+    }
+  }
+  .fundraising-kyc-root .bg-white\/10{
+    background-color: color-mix(in srgb, #fff 10%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--color-white) 10%, transparent);
+    }
+  }
+  .fundraising-kyc-root .bg-white\/12{
+    background-color: color-mix(in srgb, #fff 12%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--color-white) 12%, transparent);
+    }
+  }
+  .fundraising-kyc-root .bg-white\/15{
+    background-color: color-mix(in srgb, #fff 15%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--color-white) 15%, transparent);
+    }
+  }
+  .fundraising-kyc-root .bg-gradient-to-b{
+    --tw-gradient-position: to bottom in oklab;
+    background-image: linear-gradient(var(--tw-gradient-stops));
+  }
+  .fundraising-kyc-root .bg-gradient-to-br{
+    --tw-gradient-position: to bottom right in oklab;
+    background-image: linear-gradient(var(--tw-gradient-stops));
+  }
+  .fundraising-kyc-root .from-matanho-950{
+    --tw-gradient-from: var(--color-matanho-950);
+    --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+  }
+  .fundraising-kyc-root .via-matanho-900{
+    --tw-gradient-via: var(--color-matanho-900);
+    --tw-gradient-via-stops: var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-via) var(--tw-gradient-via-position), var(--tw-gradient-to) var(--tw-gradient-to-position);
+    --tw-gradient-stops: var(--tw-gradient-via-stops);
+  }
+  .fundraising-kyc-root .to-ink-950{
+    --tw-gradient-to: var(--color-ink-950);
+    --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+  }
+  .fundraising-kyc-root .object-cover{
+    object-fit: cover;
+  }
+  .fundraising-kyc-root .p-0{
+    padding: calc(var(--spacing) * 0);
+  }
+  .fundraising-kyc-root .p-3{
+    padding: calc(var(--spacing) * 3);
+  }
+  .fundraising-kyc-root .p-4{
+    padding: calc(var(--spacing) * 4);
+  }
+  .fundraising-kyc-root .p-5{
+    padding: calc(var(--spacing) * 5);
+  }
+  .fundraising-kyc-root .px-2{
+    padding-inline: calc(var(--spacing) * 2);
+  }
+  .fundraising-kyc-root .px-2\.5{
+    padding-inline: calc(var(--spacing) * 2.5);
+  }
+  .fundraising-kyc-root .px-3{
+    padding-inline: calc(var(--spacing) * 3);
+  }
+  .fundraising-kyc-root .px-3\.5{
+    padding-inline: calc(var(--spacing) * 3.5);
+  }
+  .fundraising-kyc-root .px-4{
+    padding-inline: calc(var(--spacing) * 4);
+  }
+  .fundraising-kyc-root .px-5{
+    padding-inline: calc(var(--spacing) * 5);
+  }
+  .fundraising-kyc-root .px-6{
+    padding-inline: calc(var(--spacing) * 6);
+  }
+  .fundraising-kyc-root .py-1{
+    padding-block: calc(var(--spacing) * 1);
+  }
+  .fundraising-kyc-root .py-2{
+    padding-block: calc(var(--spacing) * 2);
+  }
+  .fundraising-kyc-root .py-2\.5{
+    padding-block: calc(var(--spacing) * 2.5);
+  }
+  .fundraising-kyc-root .py-3{
+    padding-block: calc(var(--spacing) * 3);
+  }
+  .fundraising-kyc-root .py-4{
+    padding-block: calc(var(--spacing) * 4);
+  }
+  .fundraising-kyc-root .py-5{
+    padding-block: calc(var(--spacing) * 5);
+  }
+  .fundraising-kyc-root .py-6{
+    padding-block: calc(var(--spacing) * 6);
+  }
+  .fundraising-kyc-root .py-8{
+    padding-block: calc(var(--spacing) * 8);
+  }
+  .fundraising-kyc-root .py-10{
+    padding-block: calc(var(--spacing) * 10);
+  }
+  .fundraising-kyc-root .pt-6{
+    padding-top: calc(var(--spacing) * 6);
+  }
+  .fundraising-kyc-root .pb-3{
+    padding-bottom: calc(var(--spacing) * 3);
+  }
+  .fundraising-kyc-root .text-center{
+    text-align: center;
+  }
+  .fundraising-kyc-root .text-left{
+    text-align: left;
+  }
+  .fundraising-kyc-root .text-right{
+    text-align: right;
+  }
+  .fundraising-kyc-root .text-2xl{
+    font-size: var(--text-2xl);
+    line-height: var(--tw-leading, var(--text-2xl--line-height));
+  }
+  .fundraising-kyc-root .text-base{
+    font-size: var(--text-base);
+    line-height: var(--tw-leading, var(--text-base--line-height));
+  }
+  .fundraising-kyc-root .text-lg{
+    font-size: var(--text-lg);
+    line-height: var(--tw-leading, var(--text-lg--line-height));
+  }
+  .fundraising-kyc-root .text-sm{
+    font-size: var(--text-sm);
+    line-height: var(--tw-leading, var(--text-sm--line-height));
+  }
+  .fundraising-kyc-root .text-xl{
+    font-size: var(--text-xl);
+    line-height: var(--tw-leading, var(--text-xl--line-height));
+  }
+  .fundraising-kyc-root .text-xs{
+    font-size: var(--text-xs);
+    line-height: var(--tw-leading, var(--text-xs--line-height));
+  }
+  .fundraising-kyc-root .text-\[11px\]{
+    font-size: 11px;
+  }
+  .fundraising-kyc-root .leading-5{
+    --tw-leading: calc(var(--spacing) * 5);
+    line-height: calc(var(--spacing) * 5);
+  }
+  .fundraising-kyc-root .leading-6{
+    --tw-leading: calc(var(--spacing) * 6);
+    line-height: calc(var(--spacing) * 6);
+  }
+  .fundraising-kyc-root .font-bold{
+    --tw-font-weight: var(--font-weight-bold);
+    font-weight: var(--font-weight-bold);
+  }
+  .fundraising-kyc-root .font-medium{
+    --tw-font-weight: var(--font-weight-medium);
+    font-weight: var(--font-weight-medium);
+  }
+  .fundraising-kyc-root .font-semibold{
+    --tw-font-weight: var(--font-weight-semibold);
+    font-weight: var(--font-weight-semibold);
+  }
+  .fundraising-kyc-root .tracking-\[0\.12em\]{
+    --tw-tracking: 0.12em;
+    letter-spacing: 0.12em;
+  }
+  .fundraising-kyc-root .tracking-\[0\.14em\]{
+    --tw-tracking: 0.14em;
+    letter-spacing: 0.14em;
+  }
+  .fundraising-kyc-root .tracking-\[0\.16em\]{
+    --tw-tracking: 0.16em;
+    letter-spacing: 0.16em;
+  }
+  .fundraising-kyc-root .tracking-tight{
+    --tw-tracking: var(--tracking-tight);
+    letter-spacing: var(--tracking-tight);
+  }
+  .fundraising-kyc-root .text-amber-800{
+    color: var(--color-amber-800);
+  }
+  .fundraising-kyc-root .text-amber-900{
+    color: var(--color-amber-900);
+  }
+  .fundraising-kyc-root .text-amber-950{
+    color: var(--color-amber-950);
+  }
+  .fundraising-kyc-root .text-emerald-950{
+    color: var(--color-emerald-950);
+  }
+  .fundraising-kyc-root .text-ink-500{
+    color: var(--color-ink-500);
+  }
+  .fundraising-kyc-root .text-ink-600{
+    color: var(--color-ink-600);
+  }
+  .fundraising-kyc-root .text-ink-700{
+    color: var(--color-ink-700);
+  }
+  .fundraising-kyc-root .text-ink-950{
+    color: var(--color-ink-950);
+  }
+  .fundraising-kyc-root .text-matanho-700{
+    color: var(--color-matanho-700);
+  }
+  .fundraising-kyc-root .text-matanho-800{
+    color: var(--color-matanho-800);
+  }
+  .fundraising-kyc-root .text-matanho-900{
+    color: var(--color-matanho-900);
+  }
+  .fundraising-kyc-root .text-matanho-950{
+    color: var(--color-matanho-950);
+  }
+  .fundraising-kyc-root .text-red-600{
+    color: var(--color-red-600);
+  }
+  .fundraising-kyc-root .text-red-800{
+    color: var(--color-red-800);
+  }
+  .fundraising-kyc-root .text-white{
+    color: var(--color-white);
+  }
+  .fundraising-kyc-root .text-white\/38{
+    color: color-mix(in srgb, #fff 38%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      color: color-mix(in oklab, var(--color-white) 38%, transparent);
+    }
+  }
+  .fundraising-kyc-root .text-white\/50{
+    color: color-mix(in srgb, #fff 50%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      color: color-mix(in oklab, var(--color-white) 50%, transparent);
+    }
+  }
+  .fundraising-kyc-root .text-white\/55{
+    color: color-mix(in srgb, #fff 55%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      color: color-mix(in oklab, var(--color-white) 55%, transparent);
+    }
+  }
+  .fundraising-kyc-root .text-white\/60{
+    color: color-mix(in srgb, #fff 60%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      color: color-mix(in oklab, var(--color-white) 60%, transparent);
+    }
+  }
+  .fundraising-kyc-root .text-white\/65{
+    color: color-mix(in srgb, #fff 65%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      color: color-mix(in oklab, var(--color-white) 65%, transparent);
+    }
+  }
+  .fundraising-kyc-root .text-white\/70{
+    color: color-mix(in srgb, #fff 70%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      color: color-mix(in oklab, var(--color-white) 70%, transparent);
+    }
+  }
+  .fundraising-kyc-root .text-white\/85{
+    color: color-mix(in srgb, #fff 85%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      color: color-mix(in oklab, var(--color-white) 85%, transparent);
+    }
+  }
+  .fundraising-kyc-root .uppercase{
+    text-transform: uppercase;
+  }
+  .fundraising-kyc-root .opacity-40{
+    opacity: 40%;
+  }
+  .fundraising-kyc-root .opacity-60{
+    opacity: 60%;
+  }
+  .fundraising-kyc-root .opacity-80{
+    opacity: 80%;
+  }
+  .fundraising-kyc-root .shadow-card{
+    --tw-shadow: 0 10px 30px var(--tw-shadow-color, rgba(23, 39, 60, 0.07));
+    box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
+  }
+  .fundraising-kyc-root .shadow-soft{
+    --tw-shadow: 0 22px 70px var(--tw-shadow-color, rgba(23, 39, 60, 0.11));
+    box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
+  }
+  .fundraising-kyc-root .backdrop-blur{
+    --tw-backdrop-blur: blur(8px);
+    -webkit-backdrop-filter: var(--tw-backdrop-blur,) var(--tw-backdrop-brightness,) var(--tw-backdrop-contrast,) var(--tw-backdrop-grayscale,) var(--tw-backdrop-hue-rotate,) var(--tw-backdrop-invert,) var(--tw-backdrop-opacity,) var(--tw-backdrop-saturate,) var(--tw-backdrop-sepia,);
+    backdrop-filter: var(--tw-backdrop-blur,) var(--tw-backdrop-brightness,) var(--tw-backdrop-contrast,) var(--tw-backdrop-grayscale,) var(--tw-backdrop-hue-rotate,) var(--tw-backdrop-invert,) var(--tw-backdrop-opacity,) var(--tw-backdrop-saturate,) var(--tw-backdrop-sepia,);
+  }
+  .fundraising-kyc-root .transition{
+    transition-property: color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to, opacity, box-shadow, transform, translate, scale, rotate, filter, -webkit-backdrop-filter, backdrop-filter, display, visibility, content-visibility, overlay, pointer-events;
+    transition-timing-function: var(--tw-ease, var(--default-transition-timing-function));
+    transition-duration: var(--tw-duration, var(--default-transition-duration));
+  }
+  .fundraising-kyc-root .outline-none{
+    --tw-outline-style: none;
+    outline-style: none;
+  }
+  .fundraising-kyc-root .placeholder\:text-ink-300{
+    &::placeholder {
+      color: var(--color-ink-300);
+    }
+  }
+  .fundraising-kyc-root .last\:border-0{
+    &:last-child {
+      border-style: var(--tw-border-style);
+      border-width: 0px;
+    }
+  }
+  .fundraising-kyc-root .last\:pb-0{
+    &:last-child {
+      padding-bottom: calc(var(--spacing) * 0);
+    }
+  }
+  .fundraising-kyc-root .focus-within\:border-matanho-500{
+    &:focus-within {
+      border-color: var(--color-matanho-500);
+    }
+  }
+  .fundraising-kyc-root .focus-within\:ring-4{
+    &:focus-within {
+      --tw-ring-shadow: var(--tw-ring-inset,) 0 0 0 calc(4px + var(--tw-ring-offset-width)) var(--tw-ring-color, currentcolor);
+      box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
+    }
+  }
+  .fundraising-kyc-root .focus-within\:ring-matanho-100{
+    &:focus-within {
+      --tw-ring-color: var(--color-matanho-100);
+    }
+  }
+  .fundraising-kyc-root .hover\:border-matanho-100{
+    &:hover {
+      @media (hover: hover) {
+        border-color: var(--color-matanho-100);
+      }
+    }
+  }
+  .fundraising-kyc-root .hover\:bg-amber-50{
+    &:hover {
+      @media (hover: hover) {
+        background-color: var(--color-amber-50);
+      }
+    }
+  }
+  .fundraising-kyc-root .hover\:bg-ink-50{
+    &:hover {
+      @media (hover: hover) {
+        background-color: var(--color-ink-50);
+      }
+    }
+  }
+  .fundraising-kyc-root .hover\:bg-ink-900{
+    &:hover {
+      @media (hover: hover) {
+        background-color: var(--color-ink-900);
+      }
+    }
+  }
+  .fundraising-kyc-root .hover\:bg-matanho-50\/40{
+    &:hover {
+      @media (hover: hover) {
+        background-color: color-mix(in srgb, #eff9f6 40%, transparent);
+        @supports (color: color-mix(in lab, red, red)) {
+          background-color: color-mix(in oklab, var(--color-matanho-50) 40%, transparent);
+        }
+      }
+    }
+  }
+  .fundraising-kyc-root .hover\:bg-matanho-600{
+    &:hover {
+      @media (hover: hover) {
+        background-color: var(--color-matanho-600);
+      }
+    }
+  }
+  .fundraising-kyc-root .hover\:bg-matanho-800{
+    &:hover {
+      @media (hover: hover) {
+        background-color: var(--color-matanho-800);
+      }
+    }
+  }
+  .fundraising-kyc-root .hover\:bg-red-50{
+    &:hover {
+      @media (hover: hover) {
+        background-color: var(--color-red-50);
+      }
+    }
+  }
+  .fundraising-kyc-root .hover\:bg-white\/5{
+    &:hover {
+      @media (hover: hover) {
+        background-color: color-mix(in srgb, #fff 5%, transparent);
+        @supports (color: color-mix(in lab, red, red)) {
+          background-color: color-mix(in oklab, var(--color-white) 5%, transparent);
+        }
+      }
+    }
+  }
+  .fundraising-kyc-root .hover\:bg-white\/10{
+    &:hover {
+      @media (hover: hover) {
+        background-color: color-mix(in srgb, #fff 10%, transparent);
+        @supports (color: color-mix(in lab, red, red)) {
+          background-color: color-mix(in oklab, var(--color-white) 10%, transparent);
+        }
+      }
+    }
+  }
+  .fundraising-kyc-root .hover\:text-red-700{
+    &:hover {
+      @media (hover: hover) {
+        color: var(--color-red-700);
+      }
+    }
+  }
+  .fundraising-kyc-root .focus\:border-matanho-500{
+    &:focus {
+      border-color: var(--color-matanho-500);
+    }
+  }
+  .fundraising-kyc-root .focus\:ring-4{
+    &:focus {
+      --tw-ring-shadow: var(--tw-ring-inset,) 0 0 0 calc(4px + var(--tw-ring-offset-width)) var(--tw-ring-color, currentcolor);
+      box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
+    }
+  }
+  .fundraising-kyc-root .focus\:ring-ink-100{
+    &:focus {
+      --tw-ring-color: var(--color-ink-100);
+    }
+  }
+  .fundraising-kyc-root .focus\:ring-matanho-100{
+    &:focus {
+      --tw-ring-color: var(--color-matanho-100);
+    }
+  }
+  .fundraising-kyc-root .focus\:ring-matanho-500{
+    &:focus {
+      --tw-ring-color: var(--color-matanho-500);
+    }
+  }
+  .fundraising-kyc-root .focus\:outline-none{
+    &:focus {
+      --tw-outline-style: none;
+      outline-style: none;
+    }
+  }
+  .fundraising-kyc-root .disabled\:cursor-not-allowed{
+    &:disabled {
+      cursor: not-allowed;
+    }
+  }
+  .fundraising-kyc-root .disabled\:cursor-wait{
+    &:disabled {
+      cursor: wait;
+    }
+  }
+  .fundraising-kyc-root .disabled\:opacity-40{
+    &:disabled {
+      opacity: 40%;
+    }
+  }
+  .fundraising-kyc-root .disabled\:opacity-60{
+    &:disabled {
+      opacity: 60%;
+    }
+  }
+  .fundraising-kyc-root .sm\:col-span-2{
+    @media (width >= 40rem) {
+      grid-column: span 2 / span 2;
+    }
+  }
+  .fundraising-kyc-root .sm\:h-9{
+    @media (width >= 40rem) {
+      height: calc(var(--spacing) * 9);
+    }
+  }
+  .fundraising-kyc-root .sm\:grid-cols-2{
+    @media (width >= 40rem) {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  .fundraising-kyc-root .sm\:grid-cols-3{
+    @media (width >= 40rem) {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+  .fundraising-kyc-root .sm\:grid-cols-\[minmax\(0\, .fundraising-kyc-root 1fr\)_160px\]{
+    @media (width >= 40rem) {
+      grid-template-columns: minmax(0,1fr) 160px;
+    }
+  }
+  .fundraising-kyc-root .sm\:flex-row{
+    @media (width >= 40rem) {
+      flex-direction: row;
+    }
+  }
+  .fundraising-kyc-root .sm\:items-center{
+    @media (width >= 40rem) {
+      align-items: center;
+    }
+  }
+  .fundraising-kyc-root .sm\:items-start{
+    @media (width >= 40rem) {
+      align-items: flex-start;
+    }
+  }
+  .fundraising-kyc-root .sm\:justify-between{
+    @media (width >= 40rem) {
+      justify-content: space-between;
+    }
+  }
+  .fundraising-kyc-root .sm\:p-5{
+    @media (width >= 40rem) {
+      padding: calc(var(--spacing) * 5);
+    }
+  }
+  .fundraising-kyc-root .sm\:px-6{
+    @media (width >= 40rem) {
+      padding-inline: calc(var(--spacing) * 6);
+    }
+  }
+  .fundraising-kyc-root .sm\:px-7{
+    @media (width >= 40rem) {
+      padding-inline: calc(var(--spacing) * 7);
+    }
+  }
+  .fundraising-kyc-root .sm\:px-10{
+    @media (width >= 40rem) {
+      padding-inline: calc(var(--spacing) * 10);
+    }
+  }
+  .fundraising-kyc-root .sm\:py-7{
+    @media (width >= 40rem) {
+      padding-block: calc(var(--spacing) * 7);
+    }
+  }
+  .fundraising-kyc-root .sm\:py-8{
+    @media (width >= 40rem) {
+      padding-block: calc(var(--spacing) * 8);
+    }
+  }
+  .fundraising-kyc-root .sm\:py-10{
+    @media (width >= 40rem) {
+      padding-block: calc(var(--spacing) * 10);
+    }
+  }
+  .fundraising-kyc-root .sm\:py-16{
+    @media (width >= 40rem) {
+      padding-block: calc(var(--spacing) * 16);
+    }
+  }
+  .fundraising-kyc-root .sm\:text-3xl{
+    @media (width >= 40rem) {
+      font-size: var(--text-3xl);
+      line-height: var(--tw-leading, var(--text-3xl--line-height));
+    }
+  }
+  .fundraising-kyc-root .sm\:text-xl{
+    @media (width >= 40rem) {
+      font-size: var(--text-xl);
+      line-height: var(--tw-leading, var(--text-xl--line-height));
+    }
+  }
+  .fundraising-kyc-root .lg\:sticky{
+    @media (width >= 64rem) {
+      position: sticky;
+    }
+  }
+  .fundraising-kyc-root .lg\:top-0{
+    @media (width >= 64rem) {
+      top: calc(var(--spacing) * 0);
+    }
+  }
+  .fundraising-kyc-root .lg\:mt-5{
+    @media (width >= 64rem) {
+      margin-top: calc(var(--spacing) * 5);
+    }
+  }
+  .fundraising-kyc-root .lg\:mt-7{
+    @media (width >= 64rem) {
+      margin-top: calc(var(--spacing) * 7);
+    }
+  }
+  .fundraising-kyc-root .lg\:block{
+    @media (width >= 64rem) {
+      display: block;
+    }
+  }
+  .fundraising-kyc-root .lg\:flex{
+    @media (width >= 64rem) {
+      display: flex;
+    }
+  }
+  .fundraising-kyc-root .lg\:grid{
+    @media (width >= 64rem) {
+      display: grid;
+    }
+  }
+  .fundraising-kyc-root .lg\:hidden{
+    @media (width >= 64rem) {
+      display: none;
+    }
+  }
+  .fundraising-kyc-root .lg\:h-full{
+    @media (width >= 64rem) {
+      height: 100%;
+    }
+  }
+  .fundraising-kyc-root .lg\:h-screen{
+    @media (width >= 64rem) {
+      height: 100vh;
+    }
+  }
+  .fundraising-kyc-root .lg\:min-h-0{
+    @media (width >= 64rem) {
+      min-height: calc(var(--spacing) * 0);
+    }
+  }
+  .fundraising-kyc-root .lg\:flex-1{
+    @media (width >= 64rem) {
+      flex: 1;
+    }
+  }
+  .fundraising-kyc-root .lg\:grid-cols-\[300px_minmax\(0\, .fundraising-kyc-root 1fr\)\]{
+    @media (width >= 64rem) {
+      grid-template-columns: 300px minmax(0,1fr);
+    }
+  }
+  .fundraising-kyc-root .lg\:flex-col{
+    @media (width >= 64rem) {
+      flex-direction: column;
+    }
+  }
+  .fundraising-kyc-root .lg\:overflow-y-auto{
+    @media (width >= 64rem) {
+      overflow-y: auto;
+    }
+  }
+  .fundraising-kyc-root .lg\:px-5{
+    @media (width >= 64rem) {
+      padding-inline: calc(var(--spacing) * 5);
+    }
+  }
+  .fundraising-kyc-root .lg\:py-7{
+    @media (width >= 64rem) {
+      padding-block: calc(var(--spacing) * 7);
+    }
+  }
+  .fundraising-kyc-root .lg\:pr-1{
+    @media (width >= 64rem) {
+      padding-right: calc(var(--spacing) * 1);
+    }
+  }
+  .fundraising-kyc-root .lg\:text-left{
+    @media (width >= 64rem) {
+      text-align: left;
+    }
+  }
+  .fundraising-kyc-root .xl\:grid-cols-3{
+    @media (width >= 80rem) {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+  .fundraising-kyc-root .xl\:grid-cols-\[minmax\(0\, .fundraising-kyc-root 1\.15fr\)_minmax\(300px\, .fundraising-kyc-root \.85fr\)\]{
+    @media (width >= 80rem) {
+      grid-template-columns: minmax(0,1.15fr) minmax(300px,.85fr);
+    }
+  }
+  .fundraising-kyc-root .xl\:px-10{
+    @media (width >= 80rem) {
+      padding-inline: calc(var(--spacing) * 10);
+    }
+  }
+  .fundraising-kyc-root .xl\:py-10{
+    @media (width >= 80rem) {
+      padding-block: calc(var(--spacing) * 10);
+    }
+  }
+}
+@layer base {
+  .fundraising-kyc-root{
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    color: var(--color-ink-900);
+    background: var(--color-ink-50);
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+  }
+  .fundraising-kyc-root *{
+    box-sizing: border-box;
+  }
+  .fundraising-kyc-root{
+    scroll-behavior: smooth;
+  }
+  .fundraising-kyc-root{
+    margin: 0;
+    min-width: 320px;
+    min-height: 100vh;
+    background: var(--color-ink-50);
+  }
+  .fundraising-kyc-root button, .fundraising-kyc-root input, .fundraising-kyc-root select, .fundraising-kyc-root textarea{
+    font: inherit;
+  }
+  .fundraising-kyc-root button{
+    -webkit-tap-highlight-color: transparent;
+  }
+  .fundraising-kyc-root ::selection{
+    background: var(--color-matanho-100);
+    color: var(--color-matanho-950);
+  }
+}
+@layer components {
+  .fundraising-kyc-root .field-input{
+    width: 100%;
+    border-radius: var(--radius-xl);
+    border-style: var(--tw-border-style);
+    border-width: 1px;
+    border-color: var(--color-ink-100);
+    background-color: var(--color-white);
+    padding-inline: calc(var(--spacing) * 3.5);
+    padding-block: calc(var(--spacing) * 3);
+    font-size: var(--text-sm);
+    line-height: var(--tw-leading, var(--text-sm--line-height));
+    color: var(--color-ink-950);
+    transition-property: color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to, opacity, box-shadow, transform, translate, scale, rotate, filter, -webkit-backdrop-filter, backdrop-filter, display, visibility, content-visibility, overlay, pointer-events;
+    transition-timing-function: var(--tw-ease, var(--default-transition-timing-function));
+    transition-duration: var(--tw-duration, var(--default-transition-duration));
+    --tw-outline-style: none;
+    outline-style: none;
+    &::placeholder {
+      color: var(--color-ink-300);
+    }
+    &:focus {
+      border-color: var(--color-matanho-500);
+    }
+    &:focus {
+      --tw-ring-shadow: var(--tw-ring-inset,) 0 0 0 calc(4px + var(--tw-ring-offset-width)) var(--tw-ring-color, currentcolor);
+      box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
+    }
+    &:focus {
+      --tw-ring-color: var(--color-matanho-100);
+    }
+  }
+  .fundraising-kyc-root .field-label{
+    margin-bottom: calc(var(--spacing) * 2);
+    display: flex;
+    align-items: center;
+    gap: calc(var(--spacing) * 1);
+    font-size: var(--text-xs);
+    line-height: var(--tw-leading, var(--text-xs--line-height));
+    --tw-font-weight: var(--font-weight-semibold);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-ink-700);
+  }
+  .fundraising-kyc-root .button-primary{
+    border-radius: var(--radius-xl);
+    background-color: var(--color-matanho-700);
+    padding-inline: calc(var(--spacing) * 5);
+    padding-block: calc(var(--spacing) * 3);
+    font-size: var(--text-sm);
+    line-height: var(--tw-leading, var(--text-sm--line-height));
+    --tw-font-weight: var(--font-weight-semibold);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-white);
+    --tw-shadow: 0 10px 30px var(--tw-shadow-color, rgba(23, 39, 60, 0.07));
+    box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
+    transition-property: color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to, opacity, box-shadow, transform, translate, scale, rotate, filter, -webkit-backdrop-filter, backdrop-filter, display, visibility, content-visibility, overlay, pointer-events;
+    transition-timing-function: var(--tw-ease, var(--default-transition-timing-function));
+    transition-duration: var(--tw-duration, var(--default-transition-duration));
+    &:hover {
+      @media (hover: hover) {
+        background-color: var(--color-matanho-800);
+      }
+    }
+    &:focus {
+      --tw-ring-shadow: var(--tw-ring-inset,) 0 0 0 calc(4px + var(--tw-ring-offset-width)) var(--tw-ring-color, currentcolor);
+      box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
+    }
+    &:focus {
+      --tw-ring-color: var(--color-matanho-100);
+    }
+    &:focus {
+      --tw-outline-style: none;
+      outline-style: none;
+    }
+    &:disabled {
+      cursor: wait;
+    }
+    &:disabled {
+      opacity: 60%;
+    }
+  }
+  .fundraising-kyc-root .button-secondary{
+    border-radius: var(--radius-xl);
+    border-style: var(--tw-border-style);
+    border-width: 1px;
+    border-color: var(--color-ink-100);
+    background-color: var(--color-white);
+    padding-inline: calc(var(--spacing) * 4);
+    padding-block: calc(var(--spacing) * 3);
+    font-size: var(--text-sm);
+    line-height: var(--tw-leading, var(--text-sm--line-height));
+    --tw-font-weight: var(--font-weight-semibold);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-ink-700);
+    transition-property: color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to, opacity, box-shadow, transform, translate, scale, rotate, filter, -webkit-backdrop-filter, backdrop-filter, display, visibility, content-visibility, overlay, pointer-events;
+    transition-timing-function: var(--tw-ease, var(--default-transition-timing-function));
+    transition-duration: var(--tw-duration, var(--default-transition-duration));
+    &:hover {
+      @media (hover: hover) {
+        background-color: var(--color-ink-50);
+      }
+    }
+    &:focus {
+      --tw-ring-shadow: var(--tw-ring-inset,) 0 0 0 calc(4px + var(--tw-ring-offset-width)) var(--tw-ring-color, currentcolor);
+      box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
+    }
+    &:focus {
+      --tw-ring-color: var(--color-ink-100);
+    }
+    &:focus {
+      --tw-outline-style: none;
+      outline-style: none;
+    }
+    &:disabled {
+      cursor: not-allowed;
+    }
+    &:disabled {
+      opacity: 40%;
+    }
+  }
+  .fundraising-kyc-root .status-pill{
+    display: inline-flex;
+    align-items: center;
+    border-radius: calc(infinity * 1px);
+    border-style: var(--tw-border-style);
+    border-width: 1px;
+    padding-inline: calc(var(--spacing) * 2.5);
+    padding-block: calc(var(--spacing) * 1);
+    font-size: var(--text-xs);
+    line-height: var(--tw-leading, var(--text-xs--line-height));
+    --tw-font-weight: var(--font-weight-semibold);
+    font-weight: var(--font-weight-semibold);
+  }
+  .fundraising-kyc-root .status-neutral{
+    border-color: var(--color-ink-100);
+    background-color: var(--color-ink-50);
+    color: var(--color-ink-700);
+  }
+  .fundraising-kyc-root .status-success{
+    border-color: var(--color-matanho-100);
+    background-color: var(--color-matanho-50);
+    color: var(--color-matanho-800);
+  }
+  .fundraising-kyc-root .status-warning{
+    border-color: var(--color-amber-200);
+    background-color: var(--color-amber-50);
+    color: var(--color-amber-800);
+  }
+  .fundraising-kyc-root .status-danger{
+    border-color: var(--color-red-200);
+    background-color: var(--color-red-50);
+    color: var(--color-red-800);
+  }
+  .fundraising-kyc-root .callout{
+    border-radius: var(--radius-2xl);
+    border-style: var(--tw-border-style);
+    border-width: 1px;
+    padding: calc(var(--spacing) * 4);
+    font-size: var(--text-xs);
+    line-height: var(--tw-leading, var(--text-xs--line-height));
+    --tw-leading: calc(var(--spacing) * 5);
+    line-height: calc(var(--spacing) * 5);
+  }
+  .fundraising-kyc-root .callout-info{
+    border-color: var(--color-matanho-100);
+    background-color: var(--color-matanho-50);
+    color: var(--color-matanho-950);
+  }
+  .fundraising-kyc-root .callout-warning{
+    border-color: var(--color-amber-200);
+    background-color: var(--color-amber-50);
+    color: var(--color-amber-950);
+  }
+  .fundraising-kyc-root .callout-success{
+    border-color: var(--color-emerald-200);
+    background-color: var(--color-emerald-50);
+    color: var(--color-emerald-950);
+  }
+  .fundraising-kyc-root .choice-card{
+    border-radius: var(--radius-2xl);
+    border-style: var(--tw-border-style);
+    border-width: 1px;
+    border-color: var(--color-ink-100);
+    background-color: var(--color-white);
+    padding: calc(var(--spacing) * 4);
+    text-align: left;
+    transition-property: color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to, opacity, box-shadow, transform, translate, scale, rotate, filter, -webkit-backdrop-filter, backdrop-filter, display, visibility, content-visibility, overlay, pointer-events;
+    transition-timing-function: var(--tw-ease, var(--default-transition-timing-function));
+    transition-duration: var(--tw-duration, var(--default-transition-duration));
+    &:hover {
+      @media (hover: hover) {
+        border-color: var(--color-matanho-100);
+      }
+    }
+    &:hover {
+      @media (hover: hover) {
+        background-color: var(--color-ink-50);
+      }
+    }
+    &:focus {
+      --tw-ring-shadow: var(--tw-ring-inset,) 0 0 0 calc(4px + var(--tw-ring-offset-width)) var(--tw-ring-color, currentcolor);
+      box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
+    }
+    &:focus {
+      --tw-ring-color: var(--color-matanho-100);
+    }
+    &:focus {
+      --tw-outline-style: none;
+      outline-style: none;
+    }
+  }
+  .fundraising-kyc-root .choice-card-active{
+    border-color: var(--color-matanho-500);
+    background-color: var(--color-matanho-50);
+    --tw-shadow: 0 10px 30px var(--tw-shadow-color, rgba(23, 39, 60, 0.07));
+    box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
+  }
+  .fundraising-kyc-root .summary-card{
+    border-radius: var(--radius-xl);
+    border-style: var(--tw-border-style);
+    border-width: 1px;
+    border-color: var(--color-ink-100);
+    background-color: var(--color-white);
+    padding: calc(var(--spacing) * 3);
+  }
+}
+.fundraising-kyc-root .face-mask{
+  box-shadow: 0 0 0 999px rgba(6, 18, 28, 0.30);
+}
+.fundraising-kyc-root .sidebar-glow::after{
+  content: "";
+  position: absolute;
+  width: 330px;
+  height: 330px;
+  right: -170px;
+  bottom: -150px;
+  border-radius: 9999px;
+  background: rgba(255,255,255,.055);
+  filter: blur(2px);
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fundraising-kyc-root *, .fundraising-kyc-root *::before, .fundraising-kyc-root *::after{
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+@property --tw-translate-x {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0;
+}
+@property --tw-translate-y {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0;
+}
+@property --tw-translate-z {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0;
+}
+@property --tw-scale-x {
+  syntax: "*";
+  inherits: false;
+  initial-value: 1;
+}
+@property --tw-scale-y {
+  syntax: "*";
+  inherits: false;
+  initial-value: 1;
+}
+@property --tw-scale-z {
+  syntax: "*";
+  inherits: false;
+  initial-value: 1;
+}
+@property --tw-space-y-reverse {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0;
+}
+@property --tw-border-style {
+  syntax: "*";
+  inherits: false;
+  initial-value: solid;
+}
+@property --tw-gradient-position {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-gradient-from {
+  syntax: "<color>";
+  inherits: false;
+  initial-value: #0000;
+}
+@property --tw-gradient-via {
+  syntax: "<color>";
+  inherits: false;
+  initial-value: #0000;
+}
+@property --tw-gradient-to {
+  syntax: "<color>";
+  inherits: false;
+  initial-value: #0000;
+}
+@property --tw-gradient-stops {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-gradient-via-stops {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-gradient-from-position {
+  syntax: "<length-percentage>";
+  inherits: false;
+  initial-value: 0%;
+}
+@property --tw-gradient-via-position {
+  syntax: "<length-percentage>";
+  inherits: false;
+  initial-value: 50%;
+}
+@property --tw-gradient-to-position {
+  syntax: "<length-percentage>";
+  inherits: false;
+  initial-value: 100%;
+}
+@property --tw-leading {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-font-weight {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-tracking {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-shadow {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0 0 #0000;
+}
+@property --tw-shadow-color {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-shadow-alpha {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 100%;
+}
+@property --tw-inset-shadow {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0 0 #0000;
+}
+@property --tw-inset-shadow-color {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-inset-shadow-alpha {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 100%;
+}
+@property --tw-ring-color {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-ring-shadow {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0 0 #0000;
+}
+@property --tw-inset-ring-color {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-inset-ring-shadow {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0 0 #0000;
+}
+@property --tw-ring-inset {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-ring-offset-width {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@property --tw-ring-offset-color {
+  syntax: "*";
+  inherits: false;
+  initial-value: #fff;
+}
+@property --tw-ring-offset-shadow {
+  syntax: "*";
+  inherits: false;
+  initial-value: 0 0 #0000;
+}
+@property --tw-backdrop-blur {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-backdrop-brightness {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-backdrop-contrast {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-backdrop-grayscale {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-backdrop-hue-rotate {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-backdrop-invert {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-backdrop-opacity {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-backdrop-saturate {
+  syntax: "*";
+  inherits: false;
+}
+@property --tw-backdrop-sepia {
+  syntax: "*";
+  inherits: false;
+}
+
+

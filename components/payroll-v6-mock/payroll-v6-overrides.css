@@ -1,0 +1,26 @@
+/* SharedTopbar offset + overlay fixes for Payroll V6 */
+
+.payroll-v6-root {
+  position: relative;
+  min-height: calc(100vh - 5rem);
+  overflow-x: clip;
+  overflow-y: visible;
+}
+
+.payroll-v6-root .app {
+  height: calc(100vh - 5rem);
+  min-height: calc(100vh - 5rem);
+}
+
+.payroll-v6-root .sidebar {
+  position: relative;
+  z-index: 20;
+}
+
+.payroll-v6-root .shell {
+  min-height: 0;
+}
+
+.payroll-v6-root .toast-stack {
+  z-index: 200;
+}

@@ -1,0 +1,16 @@
+/* SharedTopbar offset for Fundraising KYC */
+
+.fundraising-kyc-root {
+  position: relative;
+  min-height: calc(100vh - 5rem);
+  overflow-x: clip;
+}
+
+.fundraising-kyc-root .min-h-screen {
+  min-height: calc(100vh - 5rem);
+}
+
+.fundraising-kyc-root aside.lg\:h-screen,
+.fundraising-kyc-root .lg\:h-screen {
+  max-height: calc(100vh - 5rem);
+}

@@ -30,8 +30,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // Only block the app on initial session resolution — not on background profile refresh
   const waitingForSession = isLoading && !bootTimedOut
 
+  // Skip auth boot gate on login and on Home Version 3 public preview (mock, no backend).
+  const skipAuthBoot =
+    pathname === '/login' ||
+    pathname === '/home-v3' ||
+    (pathname?.startsWith('/home-v3/') ?? false) ||
+    pathname === '/portfolio-v11' ||
+    (pathname?.startsWith('/portfolio-v11/') ?? false) ||
+    pathname === '/payroll-v6' ||
+    (pathname?.startsWith('/payroll-v6/') ?? false) ||
+    pathname === '/fundraising-kyc' ||
+    (pathname?.startsWith('/fundraising-kyc/') ?? false) ||
+    pathname === '/investee-portal-v8' ||
+    (pathname?.startsWith('/investee-portal-v8/') ?? false)
+
   // Show loading state while checking authentication, but not on login page
-  if (waitingForSession && pathname !== '/login') {
+  if (waitingForSession && !skipAuthBoot) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-cyan-50">
         <div className="text-center">

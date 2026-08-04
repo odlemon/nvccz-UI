@@ -1,0 +1,20 @@
+/** Key Matanho V10 tokens (CSS custom properties remain authoritative in home-v3.css) */
+export const hv3 = {
+  brandPrimary: "#075DFF",
+  blue: "#075DFF",
+  blue2: "#00A8FF",
+  cyan: "#00C7D9",
+  navy: "#061A36",
+  ink: "#0A213E",
+  ink2: "#314A68",
+  canvas: "#f5f7fb",
+  workspaceWarm: "#f6f1e9",
+  success: "#00A86B",
+  amber: "#F29A18",
+  danger: "#F04F5F",
+  radiusSm: "12px",
+  radius: "18px",
+  sidebar: "264px",
+  topbar: "78px",
+  assetBase: "/home-v3/assets",
+} as const

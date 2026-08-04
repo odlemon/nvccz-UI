@@ -2624,6 +2624,21 @@ export function hasModuleAccess(
   roleCode: RoleCode,
   moduleId: string
 ): boolean {
+  // Employee Hub Personal Home — available to all authenticated roles (mock phase)
+  if (moduleId === "employee-hub") return true;
+  // Home Version 3 (client Matanho V10 port) — open during comparison/mock phase
+  if (moduleId === "home-v3") return true;
+  // Portfolio V11 client design port — open during comparison/mock phase
+  if (moduleId === "portfolio-v11") return true;
+  // Payroll HR V6 client design port — open during comparison/mock phase
+  if (moduleId === "payroll-v6") return true;
+  // Fundraising Investor KYC client design port — open during comparison/mock phase
+  if (moduleId === "fundraising-kyc") return true;
+  // Investee Portal V8 client design port — open during comparison/mock phase
+  if (moduleId === "investee-portal-v8") return true;
+  // Accounting V2 redesign mocks — open during mock phase
+  if (moduleId === "accounting-v2") return true;
+
   const permissions = getRolePermissions(roleCode);
   if (!permissions) return false;
 
@@ -2653,6 +2668,14 @@ export function hasSubModuleAccess(
   moduleId: string,
   subModuleId: string
 ): boolean {
+  if (moduleId === "employee-hub") return true;
+  if (moduleId === "home-v3") return true;
+  if (moduleId === "portfolio-v11") return true;
+  if (moduleId === "payroll-v6") return true;
+  if (moduleId === "fundraising-kyc") return true;
+  if (moduleId === "investee-portal-v8") return true;
+  if (moduleId === "accounting-v2") return true;
+
   const permissions = getRolePermissions(roleCode);
   if (!permissions) return false;
 

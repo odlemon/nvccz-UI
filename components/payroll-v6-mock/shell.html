@@ -1,0 +1,34 @@
+<div class="app" id="app">
+<aside class="sidebar">
+<div class="brand">
+<img alt="Matanho logo" id="brandLogo"/>
+<div class="brand-copy"><strong>PAYROLL</strong><span>HUMAN CAPITAL OS</span></div>
+<div aria-label="Matanho" class="brand-mark">m</div>
+</div>
+<button class="tenant" data-action="tenant"><div class="tenant-icon">AH</div><div class="tenant-meta"><strong>Arcus Holdings Private Limited</strong><span>Zimbabwe production tenant</span></div></button>
+<div class="nav-scroll" id="nav"></div>
+<div class="sidebar-foot"><div class="health"><i class="pulse"></i><div><strong>Payroll controls active</strong><span>Immutable audit mode enabled</span></div></div></div>
+</aside>
+<section class="shell">
+<header class="topbar">
+<button aria-label="Open navigation" class="icon-btn mobile-only" id="mobileMenu"></button>
+<button aria-label="Collapse navigation" class="icon-btn" id="collapseBtn"></button>
+<button class="search-launch" id="searchLauncher"><span id="searchIcon"></span><span>Search employees, payroll runs, documents or controls</span><kbd>Ctrl K</kbd></button>
+<div class="spacer"></div>
+<button type="button" id="appLauncher" class="icon-btn app-launcher" aria-label="Open Matanho apps" title="Matanho apps"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.4"></rect><rect x="14" y="3" width="7" height="7" rx="1.4"></rect><rect x="3" y="14" width="7" height="7" rx="1.4"></rect><rect x="14" y="14" width="7" height="7" rx="1.4"></rect></svg></button>
+<select aria-label="Payroll period" class="top-select" id="periodSelect"><option>June 2026</option><option>May 2026</option><option>April 2026</option></select>
+<select aria-label="Simulate role" class="top-select role-select" id="roleSelect"></select>
+<button aria-label="Toggle theme" class="icon-btn" id="themeBtn"></button>
+<button aria-label="Notifications" class="icon-btn" id="notificationBtn"></button>
+<div class="profile"><div class="avatar">TM</div><div><strong>Tariro Moyo</strong><span id="roleLabel">Payroll Manager</span></div></div>
+</header>
+<main class="content" id="content"></main>
+</section>
+</div>
+<div class="drawer-backdrop" id="drawerBackdrop"></div>
+<aside class="drawer" id="drawer"><div class="drawer-head" id="drawerHead"></div><div class="drawer-body" id="drawerBody"></div><div class="drawer-foot" id="drawerFoot"></div></aside>
+<div class="modal-backdrop" id="modalBackdrop"></div>
+<section class="modal" id="modal"><div class="modal-head" id="modalHead"></div><div class="modal-body" id="modalBody"></div><div class="modal-foot" id="modalFoot"></div></section>
+<div class="command-backdrop" id="commandBackdrop"></div>
+<section class="command" id="command"><input id="commandInput" placeholder="Type a page, employee, report or action..."/><div class="command-results" id="commandResults"></div></section>
+<div class="toast-stack" id="toasts"></div>

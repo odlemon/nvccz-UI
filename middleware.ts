@@ -154,6 +154,11 @@ export function middleware(request: NextRequest) {
     '/public-tenders',        // public tender browsing
     '/applications/form',     // public application form
     '/vendor-quotations',     // vendor quotation submission routes
+    '/home-v3',               // Home Version 3 mock — public preview (no API / no login)
+    '/portfolio-v11',         // Portfolio V11 client design — public preview
+    '/payroll-v6',            // Payroll HR V6 client design — public preview
+    '/fundraising-kyc',       // Investor KYC onboarding client design — public preview
+    '/investee-portal-v8',    // Investee Portal V8 client design — public preview
     '/[token]'
   ]
   if (passThroughRoutes.some((route) => pathname.startsWith(route))) {

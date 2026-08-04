@@ -1,0 +1,22 @@
+/* SharedTopbar offset for Investee Portal V8 */
+
+.investee-portal-v8-root {
+  position: relative;
+  min-height: calc(100vh - 5rem);
+  overflow-x: clip;
+  overflow-y: visible;
+}
+
+.investee-portal-v8-root .app {
+  height: calc(100vh - 5rem);
+  min-height: calc(100vh - 5rem);
+}
+
+.investee-portal-v8-root .sidebar {
+  position: relative;
+  z-index: 20;
+}
+
+.investee-portal-v8-root .toasts {
+  z-index: 200;
+}
