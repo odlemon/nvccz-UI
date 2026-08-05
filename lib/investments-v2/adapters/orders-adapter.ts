@@ -72,7 +72,17 @@ function titleCaseStatus(raw: string): string {
 }
 
 /** Map API order status → client lifecycle labels (broker outside system). */
-export function mapOrderUiStatus(status: string | null | undefined): string {
+export function mapOrderUiStatus(
+  status: string | null | undefined,
+  openBroker?: { outcome?: string } | null,
+): string {
+  if (openBroker?.outcome) {
+    const o = String(openBroker.outcome).toUpperCase()
+    if (o === 'COUNTER') return 'Counter-offer'
+    if (o === 'FILLED') return 'Broker fill'
+    if (o === 'UNABLE') return 'Broker unable'
+    if (o === 'PARTIAL') return 'Partial fill'
+  }
   const u = String(status ?? '').toUpperCase()
   if (u === 'DRAFT') return 'Draft'
   if (u === 'SUBMITTED' || u === 'COMPLIANCE_REVIEW' || u === 'CHECKED') return 'Submitted'
@@ -112,11 +122,30 @@ export const ORDERBOOK_LIFECYCLE_TABS = [
   'Archived',
 ] as const
 
+/** Statuses that belong on blotter / closed queues — not the default Orderbook inbox. */
+const ORDERBOOK_INBOX_EXCLUDED = new Set([
+  'Executed',
+  'Pending Settlement',
+  'Settled',
+  'Cancelled',
+  'Failed',
+  'Rejected',
+  'Archived',
+])
+
 export function orderMatchesLifecycleTab(uiStatus: string, tab: string): boolean {
-  if (tab === 'Orderbook') return true
+  const awaitingBrokerDecision = new Set([
+    'Confirmation Recorded',
+    'Counter-offer',
+    'Broker fill',
+    'Broker unable',
+    'Partial fill',
+  ])
+  // Default inbox = pending instructions only (broker-outside model).
+  if (tab === 'Orderbook') return !ORDERBOOK_INBOX_EXCLUDED.has(uiStatus)
   if (tab === 'Submitted') return uiStatus === 'Submitted' || uiStatus === 'Compliance Review'
   if (tab === 'Sent to Broker') return uiStatus === 'Sent to Broker'
-  if (tab === 'Confirmation Recorded') return uiStatus === 'Confirmation Recorded'
+  if (tab === 'Confirmation Recorded') return awaitingBrokerDecision.has(uiStatus)
   return uiStatus === tab
 }
 
@@ -256,6 +285,7 @@ export type OrderbookRow = {
   gross: string
   grossValue: number
   broker: string
+  brokerProfileId: string | null
   custodian: string
   custodianProfileId: string | null
   settlementAccountId: string | null
@@ -271,6 +301,10 @@ export type OrderbookRow = {
   createdAt: string
   status: string
   rawStatus: string
+  brokerOutcome: string | null
+  brokerOfferQty: string | null
+  brokerOfferPrice: string | null
+  brokerOfferCurrency: string | null
   version: number
 }
 
@@ -360,6 +394,8 @@ export async function resolveOrderTradeId(order: {
 }
 
 function mapApprovalLabel(order: Order): string {
+  const open = order.openBrokerConfirmation
+  if (open?.outcome) return 'Awaiting your decision'
   const latest = order.approvals?.[0]
   if (latest?.status) return titleCaseStatus(latest.status)
   if (order.approvedAt) return 'Approved'
@@ -370,8 +406,22 @@ function mapApprovalLabel(order: Order): string {
   return titleCaseStatus(String(order.status ?? DASH))
 }
 
-function mapRoutingLabel(status: string): string {
+function mapRoutingLabel(
+  status: string,
+  openBroker?: Order['openBrokerConfirmation'],
+): string {
+  if (openBroker?.outcome) {
+    const o = String(openBroker.outcome).toUpperCase()
+    const qty = openBroker.quantity ?? ''
+    const px = openBroker.price ?? ''
+    const ccy = openBroker.currencyCode ? ` ${openBroker.currencyCode}` : ''
+    if (o === 'COUNTER') return `Counter ${qty} @ ${px}${ccy}`
+    if (o === 'FILLED') return `Fill ${qty} @ ${px}${ccy} — accept?`
+    if (o === 'UNABLE') return 'Unable to fill'
+    if (o === 'PARTIAL') return `Partial ${qty} @ ${px}${ccy}`
+  }
   const u = status.toUpperCase()
+  if (u === 'BROKER_CONFIRMATION_RECORDED' || u === 'CONFIRMATION_RECORDED') return 'Broker replied'
   if (u === 'SENT_TO_BROKER') return 'At broker'
   if (u === 'EXECUTED') return 'Filled'
   if (u === 'CANCELLED') return 'Cancelled'
@@ -392,7 +442,7 @@ export function mapOrderbookOrders(data: unknown, fundNameById?: Record<string, 
     const limitPrice = n(o.limitPrice)
     const px = execPrice ?? limitPrice ?? 0
     const grossValue = qty * px
-    const uiStatus = mapOrderUiStatus(o.status)
+    const uiStatus = mapOrderUiStatus(o.status, o.openBrokerConfirmation)
     const filledQty = n(o.filledQuantity)
     const filled =
       filledQty != null
@@ -422,6 +472,10 @@ export function mapOrderbookOrders(data: unknown, fundNameById?: Record<string, 
       gross: formatMoneyDisplay(grossValue, 0),
       grossValue,
       broker: String(o.brokerName ?? o.brokerProfileId ?? DASH),
+      brokerProfileId:
+        o.brokerProfileId != null && String(o.brokerProfileId).trim()
+          ? String(o.brokerProfileId)
+          : null,
       custodian: String(o.custodianName ?? o.custodianProfileId ?? DASH),
       custodianProfileId: o.custodianProfileId != null && String(o.custodianProfileId).trim() ? String(o.custodianProfileId) : null,
       settlementAccountId:
@@ -434,11 +488,17 @@ export function mapOrderbookOrders(data: unknown, fundNameById?: Record<string, 
       tradeDate: fmtDateTime(o.tradeDate ?? o.submittedAt ?? o.createdAt),
       valueDate: fmtDate(o.valueDate),
       approval: mapApprovalLabel(o),
-      routing: mapRoutingLabel(String(o.status ?? '')),
+      routing: mapRoutingLabel(String(o.status ?? ''), o.openBrokerConfirmation),
       created: fmtDate(o.createdAt),
       createdAt: String(o.createdAt ?? ''),
       status: uiStatus,
       rawStatus: String(o.status ?? ''),
+      brokerOutcome: o.openBrokerConfirmation?.outcome
+        ? String(o.openBrokerConfirmation.outcome).toUpperCase()
+        : null,
+      brokerOfferQty: o.openBrokerConfirmation?.quantity ?? null,
+      brokerOfferPrice: o.openBrokerConfirmation?.price ?? null,
+      brokerOfferCurrency: o.openBrokerConfirmation?.currencyCode ?? null,
       tradeId: o.tradeId != null && String(o.tradeId).trim() ? String(o.tradeId) : null,
       version: Number(o.version ?? o.auditVersion ?? 1) || 1,
     }

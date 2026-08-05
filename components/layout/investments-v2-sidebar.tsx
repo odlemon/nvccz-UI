@@ -57,14 +57,15 @@ const navItems = [
   {
     label: 'Reconciliation',
     icon: Scale,
-    href: '/investments-v2/reconciliation',
+    href: '/investments-v2/reconciliation/trade',
     children: [
-      { label: 'Client', href: '/investments-v2/reconciliation' },
       { label: 'Trade', href: '/investments-v2/reconciliation/trade' },
-      { label: 'Cash', href: '/investments-v2/reconciliation/fund-cash' },
-      { label: 'Cash Ledger', href: '/investments-v2/reconciliation/cash-ledger' },
-      { label: 'Exceptions', href: '/investments-v2/reconciliation/exceptions' },
-      { label: 'Statements', href: '/investments-v2/reconciliation/statements' },
+      // Hidden for now — client / cash recon surfaces
+      // { label: 'Client', href: '/investments-v2/reconciliation' },
+      // { label: 'Cash', href: '/investments-v2/reconciliation/fund-cash' },
+      // { label: 'Cash Ledger', href: '/investments-v2/reconciliation/cash-ledger' },
+      // { label: 'Exceptions', href: '/investments-v2/reconciliation/exceptions' },
+      // { label: 'Statements', href: '/investments-v2/reconciliation/statements' },
     ],
   },
   {

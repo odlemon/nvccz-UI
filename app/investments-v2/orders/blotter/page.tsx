@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import { Check, ExternalLink, FileCheck, Loader2, Search } from 'lucide-react'
 import { OpsKpiSkeleton, OpsTableSkeleton } from '@/components/investments-v2/loading-skeletons'
 import { DetailPanel } from '@/components/investments-v2/ui/detail-panel'
-import { buttonClass, Field, inputClass, Metric, Modal, OrdersCard, OrdersPage, Pill, SelectField, tableClass, tableWrapClass } from '@/components/investments-v2/orders-ui'
+import { buttonClass, inputClass, Metric, OrdersCard, OrdersPage, Pill, SelectField, tableClass, tableWrapClass } from '@/components/investments-v2/orders-ui'
 import { formatOpsError, investmentOpsApi } from '@/lib/api/investment-ops-api'
 import {
   accountingDeepLink,
@@ -58,11 +58,8 @@ function TradeBlotterPageInner() {
   const [status, setStatus] = useState('All')
   const [query, setQuery] = useState('')
   const [selected, setSelected] = useState<BlotterTradeRow | null>(null)
-  const [actionBusy, setActionBusy] = useState<'confirm' | 'settle' | 'post' | null>(null)
+  const [actionBusy, setActionBusy] = useState<'confirm' | 'settle' | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
-  const [settleOpen, setSettleOpen] = useState(false)
-  const [settleAt, setSettleAt] = useState('')
-  const [custodianReference, setCustodianReference] = useState('')
   const [deepLinkMsg, setDeepLinkMsg] = useState<string | null>(null)
   const deepLinkApplied = useRef<string | null>(null)
   const deepLinkFailed = useRef<string | null>(null)
@@ -162,7 +159,7 @@ function TradeBlotterPageInner() {
     value == null || !Number.isFinite(value) ? '—' : value.toLocaleString('en-US', { minimumFractionDigits: 2 })
 
   const runTradeAction = async (
-    kind: 'confirm' | 'settle' | 'post',
+    kind: 'confirm' | 'settle',
     action: () => Promise<{ success?: boolean; message?: string; error?: string; code?: string }>,
   ) => {
     if (!selected?.apiId || actionBusy) return
@@ -185,42 +182,10 @@ function TradeBlotterPageInner() {
   const confirmSelectedTrade = () =>
     runTradeAction('confirm', () => investmentOpsApi.confirmTrade(selected!.apiId))
 
-  const openSettleModal = () => {
-    if (!selected) return
-    setSettleAt(new Date().toISOString().slice(0, 16))
-    setCustodianReference('')
-    setSettleOpen(true)
-  }
-
-  const settleSelectedTrade = async () => {
-    if (!selected?.apiId || actionBusy) return
-    if (!custodianReference.trim()) {
-      toast.error('Custodian / CSD reference is required.')
-      return
-    }
-    const settledAtIso = settleAt
-      ? new Date(settleAt).toISOString()
-      : new Date().toISOString()
-    await runTradeAction('settle', () =>
-      investmentOpsApi.settleTrade(selected.apiId, {
-        allowDeferredAccounting: true,
-        settledAt: settledAtIso,
-        custodianReference: custodianReference.trim(),
-      }),
-    )
-    setSettleOpen(false)
-  }
-
-  /**
-   * Settle requiring immediate accounting, or re-call settle after deferred settle
-   * so books move to Posted (same settle endpoint, allowDeferredAccounting: false).
-   */
-  const postSelectedTrade = () =>
-    runTradeAction('post', () =>
+  const settleSelectedTrade = () =>
+    runTradeAction('settle', () =>
       investmentOpsApi.settleTrade(selected!.apiId, {
-        allowDeferredAccounting: false,
         settledAt: new Date().toISOString(),
-        ...(custodianReference.trim() ? { custodianReference: custodianReference.trim() } : {}),
       }),
     )
 
@@ -253,22 +218,15 @@ function TradeBlotterPageInner() {
   const isConfirmed = selected?.confirmation === 'Confirmed'
   const isSettled = selected?.settlement === 'Settled'
   const isPosted = selected?.accounting === 'Posted'
-  // Blotter post-trade sequence: Confirm → Settle → Post
+  const isSettleComplete = isSettled && isPosted
+  // Blotter post-trade sequence: Confirm → Settle & post
   const canConfirm = Boolean(selected) && !isConfirmed
-  const canSettle = Boolean(selected) && isConfirmed && !isSettled
-  const canPost = Boolean(selected) && isConfirmed && isSettled && !isPosted
+  const canSettle = Boolean(selected) && isConfirmed && !isSettleComplete
   const settleHint = !isConfirmed
     ? 'Confirm the trade first'
-    : isSettled
-      ? 'Already settled'
+    : isSettleComplete
+      ? 'Settled and posted'
       : null
-  const postHint = !isConfirmed
-    ? 'Confirm the trade first'
-    : !isSettled
-      ? 'Mark settled first'
-      : isPosted
-        ? 'Already posted'
-        : null
 
   return (
     <OrdersPage
@@ -510,14 +468,17 @@ function TradeBlotterPageInner() {
               </button>
             </div>
             <div className="rounded-[18px] border border-white/[0.07] p-4">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <div>
-                  <p className="text-[11px] font-medium">2. Custodian settlement</p>
+                  <p className="text-[11px] font-medium">2. Settle &amp; post</p>
                   <p className="mt-1 text-[9px] text-slate-500">
-                    Cash + securities via {selected.custodian} · value date {selected.valueDate}
+                    Custodian settlement + books via {selected.custodian} · value date {selected.valueDate}
                   </p>
                 </div>
-                <Pill tone={selected.settlement === 'Settled' ? 'green' : 'amber'}>{selected.settlement}</Pill>
+                <div className="flex shrink-0 flex-col items-end gap-1">
+                  <Pill tone={selected.settlement === 'Settled' ? 'green' : 'amber'}>{selected.settlement}</Pill>
+                  <Pill tone={selected.accounting === 'Posted' ? 'green' : 'slate'}>{selected.accounting}</Pill>
+                </div>
               </div>
               <button
                 type="button"
@@ -528,49 +489,17 @@ function TradeBlotterPageInner() {
                   'mt-3 w-full border-emerald-400/30 text-emerald-300',
                   (Boolean(actionBusy) || !canSettle) && 'cursor-not-allowed opacity-40',
                 )}
-                onClick={openSettleModal}
+                onClick={() => void settleSelectedTrade()}
               >
                 {actionBusy === 'settle' ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 ) : (
                   <Check className="h-3.5 w-3.5" />
                 )}
-                {isSettled ? 'Settled' : 'Settle with custodian'}
+                {isSettleComplete ? 'Settled & posted' : 'Settle & post'}
               </button>
-              {settleHint && !isSettled && (
+              {settleHint && !isSettleComplete && (
                 <p className="mt-2 text-[9px] text-amber-400/80">{settleHint}</p>
-              )}
-            </div>
-            <div className="rounded-[18px] border border-white/[0.07] p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-[11px] font-medium">3. Accounting posting</p>
-                  <p className="mt-1 text-[9px] text-slate-500">
-                    After custodian settlement, post books (immediate accounting).
-                  </p>
-                </div>
-                <Pill tone={selected.accounting === 'Posted' ? 'green' : 'slate'}>{selected.accounting}</Pill>
-              </div>
-              <button
-                type="button"
-                disabled={Boolean(actionBusy) || !canPost}
-                title={postHint ?? undefined}
-                className={cn(
-                  buttonClass,
-                  'mt-3 w-full border-blue-400/30 text-blue-300',
-                  (Boolean(actionBusy) || !canPost) && 'cursor-not-allowed opacity-40',
-                )}
-                onClick={() => void postSelectedTrade()}
-              >
-                {actionBusy === 'post' ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Check className="h-3.5 w-3.5" />
-                )}
-                {isPosted ? 'Posted' : 'Post books'}
-              </button>
-              {postHint && !isPosted && (
-                <p className="mt-2 text-[9px] text-amber-400/80">{postHint}</p>
               )}
               {isPosted && (
                 <button
@@ -587,7 +516,7 @@ function TradeBlotterPageInner() {
             </div>
             <div className="rounded-[18px] border border-white/[0.07] p-4">
               <div>
-                <p className="text-[11px] font-medium">4. Reconcile</p>
+                <p className="text-[11px] font-medium">3. Reconcile</p>
                 <p className="mt-1 text-[9px] text-slate-500">
                   Match internal trade × broker statement × custodian statement. Cash lines linked on settle (BA-RC-2).
                 </p>
@@ -618,58 +547,6 @@ function TradeBlotterPageInner() {
           </div>
         </DetailPanel>
       )}
-      <Modal
-        open={settleOpen}
-        onClose={() => {
-          if (actionBusy === 'settle') return
-          setSettleOpen(false)
-        }}
-        title="Custodian settlement"
-        subtitle={`Record cash + securities settlement via ${selected?.custodian ?? 'custodian'}.`}
-        footer={
-          <>
-            <button
-              type="button"
-              className={buttonClass}
-              disabled={actionBusy === 'settle'}
-              onClick={() => setSettleOpen(false)}
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              disabled={Boolean(actionBusy) || !custodianReference.trim()}
-              className={cn(buttonClass, 'border-emerald-400/40 bg-emerald-600 text-white')}
-              onClick={() => void settleSelectedTrade()}
-            >
-              {actionBusy === 'settle' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-              {actionBusy === 'settle' ? 'Settling…' : 'Confirm settlement'}
-            </button>
-          </>
-        }
-      >
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Settled at">
-            <input
-              className={inputClass}
-              type="datetime-local"
-              value={settleAt}
-              onChange={(e) => setSettleAt(e.target.value)}
-            />
-          </Field>
-          <Field label="Custodian / CSD reference">
-            <input
-              className={inputClass}
-              value={custodianReference}
-              onChange={(e) => setCustodianReference(e.target.value)}
-              placeholder="e.g. CSD-99102"
-            />
-          </Field>
-        </div>
-        <p className="mt-3 text-[10px] text-slate-500">
-          Value date on trade: {selected?.valueDate ?? '—'} · Custodian: {selected?.custodian ?? '—'}
-        </p>
-      </Modal>
     </OrdersPage>
   )
 }

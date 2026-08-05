@@ -59,6 +59,16 @@ export const subscribeTaskEvent = <T = any>(
   }
 }
 
+export const subscribeInvestmentBrokerReply = <T = { orderId: string; outcome?: string }>(
+  handler: (payload: T) => void,
+): (() => void) => {
+  const s = getSocket()
+  s.on("investment_broker_reply", handler as any)
+  return () => {
+    s.off("investment_broker_reply", handler as any)
+  }
+}
+
 export const subscribeNotifications = <T = any>(
   handler: (payload: T) => void
 ): (() => void) => {

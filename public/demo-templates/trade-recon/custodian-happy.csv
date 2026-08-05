@@ -1,2 +1,2 @@
 symbol,side,quantity,price,trade_date,custodian_ref,currency
-ABC,BUY,1000,10.00,2026-07-21,CSD-99102,USD
+INN,BUY,100,12.50,2026-08-05,CSD-INN-001,ZWG

@@ -278,9 +278,25 @@ export type TradeReconTemplate = {
   [key: string]: unknown
 }
 
+export type TradeReconMatch = {
+  id: string
+  how?: 'AUTO' | 'MANUAL' | string
+  status?: string
+  symbol?: string | null
+  side?: string | null
+  tradeRef?: string | null
+  internalQty?: string | null
+  brokerQty?: string | null
+  custodianQty?: string | null
+  price?: string | null
+  [key: string]: unknown
+}
+
 export type TradeReconBatch = {
   id: string
   fundId?: string
+  fundName?: string | null
+  displayLabel?: string | null
   asOfDate?: string
   status?: string
   brokerTemplateCode?: string
@@ -289,6 +305,7 @@ export type TradeReconBatch = {
   exceptionCount?: number
   brokerLineCount?: number
   custodianLineCount?: number
+  matches?: TradeReconMatch[]
   exceptions?: TradeReconException[]
   summary?: Record<string, unknown>
   [key: string]: unknown
@@ -299,11 +316,16 @@ export type TradeReconException = {
   code?: string
   status?: string
   symbol?: string
+  instrumentSymbol?: string
   side?: string
   message?: string
   internalQty?: string | number
   brokerQty?: string | number
   custodianQty?: string | number
+  internalQuantity?: string | number
+  brokerQuantity?: string | number
+  custodianQuantity?: string | number
+  tradeRef?: string | null
   tradeId?: string | null
   [key: string]: unknown
 }
@@ -385,6 +407,17 @@ export interface Order {
   approvals?: OrderApproval[]
   complianceResults?: OrderComplianceResult[]
   complianceRuns?: unknown[]
+  /** Open broker confirmation awaiting AM accept/reject (list enrichment). */
+  openBrokerConfirmation?: {
+    id: string
+    outcome: BrokerConfirmationOutcome | string
+    status?: string
+    quantity?: string | null
+    price?: string | null
+    currencyCode?: string | null
+    brokerReference?: string | null
+    recordedAt?: string | null
+  } | null
 }
 
 export interface OrderListResult {
@@ -787,6 +820,20 @@ export interface ReportTemplate {
   requiresFundId: boolean
   requiresClientId: boolean
   hasDocxTemplate: boolean
+  version?: number
+  parameterSchema?: {
+    type?: string
+    required?: string[]
+    properties?: Record<
+      string,
+      {
+        type?: string | string[]
+        description?: string
+        enum?: string[]
+        format?: string
+      }
+    >
+  }
 }
 
 export interface GeneratedReport {
@@ -1394,10 +1441,52 @@ class InvestmentOpsApiService {
       settlementAccountId?: string | null
       valueDate?: string | null
     } = {},
-  ): Promise<InvestmentOpsResponse<{ order?: Order; route?: unknown } & Order>> {
+  ): Promise<
+    InvestmentOpsResponse<{
+      order?: Order
+      route?: unknown
+      instruction?: {
+        instructionId?: string
+        status?: string
+        toEmail?: string | null
+        deliveryError?: string | null
+        replyUrl?: string
+        expiresAt?: string
+      }
+    } & Order>
+  > {
     return apiClient.post(`${this.BASE}/orders/${id}/send-to-broker`, body, {
       headers: idempotencyHeaders(),
     })
+  }
+
+  async listBrokerMessages(
+    orderId: string,
+  ): Promise<
+    InvestmentOpsResponse<{
+      messages: Array<{
+        id: string
+        direction: string
+        channel: string
+        kind: string
+        body?: string | null
+        actorLabel?: string | null
+        createdAt: string
+        payloadJson?: Record<string, unknown> | null
+      }>
+      latestInstruction: {
+        id: string
+        status: string
+        toEmail?: string | null
+        deliveryError?: string | null
+        replyUrl: string
+        sentAt?: string | null
+        expiresAt?: string
+        repliedAt?: string | null
+      } | null
+    }>
+  > {
+    return apiClient.get(`${this.BASE}/orders/${orderId}/broker-messages`)
   }
 
   async rejectOrder(
@@ -1550,7 +1639,7 @@ class InvestmentOpsApiService {
   ): Promise<InvestmentOpsResponse<{ order?: Order; trade?: OpsTrade } | OpsTrade>> {
     return apiClient.post(
       `${this.BASE}/trades/${id}/settle`,
-      { allowDeferredAccounting: true, ...data },
+      data,
       { headers: idempotencyHeaders() },
     )
   }
@@ -2076,7 +2165,7 @@ class InvestmentOpsApiService {
   }): Promise<InvestmentOpsResponse<Record<string, unknown>>> {
     return apiClient.post(
       `${this.BASE}/accounting/ledger-exports`,
-      { format: "JSON", ...data },
+      { format: "CSV", ...data },
       { headers: idempotencyHeaders() },
     )
   }
@@ -2122,7 +2211,9 @@ class InvestmentOpsApiService {
     format: string
     parameters: Record<string, any>
   }): Promise<InvestmentOpsResponse<GeneratedReport>> {
-    return apiClient.post(`${this.BASE}/reports/generate`, data)
+    return apiClient.post(`${this.BASE}/reports/generate`, data, {
+      headers: idempotencyHeaders(),
+    })
   }
 
   async downloadReport(id: string): Promise<Blob> {
@@ -2470,6 +2561,19 @@ class InvestmentOpsApiService {
   // ── BA-RC-1 — Trade 3-way reconciliation ─────────────────────────────────────
   async listTradeReconTemplates(): Promise<InvestmentOpsResponse<TradeReconTemplate[]>> {
     return apiClient.get(`${this.BASE}/trade-reconciliation/templates`)
+  }
+
+  async listTradeReconBatches(params?: {
+    fundId?: string
+    status?: string
+    limit?: number
+  }): Promise<InvestmentOpsResponse<{ items: TradeReconBatch[]; total: number }>> {
+    const q = new URLSearchParams()
+    if (params?.fundId) q.append('fundId', params.fundId)
+    if (params?.status) q.append('status', params.status)
+    if (params?.limit != null) q.append('limit', String(params.limit))
+    const qs = q.toString()
+    return apiClient.get(`${this.BASE}/trade-reconciliation/batches${qs ? `?${qs}` : ''}`)
   }
 
   async createTradeReconBatch(body: {

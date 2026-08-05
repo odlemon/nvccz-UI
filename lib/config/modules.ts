@@ -540,14 +540,16 @@ export const MODULE_CONFIG: ModuleConfig[] = [
         id: "investments-reconciliation",
         title: "Reconciliation",
         icon: Scale,
-        path: "/investments-v2/reconciliation",
+        path: "/investments-v2/reconciliation/trade",
         items: [
-          { id: "investments-reconciliation-overview", name: "Client Accounts Overview", path: "/investments-v2/reconciliation", icon: CiGrid41, description: "Client cash accounts and reconciliation health" },
-          { id: "investments-reconciliation-cash-ledger", name: "Cash Ledger", path: "/investments-v2/reconciliation/cash-ledger", icon: CiGrid41, description: "Trading and fund cash ledgers" },
-          { id: "investments-reconciliation-fund-cash", name: "Fund Cash Reconciliation", path: "/investments-v2/reconciliation/fund-cash", icon: CiGrid41, description: "Internal ledger vs bank statement workspace" },
-          { id: "investments-reconciliation-broker-custodian", name: "Broker & Custodian", path: "/investments-v2/reconciliation/broker-custodian", icon: CiGrid41, description: "Three-way broker and custodian reconciliation" },
-          { id: "investments-reconciliation-exceptions", name: "Exceptions", path: "/investments-v2/reconciliation/exceptions", icon: CiGrid41, description: "Reconciliation exceptions and approvals" },
-          { id: "investments-reconciliation-statements", name: "Client Statements", path: "/investments-v2/reconciliation/statements", icon: CiGrid41, description: "Investor and client cash statements" },
+          { id: "investments-reconciliation-trade", name: "Trade Reconciliation", path: "/investments-v2/reconciliation/trade", icon: CiGrid41, description: "Three-way blotter × broker × custodian reconciliation" },
+          // Hidden for now — client / cash recon surfaces
+          // { id: "investments-reconciliation-overview", name: "Client Accounts Overview", path: "/investments-v2/reconciliation", icon: CiGrid41, description: "Client cash accounts and reconciliation health" },
+          // { id: "investments-reconciliation-cash-ledger", name: "Cash Ledger", path: "/investments-v2/reconciliation/cash-ledger", icon: CiGrid41, description: "Trading and fund cash ledgers" },
+          // { id: "investments-reconciliation-fund-cash", name: "Fund Cash Reconciliation", path: "/investments-v2/reconciliation/fund-cash", icon: CiGrid41, description: "Internal ledger vs bank statement workspace" },
+          // { id: "investments-reconciliation-broker-custodian", name: "Broker & Custodian", path: "/investments-v2/reconciliation/broker-custodian", icon: CiGrid41, description: "Three-way broker and custodian reconciliation" },
+          // { id: "investments-reconciliation-exceptions", name: "Exceptions", path: "/investments-v2/reconciliation/exceptions", icon: CiGrid41, description: "Reconciliation exceptions and approvals" },
+          // { id: "investments-reconciliation-statements", name: "Client Statements", path: "/investments-v2/reconciliation/statements", icon: CiGrid41, description: "Investor and client cash statements" },
         ],
       },
       {
@@ -599,8 +601,6 @@ export const MODULE_CONFIG: ModuleConfig[] = [
         items: [
           { id: "investments-accounting-events", name: "Accounting Events", path: "/investments-v2/accounting", icon: CiGrid41, description: "Accounting events" },
           { id: "investments-accounting-journals", name: "Journals", path: "/investments-v2/accounting", icon: CiGrid41, description: "GL journals" },
-          { id: "investments-accounting-posting-statuses", name: "Posting Statuses", path: "/investments-v2/accounting", icon: CiGrid41, description: "Accounting posting statuses" },
-          { id: "investments-accounting-reversals", name: "Reversals", path: "/investments-v2/accounting", icon: CiGrid41, description: "Journal reversals" },
           { id: "investments-accounting-ledger-exports", name: "Ledger Exports", path: "/investments-v2/accounting", icon: CiGrid41, description: "Ledger exports" },
         ],
       },

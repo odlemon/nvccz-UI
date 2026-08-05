@@ -1,8 +1,10 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { ExternalLink, Loader2, Plus, Search } from 'lucide-react'
-import { OpsCardGridSkeleton, OpsTableSkeleton } from '@/components/investments-v2/loading-skeletons'
+import { OpsListSkeleton, OpsSkeleton, OpsCardGridSkeleton, OpsTableSkeleton } from '@/components/investments-v2/loading-skeletons'
+import { BrokerCommunicationPanel } from '@/components/investments-v2/broker-communication-panel'
 import { ConfirmReasonDialog } from '@/components/investments-v2/ui/confirm-reason-dialog'
 import { DetailPanel } from '@/components/investments-v2/ui/detail-panel'
 import { PlaceEquityOrderModal } from '@/components/investments-v2/place-equity-order-modal'
@@ -22,22 +24,32 @@ import {
 } from '@/lib/investments-v2/adapters/orders-adapter'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
+import { useInvestmentBrokerReplySocket } from '@/lib/hooks/useNotificationSocket'
 import type { OrderApproval } from '@/lib/api/investment-ops-api'
 
 const tabs = [...ORDERBOOK_LIFECYCLE_TABS]
 
 const tone = (status: string) => {
-  if (status === 'Executed' || status === 'Settled' || status === 'Approved' || status === 'Confirmation Recorded')
+  if (
+    status === 'Executed' ||
+    status === 'Settled' ||
+    status === 'Approved' ||
+    status === 'Confirmation Recorded' ||
+    status === 'Broker fill'
+  )
     return 'green'
   if (
     status === 'Draft' ||
     status === 'Submitted' ||
     status === 'Sent to Broker' ||
     status === 'Pending Settlement' ||
-    status === 'Partially Executed'
+    status === 'Partially Executed' ||
+    status === 'Counter-offer' ||
+    status === 'Partial fill'
   )
     return 'amber'
-  if (status === 'Cancelled' || status === 'Failed' || status === 'Rejected') return 'red'
+  if (status === 'Broker unable' || status === 'Cancelled' || status === 'Failed' || status === 'Rejected')
+    return 'red'
   return 'blue'
 }
 
@@ -99,6 +111,8 @@ function mapBlotterCards(data: unknown, fundNameById: Record<string, string>): B
 }
 
 export default function OrderbookPage() {
+  const searchParams = useSearchParams()
+  const deepLinkOrderId = searchParams.get('orderId')
   const [orders, setOrders] = useState<OrderbookRow[]>([])
   const [fundOptions, setFundOptions] = useState<{ id: string; name: string }[]>([])
   const [loading, setLoading] = useState(true)
@@ -127,13 +141,37 @@ export default function OrderbookPage() {
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [sendOpen, setSendOpen] = useState(false)
   const [sendCustodianId, setSendCustodianId] = useState('')
+  const [sendBrokerId, setSendBrokerId] = useState('')
   const [sendValueDate, setSendValueDate] = useState('')
   const [sendNotes, setSendNotes] = useState('')
+  const [lastReplyUrl, setLastReplyUrl] = useState<string | null>(null)
+  const [brokerThreadLoading, setBrokerThreadLoading] = useState(false)
+  const [brokerThread, setBrokerThread] = useState<{
+    messages: Array<{
+      id: string
+      direction: string
+      channel: string
+      kind: string
+      body?: string | null
+      actorLabel?: string | null
+      createdAt: string
+      payloadJson?: Record<string, unknown> | null
+    }>
+    latestInstruction: {
+      id: string
+      replyUrl: string
+      status: string
+      toEmail?: string | null
+      deliveryError?: string | null
+      sentAt?: string | null
+      repliedAt?: string | null
+    } | null
+  } | null>(null)
   const [custodians, setCustodians] = useState<{ id: string; name: string }[]>([])
+  const [brokers, setBrokers] = useState<{ id: string; name: string; email: string }[]>([])
   const [confOutcome, setConfOutcome] = useState<BrokerConfirmationOutcome>('FILLED')
   const [confQty, setConfQty] = useState('')
   const [confPrice, setConfPrice] = useState('')
-  const [confBrokerRef, setConfBrokerRef] = useState('')
   const [confTradeDate, setConfTradeDate] = useState('')
   const [confValueDate, setConfValueDate] = useState('')
   const [confNotes, setConfNotes] = useState('')
@@ -189,17 +227,29 @@ export default function OrderbookPage() {
   }, [load])
 
   useEffect(() => {
-    void investmentOpsApi
-      .listCustodians()
-      .then((res) => {
-        if (res.success === false) return
+    void Promise.all([
+      investmentOpsApi.listCustodians().catch(() => null),
+      investmentOpsApi.listBrokers().catch(() => null),
+    ]).then(([custRes, brokerRes]) => {
+      if (custRes && custRes.success !== false) {
         setCustodians(
-          unwrapList<{ id?: string; name?: string }>(res.data)
+          unwrapList<{ id?: string; name?: string }>(custRes.data)
             .map((c) => ({ id: String(c.id ?? ''), name: String(c.name ?? c.id ?? 'Custodian') }))
             .filter((c) => c.id),
         )
-      })
-      .catch(() => undefined)
+      }
+      if (brokerRes && brokerRes.success !== false) {
+        setBrokers(
+          unwrapList<{ id?: string; name?: string; contactEmail?: string }>(brokerRes.data)
+            .map((b) => ({
+              id: String(b.id ?? ''),
+              name: String(b.name ?? b.id ?? 'Broker'),
+              email: String(b.contactEmail ?? '').trim(),
+            }))
+            .filter((b) => b.id),
+        )
+      }
+    })
   }, [])
 
   const filtered = useMemo(() => {
@@ -250,6 +300,80 @@ export default function OrderbookPage() {
       cancelled = true
     }
   }, [selected?.apiId, selected?.version])
+
+  useEffect(() => {
+    if (!selected?.apiId) {
+      setBrokerThread(null)
+      setBrokerThreadLoading(false)
+      return
+    }
+    let cancelled = false
+    setBrokerThreadLoading(true)
+    void investmentOpsApi
+      .listBrokerMessages(selected.apiId)
+      .then((res) => {
+        if (cancelled) return
+        if (res.success === false || !res.data) {
+          setBrokerThread(null)
+          return
+        }
+        setBrokerThread(res.data)
+        if (res.data.latestInstruction?.replyUrl) {
+          setLastReplyUrl(res.data.latestInstruction.replyUrl)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setBrokerThread(null)
+      })
+      .finally(() => {
+        if (!cancelled) setBrokerThreadLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [selected?.apiId, selected?.version, lifeBusy])
+
+  const refreshBrokerData = useCallback(
+    async (orderId: string) => {
+      if (!orderId) return
+      try {
+        const [msgRes, confRes] = await Promise.all([
+          investmentOpsApi.listBrokerMessages(orderId),
+          investmentOpsApi.listBrokerConfirmations(orderId),
+        ])
+        if (selected?.apiId === orderId) {
+          if (msgRes.success !== false && msgRes.data) {
+            setBrokerThread(msgRes.data)
+            if (msgRes.data.latestInstruction?.replyUrl) {
+              setLastReplyUrl(msgRes.data.latestInstruction.replyUrl)
+            }
+          }
+          if (confRes.success !== false) {
+            setConfirmations(unwrapList<BrokerConfirmation>(confRes.data))
+          }
+        }
+        await load()
+      } catch {
+        /* non-fatal live refresh */
+      }
+    },
+    [load, selected?.apiId],
+  )
+
+  useInvestmentBrokerReplySocket(
+    useCallback(
+      (orderId) => {
+        void refreshBrokerData(orderId)
+      },
+      [refreshBrokerData],
+    ),
+  )
+
+  useEffect(() => {
+    if (!deepLinkOrderId || orders.length === 0) return
+    const row = orders.find((o) => o.apiId === deepLinkOrderId)
+    if (row) setSelected(row)
+  }, [deepLinkOrderId, orders])
 
   useEffect(() => {
     if (!selected?.apiId) {
@@ -321,6 +445,15 @@ export default function OrderbookPage() {
       toast.error('Select a custodian before sending (Phase-1 authorisation).')
       return false
     }
+    if (action === 'send' && !sendBrokerId.trim()) {
+      toast.error('Select a broker before sending — email goes to their profile contact.')
+      return false
+    }
+    const selectedBroker = brokers.find((b) => b.id === sendBrokerId.trim())
+    if (action === 'send' && selectedBroker && !selectedBroker.email) {
+      toast.error(`Broker “${selectedBroker.name}” has no contact email on their record.`)
+      return false
+    }
     setLifeBusy(action)
     setLifeError(null)
     try {
@@ -334,11 +467,35 @@ export default function OrderbookPage() {
           channel: 'EMAIL',
           sentAt: new Date().toISOString(),
           notes: sendNotes.trim() || undefined,
+          brokerProfileId: sendBrokerId.trim(),
           custodianProfileId: sendCustodianId.trim(),
           valueDate: sendValueDate || undefined,
           settlementAccountId: selected.settlementAccountId || undefined,
         })
+        if (res.success === false) throw new Error(formatOpsError(res, 'Failed to send order'))
         setSendOpen(false)
+        const instruction = (res as { data?: { instruction?: { replyUrl?: string; status?: string; toEmail?: string | null; deliveryError?: string | null } } })
+          ?.data?.instruction
+        if (instruction?.replyUrl) {
+          setLastReplyUrl(instruction.replyUrl)
+          toast.success(
+            instruction.status === 'SENT'
+              ? `Email sent to ${instruction.toEmail || 'broker'}. Broker can reply via the link.`
+              : `Instruction created (${instruction.status}). Share the reply link with the broker.`,
+            {
+              action: {
+                label: 'Copy reply link',
+                onClick: () => {
+                  void navigator.clipboard.writeText(instruction.replyUrl!)
+                  toast.message('Broker reply link copied')
+                },
+              },
+              duration: 12000,
+            },
+          )
+        } else {
+          toast.success('Order sent to broker. Custodian authorisation recorded — no blotter row yet.')
+        }
       } else if (action === 'reject') {
         res = await investmentOpsApi.rejectOrder(selected.apiId, {
           reason: reason!.trim(),
@@ -363,7 +520,7 @@ export default function OrderbookPage() {
       } else if (action === 'submit') {
         toast.success('Order submitted for approval.')
       } else if (action === 'send') {
-        toast.success('Order sent to broker. Custodian authorisation recorded — no blotter row yet.')
+        // toast handled above with reply link
       } else if (action === 'fail') {
         toast.success('Order marked Failed.')
       } else if (action === 'archive') {
@@ -384,6 +541,7 @@ export default function OrderbookPage() {
   const openSendToBroker = () => {
     if (!selected) return
     setSendCustodianId(selected.custodianProfileId ?? '')
+    setSendBrokerId(selected.brokerProfileId ?? '')
     setSendValueDate(selected.valueDateIso ?? '')
     setSendNotes('')
     setSendOpen(true)
@@ -400,7 +558,6 @@ export default function OrderbookPage() {
         ? String(existing.price)
         : String(selected.execPrice ?? selected.limitPrice ?? ''),
     )
-    setConfBrokerRef(existing?.brokerReference != null ? String(existing.brokerReference) : '')
     setConfTradeDate(
       existing?.tradeDate
         ? String(existing.tradeDate).slice(0, 10)
@@ -426,7 +583,6 @@ export default function OrderbookPage() {
         quantity: confQty.trim(),
         price: confPrice.trim(),
         currencyCode: 'USD',
-        brokerReference: confBrokerRef.trim() || undefined,
         tradeDate: confTradeDate || undefined,
         valueDate: confValueDate || undefined,
         notes: confNotes.trim() || undefined,
@@ -494,7 +650,7 @@ export default function OrderbookPage() {
         expectedVersion: selected.version,
       })
       if (res.success === false) throw new Error(formatOpsError(res, 'Failed to reject confirmation'))
-      toast.message('Confirmation rejected. Order back with broker (outside system) — no blotter row.')
+      toast.message('Confirmation rejected. Use Send again to email the same or another broker.')
       setConfirmations([])
       await load()
       return true
@@ -521,6 +677,8 @@ export default function OrderbookPage() {
     raw === 'PARTIALLY_EXECUTED' ||
     raw.includes('PARTIAL')
   const hasOpenConfirmation = Boolean(openConfirmation)
+  const canSendToBroker = raw === 'APPROVED' || (awaitingBroker && !hasOpenConfirmation)
+  const sendAgain = awaitingBroker && !hasOpenConfirmation
 
   /** Open blotter tab only — no extra API; requires order.tradeId on the row. */
   const openBlotterForOrder = (order: OrderbookRow) => {
@@ -672,9 +830,27 @@ export default function OrderbookPage() {
                     </td>
                     <td>
                       <Pill tone={tone(order.status) as 'green' | 'amber' | 'blue' | 'red'}>{order.status}</Pill>
+                      {order.brokerOfferQty && order.brokerOfferPrice ? (
+                        <div className="mt-0.5 text-[9px] text-slate-500">
+                          {order.brokerOfferQty} @ {order.brokerOfferPrice}
+                          {order.brokerOfferCurrency ? ` ${order.brokerOfferCurrency}` : ''}
+                        </div>
+                      ) : null}
                     </td>
                     <td>
-                      <Pill tone={order.approval.includes('Rejected') ? 'red' : order.approval.includes('Not') ? 'slate' : 'green'}>{order.approval}</Pill>
+                      <Pill
+                        tone={
+                          order.approval.includes('Awaiting')
+                            ? 'amber'
+                            : order.approval.includes('Rejected')
+                              ? 'red'
+                              : order.approval.includes('Not')
+                                ? 'slate'
+                                : 'green'
+                        }
+                      >
+                        {order.approval}
+                      </Pill>
                     </td>
                     <td>{order.routing}</td>
                     <td onClick={(e) => e.stopPropagation()}>
@@ -712,7 +888,7 @@ export default function OrderbookPage() {
       </OrdersCard>
 
       {selected && (
-        <DetailPanel open={!!selected} onClose={() => setSelected(null)} width="max-w-md">
+        <DetailPanel open={!!selected} onClose={() => setSelected(null)} width="max-w-2xl">
           <div className="flex items-start justify-between">
             <div>
               <p className="text-[9px] uppercase tracking-widest text-blue-400">Order detail</p>
@@ -753,7 +929,6 @@ export default function OrderbookPage() {
                 ? {
                     'Broker qty': String(openConfirmation.quantity),
                     'Broker px': String(openConfirmation.price),
-                    'Broker ref': String(openConfirmation.brokerReference || '—'),
                     Outcome: String(openConfirmation.outcome),
                   }
                 : {}),
@@ -780,10 +955,10 @@ export default function OrderbookPage() {
                 Approve
               </button>
             )}
-            {raw === 'APPROVED' && (
+            {canSendToBroker && (
               <button type="button" disabled={anyLifeBusy} className={cn(buttonClass)} onClick={openSendToBroker}>
                 {lifeBusy === 'send' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-                Send to broker
+                {sendAgain ? 'Send again' : 'Send to broker'}
               </button>
             )}
             {canRecordConfirmation && !hasOpenConfirmation && (
@@ -856,14 +1031,29 @@ export default function OrderbookPage() {
               </button>
             )}
           </div>
-          {(raw === 'APPROVED' || awaitingBroker || confirmationRecorded || raw === 'PARTIALLY_EXECUTED') && (
-            <p className="mt-2 text-[9px] text-slate-500">
-              Broker negotiation is outside this system. After Send, record the broker&apos;s confirmation, then Accept to create the executed trade on the blotter. Custodian settlement and recon follow on the blotter / recon screens.
-            </p>
+          {(brokerThreadLoading ||
+            brokerThread?.latestInstruction ||
+            lastReplyUrl ||
+            awaitingBroker ||
+            confirmationRecorded) && (
+            <BrokerCommunicationPanel
+              loading={brokerThreadLoading}
+              messages={brokerThread?.messages ?? []}
+              latestInstruction={brokerThread?.latestInstruction ?? null}
+              lastReplyUrl={lastReplyUrl}
+              openConfirmation={openConfirmation}
+              rawStatus={raw}
+              onCopyReplyLink={() => {
+                const url = brokerThread?.latestInstruction?.replyUrl || lastReplyUrl
+                if (!url) return
+                void navigator.clipboard.writeText(url)
+                toast.message('Reply link copied — send to the broker if needed')
+              }}
+            />
           )}
           {hasOpenConfirmation && String(openConfirmation?.outcome).toUpperCase() === 'UNABLE' && (
             <p className="mt-2 text-[9px] text-amber-200">
-              Broker unable — Reject confirmation and keep looking, or Fail the order.
+              Broker unable — Reject confirmation and keep looking, then Send again (same or different broker), or Fail the order.
             </p>
           )}
 
@@ -953,8 +1143,7 @@ export default function OrderbookPage() {
           if (lifeBusy === 'send') return
           setSendOpen(false)
         }}
-        title="Send to broker"
-        subtitle="Confirm custodian authorisation (Phase 1). Broker negotiation stays outside this system — no blotter row until you Accept a confirmation."
+        title={sendAgain ? 'Send again to broker' : 'Send to broker'}
         footer={
           <>
             <button
@@ -967,17 +1156,32 @@ export default function OrderbookPage() {
             </button>
             <button
               type="button"
-              disabled={anyLifeBusy || !sendCustodianId.trim()}
+              disabled={anyLifeBusy || !sendCustodianId.trim() || !sendBrokerId.trim()}
               className={cn(buttonClass, 'bg-blue-600 text-white')}
               onClick={() => void runLifecycle('send')}
             >
               {lifeBusy === 'send' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-              {lifeBusy === 'send' ? 'Sending…' : 'Send instruction'}
+              {lifeBusy === 'send' ? 'Sending…' : sendAgain ? 'Send again' : 'Send email instruction'}
             </button>
           </>
         }
       >
         <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Broker">
+            <select
+              className={inputClass}
+              value={sendBrokerId}
+              onChange={(e) => setSendBrokerId(e.target.value)}
+            >
+              <option value="">Select broker…</option>
+              {brokers.map((b) => (
+                <option key={b.id} value={b.id} disabled={!b.email}>
+                  {b.name}
+                  {b.email ? ` · ${b.email}` : ' · (no email)'}
+                </option>
+              ))}
+            </select>
+          </Field>
           <Field label="Custodian">
             <select
               className={inputClass}
@@ -1008,9 +1212,6 @@ export default function OrderbookPage() {
               disabled
             />
           </Field>
-          <Field label="Broker">
-            <input className={inputClass} value={selected?.broker ?? '—'} readOnly disabled />
-          </Field>
         </div>
         <div className="mt-4">
           <Field label="Notes (optional)">
@@ -1018,10 +1219,20 @@ export default function OrderbookPage() {
               className={cn(inputClass, 'min-h-[64px]')}
               value={sendNotes}
               onChange={(e) => setSendNotes(e.target.value)}
-              placeholder="e.g. Instruction emailed to ABC Brokers"
+              placeholder="Shown on the instruction email"
             />
           </Field>
         </div>
+        {!sendBrokerId.trim() && (
+          <p className="mt-3 text-[10px] text-amber-200">
+            Broker is required — instruction email uses their profile contact email.
+          </p>
+        )}
+        {sendBrokerId.trim() && brokers.find((b) => b.id === sendBrokerId)?.email === '' && (
+          <p className="mt-3 text-[10px] text-amber-200">
+            This broker has no contact email. Add one on the broker record before sending.
+          </p>
+        )}
         {!sendCustodianId.trim() && (
           <p className="mt-3 text-[10px] text-amber-200">
             Custodian is required before send — AM authorises cash/securities prep at the custodian.
@@ -1071,9 +1282,6 @@ export default function OrderbookPage() {
               <option value="COUNTER">Counter</option>
               <option value="UNABLE">Unable</option>
             </select>
-          </Field>
-          <Field label="Broker reference">
-            <input className={inputClass} value={confBrokerRef} onChange={(e) => setConfBrokerRef(e.target.value)} placeholder="Optional" />
           </Field>
           <Field label="Confirmed quantity">
             <input className={inputClass} value={confQty} onChange={(e) => setConfQty(e.target.value)} inputMode="decimal" />

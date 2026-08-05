@@ -6,6 +6,7 @@ import { Analytics } from "@vercel/analytics/next"
 import { Suspense } from "react"
 import { StoreProvider } from "@/lib/store/provider"
 import { AuthProvider } from "@/lib/auth/AuthProvider"
+import { GlobalRealtimeMount } from "@/components/performance/collaboration/global-realtime-mount"
 import { Toaster } from "sonner"
 import { RouteTransition } from "@/components/route-transition"
 import "./globals.css"
@@ -43,6 +44,7 @@ export default function RootLayout({
       <body className={`font-sans ${montserrat.variable} ${inter.variable} ${GeistMono.variable} antialiased`}>
         <StoreProvider>
           <AuthProvider>
+            <GlobalRealtimeMount />
             <RouteTransition>
               <Suspense fallback={null}>{children}</Suspense>
             </RouteTransition>

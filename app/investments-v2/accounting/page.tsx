@@ -16,7 +16,7 @@ import { ConfirmReasonDialog } from '@/components/investments-v2/ui/confirm-reas
 import { formatMoneyDisplay, formatOpsError, investmentOpsApi, unwrapList, type AccountingEvent, type JournalEntry } from '@/lib/api/investment-ops-api'
 import { cn } from '@/lib/utils'
 
-const tabs = ['Accounting Events', 'Journals', 'Posting Statuses', 'Reversals', 'Ledger Exports']
+const tabs = ['Accounting Events', 'Journals', 'Ledger Exports']
 
 function formatDate(value?: string | null) {
   if (!value) return '—'
@@ -122,19 +122,9 @@ function AccountingPageInner() {
     return d.toISOString().slice(0, 10)
   })
   const [exportTo, setExportTo] = useState(() => new Date().toISOString().slice(0, 10))
-  const [reversals, setReversals] = useState<Record<string, unknown>[]>([])
-  const [reversalsLoading, setReversalsLoading] = useState(false)
   const [ledgerExports, setLedgerExports] = useState<Record<string, unknown>[]>([])
   const [ledgerExportsLoading, setLedgerExportsLoading] = useState(false)
   const [ledgerDownloadId, setLedgerDownloadId] = useState<string | null>(null)
-  const [postingStatus, setPostingStatus] = useState<{
-    byStatus?: Record<string, number>
-    counts?: Record<string, number>
-    total?: number
-    recentFailures?: Array<Record<string, unknown>>
-  } | null>(null)
-  const [postingStatusLoading, setPostingStatusLoading] = useState(false)
-  const [postingStatusError, setPostingStatusError] = useState<string | null>(null)
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null)
   const [deepLinkMsg, setDeepLinkMsg] = useState<string | null>(null)
   const deepLinkApplied = useRef<string | null>(null)
@@ -271,31 +261,6 @@ function AccountingPageInner() {
     el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
   }, [selectedEventId, tab])
   useEffect(() => {
-    if (tab !== 'Reversals') return
-    let cancelled = false
-    setReversalsLoading(true)
-    investmentOpsApi
-      .listAccountingReversals({ fundId: selectedFundId, pageSize: 100 })
-      .then((res) => {
-        if (cancelled) return
-        if (!res.success) {
-          setReversals([])
-          return
-        }
-        setReversals(unwrapList(res.data))
-      })
-      .catch(() => {
-        if (!cancelled) setReversals([])
-      })
-      .finally(() => {
-        if (!cancelled) setReversalsLoading(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [tab, selectedFundId])
-
-  useEffect(() => {
     if (tab !== 'Ledger Exports') return
     let cancelled = false
     setLedgerExportsLoading(true)
@@ -314,36 +279,6 @@ function AccountingPageInner() {
       })
       .finally(() => {
         if (!cancelled) setLedgerExportsLoading(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [tab, selectedFundId])
-
-  useEffect(() => {
-    if (tab !== 'Posting Statuses') return
-    let cancelled = false
-    setPostingStatusLoading(true)
-    setPostingStatusError(null)
-    investmentOpsApi
-      .listAccountingPostingStatus({ fundId: selectedFundId })
-      .then((res) => {
-        if (cancelled) return
-        if (!res.success) {
-          setPostingStatus(null)
-          setPostingStatusError(formatOpsError(res))
-          return
-        }
-        setPostingStatus(res.data ?? null)
-      })
-      .catch((e) => {
-        if (!cancelled) {
-          setPostingStatus(null)
-          setPostingStatusError(e instanceof Error ? e.message : 'Failed to load posting status')
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setPostingStatusLoading(false)
       })
     return () => {
       cancelled = true
@@ -442,7 +377,7 @@ function AccountingPageInner() {
         fundId,
         from: exportFrom,
         to: exportTo,
-        format: 'JSON',
+        format: 'CSV',
       })
       if (!res.success) throw new Error(formatOpsError(res))
       const list = await investmentOpsApi.listLedgerExports({ fundId: selectedFundId, pageSize: 100 })
@@ -454,7 +389,7 @@ function AccountingPageInner() {
     }
   }
 
-  const downloadExport = async (id: string) => {
+  const downloadExport = async (id: string, batchRef?: string) => {
     setActionError(null)
     setLedgerDownloadId(id)
     try {
@@ -462,7 +397,7 @@ function AccountingPageInner() {
       const url = URL.createObjectURL(blob)
       const anchor = document.createElement('a')
       anchor.href = url
-      anchor.download = `${id}.export`
+      anchor.download = `${batchRef || id}.csv`
       anchor.click()
       URL.revokeObjectURL(url)
     } catch (e) {
@@ -485,14 +420,6 @@ function AccountingPageInner() {
   const journalSubmitted = journal && ['SUBMITTED', 'PENDING_APPROVAL', 'IN_REVIEW'].includes(journalStatus)
   const journalApproved = journal && ['APPROVED', 'READY', 'READY_TO_POST'].includes(journalStatus)
   const journalPostable = journal && !['POSTED', 'REVERSED', 'REJECTED'].includes(journalStatus) && (journalApproved || journalDraftish || journalSubmitted || isBalanced)
-
-  const postingCounts = useMemo(() => {
-    if (!postingStatus) return [] as [string, number][]
-    const source = postingStatus.byStatus ?? postingStatus.counts ?? {}
-    return Object.entries(source).sort(([a], [b]) => a.localeCompare(b))
-  }, [postingStatus])
-
-  const postingFailures = postingStatus?.recentFailures ?? []
 
   return (
     <main className="min-h-full bg-[#05090f] p-3 text-[#eef2f8] sm:p-5">
@@ -738,84 +665,14 @@ function AccountingPageInner() {
           </div>
         )}
 
-        {tab === 'Posting Statuses' && (
-          <Card title="Posting status by portfolio" subtitle="Aggregated accounting posting queue from the server">
-            <Toolbar>
+        {tab === 'Ledger Exports' && (
+          <Card title="Ledger export history" subtitle="Create a CSV export of posted accounting events and journal lines">
+            <div className="mb-4 flex flex-wrap items-end gap-3 rounded-2xl border border-white/[.05] bg-[#09111d]/50 p-4">
               <Drop
                 value={portfolioFilter}
                 options={['All portfolios', ...portfolios.map((p) => p.name)]}
                 onChange={setPortfolioFilter}
               />
-            </Toolbar>
-            {postingStatusError ? (
-              <div className="border-b border-white/[.05] px-4 py-3 text-[11px] text-rose-300">{postingStatusError}</div>
-            ) : null}
-            {postingStatusLoading ? (
-              <OpsPanelSkeleton className="px-4 py-6" />
-            ) : postingCounts.length === 0 && postingFailures.length === 0 ? (
-              <div className="px-4 py-12 text-center text-[11px] text-[#8290a4]">
-                No posting status summary returned for this filter.
-              </div>
-            ) : (
-              <div className="space-y-4 p-4">
-                {postingStatus?.total != null ? (
-                  <p className="text-[10px] text-[#718096]">
-                    Total events tracked: <span className="font-semibold text-[#c5cfdb]">{postingStatus.total}</span>
-                  </p>
-                ) : null}
-                {postingCounts.length > 0 ? (
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
-                    {postingCounts.map(([status, count]) => (
-                      <div key={status} className="rounded-2xl border border-white/[.05] bg-[#09111d]/70 px-4 py-3">
-                        <p className="text-[9px] text-[#728197]">{formatStatus(status)}</p>
-                        <p className="mt-1 text-[15px] font-semibold">{count}</p>
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
-                {postingFailures.length > 0 ? (
-                  <div className="overflow-hidden rounded-2xl border border-white/[.06]">
-                    <div className="border-b border-white/[.06] px-4 py-3">
-                      <h3 className="text-[11px] font-semibold">Recent failures</h3>
-                    </div>
-                    <Table
-                      headers={['Event', 'Portfolio', 'Type', 'Reference', 'Status', 'Reason']}
-                      rows={postingFailures.map((row) => [
-        cellValue(row, ['id', 'eventId', 'accountingEventId']),
-                        (() => {
-                          const fundId = row.fundId ?? row['fundId']
-                          return fundId ? fundName(String(fundId)) : '—'
-                        })(),
-                        cellValue(row, ['eventType', 'type']),
-                        cellValue(row, ['tradeRef', 'reference', 'sourceId']),
-                        <Badge key="s" value={cellValue(row, ['status'])} />,
-                        cellValue(row, ['failureReason', 'reason', 'message', 'error']),
-                      ])}
-                    />
-                  </div>
-                ) : null}
-              </div>
-            )}
-          </Card>
-        )}
-        {tab === 'Reversals' && (
-          <Card title="Reversal register" subtitle="Approved counter-entries retain the original event audit trail">
-            <Table
-              headers={['Reversal', 'Event', 'Status', 'Reason']}
-              loading={reversalsLoading}
-              empty="No accounting reversals returned by the API."
-              rows={reversals.map((row) => [
-                cellValue(row, ['id']),
-                cellValue(row, ['eventId', 'accountingEventId', 'sourceEventId']),
-                <Badge key="s" value={cellValue(row, ['status'])} />,
-                cellValue(row, ['reason', 'reversalReason']),
-              ])}
-            />
-          </Card>
-        )}
-        {tab === 'Ledger Exports' && (
-          <Card title="Ledger export history" subtitle="Create an export batch, then download the file stream">
-            <div className="mb-4 flex flex-wrap items-end gap-3 rounded-2xl border border-white/[.05] bg-[#09111d]/50 p-4">
               <label className="block">
                 <span className="mb-1.5 block text-[9px] text-[#718096]">From</span>
                 <input
@@ -853,16 +710,20 @@ function AccountingPageInner() {
               rows={ledgerExports.map((row) => {
                 const id = cellValue(row, ['id'])
                 const exportLabel = cellValue(row, ['exportBatchRef', 'reference', 'batchRef']) || 'Ledger export'
+                const portfolio =
+                  cellValue(row, ['fundName', 'portfolio']) !== '—'
+                    ? cellValue(row, ['fundName', 'portfolio'])
+                    : fundName(cellValue(row, ['fundId']))
                 return [
                   exportLabel,
-                  fundName(cellValue(row, ['fundId'])),
+                  portfolio,
                   cellValue(row, ['exportBatchRef', 'reference']),
                   <Badge key="s" value={cellValue(row, ['status'])} />,
                   <button
                     key="d"
                     type="button"
                     disabled={ledgerDownloadId === id}
-                    onClick={() => downloadExport(id)}
+                    onClick={() => downloadExport(id, exportLabel !== '—' ? exportLabel : undefined)}
                     className="rounded-full border border-white/10 px-3 py-1.5 text-[9px] hover:bg-white/10 disabled:opacity-40"
                   >
                     {ledgerDownloadId === id ? '…' : 'Download'}

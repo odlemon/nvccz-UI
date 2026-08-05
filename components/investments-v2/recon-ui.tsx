@@ -25,12 +25,13 @@ export const reconSubtle = 'text-muted-foreground'
 export const reconDivider = 'border-border'
 
 const navLinks = [
-  { href: '/investments-v2/reconciliation', label: 'Client', exact: true },
   { href: '/investments-v2/reconciliation/trade', label: 'Trade' },
-  { href: '/investments-v2/reconciliation/fund-cash', label: 'Cash' },
-  { href: '/investments-v2/reconciliation/cash-ledger', label: 'Cash ledger' },
-  { href: '/investments-v2/reconciliation/exceptions', label: 'Exceptions' },
-  { href: '/investments-v2/reconciliation/statements', label: 'Statements' },
+  // Hidden for now — client / cash recon surfaces
+  // { href: '/investments-v2/reconciliation', label: 'Client', exact: true },
+  // { href: '/investments-v2/reconciliation/fund-cash', label: 'Cash' },
+  // { href: '/investments-v2/reconciliation/cash-ledger', label: 'Cash ledger' },
+  // { href: '/investments-v2/reconciliation/exceptions', label: 'Exceptions' },
+  // { href: '/investments-v2/reconciliation/statements', label: 'Statements' },
 ]
 
 /** Pill segment control for Trading|Fund / Client|Investor switches on the same route. */
@@ -79,6 +80,7 @@ export function ReconNavTabs({
   variant?: 'default' | 'terminal-dark'
 }) {
   const pathname = usePathname()
+  if (navLinks.length <= 1) return null
   return (
     <nav
       aria-label="Reconciliation screens"

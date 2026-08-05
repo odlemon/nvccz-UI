@@ -22,44 +22,24 @@ import {
   CheckCheck,
   Loader2,
   Filter,
-  AlertTriangle,
-  ClipboardList,
-  AtSign,
-  MessageCircle,
-  Calendar,
-  Check,
-  CircleDot,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { AppNotification } from "@/lib/api/performance-notifications-api"
 import { toast } from "sonner"
 import { extractApiError } from "@/lib/utils/api-error"
+import { getNotificationTypeStyle } from "./notification-type-styles"
 
 const PAGE_SIZE = 20
-
-const TYPE_ICON_COLOR: Record<string, { icon: any; bg: string; text: string }> = {
-  TASK_ASSIGNED: { icon: ClipboardList, bg: "bg-blue-100", text: "text-blue-600" },
-  TASK_MENTION: { icon: AtSign, bg: "bg-violet-100", text: "text-violet-600" },
-  TASK_COMMENT: { icon: MessageCircle, bg: "bg-emerald-100", text: "text-emerald-600" },
-  TASK_RED_ZONE: { icon: AlertTriangle, bg: "bg-red-100", text: "text-red-600" },
-  REVIEW_DUE: { icon: ClipboardList, bg: "bg-amber-100", text: "text-amber-600" },
-  REVIEW_FINALIZED: { icon: Check, bg: "bg-green-100", text: "text-green-600" },
-  GOAL_PROGRESS: { icon: CircleDot, bg: "bg-sky-100", text: "text-sky-600" },
-  CYCLE_CREATED: { icon: Calendar, bg: "bg-indigo-100", text: "text-indigo-600" },
-  event: { icon: Calendar, bg: "bg-purple-100", text: "text-purple-600" },
-  SYSTEM: { icon: Bell, bg: "bg-gray-100", text: "text-gray-600" },
-}
-
-const getTypeStyle = (type: string) =>
-  TYPE_ICON_COLOR[type] || TYPE_ICON_COLOR.SYSTEM
 
 interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
   onNotificationClick: (n: AppNotification) => void
+  /** Portal into investments-terminal so dark/light CSS variables apply */
+  portalContainer?: HTMLElement | null
 }
 
-export function NotificationsModal({ open, onOpenChange, onNotificationClick }: Props) {
+export function NotificationsModal({ open, onOpenChange, onNotificationClick, portalContainer }: Props) {
   const dispatch = useAppDispatch()
   const { feed, unreadCount, total, pagination, loading } = useAppSelector(
     (s) => s.notifications
@@ -117,12 +97,15 @@ export function NotificationsModal({ open, onOpenChange, onNotificationClick }: 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-3xl max-h-[85vh] flex flex-col p-0 gap-0">
-        <DialogHeader className="p-6 pb-4 border-b">
+      <DialogContent
+        container={portalContainer ?? undefined}
+        className="sm:max-w-3xl max-h-[85vh] flex flex-col p-0 gap-0 bg-popover text-popover-foreground"
+      >
+        <DialogHeader className="p-6 pb-4 border-b border-border">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <DialogTitle className="text-xl flex items-center gap-2">
-                <Bell className="w-5 h-5 text-blue-600" />
+              <DialogTitle className="text-xl flex items-center gap-2 text-foreground">
+                <Bell className="w-5 h-5 text-primary" />
                 All Notifications
               </DialogTitle>
               <DialogDescription className="mt-1">
@@ -147,7 +130,7 @@ export function NotificationsModal({ open, onOpenChange, onNotificationClick }: 
 
           {/* Filter pills */}
           <div className="flex items-center gap-2 mt-4">
-            <Filter className="w-3.5 h-3.5 text-gray-400" />
+            <Filter className="w-3.5 h-3.5 text-muted-foreground" />
             <button
               onClick={() => {
                 setFilter("all")
@@ -156,8 +139,8 @@ export function NotificationsModal({ open, onOpenChange, onNotificationClick }: 
               className={cn(
                 "px-3 py-1 rounded-full text-xs font-medium transition-colors",
                 filter === "all"
-                  ? "bg-blue-100 text-blue-700"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  ? "bg-primary/15 text-primary"
+                  : "bg-muted text-muted-foreground hover:bg-accent"
               )}
             >
               All ({total})
@@ -170,8 +153,8 @@ export function NotificationsModal({ open, onOpenChange, onNotificationClick }: 
               className={cn(
                 "px-3 py-1 rounded-full text-xs font-medium transition-colors",
                 filter === "unread"
-                  ? "bg-red-100 text-red-700"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  ? "bg-red-500/15 text-red-600 dark:text-red-300"
+                  : "bg-muted text-muted-foreground hover:bg-accent"
               )}
             >
               Unread ({unreadCount})
@@ -183,15 +166,15 @@ export function NotificationsModal({ open, onOpenChange, onNotificationClick }: 
         <div className="flex-1 overflow-y-auto px-6 py-4">
           {loading && feed.length === 0 ? (
             <div className="flex items-center justify-center py-20">
-              <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
             </div>
           ) : visible.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-center">
-              <Bell className="w-12 h-12 text-gray-300 mb-3" />
-              <p className="text-sm font-medium text-gray-500">
+              <Bell className="w-12 h-12 text-muted-foreground/40 mb-3" />
+              <p className="text-sm font-medium text-muted-foreground">
                 {filter === "unread" ? "No unread notifications" : "No notifications yet"}
               </p>
-              <p className="text-xs text-gray-400 mt-1">
+              <p className="text-xs text-muted-foreground/70 mt-1">
                 {filter === "unread"
                   ? "You're all caught up"
                   : "You'll see notifications here when there's activity"}
@@ -214,8 +197,8 @@ export function NotificationsModal({ open, onOpenChange, onNotificationClick }: 
         </div>
 
         {/* Footer / Pagination */}
-        <div className="border-t p-4 flex items-center justify-between bg-gray-50 flex-wrap gap-2">
-          <p className="text-xs text-gray-500">
+        <div className="border-t border-border p-4 flex items-center justify-between bg-muted/40 flex-wrap gap-2">
+          <p className="text-xs text-muted-foreground">
             {filteredCount === 0
               ? "Showing 0 of 0"
               : `Showing ${showingFrom}–${showingTo} of ${filteredCount}${
@@ -281,7 +264,7 @@ function ModalRow({
   notification: AppNotification
   onClick: () => void
 }) {
-  const style = getTypeStyle(notification.type)
+  const style = getNotificationTypeStyle(notification.type)
   const Icon = style.icon
 
   return (
@@ -291,8 +274,8 @@ function ModalRow({
         className={cn(
           "w-full text-left p-4 rounded-xl border transition-all flex items-start gap-3",
           notification.isRead
-            ? "bg-white border-gray-200 hover:border-gray-300"
-            : "bg-blue-50/40 border-blue-200 hover:border-blue-300"
+            ? "bg-card border-border hover:border-border/80 hover:bg-accent/50"
+            : "bg-primary/5 dark:bg-primary/10 border-primary/30 hover:border-primary/50"
         )}
       >
         <div
@@ -309,23 +292,23 @@ function ModalRow({
               <p
                 className={cn(
                   "text-sm truncate",
-                  notification.isRead ? "text-gray-700" : "font-semibold text-gray-900"
+                  notification.isRead ? "text-muted-foreground" : "font-semibold text-foreground"
                 )}
               >
                 {notification.title}
               </p>
               {!notification.isRead && (
-                <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
+                <span className="w-2 h-2 rounded-full bg-primary flex-shrink-0" />
               )}
             </div>
             <Badge variant="outline" className="text-[9px] uppercase tracking-wider">
               {notification.type.replace(/_/g, " ")}
             </Badge>
           </div>
-          <p className="text-xs text-gray-600 mt-1 line-clamp-2">
+          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
             {notification.message}
           </p>
-          <p className="text-[10px] text-gray-400 mt-2">
+          <p className="text-[10px] text-muted-foreground/70 mt-2">
             {notification.timeAgo ||
               new Date(notification.createdAt).toLocaleString()}
           </p>

@@ -1,0 +1,23 @@
+---
+description: Agent runs backend ops directly — never ask the user to restart or touch the backend
+alwaysApply: true
+---
+
+# Agent owns backend operations
+
+The agent has shell access to the backend repo (`C:\Users\lysp\Downloads\nvccz`, port **3009**).
+
+## Never tell the user to
+
+- Restart the backend
+- Run backend scripts, migrations, or npm commands
+- Fix backend config, env, or database issues themselves
+- "Try again after the server reloads"
+
+## Always do it yourself
+
+- Restart or kill/restart port 3009 when backend changes need to be live
+- Run verification scripts, DB queries, and smoke tests against the backend
+- Apply backend fixes in `nvccz` without handing off steps
+
+If backend work is blocked (permissions, missing secrets only the user has), say what is blocked and what you need from them — not a list of commands to run.

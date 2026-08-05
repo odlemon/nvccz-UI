@@ -1,2 +1,2 @@
 symbol,side,quantity,price,trade_date,broker_ref,currency
-ABC,BUY,900,10.00,2026-07-21,BRK-8821,USD
+INN,BUY,50,12.50,2026-08-05,BRK-INN-001,ZWG

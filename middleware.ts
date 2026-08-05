@@ -159,6 +159,7 @@ export function middleware(request: NextRequest) {
     '/payroll-v6',            // Payroll HR V6 client design — public preview
     '/fundraising-kyc',       // Investor KYC onboarding client design — public preview
     '/investee-portal-v8',    // Investee Portal V8 client design — public preview
+    '/broker-instruction',    // Broker magic-link reply to trade instruction (no login)
     '/[token]'
   ]
   if (passThroughRoutes.some((route) => pathname.startsWith(route))) {

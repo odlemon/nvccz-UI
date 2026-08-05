@@ -8,7 +8,7 @@ import { Check, ChevronsUpDown, Download, FileText, Loader2, Plus, Search, X } f
 import { OpsTableSkeleton } from '@/components/investments-v2/loading-skeletons'
 import { useAppDispatch, useAppSelector } from '@/lib/store'
 import { fetchPortfolios, fetchReportTemplates, fetchReports, generateReport } from '@/lib/store/slices/investmentOpsSlice'
-import { investmentOpsApi } from '@/lib/api/investment-ops-api'
+import { investmentOpsApi, type ReportTemplate } from '@/lib/api/investment-ops-api'
 import { useSortedPaginated } from '@/components/investments-v2/ui/use-sorted-paginated'
 import { SortableTh } from '@/components/investments-v2/ui/sortable-th'
 import { TablePagination } from '@/components/investments-v2/ui/table-pagination'
@@ -18,6 +18,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { DatePicker } from '@/components/ui/date-picker'
+import { toast } from 'sonner'
 
 type ReportSortKey = 'type' | 'createdAt' | 'status'
 
@@ -30,20 +31,7 @@ const FORMAT_EXTENSION: Record<string, string> = {
   JSON: 'json',
 }
 
-// Per-report-type parameter shape — the generate API has no machine-readable
-// parameter schema (only scopeType/requiresFundId/requiresClientId), so this
-// mirrors the documented payload examples per report type.
 type ParamField = 'periodStart' | 'periodEnd' | 'valuationDate' | 'benchmarkName' | 'assetManagerName'
-
-const REPORT_PARAM_FIELDS: Record<string, ParamField[]> = {
-  CLIENT_PORTFOLIO_VALUATION: ['valuationDate'],
-  PORTFOLIO_VALUATION: [],
-  TRADE_BLOTTER: [],
-  HOLDINGS_SUMMARY: [],
-  COMPLIANCE_SUMMARY: [],
-  RECONCILIATION_SUMMARY: [],
-}
-const DEFAULT_PARAM_FIELDS: ParamField[] = ['periodStart', 'periodEnd', 'valuationDate', 'benchmarkName', 'assetManagerName']
 
 const PARAM_FIELD_LABELS: Record<ParamField, string> = {
   periodStart: 'Period Start',
@@ -51,6 +39,43 @@ const PARAM_FIELD_LABELS: Record<ParamField, string> = {
   valuationDate: 'Valuation Date',
   benchmarkName: 'Benchmark Name',
   assetManagerName: 'Asset Manager Name',
+}
+
+const SCHEMA_TO_FIELD: Record<string, ParamField> = {
+  periodStart: 'periodStart',
+  periodEnd: 'periodEnd',
+  valuationDate: 'valuationDate',
+  asOf: 'valuationDate',
+  benchmarkName: 'benchmarkName',
+  assetManagerName: 'assetManagerName',
+}
+
+/** Prefer API parameterSchema; fall back for older payloads. */
+function paramFieldsForTemplate(tmpl: ReportTemplate | undefined): ParamField[] {
+  if (!tmpl) return []
+  const props = tmpl.parameterSchema?.properties
+  if (props && Object.keys(props).length) {
+    const fields: ParamField[] = []
+    const seen = new Set<ParamField>()
+    for (const key of Object.keys(props)) {
+      if (key === 'fundId' || key === 'clientId' || key === 'format') continue
+      const mapped = SCHEMA_TO_FIELD[key]
+      if (!mapped || seen.has(mapped)) continue
+      seen.add(mapped)
+      fields.push(mapped)
+    }
+    return fields
+  }
+  if (tmpl.hasDocxTemplate) {
+    return ['periodStart', 'periodEnd', 'valuationDate', 'benchmarkName', 'assetManagerName']
+  }
+  return []
+}
+
+function preferredFormat(tmpl: ReportTemplate | undefined): string {
+  if (!tmpl?.supportedFormats?.length) return ''
+  if (tmpl.hasDocxTemplate && tmpl.supportedFormats.includes('DOCX')) return 'DOCX'
+  return tmpl.supportedFormats[0]
 }
 
 const NEW_REPORT_EMPTY = {
@@ -152,11 +177,11 @@ export default function ReportingPage() {
 
   const fundName = (fundId: string | null) => (fundId ? portfolios.find((f) => f.id === fundId)?.name ?? '—' : null)
   const selectedTemplate = reportTemplates.find((t) => t.code === form.reportType)
-  const paramFields = REPORT_PARAM_FIELDS[form.reportType] ?? DEFAULT_PARAM_FIELDS
+  const paramFields = paramFieldsForTemplate(selectedTemplate)
 
   const handleReportTypeChange = (code: string) => {
     const tmpl = reportTemplates.find((t) => t.code === code)
-    setForm((p) => ({ ...p, reportType: code, format: tmpl?.supportedFormats[0] ?? '' }))
+    setForm((p) => ({ ...p, reportType: code, format: preferredFormat(tmpl) }))
   }
 
   const handlePickTemplate = (code: string) => {
@@ -170,58 +195,82 @@ export default function ReportingPage() {
       setFormError('Select a report type')
       return
     }
+    if (!form.format) {
+      setFormError('Select an output format')
+      return
+    }
     if (selectedTemplate.requiresFundId && !selectedFundId) {
-      setFormError('This report requires a fund, but none is selected')
+      setFormError('Select a fund from the portfolio switcher before generating this report')
       return
     }
-    if (selectedTemplate.requiresClientId && !form.clientId) {
-      setFormError('This report requires a client ID')
+    if (selectedTemplate.requiresClientId && !form.clientId.trim()) {
+      setFormError('This report requires a client mandate ID')
       return
     }
-    for (const f of paramFields) {
-      if (!form[f]) {
-        setFormError(`${PARAM_FIELD_LABELS[f]} is required for this report type`)
-        return
-      }
+    const parameters: Record<string, string> = {}
+    if (paramFields.includes('periodStart') && form.periodStart) {
+      parameters.periodStart = format(form.periodStart, 'yyyy-MM-dd')
     }
-    const parameters: Record<string, any> = {}
-    if (paramFields.includes('periodStart') && form.periodStart) parameters.periodStart = format(form.periodStart, 'yyyy-MM-dd')
-    if (paramFields.includes('periodEnd') && form.periodEnd) parameters.periodEnd = format(form.periodEnd, 'yyyy-MM-dd')
-    if (paramFields.includes('valuationDate') && form.valuationDate) parameters.valuationDate = format(form.valuationDate, 'yyyy-MM-dd')
-    if (paramFields.includes('benchmarkName') && form.benchmarkName) parameters.benchmarkName = form.benchmarkName
-    if (paramFields.includes('assetManagerName') && form.assetManagerName) parameters.assetManagerName = form.assetManagerName
+    if (paramFields.includes('periodEnd') && form.periodEnd) {
+      parameters.periodEnd = format(form.periodEnd, 'yyyy-MM-dd')
+    }
+    if (paramFields.includes('valuationDate') && form.valuationDate) {
+      parameters.valuationDate = format(form.valuationDate, 'yyyy-MM-dd')
+      parameters.asOf = parameters.valuationDate
+    }
+    if (paramFields.includes('benchmarkName') && form.benchmarkName.trim()) {
+      parameters.benchmarkName = form.benchmarkName.trim()
+    }
+    if (paramFields.includes('assetManagerName') && form.assetManagerName.trim()) {
+      parameters.assetManagerName = form.assetManagerName.trim()
+    }
 
     try {
-      await dispatch(
+      const run = await dispatch(
         generateReport({
           fundId: selectedTemplate.requiresFundId ? selectedFundId ?? undefined : undefined,
-          clientId: selectedTemplate.requiresClientId ? form.clientId : undefined,
+          clientId: selectedTemplate.requiresClientId ? form.clientId.trim() : undefined,
           reportType: form.reportType,
           format: form.format,
           parameters,
-        })
+        }),
       ).unwrap()
+      toast.success(
+        run?.status === 'COMPLETED'
+          ? `${selectedTemplate.name} ready to download`
+          : `${selectedTemplate.name} queued`,
+      )
       setForm(NEW_REPORT_EMPTY)
       setShowGenerate(false)
       dispatch(fetchReports({ fundId: selectedFundId ?? undefined }))
     } catch (err: any) {
-      setFormError(err.message || 'Failed to generate report')
+      const msg = err.message || 'Failed to generate report'
+      setFormError(msg)
+      toast.error(msg)
     }
   }
 
   const handleDownload = async (run: (typeof reportRuns)[number]) => {
+    if (!run.downloadAvailable && String(run.status).toUpperCase() !== 'COMPLETED') {
+      toast.error('Report is not ready to download yet')
+      return
+    }
     setDownloadingById((p) => ({ ...p, [run.id]: true }))
     try {
       const blob = await investmentOpsApi.downloadReport(run.id)
+      if (!(blob instanceof Blob) || blob.size === 0) {
+        throw new Error('Empty download response')
+      }
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      const ext = FORMAT_EXTENSION[run.format] ?? run.format.toLowerCase()
-      a.download = `${run.reportType}-${run.id}.${ext}`
+      const ext = FORMAT_EXTENSION[String(run.format).toUpperCase()] ?? String(run.format).toLowerCase()
+      a.download = `${run.reportTypeName || run.reportType}-${run.id}.${ext}`
       a.click()
       URL.revokeObjectURL(url)
-    } catch {
-      // no-op — a failed fetch simply leaves nothing downloaded
+      toast.success('Download started')
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to download report')
     } finally {
       setDownloadingById((p) => ({ ...p, [run.id]: false }))
     }
@@ -238,7 +287,10 @@ export default function ReportingPage() {
             <div>
               <p className="text-[10px] uppercase tracking-[.2em] text-muted-foreground">Portfolio intelligence</p>
               <h1 className="mt-1 text-lg font-semibold">Investment reporting</h1>
-              <p className="mt-1 max-w-xl text-[11px] text-muted-foreground">Generate governed investment reports and manage completed output across every available reporting scope.</p>
+              <p className="mt-1 max-w-xl text-[11px] text-muted-foreground">
+                Generate Word (DOCX) pack reports from Arcus templates, plus flat PDF/Excel summaries. Yellow authoring
+                marks are stripped on download.
+              </p>
             </div>
             <div className="flex flex-wrap items-stretch gap-2">
               {[
@@ -304,7 +356,7 @@ export default function ReportingPage() {
                     <div className="flex flex-wrap gap-1">
                       {template.supportedFormats.map((reportFormat) => <span key={reportFormat} className="rounded-full bg-muted px-2 py-1 text-[8px] font-medium text-muted-foreground">{reportFormat}</span>)}
                     </div>
-                    <span className="text-[9px] font-medium text-primary">{template.hasDocxTemplate ? 'Template ready' : 'Available'}</span>
+                    <span className="text-[9px] font-medium text-primary">{template.hasDocxTemplate ? 'Word template ready' : 'Available'}</span>
                   </div>
                 </button>
               ))}
