@@ -142,7 +142,7 @@ export function EmployeeHubTopChrome() {
   )
 
   return (
-    <div className="sticky top-20 z-20 border-b bg-white/90 backdrop-blur-md" style={{ borderColor: eh.border }}>
+    <div className="sticky top-0 z-20 border-b bg-white/90 backdrop-blur-md" style={{ borderColor: eh.border }}>
       <div className="flex items-center gap-3 px-4 lg:px-5 h-14">
         <div className="relative flex-1 max-w-xl">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#94A3B8]" />
@@ -226,7 +226,7 @@ export function EmployeeHubTopChrome() {
 export function EmployeeHubShell({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState(false)
   return (
-    <div className="flex min-h-[calc(100vh-5rem)]" style={{ backgroundColor: eh.canvas }}>
+    <div className="flex min-h-screen" style={{ backgroundColor: eh.canvas }}>
       <EmployeeHubSidebar collapsed={collapsed} onToggle={() => setCollapsed((v) => !v)} />
       <div className="flex-1 min-w-0 flex flex-col">
         <EmployeeHubTopChrome />

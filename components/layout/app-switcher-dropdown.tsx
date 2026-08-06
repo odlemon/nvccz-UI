@@ -2,7 +2,7 @@
 
 import { useRef, useEffect, useMemo } from "react"
 import { createPortal } from "react-dom"
-import { MODULE_CONFIG } from "@/lib/config/modules"
+import { getSwitcherModules } from "@/lib/config/modules"
 import { useRolePermissions } from "@/lib/hooks/useRolePermissions"
 
 interface AppSwitcherDropdownProps {
@@ -18,7 +18,7 @@ export function AppSwitcherDropdown({ isOpen, onClose, onModuleSelect, currentMo
 
   const modulesToDisplay = useMemo(() => {
     if (!isAuthenticated || isLoading) return []
-    return MODULE_CONFIG.filter((module) => hasModuleAccess(module.id))
+    return getSwitcherModules().filter((module) => hasModuleAccess(module.id))
   }, [isAuthenticated, isLoading, hasModuleAccess])
 
   useEffect(() => {

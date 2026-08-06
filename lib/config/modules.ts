@@ -94,7 +94,20 @@ export interface ModuleConfig {
   groups?: ModuleGroupConfig[]
   requiresPermission?: boolean // Add this
   minLevel?: number // Add this
+  /** When true, hidden from App Switcher (replaced by a client design module). */
+  hiddenFromSwitcher?: boolean
 }
+
+/**
+ * Old modules superseded by client-design ports — still routable, hidden from App Switcher.
+ */
+export const SUPERSEDED_MODULE_IDS = new Set([
+  "homepage",
+  "employee-hub",
+  "portfolio-management",
+  "payroll",
+  "accounting",
+])
 
 export const MODULE_CONFIG: ModuleConfig[] = [
   {
@@ -104,7 +117,8 @@ export const MODULE_CONFIG: ModuleConfig[] = [
     icon: CiHome,
     color: "oklch(0.60 0.18 252)",
     path: "/",
-    subModules: []
+    subModules: [],
+    hiddenFromSwitcher: true,
   },
   {
     id: "employee-hub",
@@ -113,6 +127,7 @@ export const MODULE_CONFIG: ModuleConfig[] = [
     icon: CiUser,
     color: "oklch(0.65 0.12 200)",
     path: "/employee-hub",
+    hiddenFromSwitcher: true,
     subModules: [
       { id: "eh-home", name: "Home", path: "/employee-hub", icon: CiHome, description: "Personal home" },
       { id: "eh-feed", name: "News", path: "/employee-hub/news", icon: CiFileOn, description: "News feed" },
@@ -129,8 +144,8 @@ export const MODULE_CONFIG: ModuleConfig[] = [
   },
   {
     id: "home-v3",
-    name: "Home Version 3",
-    description: "Client Matanho Employee Hub Premium V17.1 design — faithful Next.js port for comparison",
+    name: "Homepage",
+    description: "Personal home, news, work, people, services and Matanho AI",
     icon: CiHome,
     color: "oklch(0.55 0.18 255)",
     path: "/home-v3",
@@ -152,8 +167,8 @@ export const MODULE_CONFIG: ModuleConfig[] = [
   },
   {
     id: "portfolio-v11",
-    name: "Portfolio (V11)",
-    description: "Client Matanho Portfolio Management V11 design — faithful Next.js port for comparison",
+    name: "Portfolio Management",
+    description: "Manage investment portfolios, funds, LPs and reporting",
     icon: CiShop,
     color: "oklch(0.58 0.16 280)",
     path: "/portfolio-v11",
@@ -177,6 +192,7 @@ export const MODULE_CONFIG: ModuleConfig[] = [
     icon: CiShop,
     color: "oklch(0.72 0.12 225)",
     path: "/portfolio",
+    hiddenFromSwitcher: true,
     // Flat shortcuts (optional)
     subModules: [
       { id: "Dashboard", name: "Dashboard", path: "/portfolio", icon: CiGrid41, description: "Manage your portfolio" },
@@ -280,6 +296,7 @@ export const MODULE_CONFIG: ModuleConfig[] = [
     icon: CiDollar,
     color: "oklch(0.54 0.1 280)",
     path: "/payroll",
+    hiddenFromSwitcher: true,
     subModules: [
       { id: "payroll-dashboard", name: "Dashboard", path: "/payroll", icon: CiGrid41, description: "Payroll dashboard" },
       { id: "payroll-employees", name: "Employees", path: "/payroll/employees", icon: CiViewList, description: "Employees" },
@@ -293,8 +310,8 @@ export const MODULE_CONFIG: ModuleConfig[] = [
   },
   {
     id: "payroll-v6",
-    name: "Payroll (V6)",
-    description: "Client Matanho Payroll HR Deploy V6 design — faithful Next.js port for comparison",
+    name: "Payroll",
+    description: "Payroll, tax, leave, vault and employee self-service",
     icon: CiDollar,
     color: "oklch(0.52 0.14 255)",
     path: "/payroll-v6",
@@ -341,6 +358,7 @@ export const MODULE_CONFIG: ModuleConfig[] = [
     icon: CiDollar,
     color: "oklch(0.62 0.10 170)",
     path: "/accounting",
+    hiddenFromSwitcher: true,
     subModules: [
       { id: "accounting-dashboard", name: "Dashboard", path: "/accounting", icon: CiGrid41, description: "Accounting dashboard" },
       { id: "general-ledger", name: "General Ledger", path: "/accounting/general-ledger", icon: CiFileOn, description: "Chart of accounts and journal entries" },
@@ -372,8 +390,8 @@ export const MODULE_CONFIG: ModuleConfig[] = [
   },
   {
     id: "accounting-v2",
-    name: "Accounting (New)",
-    description: "Accounting redesign mocks — Command Centre and process screens",
+    name: "Accounting",
+    description: "Accounting Command Centre, GL, cash, close and reports",
     icon: CiDollar,
     color: "oklch(0.55 0.14 255)",
     path: "/accounting-v2",
@@ -698,8 +716,8 @@ export const MODULE_CONFIG: ModuleConfig[] = [
   },
   {
     id: "investee-portal-v8",
-    name: "Investee Portal (V8)",
-    description: "Client Matanho Investee Portal Production V8 design — faithful Next.js port for comparison",
+    name: "Investee Portal",
+    description: "Portfolio company KPI, reporting, governance and requests",
     icon: Building2,
     color: "oklch(0.50 0.14 275)",
     path: "/investee-portal-v8",
@@ -840,3 +858,7 @@ export const getModuleByPath = (path: string): ModuleConfig | undefined => {
     }) : false)
   )
 }
+
+/** Modules shown in the App Switcher (excludes superseded old UIs). */
+export const getSwitcherModules = (): ModuleConfig[] =>
+  MODULE_CONFIG.filter((m) => !m.hiddenFromSwitcher && !SUPERSEDED_MODULE_IDS.has(m.id))

@@ -93,21 +93,30 @@ type BlotterCard = {
 }
 
 function mapBlotterCards(data: unknown, fundNameById: Record<string, string>): BlotterCard[] {
-  return unwrapList<OpsBlotter>(data).map((b) => {
-    const fundId = b.fundId != null ? String(b.fundId) : ''
-    return {
-      id: String(b.id ?? ''),
-      name: String(b.name ?? b.title ?? 'Untitled blotter'),
-      orders: Number(b.orderCount ?? 0),
-      owner: String(b.ownerName ?? b.createdByName ?? '—'),
-      portfolio: fundId ? fundNameById[fundId] ?? fundId : '—',
-      updated: b.updatedAt
-        ? new Date(String(b.updatedAt)).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-        : b.createdAt
-          ? new Date(String(b.createdAt)).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-          : '—',
-    }
-  })
+  return unwrapList<OpsBlotter>(data)
+    .map((b) => {
+      const fundId = b.fundId != null ? String(b.fundId) : ''
+      const rawName = String(b.name ?? b.title ?? '').trim()
+      return {
+        id: String(b.id ?? ''),
+        name: rawName || 'Untitled blotter',
+        orders: Number(b.orderCount ?? 0),
+        owner: String(b.ownerName ?? b.createdByName ?? '—'),
+        portfolio: fundId ? fundNameById[fundId] ?? fundId : '—',
+        updated: b.updatedAt
+          ? new Date(String(b.updatedAt)).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+          : b.createdAt
+            ? new Date(String(b.createdAt)).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+            : '—',
+        hasName: Boolean(rawName),
+      }
+    })
+    // Hide empty untitled working sets (0 orders, no real name) — clutter from incomplete creates
+    .filter((b) => {
+      const unnamed = !b.hasName || /^untitled\b/i.test(b.name)
+      return !(unnamed && b.orders === 0)
+    })
+    .map(({ hasName: _hasName, ...card }) => card)
 }
 
 export default function OrderbookPage() {
@@ -737,11 +746,16 @@ export default function OrderbookPage() {
                 <span className="text-[11px] font-semibold">{item.name}</span>
                 <Pill tone="blue">{item.orders} orders</Pill>
               </div>
+              <p className="mt-3 text-[10px] text-slate-500">
+                {item.orders === 0
+                  ? 'No orders in this working set yet. Open New order to add one.'
+                  : `${item.orders} order${item.orders === 1 ? '' : 's'} linked to this blotter.`}
+              </p>
               <div className="mt-3 flex justify-between text-[9px] text-slate-500">
                 <span>
                   {item.owner} · {item.portfolio}
                 </span>
-                <span>{item.updated}</span>
+                <span title="Last updated">{item.updated}</span>
               </div>
             </button>
           ))}

@@ -3,9 +3,9 @@
 import type React from "react"
 import { Suspense, useEffect, useState } from "react"
 import { usePathname } from "next/navigation"
-import { SharedTopbar } from "./shared-topbar"
+import { ClientDesignAppSwitcher } from "./client-design-app-switcher"
 import { PortfolioV11App } from "@/components/portfolio-v11-mock/portfolio-v11-app"
-import { MODULE_CONFIG, getModuleByPath } from "@/lib/config/modules"
+import { getModuleByPath } from "@/lib/config/modules"
 
 export function PortfolioV11Layout({ children }: { children: React.ReactNode }) {
   const [currentModule, setCurrentModule] = useState("portfolio-v11")
@@ -16,21 +16,15 @@ export function PortfolioV11Layout({ children }: { children: React.ReactNode }) 
     if (module) setCurrentModule(module.id)
   }, [pathname])
 
-  const handleModuleSelect = (module: string) => {
-    setCurrentModule(module)
-    const moduleConfig = MODULE_CONFIG.find((m) => m.id === module)
-    if (moduleConfig) window.location.href = moduleConfig.path
-  }
-
   return (
     <div className="min-h-screen bg-[#f2f5f9]">
-      <SharedTopbar onModuleSelect={handleModuleSelect} currentModule={currentModule} />
-      <Suspense fallback={<div className="p-8 text-sm text-[#64748B]">Loading Portfolio V11…</div>}>
+      <Suspense fallback={<div className="p-8 text-sm text-[#64748B]">Loading Portfolio…</div>}>
         <PortfolioV11App />
       </Suspense>
       <div className="sr-only" aria-hidden>
         {children}
       </div>
+      <ClientDesignAppSwitcher currentModule={currentModule} />
     </div>
   )
 }

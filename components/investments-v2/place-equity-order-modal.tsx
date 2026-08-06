@@ -109,7 +109,7 @@ export function PlaceEquityOrderModal({ open, onClose, onComplete }: PlaceEquity
   const [instruments, setInstruments] = useState<Instrument[]>([])
   const [preview, setPreview] = useState<OrderPreview | null>(null)
   const [previewModalOpen, setPreviewModalOpen] = useState(false)
-  const [historyPoints, setHistoryPoints] = useState<number[]>([])
+  const [historyPoints, setHistoryPoints] = useState<{ price: number; at: string | null }[]>([])
   const [hoverIdx, setHoverIdx] = useState<number | null>(null)
 
   const instrument = instruments.find((item) => item.id === instrumentId) ?? null
@@ -151,9 +151,17 @@ export function PlaceEquityOrderModal({ open, onClose, onComplete }: PlaceEquity
     Number.isFinite(consideration) &&
     consideration > fundCashAvailable
   const exposureImpact = n(est.exposure?.exposureImpactPct) ?? n(est.exposureImpactPct)
-  const chartPoints = historyPoints.length >= 2 ? historyPoints : lastPrice > 0 ? [lastPrice * 0.99, lastPrice] : []
+  const chartPoints =
+    historyPoints.length >= 2
+      ? historyPoints
+      : lastPrice > 0
+        ? [
+            { price: lastPrice * 0.99, at: null },
+            { price: lastPrice, at: null },
+          ]
+        : []
   const chartChange =
-    chartPoints.length >= 2 ? chartPoints[chartPoints.length - 1]! - chartPoints[0]! : 0
+    chartPoints.length >= 2 ? chartPoints[chartPoints.length - 1]!.price - chartPoints[0]!.price : 0
   const pricedOk =
     orderType === 'MARKET'
       ? lastPrice > 0
@@ -174,20 +182,80 @@ export function PlaceEquityOrderModal({ open, onClose, onComplete }: PlaceEquity
       : null
 
   const chartGeometry = useMemo(() => {
-    if (!chartPoints.length) {
-      return { line: '', area: '', min: 0, max: 0 }
+    const empty = {
+      line: '',
+      area: '',
+      min: 0,
+      max: 0,
+      xLabels: [] as string[],
+      yLabels: [] as { y: number; label: string }[],
+      plotLeft: 48,
+      plotRight: 470,
+      plotTop: 18,
+      plotBottom: 108,
+      plotWidth: 422,
+      coordinates: [] as [number, number][],
     }
-    const min = Math.min(...chartPoints)
-    const max = Math.max(...chartPoints)
-    const range = Math.max(max - min, 1)
+    if (!chartPoints.length) return empty
+    const prices = chartPoints.map((p) => p.price)
+    const min = Math.min(...prices)
+    const max = Math.max(...prices)
+    const range = Math.max(max - min, 0.0001)
+    const plotLeft = 48
+    const plotRight = 470
+    const plotTop = 18
+    const plotBottom = 108
+    const plotWidth = plotRight - plotLeft
+    const plotHeight = plotBottom - plotTop
     const coordinates = chartPoints.map((point, index) => {
-      const x = (index / Math.max(chartPoints.length - 1, 1)) * 430
-      const y = 20 + ((max - point) / range) * 92
-      return [x, y] as const
+      const x = plotLeft + (index / Math.max(chartPoints.length - 1, 1)) * plotWidth
+      const y = plotTop + ((max - point.price) / range) * plotHeight
+      return [x, y] as [number, number]
     })
     const line = coordinates.map(([x, y], index) => `${index ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`).join(' ')
-    return { line, area: `${line} L430 128 L0 128 Z`, min, max }
-  }, [chartPoints])
+    const formatAxisDate = (at: string | null, index: number) => {
+      if (at) {
+        const d = new Date(at)
+        if (!Number.isNaN(d.getTime())) {
+          return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
+        }
+      }
+      const periodHints: Record<ChartPeriod, string[]> = {
+        '1D': ['Open', 'Mid', 'Close'],
+        '1W': ['Mon', 'Wed', 'Fri'],
+        '1M': ['Wk1', 'Wk2', 'Wk3', 'Wk4'],
+        '3M': ['M1', 'M2', 'M3'],
+        '1Y': ['Q1', 'Q2', 'Q3', 'Q4'],
+      }
+      const hints = periodHints[chartPeriod]
+      const idx = Math.round((index / Math.max(chartPoints.length - 1, 1)) * (hints.length - 1))
+      return hints[idx] ?? ''
+    }
+    const xLabelIndexes =
+      chartPoints.length <= 3
+        ? chartPoints.map((_, i) => i)
+        : [0, Math.floor((chartPoints.length - 1) / 2), chartPoints.length - 1]
+    const xLabels = xLabelIndexes.map((i) => formatAxisDate(chartPoints[i]?.at ?? null, i))
+    const yLabels = [0, 0.5, 1].map((t) => {
+      const value = max - t * range
+      const y = plotTop + t * plotHeight
+      return { y, label: value.toFixed(2) }
+    })
+    return {
+      line,
+      area: `${line} L${plotRight} ${plotBottom} L${plotLeft} ${plotBottom} Z`,
+      min,
+      max,
+      xLabels,
+      yLabels,
+      plotLeft,
+      plotRight,
+      plotTop,
+      plotBottom,
+      plotWidth,
+      coordinates,
+    }
+  }, [chartPoints, chartPeriod])
 
   const loadMeta = useCallback(async () => {
     setLoadingMeta(true)
@@ -346,9 +414,19 @@ export function PlaceEquityOrderModal({ open, onClose, onComplete }: PlaceEquity
       .then((res) => {
         if (cancelled || res.success === false) return
         const series = res.data?.series ?? res.data?.items
-        const raw = Array.isArray(series) ? series : unwrapList<{ price?: string | number }>(res.data)
-        const pts = raw.map((p) => n(p.price)).filter((v): v is number => v != null)
-        setHistoryPoints(pts)
+        const raw = Array.isArray(series)
+          ? series
+          : unwrapList<{ price?: string | number; pricedAt?: string | null }>(res.data)
+        const pts = raw
+          .map((p) => {
+            const price = n(p.price)
+            if (price == null) return null
+            return { price, at: p.pricedAt ? String(p.pricedAt) : null }
+          })
+          .filter((v): v is { price: number; at: string | null } => v != null)
+        // API often returns newest-first; chart left→right should be oldest→newest
+        const chronological = [...pts].reverse()
+        setHistoryPoints(chronological)
       })
       .catch(() => {
         if (!cancelled) setHistoryPoints([])
@@ -636,41 +714,110 @@ export function PlaceEquityOrderModal({ open, onClose, onComplete }: PlaceEquity
               ))}
             </select>
             {chartGeometry.line ? (
-              <svg viewBox="0 0 480 140" className="mt-2 h-32 w-full" preserveAspectRatio="none" aria-label={`${chartPeriod} price chart`}>
+              <svg viewBox="0 0 480 140" className="mt-2 h-36 w-full" preserveAspectRatio="xMidYMid meet" aria-label={`${chartPeriod} price chart`}>
                 <defs>
                   <linearGradient id="equity-order-chart-fill" x1="0" y1="0" x2="0" y2="1">
                     <stop className="equity-order-chart-fill-start" offset="0" />
                     <stop className="equity-order-chart-fill-end" offset="1" />
                   </linearGradient>
                 </defs>
-                {[32, 64, 96].map((y) => (
-                  <line className="equity-order-chart-grid" key={y} x1="0" y1={y} x2="430" y2={y} />
+                {/* Y-axis (price) */}
+                <line
+                  className="equity-order-chart-grid"
+                  x1={chartGeometry.plotLeft}
+                  y1={chartGeometry.plotTop}
+                  x2={chartGeometry.plotLeft}
+                  y2={chartGeometry.plotBottom}
+                  strokeWidth={1}
+                />
+                {/* X-axis (period) */}
+                <line
+                  className="equity-order-chart-grid"
+                  x1={chartGeometry.plotLeft}
+                  y1={chartGeometry.plotBottom}
+                  x2={chartGeometry.plotRight}
+                  y2={chartGeometry.plotBottom}
+                  strokeWidth={1}
+                />
+                {chartGeometry.yLabels.map((tick) => (
+                  <g key={tick.label}>
+                    <line
+                      className="equity-order-chart-grid"
+                      x1={chartGeometry.plotLeft}
+                      y1={tick.y}
+                      x2={chartGeometry.plotRight}
+                      y2={tick.y}
+                      strokeOpacity={0.5}
+                    />
+                    <text
+                      x={chartGeometry.plotLeft - 6}
+                      y={tick.y + 3}
+                      textAnchor="end"
+                      className="fill-current text-[8px] equity-order-muted"
+                    >
+                      {tick.label}
+                    </text>
+                  </g>
                 ))}
+                {chartGeometry.xLabels.map((label, i) => {
+                  const xIndexes =
+                    chartPoints.length <= 3
+                      ? chartPoints.map((_, idx) => idx)
+                      : [0, Math.floor((chartPoints.length - 1) / 2), chartPoints.length - 1]
+                  const dataIdx = xIndexes[i] ?? 0
+                  const x =
+                    (chartGeometry.plotLeft ?? 48) +
+                    (dataIdx / Math.max(chartPoints.length - 1, 1)) * (chartGeometry.plotWidth ?? 422)
+                  return (
+                    <text
+                      key={`${label}-${i}`}
+                      x={x}
+                      y={132}
+                      textAnchor="middle"
+                      className="fill-current text-[8px] equity-order-muted"
+                    >
+                      {label}
+                    </text>
+                  )
+                })}
+                <text
+                  x={12}
+                  y={12}
+                  className="fill-current text-[8px] font-medium equity-order-muted"
+                >
+                  Price
+                </text>
+                <text
+                  x={240}
+                  y={140}
+                  textAnchor="middle"
+                  className="fill-current text-[8px] font-medium equity-order-muted"
+                >
+                  Period ({chartPeriod})
+                </text>
                 <path d={chartGeometry.area} fill="url(#equity-order-chart-fill)" />
                 <path
                   className={cn('equity-order-chart-line', chartChange < 0 && 'is-negative')}
                   d={chartGeometry.line}
                   fill="none"
                 />
-                {chartPoints.map((point, index) => {
-                  const x = (index / Math.max(chartPoints.length - 1, 1)) * 430
-                  const range = Math.max(chartGeometry.max - chartGeometry.min, 1)
-                  const y = 20 + ((chartGeometry.max - point) / range) * 92
-                  return (
-                    <circle
-                      key={index}
-                      cx={x}
-                      cy={y}
-                      r={hoverIdx === index ? 5 : 3}
-                      className="equity-order-chart-line fill-current"
-                      onMouseEnter={() => setHoverIdx(index)}
-                      onMouseLeave={() => setHoverIdx(null)}
-                    />
-                  )
-                })}
+                {chartGeometry.coordinates?.map(([x, y], index) => (
+                  <circle
+                    key={index}
+                    cx={x}
+                    cy={y}
+                    r={hoverIdx === index ? 5 : 3}
+                    className="equity-order-chart-line fill-current"
+                    onMouseEnter={() => setHoverIdx(index)}
+                    onMouseLeave={() => setHoverIdx(null)}
+                  />
+                ))}
                 {hoverIdx != null && chartPoints[hoverIdx] != null && (
-                  <text x={12} y={18} className="fill-current text-[10px] font-mono equity-order-value">
-                    {chartPoints[hoverIdx]!.toFixed(4)}
+                  <text x={(chartGeometry.plotLeft ?? 48) + 4} y={16} className="fill-current text-[10px] font-mono equity-order-value">
+                    {chartPoints[hoverIdx]!.price.toFixed(4)}
+                    {chartPoints[hoverIdx]!.at
+                      ? ` · ${new Date(chartPoints[hoverIdx]!.at!).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`
+                      : ''}
                   </text>
                 )}
               </svg>
