@@ -25,7 +25,7 @@ export function EmployeeHubLayout({ children }: EmployeeHubLayoutProps) {
       <Suspense fallback={<div className="p-8 text-sm text-[#64748B]">Loading Employee Hub…</div>}>
         <EmployeeHubShell>{children}</EmployeeHubShell>
       </Suspense>
-      <ClientDesignAppSwitcher currentModule={currentModule} />
+      <ClientDesignAppSwitcher currentModule={currentModule} showHeaderButton={false} />
     </div>
   )
 }

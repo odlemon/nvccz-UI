@@ -24,7 +24,7 @@ export function InvesteePortalV8Layout({ children }: { children: React.ReactNode
       <div className="sr-only" aria-hidden>
         {children}
       </div>
-      <ClientDesignAppSwitcher currentModule={currentModule} />
+      <ClientDesignAppSwitcher currentModule={currentModule} showHeaderButton={false} />
     </div>
   )
 }

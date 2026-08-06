@@ -28,7 +28,7 @@ export function HomeV3Layout({ children }: HomeV3LayoutProps) {
       <div className="sr-only" aria-hidden>
         {children}
       </div>
-      <ClientDesignAppSwitcher currentModule={currentModule} />
+      <ClientDesignAppSwitcher currentModule={currentModule} showHeaderButton={false} />
     </div>
   )
 }

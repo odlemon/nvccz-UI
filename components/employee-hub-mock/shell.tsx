@@ -165,12 +165,15 @@ export function EmployeeHubTopChrome() {
 
         <button
           type="button"
-          onClick={() => toast("Employee Hub", { description: "You are in Personal Home." })}
-          className="hidden md:inline-flex items-center gap-2 h-10 px-3 rounded-full border bg-white text-sm font-medium text-[#334155]"
+          data-arcus-modules
+          onClick={() => window.__openArcusAppSwitcher?.()}
+          className="inline-flex items-center gap-2 h-10 px-3 rounded-full border bg-white text-sm font-medium text-[#334155] hover:bg-[#F7F6F3]"
           style={{ borderColor: eh.border }}
+          aria-label="Switch module"
+          title="Switch module"
         >
           <LayoutGrid className="h-4 w-4 text-[#0EA5B7]" />
-          Employee Hub
+          <span className="hidden sm:inline">Modules</span>
           <ChevronDown className="h-3.5 w-3.5 text-[#94A3B8]" />
         </button>
 

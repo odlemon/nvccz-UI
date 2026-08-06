@@ -1027,7 +1027,13 @@ init();
     launcher.innerHTML = icon('apps');
     if (launcher.dataset.appsBound !== 'true') {
       launcher.dataset.appsBound = 'true';
-      launcher.addEventListener('click', () => {
+      launcher.addEventListener('click', (event) => {
+        if (typeof window !== 'undefined' && typeof window.__openArcusAppSwitcher === 'function') {
+          event.preventDefault();
+          event.stopPropagation();
+          window.__openArcusAppSwitcher();
+          return;
+        }
         launcher.classList.add('is-open');
         const apps = [
           ['overview','Payroll & Human Capital','People, pay and compliance','users'],

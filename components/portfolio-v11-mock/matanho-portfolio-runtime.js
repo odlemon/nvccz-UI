@@ -2832,6 +2832,10 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   }
 
   function showModuleSwitcher(anchor) {
+    if (typeof window !== 'undefined' && typeof window.__openArcusAppSwitcher === 'function') {
+      window.__openArcusAppSwitcher();
+      return;
+    }
     const modules = [
       ['Portfolio Management','Active','layers','var(--brand)'],['Loan Operations','Available','wallet','var(--blue)'],['Workshop OS','Available','settings','var(--emerald)'],['Procurement','Preview','clipboard','var(--amber)'],['Employee Hub','Available','users','var(--purple)'],['Board Management','Preview','gavel','var(--cyan)']
     ];
