@@ -668,7 +668,7 @@ export function ModuleSetupWorkspace({ orderSetupContent }: { orderSetupContent:
                 {LIVE_REFERENCE_TABS.has(activeTab) ? `${filtered.length} records from API` : `${filtered.length} configured records · not wired to API yet`}
               </p>
             </div>
-            <div className="flex gap-2"><div className="relative flex-1 sm:w-60"><Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-[#627086]" /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search records…" className={cn(fieldClass, 'pl-9')} /></div><button className={buttonClass} onClick={() => { setDraft({ code: '', name: '', extra: '' }); setReferenceKind(null); setModal('reference') }}><Plus className="h-3.5 w-3.5" /> Add</button></div>
+            <div className="flex gap-2"><div className="relative flex-1 sm:w-60"><Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-[#627086]" /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search records…" className={cn(fieldClass, 'pl-9')} /></div><button className={buttonClass} onClick={() => { setDraft({ code: '', name: '', extra: activeTab === 'Broker/Counterparties' ? 'BROKER' : '' }); setReferenceKind(null); setModal('reference') }}><Plus className="h-3.5 w-3.5" /> Add</button></div>
           </div>
           {liveTabLoading ? (
             <OpsTableSkeleton rows={8} cols={data?.columns.length ?? 5} className="px-5 py-6" />
@@ -966,12 +966,35 @@ export function ModuleSetupWorkspace({ orderSetupContent }: { orderSetupContent:
             <span className="mb-1.5 block text-[10px] text-[#8b99ad]">{activeTab === 'Commissions' ? 'Rate (bps)' : modal === 'corporate' || modal === 'tag' ? 'Display name' : 'Name'}</span>
             <input value={draft.name} onChange={e => setDraft(v => ({ ...v, name: e.target.value }))} className={fieldClass} placeholder={activeTab === 'Commissions' ? '25' : modal === 'corporate' ? 'Cash dividend' : modal === 'tag' ? 'Core holding' : 'Display name'} />
           </label>
-          {(modal === 'corporate' || (activeTab === 'Broker/Counterparties' || activeTab === 'Countries' || activeTab === 'Markets' || activeTab === 'Issuer' || activeTab === 'Currencies') && !referenceKind) && (
+          {(modal === 'corporate' || ((activeTab === 'Broker/Counterparties' || activeTab === 'Countries' || activeTab === 'Markets' || activeTab === 'Issuer' || activeTab === 'Currencies') && !referenceKind)) && (
             <label className="sm:col-span-2">
               <span className="mb-1.5 block text-[10px] text-[#8b99ad]">
-                {modal === 'corporate' ? 'External code (optional)' : activeTab === 'Broker/Counterparties' ? 'Type (BROKER or CUSTODIAN)' : activeTab === 'Currencies' ? 'Symbol' : 'Country / region code'}
+                {modal === 'corporate'
+                  ? 'External code (optional)'
+                  : activeTab === 'Broker/Counterparties'
+                    ? 'Type'
+                    : activeTab === 'Currencies'
+                      ? 'Symbol'
+                      : 'Country / region code'}
               </span>
-              <input value={draft.extra} onChange={e => setDraft(v => ({ ...v, extra: e.target.value }))} className={fieldClass} placeholder={modal === 'corporate' ? 'e.g. DVCA' : activeTab === 'Broker/Counterparties' ? 'BROKER' : activeTab === 'Currencies' ? '$' : 'ZW'} />
+              {activeTab === 'Broker/Counterparties' && modal === 'reference' ? (
+                <select
+                  value={draft.extra === 'CUSTODIAN' ? 'CUSTODIAN' : 'BROKER'}
+                  onChange={(e) => setDraft((v) => ({ ...v, extra: e.target.value }))}
+                  className={fieldClass}
+                  aria-label="Counterparty type"
+                >
+                  <option value="BROKER">Broker</option>
+                  <option value="CUSTODIAN">Custodian</option>
+                </select>
+              ) : (
+                <input
+                  value={draft.extra}
+                  onChange={(e) => setDraft((v) => ({ ...v, extra: e.target.value }))}
+                  className={fieldClass}
+                  placeholder={modal === 'corporate' ? 'e.g. DVCA' : activeTab === 'Currencies' ? '$' : 'ZW'}
+                />
+              )}
             </label>
           )}
         </div>
