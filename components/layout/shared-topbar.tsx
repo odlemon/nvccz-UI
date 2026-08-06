@@ -85,7 +85,7 @@ export function SharedTopbar({ onModuleSelect, currentModule, moduleActions }: S
               className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
               onClick={() => window.location.href = '/home-v3'}
             >
-              <img src="/new_logo.jpeg" alt="Matanho" height={40} width={140} className="h-10 w-auto object-contain rounded-md" />
+              <img src="/new_logo.png" alt="Matanho" height={40} width={140} className="h-10 w-auto object-contain" />
             </div>
           </div>
 

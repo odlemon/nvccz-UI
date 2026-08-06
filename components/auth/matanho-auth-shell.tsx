@@ -16,7 +16,7 @@ type MatanhoAuthShellProps = {
 
 /**
  * Full-bleed mountain / glass auth layout shared by login + forgot-password.
- * Left branding matches the Matanho login crop; `/new_logo.jpeg` is used on mobile
+ * Left branding matches the Matanho login crop; `/new_logo.png` is used on mobile
  * (light plate) and across app chrome.
  */
 export function MatanhoAuthShell({
@@ -85,16 +85,14 @@ export function MatanhoAuthShell({
           >
             {/* Mobile: official logo asset */}
             <div className="lg:hidden mb-6 flex flex-col items-center text-center">
-              <div className="inline-flex rounded-xl bg-white px-3 py-2.5 mb-3 shadow-lg">
-                <Image
-                  src="/new_logo.jpeg"
-                  alt="Matanho — Investment Management ERP"
-                  width={200}
-                  height={64}
-                  className="h-11 w-auto object-contain"
-                  priority
-                />
-              </div>
+              <Image
+                src="/new_logo.png"
+                alt="Matanho — Investment Management ERP"
+                width={200}
+                height={64}
+                className="h-11 w-auto object-contain mb-3 brightness-0 invert"
+                priority
+              />
               <p className="text-white/85 text-sm max-w-xs">
                 The infrastructure behind every investment.
               </p>

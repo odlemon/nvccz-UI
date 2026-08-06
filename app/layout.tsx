@@ -28,9 +28,9 @@ export const metadata: Metadata = {
   description: "The infrastructure behind every investment.",
   generator: "v0.app",
   icons: {
-    icon: "/new_logo.jpeg",
-    shortcut: "/new_logo.jpeg",
-    apple: "/new_logo.jpeg",
+    icon: "/new_logo.png",
+    shortcut: "/new_logo.png",
+    apple: "/new_logo.png",
   },
 }
 

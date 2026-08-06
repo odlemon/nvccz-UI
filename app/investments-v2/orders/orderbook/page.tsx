@@ -829,7 +829,11 @@ export default function OrderbookPage() {
                       {order.ticker}
                       <div className="text-[9px] text-slate-600">{order.instrument}</div>
                     </td>
-                    <td>{order.side}</td>
+                    <td>
+                      <Pill tone={String(order.side).toUpperCase().includes('SELL') ? 'red' : 'green'}>
+                        {order.side}
+                      </Pill>
+                    </td>
                     <td className="text-right font-mono">{order.qty.toLocaleString()}</td>
                     <td className="text-right font-mono">{order.filled.toLocaleString()}</td>
                     <td className="text-right font-mono">
@@ -949,7 +953,13 @@ export default function OrderbookPage() {
             }).map(([label, value]) => (
               <div key={label} className="rounded-[16px] bg-white/[0.035] p-3">
                 <div className="text-[9px] uppercase text-slate-600">{label}</div>
-                <div className="mt-1 text-[11px]">{value}</div>
+                {label === 'Side' ? (
+                  <div className="mt-1">
+                    <Pill tone={String(value).toUpperCase().includes('SELL') ? 'red' : 'green'}>{value}</Pill>
+                  </div>
+                ) : (
+                  <div className="mt-1 text-[11px]">{value}</div>
+                )}
               </div>
             ))}
           </div>

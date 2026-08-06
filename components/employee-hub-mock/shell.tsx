@@ -61,7 +61,7 @@ export function EmployeeHubSidebar({ collapsed, onToggle }: { collapsed: boolean
     >
       <div className={cn("px-3 pt-4 pb-3", collapsed && "px-2")}>
         <Link href="/employee-hub" className="flex items-center gap-2 px-1">
-          <Image src="/new_logo.jpeg" alt="Matanho" width={120} height={36} className={cn("h-8 w-auto object-contain", collapsed && "hidden")} />
+          <Image src="/new_logo.png" alt="Matanho" width={120} height={36} className={cn("h-8 w-auto object-contain", collapsed && "hidden")} />
           {collapsed && (
             <span className="h-8 w-8 rounded-lg bg-[#0EA5B7] text-white text-xs font-bold inline-flex items-center justify-center">M</span>
           )}
