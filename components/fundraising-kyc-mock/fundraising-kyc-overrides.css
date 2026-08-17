@@ -22,6 +22,11 @@
   max-height: 100%;
 }
 
+.fundraising-kyc-root .kyc-app-shell {
+  height: 100%;
+  min-height: 0;
+}
+
 /* Mobile: stack sidebar + main; whole column scrolls */
 @media (max-width: 63.99rem) {
   .fundraising-kyc-root {
@@ -37,13 +42,15 @@
     min-height: 100%;
   }
 
-  .fundraising-kyc-root .min-h-screen {
+  .fundraising-kyc-root .min-h-screen,
+  .fundraising-kyc-root .kyc-app-shell {
     display: flex !important;
     flex-direction: column;
     overflow-x: hidden !important;
     overflow-y: auto !important;
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
+    height: auto !important;
   }
 
   .fundraising-kyc-root aside.sidebar-glow {
@@ -54,11 +61,15 @@
     flex-shrink: 0;
   }
 
-  .fundraising-kyc-root main {
+  .fundraising-kyc-root .kyc-main {
     flex: 1 1 auto;
     min-height: 0;
     overflow: visible !important;
     height: auto !important;
+  }
+
+  .fundraising-kyc-root .kyc-step-rail {
+    display: none !important;
   }
 
   .fundraising-kyc-root .xl\:px-10,
@@ -68,8 +79,9 @@
   }
 }
 
-/* Desktop: two-column grid; only main scrolls */
+/* Desktop: two-column grid; sidebar steps scroll; main scrolls */
 @media (min-width: 64rem) {
+  .fundraising-kyc-root .kyc-app-shell.lg\:grid,
   .fundraising-kyc-root .lg\:grid {
     display: grid !important;
     grid-template-columns: 300px minmax(0, 1fr) !important;
@@ -78,27 +90,46 @@
     overflow: hidden !important;
   }
 
-  .fundraising-kyc-root aside.sidebar-glow,
-  .fundraising-kyc-root .lg\:h-screen {
+  .fundraising-kyc-root .kyc-sidebar {
     position: relative !important;
     top: auto !important;
     height: 100% !important;
     max-height: 100% !important;
     min-height: 0 !important;
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
   }
 
-  .fundraising-kyc-root aside .lg\:overflow-y-auto {
-    overflow-y: auto;
+  .fundraising-kyc-root .kyc-sidebar-inner {
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    max-width: none !important;
+    width: 100%;
+  }
+
+  .fundraising-kyc-root .kyc-sidebar-scroll {
+    flex: 1 1 auto;
     min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
 
-  .fundraising-kyc-root main {
+  .fundraising-kyc-root .kyc-step-rail {
+    display: block !important;
+  }
+
+  .fundraising-kyc-root .kyc-main {
     overflow-x: hidden !important;
     overflow-y: auto !important;
     min-height: 0 !important;
+    min-width: 0 !important;
     height: 100% !important;
     overscroll-behavior: contain;
+    background: #f6f8fb;
   }
 }
 
@@ -109,17 +140,10 @@
   .fundraising-kyc-root .xl\:grid-cols-3 {
     grid-template-columns: minmax(0, 1fr) !important;
   }
-
-  .fundraising-kyc-root .xl\:grid-cols-\[minmax\(0\, .fundraising-kyc-root 1\.15fr\)_minmax\(300px\, .fundraising-kyc-root \.85fr\)\] {
-    grid-template-columns: minmax(0, 1fr) !important;
-  }
 }
 
 /* Sidebar custom scrollbar */
 .fundraising-kyc-root .kyc-sidebar-scroll {
-  overflow-x: hidden;
-  overflow-y: auto;
-  overscroll-behavior: contain;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.34) transparent;
 }

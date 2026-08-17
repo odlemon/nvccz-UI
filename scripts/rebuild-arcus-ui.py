@@ -87,11 +87,11 @@ test -f src/ui/package.json
 test -f src/ui/Dockerfile
 echo '=== rebuild DEV ui ==='
 docker compose --env-file secrets/dev.env -f compose/docker-compose.dev.yml up -d --build ui
-echo '=== rebuild PROD ui ==='
-docker compose --env-file secrets/prod.env -f compose/docker-compose.prod.yml up -d --build ui
+echo '=== rebuild DEMO ui ==='
+docker compose --env-file secrets/demo.env -f compose/docker-compose.demo.yml up -d --build ui
 echo '=== status ==='
 docker compose --env-file secrets/dev.env -f compose/docker-compose.dev.yml ps
-docker compose --env-file secrets/prod.env -f compose/docker-compose.prod.yml ps
+docker compose --env-file secrets/demo.env -f compose/docker-compose.demo.yml ps
 echo ARCUS_UI_REBUILD_DONE
 """
 
