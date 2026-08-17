@@ -20,7 +20,6 @@ import {
 } from "@/components/ui/tooltip"
 import {
   CiSearch,
-  CiGrid41,
   CiBellOn,
   CiSettings,
   CiUser,
@@ -28,8 +27,13 @@ import {
   CiCalendar,
   CiCircleInfo
 } from "react-icons/ci"
-import { AppSwitcherDropdown } from "./app-switcher-dropdown"
 import { NotificationsBell } from "@/components/notifications/notifications-bell"
+import { ModuleSwitcherButton } from "./module-switcher-button"
+import {
+  ArcusAppSwitcherProvider,
+  useArcusAppSwitcher,
+} from "./arcus-app-switcher-provider"
+import "@/components/layout/arcus-header-overrides.css"
 import { useAppDispatch, useAppSelector } from "@/lib/store"
 import { setCurrency } from "@/lib/store/slices/uiSlice"
 import { logoutUser } from "@/lib/store/slices/authSlice"
@@ -41,9 +45,19 @@ interface SharedTopbarProps {
   moduleActions?: React.ReactNode
 }
 
-export function SharedTopbar({ onModuleSelect, currentModule, moduleActions }: SharedTopbarProps) {
-  const [showAppSwitcher, setShowAppSwitcher] = useState(false)
+export function SharedTopbar(props: SharedTopbarProps) {
+  const parent = useArcusAppSwitcher()
+  if (parent) return <SharedTopbarInner {...props} />
+  return (
+    <ArcusAppSwitcherProvider currentModule={props.currentModule}>
+      <SharedTopbarInner {...props} />
+    </ArcusAppSwitcherProvider>
+  )
+}
+
+function SharedTopbarInner({ currentModule, moduleActions }: SharedTopbarProps) {
   const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const appSwitcher = useArcusAppSwitcher()
   const dispatch = useAppDispatch()
   const currency = useAppSelector((state) => state.ui.currency)
   const { user, token, isAuthenticated, userDetails } = useAppSelector((state) => state.auth)
@@ -77,7 +91,7 @@ export function SharedTopbar({ onModuleSelect, currentModule, moduleActions }: S
   return (
     <TooltipProvider>
       <>
-      <header className="h-20 border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
+      <header data-arcus-shared-topbar className="h-20 border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="flex items-center justify-between h-full px-6">
           {/* Left Section - Logo and Breadcrumb */}
           <div className="flex items-center gap-4">
@@ -106,35 +120,10 @@ export function SharedTopbar({ onModuleSelect, currentModule, moduleActions }: S
 
             {/* App Switcher with Active Module - Hidden for applicants */}
             {!isApplicant && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div
-                    onClick={() => setShowAppSwitcher(true)}
-                    className="flex items-center gap-2 px-2 py-2 rounded-full cursor-pointer transition-colors group hover:primary-200 bg-accent"
-                    style={{
-                      backgroundColor: 'oklch(0.60 0.18 252)20'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = 'oklch(0.60 0.18 252)30'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'oklch(0.60 0.18 252)20'
-                    }}
-                  >
-                    <div className="w-8 h-8 rounded-full  dark:bg-gray-800  dark:border-gray-700 flex items-center justify-center">
-                      <CiGrid41 size={20} style={{ color: 'oklch(0.60 0.18 252)' }} />
-                    </div>
-                    {currentModule !== "homepage" && (
-                      <span className="text-sm text-muted-foreground capitalize group-hover:text-gray-500  dark:group-hover:text-gray-400">
-                        {currentModule.replace("-", " ")}
-                      </span>
-                    )}
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Switch Applications</p>
-                </TooltipContent>
-              </Tooltip>
+              <ModuleSwitcherButton
+                currentModule={currentModule}
+                onClick={() => appSwitcher?.openSwitcher() ?? window.__openArcusAppSwitcher?.()}
+              />
             )}
 
             {/* Notifications */}
@@ -216,18 +205,6 @@ export function SharedTopbar({ onModuleSelect, currentModule, moduleActions }: S
         </div>
       </header>
 
-      {/* Portaled overlay — keep outside blurred header so it is not clipped */}
-      {!isApplicant && (
-        <AppSwitcherDropdown
-          isOpen={showAppSwitcher}
-          onClose={() => setShowAppSwitcher(false)}
-          onModuleSelect={(module) => {
-            onModuleSelect(module)
-            setShowAppSwitcher(false)
-          }}
-          currentModule={currentModule}
-        />
-      )}
       </>
     </TooltipProvider>
   )

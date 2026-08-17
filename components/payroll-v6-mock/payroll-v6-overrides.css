@@ -1,24 +1,68 @@
-/* SharedTopbar offset + overlay fixes for Payroll V6 */
+/* Payroll V6: sidebar stays put; only .content scrolls. */
 
 .payroll-v6-root {
   position: relative;
-  min-height: calc(100vh - 5rem);
-  overflow-x: clip;
-  overflow-y: visible;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .payroll-v6-root .app {
-  height: calc(100vh - 5rem);
-  min-height: calc(100vh - 5rem);
+  flex: 1 1 auto;
+  height: 100% !important;
+  max-height: 100% !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  grid-template-rows: minmax(0, 1fr);
 }
 
 .payroll-v6-root .sidebar {
   position: relative;
   z-index: 20;
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: 100%;
+  overflow: hidden;
 }
 
 .payroll-v6-root .shell {
-  min-height: 0;
+  min-width: 0;
+  min-height: 0 !important;
+  height: 100% !important;
+  max-height: 100% !important;
+  overflow: hidden !important;
+}
+
+.payroll-v6-root .content {
+  min-height: 0 !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+}
+
+@media (min-width: 761px) {
+  .payroll-v6-root .app:not(.collapsed) {
+    --sidebar: 282px;
+  }
+  .payroll-v6-root .app:not(.collapsed) .brand img,
+  .payroll-v6-root .app:not(.collapsed) .tenant-meta,
+  .payroll-v6-root .app:not(.collapsed) .nav-group,
+  .payroll-v6-root .app:not(.collapsed) .nav-label,
+  .payroll-v6-root .app:not(.collapsed) .nav-count,
+  .payroll-v6-root .app:not(.collapsed) .health div {
+    display: block;
+  }
+  .payroll-v6-root .app:not(.collapsed) .brand-mark {
+    display: none;
+  }
+  .payroll-v6-root .app:not(.collapsed) .brand,
+  .payroll-v6-root .app:not(.collapsed) .tenant,
+  .payroll-v6-root .app:not(.collapsed) .health,
+  .payroll-v6-root .app:not(.collapsed) .nav-item {
+    justify-content: flex-start;
+  }
 }
 
 .payroll-v6-root .toast-stack {

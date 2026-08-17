@@ -50,7 +50,7 @@ const navGroups=[
  {label:'Administration',items:[['team','Team & Access','shield'],['settings','Settings','settings']]}
 ];
 const store={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}}};
-const state={page:(typeof initialPage==='string'&&initialPage&&initialPage!=='integrations')?initialPage:'dashboard',theme:store.get('matanho-investee-theme')||'light',collapsed:store.get('matanho-investee-collapsed')==='1',scenario:'Base case',reportTab:'schedule',activeThread:0,forecastSheet:'Operating Plan',activeForecastCell:'B3',forecastCloseDay:Number(store.get('matanho-forecast-close-day')||5),forecastLockPast:store.get('matanho-forecast-lock-past')!=='0'};
+const state={page:(typeof initialPage==='string'&&initialPage&&initialPage!=='integrations')?initialPage:'dashboard',theme:store.get('matanho-investee-theme')||'light',collapsed:false,scenario:'Base case',reportTab:'schedule',activeThread:0,forecastSheet:'Operating Plan',activeForecastCell:'B3',forecastCloseDay:Number(store.get('matanho-forecast-close-day')||5),forecastLockPast:store.get('matanho-forecast-lock-past')!=='0'};
 const company={name:'Zambezi Pay Technologies',short:'Zambezi Pay',fund:'Matanho Venture Fund I',sector:'Financial technology',stage:'Series B',currency:'USD',investmentDate:'18 Jan 2022',invested:28000000,valuation:72300000,ownership:16.7,board:'Board observer',lead:'Nyasha Moyo',reporting:'Quarterly',nextBoard:'05 Sep 2026'};
 const metrics=[
  {label:'Revenue · Q2',value:'$3.42m',foot:'+18.6% vs Q2 2025',trend:'up',icon:'trending',tone:'',series:[42,48,54,57,65,74]},

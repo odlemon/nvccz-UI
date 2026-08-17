@@ -30,6 +30,7 @@ import {
   requireOpsData,
   resolveCashAccountLabel,
   resolvePortfolioName,
+  isMaskedAccountLabel,
 } from '@/lib/investments-v2/adapters/cash-recon-adapter'
 import { R as C, ReconAccent } from '@/lib/investments-v2/recon-tokens'
 import { cn } from '@/lib/utils'
@@ -59,6 +60,11 @@ const statusStyle: Record<ExceptionStatus, { bg: string; color: string; border: 
 }
 
 const ageColor = (severity: ExceptionSeverity) => severityStyle[severity].color
+
+function usdLabel(amount: string | undefined) {
+  if (!amount || amount === '—' || /^nan$/i.test(amount)) return '—'
+  return amount.startsWith('USD') ? amount : `USD ${amount}`
+}
 
 function bufferToBase64(buf: ArrayBuffer) {
   const bytes = new Uint8Array(buf)
@@ -161,10 +167,11 @@ export default function ExceptionsApprovalsPage() {
       setRows(
         mapped.items.map((row) => ({
           ...row,
-          account:
-            row.account !== '—'
-              ? row.account
-              : resolveCashAccountLabel(row.cashAccountId, cashAccounts),
+          account: resolveCashAccountLabel(
+            row.cashAccountId,
+            cashAccounts,
+            isMaskedAccountLabel(row.account) ? '—' : row.account,
+          ),
           portfolio:
             row.portfolio !== '—'
               ? row.portfolio
@@ -412,13 +419,10 @@ export default function ExceptionsApprovalsPage() {
         <header className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div>
             <div className="flex flex-wrap items-center gap-2.5">
-              <h1 className="text-[22px] font-semibold leading-tight tracking-[-0.01em]">Reconciliation Exceptions & Approvals</h1>
-              <span className="inline-flex h-6 items-center rounded-full border px-2.5 text-[11px] font-medium" style={{ background: C.muted, borderColor: C.cardBorder, color: C.muted }}>
-                Stock Picker
-              </span>
+              <h1 className="text-[22px] font-semibold leading-tight tracking-[-0.01em]">Exceptions</h1>
             </div>
             <p className="mt-1.5 text-[13px] leading-snug" style={{ color: C.muted }}>
-              Identify, investigate and resolve reconciliation exceptions requiring analyst action.
+              Breaks that did not auto-clear. Open a row to investigate, attach evidence, then approve or reject.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2.5">
@@ -446,10 +450,45 @@ export default function ExceptionsApprovalsPage() {
         {actionMsg ? <div className="rounded-[10px] border border-border bg-muted/40 px-3 py-2 text-[12px] text-muted-foreground">{actionMsg}</div> : null}
 
         <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <KpiCard icon={<ShieldAlert className="h-4 w-4 text-[#FB7185]" />} iconBg="rgba(244,63,94,0.15)" label="Critical / High" value={String(summary.critical)} amount={`USD ${summary.criticalAmount}`} trend={`Open ${summary.open ?? 0}`} trendColor="#FB7185" />
-          <KpiCard icon={<Clock3 className="h-4 w-4 text-[#FBBF24]" />} iconBg="rgba(245,158,11,0.15)" label="Overdue Approvals" value={String(summary.overdue)} amount={`USD ${summary.overdueAmount}`} trend="From exceptions summary" trendColor="#FB7185" />
-          <KpiCard icon={<FilePenLine className="h-4 w-4 text-[#FACC15]" />} iconBg="rgba(234,179,8,0.15)" label="Pending Adjustments" value={String(summary.pending)} amount={`USD ${summary.pendingAmount}`} trend={`Investigating ${summary.investigating ?? 0}`} trendColor="#FBBF24" />
-          <KpiCard icon={<Send className="h-4 w-4 text-[#4ADE80]" />} iconBg="rgba(34,197,94,0.15)" label="Straight-Through Match Rate" value={summary.stpRate} trend="From summary when provided" trendColor="#4ADE80" />
+          <KpiCard
+            icon={<ShieldAlert className="h-4 w-4 text-[#FB7185]" />}
+            iconBg="rgba(244,63,94,0.15)"
+            label="Critical / High"
+            value={String(summary.critical)}
+            amount={usdLabel(summary.criticalAmount)}
+            trend={`${summary.open} open`}
+            trendColor="#FB7185"
+          />
+          <KpiCard
+            icon={<Clock3 className="h-4 w-4 text-[#FBBF24]" />}
+            iconBg="rgba(245,158,11,0.15)"
+            label="Overdue Approvals"
+            value={String(summary.overdue)}
+            amount={usdLabel(summary.overdueAmount)}
+            trend={summary.overdue === 0 ? 'None past SLA' : 'Past decision deadline'}
+            trendColor="#FB7185"
+          />
+          <KpiCard
+            icon={<FilePenLine className="h-4 w-4 text-[#FACC15]" />}
+            iconBg="rgba(234,179,8,0.15)"
+            label="Pending Adjustments"
+            value={String(summary.pending)}
+            amount={usdLabel(summary.pendingAmount)}
+            trend={`${summary.investigating} investigating`}
+            trendColor="#FBBF24"
+          />
+          <KpiCard
+            icon={<Send className="h-4 w-4 text-[#4ADE80]" />}
+            iconBg="rgba(34,197,94,0.15)"
+            label="Straight-through match"
+            value={summary.stpRate}
+            trend={
+              summary.matchLinks > 0
+                ? `${summary.autoConfirmed} of ${summary.matchLinks} auto-confirmed`
+                : 'No match links yet'
+            }
+            trendColor="#4ADE80"
+          />
         </section>
 
         <section className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_420px]">

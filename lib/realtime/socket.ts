@@ -17,10 +17,12 @@ export const getSocket = (): Socket => {
 
   socket = io(getWebSocketUrl(), {
     auth: { token },
-    transports: ["websocket", "polling"],
+    // Prefer polling first so reconnects survive brief API restarts / WS upgrade flaps
+    transports: ["polling", "websocket"],
     reconnection: true,
-    reconnectionAttempts: 5,
+    reconnectionAttempts: 20,
     reconnectionDelay: 1000,
+    reconnectionDelayMax: 8000,
     autoConnect: true,
   })
 

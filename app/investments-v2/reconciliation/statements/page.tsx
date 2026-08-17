@@ -1,23 +1,18 @@
 'use client'
 
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 import {
-  Check,
-  CheckCircle2,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   ChevronsRight,
   CircleDollarSign,
   Download,
-  Eye,
   FileStack,
-  FileText,
   Info,
   Loader2,
-  Mail,
   Network,
-  Upload,
   Wallet,
 } from 'lucide-react'
 import { ReconApiBanner, ReconNavTabs, ViewSegment } from '@/components/investments-v2/recon-ui'
@@ -33,36 +28,23 @@ import {
   requireOpsData,
   resolveCashAccountLabel,
   displayLabel,
+  isMaskedAccountLabel,
 } from '@/lib/investments-v2/adapters/cash-recon-adapter'
 import { formatMoneyDisplay, unwrapList } from '@/lib/api/investment-ops-helpers'
-import { R as C, ReconAccent } from '@/lib/investments-v2/recon-tokens'
+import { R as C } from '@/lib/investments-v2/recon-tokens'
 import { cn } from '@/lib/utils'
 
 type StatementView = 'client' | 'investor'
 type StatementRow = ReturnType<typeof mapStatements>['items'][number]
 
-const investorFilters = [
-  { label: 'Fund', value: 'All funds' },
-  { label: 'Investor / Client', value: 'All investors' },
-  { label: 'Class', value: 'All classes' },
-  { label: 'Period', value: 'All periods' },
-  { label: 'Delivery Channel', value: 'Email' },
-  { label: 'Status', value: 'All' },
-]
-
-const clientFilters = [
-  { label: 'Client', key: 'client' as const, value: 'All clients' },
-  { label: 'Account', key: 'account' as const, value: 'All accounts' },
-  { label: 'Currency', key: 'currency' as const, value: 'All' },
-  { label: 'Status', key: 'status' as const, value: 'All' },
-]
-
 function defaultPeriodRange() {
-  const now = new Date()
-  const from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
-  const to = now
-  const iso = (d: Date) => d.toISOString().slice(0, 10)
-  return { periodFrom: iso(from), periodTo: iso(to) }
+  const to = new Date().toISOString().slice(0, 10)
+  // Cover posted demo cash (opening 15 Jun 2025 through current books).
+  return { periodFrom: '2025-06-01', periodTo: to }
+}
+
+function statementTypeForView() {
+  return 'CLIENT_CASH'
 }
 
 export default function StatementsPage() {
@@ -73,19 +55,15 @@ export default function StatementsPage() {
   const { isRefetching, withRefetch } = useRefetchLoading()
   const [error, setError] = useState<string | null>(null)
   const [actionMsg, setActionMsg] = useState<string | null>(null)
-  const [busyAction, setBusyAction] = useState<
-    'generate' | 'preview' | 'approve' | 'email' | 'download' | null
-  >(null)
+  const [busyAction, setBusyAction] = useState<'generate' | 'download' | null>(null)
   const busy = busyAction !== null
   const [rows, setRows] = useState<StatementRow[]>([])
   const [total, setTotal] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
   const [summary, setSummary] = useState(mapStatementsSummary(null))
-  const [previewHtml, setPreviewHtml] = useState<string | null>(null)
   const [detail, setDetail] = useState<StatementRow | null>(null)
   const [cashAccounts, setCashAccounts] = useState<{ id: string; label: string; clientOrVehicleId?: string }[]>([])
   const [accountFilter, setAccountFilter] = useState('All accounts')
-  const [statusFilter, setStatusFilter] = useState('All')
   const [currencyFilter, setCurrencyFilter] = useState('All')
   const pageSize = 8
   const isInvestor = statementView === 'investor'
@@ -122,11 +100,8 @@ export default function StatementsPage() {
           page: p,
           pageSize,
         }
-        // Investor segment uses INVESTOR_CAPITAL statementType when supported.
-        if (isInvestor) params.statementType = 'INVESTOR_CAPITAL'
-        else params.statementType = 'PERIODIC'
+        params.statementType = statementTypeForView()
         if (selectedAccountId) params.cashAccountId = selectedAccountId
-        if (statusFilter !== 'All') params.status = statusFilter.toUpperCase().replace(/\s+/g, '_')
         if (currencyFilter !== 'All') params.currency = currencyFilter
 
         const [listRes, sumRes] = await Promise.all([
@@ -138,10 +113,11 @@ export default function StatementsPage() {
         setRows(
           mapped.items.map((row) => ({
             ...row,
-            account:
-              row.account !== '—'
-                ? row.account
-                : resolveCashAccountLabel(row.cashAccountId, cashAccounts),
+            account: resolveCashAccountLabel(
+              row.cashAccountId,
+              cashAccounts,
+              isMaskedAccountLabel(row.account) ? '—' : row.account,
+            ),
           })),
         )
         setTotal(mapped.total)
@@ -170,53 +146,34 @@ export default function StatementsPage() {
         setLoading(false)
       }
     },
-    [cashAccounts, currencyFilter, isInvestor, page, selectedAccountId, statusFilter],
+    [cashAccounts, currencyFilter, page, selectedAccountId],
   )
 
-  const loadPreview = useCallback(async (id: string) => {
-    setBusyAction('preview')
-    setActionMsg(null)
-    try {
-      const previewRes = await stockPickerCashApi.previewClientStatement(id)
-      const data = requireOpsData(previewRes, 'statement preview') as Record<string, unknown>
-      const html =
-        (typeof data.previewHtml === 'string' && data.previewHtml) ||
-        (typeof data.html === 'string' && data.html) ||
-        null
-      if (html) {
-        setPreviewHtml(html)
-        setActionMsg('Preview loaded.')
-      } else {
-        setPreviewHtml(null)
-        setActionMsg('No preview HTML returned — showing summary panel.')
-      }
-    } catch (e) {
-      setPreviewHtml(null)
-      setActionMsg(opsErrorMessage(e, 'Preview failed'))
-    } finally {
-      setBusyAction(null)
-    }
-  }, [])
-
   useEffect(() => {
+    if (isInvestor) {
+      setLoading(false)
+      setRows([])
+      setTotal(0)
+      setTotalPages(1)
+      setSelectedId('')
+      setDetail(null)
+      setSummary(mapStatementsSummary(null))
+      return
+    }
     void withRefetch(() => loadList(page))
-  }, [loadList, page, withRefetch])
+  }, [isInvestor, loadList, page, withRefetch])
 
   const selected = rows.find((r) => r.id === selectedId) ?? rows[0] ?? null
 
   useEffect(() => {
     if (!selected?.id) {
       setDetail(null)
-      setPreviewHtml(null)
       return
     }
     let cancelled = false
     ;(async () => {
       try {
-        const [stmtRes, previewRes] = await Promise.all([
-          stockPickerCashApi.getClientStatement(selected.id),
-          stockPickerCashApi.previewClientStatement(selected.id).catch(() => null),
-        ])
+        const stmtRes = await stockPickerCashApi.getClientStatement(selected.id)
         if (cancelled) return
         if (stmtRes?.success && stmtRes.data) {
           const mapped = mapStatements({ items: [stmtRes.data], total: 1, page: 1, pageSize: 1, totalPages: 1 })
@@ -224,16 +181,8 @@ export default function StatementsPage() {
         } else {
           setDetail(selected)
         }
-        const previewData =
-          previewRes && typeof previewRes === 'object' && 'data' in previewRes
-            ? (previewRes as { data?: { previewHtml?: string } }).data
-            : null
-        setPreviewHtml(previewData?.previewHtml ?? null)
       } catch {
-        if (!cancelled) {
-          setDetail(selected)
-          setPreviewHtml(null)
-        }
+        if (!cancelled) setDetail(selected)
       }
     })()
     return () => {
@@ -242,8 +191,6 @@ export default function StatementsPage() {
   }, [selected])
 
   const preview = detail ?? selected
-  const readyPct =
-    summary.total > 0 ? Math.round((summary.ready / summary.total) * 100) : summary.ready > 0 ? 100 : 0
   const from = rows.length === 0 ? 0 : (page - 1) * pageSize + 1
   const to = Math.min(page * pageSize, total || rows.length)
 
@@ -257,22 +204,35 @@ export default function StatementsPage() {
 
       const accountsRes = await stockPickerCashApi.listClientCashAccounts({ page: 1, pageSize: 100 })
       const accountsData = requireOpsData(accountsRes, 'client cash accounts')
-      const accounts = unwrapList<{ id?: string; baseCurrency?: string; clientOrVehicleId?: string }>(accountsData)
+      const accounts = unwrapList<{
+        id?: string
+        baseCurrency?: string
+        currency?: string
+        clientOrVehicleId?: string
+      }>(accountsData)
 
       let cashAccountIds: string[] = []
       if (selected?.cashAccountId) {
         cashAccountIds = [selected.cashAccountId]
+      } else if (selectedAccountId) {
+        cashAccountIds = [selectedAccountId]
       } else {
-        cashAccountIds = accounts.map((a) => a.id).filter((id): id is string => Boolean(id))
+        cashAccountIds = accounts
+          .filter((a) => a.id && a.clientOrVehicleId)
+          .filter((a) => String(a.baseCurrency ?? a.currency ?? 'USD').toUpperCase() === 'USD')
+          .map((a) => String(a.id))
+        if (!cashAccountIds.length) {
+          cashAccountIds = accounts.filter((a) => a.id && a.clientOrVehicleId).map((a) => String(a.id))
+        }
       }
 
       if (!cashAccountIds.length) {
-        setActionMsg('Generate requires at least one cashAccountId — none available from selection or account list.')
+        setActionMsg('Generate needs a cash account linked to a client or fund. Pick an account, then try again.')
         return
       }
 
       const firstAccount = accounts.find((a) => a.id === cashAccountIds[0]) ?? accounts[0]
-      currency = String(firstAccount?.baseCurrency ?? currency)
+      currency = String(firstAccount?.baseCurrency ?? firstAccount?.currency ?? currency)
       clientOrVehicleId = clientOrVehicleId || String(firstAccount?.clientOrVehicleId ?? '')
 
       const payload: Record<string, unknown> = {
@@ -280,7 +240,7 @@ export default function StatementsPage() {
         currency,
         periodFrom: selected?.periodFrom?.slice(0, 10) || range.periodFrom,
         periodTo: selected?.periodTo?.slice(0, 10) || range.periodTo,
-        statementType: isInvestor ? 'INVESTOR_CAPITAL' : 'PERIODIC',
+        statementType: statementTypeForView(),
       }
 
       if (cashAccountIds.length > 1) {
@@ -294,36 +254,6 @@ export default function StatementsPage() {
       await loadList(page)
     } catch (e) {
       setActionMsg(opsErrorMessage(e, 'Generate failed'))
-    } finally {
-      setBusyAction(null)
-    }
-  }
-
-  const approveSelected = async () => {
-    if (!selected) return
-    setBusyAction('approve')
-    setActionMsg(null)
-    try {
-      await stockPickerCashApi.approveClientStatement(selected.id, { expectedVersion: selected.version })
-      setActionMsg('Statement approved.')
-      await loadList(page)
-    } catch (e) {
-      setActionMsg(opsErrorMessage(e, 'Approve failed'))
-    } finally {
-      setBusyAction(null)
-    }
-  }
-
-  const emailSelected = async () => {
-    if (!selected) return
-    setBusyAction('email')
-    setActionMsg(null)
-    try {
-      await stockPickerCashApi.emailClientStatement(selected.id, {})
-      setActionMsg('Email delivery queued.')
-      await loadList(page)
-    } catch (e) {
-      setActionMsg(opsErrorMessage(e, 'Email failed'))
     } finally {
       setBusyAction(null)
     }
@@ -462,8 +392,8 @@ export default function StatementsPage() {
             </div>
             <p className="mt-1.5 text-[13px] leading-snug" style={{ color: C.muted }}>
               {isInvestor
-                ? 'Generate and manage investor statements across funds, investors, and account classes.'
-                : 'Generate and deliver client cash statements from the trading cash ledger.'}
+                ? 'LP capital-account statements (calls, distributions, NAV) — not the client cash book.'
+                : 'Outgoing client cash statements from posted books. This is not the bank CSV you imported.'}
             </p>
           </div>
         </header>
@@ -476,7 +406,11 @@ export default function StatementsPage() {
           </div>
         ) : null}
 
-        <section className="grid grid-cols-2 gap-3 lg:grid-cols-4 xl:items-end">
+        {isInvestor ? (
+          <InvestorStatementsPanel />
+        ) : (
+          <>
+        <section className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:items-end">
           <FilterField
             label="Account"
             value={accountFilter}
@@ -495,15 +429,6 @@ export default function StatementsPage() {
               setPage(1)
             }}
           />
-          <FilterField
-            label="Status"
-            value={statusFilter}
-            options={['All', 'Draft', 'Pending Approval', 'Approved', 'Delivered']}
-            onChange={(v) => {
-              setStatusFilter(v)
-              setPage(1)
-            }}
-          />
           <button
             type="button"
             className="h-9 justify-self-start text-[12px] font-medium"
@@ -511,7 +436,6 @@ export default function StatementsPage() {
             onClick={() => {
               setAccountFilter('All accounts')
               setCurrencyFilter('All')
-              setStatusFilter('All')
               setPage(1)
             }}
           >
@@ -519,129 +443,28 @@ export default function StatementsPage() {
           </button>
         </section>
 
-        {/* KPIs — live summary only; investor capital fields not on client-statements API */}
-        <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
-          {isInvestor ? (
-            <>
-              <Kpi
-                icon={<Wallet className="h-4 w-4 text-[#60A5FA]" />}
-                iconBg="rgba(59,130,246,0.15)"
-                label="Draft"
-                value={String(summary.draft)}
-                trend="From statements summary"
-              />
-              <Kpi
-                icon={<Network className="h-4 w-4 text-[#34D399]" />}
-                iconBg="rgba(16,185,129,0.15)"
-                label="Pending Approval"
-                value={String(summary.pendingApproval)}
-                trend="Status counts from summary"
-              />
-              <Kpi
-                icon={<CircleDollarSign className="h-4 w-4 text-[#FBBF24]" />}
-                iconBg="rgba(245,158,11,0.15)"
-                label="Approved"
-                value={String(summary.approved)}
-                trend="—"
-              />
-              <Kpi
-                icon={<FileText className="h-4 w-4 text-[#C084FC]" />}
-                iconBg="rgba(168,85,247,0.15)"
-                label="Delivered"
-                value={String(summary.delivered)}
-                trend="—"
-              />
-              <article className="rounded-[12px] border p-4" style={{ background: C.card, borderColor: C.cardBorder }}>
-                <div className="flex items-start gap-3">
-                  <span
-                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
-                    style={{ background: 'rgba(16,185,129,0.15)' }}
-                  >
-                    <CheckCircle2 className="h-4 w-4 text-[#34D399]" />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[12px]" style={{ color: C.muted }}>
-                      Statements Ready
-                    </p>
-                    <p className="mt-1 font-mono text-[18px] font-semibold leading-none" style={{ color: C.text }}>
-                      {summary.ready}{' '}
-                      <span className="text-[12px] font-normal" style={{ color: C.muted2 }}>
-                        of {summary.total || total || '—'}
-                      </span>
-                    </p>
-                    <div className="mt-3 flex items-center gap-2">
-                      <div className="h-1.5 flex-1 overflow-hidden rounded-full" style={{ background: C.control }}>
-                        <div className="h-full rounded-full" style={{ width: `${readyPct}%`, background: C.green }} />
-                      </div>
-                      <span className="text-[11px] font-medium" style={{ color: C.greenSoft }}>
-                        {readyPct}%
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </article>
-            </>
-          ) : (
-            <>
-              <Kpi
-                icon={<Wallet className="h-4 w-4 text-[#60A5FA]" />}
-                iconBg="rgba(59,130,246,0.15)"
-                label="Client Cash Covered"
-                value={summary.clientCashCovered ? `USD ${summary.clientCashCovered}` : '—'}
-                trend="When summary provides totalCash"
-              />
-              <Kpi
-                icon={<Network className="h-4 w-4 text-[#34D399]" />}
-                iconBg="rgba(16,185,129,0.15)"
-                label="Accounts in Scope"
-                value={summary.accountsInScope != null ? String(summary.accountsInScope) : String(total || '—')}
-                trend="Statement runs"
-              />
-              <Kpi
-                icon={<CircleDollarSign className="h-4 w-4 text-[#FBBF24]" />}
-                iconBg="rgba(245,158,11,0.15)"
-                label="Period Movements"
-                value={summary.periodMovements ? `USD ${summary.periodMovements}` : '—'}
-                trend={summary.periodMovements ? 'From statements summary' : 'When summary provides movementTotal'}
-              />
-              <Kpi
-                icon={<FileText className="h-4 w-4 text-[#C084FC]" />}
-                iconBg="rgba(168,85,247,0.15)"
-                label="Pending Delivery"
-                value={String(summary.pendingDelivery)}
-                trend="Draft + pending approval"
-              />
-              <article className="rounded-[12px] border p-4" style={{ background: C.card, borderColor: C.cardBorder }}>
-                <div className="flex items-start gap-3">
-                  <span
-                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
-                    style={{ background: 'rgba(16,185,129,0.15)' }}
-                  >
-                    <CheckCircle2 className="h-4 w-4 text-[#34D399]" />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[12px]" style={{ color: C.muted }}>
-                      Statements Ready
-                    </p>
-                    <p className="mt-1 font-mono text-[18px] font-semibold leading-none" style={{ color: C.text }}>
-                      {summary.ready}{' '}
-                      <span className="text-[12px] font-normal" style={{ color: C.muted2 }}>
-                        of {summary.total || total || '—'}
-                      </span>
-                    </p>
-                    <div className="mt-3 flex items-center gap-2">
-                      <div className="h-1.5 flex-1 overflow-hidden rounded-full" style={{ background: C.control }}>
-                        <div className="h-full rounded-full" style={{ width: `${readyPct}%`, background: C.green }} />
-                      </div>
-                      <span className="text-[11px] font-medium" style={{ color: C.greenSoft }}>
-                        {readyPct}%
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </article>
-            </>
-          )}
+        <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <Kpi
+            icon={<Wallet className="h-4 w-4 text-[#60A5FA]" />}
+            iconBg="rgba(59,130,246,0.15)"
+            label="Client Cash Covered"
+            value={summary.clientCashCovered ? `USD ${summary.clientCashCovered}` : '—'}
+            trend={summary.clientCashCovered ? 'Closing cash on issued statements' : 'Generate a batch to fill this'}
+          />
+          <Kpi
+            icon={<Network className="h-4 w-4 text-[#34D399]" />}
+            iconBg="rgba(16,185,129,0.15)"
+            label="Accounts in Scope"
+            value={summary.accountsInScope != null ? String(summary.accountsInScope) : String(total || 0)}
+            trend={total === 1 ? '1 statement run' : `${total} statement runs`}
+          />
+          <Kpi
+            icon={<CircleDollarSign className="h-4 w-4 text-[#FBBF24]" />}
+            iconBg="rgba(245,158,11,0.15)"
+            label="Period Movements"
+            value={summary.periodMovements ? `USD ${summary.periodMovements}` : '—'}
+            trend={summary.periodMovements ? 'Net opening to closing' : 'Generate a batch to fill this'}
+          />
         </section>
 
         {/* Body */}
@@ -656,9 +479,9 @@ export default function StatementsPage() {
               </h2>
               <span
                 className="rounded-full px-2.5 py-0.5 text-[11px] font-medium"
-                style={{ background: C.muted, color: C.muted, border: `1px solid ${C.cardBorder}` }}
+                style={{ background: C.control, color: C.text, border: `1px solid ${C.controlBorder}` }}
               >
-                {total} Runs
+                {total} {total === 1 ? 'run' : 'runs'}
               </span>
             </div>
 
@@ -667,9 +490,8 @@ export default function StatementsPage() {
               <table className="w-full min-w-[640px] text-left">
                 <thead>
                   <tr style={{ borderBottom: `1px solid ${C.rowBorder}` }}>
-                    {(isInvestor
-                      ? ['Period', 'As At Date', 'Account', 'Status', 'Investors', 'Generated By', 'Generated On']
-                      : ['Period', 'As At Date', 'Account', 'Status', 'Clients', 'Generated By', 'Generated On']
+                    {(
+                      ['Period', 'As At Date', 'Account', 'Generated By', 'Generated On']
                     ).map((h) => (
                       <th key={h} className="px-3 py-3 text-[11px] font-medium" style={{ color: C.muted2 }}>
                         {h}
@@ -680,19 +502,17 @@ export default function StatementsPage() {
                 <tbody>
                   {loading && rows.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="p-0">
+                        <td colSpan={5} className="p-0">
                         <ReconTableSkeleton rows={6} cols={6} />
                       </td>
                     </tr>
                   ) : null}
                   {!loading && rows.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="px-3 py-10 text-center text-[12px]" style={{ color: C.muted2 }}>
-                        {error
-                          ? 'Unable to load statements.'
-                          : isInvestor
-                            ? 'No investor statements returned. Confirm statementType=INVESTOR_CAPITAL on /client-statements.'
-                            : 'No client statements for this segment.'}
+                        <td colSpan={5} className="px-3 py-10 text-center text-[12px]" style={{ color: C.muted2 }}>
+                          {error
+                            ? 'Unable to load statements.'
+                            : 'No statements yet. Click Generate Batch to issue one from posted books.'}
                       </td>
                     </tr>
                   ) : null}
@@ -715,12 +535,6 @@ export default function StatementsPage() {
                       </td>
                       <td className="px-3 py-3 text-[12px]" style={{ color: C.muted }}>
                         {row.account}
-                      </td>
-                      <td className="px-3 py-3">
-                        <RunStatus status={row.status} />
-                      </td>
-                      <td className="px-3 py-3 font-mono text-[12px]" style={{ color: C.muted }}>
-                        {isInvestor ? row.investors : row.clients}
                       </td>
                       <td className="px-3 py-3 text-[12px]" style={{ color: C.muted }}>
                         {row.generatedBy}
@@ -792,27 +606,6 @@ export default function StatementsPage() {
                 {busyAction === 'generate' ? 'Generating…' : 'Generate Batch'}
               </button>
               <OutlineBtn
-                icon={<Eye className="h-3.5 w-3.5" />}
-                label="Preview"
-                loading={busyAction === 'preview'}
-                disabled={!selected || (busyAction !== null && busyAction !== 'preview')}
-                onClick={() => selected && void loadPreview(selected.id)}
-              />
-              <OutlineBtn
-                icon={<Check className="h-3.5 w-3.5" />}
-                label="Approve"
-                loading={busyAction === 'approve'}
-                disabled={!selected || (busyAction !== null && busyAction !== 'approve')}
-                onClick={() => void approveSelected()}
-              />
-              <OutlineBtn
-                icon={<Mail className="h-3.5 w-3.5" />}
-                label="Email"
-                loading={busyAction === 'email'}
-                disabled={!selected || (busyAction !== null && busyAction !== 'email')}
-                onClick={() => void emailSelected()}
-              />
-              <OutlineBtn
                 icon={<Download className="h-3.5 w-3.5" />}
                 label="Download PDF"
                 loading={busyAction === 'download'}
@@ -832,7 +625,7 @@ export default function StatementsPage() {
                       <OpsListSkeleton rows={5} />
                     </div>
                   ) : (
-                    <p className="text-[13px]">Select a statement run to preview.</p>
+                    <p className="text-[13px]">Select a statement run to see opening cash, movements, and closing cash.</p>
                   )}
                 </div>
               ) : (
@@ -850,13 +643,13 @@ export default function StatementsPage() {
                           ZAMBEZI ASSET MANAGEMENT
                         </p>
                         <p className="mt-0.5 text-[10px]" style={{ color: C.muted2 }}>
-                          {isInvestor ? 'Private Markets' : 'Stock Picker · Client Cash'}
+                          Client cash
                         </p>
                       </div>
                     </div>
                     <div className="text-right">
                       <p className="text-[14px] font-semibold" style={{ color: C.text }}>
-                        {isInvestor ? 'Investor Statement' : 'Client Cash Statement'}
+                        Client Cash Statement
                       </p>
                       <p className="mt-1 text-[11px]" style={{ color: C.muted }}>
                         {preview.period}
@@ -867,26 +660,7 @@ export default function StatementsPage() {
                     </div>
                   </div>
 
-                  {previewHtml ? (
-                    <div
-                      className="mt-4 max-h-[420px] flex-1 overflow-auto rounded-[8px] border p-3 text-[12px]"
-                      style={{ borderColor: C.rowBorder, color: C.text }}
-                      dangerouslySetInnerHTML={{ __html: previewHtml }}
-                    />
-                  ) : isInvestor ? (
-                    <div className="mt-4 flex-1 space-y-3 text-[12px]" style={{ color: C.muted2 }}>
-                      <p>
-                        Investor capital-account lines are not returned by `/client-statements`. Showing cash envelope when
-                        present.
-                      </p>
-                      <p className="font-mono" style={{ color: C.text }}>
-                        Opening {formatMoneyDisplay(preview.openingCashRaw ?? preview.openingCash)} · Closing{' '}
-                        {formatMoneyDisplay(preview.closingCashRaw ?? preview.closingCash)} {preview.currency}
-                      </p>
-                      <p>Account: {resolveCashAccountLabel(preview.cashAccountId, cashAccounts)} · Type: {preview.statementType}</p>
-                    </div>
-                  ) : (
-                    <>
+                  <>
                       <div className="grid gap-4 border-b py-4 md:grid-cols-3" style={{ borderColor: C.rowBorder }}>
                         <div>
                           <p className="text-[10px] uppercase tracking-wider" style={{ color: C.muted2 }}>
@@ -903,9 +677,8 @@ export default function StatementsPage() {
                         </div>
                         <div className="space-y-1.5 text-[11px]">
                           {[
-                            ['Statement Type', preview.statementType],
+                            ['Statement Type', preview.statementType === 'CLIENT_CASH' ? 'Client cash' : preview.statementType],
                             ['Currency', preview.currency],
-                            ['Status', preview.status],
                             ['Version', String(preview.version ?? '—')],
                           ].map(([k, v]) => (
                             <div key={k} className="flex justify-between gap-3">
@@ -945,11 +718,11 @@ export default function StatementsPage() {
                             </tr>
                           </thead>
                           <tbody>
-                            {cashLines.map((line) => {
+                            {cashLines.map((line, i) => {
                               const closing = line.label === 'Closing Cash'
                               return (
                                 <tr
-                                  key={line.label}
+                                  key={`${line.label}-${i}`}
                                   style={{ borderBottom: closing ? undefined : `1px solid ${C.rowBorder}` }}
                                 >
                                   <td
@@ -974,7 +747,6 @@ export default function StatementsPage() {
                         </table>
                       </div>
                     </>
-                  )}
 
                   <p className="mt-4 flex items-start gap-1.5 text-[10px]" style={{ color: C.muted2 }}>
                     <Info className="mt-0.5 h-3 w-3 shrink-0" />
@@ -985,8 +757,41 @@ export default function StatementsPage() {
             </div>
           </article>
         </section>
+          </>
+        )}
       </div>
     </main>
+  )
+}
+
+function InvestorStatementsPanel() {
+  return (
+    <section className="rounded-[12px] border p-6" style={{ background: C.card, borderColor: C.cardBorder }}>
+      <h2 className="text-[16px] font-semibold" style={{ color: C.text }}>
+        Investor capital statements
+      </h2>
+      <p className="mt-2 max-w-2xl text-[13px] leading-relaxed" style={{ color: C.muted }}>
+        Client statements are the cash book you just reconciled — opening, movements, closing. Investor statements are
+        LP capital-account artefacts (calls, distributions, NAV). They are not generated from posted trading cash, so
+        this view does not repeat the client cash PDF.
+      </p>
+      <div className="mt-5 flex flex-wrap gap-2">
+        <Link
+          href="/lp-portal/ledger"
+          className="inline-flex h-10 items-center rounded-full px-5 text-[12px] font-medium text-white"
+          style={{ background: C.blue }}
+        >
+          Open LP ledger
+        </Link>
+        <Link
+          href="/portfolio/funds/capital-calls"
+          className="inline-flex h-10 items-center rounded-full border px-5 text-[12px] font-medium"
+          style={{ background: C.control, borderColor: C.controlBorder, color: C.text }}
+        >
+          Open capital calls
+        </Link>
+      </div>
+    </section>
   )
 }
 
@@ -1080,30 +885,6 @@ function OutlineBtn({
       {label}
       {chevron && <ChevronDown className="h-3 w-3" style={{ color: C.muted2 }} />}
     </button>
-  )
-}
-
-type StatementRunStatus = 'Draft' | 'Pending Approval' | 'Approved' | 'Delivered' | 'Ready for Release' | 'Released'
-
-function RunStatus({ status }: { status: StatementRunStatus }) {
-  const styles: Record<StatementRunStatus, { bg: string; color: string; label: string }> = {
-    Draft: { bg: 'rgba(148,163,184,0.15)', color: '#94A3B8', label: 'Draft' },
-    'Pending Approval': { bg: 'rgba(245,158,11,0.15)', color: '#FBBF24', label: 'Pending Approval' },
-    Approved: { bg: 'rgba(59,130,246,0.15)', color: '#60A5FA', label: 'Approved' },
-    Delivered: { bg: 'rgba(16,185,129,0.15)', color: ReconAccent.greenSoft, label: 'Delivered' },
-    'Ready for Release': { bg: 'rgba(16,185,129,0.15)', color: ReconAccent.greenSoft, label: 'Ready for Release' },
-    Released: { bg: 'rgba(16,185,129,0.15)', color: ReconAccent.greenSoft, label: 'Released' },
-  }
-  const tone = styles[status] ?? styles['Ready for Release']
-  const showCheck = status === 'Released' || status === 'Delivered' || status === 'Approved'
-  return (
-    <span
-      className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-medium"
-      style={{ background: tone.bg, color: tone.color }}
-    >
-      {showCheck ? <CheckCircle2 className="h-3.5 w-3.5" /> : null}
-      {tone.label}
-    </span>
   )
 }
 

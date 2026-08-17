@@ -323,6 +323,13 @@ class StockPickerCashApi {
     })
   }
 
+  /** One-shot: upload CSV, validate on the server, commit if valid. */
+  async ingestExternalStatementImport(data: Record<string, unknown>) {
+    return apiClient.post(`${BASE}/external-statements/imports/ingest`, data, {
+      headers: idempotencyHeaders(),
+    })
+  }
+
   async getExternalStatementImport(id: string) {
     return apiClient.get(`${BASE}/external-statements/imports/${id}`)
   }
@@ -383,6 +390,12 @@ class StockPickerCashApi {
 
   async getReconciliationBatch(id: string) {
     return apiClient.get<OpsEnvelope<ReconciliationBatch>>(`${BASE}/reconciliation-batches/${id}`)
+  }
+
+  async deleteReconciliationBatch(id: string) {
+    return apiClient.delete<OpsEnvelope<{ id: string; deleted?: boolean }>>(
+      `${BASE}/reconciliation-batches/${id}`,
+    )
   }
 
   async runReconciliationBatch(id: string) {

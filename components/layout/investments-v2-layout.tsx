@@ -25,31 +25,38 @@ export function InvestmentsV2Layout({ children }: InvestmentsV2LayoutProps) {
     }
   }, [pathname])
 
+  useEffect(() => {
+    const html = document.documentElement
+    const { overflow: prevHtml } = html.style
+    const { overflow: prevBody } = document.body.style
+    html.style.overflow = "hidden"
+    document.body.style.overflow = "hidden"
+    return () => {
+      html.style.overflow = prevHtml
+      document.body.style.overflow = prevBody
+    }
+  }, [])
+
   const handleModuleSelect = (module: string) => {
-    console.log('InvestmentsV2Layout handleModuleSelect called with:', module)
     setCurrentModule(module)
-    
-    const moduleConfig = MODULE_CONFIG.find(m => m.id === module)
+    const moduleConfig = MODULE_CONFIG.find((m) => m.id === module)
     if (moduleConfig) {
-      console.log('Navigating to:', moduleConfig.path)
       window.location.href = moduleConfig.path
     }
   }
 
   return (
     <InvestmentsThemeProvider>
-      <div className="min-h-screen bg-background">
+      <div className="flex h-dvh flex-col overflow-hidden bg-background">
         <SharedTopbar
           onModuleSelect={handleModuleSelect}
           currentModule={currentModule}
           moduleActions={<ThemeToggle />}
         />
 
-        <div className="flex" style={{ height: 'calc(100vh - 80px)' }}>
+        <div className="flex min-h-0 flex-1 overflow-hidden">
           <InvestmentsV2Sidebar />
-          <main className="flex-1 overflow-auto">
-            {children}
-          </main>
+          <main className="min-h-0 min-w-0 flex-1 overflow-y-auto bg-background">{children}</main>
         </div>
       </div>
     </InvestmentsThemeProvider>

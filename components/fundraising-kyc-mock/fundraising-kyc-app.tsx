@@ -52,8 +52,7 @@ export function FundraisingKycApp() {
   return (
     <div
       ref={rootRef}
-      className="fundraising-kyc-root"
-      style={{ minHeight: "calc(100vh - 5rem)", position: "relative" }}
+      className="fundraising-kyc-root h-full min-h-0"
     />
   )
 }

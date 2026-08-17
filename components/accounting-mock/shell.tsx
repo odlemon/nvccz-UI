@@ -58,7 +58,7 @@ export function AccountingMockSidebar({
   return (
     <aside
       className={cn(
-        "shrink-0 flex flex-col min-h-[calc(100vh-5rem)] sticky top-20 transition-all text-white",
+        "shrink-0 flex flex-col h-full min-h-0 overflow-hidden transition-all text-white",
         collapsed ? "w-[72px]" : "w-[220px]"
       )}
       style={{ backgroundColor: ac.navy }}
@@ -175,7 +175,7 @@ export function AccountingMockTopChrome() {
   const [currency, setCurrency] = useState(acCurrency)
 
   return (
-    <div className="sticky top-20 z-20 border-b bg-white" style={{ borderColor: ac.border }}>
+    <div className="shrink-0 border-b bg-white" style={{ borderColor: ac.border }}>
       <div className="flex items-center gap-2 px-4 h-11 overflow-x-auto">
         <AcContextSelect
           label="Entity"
@@ -218,11 +218,11 @@ export function AccountingMockTopChrome() {
 export function AccountingMockShell({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState(false)
   return (
-    <div className="flex min-h-[calc(100vh-5rem)]" style={{ backgroundColor: ac.canvas }}>
+    <div className="flex flex-1 min-h-0 overflow-hidden" style={{ backgroundColor: ac.canvas }}>
       <AccountingMockSidebar collapsed={collapsed} onToggle={() => setCollapsed((v) => !v)} />
-      <div className="flex-1 min-w-0 flex flex-col">
+      <div className="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden">
         <AccountingMockTopChrome />
-        <div className="flex-1 min-w-0 overflow-auto">{children}</div>
+        <div className="flex-1 min-w-0 overflow-y-auto">{children}</div>
       </div>
     </div>
   )

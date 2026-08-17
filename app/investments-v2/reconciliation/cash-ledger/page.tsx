@@ -1,10 +1,8 @@
 'use client'
 
 import { type ReactNode, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
-import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import {
-  ArrowUpRight,
   Banknote,
   Calendar,
   ChevronDown,
@@ -12,7 +10,6 @@ import {
   ChevronRight,
   Clock3,
   Download,
-  Filter,
   Info,
   MoreVertical,
   Percent,
@@ -44,41 +41,12 @@ import {
   requireOpsData,
   resolveCashAccountLabel,
   resolvePortfolioName,
+  isMaskedAccountLabel,
 } from '@/lib/investments-v2/adapters/cash-recon-adapter'
 import { R as C, ReconAccent } from '@/lib/investments-v2/recon-tokens'
-import { cn } from '@/lib/utils'
 
-const tabs = ['Ledger', 'Capital Calls', 'Distributions', 'Fees', 'Documents'] as const
 type LedgerView = 'trading' | 'fund'
 type LedgerRow = ReturnType<typeof mapCashLedgerRows>['items'][number]
-type FundActivityTab = Exclude<(typeof tabs)[number], 'Ledger'>
-
-const FUND_ACTIVITY_LINKS: Record<
-  FundActivityTab,
-  { href: string; title: string; description: string; note?: string }
-> = {
-  'Capital Calls': {
-    href: '/portfolio/funds/capital-calls',
-    title: 'Fund capital calls',
-    description: 'Issue notices, track paid vs outstanding, and manage LP call schedules in Fund Ops.',
-  },
-  Distributions: {
-    href: '/lp-portal/ledger',
-    title: 'LP distributions ledger',
-    description: 'Distribution notices and cash-out events are owned by the LP portal ledger, not the cash ledger API.',
-    note: 'Capital call activity (including some distribution offsets) may also appear under Fund Ops capital calls.',
-  },
-  Fees: {
-    href: '/lp-portal/ledger',
-    title: 'Management & admin fees',
-    description: 'Fee accruals and settlements are posted through the LP ledger module rather than fund cash ledger lines.',
-  },
-  Documents: {
-    href: '/investments-v2/documentation',
-    title: 'Investment documentation',
-    description: 'Fund notices, statements, and supporting files live in the Investments documentation register.',
-  },
-}
 
 export default function CashLedgerPage() {
   return (
@@ -102,7 +70,6 @@ function CashLedgerPageInner() {
   const deepFundId = searchParams.get('fundId')
 
   const [ledgerView, setLedgerView] = useState<LedgerView>('fund')
-  const [tab, setTab] = useState<(typeof tabs)[number]>('Ledger')
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const { isRefetching, withRefetch } = useRefetchLoading()
@@ -184,14 +151,16 @@ function CashLedgerPageInner() {
         mapped.items.map((row) => ({
           ...row,
           fund: resolvePortfolioName(row.fund, portfolios, row.fund),
-          cashAccount:
-            row.cashAccount !== '—'
-              ? row.cashAccount
-              : resolveCashAccountLabel(row.cashAccountId, cashAccounts),
-          account:
-            row.account !== '—'
-              ? row.account
-              : resolveCashAccountLabel(row.cashAccountId, cashAccounts),
+          cashAccount: resolveCashAccountLabel(
+            row.cashAccountId,
+            cashAccounts,
+            isMaskedAccountLabel(row.cashAccount) ? '—' : row.cashAccount,
+          ),
+          account: resolveCashAccountLabel(
+            row.cashAccountId,
+            cashAccounts,
+            isMaskedAccountLabel(row.account) ? '—' : row.account,
+          ),
         })),
       )
       setTotal(mapped.total)
@@ -264,7 +233,6 @@ function CashLedgerPageInner() {
                 onChange={(id) => {
                   setLedgerView(id)
                   setPage(1)
-                  setTab('Ledger')
                 }}
                 options={[
                   { id: 'trading', label: 'Trading' },
@@ -367,30 +335,6 @@ function CashLedgerPageInner() {
         </section>
 
         <section className="overflow-hidden rounded-[12px] border" style={{ background: C.card, borderColor: C.cardBorder }}>
-          <div className="flex flex-col gap-3 border-b px-4 pt-2 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: C.cardBorder }}>
-            <div className="flex gap-1 overflow-x-auto">
-              {(isFund ? tabs : (['Ledger'] as const)).map((item) => (
-                <button
-                  key={item}
-                  type="button"
-                  onClick={() => setTab(item)}
-                  className={cn(
-                    'shrink-0 border-b-2 px-3 py-3 text-[12px] font-medium transition',
-                    tab === item ? 'border-[#3B82F6] text-white' : 'border-transparent',
-                  )}
-                  style={{ color: tab === item ? C.text : C.muted2 }}
-                >
-                  {item}
-                </button>
-              ))}
-            </div>
-            <div className="flex gap-2 pb-2 sm:pb-0">
-              <GhostBtn icon={<Filter className="h-3.5 w-3.5" />}>Filters</GhostBtn>
-            </div>
-          </div>
-
-          {tab === 'Ledger' ? (
-            <>
               <div className="relative overflow-x-auto">
                 <RefetchOverlay active={isRefetching} rows={8} cols={13} />
                 <table className="w-full min-w-[1280px] text-left">
@@ -484,10 +428,6 @@ function CashLedgerPageInner() {
                   </PagerBtn>
                 </div>
               </div>
-            </>
-          ) : (
-            <FundActivityDeepLinks tab={tab} />
-          )}
         </section>
 
         {isFund ? (
@@ -533,38 +473,6 @@ function CashLedgerPageInner() {
         ) : null}
       </div>
     </main>
-  )
-}
-
-function FundActivityDeepLinks({ tab }: { tab: FundActivityTab }) {
-  const link = FUND_ACTIVITY_LINKS[tab]
-  return (
-    <div className="space-y-4 px-4 py-8">
-      <article
-        className="mx-auto max-w-xl rounded-[12px] border p-5"
-        style={{ background: C.control, borderColor: C.cardBorder }}
-      >
-        <h3 className="text-[14px] font-semibold" style={{ color: C.text }}>
-          {link.title}
-        </h3>
-        <p className="mt-2 text-[12px] leading-relaxed" style={{ color: C.muted }}>
-          {link.description}
-        </p>
-        {link.note ? (
-          <p className="mt-2 text-[11px] leading-relaxed" style={{ color: C.muted2 }}>
-            {link.note}
-          </p>
-        ) : null}
-        <Link
-          href={link.href}
-          className="mt-5 inline-flex h-10 items-center gap-2 rounded-full px-5 text-[12px] font-medium text-white transition hover:opacity-90"
-          style={{ background: C.blue }}
-        >
-          Open {tab}
-          <ArrowUpRight className="h-3.5 w-3.5" />
-        </Link>
-      </article>
-    </div>
   )
 }
 
@@ -646,15 +554,6 @@ function FilterSelect({
         </span>
       )}
     </label>
-  )
-}
-
-function GhostBtn({ children, icon }: { children: ReactNode; icon?: ReactNode }) {
-  return (
-    <button type="button" className="inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[11px]" style={{ background: C.control, borderColor: C.controlBorder, color: C.text }}>
-      {icon && <span style={{ color: C.muted }}>{icon}</span>}
-      {children}
-    </button>
   )
 }
 

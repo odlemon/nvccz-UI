@@ -46,8 +46,7 @@ API: `GET /api/investment-ops/trade-reconciliation/batches?status=DRAFT|COMPLETE
 1. Go to `/investments-v2/reconciliation/trade` (or click **Open trade recon** from the blotter).
 2. Select the **fund / portfolio** your trade belongs to.
 3. Set **As-of date** to today's date (the date the trade was executed).
-4. Leave broker and custodian template on their defaults (`BROKER_ZSE_CSV_V1` / `CUSTODIAN_CSD_CSV_V1`).
-5. Click **Create batch**.
+4. Click **Create batch**.
 
 **Expect:** Step advances to "Ingest broker".
 

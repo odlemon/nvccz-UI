@@ -1,0 +1,138 @@
+/* Performance V22 shell — same full-bleed pattern as payroll-v6 / portfolio-v11 / home-v3:
+   fixed left rail, topbar+workspace fill the remaining viewport. No centered page gutters. */
+
+.performance-v22-root {
+  --pm22-sidebar: 66px;
+  position: relative;
+  display: block;
+  width: 100% !important;
+  max-width: none !important;
+  height: 100% !important;
+  min-height: 0;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden;
+  background: var(--bg, #f4f6fa);
+}
+
+.performance-v22-root .app.expanded {
+  --pm22-sidebar: 248px;
+}
+
+.performance-v22-root #app.app,
+.performance-v22-root .app {
+  position: relative !important;
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  max-height: 100% !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  grid-template-columns: none !important;
+  grid-template-rows: none !important;
+}
+
+/* Left rail — fixed, flush to viewport (portfolio-v11 pattern) */
+.performance-v22-root .sidebar {
+  position: fixed !important;
+  top: 0 !important;
+  right: auto !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  inset: 0 auto 0 0 !important;
+  width: var(--pm22-sidebar) !important;
+  height: 100dvh !important;
+  max-height: 100dvh !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  transform: none !important;
+  overflow: hidden !important;
+  z-index: 40;
+}
+
+.performance-v22-root .topbar,
+.performance-v22-root .enterprise-contextbar-v7,
+.performance-v22-root .workspace {
+  position: relative !important;
+  left: auto !important;
+  right: auto !important;
+  margin: 0 0 0 var(--pm22-sidebar) !important;
+  width: calc(100% - var(--pm22-sidebar)) !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+}
+
+.performance-v22-root header.topbar,
+.performance-v22-root .topbar {
+  height: var(--topbar, 62px) !important;
+  padding-bottom: 0 !important;
+  border-bottom: 1px solid var(--line, #e3e7ef) !important;
+  z-index: 30;
+}
+
+.performance-v22-root .enterprise-contextbar-v7 {
+  height: var(--enterprise-row, 36px) !important;
+}
+
+.performance-v22-root .workspace {
+  height: calc(100dvh - var(--topbar, 62px)) !important;
+  max-height: none !important;
+  min-height: 0 !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+  padding: 18px 20px 108px !important;
+}
+
+.performance-v22-root .app:has(.enterprise-contextbar-v7) .workspace {
+  height: calc(100dvh - var(--topbar, 62px) - var(--enterprise-row, 36px)) !important;
+}
+
+/* Content fills workspace — never center under a max-width */
+.performance-v22-root .page,
+.performance-v22-root #workspace .page,
+.performance-v22-root .workspace > .page {
+  max-width: none !important;
+  width: 100% !important;
+  margin: 0 !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+.performance-v22-root .toast-stack {
+  z-index: 200;
+}
+
+@media (max-width: 780px) {
+  .performance-v22-root {
+    --pm22-sidebar: 0px;
+  }
+
+  .performance-v22-root .sidebar {
+    position: fixed !important;
+    inset: 0 auto 0 0 !important;
+    width: min(290px, 88vw) !important;
+    height: 100% !important;
+    transform: translateX(-102%) !important;
+  }
+
+  .performance-v22-root .app.mobile-nav .sidebar {
+    transform: none !important;
+  }
+
+  .performance-v22-root .topbar,
+  .performance-v22-root .enterprise-contextbar-v7,
+  .performance-v22-root .workspace {
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
+
+  .performance-v22-root .workspace {
+    height: auto !important;
+    overflow: visible !important;
+  }
+}

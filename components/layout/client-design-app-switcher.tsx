@@ -1,10 +1,12 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { CiGrid41 } from "react-icons/ci"
-import { ChevronDown } from "lucide-react"
-import { AppSwitcherDropdown } from "./app-switcher-dropdown"
-import { MODULE_CONFIG, getModuleById } from "@/lib/config/modules"
+import { ModuleSwitcherButton } from "./module-switcher-button"
+import {
+  ArcusAppSwitcherProvider,
+  useArcusAppSwitcher,
+} from "./arcus-app-switcher-provider"
+import "./arcus-header-overrides.css"
 
 declare global {
   interface Window {
@@ -20,9 +22,44 @@ const HEADER_SWITCHER_SELECTOR = [
   ".app-launcher-top",
 ].join(", ")
 
+function ClientDesignAppSwitcherInner({
+  showHeaderButton = true,
+  currentModule,
+}: {
+  currentModule: string
+  showHeaderButton?: boolean
+}) {
+  const appSwitcher = useArcusAppSwitcher()
+
+  useEffect(() => {
+    const onClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null
+      if (!target?.closest) return
+      const hit = target.closest(HEADER_SWITCHER_SELECTOR)
+      if (!hit) return
+      event.preventDefault()
+      event.stopPropagation()
+      appSwitcher?.openSwitcher() ?? window.__openArcusAppSwitcher?.()
+    }
+
+    document.addEventListener("click", onClick, true)
+    return () => document.removeEventListener("click", onClick, true)
+  }, [appSwitcher])
+
+  if (!showHeaderButton) return null
+
+  return (
+    <ModuleSwitcherButton
+      currentModule={currentModule}
+      onClick={() => appSwitcher?.openSwitcher() ?? window.__openArcusAppSwitcher?.()}
+      className="fixed top-3 right-3 z-[90] shadow-md backdrop-blur-md"
+    />
+  )
+}
+
 /**
- * App Switcher host for client-design modules (SharedTopbar removed).
- * Opens from in-header controls via click delegation / window.__openArcusAppSwitcher.
+ * Wires in-shell mock header buttons to the shared Arcus app switcher.
+ * Dropdown is rendered once by ArcusAppSwitcherProvider (same design as Investments).
  */
 export function ClientDesignAppSwitcher({
   currentModule,
@@ -32,59 +69,23 @@ export function ClientDesignAppSwitcher({
   /** When false, only wire existing header buttons (no floating fallback). */
   showHeaderButton?: boolean
 }) {
-  const [open, setOpen] = useState(false)
-  const moduleName = getModuleById(currentModule)?.name ?? "Modules"
+  const parent = useArcusAppSwitcher()
 
-  const handleModuleSelect = (module: string) => {
-    const moduleConfig = MODULE_CONFIG.find((m) => m.id === module)
-    if (moduleConfig) window.location.href = moduleConfig.path
+  if (parent) {
+    return (
+      <ClientDesignAppSwitcherInner
+        currentModule={currentModule}
+        showHeaderButton={showHeaderButton}
+      />
+    )
   }
 
-  useEffect(() => {
-    const openSwitcher = () => setOpen(true)
-    window.__openArcusAppSwitcher = openSwitcher
-
-    const onClick = (event: MouseEvent) => {
-      const target = event.target as HTMLElement | null
-      if (!target?.closest) return
-      const hit = target.closest(HEADER_SWITCHER_SELECTOR)
-      if (!hit) return
-      event.preventDefault()
-      event.stopPropagation()
-      openSwitcher()
-    }
-
-    document.addEventListener("click", onClick, true)
-    return () => {
-      document.removeEventListener("click", onClick, true)
-      if (window.__openArcusAppSwitcher === openSwitcher) {
-        delete window.__openArcusAppSwitcher
-      }
-    }
-  }, [])
-
   return (
-    <>
-      {showHeaderButton && (
-        <button
-          type="button"
-          data-arcus-modules
-          onClick={() => setOpen(true)}
-          className="fixed top-3 right-3 z-[90] inline-flex h-10 items-center gap-2 rounded-full border border-black/10 bg-white/95 px-3.5 text-sm font-medium text-[#0F172A] shadow-md backdrop-blur-md transition hover:bg-white"
-          aria-label="Open module switcher"
-          title="Switch module"
-        >
-          <CiGrid41 size={18} className="text-[#2563eb]" />
-          <span className="max-w-[140px] truncate hidden sm:inline">{moduleName}</span>
-          <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
-        </button>
-      )}
-      <AppSwitcherDropdown
-        isOpen={open}
-        onClose={() => setOpen(false)}
-        onModuleSelect={handleModuleSelect}
+    <ArcusAppSwitcherProvider currentModule={currentModule}>
+      <ClientDesignAppSwitcherInner
         currentModule={currentModule}
+        showHeaderButton={showHeaderButton}
       />
-    </>
+    </ArcusAppSwitcherProvider>
   )
 }

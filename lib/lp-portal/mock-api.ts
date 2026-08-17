@@ -115,6 +115,21 @@ function resolveFundKey(fundId?: string): string {
   return GROWTH
 }
 
+/** Mixed-portfolio consolidated dashboard: private-capital KPIs + open-ended side panel. */
+function attachOpenEndedForMixedPortfolio(dash: LpDashboardData): LpDashboardData {
+  if (dash.openEndedSummary) return dash
+  const store = getMockStore()
+  for (const fund of store.session.funds) {
+    if (fund.operatingModel !== "OPEN_ENDED") continue
+    const openEndedDash = store.dashboards[fund.fundId]
+    if (!openEndedDash?.openEndedSummary) continue
+    dash.openEndedSummary = structuredClone(openEndedDash.openEndedSummary)
+    dash.openEndedHistory = structuredClone(openEndedDash.openEndedHistory)
+    break
+  }
+  return dash
+}
+
 function formDataToRecord(body: FormData | Record<string, unknown>): Record<string, unknown> {
   if (!(body instanceof FormData)) return { ...body }
   const out: Record<string, unknown> = {}
@@ -137,8 +152,9 @@ export const mockLpPortalApi = {
   } = {}): Promise<LpPortalResponse<LpDashboardData>> {
     await delay()
     const key = resolveFundKey(params.fundId)
-    const dash = getMockStore().dashboards[key] ?? getMockStore().dashboards[GROWTH]
-    return ok(structuredClone(dash))
+    const dash = structuredClone(getMockStore().dashboards[key] ?? getMockStore().dashboards[GROWTH])
+    if (!params.fundId) attachOpenEndedForMixedPortfolio(dash)
+    return ok(dash)
   },
 
   async getDashboardActions(): Promise<LpPortalResponse<{ items: LpDashboardAction[] }>> {

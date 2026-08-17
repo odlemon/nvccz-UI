@@ -52,9 +52,8 @@ export function PortfolioV11App() {
   return (
     <div
       ref={rootRef}
-      className="portfolio-v11-root"
+      className="portfolio-v11-root h-full"
       data-theme="light"
-      style={{ minHeight: "calc(100vh - 5rem)", position: "relative" }}
     />
   )
 }

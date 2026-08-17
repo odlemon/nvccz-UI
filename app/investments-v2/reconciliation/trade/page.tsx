@@ -1,7 +1,6 @@
 'use client'
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
-import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { AlertTriangle, Check, Download, Loader2, Upload } from 'lucide-react'
 import { ReconApiBanner, ReconNavTabs, reconCard, reconInput, reconPill, reconPrimaryPill } from '@/components/investments-v2/recon-ui'
@@ -11,8 +10,8 @@ import {
   unwrapList,
   type TradeReconBatch,
   type TradeReconException,
+  type TradeReconLeg,
   type TradeReconMatch,
-  type TradeReconTemplate,
 } from '@/lib/api/investment-ops-api'
 import { R as C } from '@/lib/investments-v2/recon-tokens'
 import { cn } from '@/lib/utils'
@@ -21,7 +20,7 @@ import { toast } from 'sonner'
 const STEPS = [
   'Create batch',
   'Ingest broker',
-  'Ingest custodian',
+  'Ingest bank / custodian',
   'Run match',
   'Matches & complete',
 ] as const
@@ -32,8 +31,6 @@ type TradeReconSession = {
   step: number
   fundId: string
   asOfDate: string
-  brokerTemplate: string
-  custodianTemplate: string
   batchId: string | null
   brokerCsv: string
   custodianCsv: string
@@ -87,6 +84,279 @@ function clearSession() {
   }
 }
 
+function dash(v: unknown): string {
+  const s = v == null ? '' : String(v).trim()
+  return s || '—'
+}
+
+function isoDate(v: unknown): string | null {
+  if (v == null || v === '') return null
+  const s = String(v)
+  if (s.length >= 10) return s.slice(0, 10)
+  return s
+}
+
+type ReconLine = {
+  source?: string
+  instrumentSymbol?: string | null
+  side?: string | null
+  quantity?: string | number | null
+  price?: string | number | null
+  tradeDate?: string | null
+  externalRef?: string | null
+  currencyCode?: string | null
+  matchedTradeRef?: string | null
+  _matchedTradeId?: string | null
+  matchedTradeId?: string | null
+}
+
+function lineToLeg(line: ReconLine | undefined | null): TradeReconLeg | null {
+  if (!line) return null
+  return {
+    symbol: line.instrumentSymbol ?? null,
+    side: line.side ?? null,
+    qty: line.quantity != null ? String(line.quantity) : null,
+    price: line.price != null ? String(line.price) : null,
+    date: isoDate(line.tradeDate),
+    ref: line.externalRef ?? null,
+    currency: line.currencyCode ?? null,
+  }
+}
+
+function findMatchedLine(lines: ReconLine[], source: 'BROKER' | 'CUSTODIAN', match: TradeReconMatch): ReconLine | undefined {
+  const src = source
+  const tradeId = String(match.id ?? '').replace(/^match_/, '')
+  return (
+    lines.find(
+      (l) =>
+        String(l.source ?? '').toUpperCase() === src &&
+        match.tradeRef &&
+        String(l.matchedTradeRef ?? '') === String(match.tradeRef),
+    ) ||
+    lines.find(
+      (l) =>
+        String(l.source ?? '').toUpperCase() === src &&
+        tradeId &&
+        String(l._matchedTradeId ?? l.matchedTradeId ?? '') === tradeId,
+    )
+  )
+}
+
+function mergeLeg(primary?: TradeReconLeg | null, fallback?: TradeReconLeg | null): TradeReconLeg {
+  return {
+    symbol: primary?.symbol ?? fallback?.symbol ?? null,
+    side: primary?.side ?? fallback?.side ?? null,
+    qty: primary?.qty ?? fallback?.qty ?? null,
+    price: primary?.price ?? fallback?.price ?? null,
+    date: isoDate(primary?.date) ?? isoDate(fallback?.date),
+    ref: primary?.ref ?? fallback?.ref ?? null,
+    currency: primary?.currency ?? fallback?.currency ?? null,
+  }
+}
+
+function legsForMatch(match: TradeReconMatch, batch: TradeReconBatch | null): {
+  us: TradeReconLeg
+  broker: TradeReconLeg
+  custodian: TradeReconLeg
+} {
+  const lines = Array.isArray(batch?.lines) ? (batch!.lines as ReconLine[]) : []
+  const brokerLine = findMatchedLine(lines, 'BROKER', match)
+  const custodianLine = findMatchedLine(lines, 'CUSTODIAN', match)
+  const usFallback: TradeReconLeg = {
+    symbol: match.symbol ?? null,
+    side: match.side ?? null,
+    qty: match.internalQty ?? null,
+    price: match.price ?? null,
+    date: isoDate(batch?.asOfDate),
+    ref: match.tradeRef ?? null,
+    currency: null,
+  }
+  const brokerFallback: TradeReconLeg = {
+    ...lineToLeg(brokerLine),
+    qty: match.brokerQty ?? lineToLeg(brokerLine)?.qty ?? null,
+  }
+  const custodianFallback: TradeReconLeg = {
+    ...lineToLeg(custodianLine),
+    qty: match.custodianQty ?? lineToLeg(custodianLine)?.qty ?? null,
+  }
+  const broker = mergeLeg(match.broker, brokerFallback)
+  const custodian = mergeLeg(match.custodian, custodianFallback)
+  const us = mergeLeg(match.us, usFallback)
+  if (!us.currency) us.currency = broker.currency ?? custodian.currency ?? null
+  if (!us.date) us.date = broker.date ?? custodian.date ?? isoDate(batch?.asOfDate)
+  return { us, broker, custodian }
+}
+
+type LegKey = 'us' | 'broker' | 'custodian'
+
+const LEG_PANELS: { key: LegKey; title: string; source: string; panel: string; heading: string }[] = [
+  {
+    key: 'us',
+    title: 'Internal',
+    source: 'Blotter',
+    panel: 'border-sky-500/30 bg-sky-500/[0.06]',
+    heading: 'text-sky-300',
+  },
+  {
+    key: 'broker',
+    title: 'Broker',
+    source: 'Broker statement',
+    panel: 'border-violet-500/30 bg-violet-500/[0.06]',
+    heading: 'text-violet-300',
+  },
+  {
+    key: 'custodian',
+    title: 'Bank / Custodian',
+    source: 'Custodian statement',
+    panel: 'border-cyan-500/30 bg-cyan-500/[0.06]',
+    heading: 'text-cyan-300',
+  },
+]
+
+/** Ref is informational — each party has its own reference, so it never counts as a break. */
+const COMPARE_FIELDS: { key: keyof TradeReconLeg; label: string }[] = [
+  { key: 'symbol', label: 'Symbol' },
+  { key: 'side', label: 'Side' },
+  { key: 'qty', label: 'Quantity' },
+  { key: 'price', label: 'Price' },
+  { key: 'date', label: 'Trade date' },
+  { key: 'currency', label: 'Currency' },
+]
+
+function canonical(value: string): string {
+  const n = Number(value)
+  if (value.trim() !== '' && Number.isFinite(n)) return String(n)
+  return value.trim().toUpperCase()
+}
+
+type FieldComparison = {
+  values: Record<LegKey, string>
+  differs: Record<LegKey, boolean>
+  disagree: boolean
+}
+
+function compareField(legs: Record<LegKey, TradeReconLeg>, key: keyof TradeReconLeg): FieldComparison {
+  const values: Record<LegKey, string> = {
+    us: dash(legs.us[key]),
+    broker: dash(legs.broker[key]),
+    custodian: dash(legs.custodian[key]),
+  }
+  const present = LEG_PANELS.map((p) => p.key).filter((k) => values[k] !== '—')
+  const reference = values.us !== '—' ? values.us : present.length ? values[present[0]] : '—'
+  const differs: Record<LegKey, boolean> = { us: false, broker: false, custodian: false }
+  let disagree = false
+  for (const k of present) {
+    if (canonical(values[k]) !== canonical(reference)) {
+      differs[k] = true
+      disagree = true
+    }
+  }
+  return { values, differs, disagree }
+}
+
+function legIsEmpty(leg: TradeReconLeg): boolean {
+  return COMPARE_FIELDS.every((f) => dash(leg[f.key]) === '—') && dash(leg.ref) === '—'
+}
+
+function MatchComparison({ match, batch }: { match: TradeReconMatch; batch: TradeReconBatch | null }) {
+  const legs = legsForMatch(match, batch)
+  const comparisons = COMPARE_FIELDS.map((field) => ({ field, ...compareField(legs, field.key) }))
+  const breakCount = comparisons.filter((c) => c.disagree).length
+  const detailFields = comparisons.filter((c) => c.field.key !== 'qty' && c.field.key !== 'price')
+
+  return (
+    <article className="overflow-hidden rounded-2xl border border-border bg-background/40">
+      <header className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-4 py-2.5">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[13px] font-semibold">{dash(match.symbol)}</span>
+          <span className="font-mono text-[10px] text-muted-foreground">{dash(match.tradeRef)}</span>
+          <span className="inline-flex rounded-full bg-muted px-2 py-0.5 text-[9px] uppercase tracking-wider text-muted-foreground">
+            {String(match.how ?? 'AUTO')}
+          </span>
+        </div>
+        <span
+          className={cn(
+            'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-medium',
+            breakCount === 0 ? 'bg-emerald-500/15 text-emerald-400' : 'bg-amber-500/15 text-amber-400',
+          )}
+        >
+          {breakCount === 0 ? <Check className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
+          {breakCount === 0
+            ? 'All three agree'
+            : `${breakCount} field${breakCount === 1 ? '' : 's'} differ`}
+        </span>
+      </header>
+
+      <div className="grid gap-3 p-3 md:grid-cols-3">
+        {LEG_PANELS.map((panel) => {
+          const leg = legs[panel.key]
+          const empty = legIsEmpty(leg)
+          const qty = comparisons.find((c) => c.field.key === 'qty')
+          const price = comparisons.find((c) => c.field.key === 'price')
+          return (
+            <section key={panel.key} className={cn('rounded-2xl border p-3', panel.panel)}>
+              <div className="flex items-baseline justify-between gap-2">
+                <h4 className={cn('text-[12px] font-semibold', panel.heading)}>{panel.title}</h4>
+                <span className="text-[9px] uppercase tracking-wider text-muted-foreground">{panel.source}</span>
+              </div>
+
+              {empty ? (
+                <p className="py-6 text-center text-[11px] text-muted-foreground">No statement line</p>
+              ) : (
+                <>
+                  <div className="mt-2.5 flex items-baseline gap-1.5">
+                    <span
+                      className={cn(
+                        'font-mono text-[20px] font-semibold leading-none',
+                        qty?.differs[panel.key] && 'text-amber-400',
+                      )}
+                    >
+                      {qty?.values[panel.key] ?? '—'}
+                    </span>
+                    <span className="text-[11px] text-muted-foreground">@</span>
+                    <span
+                      className={cn(
+                        'font-mono text-[13px]',
+                        price?.differs[panel.key] && 'text-amber-400',
+                      )}
+                    >
+                      {price?.values[panel.key] ?? '—'}
+                    </span>
+                  </div>
+
+                  <dl className="mt-3 space-y-1.5">
+                    {detailFields.map((c) => (
+                      <div key={c.field.key} className="flex items-baseline justify-between gap-2">
+                        <dt className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                          {c.field.label}
+                        </dt>
+                        <dd
+                          className={cn(
+                            'font-mono text-[11px]',
+                            c.differs[panel.key] && 'text-amber-400',
+                          )}
+                        >
+                          {c.values[panel.key]}
+                        </dd>
+                      </div>
+                    ))}
+                    <div className="flex items-baseline justify-between gap-2 border-t border-border/50 pt-1.5">
+                      <dt className="text-[10px] uppercase tracking-wider text-muted-foreground">Ref</dt>
+                      <dd className="max-w-[60%] truncate font-mono text-[10px] text-muted-foreground" title={dash(leg.ref)}>
+                        {dash(leg.ref)}
+                      </dd>
+                    </div>
+                  </dl>
+                </>
+              )}
+            </section>
+          )
+        })}
+      </div>
+    </article>
+  )
+}
+
 export default function TradeReconPage() {
   return (
     <Suspense
@@ -112,14 +382,9 @@ function TradeReconPageInner() {
   const [step, setStep] = useState(() => Math.min(saved?.step ?? 0, STEPS.length - 1))
   const [error, setError] = useState<string | null>(null)
   const [funds, setFunds] = useState<{ id: string; name: string }[]>([])
-  const [templates, setTemplates] = useState<TradeReconTemplate[]>([])
   const [fundId, setFundId] = useState(saved?.fundId ?? '')
   const [asOfDate, setAsOfDate] = useState(
     () => saved?.asOfDate ?? new Date().toISOString().slice(0, 10),
-  )
-  const [brokerTemplate, setBrokerTemplate] = useState(saved?.brokerTemplate ?? 'BROKER_ZSE_CSV_V1')
-  const [custodianTemplate, setCustodianTemplate] = useState(
-    saved?.custodianTemplate ?? 'CUSTODIAN_CSD_CSV_V1',
   )
   const [batch, setBatch] = useState<TradeReconBatch | null>(null)
   const [brokerCsv, setBrokerCsv] = useState(saved?.brokerCsv ?? '')
@@ -175,10 +440,7 @@ function TradeReconPageInner() {
   }
 
   useEffect(() => {
-    void Promise.all([
-      investmentOpsApi.listPortfolios(),
-      investmentOpsApi.listTradeReconTemplates().catch(() => null),
-    ]).then(async ([fundsRes, tmplRes]) => {
+    void investmentOpsApi.listPortfolios().then(async (fundsRes) => {
       let rows: { id: string; name: string }[] = []
       if (fundsRes.success !== false) {
         rows = unwrapList<{ id?: string; name?: string }>(fundsRes.data)
@@ -187,18 +449,6 @@ function TradeReconPageInner() {
         setFunds(rows)
         if (deepFundId && rows.some((r) => r.id === deepFundId)) setFundId(deepFundId)
         else if (!fundId && rows[0]) setFundId(rows[0].id)
-      }
-      if (tmplRes && tmplRes.success !== false) {
-        const tmpls = unwrapList<TradeReconTemplate>(tmplRes.data)
-        setTemplates(tmpls)
-        if (!saved?.brokerTemplate) {
-          const broker = tmpls.find((t) => String(t.side ?? t.code).toUpperCase().includes('BROKER'))
-          if (broker?.code) setBrokerTemplate(String(broker.code))
-        }
-        if (!saved?.custodianTemplate) {
-          const cust = tmpls.find((t) => String(t.side ?? t.code).toUpperCase().includes('CUSTODIAN'))
-          if (cust?.code) setCustodianTemplate(String(cust.code))
-        }
       }
 
       if (saved?.batchId) {
@@ -228,8 +478,6 @@ function TradeReconPageInner() {
       step,
       fundId,
       asOfDate,
-      brokerTemplate,
-      custodianTemplate,
       batchId: batch?.id ?? null,
       brokerCsv,
       custodianCsv,
@@ -241,29 +489,12 @@ function TradeReconPageInner() {
     step,
     fundId,
     asOfDate,
-    brokerTemplate,
-    custodianTemplate,
     batch?.id,
     brokerCsv,
     custodianCsv,
     writeOffReason,
     tradeFilter,
   ])
-
-  const brokerTemplates = useMemo(
-    () =>
-      templates.filter((t) => String(t.side ?? t.code).toUpperCase().includes('BROKER')).length
-        ? templates.filter((t) => String(t.side ?? t.code).toUpperCase().includes('BROKER'))
-        : templates,
-    [templates],
-  )
-  const custodianTemplates = useMemo(
-    () =>
-      templates.filter((t) => String(t.side ?? t.code).toUpperCase().includes('CUSTODIAN')).length
-        ? templates.filter((t) => String(t.side ?? t.code).toUpperCase().includes('CUSTODIAN'))
-        : templates,
-    [templates],
-  )
 
   const allExceptions = useMemo(() => exceptionsFromBatch(batch), [batch])
   const openExceptions = useMemo(
@@ -381,8 +612,6 @@ function TradeReconPageInner() {
       const res = await investmentOpsApi.createTradeReconBatch({
         fundId,
         asOfDate,
-        brokerTemplateCode: brokerTemplate || undefined,
-        custodianTemplateCode: custodianTemplate || undefined,
       })
       if (res.success === false) throw new Error(formatOpsError(res, 'Create batch failed'))
       const created = res.data
@@ -400,7 +629,6 @@ function TradeReconPageInner() {
       const batchId = batch.id
       const res = await investmentOpsApi.ingestTradeReconBroker(batchId, {
         csvText: brokerCsv,
-        templateCode: brokerTemplate || undefined,
       })
       if (res.success === false) throw new Error(formatOpsError(res, 'Broker ingest failed'))
       if (res.data?.id) setBatch(res.data)
@@ -416,7 +644,6 @@ function TradeReconPageInner() {
       const batchId = batch.id
       const res = await investmentOpsApi.ingestTradeReconCustodian(batchId, {
         csvText: custodianCsv,
-        templateCode: custodianTemplate || undefined,
       })
       if (res.success === false) throw new Error(formatOpsError(res, 'Custodian ingest failed'))
       if (res.data?.id) setBatch(res.data)
@@ -562,9 +789,9 @@ function TradeReconPageInner() {
       <div className="mx-auto max-w-[1400px] space-y-5">
         <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 className="text-[22px] font-semibold tracking-[-0.01em]">Trade recon</h1>
+            <h1 className="text-[22px] font-semibold tracking-[-0.01em]">Trade match</h1>
             <p className="mt-1.5 text-[13px]" style={{ color: C.muted }}>
-              Three-way batch: internal blotter × broker statement × custodian statement. Upload files, match, clear exceptions.
+              Internal blotter × Broker statement × Bank/custodian statement. Upload both external sides, run match, clear exceptions.
             </p>
             {deepTradeId ? (
               <p className="mt-1 text-[11px]" style={{ color: C.blueLink }}>
@@ -578,9 +805,6 @@ function TradeReconPageInner() {
                 Start over
               </button>
             ) : null}
-            <Link href="/investments-v2/reconciliation/broker-custodian" className={cn(reconPill, 'h-9')}>
-              Legacy match queue
-            </Link>
           </div>
         </header>
 
@@ -708,7 +932,7 @@ function TradeReconPageInner() {
                 step === i ? 'bg-primary text-primary-foreground' : 'border border-border bg-muted text-muted-foreground',
               )}
             >
-              {i + 1}. {label}
+              {label}
             </button>
           ))}
         </nav>
@@ -742,7 +966,7 @@ function TradeReconPageInner() {
               <div className="rounded-2xl border border-border bg-muted/40 px-3 py-2.5">
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Clean matches</p>
                 <p className="mt-0.5 text-[18px] font-semibold text-emerald-400">{cleanMatchedCount}</p>
-                <p className="text-[10px] text-muted-foreground">Blotter = broker = custodian</p>
+                <p className="text-[10px] text-muted-foreground">Internal = Broker = Bank/custodian</p>
               </div>
               <div className="rounded-2xl border border-border bg-muted/40 px-3 py-2.5">
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Need attention</p>
@@ -767,7 +991,7 @@ function TradeReconPageInner() {
 
         {step === 0 && (
           <section className={`${reconCard} space-y-4 p-5`}>
-            <h2 className="text-[14px] font-semibold">1. Create batch</h2>
+            <h2 className="text-[14px] font-semibold">Create batch</h2>
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="space-y-1 text-[11px]">
                 <span style={{ color: C.muted }}>Fund</span>
@@ -784,35 +1008,6 @@ function TradeReconPageInner() {
                 <span style={{ color: C.muted }}>As of date</span>
                 <input className={reconInput} type="date" value={asOfDate} onChange={(e) => setAsOfDate(e.target.value)} />
               </label>
-              <label className="space-y-1 text-[11px]">
-                <span style={{ color: C.muted }}>Broker template</span>
-                <select className={reconInput} value={brokerTemplate} onChange={(e) => setBrokerTemplate(e.target.value)}>
-                  {(brokerTemplates.length ? brokerTemplates : [{ code: 'BROKER_ZSE_CSV_V1', name: 'BROKER_ZSE_CSV_V1' }]).map(
-                    (t) => (
-                      <option key={String(t.code)} value={String(t.code)}>
-                        {String(t.name ?? t.code)}
-                      </option>
-                    ),
-                  )}
-                </select>
-              </label>
-              <label className="space-y-1 text-[11px]">
-                <span style={{ color: C.muted }}>Custodian template</span>
-                <select
-                  className={reconInput}
-                  value={custodianTemplate}
-                  onChange={(e) => setCustodianTemplate(e.target.value)}
-                >
-                  {(custodianTemplates.length
-                    ? custodianTemplates
-                    : [{ code: 'CUSTODIAN_CSD_CSV_V1', name: 'CUSTODIAN_CSD_CSV_V1' }]
-                  ).map((t) => (
-                    <option key={String(t.code)} value={String(t.code)}>
-                      {String(t.name ?? t.code)}
-                    </option>
-                  ))}
-                </select>
-              </label>
             </div>
             <button
               type="button"
@@ -828,7 +1023,7 @@ function TradeReconPageInner() {
 
         {step === 1 && (
           <section className={`${reconCard} space-y-4 p-5`}>
-            <h2 className="text-[14px] font-semibold">2. Ingest broker statement</h2>
+            <h2 className="text-[14px] font-semibold">Ingest broker statement</h2>
             <div className="flex flex-wrap gap-2">
               <button type="button" className={reconPill} onClick={() => downloadBlankTemplate('broker')}>
                 <Download className="h-3.5 w-3.5" />
@@ -873,7 +1068,7 @@ function TradeReconPageInner() {
 
         {step === 2 && (
           <section className={`${reconCard} space-y-4 p-5`}>
-            <h2 className="text-[14px] font-semibold">3. Ingest custodian statement</h2>
+            <h2 className="text-[14px] font-semibold">Ingest bank / custodian statement</h2>
             {!batch?.id ? (
               <p className="text-[12px] text-amber-400">
                 Batch session was lost — go back and create/ingest broker again, or click Start over.
@@ -930,7 +1125,7 @@ function TradeReconPageInner() {
 
         {step === 3 && (
           <section className={`${reconCard} space-y-4 p-5`}>
-            <h2 className="text-[14px] font-semibold">4. Run match</h2>
+            <h2 className="text-[14px] font-semibold">Run match</h2>
             <p className="text-[12px]" style={{ color: C.muted }}>
               Compares blotter trades for this fund/date to your broker and custodian CSVs. Clean three-way hits
               count as matches; everything else becomes an exception to review.
@@ -962,9 +1157,9 @@ function TradeReconPageInner() {
           <section className={`${reconCard} space-y-4 p-5`}>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h2 className="text-[14px] font-semibold">5. Matches &amp; complete</h2>
+                <h2 className="text-[14px] font-semibold">Matches &amp; complete</h2>
                 <p className="mt-1 text-[12px]" style={{ color: C.muted }}>
-                  Clean matches on the left. Clear open exceptions on the right, then Complete here.
+                  Each match compares Internal (blotter) vs Broker vs Bank/custodian. Clear open exceptions, then Complete.
                 </p>
               </div>
               <input
@@ -975,49 +1170,24 @@ function TradeReconPageInner() {
               />
             </div>
 
-            <div className="grid items-stretch gap-4 lg:grid-cols-2">
+            <div className="grid items-stretch gap-4">
               {/* Matches */}
               <div className="flex min-h-0 min-w-0 flex-col space-y-3 rounded-2xl border border-emerald-500/25 bg-emerald-500/5 p-4">
                 <div className="flex shrink-0 items-center justify-between gap-2">
                   <h3 className="text-[13px] font-semibold text-emerald-400">
                     Matches ({filteredMatches.length})
                   </h3>
-                  <span className="text-[10px] text-muted-foreground">Auto + manual</span>
+                  <span className="text-[10px] text-muted-foreground">Internal vs Broker vs Bank/custodian</span>
                 </div>
                 {filteredMatches.length === 0 ? (
                   <p className="py-10 text-center text-[12px] text-muted-foreground">
                     No matches yet — run match or manually match an exception.
                   </p>
                 ) : (
-                  <div className="max-h-[min(52vh,420px)] overflow-auto overscroll-contain rounded-xl border border-border/40">
-                    <table className="w-full text-left text-[11px]">
-                      <thead className="sticky top-0 z-[1] bg-card">
-                        <tr className="border-b border-border text-[9px] uppercase tracking-wider text-muted-foreground">
-                          <th className="px-2 py-2">How</th>
-                          <th className="px-2 py-2">Symbol</th>
-                          <th className="px-2 py-2">Trade ref</th>
-                          <th className="px-2 py-2">Int</th>
-                          <th className="px-2 py-2">Brk</th>
-                          <th className="px-2 py-2">Csd</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredMatches.map((m) => (
-                          <tr key={m.id} className="border-b border-border/50">
-                            <td className="px-2 py-2">
-                              <span className="inline-flex rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
-                                {String(m.how ?? 'AUTO')}
-                              </span>
-                            </td>
-                            <td className="px-2 py-2 font-medium">{String(m.symbol ?? '—')}</td>
-                            <td className="px-2 py-2 font-mono text-[10px]">{String(m.tradeRef ?? '—')}</td>
-                            <td className="px-2 py-2 font-mono">{String(m.internalQty ?? '—')}</td>
-                            <td className="px-2 py-2 font-mono">{String(m.brokerQty ?? '—')}</td>
-                            <td className="px-2 py-2 font-mono">{String(m.custodianQty ?? '—')}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                  <div className="space-y-3">
+                    {filteredMatches.map((m) => (
+                      <MatchComparison key={m.id} match={m} batch={batch} />
+                    ))}
                   </div>
                 )}
               </div>

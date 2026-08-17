@@ -17,7 +17,8 @@ else
 fi
 
 cat > .env.local <<'EOF'
-NEXT_PUBLIC_API_BASE_URL=http://31.220.82.129:3009/api
+NEXT_PUBLIC_API_BASE_URL=http://207.180.234.151:3009/api
+NEXT_PUBLIC_WS_URL=http://207.180.234.151:3009
 EOF
 
 export NODE_OPTIONS="--max-old-space-size=4096"

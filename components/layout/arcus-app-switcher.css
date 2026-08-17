@@ -1,0 +1,74 @@
+/**
+ * Locked Arcus app switcher modal — same appearance on every module (Investments reference).
+ * Portaled to document.body; styles must not depend on parent module theme.
+ */
+
+[data-arcus-app-switcher] {
+  color-scheme: light;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+[data-arcus-app-switcher] [data-arcus-app-switcher-panel] {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  color: #111827;
+}
+
+[data-arcus-app-switcher] [data-arcus-app-switcher-title] {
+  color: #111827;
+  font-weight: 500;
+}
+
+[data-arcus-app-switcher] [data-arcus-app-switcher-card] {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+  text-align: left;
+}
+
+[data-arcus-app-switcher] [data-arcus-app-switcher-card]:hover {
+  background: #f9fafb;
+  border-color: #d1d5db;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.08);
+}
+
+[data-arcus-app-switcher] [data-arcus-app-switcher-card][data-active="true"] {
+  background: #eff6ff;
+  border: 2px solid #3b82f6;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.08);
+}
+
+[data-arcus-app-switcher] [data-arcus-app-switcher-icon] {
+  background: #ffffff;
+  border-radius: 0.75rem;
+  border-width: 2px;
+  border-style: solid;
+}
+
+[data-arcus-app-switcher] [data-arcus-app-switcher-name] {
+  color: #374151;
+  font-weight: 400;
+  font-size: 0.8125rem;
+  line-height: 1.25;
+}
+
+[data-arcus-app-switcher] [data-arcus-app-switcher-card][data-active="true"] [data-arcus-app-switcher-name] {
+  color: #1d4ed8;
+  font-weight: 500;
+}
+
+[data-arcus-app-switcher] [data-arcus-app-switcher-desc] {
+  color: #6b7280;
+  font-size: 0.625rem;
+  line-height: 1.35;
+}
+
+@media (min-width: 640px) {
+  [data-arcus-app-switcher] [data-arcus-app-switcher-name] {
+    font-size: 0.875rem;
+  }
+
+  [data-arcus-app-switcher] [data-arcus-app-switcher-desc] {
+    font-size: 0.75rem;
+  }
+}

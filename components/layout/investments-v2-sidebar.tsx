@@ -59,13 +59,13 @@ const navItems = [
     icon: Scale,
     href: '/investments-v2/reconciliation/trade',
     children: [
-      { label: 'Trade', href: '/investments-v2/reconciliation/trade' },
-      // Hidden for now — client / cash recon surfaces
-      // { label: 'Client', href: '/investments-v2/reconciliation' },
-      // { label: 'Cash', href: '/investments-v2/reconciliation/fund-cash' },
-      // { label: 'Cash Ledger', href: '/investments-v2/reconciliation/cash-ledger' },
-      // { label: 'Exceptions', href: '/investments-v2/reconciliation/exceptions' },
-      // { label: 'Statements', href: '/investments-v2/reconciliation/statements' },
+      { label: 'Overview', href: '/investments-v2/reconciliation' },
+      { label: 'Trade match', href: '/investments-v2/reconciliation/trade' },
+      { label: 'Cash match', href: '/investments-v2/reconciliation/fund-cash' },
+      { label: 'Positions', href: '/investments-v2/reconciliation/positions' },
+      { label: 'Cash Ledger', href: '/investments-v2/reconciliation/cash-ledger' },
+      { label: 'Exceptions', href: '/investments-v2/reconciliation/exceptions' },
+      { label: 'Statements', href: '/investments-v2/reconciliation/statements' },
     ],
   },
   {
@@ -159,9 +159,13 @@ export function InvestmentsV2Sidebar() {
   const isRootActive = (href: string, children?: { href: string }[]) => {
     if (href === '/investments-v2') return pathname === href
     if (children?.length) {
-      return children.some(
-        (c) => pathname === c.href || (c.href !== href && pathname.startsWith(`${c.href}/`)),
-      ) || pathname === href || pathname.startsWith(`${href}/`)
+      return (
+        children.some(
+          (c) => pathname === c.href || (c.href !== href && pathname.startsWith(`${c.href}/`)),
+        ) ||
+        pathname === href ||
+        pathname.startsWith(`${href}/`)
+      )
     }
     return pathname === href || pathname.startsWith(`${href}/`)
   }
@@ -176,11 +180,11 @@ export function InvestmentsV2Sidebar() {
   return (
     <aside
       className={cn(
-        'flex h-full shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-[width] duration-200',
-        collapsed ? 'w-[68px]' : 'w-[220px]',
+        'iv2-sidebar flex h-full shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-[width] duration-200',
+        collapsed ? 'w-[62px]' : 'w-[206px]',
       )}
     >
-      <nav className="flex-1 space-y-0.5 overflow-y-auto px-2 py-3">
+      <nav className="iv2-sidebar-scroll flex-1 space-y-0.5 overflow-y-auto px-2 py-2">
         {navItems.map((item) => {
           const Icon = item.icon
           const active = isRootActive(item.href, item.children)
@@ -193,14 +197,21 @@ export function InvestmentsV2Sidebar() {
                 href={item.href}
                 title={collapsed ? item.label : undefined}
                 className={cn(
-                  'flex h-10 items-center gap-2.5 rounded-full px-3 text-[12px] font-medium transition-colors',
+                  'flex min-h-10 items-center gap-3 rounded-xl px-2.5 text-[11px] font-medium transition-colors',
                   collapsed && 'justify-center px-0',
                   active
-                    ? 'bg-sidebar-accent text-sidebar-primary'
+                    ? 'bg-sidebar-accent font-semibold text-sidebar-primary'
                     : 'text-sidebar-foreground hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground',
                 )}
               >
-                <Icon className={cn('h-4 w-4 shrink-0', active ? 'text-sidebar-primary' : 'opacity-70')} />
+                <span
+                  className={cn(
+                    'flex size-7 shrink-0 items-center justify-center rounded-full opacity-80',
+                    active && 'bg-primary/10 text-sidebar-primary opacity-100',
+                  )}
+                >
+                  <Icon className="size-4" />
+                </span>
                 {!collapsed && <span className="truncate">{item.label}</span>}
               </Link>
             )
@@ -213,20 +224,27 @@ export function InvestmentsV2Sidebar() {
                 title={collapsed ? item.label : undefined}
                 onClick={() => toggleExpand(item.label)}
                 className={cn(
-                  'flex h-10 w-full items-center gap-2.5 rounded-full px-3 text-[12px] font-medium transition-colors',
+                  'flex min-h-10 w-full items-center gap-3 rounded-xl px-2.5 text-[11px] font-medium transition-colors',
                   collapsed ? 'justify-center px-0' : 'justify-between',
                   active
-                    ? 'bg-sidebar-accent text-sidebar-primary'
+                    ? 'bg-sidebar-accent font-semibold text-sidebar-primary'
                     : 'text-sidebar-foreground hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground',
                 )}
               >
-                <span className="flex min-w-0 items-center gap-2.5">
-                  <Icon className={cn('h-4 w-4 shrink-0', active ? 'text-sidebar-primary' : 'opacity-70')} />
+                <span className="flex min-w-0 items-center gap-3">
+                  <span
+                    className={cn(
+                      'flex size-7 shrink-0 items-center justify-center rounded-full opacity-80',
+                      active && 'bg-primary/10 text-sidebar-primary opacity-100',
+                    )}
+                  >
+                    <Icon className="size-4" />
+                  </span>
                   {!collapsed && <span className="truncate">{item.label}</span>}
                 </span>
                 {!collapsed && (
                   <ChevronDown
-                    className={cn('h-3.5 w-3.5 shrink-0 opacity-60 transition-transform', isExp && 'rotate-180')}
+                    className={cn('size-3.5 shrink-0 opacity-60 transition-transform', isExp && 'rotate-180')}
                   />
                 )}
               </button>
@@ -240,9 +258,9 @@ export function InvestmentsV2Sidebar() {
                         key={child.href}
                         href={child.href}
                         className={cn(
-                          'flex items-center rounded-full px-3 py-1.5 text-[11.5px] transition-colors',
+                          'flex items-center rounded-xl px-3 py-1.5 text-[11px] transition-colors',
                           childActive
-                            ? 'bg-primary/10 font-medium text-primary'
+                            ? 'bg-primary/10 font-semibold text-primary'
                             : 'text-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground',
                         )}
                       >
@@ -263,11 +281,11 @@ export function InvestmentsV2Sidebar() {
           onClick={toggleCollapsed}
           aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           className={cn(
-            'flex h-9 w-full items-center gap-2 rounded-full px-3 text-[12px] font-medium text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+            'flex h-9 w-full items-center gap-2 rounded-full px-3 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
             collapsed && 'justify-center px-0',
           )}
         >
-          {collapsed ? <ChevronsRight className="h-4 w-4" /> : <ChevronsLeft className="h-4 w-4" />}
+          {collapsed ? <ChevronsRight className="size-4" /> : <ChevronsLeft className="size-4" />}
           {!collapsed && <span>Collapse</span>}
         </button>
       </div>

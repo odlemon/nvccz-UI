@@ -1,20 +1,85 @@
-/* SharedTopbar offset for Investee Portal V8 */
+/* Investee Portal V8: expanded sidebar, full-height shell, topbar fills right. */
 
 .investee-portal-v8-root {
   position: relative;
-  min-height: calc(100vh - 5rem);
-  overflow-x: clip;
-  overflow-y: visible;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .investee-portal-v8-root .app {
-  height: calc(100vh - 5rem);
-  min-height: calc(100vh - 5rem);
+  height: 100%;
+  min-height: 0;
+  max-height: none;
 }
 
 .investee-portal-v8-root .sidebar {
   position: relative;
   z-index: 20;
+  min-height: 100%;
+}
+
+.investee-portal-v8-root .shell {
+  min-height: 0;
+  height: 100%;
+}
+
+.investee-portal-v8-root .topbar {
+  background: var(--surface);
+  backdrop-filter: none;
+  width: 100%;
+  justify-content: flex-start;
+}
+
+.investee-portal-v8-root .search-trigger {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: none;
+}
+
+.investee-portal-v8-root .topbar [data-arcus-modules] {
+  margin-left: auto;
+}
+
+@media (min-width: 761px) {
+  .investee-portal-v8-root {
+    --sidebar: 258px;
+  }
+  .investee-portal-v8-root .app.collapsed {
+    --sidebar: 78px;
+  }
+  .investee-portal-v8-root .app:not(.collapsed) .brand-module,
+  .investee-portal-v8-root .app:not(.collapsed) .company-copy,
+  .investee-portal-v8-root .app:not(.collapsed) .company-card > svg,
+  .investee-portal-v8-root .app:not(.collapsed) .nav-item .label,
+  .investee-portal-v8-root .app:not(.collapsed) .system-health span {
+    display: block;
+  }
+  .investee-portal-v8-root .app:not(.collapsed) .nav-count {
+    display: grid;
+  }
+  .investee-portal-v8-root .app:not(.collapsed) .brand-mark img {
+    display: block;
+  }
+  .investee-portal-v8-root .app:not(.collapsed) .brand-mark::after {
+    content: none;
+    display: none;
+  }
+  .investee-portal-v8-root .app:not(.collapsed) .brand-mark {
+    min-width: 154px !important;
+    width: auto !important;
+    height: 42px !important;
+    padding: 6px 8px !important;
+    overflow: hidden !important;
+  }
+  .investee-portal-v8-root .app:not(.collapsed) .company-card,
+  .investee-portal-v8-root .app:not(.collapsed) .nav-item,
+  .investee-portal-v8-root .app:not(.collapsed) .system-health {
+    justify-content: flex-start;
+  }
+  .investee-portal-v8-root .app:not(.collapsed) .nav-item {
+    padding: 0 10px;
+  }
 }
 
 .investee-portal-v8-root .toasts {

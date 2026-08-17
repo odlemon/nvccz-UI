@@ -85,9 +85,8 @@ export function HomeV3App() {
   return (
     <div
       ref={rootRef}
-      className="home-v3-root"
+      className="home-v3-root h-full"
       data-cover-theme="porcelain"
-      style={{ minHeight: "calc(100vh - 5rem)", position: "relative" }}
     />
   )
 }

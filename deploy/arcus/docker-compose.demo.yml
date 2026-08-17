@@ -1,0 +1,87 @@
+name: arcus-demo
+
+networks:
+  edge:
+    external: true
+    name: lms_lms-network
+
+services:
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --default-authentication-plugin=mysql_native_password
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: arcus_prod
+      MYSQL_USER: arcus_prod
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - arcus_demo_mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 5s
+      timeout: 5s
+      retries: 40
+      start_period: 20s
+
+  api:
+    build:
+      context: ../src/api
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - default
+      - edge
+    env_file:
+      - ../secrets/demo.env
+    environment:
+      NODE_ENV: production
+      PORT: "3009"
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DATABASE_URL: mysql://arcus_prod:${MYSQL_PASSWORD}@mysql:3306/arcus_prod
+      RUN_SEED: "1"
+    volumes:
+      - arcus_demo_api_storage:/app/storage/local-upload-mock
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=lms_lms-network
+      - traefik.http.routers.arcus-demo-api.rule=Host(`demo-api.arcus.co.zw`)
+      - traefik.http.routers.arcus-demo-api.entrypoints=websecure
+      - traefik.http.routers.arcus-demo-api.tls.certresolver=le
+      - traefik.http.services.arcus-demo-api.loadbalancer.server.port=3009
+
+  ui:
+    build:
+      context: ../src/ui
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL}
+        NEXT_PUBLIC_WS_URL: ${PUBLIC_WS_URL}
+    restart: unless-stopped
+    depends_on:
+      - api
+    networks:
+      - default
+      - edge
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=lms_lms-network
+      - traefik.http.routers.arcus-demo-ui.rule=Host(`demo.arcus.co.zw`)
+      - traefik.http.routers.arcus-demo-ui.entrypoints=websecure
+      - traefik.http.routers.arcus-demo-ui.tls.certresolver=le
+      - traefik.http.services.arcus-demo-ui.loadbalancer.server.port=3000
+
+volumes:
+  arcus_demo_mysql:
+    external: true
+    name: arcus-prod_arcus_prod_mysql
+  arcus_demo_api_storage:
+    external: true
+    name: arcus-prod_arcus_prod_api_storage

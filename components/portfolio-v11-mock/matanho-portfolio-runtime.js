@@ -1,4 +1,4 @@
-/* Auto-extracted Matanho Portfolio V11 runtime — adapted for Next.js */
+/* Auto-extracted Matanho Portfolio V23 runtime — adapted for Next.js (/portfolio-v11) */
 export function startPortfolioV11Runtime(rootEl, options = {}) {
   const initialPage = options.initialPage || 'dashboard';
   window.__PORTFOLIO_V11_NAV__ = options.onNavigate || (() => {});
@@ -27,6 +27,48 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
   const escapeHTML = value => String(value ?? '').replace(/[&<>'"]/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[char]));
   const initials = name => name.split(/\s+/).map(part => part[0]).join('').slice(0,2).toUpperCase();
+
+  const PROFILE_PHOTO_POOL = [
+    "/portfolio-v11/assets/employee-1.jpg",
+    "/portfolio-v11/assets/employee-2.jpg",
+    "/portfolio-v11/assets/employee-3.jpg",
+    "/portfolio-v11/assets/employee-4.jpg",
+    "/portfolio-v11/assets/employee-5.jpg",
+    "/portfolio-v11/assets/employee-6.jpg",
+    "/portfolio-v11/assets/employee-7.jpg",
+    "/portfolio-v11/assets/employee-8.jpg",
+    "/portfolio-v11/assets/employee-9.jpg"
+  ];
+
+  const PROFILE_PHOTO_EXACT = {
+    "Tendai Moyo": "/portfolio-v11/assets/employee-1.jpg",
+    "Rudo Chikore": "/portfolio-v11/assets/employee-2.jpg",
+    "Tariro Kasere": "/portfolio-v11/assets/employee-3.jpg",
+    "Nyasha Moyo": "/portfolio-v11/assets/employee-4.jpg",
+    "Chipo Dube": "/portfolio-v11/assets/employee-5.jpg",
+    "Farai Chikore": "/portfolio-v11/assets/employee-6.jpg",
+    "Laura Chen": "/portfolio-v11/assets/employee-7.jpg",
+    "Tendai Sibanda": "/portfolio-v11/assets/employee-8.jpg",
+    "Anita Kapoor": "/portfolio-v11/assets/employee-9.jpg",
+    "Tawanda Kasere": "/portfolio-v11/assets/employee-1.jpg",
+    "Rudo Maposa": "/portfolio-v11/assets/employee-2.jpg",
+    "Farai Dube": "/portfolio-v11/assets/employee-3.jpg",
+    "Chipo Ndlovu": "/portfolio-v11/assets/employee-4.jpg",
+    "Tinashe Chaka": "/portfolio-v11/assets/employee-5.jpg",
+    "Lerato Maseko": "/portfolio-v11/assets/employee-6.jpg",
+    "Danai Chirwa": "/portfolio-v11/assets/employee-7.jpg",
+    "Tariro Moyo": "/portfolio-v11/assets/employee-8.jpg"
+  };
+  function profilePhoto(name='') {
+    const key=String(name||'').trim();
+    if(PROFILE_PHOTO_EXACT[key]) return PROFILE_PHOTO_EXACT[key];
+    let hash=0; for(let i=0;i<key.length;i++) hash=((hash<<5)-hash+key.charCodeAt(i))|0;
+    return PROFILE_PHOTO_POOL[Math.abs(hash)%PROFILE_PHOTO_POOL.length];
+  }
+  function personAvatar(name, extra='') {
+    const safe=escapeHTML(String(name||'Employee'));
+    return `<span class="avatar photo-avatar ${extra}"><img src="${profilePhoto(name)}" alt="${safe}" loading="lazy"></span>`;
+  }
   const sum = (items, fn = x => x) => items.reduce((total, item) => total + fn(item), 0);
   const storage = {
     get(key, fallback = null) { try { return window.localStorage.getItem(key) ?? fallback; } catch { return fallback; } },
@@ -145,7 +187,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   ];
 
   const companies = [
-    { id:'CO-001', name:'Nova Analytics', sector:'Enterprise Software', stage:'Growth', entry:'12 Mar 2022', invested:45000000, fairValue:128400000, ownership:18.2, revenueGrowth:32.4, runway:18, health:82, boardDate:'20 Aug 2026', lastReport:'30 Jun 2026', fund:'Matanho Growth Fund II', city:'Harare, Zimbabwe', revenue:[12.8,16.4,22.6,29.0,36.5], ebitda:[2.3,3.4,6.4,8.9,12.5], arr:22.6, margin:74, nrr:135, clients:83, esg:[72,68,78], color:'#5c3fc4' },
+    { id:'CO-001', name:'Nova Analytics', sector:'Enterprise Software', stage:'Growth', entry:'12 Mar 2022', invested:45000000, fairValue:128400000, ownership:18.2, revenueGrowth:32.4, runway:18, health:82, boardDate:'20 Aug 2026', lastReport:'30 Jun 2026', fund:'Matanho Growth Fund II', city:'Harare, Zimbabwe', revenue:[12.8,16.4,22.6,29.0,36.5], ebitda:[2.3,3.4,6.4,8.9,12.5], arr:22.6, margin:74, nrr:135, clients:83, esg:[72,68,78], color:'#4778bc' },
     { id:'CO-002', name:'GreenOrbit Energy', sector:'Climate Tech', stage:'Growth', entry:'05 Aug 2021', invested:32000000, fairValue:96700000, ownership:21.5, revenueGrowth:27.8, runway:24, health:76, boardDate:'12 Aug 2026', lastReport:'28 Jun 2026', fund:'Matanho Climate & Infrastructure I', city:'Lusaka, Zambia', revenue:[9.8,12.6,18.2,24.4,31.1], ebitda:[1.1,2.0,3.8,5.6,7.9], arr:18.2, margin:61, nrr:118, clients:42, esg:[89,74,72], color:'#0a9e73' },
     { id:'CO-003', name:'Mukuru Logistics', sector:'Mobility & Logistics', stage:'Growth', entry:'27 Apr 2022', invested:40000000, fairValue:64300000, ownership:19.3, revenueGrowth:20.3, runway:12, health:69, boardDate:'19 Aug 2026', lastReport:'25 Jun 2026', fund:'Matanho Growth Fund II', city:'Johannesburg, South Africa', revenue:[22,27,31,38,45], ebitda:[1.8,2.9,4.0,5.3,6.7], arr:31.4, margin:48, nrr:109, clients:126, esg:[58,71,76], color:'#2563eb' },
     { id:'CO-004', name:'Nyasha Foods', sector:'Consumer', stage:'Growth', entry:'10 Dec 2021', invested:25000000, fairValue:58100000, ownership:17.5, revenueGrowth:23.6, runway:14, health:74, boardDate:'14 Aug 2026', lastReport:'27 Jun 2026', fund:'Matanho Opportunity Fund', city:'Bulawayo, Zimbabwe', revenue:[18,23,29,37,46], ebitda:[2.4,3.5,5.1,6.8,9.1], arr:0, margin:39, nrr:0, clients:520, esg:[64,77,69], color:'#f29a1f' },
@@ -188,7 +230,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
 
   const lps = [
     { id:'LP-001', name:'Zambezi Pension Fund', type:'Pension Fund', geography:'Africa', commitment:250000000, called:155000000, distributed:78400000, netIrr:14.2, owner:'Maya Moyo', lastInteraction:'3 Jul 2026', kyc:'Verified', portal:'Active', unfunded:95000000, tvpi:1.84, dpi:.31, color:'#111827' },
-    { id:'LP-002', name:'Horizon Family Office', type:'Family Office', geography:'North America', commitment:150000000, called:67500000, distributed:32100000, netIrr:12.8, owner:'Daniel Lunga', lastInteraction:'8 Jul 2026', kyc:'Verified', portal:'Active', unfunded:82500000, tvpi:1.67, dpi:.28, color:'#5c3fc4' },
+    { id:'LP-002', name:'Horizon Family Office', type:'Family Office', geography:'North America', commitment:150000000, called:67500000, distributed:32100000, netIrr:12.8, owner:'Daniel Lunga', lastInteraction:'8 Jul 2026', kyc:'Verified', portal:'Active', unfunded:82500000, tvpi:1.67, dpi:.28, color:'#4778bc' },
     { id:'LP-003', name:'Savannah Insurance', type:'Insurance', geography:'Europe', commitment:200000000, called:110000000, distributed:54700000, netIrr:13.6, owner:'Aisha Chirwa', lastInteraction:'2 Jul 2026', kyc:'Verified', portal:'Active', unfunded:90000000, tvpi:1.74, dpi:.35, color:'#0c879f' },
     { id:'LP-004', name:'Baobab Growth Partners', type:'Fund of Funds', geography:'Africa', commitment:125000000, called:47500000, distributed:18600000, netIrr:11.4, owner:'James Mbewe', lastInteraction:'1 Jul 2026', kyc:'In Review', portal:'Active', unfunded:77500000, tvpi:1.49, dpi:.24, color:'#f29a1f' },
     { id:'LP-005', name:'Evergreen Endowment', type:'Endowment', geography:'North America', commitment:175000000, called:87500000, distributed:41200000, netIrr:10.7, owner:'Maya Moyo', lastInteraction:'26 Jun 2026', kyc:'Verified', portal:'Active', unfunded:87500000, tvpi:1.56, dpi:.29, color:'#0a9e73' }
@@ -216,6 +258,31 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     { id:'DOC-010', folder:'Committee Pack', name:'Investment Committee Pack.pdf', type:'PDF', version:'v1.0', owner:'Nyasha Moyo', uploaded:'14 Jul 2026', status:'Verified', access:'Internal' },
     { id:'DOC-011', folder:'Closing & Disbursement', name:'Closing Conditions Checklist.xlsx', type:'XLSX', version:'v1.0', owner:'Tendai Moyo', uploaded:'16 Jul 2026', status:'In review', access:'Internal' }
   ];
+
+
+  documents.push(
+    { id:'DOC-FUND-001', folder:'Legal', name:'Limited Partnership Agreement.pdf', type:'PDF', version:'v4.2', owner:'Legal & Governance', uploaded:'12 Jun 2026', status:'Verified', access:'Internal / LP' },
+    { id:'DOC-FUND-002', folder:'Fundraising', name:'Private Placement Memorandum.pdf', type:'PDF', version:'v3.1', owner:'Investor Relations', uploaded:'4 Apr 2026', status:'Verified', access:'Internal / LP' },
+    { id:'DOC-FUND-003', folder:'Legal', name:'Side Letter Register.xlsx', type:'XLSX', version:'v8.0', owner:'Legal & Governance', uploaded:'15 Jul 2026', status:'In review', access:'Restricted' },
+    { id:'DOC-FUND-004', folder:'Valuation', name:'Q2 2026 Valuation Pack.pdf', type:'PDF', version:'v1.0', owner:'Investment Team', uploaded:'10 Jul 2026', status:'Verified', access:'Internal' },
+    { id:'DOC-FUND-005', folder:'Investor Reporting', name:'Capital Account Statements Q2.zip', type:'ZIP', version:'v1.0', owner:'Fund Accounting', uploaded:'14 Jul 2026', status:'Verified', access:'LP Portal' },
+    { id:'DOC-FUND-006', folder:'ESG', name:'ESG & Impact Report 2025.pdf', type:'PDF', version:'v2.0', owner:'Monitoring & Evaluation', uploaded:'28 Jun 2026', status:'Verified', access:'Internal / LP' },
+    { id:'DOC-FUND-007', folder:'Audit', name:'Audit Findings and Responses.docx', type:'DOCX', version:'v1.4', owner:'Fund Accounting', uploaded:'11 Jul 2026', status:'Needs update', access:'Internal' },
+    { id:'DOC-LP-001', folder:'LP Legal', name:'Limited Partnership Agreement', type:'PDF', version:'v3.0', owner:'Legal & Governance', uploaded:'12 Feb 2021', status:'Executed', access:'Internal / LP' },
+    { id:'DOC-LP-002', folder:'LP Legal', name:'Side Letter', type:'PDF', version:'v2.1', owner:'Legal & Governance', uploaded:'18 Feb 2021', status:'Executed', access:'Restricted' },
+    { id:'DOC-LP-003', folder:'KYC', name:'KYC Annual Review 2025', type:'PDF', version:'v1.0', owner:'Compliance', uploaded:'25 Jul 2025', status:'Verified', access:'Internal' },
+    { id:'DOC-LP-004', folder:'KYC', name:'Beneficial Ownership Declaration', type:'PDF', version:'v1.2', owner:'Compliance', uploaded:'2 Jul 2026', status:'In Review', access:'Internal / LP' },
+    { id:'DOC-LP-005', folder:'Financial', name:'Audited Financial Statements 2024', type:'PDF', version:'v1.0', owner:'Fund Accounting', uploaded:'18 Jul 2026', status:'Outstanding', access:'Internal / LP' },
+    { id:'DOC-LP-006', folder:'Tax', name:'Tax Residence Certificate', type:'PDF', version:'v1.1', owner:'Fund Accounting', uploaded:'5 Jun 2026', status:'Verified', access:'Internal' },
+    { id:'DOC-LP-007', folder:'Reporting', name:'Capital Account Statement Q2 2026', type:'PDF', version:'v1.0', owner:'Fund Accounting', uploaded:'7 Jul 2026', status:'Delivered', access:'LP Portal' },
+    { id:'DOC-LP-008', folder:'Reporting', name:'Investor Update Q2 2026', type:'PDF', version:'v1.0', owner:'Investor Relations', uploaded:'7 Jul 2026', status:'Acknowledged', access:'LP Portal' }
+  );
+
+  function documentIdForName(name) {
+    const normalise = value => String(value || '').replace(/\.(pdf|docx|xlsx|xls|csv|zip)$/i,'').trim().toLowerCase();
+    const target = normalise(name);
+    return (documents.find(doc => normalise(doc.name) === target) || documents[0]).id;
+  }
 
   documents.forEach((doc,index) => Object.assign(doc, {
     category: doc.folder,
@@ -363,7 +430,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
 
 
   const state = {
-    page: initialPage || 'dashboard',
+    page: 'dashboard',
     previousPage: null,
     sidebarCollapsed: storage.get('matanho-portfolio-sidebar','collapsed') !== 'expanded',
     mobileNavOpen: false,
@@ -547,13 +614,13 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
 
   function metricCard({ label, value, iconName = 'trend-up', accent = 'brand', foot = '', trend = 'positive', action = '', spark = null }) {
     const palettes = {
-      brand: ['var(--brand)', 'var(--brand-soft)', 'rgba(101,84,232,.09)'],
+      brand: ['var(--brand)', 'var(--brand-soft)', 'rgba(37,99,235,.09)'],
       blue: ['var(--blue)', 'var(--blue-soft)', 'rgba(36,117,245,.08)'],
       emerald: ['var(--emerald)', 'var(--emerald-soft)', 'rgba(7,147,109,.08)'],
       amber: ['var(--amber)', 'var(--amber-soft)', 'rgba(217,130,11,.08)'],
       red: ['var(--red)', 'var(--red-soft)', 'rgba(217,71,92,.08)'],
       cyan: ['var(--cyan)', 'var(--cyan-soft)', 'rgba(15,152,182,.08)'],
-      purple: ['var(--purple)', 'var(--purple-soft)', 'rgba(139,92,246,.08)']
+      purple: ['var(--purple)', 'var(--purple-soft)', 'rgba(96,165,250,.08)']
     };
     const [color,bg,glow] = palettes[accent] || palettes.brand;
     return `<article class="metric-card ${action ? 'clickable' : ''}" ${action ? `data-action="${action}" data-metric-label="${escapeHTML(label)}" data-metric-value="${escapeHTML(String(value).replace(/<[^>]*>/g,''))}"` : ''} style="--metric-color:${color};--metric-bg:${bg};--metric-glow:${glow}">
@@ -727,14 +794,8 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   }
 
   function avatar(name, index = 0) {
-    const gradients = [
-      'linear-gradient(145deg,#283752,#7860e8)',
-      'linear-gradient(145deg,#0d7f79,#0bb58b)',
-      'linear-gradient(145deg,#a0572b,#f09a43)',
-      'linear-gradient(145deg,#7042a8,#c062dc)',
-      'linear-gradient(145deg,#1d5e9c,#38a2da)'
-    ];
-    return `<span class="mini-avatar" style="background:${gradients[index%gradients.length]}">${escapeHTML(initials(name))}</span>`;
+    const safe=escapeHTML(String(name||'Employee'));
+    return `<span class="mini-avatar photo-avatar"><img src="${profilePhoto(name)}" alt="${safe}" loading="lazy"></span>`;
   }
 
   function renderNav() {
@@ -802,7 +863,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   function analyticsDistribution(records) {
     const grouped = new Map();
     records.forEach(item => grouped.set(item.dimension, (grouped.get(item.dimension) || 0) + item.value));
-    const colors = ['#6554e8','#2475f5','#07936d','#f29a1f','#d9475c','#0f98b6','#8b5cf6'];
+    const colors = ['#2563eb','#2475f5','#07936d','#f29a1f','#d9475c','#0f98b6','#60a5fa'];
     return [...grouped.entries()].sort((a,b)=>b[1]-a[1]).slice(0,6).map(([label,value],index) => ({
       label, value, color:colors[index%colors.length], display:formatMoney(value)
     }));
@@ -1080,7 +1141,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       {label:'Software',value:34.2,color:'#2475f5',display:'34.2%'},
       {label:'Healthcare',value:23.1,color:'#0ba780',display:'23.1%'},
       {label:'Consumer',value:19.8,color:'#f5a623',display:'19.8%'},
-      {label:'FinTech',value:12.7,color:'#8b5cf6',display:'12.7%'},
+      {label:'FinTech',value:12.7,color:'#60a5fa',display:'12.7%'},
       {label:'Industrials',value:6.5,color:'#11a5b7',display:'6.5%'},
       {label:'Other',value:3.7,color:'#adb5c3',display:'3.7%'}
     ];
@@ -1114,7 +1175,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   }
 
   function renderDealFlow() {
-    const stageColors = {'Sourcing':'#3b82f6','Screening':'#0ea5a8','Initial Review':'#8b5cf6','Investment Committee':'#f59e0b','Due Diligence':'#7c3aed','Term Sheet':'#0ea5a8','Portfolio':'#10b981','Rejected':'#ef4444'};
+    const stageColors = {'Sourcing':'#3b82f6','Screening':'#0ea5a8','Initial Review':'#60a5fa','Investment Committee':'#f59e0b','Due Diligence':'#2563eb','Term Sheet':'#0ea5a8','Portfolio':'#10b981','Rejected':'#ef4444'};
     const pipelineValue=sum(deals,d=>d.amount);
     const wonDeals=deals.filter(d=>d.stage==='Portfolio');
     const lostDeals=deals.filter(d=>d.stage==='Rejected');
@@ -1144,14 +1205,14 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     const dryPowder = totalCommitment - called;
     const strategies = {};
     funds.forEach(f=>strategies[f.strategy]=(strategies[f.strategy]||0)+f.commitment);
-    const strategySegments = Object.entries(strategies).map(([label,value],index)=>({label,value,color:['#2475f5','#0ba780','#8b5cf6','#f5a623','#0f98b6'][index],display:`${pct(value/totalCommitment*100)} · ${formatMoney(value)}`}));
+    const strategySegments = Object.entries(strategies).map(([label,value],index)=>({label,value,color:['#2475f5','#0ba780','#60a5fa','#f5a623','#0f98b6'][index],display:`${pct(value/totalCommitment*100)} · ${formatMoney(value)}`}));
     const geographies = [
       {label:'Southern Africa',value:52.7,color:'#2475f5',display:'52.7%'},
       {label:'East Africa',value:19.8,color:'#0ba780',display:'19.8%'},
-      {label:'West Africa',value:14.2,color:'#8b5cf6',display:'14.2%'},
+      {label:'West Africa',value:14.2,color:'#60a5fa',display:'14.2%'},
       {label:'Pan-African / Other',value:13.3,color:'#f5a623',display:'13.3%'}
     ];
-    const rows = funds.map(fund=>`<tr class="clickable" data-action="open-fund" data-id="${fund.id}"><td><div class="company-cell"><span class="company-logo" style="background:linear-gradient(145deg,#6b58e4,#0a8f76)">${escapeHTML(fund.id.slice(-1))}</span><span class="table-primary">${escapeHTML(fund.name)}</span></div></td><td>${fund.vintage}</td><td>${escapeHTML(fund.strategy)}</td><td>${fund.currency}</td><td class="text-right">${formatMoney(fund.commitment,fund.currency)}</td><td><div class="inline-progress">${progressBar(fund.called/fund.commitment*100)}<span>${pct(fund.called/fund.commitment*100)}</span></div></td><td class="text-right">${formatMoney(fund.nav,fund.currency)}</td><td class="text-right">${formatMoney(fund.distributed,fund.currency)}</td><td class="text-right positive">${pct(fund.grossIrr)}</td><td class="text-right positive">${pct(fund.netIrr)}</td><td class="text-right">${fund.tvpi.toFixed(2)}x</td><td class="text-right">${fund.dpi.toFixed(2)}x</td><td>${statusPill(fund.status)}</td></tr>`).join('');
+    const rows = funds.map(fund=>`<tr class="clickable" data-action="open-fund" data-id="${fund.id}"><td><div class="company-cell"><span class="company-logo" style="background:linear-gradient(145deg,#6094dc,#0a8f76)">${escapeHTML(fund.id.slice(-1))}</span><span class="table-primary">${escapeHTML(fund.name)}</span></div></td><td>${fund.vintage}</td><td>${escapeHTML(fund.strategy)}</td><td>${fund.currency}</td><td class="text-right">${formatMoney(fund.commitment,fund.currency)}</td><td><div class="inline-progress">${progressBar(fund.called/fund.commitment*100)}<span>${pct(fund.called/fund.commitment*100)}</span></div></td><td class="text-right">${formatMoney(fund.nav,fund.currency)}</td><td class="text-right">${formatMoney(fund.distributed,fund.currency)}</td><td class="text-right positive">${pct(fund.grossIrr)}</td><td class="text-right positive">${pct(fund.netIrr)}</td><td class="text-right">${fund.tvpi.toFixed(2)}x</td><td class="text-right">${fund.dpi.toFixed(2)}x</td><td>${statusPill(fund.status)}</td></tr>`).join('');
     return `${pageHeader('Funds','Monitor fund-level performance, capital activity and structure across the portfolio.',globalPageActions({extra:button('Create fund','create-fund','primary','plus')}))}
       ${workspaceFilterBar([{label:'Vintage',action:'fund-vintage-filter',selected:'All vintages',options:['All vintages',...Array.from(new Set(funds.map(f=>String(f.vintage))))]},{label:'Strategy',action:'fund-strategy-filter',selected:'All strategies',options:['All strategies',...Array.from(new Set(funds.map(f=>f.strategy)))]},{label:'Status',action:'fund-status-filter',selected:'All statuses',options:['All statuses','Investing','Realising','Closed']},{label:'Currency',action:'fund-currency-filter',selected:'All currencies',options:['All currencies','USD','ZWG']}])}
       <section class="metric-grid section-gap">
@@ -1219,7 +1280,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     ];
     const sectorValues = {};
     companies.forEach(company=>sectorValues[company.sector]=(sectorValues[company.sector]||0)+company.fairValue);
-    const sectorSegments = Object.entries(sectorValues).map(([label,value],index)=>({label,value,color:['#2475f5','#0ba780','#8b5cf6','#f5a623','#0f98b6','#d9475c'][index],display:formatMoney(value)}));
+    const sectorSegments = Object.entries(sectorValues).map(([label,value],index)=>({label,value,color:['#2475f5','#0ba780','#60a5fa','#f5a623','#0f98b6','#d9475c'][index],display:formatMoney(value)}));
     return `${pageHeader('Portfolio Companies','Portfolio health, fair value, growth and value-creation oversight.',globalPageActions({extra:`${button('Filters','company-filters','','filter')}${button('Add company','add-company','primary','plus')}`}))}
       <section class="metric-grid">
         ${metricCard({label:'Active Portfolio Companies',value:String(companies.length),iconName:'building',accent:'emerald',foot:'+4 vs 31 Dec 2025',action:'metric-companies'})}
@@ -1298,7 +1359,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     const rows = lps.map(lp=>`<tr class="clickable" data-action="open-lp" data-id="${lp.id}"><td><div class="company-cell"><span class="company-logo" style="background:${lp.color}">${escapeHTML(initials(lp.name))}</span><span class="table-primary brand-text">${escapeHTML(lp.name)}</span></div></td><td>${escapeHTML(lp.type)}</td><td>${escapeHTML(lp.geography)}</td><td class="text-right">${formatMoney(lp.commitment)}</td><td><div class="inline-progress">${progressBar(lp.called/lp.commitment*100)}<span>${pct(lp.called/lp.commitment*100)}</span></div></td><td class="text-right">${formatMoney(lp.distributed)}</td><td class="text-right positive">${pct(lp.netIrr)}</td><td>${escapeHTML(lp.owner)}</td><td>${lp.lastInteraction}</td><td>${statusPill(lp.kyc)}</td><td>${statusPill(lp.portal)}</td><td><button class="button ghost compact icon-only" data-action="activity-menu" data-context="lp" data-id="${lp.id}" aria-label="LP activity">${icon('clock')}</button></td></tr>`).join('');
     const geography = {};
     lps.forEach(lp=>geography[lp.geography]=(geography[lp.geography]||0)+lp.commitment);
-    const geosegments = Object.entries(geography).map(([label,value],i)=>({label,value,color:['#2475f5','#0ba780','#8b5cf6','#f5a623'][i],display:`${pct(value/totalCommitments*100)} · ${formatMoney(value)}`}));
+    const geosegments = Object.entries(geography).map(([label,value],i)=>({label,value,color:['#2475f5','#0ba780','#60a5fa','#f5a623'][i],display:`${pct(value/totalCommitments*100)} · ${formatMoney(value)}`}));
     return `${pageHeader('LP Management','Manage investors, commitments, communications, KYC and account history.',`${selectControl('LP filter',['All LPs','Pension Funds','Family Offices','Insurance','Funds of Funds'],'All LPs','lp-filter')}${selectControl('Date',['31 Jul 2026','30 Jun 2026'],'31 Jul 2026','date-filter')}${button('Export','export-lps','','download')}${button('Add LP','add-lp','primary','plus')}`)}
       <section class="metric-grid">
         ${metricCard({label:'Active LPs',value:'42',iconName:'users',accent:'emerald',foot:'5.0% vs 31 Dec 2025',action:'metric-active-lps'})}
@@ -1326,7 +1387,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     const stepLabels = [['Application Submitted','Complete'],['AI Screening','Shortlisted · 86/100'],['Due Diligence','Complete · 6/6'],['Term Sheet','Conditional · 15/17'],['Board & IC Decision','In review'],['Disbursement','Locked']];
     const actions = `${selectControl('Fund',funds.map(f=>f.name),deal.fund,'deal-fund')}${button('Back to Deal Flow','back-to-deals','','arrow-left')}${button('Activity','activity-menu','','clock',`data-context="deal" data-id="${deal.id}"`)}`;
     return `${pageHeader(`${deal.name} - ${deal.round}`,'Investment application and execution workspace.',actions,'Committee Review')}
-      <section class="detail-hero"><div class="detail-hero-top"><div class="entity-title"><span class="entity-logo" style="background:linear-gradient(145deg,#23314d,#6d55e6)">${escapeHTML(initials(deal.name))}</span><div><h1>${escapeHTML(deal.name)}</h1><p>${escapeHTML(deal.sector)} · ${escapeHTML(deal.round)} · ${escapeHTML(deal.fund)}</p></div></div>${statusPill(state.dealTab==='disbursement'?'Approved - Closing':'Committee Review',state.dealTab==='disbursement'?'success':'info')}</div><div class="hero-meta"><div class="hero-meta-item"><span>Requested Investment (USD)</span><strong>${formatMoney(deal.amount)}</strong></div><div class="hero-meta-item"><span>Proposed Ownership</span><strong>17.5%</strong></div><div class="hero-meta-item"><span>Pre-Money Valuation</span><strong>$85.0M</strong></div><div class="hero-meta-item"><span>Lead Investor</span><strong>${escapeHTML(deal.fund)}</strong></div><div class="hero-meta-item"><span>AI Screening Score</span><strong>${deal.score}/100</strong></div></div></section>
+      <section class="detail-hero"><div class="detail-hero-top"><div class="entity-title"><span class="entity-logo" style="background:linear-gradient(145deg,#23314d,#5e93dd)">${escapeHTML(initials(deal.name))}</span><div><h1>${escapeHTML(deal.name)}</h1><p>${escapeHTML(deal.sector)} · ${escapeHTML(deal.round)} · ${escapeHTML(deal.fund)}</p></div></div>${statusPill(state.dealTab==='disbursement'?'Approved - Closing':'Committee Review',state.dealTab==='disbursement'?'success':'info')}</div><div class="hero-meta"><div class="hero-meta-item"><span>Requested Investment (USD)</span><strong>${formatMoney(deal.amount)}</strong></div><div class="hero-meta-item"><span>Proposed Ownership</span><strong>17.5%</strong></div><div class="hero-meta-item"><span>Pre-Money Valuation</span><strong>$85.0M</strong></div><div class="hero-meta-item"><span>Lead Investor</span><strong>${escapeHTML(deal.fund)}</strong></div><div class="hero-meta-item"><span>AI Screening Score</span><strong>${deal.score}/100</strong></div></div></section>
       <div class="tabs">${tabs.map(tab=>`<button class="tab ${state.dealTab===tab[0]?'active':''}" data-action="deal-tab" data-tab="${tab[0]}">${tab[1]}</button>`).join('')}</div>
       <div class="stepper">${stepLabels.map((step,index)=>`<div class="step ${index+1<currentStep?'complete':index+1===currentStep?'current':''}"><span class="step-index">${index+1<currentStep?icon('check'):index+1}</span><span class="step-copy"><strong>${step[0]}</strong><small>${step[1]}</small></span></div>`).join('')}</div>
       ${renderDealTab(deal)}`;
@@ -1355,7 +1416,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
         ${card('AI Screening',`<div class="score-panel"><div><div class="score-big"><strong>${deal.score}</strong><span>/100</span></div><div class="score-confidence">94% confidence</div></div>${statusPill('SHORTLISTED','success')}</div><div class="grid cols-3 section-gap"><div class="text-center"><strong class="positive" style="font-size:18px">8</strong><div class="muted small">Passed</div></div><div class="text-center"><strong class="warning-text" style="font-size:18px">2</strong><div class="muted small">Review</div></div><div class="text-center"><strong class="negative" style="font-size:18px">0</strong><div class="muted small">Failed</div></div></div><button class="button ghost compact" style="width:100%;margin-top:12px" data-action="deal-tab" data-tab="screening">Open screening</button>`) }
       </section>
       <section class="grid cols-2 section-gap">
-        ${card('Attached Documents',`<div class="info-list">${documents.slice(0,8).map(doc=>`<div class="list-row"><span class="activity-icon" style="color:${doc.type==='XLSX'?'var(--emerald)':'var(--red)'};background:${doc.type==='XLSX'?'var(--emerald-soft)':'var(--red-soft)'}">${icon('file')}</span><span class="list-row-main"><strong>${escapeHTML(doc.name)}</strong><small>${escapeHTML(doc.version)} · ${escapeHTML(doc.status)}</small></span><button class="button ghost compact icon-only" data-action="preview-document" data-id="${doc.id}">${icon('eye')}</button></div>`).join('')}</div>`,{tools:button('Data room','deal-tab','compact','folder','data-tab="documents"')})}
+        ${card('Attached Documents',`<div class="info-list">${documents.slice(0,8).map(doc=>`<button type="button" class="list-row v17-document-list-row" data-action="preview-document" data-id="${doc.id}"><span class="activity-icon" style="color:${doc.type==='XLSX'?'var(--emerald)':'var(--red)'};background:${doc.type==='XLSX'?'var(--emerald-soft)':'var(--red-soft)'}">${icon('file')}</span><span class="list-row-main"><strong>${escapeHTML(doc.name)}</strong><small>${escapeHTML(doc.version)} · ${escapeHTML(doc.status)}</small></span><span class="button ghost compact icon-only" aria-hidden="true">${icon('eye')}</span></button>`).join('')}</div>`,{tools:button('Data room','deal-tab','compact','folder','data-tab="documents"')})}
         ${card('Due Diligence Workstreams',`<div class="table-wrap"><table class="criteria-table"><thead><tr><th>Workstream</th><th>Analyst</th><th>Due Date</th><th>Progress</th><th>Status</th></tr></thead><tbody>${workstreams.map((name,index)=>`<tr><td class="table-primary">${name}</td><td><span class="owner-mini">${avatar(['Nyasha Moyo','Tendai Moyo','Rudo Ndlovu','Chipo Dube','Farai Chikore','Tinashe Sibanda'][index],index)}${['Nyasha Moyo','Tendai Moyo','Rudo Ndlovu','Chipo Dube','Farai Chikore','Tinashe Sibanda'][index]}</span></td><td>${10+index} Jul 2026</td><td><div class="inline-progress">${progressBar(100,'var(--emerald)')}<span>100%</span></div></td><td>${statusPill('Complete')}</td></tr>`).join('')}</tbody></table></div>`,{tools:button('Assign tasks','assign-dd-task','compact','plus')})}
       </section>
     </div><div class="side-stack" style="display:flex">
@@ -1445,7 +1506,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
         <section class="term-signing-status"><div><span class="term-signing-icon">${icon('edit')}</span><div><strong>Electronic signing workflow</strong><small>${envelope?.recipients.map(recipient=>`${recipient[0]} · ${recipient[2]}`).join('  •  ')||'Envelope not prepared'}</small></div></div><div><div class="inline-progress">${progressBar(envelope?.progress||0)}<span>${envelope?.progress||0}%</span></div>${statusPill(envelope?.status||'Draft')}</div></section>
         <div class="term-section-heading"><div><span class="overlay-eyebrow">Clause workspace</span><h3>${escapeHTML(selectedSection.name)}</h3><p>${clauses.filter(c=>c.status==='Agreed').length} agreed · ${clauses.filter(c=>c.status!=='Agreed').length} requiring attention · source-linked redlines</p></div><div class="term-section-health">${statusPill(clauses.every(c=>c.status==='Agreed')?'Complete':'Negotiating',clauses.every(c=>c.status==='Agreed')?'success':'warning')}</div></div>
         <div class="term-clause-grid">${clauses.map((clause,index)=>`<article class="clause-card interactive-clause ${clause.status==='Open'?'open-clause':''}" data-action="open-term-clause" data-section="${state.termSection}" data-clause="${index}"><div class="clause-head"><div><strong>${escapeHTML(clause.title)}</strong><div class="muted small">${escapeHTML(clause.reference)} · ${escapeHTML(clause.source)}</div></div>${statusPill(clause.status,clause.status==='Open'?'warning':'success')}</div><div class="clause-summary"><div><span>Current value</span><strong>${escapeHTML(clause.value)}</strong></div><div><span>Owner</span><strong>${escapeHTML(clause.owner)}</strong></div><div><span>Updated</span><strong>${escapeHTML(clause.updated)}</strong></div></div><div class="clause-preview"><div><small>Matanho position</small><p>${escapeHTML(clause.matanho)}</p></div><div><small>Company position</small><p>${escapeHTML(clause.company)}</p></div></div><div class="clause-actions">${button('Open clause','open-term-clause','compact','eye',`data-section="${state.termSection}" data-clause="${index}"`)}${clause.status==='Open'?`${button('Accept counter','accept-counter','compact','check',`data-section="${state.termSection}" data-clause="${index}"`)}${button('Retain position','retain-position','compact','gavel',`data-section="${state.termSection}" data-clause="${index}"`)}`:button('Activity','activity-menu','ghost compact','clock',`data-context="term-clause" data-id="${state.termSection}:${index}"`)}</div></article>`).join('')}</div>
-      </div><div class="side-stack" style="display:flex">${card('Signing Parties',`<div class="signature-party-list">${(envelope?.recipients||[]).map((recipient,index)=>`<div><span class="avatar">${initials(recipient[0])}</span><span><strong>${escapeHTML(recipient[0])}</strong><small>${escapeHTML(recipient[1])}</small></span>${statusPill(recipient[2],recipient[2]==='Signed'?'success':'warning')}</div>`).join('')}</div>`,{footer:`<button class="card-link" data-action="sign-term-sheet">Open signing page</button>`})}${card('Approval Routing',`<div class="approval-route"><div class="done"><span>1</span><div><strong>Legal review</strong><small>Farai Chikore · complete</small></div></div><div class="done"><span>2</span><div><strong>Investment Director</strong><small>Tariro Kasere · complete</small></div></div><div class="current"><span>3</span><div><strong>Company signature</strong><small>${envelope?.progress||0}% complete</small></div></div><div><span>4</span><div><strong>Completion certificate</strong><small>Generated after all parties sign</small></div></div></div>`)}${card('Source Data',`<div class="info-list"><div class="info-row"><span>Investment memo</span><strong>IM-NOVA-v7</strong></div><div class="info-row"><span>Valuation model</span><strong>VAL-NOVA-Q2-2026</strong></div><div class="info-row"><span>Cap table</span><strong>CAP-NOVA-v8</strong></div><div class="info-row"><span>Legal redline</span><strong>TS-NOVA-v4</strong></div><div class="info-row"><span>Last sync</span><strong>13 Jul · 16:20 CAT</strong></div></div>`,{footer:'<button class="card-link" data-action="preview-document" data-id="DOC-009">Preview current term sheet</button>'})}</div></section>`;
+      </div><div class="side-stack" style="display:flex">${card('Signing Parties',`<div class="signature-party-list">${(envelope?.recipients||[]).map((recipient,index)=>`<div>${personAvatar(recipient[0])}<span><strong>${escapeHTML(recipient[0])}</strong><small>${escapeHTML(recipient[1])}</small></span>${statusPill(recipient[2],recipient[2]==='Signed'?'success':'warning')}</div>`).join('')}</div>`,{footer:`<button class="card-link" data-action="sign-term-sheet">Open signing page</button>`})}${card('Approval Routing',`<div class="approval-route"><div class="done"><span>1</span><div><strong>Legal review</strong><small>Farai Chikore · complete</small></div></div><div class="done"><span>2</span><div><strong>Investment Director</strong><small>Tariro Kasere · complete</small></div></div><div class="current"><span>3</span><div><strong>Company signature</strong><small>${envelope?.progress||0}% complete</small></div></div><div><span>4</span><div><strong>Completion certificate</strong><small>Generated after all parties sign</small></div></div></div>`)}${card('Source Data',`<div class="info-list"><div class="info-row"><span>Investment memo</span><strong>IM-NOVA-v7</strong></div><div class="info-row"><span>Valuation model</span><strong>VAL-NOVA-Q2-2026</strong></div><div class="info-row"><span>Cap table</span><strong>CAP-NOVA-v8</strong></div><div class="info-row"><span>Legal redline</span><strong>TS-NOVA-v4</strong></div><div class="info-row"><span>Last sync</span><strong>13 Jul · 16:20 CAT</strong></div></div>`,{footer:'<button class="card-link" data-action="preview-document" data-id="DOC-009">Preview current term sheet</button>'})}</div></section>`;
   }
 
   function renderDealIC(deal) {
@@ -1493,7 +1554,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     const selected = documents.find(doc=>doc.id===state.selectedDocumentId) || filtered[0] || documents[0];
     return `<section class="document-layout"><div class="folder-list">${folders.map(folder=>`<button class="folder-button ${state.selectedFolder===folder?'active':''}" data-action="select-folder" data-folder="${escapeHTML(folder)}">${icon('folder')}<span>${escapeHTML(folder)}</span><strong>${documents.filter(doc=>doc.folder===folder).length}</strong></button>`).join('')}</div>
       <div><div class="page-actions" style="justify-content:space-between;margin-bottom:10px"><div class="table-search">${icon('search')}<input style="width:280px" placeholder="Search in ${escapeHTML(state.selectedFolder)}..."></div><div class="page-actions"><label class="button primary" style="cursor:pointer">${icon('upload')} Upload files<input type="file" multiple hidden data-file-action="upload-document"></label>${button('Create folder','create-folder','','folder')}${button('Request document','request-document','','file')}</div></div>
-        <section class="card"><div class="table-wrap"><table><thead><tr><th><input type="checkbox"></th><th>Name</th><th>Type</th><th>Version</th><th>Owner</th><th>Uploaded</th><th>Review Status</th><th>Access</th><th>Actions</th></tr></thead><tbody>${filtered.map(doc=>`<tr class="clickable" data-action="select-document" data-id="${doc.id}"><td><input type="checkbox"></td><td class="table-primary brand-text">${escapeHTML(doc.name)}</td><td>${doc.type}</td><td>${statusPill(doc.version,'info')}</td><td>${escapeHTML(doc.owner)}</td><td>${doc.uploaded}</td><td>${statusPill(doc.status)}</td><td>${escapeHTML(doc.access)}</td><td><div class="page-actions" style="justify-content:flex-start">${button('','preview-document','ghost compact icon-only','eye',`data-id="${doc.id}"`)}${button('','download-document','ghost compact icon-only','download',`data-id="${doc.id}"`)}</div></td></tr>`).join('')}</tbody></table></div></section>
+        <section class="card"><div class="table-wrap"><table><thead><tr><th><input type="checkbox"></th><th>Name</th><th>Type</th><th>Version</th><th>Owner</th><th>Uploaded</th><th>Review Status</th><th>Access</th><th>Actions</th></tr></thead><tbody>${filtered.map(doc=>`<tr class="clickable" data-action="select-document" data-id="${doc.id}"><td><input type="checkbox"></td><td class="table-primary brand-text"><button type="button" class="v17-document-name" data-action="preview-document" data-id="${doc.id}"><span class="document-row-icon">${icon(doc.type==='XLSX'?'file-chart':'file')}</span><span>${escapeHTML(doc.name)}</span></button></td><td>${doc.type}</td><td>${statusPill(doc.version,'info')}</td><td>${escapeHTML(doc.owner)}</td><td>${doc.uploaded}</td><td>${statusPill(doc.status)}</td><td>${escapeHTML(doc.access)}</td><td><div class="page-actions" style="justify-content:flex-start">${button('','preview-document','ghost compact icon-only','eye',`data-id="${doc.id}"`)}${button('','download-document','ghost compact icon-only','download',`data-id="${doc.id}"`)}</div></td></tr>`).join('')}</tbody></table></div></section>
         <section class="document-preview section-gap"><div class="document-preview-head"><span class="file-icon">${icon('file')}</span><div style="flex:1"><strong>${escapeHTML(selected.name)}</strong><div class="muted small">${escapeHTML(selected.folder)} · ${escapeHTML(selected.version)} · ${escapeHTML(selected.status)}</div></div>${statusPill(selected.status)}</div><div class="grid cols-2 section-gap"><div class="info-list"><div class="info-row"><span>Type</span><strong>${escapeHTML(selected.type)} Document</strong></div><div class="info-row"><span>Version</span><strong>${escapeHTML(selected.version)}</strong></div><div class="info-row"><span>Uploaded by</span><strong>${escapeHTML(selected.owner)}</strong></div><div class="info-row"><span>Uploaded on</span><strong>${escapeHTML(selected.uploaded)}</strong></div><div class="info-row"><span>Access</span><strong>${escapeHTML(selected.access)}</strong></div></div><div><div class="tabs"><button class="tab active">Version history</button><button class="tab">Reviewers</button><button class="tab">Comments (2)</button><button class="tab">E-signatures</button></div><div class="timeline section-gap"><div class="timeline-item"><strong>${selected.version} · Current</strong><small>${selected.uploaded} · Updated registered office address</small></div><div class="timeline-item"><strong>v2.0</strong><small>7 Jul 2026 · Reissued certificate</small></div><div class="timeline-item"><strong>v1.0</strong><small>30 Jun 2026 · Initial upload</small></div></div></div></div></section>
       </div><div class="side-stack" style="display:flex">
         ${card('Data Room Access',`<div class="info-list"><div class="info-row"><span>Internal Team</span><strong>6 users</strong></div><div class="info-row"><span>Nova Analytics</span><strong>5 users</strong></div><div class="info-row"><span>External Counsel</span><strong>3 users</strong></div></div><div class="grid cols-2 section-gap">${button('Change permissions','change-permissions','compact','shield')}${button('Revoke access','revoke-access','danger compact','lock')}</div>`) }
@@ -1593,7 +1654,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
         ${metricCard({label:'Verified KYC',value:`${lps.filter(lp=>lp.kyc==='Verified').length}/${lps.length}`,iconName:'shield',accent:'emerald',foot:'Investor records current',action:'fund-lp-kyc'})}
       </section>
       <section class="fund-three-column section-gap">
-        ${card('Commitment by Investor Type',donutChart([{label:'Pension Funds',value:250,color:'#2475f5',display:'$250M'},{label:'Insurance',value:200,color:'#07936d',display:'$200M'},{label:'Endowments',value:175,color:'#8b5cf6',display:'$175M'},{label:'Family Offices',value:150,color:'#f29a1f',display:'$150M'},{label:'Funds of Funds',value:125,color:'#0f98b6',display:'$125M'}],formatMoney(fund.commitment),'Commitment',150),{subtitle:'Investor mix'})}
+        ${card('Commitment by Investor Type',donutChart([{label:'Pension Funds',value:250,color:'#2475f5',display:'$250M'},{label:'Insurance',value:200,color:'#07936d',display:'$200M'},{label:'Endowments',value:175,color:'#60a5fa',display:'$175M'},{label:'Family Offices',value:150,color:'#f29a1f',display:'$150M'},{label:'Funds of Funds',value:125,color:'#0f98b6',display:'$125M'}],formatMoney(fund.commitment),'Commitment',150),{subtitle:'Investor mix'})}
         ${card('Geographic Mix',barChart({labels:['Africa','North America','Europe','Middle East','Asia'],series:[{name:'Commitment',color:'var(--brand)',values:[375,325,200,80,55]}],height:280,yLabel:'USD millions',format:v=>`${Math.round(v)}M`}),{subtitle:'LP domicile exposure'})}
         ${card('Investor Servicing',`<div class="info-list"><div class="info-row"><span>Notices acknowledged</span><strong>92%</strong></div><div class="info-row"><span>Portal adoption</span><strong>96%</strong></div><div class="info-row"><span>KYC current</span><strong>80%</strong></div><div class="info-row"><span>Open document requests</span><strong class="warning-text">4</strong></div><div class="info-row"><span>Interactions this quarter</span><strong>18</strong></div><div class="info-row"><span>Average response time</span><strong>1.8 days</strong></div></div>`,{footer:'<button type="button" class="card-link" data-action="new-communication">Send investor update</button>'})}
       </section>
@@ -1644,7 +1705,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       </section>
       <section class="fund-two-column section-gap fund-document-layout">
         ${card('Folders',`<div class="fund-folder-grid">${[['Legal',38],['Fundraising',26],['Valuation',44],['Investor Reporting',62],['Audit',31],['Tax',24],['ESG',37],['Capital Activity',24]].map(item=>`<button type="button" class="fund-folder" data-action="generic-action"><span class="document-row-icon folder">${icon('folder')}</span><span><strong>${item[0]}</strong><small>${item[1]} documents</small></span>${icon('chevron-right')}</button>`).join('')}</div>`) }
-        ${card('Recent Documents',`<div class="table-wrap"><table><thead><tr><th>Document</th><th>Folder</th><th>Version</th><th>Updated</th><th>Status</th><th></th></tr></thead><tbody>${fundDocs.map((doc,index)=>`<tr><td class="table-primary"><span class="document-name-cell"><span class="document-row-icon">${icon(doc[0].endsWith('.xlsx')?'file-chart':'file')}</span><span>${escapeHTML(doc[0])}</span></span></td><td>${doc[1]}</td><td>${doc[2]}</td><td>${doc[4]}</td><td>${statusPill(doc[3])}</td><td><div class="document-row-actions"><button type="button" class="button ghost compact icon-only" data-action="preview-document" data-id="${documents[index%documents.length].id}">${icon('eye')}</button><button type="button" class="button ghost compact icon-only" data-action="download-document" data-id="${documents[index%documents.length].id}">${icon('download')}</button></div></td></tr>`).join('')}</tbody></table></div>`,{tools:button('Export index','export-drilldown','compact','download')})}
+        ${card('Recent Documents',`<div class="table-wrap"><table><thead><tr><th>Document</th><th>Folder</th><th>Version</th><th>Updated</th><th>Status</th><th></th></tr></thead><tbody>${fundDocs.map((doc,index)=>`<tr><td class="table-primary"><button type="button" class="v17-document-name" data-action="preview-document" data-id="${documentIdForName(doc[0])}"><span class="document-row-icon">${icon(doc[0].endsWith('.xlsx')?'file-chart':'file')}</span><span>${escapeHTML(doc[0])}</span></button></td><td>${doc[1]}</td><td>${doc[2]}</td><td>${doc[4]}</td><td>${statusPill(doc[3])}</td><td><div class="document-row-actions"><button type="button" class="button ghost compact icon-only" data-action="preview-document" data-id="${documentIdForName(doc[0])}">${icon('eye')}</button><button type="button" class="button ghost compact icon-only" data-action="download-document" data-id="${documentIdForName(doc[0])}">${icon('download')}</button></div></td></tr>`).join('')}</tbody></table></div>`,{tools:button('Export index','export-drilldown','compact','download')})}
       </section>
     </section>`;
   }
@@ -1674,7 +1735,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       {label:'Financial Services',value:27.3,color:'#2475f5',display:'27.3%'},
       {label:'Technology',value:22.8,color:'#0ba780',display:'22.8%'},
       {label:'Consumer',value:18.6,color:'#f5a623',display:'18.6%'},
-      {label:'Industrial',value:14.7,color:'#8b5cf6',display:'14.7%'},
+      {label:'Industrial',value:14.7,color:'#60a5fa',display:'14.7%'},
       {label:'Healthcare',value:8.2,color:'#f0641c',display:'8.2%'},
       {label:'Other',value:8.4,color:'#aab3c2',display:'8.4%'}
     ];
@@ -1727,7 +1788,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     </div><div class="side-stack" style="display:flex">
       ${card('Next Board Meeting',`<div class="metric-value" style="font-size:18px">${company.boardDate}</div><p class="muted small">Harare, Zimbabwe · 10:00 SAST</p>`,{footer:'<button type="button" class="card-link" data-action="company-profile-tab" data-tab="board">Open governance workspace</button>'})}
       ${card('Leadership Team',`<div class="grid cols-2">${[['Tendai Moyo','Chief Executive Officer'],['Tinashe Nyoni','Chief Technology Officer'],['Rudo Chikomo','Chief Revenue Officer'],['Farai Mutasa','Chief Financial Officer']].map((p,i)=>`<button type="button" class="list-row" data-action="open-team">${avatar(p[0],i)}<span class="list-row-main"><strong>${p[0]}</strong><small>${p[1]}</small></span></button>`).join('')}</div>`,{footer:'<button type="button" class="card-link" data-action="open-team">View all team members</button>'})}
-      ${card('Board Composition',donutChart([{label:'Matanho',value:3,color:'#07936d',display:'3'},{label:'Management',value:2,color:'#2475f5',display:'2'},{label:'Independent',value:2,color:'#8b5cf6',display:'2'}],'7','Directors',120),{footer:'<button type="button" class="card-link" data-action="company-profile-tab" data-tab="board">View board details</button>'})}
+      ${card('Board Composition',donutChart([{label:'Matanho',value:3,color:'#07936d',display:'3'},{label:'Management',value:2,color:'#2475f5',display:'2'},{label:'Independent',value:2,color:'#60a5fa',display:'2'}],'7','Directors',120),{footer:'<button type="button" class="card-link" data-action="company-profile-tab" data-tab="board">View board details</button>'})}
       ${card('Alerts & Actions',`<div class="info-list"><button type="button" class="list-row" data-action="open-alerts"><span class="activity-icon" style="color:var(--red);background:var(--red-soft)">${icon('alert')}</span><span class="list-row-main"><strong>ISO 27001 Certification</strong><small>At Risk</small></span></button><button type="button" class="list-row" data-action="open-alerts"><span class="activity-icon" style="color:var(--amber);background:var(--amber-soft)">${icon('clock')}</span><span class="list-row-main"><strong>1 milestone due in 30 days</strong><small>Due Soon</small></span></button><button type="button" class="list-row" data-action="open-alerts"><span class="activity-icon" style="color:var(--blue);background:var(--blue-soft)">${icon('file')}</span><span class="list-row-main"><strong>2 updates pending review</strong><small>Review</small></span></button></div>`,{footer:'<button type="button" class="card-link" data-action="open-alerts">View all alerts</button>'})}
       ${card('ESG Snapshot',`<div class="info-list"><div class="info-row"><span>Environmental</span>${healthScore(company.esg[0])}</div><div class="info-row"><span>Social</span>${healthScore(company.esg[1])}</div><div class="info-row"><span>Governance</span>${healthScore(company.esg[2])}</div></div>`,{footer:'<button type="button" class="card-link" data-action="open-esg">View full ESG report</button>'})}
     </div></section>`;
@@ -1773,7 +1834,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     return `<section class="profile-tab-panel section-gap">
       <div class="profile-tab-summary"><div><strong>Board and governance workspace</strong><span>Meetings, committees, resolutions, reserved matters, declarations and governance actions.</span></div>${button('Generate board pack','company-board-pack','primary','clipboard')}</div>
       <section class="grid cols-3 section-gap">
-        ${card('Board Composition',donutChart([{label:'Matanho nominees',value:3,color:'#0ba780',display:'3'},{label:'Management',value:2,color:'#2475f5',display:'2'},{label:'Independent',value:2,color:'#8b5cf6',display:'2'}],'7','Directors',150),{subtitle:'Full board · quorum 4'})}
+        ${card('Board Composition',donutChart([{label:'Matanho nominees',value:3,color:'#0ba780',display:'3'},{label:'Management',value:2,color:'#2475f5',display:'2'},{label:'Independent',value:2,color:'#60a5fa',display:'2'}],'7','Directors',150),{subtitle:'Full board · quorum 4'})}
         ${card('Attendance Trend',barChart({labels:['Aug 2025','Nov 2025','Feb 2026','May 2026','Aug 2026'],series:[{name:'Attendance',color:'var(--blue)',values:[86,100,86,100,100]}],height:265,yLabel:'Attendance %',format:v=>`${Math.round(v)}%`}),{subtitle:'Board and committee attendance'})}
         ${card('Governance Actions',`<div class="info-list">${[['ISO 27001 remediation oversight','Technology Committee','At Risk'],['Approve South Africa subsidiary','Full Board','Pending'],['CFO succession plan','Remuneration Committee','In Review'],['FY2027 budget assumptions','Audit & Risk Committee','On Track']].map(row=>`<button type="button" class="list-row" data-action="open-board-details"><span class="list-row-main"><strong>${row[0]}</strong><small>${row[1]}</small></span>${statusPill(row[2])}</button>`).join('')}</div>`) }
       </section>
@@ -1795,7 +1856,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       <section class="grid cols-3 section-gap">
         ${card('Revenue, EBITDA & Cash',lineChart({labels:periods,series:[{name:'Revenue',color:'var(--blue)',values:[12.8,16.4,22.6,29.0,30.4,36.5]},{name:'EBITDA',color:'var(--emerald)',values:[2.3,3.4,6.4,8.9,9.6,12.5]},{name:'Closing cash',color:'var(--amber)',values:[5.2,7.8,10.4,9.7,11.3,14.8]}],height:310,yLabel:'USD millions',format:v=>`${Number(v).toFixed(1)}M`}),{subtitle:'Actual, budget and forecast'})}
         ${card('Cash Runway',barChart({labels:['Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb'],series:[{name:'Base case',color:'var(--blue)',values:[18,17,16,15,14,13,12,11]},{name:'Downside',color:'var(--red)',values:[18,16,14,12,10,8,6,4]}],height:310,yLabel:'Months of runway',format:v=>`${Math.round(v)} mo`}),{subtitle:'Liquidity scenarios'})}
-        ${card('Working Capital Cycle',donutChart([{label:'Receivables',value:42,color:'#2475f5',display:'42 days'},{label:'Contract assets',value:18,color:'#8b5cf6',display:'18 days'},{label:'Payables offset',value:25,color:'#0ba780',display:'25 days'}],'35','Net days',150),{subtitle:'Latest month-end cycle'})}
+        ${card('Working Capital Cycle',donutChart([{label:'Receivables',value:42,color:'#2475f5',display:'42 days'},{label:'Contract assets',value:18,color:'#60a5fa',display:'18 days'},{label:'Payables offset',value:25,color:'#0ba780',display:'25 days'}],'35','Net days',150),{subtitle:'Latest month-end cycle'})}
       </section>
       ${card('Income Statement',`<div class="table-wrap"><table><thead><tr><th>USD millions</th>${periods.map(p=>`<th class="text-right">${p}</th>`).join('')}<th class="text-right">FY26E vs B</th></tr></thead><tbody>${[['Revenue',[12.8,16.4,22.6,29.0,30.4,36.5],'+4.8%'],['Gross profit',[9.2,12.0,16.7,21.0,22.5,27.1],'+7.1%'],['Operating expenses',[-6.9,-8.6,-10.3,-12.1,-12.9,-14.6],'-6.6%'],['EBITDA',[2.3,3.4,6.4,8.9,9.6,12.5],'+7.9%'],['Depreciation & amortisation',[-0.8,-1.0,-1.4,-1.8,-1.8,-2.1],'0.0%'],['Net finance costs',[-0.3,-0.4,-0.6,-0.7,-0.8,-0.8],'-14.3%'],['Profit before tax',[1.2,2.0,4.4,6.4,7.0,9.6],'+9.4%'],['Net profit',[0.9,1.5,3.3,4.8,5.2,7.1],'+8.3%']].map((row,index)=>`<tr class="${index===0||index===3||index===7?'table-primary':''}"><td>${row[0]}</td>${row[1].map(v=>`<td class="text-right ${v<0?'negative':''}">${v<0?'(' + Math.abs(v).toFixed(1) + ')':v.toFixed(1)}</td>`).join('')}<td class="text-right ${row[2].startsWith('+')?'positive':'negative'}">${row[2]}</td></tr>`).join('')}</tbody></table></div>`,{footer:'<span class="muted small">Click charts above for period and account-level drill-downs.</span>'})}
       <section class="grid cols-2 section-gap">
@@ -1827,7 +1888,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     return `<section class="profile-tab-panel section-gap">
       <div class="profile-tab-summary"><div><strong>Company activity and audit trail</strong><span>Chronological operating updates, approvals, document changes and user actions.</span></div><div class="page-actions">${button('Add update','company-update','primary','plus')}${button('Export audit','export-drilldown','','download')}</div></div>
       <section class="grid cols-3 section-gap">
-        ${card('Activity by Type',donutChart([{label:'Performance',value:18,color:'#2475f5',display:'18'},{label:'Governance',value:12,color:'#8b5cf6',display:'12'},{label:'Documents',value:14,color:'#0ba780',display:'14'},{label:'Value Creation',value:9,color:'#f5a623',display:'9'},{label:'Valuation',value:5,color:'#dc4b5b',display:'5'}],'58','Events',150))}
+        ${card('Activity by Type',donutChart([{label:'Performance',value:18,color:'#2475f5',display:'18'},{label:'Governance',value:12,color:'#60a5fa',display:'12'},{label:'Documents',value:14,color:'#0ba780',display:'14'},{label:'Value Creation',value:9,color:'#f5a623',display:'9'},{label:'Valuation',value:5,color:'#dc4b5b',display:'5'}],'58','Events',150))}
         ${card('Monthly Activity',barChart({labels:['Feb','Mar','Apr','May','Jun','Jul'],series:[{name:'Events',color:'var(--blue)',values:[24,31,28,37,42,58]}],height:260,yLabel:'Recorded events',format:v=>Math.round(v)}),{subtitle:'Audit and workflow events'})}
         ${card('Open Follow-ups',`<div class="info-list">${[['Renew tax clearance certificate','Farai Mutasa','5 Aug 2026','Watch'],['Complete ISO remediation evidence','Tinashe Nyoni','12 Aug 2026','At Risk'],['Confirm South Africa office lease','Rudo Chikomo','15 Aug 2026','In Review'],['Distribute August board pack','Company Secretary','17 Aug 2026','On Track']].map(row=>`<button type="button" class="list-row" data-action="open-activity"><span class="list-row-main"><strong>${row[0]}</strong><small>${row[1]} · ${row[2]}</small></span>${statusPill(row[3])}</button>`).join('')}</div>`) }
       </section>
@@ -1954,7 +2015,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
         ${metricCard({label:'Outstanding',value:'2',iconName:'alert',accent:'amber',foot:'Both due this month',action:'lp-documents-outstanding'})}
         ${metricCard({label:'Acknowledgements',value:'96%',iconName:'check-circle',accent:'purple',foot:'Portal delivery acceptance',action:'lp-acknowledgements'})}
       </section>
-      ${card('Document Register',`<div class="table-toolbar"><div class="table-search">${icon('search')}<input type="text" placeholder="Search LP documents..."></div><div class="table-tools">${button('Filter','lp-filters','compact','filter')}${button('Export index','export-lps','compact','download')}</div></div><div class="table-wrap"><table><thead><tr><th>Document</th><th>Category</th><th>Version</th><th>Date</th><th>Status</th><th>Access</th><th>Acknowledgement</th><th></th></tr></thead><tbody>${rows.map((row,index)=>`<tr class="clickable" data-action="open-lp-documents"><td class="table-primary">${icon('file')} ${row[0]}</td><td>${row[1]}</td><td>${row[2]}</td><td>${row[3]}</td><td>${statusPill(row[4])}</td><td>${row[5]}</td><td>${index<3?'Executed':index===4?'Pending':'Recorded'}</td><td><div class="document-row-actions"><button type="button" class="button ghost compact icon-only" data-action="open-lp-documents">${icon('eye')}</button><button type="button" class="button ghost compact icon-only" data-action="download-document">${icon('download')}</button></div></td></tr>`).join('')}</tbody></table></div>`) }
+      ${card('Document Register',`<div class="table-toolbar"><div class="table-search">${icon('search')}<input type="text" placeholder="Search LP documents..."></div><div class="table-tools">${button('Filter','lp-filters','compact','filter')}${button('Export index','export-lps','compact','download')}</div></div><div class="table-wrap"><table><thead><tr><th>Document</th><th>Category</th><th>Version</th><th>Date</th><th>Status</th><th>Access</th><th>Acknowledgement</th><th></th></tr></thead><tbody>${rows.map((row,index)=>`<tr class="clickable" data-action="preview-document" data-id="${documentIdForName(row[0])}"><td class="table-primary"><button type="button" class="v17-document-name" data-action="preview-document" data-id="${documentIdForName(row[0])}">${icon('file')}<span>${row[0]}</span></button></td><td>${row[1]}</td><td>${row[2]}</td><td>${row[3]}</td><td>${statusPill(row[4])}</td><td>${row[5]}</td><td>${index<3?'Executed':index===4?'Pending':'Recorded'}</td><td><div class="document-row-actions"><button type="button" class="button ghost compact icon-only" data-action="preview-document" data-id="${documentIdForName(row[0])}">${icon('eye')}</button><button type="button" class="button ghost compact icon-only" data-action="download-document" data-id="${documentIdForName(row[0])}">${icon('download')}</button></div></td></tr>`).join('')}</tbody></table></div>`) }
       <section class="grid cols-2 section-gap">
         ${card('KYC Review Checklist',`<div class="reason-list">${[['Identity and legal form','Complete'],['Beneficial ownership','In Review'],['Source of funds','Complete'],['Sanctions and PEP screening','Complete'],['Tax residence','Complete'],['Investment authority','Complete'],['Annual financial statements','Outstanding']].map(row=>`<button type="button" class="reason-item" data-action="open-kyc">${icon(row[1]==='Complete'?'check-circle':'clock')}<div><strong>${row[0]}</strong><small>${row[1]}</small></div></button>`).join('')}</div>`) }
         ${card('Open Requests',`<div class="info-list">${[['Audited Financial Statements 2024','18 Jul 2026','5 days'],['Beneficial Ownership Declaration','25 Jul 2026','12 days']].map(row=>`<button type="button" class="list-row" data-action="open-lp-documents"><span class="list-row-main"><strong>${row[0]}</strong><small>Due ${row[1]}</small></span>${statusPill(row[2],'warning')}</button>`).join('')}</div>`) }
@@ -1968,7 +2029,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       <div class="profile-tab-summary"><div><strong>Investor communications workspace</strong><span>Contacts, interactions, secure communications, acknowledgements and follow-up scheduling.</span></div><div class="page-actions">${button('Add interaction','add-interaction','','plus')}${button('Send communication','new-communication','primary','mail')}</div></div>
       <section class="grid cols-3 section-gap">
         ${card('Engagement Trend',barChart({labels:['Feb','Mar','Apr','May','Jun','Jul'],series:[{name:'Emails & portal',color:'var(--blue)',values:[4,6,5,8,7,10]},{name:'Calls & meetings',color:'var(--emerald)',values:[2,2,3,2,4,3]}],height:290,yLabel:'Interactions',stacked:true,format:v=>Math.round(v)}),{subtitle:'Recorded investor touchpoints'})}
-        ${card('Communication Outcomes',donutChart([{label:'Opened',value:17,color:'#2475f5',display:'17'},{label:'Acknowledged',value:8,color:'#0ba780',display:'8'},{label:'Downloaded',value:6,color:'#8b5cf6',display:'6'},{label:'Pending',value:2,color:'#f5a623',display:'2'}],'33','Messages',150))}
+        ${card('Communication Outcomes',donutChart([{label:'Opened',value:17,color:'#2475f5',display:'17'},{label:'Acknowledged',value:8,color:'#0ba780',display:'8'},{label:'Downloaded',value:6,color:'#60a5fa',display:'6'},{label:'Pending',value:2,color:'#f5a623',display:'2'}],'33','Messages',150))}
         ${card('Relationship Coverage',`<div class="info-list">${[['Primary owner',lp.owner,'Active'],['Executive sponsor','Tariro Kasere','Active'],['Investor relations','James Mbewe','Active'],['Fund administration','Sarah Mitchell','Active'],['Next touchpoint','31 Jul 2026','Scheduled']].map(row=>`<div class="info-row"><span>${row[0]}</span><strong>${row[1]} · ${row[2]}</strong></div>`).join('')}</div>`) }
       </section>
       ${card('Communication & Interaction Log',`<div class="table-wrap"><table><thead><tr><th>Date</th><th>Type</th><th>Subject / Summary</th><th>Channel</th><th>Outcome</th><th>Owner</th><th>Follow-up</th><th></th></tr></thead><tbody>${communications.map((row,index)=>`<tr class="clickable" data-action="open-interaction"><td>${row[0]}</td><td>${row[1]}</td><td class="table-primary">${row[2]}</td><td>${row[3]}</td><td>${statusPill(row[4])}</td><td>${row[5]}</td><td>${index===0?'31 Jul 2026':index===4?'Complete':'None'}</td><td><button type="button" class="button ghost compact icon-only" data-action="open-interaction">${icon('chevron-right')}</button></td></tr>`).join('')}</tbody></table></div>`) }
@@ -2425,7 +2486,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     const form = $('#companyForm');
     if (!form?.reportValidity()) return;
     const data = Object.fromEntries(new FormData(form));
-    const colors = ['#4f46e5','#0d9488','#ea580c','#9333ea','#0284c7'];
+    const colors = ['#1d4ed8','#0d9488','#ea580c','#0284c7','#0284c7'];
     const company = { id:`CO-${String(companies.length+1).padStart(3,'0')}`, name:data.name, sector:data.sector, stage:data.stage, entry:'31 Jul 2026', invested:Number(data.invested), fairValue:Number(data.fairValue), ownership:Number(data.ownership), revenueGrowth:0, runway:18, health:75, boardDate:'TBC', lastReport:'Not submitted', fund:data.fund, city:data.city, revenue:[0,0,0,0,0], ebitda:[0,0,0,0,0], arr:0, margin:0, nrr:0, clients:0, esg:[0,0,0], color:colors[companies.length%colors.length] };
     companies.push(company);
     closeOverlays();
@@ -2442,7 +2503,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     if (!form?.reportValidity()) return;
     const data = Object.fromEntries(new FormData(form));
     const commitment = Number(data.commitment);
-    const lp = { id:`LP-${String(lps.length+1).padStart(3,'0')}`, name:data.name, type:data.type, geography:data.geography, commitment, called:0, distributed:0, netIrr:0, owner:data.owner, lastInteraction:'Not contacted', kyc:'Not Started', portal:'Invited', unfunded:commitment, tvpi:0, dpi:0, color:'#6554e8' };
+    const lp = { id:`LP-${String(lps.length+1).padStart(3,'0')}`, name:data.name, type:data.type, geography:data.geography, commitment, called:0, distributed:0, netIrr:0, owner:data.owner, lastInteraction:'Not contacted', kyc:'Not Started', portal:'Invited', unfunded:commitment, tvpi:0, dpi:0, color:'#2563eb' };
     lps.push(lp);
     closeOverlays(); toast('LP onboarding started', `${lp.name} was added to the directory.`); state.page='lps'; render();
   }
@@ -2477,7 +2538,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     const doc=documents.find(d=>d.id===documentId)||documents.find(d=>/Term Sheet/.test(d.name))||documents[0];
     const envelope=signatureEnvelopes.find(e=>e.id===envelopeId)||signatureEnvelopes.find(e=>e.documentId===doc.id)||signatureEnvelopes[0];
     state.selectedDocumentId=doc.id; state.selectedEnvelopeId=envelope.id;
-    const recipients=envelope.recipients.map((r,i)=>`<button class="signature-recipient ${r[2]==='Signed'?'signed':r[2]==='Declined'?'declined':''}" data-action="select-signature-recipient" data-index="${i}"><span class="avatar">${initials(r[0])}</span><span><strong>${escapeHTML(r[0])}</strong><small>${escapeHTML(r[1])}</small></span>${statusPill(r[2])}</button>`).join('');
+    const recipients=envelope.recipients.map((r,i)=>`<button class="signature-recipient ${r[2]==='Signed'?'signed':r[2]==='Declined'?'declined':''}" data-action="select-signature-recipient" data-index="${i}">${personAvatar(r[0])}<span><strong>${escapeHTML(r[0])}</strong><small>${escapeHTML(r[1])}</small></span>${statusPill(r[2])}</button>`).join('');
     showModal('Signature Studio',`${doc.name} · ${envelope.id}`,`<div class="signature-studio"><aside class="signature-toolbox"><strong>Fields</strong><button class="signature-tool" data-action="add-signature-field">${icon('edit')} Signature</button><button class="signature-tool" data-action="add-initial-field">${icon('user-check')} Initials</button><button class="signature-tool" data-action="add-date-field">${icon('calendar')} Date signed</button><button class="signature-tool" data-action="add-text-field">${icon('file')} Text field</button><div class="signature-divider"></div><strong>Recipients</strong>${recipients}</aside><main class="signature-document"><div class="signature-document-toolbar"><span>Page 1 of ${doc.pages||8}</span><span>${icon('lock')} Encrypted · audit logged</span><button data-action="signature-zoom">100%</button></div><article class="signature-page"><div class="document-letterhead"><div class="pdf-brand">MATANHO</div><small>Investment Management ERP</small></div><p class="document-classification">TERM SHEET · SERIES B INVESTMENT · ${escapeHTML(doc.version)}</p><h1>Nova Analytics (Pvt) Ltd</h1><p class="document-lead">Non-binding summary of principal investment terms</p><div class="term-summary"><div><span>Investment</span><strong>USD 18,000,000</strong></div><div><span>Pre-money valuation</span><strong>USD 85,000,000</strong></div><div><span>Proposed ownership</span><strong>17.5%</strong></div></div><h2>Governance and investor protections</h2><p>The investor shall have the right to appoint one director and one non-voting observer, subject to the definitive agreements and agreed reserved matters.</p><h2>Electronic signatures</h2>${envelope.recipients.map((recipient,index)=>recipient[2]==='Signed'?`<div class="signature-field signed"><span>${escapeHTML(recipient[0])}</span><small>${escapeHTML(recipient[1])} · Signed with OTP authentication</small></div>`:`<button class="signature-field pending" data-action="sign-term-sheet" data-signer="${index}"><span>Click to sign for ${escapeHTML(recipient[0])}</span><small>${escapeHTML(recipient[1])}</small></button>`).join('')}</article></main><aside class="signature-inspector"><div class="signature-inspector-tabs"><button class="active">Prepare</button><button>Message</button><button>Review</button></div><div class="signature-inspector-body"><h3>Envelope settings</h3><div class="info-list"><div class="info-row"><span>Signing order</span><strong>Enabled</strong></div><div class="info-row"><span>Authentication</span><strong>Email + OTP</strong></div><div class="info-row"><span>Expiry</span><strong>${escapeHTML(envelope.expires)}</strong></div><div class="info-row"><span>Reminders</span><strong>Every 2 days</strong></div></div><h3 class="section-gap">Message</h3><div class="form-field"><label>Email subject</label><input value="Please sign: ${escapeHTML(envelope.subject)}"></div><div class="form-field section-gap"><label>Private message</label><textarea>Please review and electronically sign the attached investment document.</textarea></div><div class="reason-item section-gap">${icon('shield')}<div><strong>Electronic signature evidence</strong><small>Recipient, timestamp, consent, authentication and completion certificate are recorded.</small></div></div></div></aside></div>`,`${button('Save draft','save-signature-draft')}${button('Download certificate','download-signature-certificate','','download')}${button(envelope.status==='Completed'?'View completion':'Send envelope','send-signature-envelope','primary','send')}`,{variant:'signature',size:'fullscreen',eyebrow:'Secure e-signature'});
   }
 
@@ -2824,7 +2885,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
 
   function showUserMenu(anchor) {
     showPopover(anchor, `<div class="popover-title">Signed in as</div>
-      <div class="popover-item" style="cursor:default"><span class="avatar avatar-gradient">TM</span><span class="popover-item-copy"><strong>Tariro Moyo</strong><small>Investment Director · Matanho Capital</small></span></div>
+      <div class="popover-item" style="cursor:default">${personAvatar("Tariro Moyo","avatar-gradient")}<span class="popover-item-copy"><strong>Tariro Moyo</strong><small>Investment Director · Matanho Capital</small></span></div>
       <div class="popover-divider"></div>
       <button class="popover-item" data-action="navigate" data-page="settings">${icon('settings')}<span class="popover-item-copy"><strong>Workspace settings</strong><small>Preferences, permissions and integrations</small></span></button>
       <button class="popover-item" data-action="toggle-theme">${icon(state.theme==='light'?'moon':'sun')}<span class="popover-item-copy"><strong>${state.theme==='light'?'Use dark theme':'Use light theme'}</strong><small>Change appearance on this browser</small></span></button>
@@ -2832,10 +2893,6 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   }
 
   function showModuleSwitcher(anchor) {
-    if (typeof window !== 'undefined' && typeof window.__openArcusAppSwitcher === 'function') {
-      window.__openArcusAppSwitcher();
-      return;
-    }
     const modules = [
       ['Portfolio Management','Active','layers','var(--brand)'],['Loan Operations','Available','wallet','var(--blue)'],['Workshop OS','Available','settings','var(--emerald)'],['Procurement','Preview','clipboard','var(--amber)'],['Employee Hub','Available','users','var(--purple)'],['Board Management','Preview','gavel','var(--cyan)']
     ];
@@ -3033,7 +3090,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     phone: '+263 77 245 8890',
     website: 'www.matanho.com',
     footer: 'Private and confidential · Prepared for authorised recipients only',
-    accent: '#6554e8',
+    accent: '#2563eb',
     logoScale: 'medium',
     alignment: 'left',
     showLogo: true,
@@ -3270,7 +3327,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   showSignatureStudio=function(documentId,envelopeId=null){v8ShowSignatureStudio(documentId,envelopeId);requestAnimationFrame(()=>{const current=$('.document-letterhead',modalLayer);if(current)current.outerHTML=v9RenderLetterhead(v9Letterhead);});};
 
   let v9ReportAutosaveTimer;
-  document.addEventListener('input', event=>{
+  document.addEventListener('input',event=>{
     const target=event.target;
     if(target.dataset.inputAction==='report-editor'){
       clearTimeout(v9ReportAutosaveTimer); state.reportAutosave='Saving…'; const status=$('.report-editor-status span:first-child'); if(status)status.innerHTML=`${icon('save')} Saving…`;
@@ -3278,15 +3335,15 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     }
     if(target.dataset.inputAction==='letterhead-live') v9RefreshLetterheadPreview();
     if(target.dataset.inputAction==='mailer-people-search'){const rows=$('#mailerPeopleRows');if(rows)rows.innerHTML=v9RenderMailerPeopleRows(target.dataset.listId,target.value);renderStaticIcons(rows);}
-  }, __pv11Sig);
-  document.addEventListener('change', event=>{
+  });
+  document.addEventListener('change',event=>{
     const target=event.target;
     if(target.dataset.changeAction==='letterhead-live') v9RefreshLetterheadPreview();
     if(target.dataset.changeAction==='report-template'){state.reportTemplate=target.value;toast('Template changed',`${target.value} styling is applied to the working draft.`);}
     if(target.dataset.fileAction==='letterhead-logo'&&target.files?.[0]){const reader=new FileReader();reader.onload=()=>{v9Letterhead.logoDataUrl=String(reader.result||'');v9RefreshLetterheadPreview();};reader.readAsDataURL(target.files[0]);}
     if(target.dataset.fileAction==='report-image'&&target.files?.[0]){const reader=new FileReader();reader.onload=()=>v9InsertReportHTML(`<figure class="report-image-block"><img src="${String(reader.result||'')}" alt="Inserted report image"><figcaption contenteditable="true">Add image caption and source.</figcaption></figure>`);reader.readAsDataURL(target.files[0]);}
-  }, __pv11Sig);
-  document.addEventListener('keydown', event=>{if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='s'&&state.page==='report-builder'){event.preventDefault();v9SaveCurrentReportSection(false);}}, __pv11Sig);
+  });
+  document.addEventListener('keydown',event=>{if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='s'&&state.page==='report-builder'){event.preventDefault();v9SaveCurrentReportSection(false);}});
 
   const originalHandleAction=handleAction;
   handleAction=function(action,trigger,event){
@@ -3323,7 +3380,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       case 'modal-rail-step': { $$('.modal-rail-step',modalLayer).forEach(node=>node.classList.toggle('active',node===trigger)); const sections=$$('.modal-body > section,.modal-body > form > section',modalLayer); const target=sections[Number(trigger.dataset.step)]; target?.scrollIntoView({behavior:'smooth',block:'start'}); return; }
       case 'edit-letterhead': v9SaveCurrentReportSection(); v9ShowLetterheadEditor(); return;
       case 'save-letterhead': v9SaveLetterhead(); return;
-      case 'reset-letterhead': Object.assign(v9Letterhead,{organisation:'Matanho Capital',product:'Investment Management ERP',address:'4th Floor, Matanho House · Harare, Zimbabwe',email:'investor-relations@matanho.com',phone:'+263 77 245 8890',website:'www.matanho.com',footer:'Private and confidential · Prepared for authorised recipients only',accent:'#6554e8',logoScale:'medium',alignment:'left',showLogo:true,showAddress:true,showFooter:true,logoDataUrl:''}); v9ShowLetterheadEditor(); return;
+      case 'reset-letterhead': Object.assign(v9Letterhead,{organisation:'Matanho Capital',product:'Investment Management ERP',address:'4th Floor, Matanho House · Harare, Zimbabwe',email:'investor-relations@matanho.com',phone:'+263 77 245 8890',website:'www.matanho.com',footer:'Private and confidential · Prepared for authorised recipients only',accent:'#2563eb',logoScale:'medium',alignment:'left',showLogo:true,showAddress:true,showFooter:true,logoDataUrl:''}); v9ShowLetterheadEditor(); return;
       case 'manage-mailer-people': closeOverlays(); v9ShowMailerPeopleManager(trigger.dataset.id||state.selectedMailerListId); return;
       case 'submit-mailer-person': v9SubmitMailerPerson(); return;
       case 'mailer-member-detail': closeOverlays(); v9ShowMailerMemberDetail(trigger.dataset.listId,trigger.dataset.personId); return;
@@ -3491,7 +3548,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     if (view === 'Portfolio') {
       const sectorMap = {};
       visibleCompanies.forEach(company=>sectorMap[company.sector]=(sectorMap[company.sector]||0)+company.fairValue);
-      const sectorSegments = Object.entries(sectorMap).map(([label,value],index)=>({label,value,color:['#2475f5','#0ba780','#8b5cf6','#f29a1f','#dc3f72','#0c879f'][index%6],display:pct(value/totalFV*100)}));
+      const sectorSegments = Object.entries(sectorMap).map(([label,value],index)=>({label,value,color:['#2475f5','#0ba780','#60a5fa','#f29a1f','#dc3f72','#0c879f'][index%6],display:pct(value/totalFV*100)}));
       return `<section class="grid cols-2">${card('Fair Value by Sector',donutChart(sectorSegments,formatMoney(totalFV),'Portfolio fair value',158),{subtitle:'Current approved valuation'})}${card('Portfolio Operating Trend',lineChart({labels:['Q2 2025','Q3 2025','Q4 2025','Q1 2026','Q2 2026'],series:[{name:'Revenue growth',color:'var(--blue)',values:[18,21,24,26,29]},{name:'EBITDA growth',color:'var(--emerald)',values:[11,14,16,19,23]}],height:310,yLabel:'Percent',format:value=>`${Math.round(value)}%`}),{subtitle:'Weighted portfolio indicators'})}</section><section class="card table-card section-gap"><div class="table-toolbar"><div><h3>Investment-Level Performance</h3><p>Cost, fair value, MOIC, operating momentum and monitoring status.</p></div>${button('Portfolio filters','company-filters','compact','filter')}</div><div class="table-wrap"><table><thead><tr><th>Company</th><th>Sector</th><th class="text-right">Invested</th><th class="text-right">Fair value</th><th class="text-right">MOIC</th><th class="text-right">Ownership</th><th class="text-right">Revenue growth</th><th>Health</th></tr></thead><tbody>${visibleCompanies.map(company=>`<tr class="clickable" data-action="open-company" data-id="${company.id}"><td class="table-primary">${escapeHTML(company.name)}</td><td>${escapeHTML(company.sector)}</td><td class="text-right">${formatMoney(company.invested)}</td><td class="text-right">${formatMoney(company.fairValue)}</td><td class="text-right">${(company.fairValue/company.invested).toFixed(2)}x</td><td class="text-right">${pct(company.ownership)}</td><td class="text-right positive">${pct(company.revenueGrowth)}</td><td>${statusPill(company.health>=75?'On track':company.health>=65?'Watch':'Attention')}</td></tr>`).join('')}</tbody></table></div></section>`;
     }
     if (view === 'Attribution') {
@@ -3566,7 +3623,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     }
   };
 
-  document.addEventListener('change', event=>{
+  document.addEventListener('change',event=>{
     const target=event.target;
     if(target.dataset.changeAction==='industry-report-template') {
       state.reportTemplate=target.value;
@@ -3576,7 +3633,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     if(target.dataset.changeAction==='fund-reporting-currency') { state.fundReportingCurrency=target.value; toast('Currency updated',target.value); render(); }
     if(target.dataset.changeAction==='fund-reporting-basis') { state.fundReportingBasis=target.value; toast('Return basis updated',target.value); render(); }
     if(target.dataset.changeAction==='fund-reporting-benchmark') { state.fundReportingBenchmark=target.value; toast('Benchmark updated',target.value); render(); }
-  }, __pv11Sig);
+  });
 
 
   // ---------------------------------------------------------------------------
@@ -3735,7 +3792,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     const selected=v11RoleDefinitions[state.rbacSelectedRole] || v11CurrentRole();
     const selectedMembers=v11RoleMembers.filter(member=>member.role===selected.id);
     const matrixRows=navGroups.map(group=>`<tr class="v11-permission-group"><th colspan="3">${escapeHTML(group.label)}</th></tr>${group.items.map(item=>{const p=selected.permissions[item.id]||{read:false,write:false};return `<tr><td><span class="v11-permission-module">${icon(item.icon)}<span><strong>${escapeHTML(item.label)}</strong><small>${escapeHTML(group.label)}</small></span></span></td><td>${v11PermissionToggle(selected.id,item.id,'read',p.read)}</td><td>${v11PermissionToggle(selected.id,item.id,'write',p.write)}</td></tr>`}).join('')}`).join('');
-    return `<div class="v11-settings-content"><section class="v11-rbac-summary"><div><small>ACTIVE SECURITY CONTEXT</small><h2>${escapeHTML(v11CurrentRole().name)}</h2><p>${escapeHTML(v11CurrentRole().scope)}</p></div><div class="v11-rbac-summary-metrics"><span><strong>${Object.keys(v11RoleDefinitions).length}</strong><small>Roles</small></span><span><strong>${v11RoleMembers.length}</strong><small>Users</small></span><span><strong>100%</strong><small>MFA coverage</small></span><span><strong>0</strong><small>Orphan access</small></span></div></section><div class="v11-rbac-layout"><aside class="v11-role-directory"><div class="section-heading-with-action"><h3>Roles</h3>${v11IsFullAuthority()?button('New role','create-custom-role','compact','plus'):''}</div>${Object.values(v11RoleDefinitions).map(role=>`<button class="v11-role-card ${selected.id===role.id?'active':''}" data-action="select-rbac-role" data-role="${role.id}" style="--role-colour:${role.colour}"><span class="v11-role-icon">${icon(role.icon)}</span><span><strong>${escapeHTML(role.name)}</strong><small>${escapeHTML(role.description)}</small></span><b>${v11RoleMemberCount(role.id)}</b></button>`).join('')}</aside><main class="v11-rbac-main"><section class="card v11-role-profile"><div class="v11-role-profile-head"><span class="v11-role-icon large" style="--role-colour:${selected.colour}">${icon(selected.icon)}</span><div><small>ROLE PROFILE</small><h2>${escapeHTML(selected.name)}</h2><p>${escapeHTML(selected.description)}</p></div><div class="v11-role-profile-actions">${statusPill(v11IsFullAuthority(selected.id)?'Full authority':'Scoped access',v11IsFullAuthority(selected.id)?'success':'info')}${button('Preview access','preview-role-access','compact','eye',`data-role="${selected.id}"`)}</div></div><div class="v11-role-facts"><span><small>Data scope</small><strong>${escapeHTML(selected.scope)}</strong></span><span><small>Approval authority</small><strong>${escapeHTML(selected.approvalLimit)}</strong></span><span><small>Members</small><strong>${selectedMembers.length}</strong></span><span><small>Last reviewed</small><strong>01 Aug 2026</strong></span></div></section><section class="card table-card section-gap"><div class="table-toolbar"><div><h3>Read and write permissions</h3><p>Read controls visibility. Write controls create, edit, approve and decision actions.</p></div><div>${statusPill(v11IsFullAuthority()?'Editing enabled':'Read-only configuration',v11IsFullAuthority()?'success':'neutral')}</div></div><div class="table-wrap v11-permission-table"><table><thead><tr><th>Workspace</th><th>Read</th><th>Write</th></tr></thead><tbody>${matrixRows}</tbody></table></div></section><section class="card table-card section-gap"><div class="table-toolbar"><div><h3>Role members</h3><p>People, scope, status and last activity for this role.</p></div>${v11IsFullAuthority()?button('Add person','add-role-member','primary compact','user-plus',`data-role="${selected.id}"`):''}</div><div class="table-wrap"><table><thead><tr><th>Person</th><th>Title</th><th>Scope</th><th>Status</th><th>Last active</th><th></th></tr></thead><tbody>${selectedMembers.length?selectedMembers.map(member=>`<tr data-action="v11-role-member-detail" data-id="${member.id}"><td class="table-primary"><span class="v11-person-cell"><span class="avatar avatar-gradient">${escapeHTML(member.initials)}</span><span>${escapeHTML(member.name)}<small>${escapeHTML(member.email)}</small></span></span></td><td>${escapeHTML(member.title)}</td><td>${escapeHTML(member.scope)}</td><td>${statusPill(member.status)}</td><td>${escapeHTML(member.lastActive)}</td><td>${v11IsFullAuthority()?button('Remove','remove-role-member','ghost compact','x',`data-id="${member.id}"`):''}</td></tr>`).join(''):`<tr><td colspan="6"><div class="empty-state"><strong>No members assigned</strong><p>Add an authorised person to this role.</p></div></td></tr>`}</tbody></table></div></section></main></div></div>`;
+    return `<div class="v11-settings-content"><section class="v11-rbac-summary"><div><small>ACTIVE SECURITY CONTEXT</small><h2>${escapeHTML(v11CurrentRole().name)}</h2><p>${escapeHTML(v11CurrentRole().scope)}</p></div><div class="v11-rbac-summary-metrics"><span><strong>${Object.keys(v11RoleDefinitions).length}</strong><small>Roles</small></span><span><strong>${v11RoleMembers.length}</strong><small>Users</small></span><span><strong>100%</strong><small>MFA coverage</small></span><span><strong>0</strong><small>Orphan access</small></span></div></section><div class="v11-rbac-layout"><aside class="v11-role-directory"><div class="section-heading-with-action"><h3>Roles</h3>${v11IsFullAuthority()?button('New role','create-custom-role','compact','plus'):''}</div>${Object.values(v11RoleDefinitions).map(role=>`<button class="v11-role-card ${selected.id===role.id?'active':''}" data-action="select-rbac-role" data-role="${role.id}" style="--role-colour:${role.colour}"><span class="v11-role-icon">${icon(role.icon)}</span><span><strong>${escapeHTML(role.name)}</strong><small>${escapeHTML(role.description)}</small></span><b>${v11RoleMemberCount(role.id)}</b></button>`).join('')}</aside><main class="v11-rbac-main"><section class="card v11-role-profile"><div class="v11-role-profile-head"><span class="v11-role-icon large" style="--role-colour:${selected.colour}">${icon(selected.icon)}</span><div><small>ROLE PROFILE</small><h2>${escapeHTML(selected.name)}</h2><p>${escapeHTML(selected.description)}</p></div><div class="v11-role-profile-actions">${statusPill(v11IsFullAuthority(selected.id)?'Full authority':'Scoped access',v11IsFullAuthority(selected.id)?'success':'info')}${button('Preview access','preview-role-access','compact','eye',`data-role="${selected.id}"`)}</div></div><div class="v11-role-facts"><span><small>Data scope</small><strong>${escapeHTML(selected.scope)}</strong></span><span><small>Approval authority</small><strong>${escapeHTML(selected.approvalLimit)}</strong></span><span><small>Members</small><strong>${selectedMembers.length}</strong></span><span><small>Last reviewed</small><strong>01 Aug 2026</strong></span></div></section><section class="card table-card section-gap"><div class="table-toolbar"><div><h3>Read and write permissions</h3><p>Read controls visibility. Write controls create, edit, approve and decision actions.</p></div><div>${statusPill(v11IsFullAuthority()?'Editing enabled':'Read-only configuration',v11IsFullAuthority()?'success':'neutral')}</div></div><div class="table-wrap v11-permission-table"><table><thead><tr><th>Workspace</th><th>Read</th><th>Write</th></tr></thead><tbody>${matrixRows}</tbody></table></div></section><section class="card table-card section-gap"><div class="table-toolbar"><div><h3>Role members</h3><p>People, scope, status and last activity for this role.</p></div>${v11IsFullAuthority()?button('Add person','add-role-member','primary compact','user-plus',`data-role="${selected.id}"`):''}</div><div class="table-wrap"><table><thead><tr><th>Person</th><th>Title</th><th>Scope</th><th>Status</th><th>Last active</th><th></th></tr></thead><tbody>${selectedMembers.length?selectedMembers.map(member=>`<tr data-action="v11-role-member-detail" data-id="${member.id}"><td class="table-primary"><span class="v11-person-cell">${personAvatar(member.name,"avatar-gradient")}<span>${escapeHTML(member.name)}<small>${escapeHTML(member.email)}</small></span></span></td><td>${escapeHTML(member.title)}</td><td>${escapeHTML(member.scope)}</td><td>${statusPill(member.status)}</td><td>${escapeHTML(member.lastActive)}</td><td>${v11IsFullAuthority()?button('Remove','remove-role-member','ghost compact','x',`data-id="${member.id}"`):''}</td></tr>`).join(''):`<tr><td colspan="6"><div class="empty-state"><strong>No members assigned</strong><p>Add an authorised person to this role.</p></div></td></tr>`}</tbody></table></div></section></main></div></div>`;
   }
 
   function v11RenderSecuritySettings() {
@@ -3774,7 +3831,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     if (state.signatureView==='Templates') return `<section class="v11-signature-template-grid">${[['Term Sheet','Investment terms, parties and controlled version','gavel'],['Subscription Agreement','Investor subscription and declarations','file'],['Board Resolution','Board authority and execution blocks','users'],['NDA','Mutual confidentiality and permitted disclosure','lock']].map((item,index)=>`<article class="card v11-signature-template"><span>${icon(item[2])}</span><div><small>TEMPLATE ${String(index+1).padStart(2,'0')}</small><h3>${item[0]}</h3><p>${item[1]}</p></div><div class="v11-template-facts"><span>Fields <strong>${[7,12,5,6][index]}</strong></span><span>Used <strong>${[18,9,12,24][index]}</strong></span></div><footer>${button('Preview','preview-signature-template','compact','eye',`data-template="${item[0]}"`)}${button('Use template','use-signature-template','primary compact','plus',`data-template="${item[0]}"`)}</footer></article>`).join('')}</section>`;
     if (state.signatureView==='Signers') {
       const signers=signatureEnvelopes.flatMap(envelope=>envelope.recipients.map(recipient=>({name:recipient[0],role:recipient[1],status:recipient[2],envelope:envelope.id,document:envelope.document}))).slice(0,12);
-      return `<section class="card table-card"><div class="table-toolbar"><div><h3>Signer register</h3><p>Identity, role, status and associated controlled document.</p></div>${button('Export signers','export-signers','compact','download')}</div><div class="table-wrap"><table><thead><tr><th>Signer</th><th>Role</th><th>Envelope</th><th>Document</th><th>Status</th><th>Authentication</th><th></th></tr></thead><tbody>${signers.map(s=>`<tr data-action="open-envelope" data-id="${s.envelope}"><td class="table-primary"><span class="v11-person-cell"><span class="avatar">${initials(s.name)}</span><span>${escapeHTML(s.name)}<small>Verified recipient</small></span></span></td><td>${escapeHTML(s.role)}</td><td>${escapeHTML(s.envelope)}</td><td>${escapeHTML(s.document)}</td><td>${statusPill(s.status)}</td><td>Email + OTP</td><td>${icon('chevron-right')}</td></tr>`).join('')}</tbody></table></div></section>`;
+      return `<section class="card table-card"><div class="table-toolbar"><div><h3>Signer register</h3><p>Identity, role, status and associated controlled document.</p></div>${button('Export signers','export-signers','compact','download')}</div><div class="table-wrap"><table><thead><tr><th>Signer</th><th>Role</th><th>Envelope</th><th>Document</th><th>Status</th><th>Authentication</th><th></th></tr></thead><tbody>${signers.map(s=>`<tr data-action="open-envelope" data-id="${s.envelope}"><td class="table-primary"><span class="v11-person-cell">${personAvatar(s.name)}<span>${escapeHTML(s.name)}<small>Verified recipient</small></span></span></td><td>${escapeHTML(s.role)}</td><td>${escapeHTML(s.envelope)}</td><td>${escapeHTML(s.document)}</td><td>${statusPill(s.status)}</td><td>Email + OTP</td><td>${icon('chevron-right')}</td></tr>`).join('')}</tbody></table></div></section>`;
     }
     if (state.signatureView==='Audit Trail') return `<section class="card table-card"><div class="table-toolbar"><div><h3>Signature audit trail</h3><p>Append-only envelope, recipient and evidence events.</p></div>${button('Export audit','export-signature-audit','compact','download')}</div><div class="table-wrap"><table><thead><tr><th>Timestamp</th><th>Envelope</th><th>Event</th><th>Actor / recipient</th><th>Authentication</th><th>Evidence</th></tr></thead><tbody><tr><td>01 Aug 2026 · 03:51 CAT</td><td>ENV-0098</td><td>Document viewed</td><td>Rudo Ndlovu</td><td>Email + OTP</td><td>evt_09f…a81</td></tr><tr><td>01 Aug 2026 · 03:42 CAT</td><td>ENV-0098</td><td>Signature applied</td><td>Farai Chikore</td><td>Passkey</td><td>sig_82c…ae1</td></tr><tr><td>31 Jul 2026 · 17:08 CAT</td><td>ENV-0097</td><td>Completion certificate issued</td><td>System</td><td>Document hash verified</td><td>cert_91b…442</td></tr></tbody></table></div></section>`;
     return `<section class="card table-card"><div class="table-toolbar"><div class="table-title-row"><h3>Signature Envelopes</h3><span class="table-badge">Electronic evidence and signing order</span></div><div class="table-tools"><label class="table-search">${icon('search')}<input placeholder="Search envelopes or signers"></label>${button('Filters','signature-filters','','filter')}</div></div><div class="table-wrap"><table><thead><tr><th>Envelope / Subject</th><th>Document</th><th>Recipients</th><th>Progress</th><th>Status</th><th>Sent</th><th>Expires</th><th>Actions</th></tr></thead><tbody>${v11EnvelopeRows()}</tbody></table></div></section>`;
@@ -3798,7 +3855,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     const envelope=signatureEnvelopes.find(item=>item.id===envelopeId)||signatureEnvelopes.find(item=>item.documentId===doc.id)||signatureEnvelopes[0];
     state.selectedEnvelopeId=envelope.id;
     state.signatureSelectedRecipient=Math.min(state.signatureSelectedRecipient,envelope.recipients.length-1);
-    const recipients=envelope.recipients.map((recipient,index)=>`<button class="signature-recipient ${recipient[2]==='Signed'?'signed':recipient[2]==='Declined'?'declined':''} ${state.signatureSelectedRecipient===index?'selected':''}" data-action="select-signature-recipient" data-index="${index}"><span class="avatar">${initials(recipient[0])}</span><span><strong>${escapeHTML(recipient[0])}</strong><small>${escapeHTML(recipient[1])}</small></span>${statusPill(recipient[2],recipient[2]==='Signed'?'success':recipient[2]==='Declined'?'danger':'warning')}</button>`).join('');
+    const recipients=envelope.recipients.map((recipient,index)=>`<button class="signature-recipient ${recipient[2]==='Signed'?'signed':recipient[2]==='Declined'?'declined':''} ${state.signatureSelectedRecipient===index?'selected':''}" data-action="select-signature-recipient" data-index="${index}">${personAvatar(recipient[0])}<span><strong>${escapeHTML(recipient[0])}</strong><small>${escapeHTML(recipient[1])}</small></span>${statusPill(recipient[2],recipient[2]==='Signed'?'success':recipient[2]==='Declined'?'danger':'warning')}</button>`).join('');
     const fields=state.signatureFields.map(field=>{const recipient=envelope.recipients[field.recipient]||envelope.recipients[0];return `<button class="v11-document-field ${state.selectedSignatureField===field.id?'selected':''}" data-action="select-signature-field" data-id="${field.id}"><span>${icon(field.type==='Signature'?'edit':field.type==='Initials'?'user-check':field.type==='Date signed'?'calendar':'file')}</span><strong>${escapeHTML(field.type)}</strong><small>${escapeHTML(recipient?.[0]||'Unassigned')} · ${escapeHTML(field.status)}</small></button>`}).join('');
     showModal('Signature Studio',`${doc.name} · ${envelope.id}`,`<div class="signature-studio v11-signature-studio"><aside class="signature-toolbox"><div class="v11-signature-tool-scroll"><div><strong>Fields</strong><button class="signature-tool" data-action="add-signature-field" data-type="Signature">${icon('edit')} Signature</button><button class="signature-tool" data-action="add-signature-field" data-type="Initials">${icon('user-check')} Initials</button><button class="signature-tool" data-action="add-signature-field" data-type="Date signed">${icon('calendar')} Date signed</button><button class="signature-tool" data-action="add-signature-field" data-type="Text field">${icon('file')} Text field</button></div><div><div class="section-heading-with-action"><strong>Recipients</strong>${button('Add','add-signature-recipient','ghost compact','plus')}</div>${recipients}</div></div></aside><main class="signature-document"><div class="signature-document-toolbar"><span>Page 1 of ${doc.pages||8}</span><span>${icon('lock')} Encrypted · audit logged</span><button data-action="signature-zoom">100%</button></div><article class="signature-page"><div class="document-letterhead"><div class="pdf-brand">MATANHO</div><small>Investment Management ERP</small></div><p class="document-classification">TERM SHEET · SERIES B INVESTMENT · ${escapeHTML(doc.version)}</p><h1>Nova Analytics (Pvt) Ltd</h1><p class="document-lead">Non-binding summary of principal investment terms</p><div class="term-summary"><div><span>Investment</span><strong>USD 18,000,000</strong></div><div><span>Pre-money valuation</span><strong>USD 85,000,000</strong></div><div><span>Proposed ownership</span><strong>17.5%</strong></div></div><h2>Governance and investor protections</h2><p>The investor shall have the right to appoint one director and one non-voting observer, subject to the definitive agreements and agreed reserved matters.</p><h2>Electronic signature fields</h2><div class="v11-document-fields">${fields}</div><h2>Signing parties</h2>${envelope.recipients.map((recipient,index)=>recipient[2]==='Signed'?`<div class="signature-field signed"><span>${escapeHTML(recipient[0])}</span><small>${escapeHTML(recipient[1])} · Signed with OTP authentication</small></div>`:`<button class="signature-field pending" data-action="sign-term-sheet" data-signer="${index}"><span>Click to sign for ${escapeHTML(recipient[0])}</span><small>${escapeHTML(recipient[1])}</small></button>`).join('')}</article></main><aside class="signature-inspector"><div class="signature-inspector-tabs">${['Prepare','Message','Review'].map(tab=>`<button class="${state.signatureInspectorTab===tab?'active':''}" data-action="signature-inspector-tab" data-tab="${tab}">${tab}</button>`).join('')}</div>${v11SignatureInspector(envelope)}</aside></div>`,`${button('Save draft','save-signature-draft')}${button('Download certificate','download-signature-certificate','','download')}${button(envelope.status==='Completed'?'View completion':'Send envelope','send-signature-envelope','primary','send')}`,{variant:'signature',size:'fullscreen',eyebrow:'Secure responsive e-signature'});
   };
@@ -3806,8 +3863,8 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   function v11UpdateUserChrome() {
     const role=v11CurrentRole();
     const member=v11RoleMember();
-    $$('.top-avatar').forEach(node=>{node.textContent=member.initials;node.title=`${member.name} · ${role.name}`;});
-    $$('.user-switcher .avatar').forEach(node=>node.textContent=member.initials);
+    $$('.top-avatar').forEach(node=>{node.innerHTML=`<img src="${profilePhoto(member.name)}" alt="${escapeHTML(member.name)}">`;node.title=`${member.name} · ${role.name}`;});
+    $$('.user-switcher .avatar').forEach(node=>{node.innerHTML=`<img src="${profilePhoto(member.name)}" alt="${escapeHTML(member.name)}">`;node.classList.add('photo-avatar');});
     const copy=$('.user-switcher-copy'); if(copy) copy.innerHTML=`<strong>${escapeHTML(member.name)}</strong><small>${escapeHTML(role.name)}</small>`;
     const topRight=$('.topbar-right');
     if(topRight) {
@@ -3899,7 +3956,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   showUserMenu=function(anchor) {
     const role=v11CurrentRole();
     const member=v11RoleMember();
-    showPopover(anchor,`<div class="popover-title">Signed in as</div><div class="popover-item v11-current-user" style="cursor:default"><span class="avatar avatar-gradient">${escapeHTML(member.initials)}</span><span class="popover-item-copy"><strong>${escapeHTML(member.name)}</strong><small>${escapeHTML(member.title)} · Matanho Capital</small></span>${statusPill(role.short,'info')}</div><div class="popover-divider"></div><div class="popover-title">Preview role access</div><div class="v11-role-switch-list">${Object.values(v11RoleDefinitions).map(item=>`<button class="popover-item ${item.id===state.currentRole?'active':''}" data-action="switch-demo-role" data-role="${item.id}"><span class="activity-icon" style="color:${item.colour};background:color-mix(in srgb,${item.colour} 12%,transparent)">${icon(item.icon)}</span><span class="popover-item-copy"><strong>${escapeHTML(item.name)}</strong><small>${escapeHTML(item.scope)}</small></span>${item.id===state.currentRole?icon('check-circle'):icon('chevron-right')}</button>`).join('')}</div><div class="popover-divider"></div>${v11CanRead('settings')?`<button class="popover-item" data-action="navigate" data-page="settings">${icon('settings')}<span class="popover-item-copy"><strong>Workspace settings</strong><small>RBAC, security, integrations and data controls</small></span></button>`:''}<button class="popover-item" data-action="toggle-theme">${icon(state.theme==='light'?'moon':'sun')}<span class="popover-item-copy"><strong>${state.theme==='light'?'Use dark theme':'Use light theme'}</strong><small>Change appearance on this browser</small></span></button><div class="popover-divider"></div><button class="popover-item" data-action="sign-out-demo">${icon('external-link')}<span class="popover-item-copy"><strong>Sign out</strong><small>Demo action only</small></span></button>`,390);
+    showPopover(anchor,`<div class="popover-title">Signed in as</div><div class="popover-item v11-current-user" style="cursor:default">${personAvatar(member.name,"avatar-gradient")}<span class="popover-item-copy"><strong>${escapeHTML(member.name)}</strong><small>${escapeHTML(member.title)} · Matanho Capital</small></span>${statusPill(role.short,'info')}</div><div class="popover-divider"></div><div class="popover-title">Preview role access</div><div class="v11-role-switch-list">${Object.values(v11RoleDefinitions).map(item=>`<button class="popover-item ${item.id===state.currentRole?'active':''}" data-action="switch-demo-role" data-role="${item.id}"><span class="activity-icon" style="color:${item.colour};background:color-mix(in srgb,${item.colour} 12%,transparent)">${icon(item.icon)}</span><span class="popover-item-copy"><strong>${escapeHTML(item.name)}</strong><small>${escapeHTML(item.scope)}</small></span>${item.id===state.currentRole?icon('check-circle'):icon('chevron-right')}</button>`).join('')}</div><div class="popover-divider"></div>${v11CanRead('settings')?`<button class="popover-item" data-action="navigate" data-page="settings">${icon('settings')}<span class="popover-item-copy"><strong>Workspace settings</strong><small>RBAC, security, integrations and data controls</small></span></button>`:''}<button class="popover-item" data-action="toggle-theme">${icon(state.theme==='light'?'moon':'sun')}<span class="popover-item-copy"><strong>${state.theme==='light'?'Use dark theme':'Use light theme'}</strong><small>Change appearance on this browser</small></span></button><div class="popover-divider"></div><button class="popover-item" data-action="sign-out-demo">${icon('external-link')}<span class="popover-item-copy"><strong>Sign out</strong><small>Demo action only</small></span></button>`,390);
   };
 
   function v11ShowRoleAccess(roleId=state.currentRole) {
@@ -3989,24 +4046,783 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     }
   };
 
-  document.addEventListener('change', event=>{
+  document.addEventListener('change',event=>{
     const target=event.target;
     if(target.dataset.changeAction==='signature-field-recipient') {
       const field=state.signatureFields.find(item=>item.id===target.dataset.field);if(field){field.recipient=Number(target.value);toast('Field reassigned','The signature field was assigned to the selected recipient.');showSignatureStudio('DOC-009',state.selectedEnvelopeId);}
     }
     if(target.dataset.changeAction==='v11-setting-toggle') toast('Setting updated','The working configuration was updated. Save changes to persist it.');
-  }, __pv11Sig);
+  });
 
-  document.addEventListener('click', event=>{
+  document.addEventListener('click',event=>{
     const focusable=event.target.closest('.v11-focusable');
     if(focusable && !event.target.closest('button,a,input,select,textarea,[data-action]')) {
       focusable.classList.toggle('element-focused');
     }
-  }, __pv11Sig);
+  });
+
+
+  // ---------------------------------------------------------------------------
+  // V15: drawn signatures, premium template previews, subtle buttons and a
+  // single page-level back/return convention.
+  // ---------------------------------------------------------------------------
+  state.v15SignatureCaptureMode = state.v15SignatureCaptureMode || 'draw';
+  state.v15SignatureInk = state.v15SignatureInk || '';
+  state.v15HasDrawnSignature = Boolean(state.v15HasDrawnSignature);
+  state.v15UploadedSignature = state.v15UploadedSignature || '';
+  state.v15SignatureEvidence = state.v15SignatureEvidence || {};
+
+  const v15BackRoutes = {
+    'analytics-detail': ['dashboard','Dashboard'],
+    'deal-detail': ['deals','Deal Flow'],
+    'applicant-portal': ['deals','Deal Flow'],
+    'company-detail': ['companies','Portfolio Companies'],
+    'fund-detail': ['funds','Funds'],
+    'lp-detail': ['lps','Limited Partners'],
+    'capital-call-detail': ['capital-calls','Capital Calls'],
+    'report-builder': ['reports-vault','Reports Vault'],
+    'reconciliation-workspace': ['reconciliations','Reconciliation']
+  };
+
+  const v15BasePageHeader = pageHeader;
+  pageHeader = function(title, subtitle, actions = '', context = '') {
+    const route = v15BackRoutes[state.page];
+    if (!route) return v15BasePageHeader(title, subtitle, actions, context);
+    const cleaned = String(actions || '')
+      .replace(/<button[^>]*data-action="(?:analytics-back|navigate-reconciliations|back-to-deals)"[\s\S]*?<\/button>/g,'');
+    return `<header class="page-header v15-page-header"><div class="v15-page-heading"><div class="v15-page-heading-top"><button type="button" class="v15-back-button" data-action="v15-standard-back" data-target="${route[0]}">${icon('arrow-left')}<span>Back</span></button><span class="v15-back-context">Return to ${escapeHTML(route[1])}</span></div><div class="page-title-row"><h1 class="page-title">${escapeHTML(title)}</h1>${context ? `<span class="page-context">${escapeHTML(context)}</span>` : ''}</div><p class="page-subtitle">${escapeHTML(subtitle)}</p></div><div class="page-actions">${cleaned}</div></header>`;
+  };
+
+  function v15SignatureKey(envelopeId, signerIndex) { return `${envelopeId}:${signerIndex}`; }
+
+  function v15RenderSignatureMark(envelopeId, signerIndex, name) {
+    const evidence = state.v15SignatureEvidence[v15SignatureKey(envelopeId, signerIndex)];
+    if (!evidence) return `<span class="typed">${escapeHTML(name)}</span>`;
+    if ((evidence.mode === 'draw' || evidence.mode === 'upload') && evidence.dataUrl) return `<img src="${evidence.dataUrl}" alt="Captured signature for ${escapeHTML(name)}">`;
+    return `<span class="typed">${escapeHTML(evidence.legalName || name)}</span>`;
+  }
+
+  function v15SetSignatureCaptureMode(mode) {
+    state.v15SignatureCaptureMode = mode;
+    $$('.v15-sign-tab', modalLayer).forEach(node => node.classList.toggle('active', node.dataset.mode === mode));
+    $$('.v15-sign-panel', modalLayer).forEach(node => node.classList.toggle('active', node.dataset.mode === mode));
+  }
+
+  function v15InitSignaturePad() {
+    const canvas = $('#v15SignatureCanvas');
+    if (!canvas || canvas.dataset.ready === '1') return;
+    canvas.dataset.ready = '1';
+    canvas.style.touchAction = 'none';
+    const wrapper = canvas.closest('.v15-signature-pad-wrap');
+    let ctx = null;
+    let drawing = false;
+    let activePointer = null;
+    let lastPoint = null;
+
+    const configureContext = () => {
+      const rect = canvas.getBoundingClientRect();
+      if (rect.width < 24 || rect.height < 24) return false;
+      const previousInk = state.v15SignatureInk;
+      const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+      canvas.width = Math.max(1, Math.round(rect.width * dpr));
+      canvas.height = Math.max(1, Math.round(rect.height * dpr));
+      ctx = canvas.getContext('2d');
+      ctx.setTransform(dpr,0,0,dpr,0,0);
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = 2.25;
+      ctx.strokeStyle = '#172033';
+      if (previousInk) {
+        const image = new Image();
+        image.onload = () => {
+          const bounds = canvas.getBoundingClientRect();
+          ctx.drawImage(image,0,0,bounds.width,bounds.height);
+        };
+        image.src = previousInk;
+      }
+      return true;
+    };
+
+    const pointFromClient = (clientX, clientY) => {
+      const bounds = canvas.getBoundingClientRect();
+      return [Math.max(0,Math.min(bounds.width,clientX-bounds.left)),Math.max(0,Math.min(bounds.height,clientY-bounds.top))];
+    };
+    const saveInk = () => {
+      if (!ctx || !state.v15HasDrawnSignature) return;
+      try { state.v15SignatureInk = canvas.toDataURL('image/png'); } catch (_) {}
+      const status = $('#v15SignatureDrawStatus');
+      if (status) status.textContent = 'Signature captured — ready to apply';
+      wrapper?.classList.add('has-ink');
+    };
+    const begin = (x,y,pointerId=null) => {
+      if (!ctx && !configureContext()) return;
+      drawing = true;
+      activePointer = pointerId;
+      lastPoint = [x,y];
+      ctx.beginPath();
+      ctx.moveTo(x,y);
+      // Register a small first mark so a tap/dot is a valid signature gesture.
+      ctx.lineTo(x+.01,y+.01);
+      ctx.stroke();
+      state.v15HasDrawnSignature = true;
+      const status = $('#v15SignatureDrawStatus');
+      if (status) status.textContent = 'Drawing signature…';
+    };
+    const move = (x,y) => {
+      if (!drawing || !ctx) return;
+      if (!lastPoint) lastPoint=[x,y];
+      const midX=(lastPoint[0]+x)/2, midY=(lastPoint[1]+y)/2;
+      ctx.quadraticCurveTo(lastPoint[0],lastPoint[1],midX,midY);
+      ctx.stroke();
+      lastPoint=[x,y];
+      state.v15HasDrawnSignature = true;
+    };
+    const finish = () => {
+      if (!drawing) return;
+      drawing = false;
+      activePointer = null;
+      lastPoint = null;
+      ctx?.closePath();
+      saveInk();
+    };
+
+    // Pointer Events path (mouse, pen, and modern touch browsers).
+    if (window.PointerEvent) {
+      canvas.addEventListener('pointerdown', event => {
+        const [x,y]=pointFromClient(event.clientX,event.clientY);
+        try { canvas.setPointerCapture?.(event.pointerId); } catch (_) {}
+        begin(x,y,event.pointerId);
+        event.preventDefault();
+      }, {passive:false});
+      canvas.addEventListener('pointermove', event => {
+        if (!drawing || (activePointer !== null && event.pointerId !== activePointer)) return;
+        const [x,y]=pointFromClient(event.clientX,event.clientY);
+        move(x,y);
+        event.preventDefault();
+      }, {passive:false});
+      ['pointerup','pointercancel','lostpointercapture'].forEach(type=>canvas.addEventListener(type,event=>{ finish(); event.preventDefault?.(); }, {passive:false}));
+    } else {
+      // Fallback for older WebViews/Safari shells.
+      canvas.addEventListener('mousedown', event => { const [x,y]=pointFromClient(event.clientX,event.clientY); begin(x,y); event.preventDefault(); });
+      window.addEventListener('mousemove', event => { if(!drawing)return; const [x,y]=pointFromClient(event.clientX,event.clientY); move(x,y); event.preventDefault(); }, {passive:false});
+      window.addEventListener('mouseup', finish);
+      canvas.addEventListener('touchstart', event => { const touch=event.touches[0]; if(!touch)return; const [x,y]=pointFromClient(touch.clientX,touch.clientY); begin(x,y); event.preventDefault(); }, {passive:false});
+      canvas.addEventListener('touchmove', event => { const touch=event.touches[0]; if(!drawing||!touch)return; const [x,y]=pointFromClient(touch.clientX,touch.clientY); move(x,y); event.preventDefault(); }, {passive:false});
+      canvas.addEventListener('touchend', event => { finish(); event.preventDefault(); }, {passive:false});
+      canvas.addEventListener('touchcancel', finish, {passive:false});
+    }
+
+    const observer = window.ResizeObserver ? new ResizeObserver(() => {
+      if (drawing) return;
+      const before = canvas.getBoundingClientRect();
+      if (before.width > 24) configureContext();
+    }) : null;
+    if (observer && wrapper) observer.observe(wrapper);
+
+    if (!configureContext()) {
+      requestAnimationFrame(() => configureContext());
+      setTimeout(configureContext,120);
+    }
+  }
+
+  function v15ClearSignaturePad() {
+    const canvas = $('#v15SignatureCanvas');
+    if (!canvas) return;
+    canvas.getContext('2d').clearRect(0,0,canvas.width,canvas.height);
+    state.v15SignatureInk = '';
+    state.v15HasDrawnSignature = false;
+    const status = $('#v15SignatureDrawStatus');
+    if (status) status.textContent = 'Draw above using a mouse, stylus or finger';
+  }
+
+  function v15ShowSignatureCapture(documentId='DOC-009', envelopeId=null, signerIndex=null) {
+    const doc = documents.find(item => item.id === documentId) || documents.find(item => /Term Sheet/.test(item.name)) || documents[0];
+    const envelope = signatureEnvelopes.find(item => item.id === envelopeId) || signatureEnvelopes.find(item => item.documentId === doc.id) || signatureEnvelopes[0];
+    const pending = envelope.recipients.findIndex(item => item[2] !== 'Signed');
+    const index = Number.isFinite(Number(signerIndex)) ? Number(signerIndex) : Math.max(0,pending);
+    const signer = envelope.recipients[index] || envelope.recipients[0];
+    state.selectedDocumentId = doc.id;
+    state.selectedEnvelopeId = envelope.id;
+    state.v15SignatureCaptureMode = 'draw';
+    state.v15SignatureInk = '';
+    state.v15HasDrawnSignature = false;
+    state.v15UploadedSignature = '';
+    const body = `<div class="v15-sign-capture"><section class="v15-sign-summary"><div class="document-letterhead"><div class="pdf-brand">MATANHO</div><small>Investment Management ERP</small></div><p class="document-classification">CONTROLLED SIGNING COPY · ${escapeHTML(doc.version)}</p><h3>${escapeHTML(doc.name.replace(/\.(pdf|docx)$/i,''))}</h3><p>Review the controlled version before applying the signature. The completed evidence record includes signer identity, consent, authentication, timestamp and document hash.</p><div class="info-list"><div class="info-row"><span>Envelope</span><strong>${escapeHTML(envelope.id)}</strong></div><div class="info-row"><span>Signer</span><strong>${escapeHTML(signer[0])}</strong></div><div class="info-row"><span>Role</span><strong>${escapeHTML(signer[1])}</strong></div><div class="info-row"><span>Document version</span><strong>${escapeHTML(doc.version)}</strong></div></div><div class="v15-sign-evidence"><span><small>Authentication</small><strong>Email + OTP</strong></span><span><small>Signing order</small><strong>${index+1} of ${envelope.recipients.length}</strong></span><span><small>Evidence</small><strong>Audit certificate</strong></span></div></section><section class="v15-sign-card"><div class="v15-sign-tabs"><button type="button" class="v15-sign-tab active" data-action="v15-signature-mode" data-mode="draw">Draw</button><button type="button" class="v15-sign-tab" data-action="v15-signature-mode" data-mode="type">Type</button><button type="button" class="v15-sign-tab" data-action="v15-signature-mode" data-mode="upload">Upload</button></div><div class="v15-sign-panel active" data-mode="draw"><p>Draw your signature in the box. Works with a mouse, touch screen or stylus.</p><div class="v15-signature-pad-wrap"><canvas id="v15SignatureCanvas"></canvas><span class="v15-sign-pad-caption">SIGN ABOVE THIS LINE</span></div><div class="v15-sign-pad-actions"><small id="v15SignatureDrawStatus">Draw above using a mouse, stylus or finger</small>${button('Clear','v15-clear-signature','ghost compact','refresh')}</div></div><div class="v15-sign-panel" data-mode="type"><div class="form-field"><label class="required">Full legal name</label><input id="v15TypedSignatureName" value="${escapeHTML(signer[0])}" autocomplete="name"></div><div class="v15-typed-signature"><strong id="v15TypedSignaturePreview">${escapeHTML(signer[0])}</strong></div></div><div class="v15-sign-panel" data-mode="upload"><label class="v15-signature-upload" for="v15SignatureUpload">${icon('upload')}<span><strong>Upload signature image</strong><small>PNG or JPG with a transparent or white background</small></span><input id="v15SignatureUpload" type="file" accept="image/png,image/jpeg" hidden></label><img id="v15SignatureUploadPreview" class="v15-upload-preview" alt="Uploaded signature preview"></div><div class="v15-sign-compliance"><label class="checkbox-row"><input id="v15SignatureConsent" type="checkbox"> I have reviewed the controlled document and consent to apply this electronic signature.</label></div></section></div>`;
+    showModal('Apply Electronic Signature',`${signer[0]} · ${signer[1]} · ${envelope.id}`,body,`${button('Cancel','close-modal')}${button('Apply signature','v15-apply-signature','primary','edit',`data-signer="${index}" data-document="${doc.id}"`)}`,{variant:'signature',size:'xl',eyebrow:'Draw, type or upload signature'});
+    requestAnimationFrame(()=>requestAnimationFrame(v15InitSignaturePad));
+    setTimeout(v15InitSignaturePad,140);
+  }
+
+  function v15ApplySignature(trigger) {
+    const envelope = signatureEnvelopes.find(item => item.id === state.selectedEnvelopeId) || signatureEnvelopes[0];
+    const index = Number(trigger.dataset.signer || 0);
+    const signer = envelope.recipients[index];
+    if (!signer) return;
+    if (!$('#v15SignatureConsent')?.checked) { toast('Consent required','Confirm that the signer reviewed the controlled document.','warning'); return; }
+    const mode = state.v15SignatureCaptureMode || 'draw';
+    let dataUrl = '';
+    let legalName = signer[0];
+    if (mode === 'draw') {
+      if (!state.v15HasDrawnSignature || !state.v15SignatureInk) { toast('Signature required','Draw a signature before applying it.','warning'); return; }
+      dataUrl = state.v15SignatureInk;
+    } else if (mode === 'type') {
+      legalName = $('#v15TypedSignatureName')?.value.trim() || '';
+      if (!legalName) { toast('Name required','Enter the signer legal name.','warning'); return; }
+    } else {
+      if (!state.v15UploadedSignature) { toast('Signature image required','Upload a PNG or JPG signature image.','warning'); return; }
+      dataUrl = state.v15UploadedSignature;
+    }
+    state.v15SignatureEvidence[v15SignatureKey(envelope.id,index)] = { mode, dataUrl, legalName, signedAt:new Date().toISOString(), auth:'Email + OTP' };
+    signer[2] = 'Signed';
+    envelope.progress = Math.round(envelope.recipients.filter(item => item[2] === 'Signed').length / envelope.recipients.length * 100);
+    envelope.status = envelope.progress === 100 ? 'Completed' : 'Waiting for others';
+    const doc = documents.find(item => item.id === trigger.dataset.document) || documents.find(item => item.id === envelope.documentId);
+    if (doc) doc.signatureStatus = envelope.status === 'Completed' ? 'Completed' : 'Partially signed';
+    closeOverlays();
+    toast('Signature applied',`${signer[0]} signed using the ${mode} method. The evidence record was updated.`);
+    render();
+  }
+
+  const v15BaseShowSignatureStudio = showSignatureStudio;
+  showSignatureStudio = function(documentId='DOC-009',envelopeId=null) {
+    const doc=documents.find(d=>d.id===documentId)||documents.find(d=>/Term Sheet/.test(d.name))||documents[0];
+    const envelope=signatureEnvelopes.find(e=>e.id===envelopeId)||signatureEnvelopes.find(e=>e.documentId===doc.id)||signatureEnvelopes[0];
+    state.selectedDocumentId=doc.id; state.selectedEnvelopeId=envelope.id;
+    state.signatureSelectedRecipient = Math.min(state.signatureSelectedRecipient || 0, Math.max(0,envelope.recipients.length-1));
+    const recipients=envelope.recipients.map((r,i)=>`<button class="signature-recipient ${i===state.signatureSelectedRecipient?'selected':''} ${r[2]==='Signed'?'signed':r[2]==='Declined'?'declined':''}" data-action="select-signature-recipient" data-index="${i}">${personAvatar(r[0])}<span><strong>${escapeHTML(r[0])}</strong><small>${escapeHTML(r[1])}</small></span>${statusPill(r[2])}</button>`).join('');
+    const fields=(state.signatureFields||[]).map(field=>`<button class="v11-document-field ${state.selectedSignatureField===field.id?'selected':''}" data-action="select-signature-field" data-id="${field.id}"><span>${icon(field.type==='Signature'?'edit':field.type==='Initials'?'user-check':field.type==='Date signed'?'calendar':'file')}</span><strong>${escapeHTML(field.type)}</strong><small>${escapeHTML(envelope.recipients[field.recipient]?.[0]||'Unassigned')} · Page ${field.page}</small></button>`).join('');
+    const signingParties=envelope.recipients.map((recipient,index)=>recipient[2]==='Signed'?`<div class="signature-field signed"><div class="v15-signed-mark">${v15RenderSignatureMark(envelope.id,index,recipient[0])}<span><strong>${escapeHTML(recipient[0])}</strong><small>${escapeHTML(recipient[1])} · Signed · Email + OTP</small></span></div></div>`:`<button class="signature-field pending" data-action="sign-term-sheet" data-signer="${index}" data-id="${doc.id}"><span>Sign as ${escapeHTML(recipient[0])}</span><small>${escapeHTML(recipient[1])} · Draw, type or upload</small></button>`).join('');
+    showModal('Signature Studio',`${doc.name} · ${envelope.id}`,`<div class="signature-studio v11-signature-studio"><aside class="signature-toolbox"><div class="v11-signature-tool-scroll"><div><strong>Fields</strong><button class="signature-tool" data-action="add-signature-field" data-type="Signature">${icon('edit')} Signature</button><button class="signature-tool" data-action="add-signature-field" data-type="Initials">${icon('user-check')} Initials</button><button class="signature-tool" data-action="add-signature-field" data-type="Date signed">${icon('calendar')} Date signed</button><button class="signature-tool" data-action="add-signature-field" data-type="Text field">${icon('file')} Text field</button></div><div><div class="section-heading-with-action"><strong>Recipients</strong>${button('Add','add-signature-recipient','ghost compact','plus')}</div>${recipients}</div></div></aside><main class="signature-document"><div class="signature-document-toolbar"><span>Page 1 of ${doc.pages||8}</span><span>${icon('lock')} Encrypted · audit logged</span><button data-action="signature-zoom">100%</button></div><article class="signature-page"><div class="document-letterhead"><div class="pdf-brand">MATANHO</div><small>Investment Management ERP</small></div><p class="document-classification">TERM SHEET · SERIES B INVESTMENT · ${escapeHTML(doc.version)}</p><h1>Nova Analytics (Pvt) Ltd</h1><p class="document-lead">Non-binding summary of principal investment terms</p><div class="term-summary"><div><span>Investment</span><strong>USD 18,000,000</strong></div><div><span>Pre-money valuation</span><strong>USD 85,000,000</strong></div><div><span>Proposed ownership</span><strong>17.5%</strong></div></div><h2>Governance and investor protections</h2><p>The investor shall have the right to appoint one director and one non-voting observer, subject to the definitive agreements and agreed reserved matters.</p><h2>Electronic signature fields</h2><div class="v11-document-fields">${fields}</div><h2>Signing parties</h2>${signingParties}</article></main><aside class="signature-inspector"><div class="signature-inspector-tabs">${['Prepare','Message','Review'].map(tab=>`<button class="${state.signatureInspectorTab===tab?'active':''}" data-action="signature-inspector-tab" data-tab="${tab}">${tab}</button>`).join('')}</div>${v11SignatureInspector(envelope)}</aside></div>`,`${button('Save draft','save-signature-draft')}${button('Download certificate','download-signature-certificate','','download')}${button(envelope.status==='Completed'?'View completion':'Send envelope','send-signature-envelope','primary','send')}`,{variant:'signature',size:'fullscreen',eyebrow:'Responsive e-signature workspace'});
+  };
+
+  const v15SignatureTemplateMeta = {
+    'Term Sheet': {title:'Series B Investment Term Sheet',kicker:'Indicative investment terms',status:'Non-binding except specified provisions',sections:['Transaction overview','Investment economics','Governance and reserved matters','Conditions precedent','Exclusivity and confidentiality','Execution']},
+    'Subscription Agreement': {title:'Subscription Agreement',kicker:'Private capital subscription documentation',status:'Execution copy',sections:['Investor particulars','Subscription and commitment','Representations and warranties','AML / KYC declarations','Notices','Execution']},
+    'Board Resolution': {title:'Written Resolution of the Board',kicker:'Corporate authorisation',status:'For approval and execution',sections:['Background','Resolutions','Delegated authority','Conflict declarations','Effective date','Execution']},
+    'NDA': {title:'Mutual Non-Disclosure Agreement',kicker:'Confidential information framework',status:'Execution copy',sections:['Purpose','Confidential information','Permitted use and disclosure','Exclusions','Term and return of information','Execution']}
+  };
+
+  function v15LegalTemplatePaper(template) {
+    const meta=v15SignatureTemplateMeta[template]||v15SignatureTemplateMeta['Term Sheet'];
+    const termRows=template==='Term Sheet' ? [['Investment amount','USD 18,000,000'],['Instrument','Series B Preferred Equity'],['Pre-money valuation','USD 85,000,000'],['Proposed ownership','17.5%'],['Board rights','1 director + 1 observer'],['Closing','Subject to CP satisfaction']] : template==='Subscription Agreement' ? [['Subscriber','Institutional Limited Partner'],['Fund','Matanho Growth Fund II'],['Commitment','USD 25,000,000'],['Funding currency','USD'],['Admission','Subject to GP acceptance'],['KYC status','Verified before closing']] : template==='Board Resolution' ? [['Company','Nova Analytics (Pvt) Ltd'],['Meeting type','Written resolution'],['Decision','Approve Series B financing'],['Authority','CEO and Company Secretary'],['Conflict review','Completed'],['Effective date','Upon final signature']] : [['Disclosing parties','Matanho Capital / Counterparty'],['Purpose','Investment evaluation'],['Term','24 months'],['Permitted recipients','Authorised representatives'],['Governing law','As agreed in final execution copy'],['Return / destruction','On request or termination']];
+    return `<article class="v15-paper"><div class="v15-paper-head"><div class="v15-paper-brand">matanho<small>Investment Management ERP</small></div><div class="v15-paper-docmeta">PRIVATE & CONFIDENTIAL<br>Controlled template<br>Version 1.0</div></div><div class="v15-paper-kicker">${escapeHTML(meta.kicker)}</div><h1>${escapeHTML(meta.title)}</h1><p class="lead">Institutional execution template with clear parties, version status, principal terms, controlled clauses and complete signing blocks.</p><div class="v15-paper-summary"><div><small>Status</small><strong>${escapeHTML(meta.status)}</strong></div><div><small>Prepared for</small><strong>Authorised parties</strong></div><div><small>Owner</small><strong>Legal & Investments</strong></div><div><small>Execution</small><strong>E-sign enabled</strong></div></div><section class="v15-paper-section"><header><span>01</span><h2>Document particulars</h2></header><table class="v15-paper-table"><tbody>${termRows.map(row=>`<tr><td style="width:34%;color:#69758b">${escapeHTML(row[0])}</td><td><strong>${escapeHTML(row[1])}</strong></td></tr>`).join('')}</tbody></table></section><section class="v15-paper-section"><header><span>02</span><h2>${escapeHTML(meta.sections[2])}</h2></header><p>The parties acknowledge that rights, approvals and obligations are subject to the definitive documents, applicable authority matrices and the current controlled version maintained in the document vault.</p><div class="v15-paper-callout"><strong>CONTROL NOTE</strong><br>Material amendments require a new version, retained redline and the configured maker-checker approval route before execution.</div></section><section class="v15-paper-section"><header><span>03</span><h2>${escapeHTML(meta.sections[4])}</h2></header><p>Confidential information may only be used for the documented transaction purpose and disclosed to authorised representatives subject to equivalent confidentiality obligations.</p></section><div class="v15-paper-signatures"><div class="v15-paper-signature"><strong>For Matanho Capital</strong>Name / title / electronic signature</div><div class="v15-paper-signature"><strong>For Counterparty</strong>Name / title / electronic signature</div></div><div class="v15-paper-footer"><span>Controlled template · Internal legal review required</span><span>Page 1 of 6</span></div></article>`;
+  }
+
+  function v15ShowSignatureTemplatePreview(template) {
+    const meta=v15SignatureTemplateMeta[template]||v15SignatureTemplateMeta['Term Sheet'];
+    const nav=meta.sections.map((section,index)=>`<button class="${index===0?'active':''}"><span>${index+1}</span>${escapeHTML(section)}</button>`).join('');
+    showModal('Template Preview',`${template} · controlled legal template`,`<div class="v15-template-preview"><aside class="v15-template-preview-nav"><small>Document outline</small>${nav}</aside><main class="v15-template-preview-canvas">${v15LegalTemplatePaper(template)}</main><aside class="v15-template-preview-meta"><small>Template controls</small><div class="v15-template-standard"><small>Document type</small><strong>${escapeHTML(template)}</strong></div><div class="v15-template-meta-list"><div><span>Status</span><strong>${escapeHTML(meta.status)}</strong></div><div><span>Signature fields</span><strong>Role-based + signing order</strong></div><div><span>Authentication</span><strong>Email + OTP / configured method</strong></div><div><span>Versioning</span><strong>Controlled draft and execution copy</strong></div><div><span>Audit evidence</span><strong>Signer, consent, time, hash</strong></div></div></aside></div>`,`${button('Close','close-modal')}${button('Use template','use-signature-template','primary','plus',`data-template="${escapeHTML(template)}"`)}`,{variant:'document',size:'fullscreen',eyebrow:'Premium execution template'});
+  }
+
+  function v15ReportTemplatePaper(name) {
+    const meta=v10IndustryTemplateMeta[name]||v10IndustryTemplateMeta['ILPA Quarterly Reporting 2.0'];
+    const isValuation=name.includes('Valuation');
+    const isPerformance=name.includes('Performance');
+    const tableRows=isValuation ? [['Opening fair value','USD 151.2M','Approved'],['Investment / follow-on','USD 12.0M','Posted'],['Realisation / proceeds','(USD 19.8M)','Reconciled'],['Fair-value movement','USD 25.0M','IC reviewed'],['Closing fair value','USD 168.4M','Approved']] : isPerformance ? [['Gross IRR','20.4%','+1.6pp'],['Net IRR','17.8%','+1.3pp'],['TVPI','2.18x','+0.14x'],['DPI','0.62x','+0.08x'],['RVPI','1.56x','+0.06x']] : [['Commitment','USD 450.0M','Fund terms'],['Called capital','USD 211.0M','47%'],['Distributions','USD 63.4M','Since inception'],['NAV','USD 168.4M','30 Jun 2026'],['Unfunded','USD 239.0M','53%']];
+    return `<article class="v15-paper"><div class="v15-report-cover-band"></div><div class="v15-paper-head"><div class="v15-paper-brand">matanho<small>Investment Management ERP</small></div><div class="v15-paper-docmeta">LIMITED PARTNER REPORTING<br>Q2 2026<br>Private & confidential</div></div><div class="v15-report-hero"><div><div class="v15-paper-kicker">${escapeHTML(meta.basis)}</div><h1>${escapeHTML(name)}</h1><p class="lead">Matanho Growth Fund II · Institutional quarterly reporting pack · Reporting currency USD.</p></div><div class="v15-report-period"><small>Reporting period</small><strong>1 Apr - 30 Jun 2026</strong><small style="margin-top:10px">Data as of</small><strong>30 Jun 2026</strong></div></div><div class="v15-paper-summary"><div><small>Net IRR</small><strong>17.8%</strong></div><div><small>TVPI</small><strong>2.18x</strong></div><div><small>DPI</small><strong>0.62x</strong></div><div><small>NAV</small><strong>USD 168.4M</strong></div></div><section class="v15-paper-section"><header><span>01</span><h2>${isValuation?'Fair-value summary':isPerformance?'Performance summary':'Fund overview and capital account'}</h2></header><table class="v15-paper-table"><thead><tr><th>Measure</th><th>Current period</th><th>Context / control</th></tr></thead><tbody>${tableRows.map(row=>`<tr><td><strong>${escapeHTML(row[0])}</strong></td><td>${escapeHTML(row[1])}</td><td>${escapeHTML(row[2])}</td></tr>`).join('')}</tbody></table></section><section class="v15-paper-section"><header><span>02</span><h2>${isValuation?'Valuation movement and sensitivity':isPerformance?'Contributions, distributions and return progression':'Capital activity and portfolio overview'}</h2></header><div class="v15-report-mini-chart"><span style="height:42%"></span><span style="height:58%"></span><span style="height:51%"></span><span style="height:72%"></span><span style="height:84%"></span><span style="height:79%"></span></div><p>Current period movements are presented alongside prior-period comparatives, source-data references and review status so that material changes can be traced to the underlying approved records.</p></section><section class="v15-paper-section"><header><span>03</span><h2>${isValuation?'Methodology and governance':'Fees, expenses, carried interest and disclosures'}</h2></header><p>${isValuation?'Fair value is supported by documented methodology, calibration, observable inputs where available, sensitivity analysis and approval evidence.':'The reporting pack separates performance, investor cash flows, fund economics and portfolio schedules with clear period, currency, methodology and source-data labels.'}</p><div class="v15-paper-callout"><strong>SOURCE & METHODOLOGY NOTE</strong><br>Generated values remain linked to approved source data. Review the LPA, accounting basis, valuation policy and jurisdiction-specific disclosure requirements before publication.</div></section><div class="v15-paper-footer"><span>${escapeHTML(meta.basis)} · Working template</span><span>Page 1 of 12</span></div></article>`;
+  }
+
+  function v15ShowIndustryReportTemplatePreview(name) {
+    const meta=v10IndustryTemplateMeta[name]||v10IndustryTemplateMeta['ILPA Quarterly Reporting 2.0'];
+    const sections=name.includes('Valuation')?['Executive valuation summary','Portfolio fair-value schedule','Movement bridge','Methodology','Sensitivity','Approval record']:name.includes('Performance')?['Performance overview','Fund-level returns','Portfolio-level returns','Contributions / distributions','Methodology','Reconciliation']:['Executive summary','Fund overview','Performance','Capital activity','Fees / expenses / carry','Portfolio schedule','Valuation','Financial statements','Disclosures'];
+    showModal('Report Template Preview',`${name} · editable auto-generated reporting pack`,`<div class="v15-template-preview"><aside class="v15-template-preview-nav"><small>Report structure</small>${sections.map((section,index)=>`<button class="${index===0?'active':''}"><span>${index+1}</span>${escapeHTML(section)}</button>`).join('')}</aside><main class="v15-template-preview-canvas">${v15ReportTemplatePaper(name)}</main><aside class="v15-template-preview-meta"><small>Standards profile</small><div class="v15-template-standard"><small>Framework basis</small><strong>${escapeHTML(meta.basis)}</strong></div><div class="v15-template-meta-list"><div><span>Generation</span><strong>Auto-prefilled from approved data</strong></div><div><span>Editing</span><strong>Every section remains editable</strong></div><div><span>Currency</span><strong>Explicit reporting currency</strong></div><div><span>Comparatives</span><strong>Current + prior period</strong></div><div><span>Source lineage</span><strong>Visible source references</strong></div><div><span>Publication</span><strong>Review and approval controlled</strong></div></div></aside></div>`,`${button('Close','close-modal')}${button('Use & prefill','apply-report-template','primary','sparkles',`data-template="${escapeHTML(name)}"`)}`,{variant:'document',size:'fullscreen',eyebrow:'Institutional reporting template'});
+  }
+
+  v10ShowTemplateLibrary = function() {
+    const cards = Object.entries(v10IndustryTemplateMeta).map(([name,meta])=>`<article class="template-library-card ${name===state.reportTemplate?'selected':''}"><span class="template-library-icon ${meta.tone}">${icon(meta.icon)}</span><div><small>${escapeHTML(meta.basis)}</small><h3>${escapeHTML(name)}</h3><p>${escapeHTML(meta.short)}</p><ul>${name.includes('Performance')?'<li>Fund and portfolio returns</li><li>Contribution and distribution schedules</li><li>Methodology and reconciliation</li>':name.includes('Valuation')?'<li>Fair-value methodology</li><li>Movement and sensitivity</li><li>Committee approvals</li>':name.includes('Quarterly Reporting')?'<li>Fees, expenses and carried interest</li><li>Fund economics and capital accounts</li><li>Portfolio and source-data schedules</li>':'<li>LP-facing executive narrative</li><li>Performance and capital activity</li><li>Portfolio, risk and appendices</li>'}</ul></div><footer>${button('Preview','preview-industry-report-template','compact','eye',`data-template="${escapeHTML(name)}"`)}${button(name===state.reportTemplate?'Regenerate':'Use template','apply-report-template',name===state.reportTemplate?'':'primary','sparkles',`data-template="${escapeHTML(name)}"`)}</footer></article>`).join('');
+    showModal('Industry Report Template Library','Preview an institutional reporting layout, then auto-generate it from current approved data and edit every section before review.',`<div class="template-library-grid">${cards}</div><div class="reason-item section-gap">${icon('info')}<div><strong>Standards-led, not automatic legal compliance</strong><small>Layouts follow recognised private-markets reporting and valuation conventions. Fund governing documents, accounting basis, client requirements and local rules remain authoritative.</small></div></div>`,`${button('Close','close-modal','primary')}`,{variant:'document',size:'xl',eyebrow:'Premium auto-generated report templates'});
+  };
+
+  const v15BaseDocumentPreviewBody = documentPreviewBody;
+  documentPreviewBody = function(doc) {
+    if (doc.type === 'XLSX' || doc.type === 'CSV') return v15BaseDocumentPreviewBody(doc);
+    const isTerm=/Term Sheet/i.test(doc.name);
+    const isReport=/Report|Pack|Memo|Financial Statements/i.test(doc.name);
+    const metaRows=isTerm ? [['Investment','USD 18,000,000'],['Instrument','Preferred equity'],['Pre-money valuation','USD 85,000,000'],['Ownership','17.5%'],['Board rights','1 director + 1 observer']] : isReport ? [['Reporting entity','Matanho Growth Fund II'],['Reporting period','Q2 2026'],['Reporting currency','USD'],['Prepared by',doc.owner],['Review status',doc.status]] : [['Document owner',doc.owner],['Classification',doc.classification],['Version',doc.version],['Access',doc.access],['Retention',doc.retention]];
+    return `<div class="pdf-preview professional-document v15-premium-document"><aside>${Array.from({length:Math.min(doc.pages||6,6)},(_,i)=>`<button class="pdf-thumbnail ${i===0?'active':''}" data-action="document-page" data-page="${i+1}"><span>${i+1}</span><div></div></button>`).join('')}</aside><div class="pdf-canvas"><article class="v15-paper"><div class="v15-paper-head"><div class="v15-paper-brand">matanho<small>Investment Management ERP</small></div><div class="v15-paper-docmeta">${escapeHTML(doc.classification).toUpperCase()}<br>${escapeHTML(doc.version)}<br>${escapeHTML(doc.folder)}</div></div><span class="v15-doc-watermark">CONTROLLED COPY</span><div class="v15-paper-kicker">${isTerm?'Investment documentation':isReport?'Institutional reporting':'Controlled document'}</div><h1>${escapeHTML(doc.name.replace(/\.(pdf|docx)$/i,''))}</h1><p class="lead">${isTerm?'Principal investment terms prepared for controlled review, negotiation and electronic execution.':isReport?'Professional investment-management report with clear reporting period, methodology, source data and approval status.':'Version-controlled investment record with source lineage, review history and permission-aware access.'}</p><div class="v15-doc-status-row"><span class="v15-doc-status-chip">${escapeHTML(doc.status)}</span><span class="v15-doc-status-chip">${escapeHTML(doc.version)}</span><span class="v15-doc-status-chip">${escapeHTML(doc.signatureStatus)}</span></div><section class="v15-paper-section"><header><span>01</span><h2>${isTerm?'Principal terms':isReport?'Report particulars':'Document particulars'}</h2></header><table class="v15-paper-table"><tbody>${metaRows.map(row=>`<tr><td style="width:35%;color:#69758b">${escapeHTML(row[0])}</td><td><strong>${escapeHTML(String(row[1]))}</strong></td></tr>`).join('')}</tbody></table></section><section class="v15-paper-section"><header><span>02</span><h2>${isTerm?'Governance, protections and conditions':'Executive summary'}</h2></header><p>${isTerm?'The transaction remains subject to definitive agreements, conditions precedent, approved governance rights and the documented authority matrix. Any material change creates a new controlled version.':'This controlled record presents the approved information for the current reporting period. Material values are supported by source-data references, review evidence and a visible publication status.'}</p>${isReport?'<div class="v15-report-mini-chart"><span style="height:35%"></span><span style="height:54%"></span><span style="height:48%"></span><span style="height:70%"></span><span style="height:83%"></span><span style="height:76%"></span></div>':''}</section><section class="v15-paper-section"><header><span>03</span><h2>Review and evidence</h2></header><table class="v15-paper-table"><thead><tr><th>Control</th><th>Owner</th><th>Status</th></tr></thead><tbody><tr><td>Source-data validation</td><td>${escapeHTML(doc.owner)}</td><td>Complete</td></tr><tr><td>Independent review</td><td>Fund Operations</td><td>${escapeHTML(doc.status)}</td></tr><tr><td>${isTerm?'Execution readiness':'Publication approval'}</td><td>Authorised approver</td><td>${doc.signatureStatus==='Completed'?'Complete':'Pending'}</td></tr></tbody></table><div class="v15-paper-callout"><strong>CONTROLLED DOCUMENT</strong><br>Edits are retained as a new version. The published or signed copy is not overwritten.</div></section>${isTerm?'<div class="v15-paper-signatures"><div class="v15-paper-signature"><strong>Matanho Capital</strong>Authorised signatory</div><div class="v15-paper-signature"><strong>Nova Analytics (Pvt) Ltd</strong>Authorised signatory</div></div>':''}<div class="v15-paper-footer"><span>${escapeHTML(doc.id)} · ${escapeHTML(doc.version)}</span><span>Page 1 of ${doc.pages||1}</span></div></article></div></div>`;
+  };
+
+  const v15BaseHandleAction = handleAction;
+  handleAction = function(action,trigger,event) {
+    switch(action) {
+      case 'v15-standard-back': navigate(trigger.dataset.target || state.previousPage || 'dashboard'); return;
+      case 'sign-term-sheet': v15ShowSignatureCapture(trigger.dataset.id || state.selectedDocumentId || 'DOC-009', state.selectedEnvelopeId, trigger.dataset.signer); return;
+      case 'v15-signature-mode': v15SetSignatureCaptureMode(trigger.dataset.mode || 'draw'); return;
+      case 'v15-clear-signature': v15ClearSignaturePad(); return;
+      case 'v15-apply-signature': v15ApplySignature(trigger); return;
+      case 'preview-signature-template': v15ShowSignatureTemplatePreview(trigger.dataset.template || 'Term Sheet'); return;
+      case 'preview-industry-report-template': v15ShowIndustryReportTemplatePreview(trigger.dataset.template || state.reportTemplate); return;
+      default: return v15BaseHandleAction(action,trigger,event);
+    }
+  };
+
+  document.addEventListener('input',event=>{
+    if (event.target.id === 'v15TypedSignatureName') {
+      const preview=$('#v15TypedSignaturePreview'); if(preview) preview.textContent=event.target.value || 'Signature';
+    }
+  });
+  document.addEventListener('change',event=>{
+    if (event.target.id !== 'v15SignatureUpload') return;
+    const file=event.target.files?.[0];
+    if (!file) return;
+    const reader=new FileReader();
+    reader.onload=()=>{
+      state.v15UploadedSignature=String(reader.result||'');
+      const img=$('#v15SignatureUploadPreview');
+      if(img){img.src=state.v15UploadedSignature;img.style.display='block';}
+      toast('Signature image loaded',file.name);
+    };
+    reader.readAsDataURL(file);
+  });
+
+
+  // V21 simplified signing experience: review -> sign -> complete.
+  function v21SignerEmail(name='') {
+    const key=String(name).trim().toLowerCase().replace(/[^a-z0-9]+/g,'.').replace(/^\.|\.$/g,'');
+    return `${key||'signer'}@matanho.com`;
+  }
+
+  function v21SignatureEvidence(envelope,index) {
+    return state.v15SignatureEvidence?.[v15SignatureKey(envelope.id,index)] || null;
+  }
+
+  function v21SignaturePaper(doc,envelope,currentIndex) {
+    const current=envelope.recipients[currentIndex] || envelope.recipients[0];
+    const rows=[
+      ['Investment amount','USD 18,000,000'],
+      ['Instrument','Preferred equity'],
+      ['Pre-money valuation','USD 85,000,000'],
+      ['Proposed ownership','17.5%'],
+      ['Board rights','1 director + 1 observer'],
+      ['Target close','31 Aug 2026']
+    ];
+    const blocks=envelope.recipients.slice(0,2).map((recipient,index)=>{
+      const evidence=v21SignatureEvidence(envelope,index);
+      if(recipient[2]==='Signed') return `<div class="v21-signature-block"><small>${escapeHTML(recipient[1])}</small><div class="v21-paper-signed"><strong class="drawn">${escapeHTML(evidence?.legalName||recipient[0])}</strong><span>Signed electronically · ${evidence?.auth||'Email + OTP'}</span></div></div>`;
+      return `<div class="v21-signature-block"><small>${escapeHTML(recipient[1])}</small><button class="v21-paper-sign-button" data-action="v21-focus-signature" data-signer="${index}">${icon('edit')}<strong>${index===currentIndex?'Sign here':'Awaiting signature'}</strong><span>${escapeHTML(recipient[0])}</span></button></div>`;
+    }).join('');
+    return `<article class="v21-esign-paper"><div class="v21-esign-paper-head"><div class="v21-esign-paper-brand">matanho<small>Investment Management ERP</small></div><div class="v21-esign-paper-meta">CONTROLLED COPY<br>${escapeHTML(doc.id)} · ${escapeHTML(doc.version)}<br>Electronic execution enabled</div></div><h1>${escapeHTML(doc.name.replace(/\.(pdf|docx)$/i,''))}</h1><p class="lead">Non-binding summary of principal investment terms prepared for controlled review and electronic execution.</p><h2>Investment overview</h2><table class="v21-term-table"><tbody>${rows.map(row=>`<tr><td>${escapeHTML(row[0])}</td><td>${escapeHTML(row[1])}</td></tr>`).join('')}</tbody></table><h2>Governance and investor protections</h2><p>The investor may appoint one director and one non-voting observer, subject to the definitive agreements, agreed reserved matters and final legal review.</p><h2>Execution</h2><p>Each signatory confirms authority to execute the controlled document. Completion evidence records the document hash, consent, signer identity, timestamp and authentication method.</p><div class="v21-signature-blocks">${blocks}</div><div class="v21-paper-footer"><span>${escapeHTML(doc.id)} · ${escapeHTML(doc.version)}</span><span>Page 1 of ${doc.pages||1}</span></div></article>`;
+  }
+
+  function v21ShowESign(documentId='DOC-009',envelopeId=null,signerIndex=null) {
+    const doc=documents.find(item=>item.id===documentId) || documents.find(item=>/Term Sheet|Agreement/.test(item.name)) || documents[0];
+    const envelope=signatureEnvelopes.find(item=>item.id===envelopeId) || signatureEnvelopes.find(item=>item.documentId===doc.id) || signatureEnvelopes[0];
+    const pending=envelope.recipients.findIndex(item=>item[2]!=='Signed');
+    const requested=(signerIndex===null||signerIndex===undefined||signerIndex==='')?NaN:Number(signerIndex);
+    const index=Number.isFinite(requested) && requested>=0 ? requested : (pending>=0?pending:0);
+    const signer=envelope.recipients[index] || envelope.recipients[0];
+    const completed=envelope.status==='Completed' || envelope.progress>=100;
+    const alreadySigned=signer?.[2]==='Signed';
+    state.selectedDocumentId=doc.id;
+    state.selectedEnvelopeId=envelope.id;
+    state.signatureSelectedRecipient=index;
+    state.v15SignatureCaptureMode='draw';
+    state.v15SignatureInk='';
+    state.v15HasDrawnSignature=false;
+    state.v15UploadedSignature='';
+
+    const otherSigners=envelope.recipients.map((r,i)=>`<div class="v21-other-signer">${personAvatar(r[0])}<span><strong>${escapeHTML(r[0])}</strong><small>${escapeHTML(r[1])}</small></span>${statusPill(r[2],r[2]==='Signed'?'success':r[2]==='Declined'?'danger':'warning')}</div>`).join('');
+    const step2=completed?'done':'active';
+    const step3=completed?'active':'';
+    const signingControls=alreadySigned || completed ? `<div class="v21-complete-card"><strong>${completed?'Document completed':'Your signature is recorded'}</strong><p>${completed?'All required signers have completed the document. The completion certificate is available for download.':'The envelope remains open while other signers complete their steps.'}</p></div>${completed?`<button class="v21-sign-primary" data-action="download-signature-certificate">${icon('download')} Download completion certificate</button>`:`<button class="v21-sign-secondary" data-action="close-modal">Finish later</button>`}` : `<div class="v21-sign-methods"><button type="button" class="v15-sign-tab active" data-action="v15-signature-mode" data-mode="draw">Draw</button><button type="button" class="v15-sign-tab" data-action="v15-signature-mode" data-mode="type">Type</button><button type="button" class="v15-sign-tab" data-action="v15-signature-mode" data-mode="upload">Upload</button></div><div class="v15-sign-panel active" data-mode="draw"><p>Draw inside the box using a mouse, finger or stylus.</p><div class="v15-signature-pad-wrap"><canvas id="v15SignatureCanvas"></canvas><span class="v15-sign-pad-caption">SIGN ABOVE THIS LINE</span></div><div class="v15-sign-pad-actions"><small id="v15SignatureDrawStatus">Draw your signature</small>${button('Clear','v15-clear-signature','ghost compact','refresh')}</div></div><div class="v15-sign-panel" data-mode="type"><div class="form-field"><label class="required">Full legal name</label><input id="v15TypedSignatureName" value="${escapeHTML(signer[0])}" autocomplete="name"></div><div class="v15-typed-signature"><strong id="v15TypedSignaturePreview">${escapeHTML(signer[0])}</strong></div></div><div class="v15-sign-panel" data-mode="upload"><label class="v15-signature-upload" for="v15SignatureUpload">${icon('upload')}<span><strong>Upload signature image</strong><small>PNG or JPG</small></span><input id="v15SignatureUpload" type="file" accept="image/png,image/jpeg" hidden></label><img id="v15SignatureUploadPreview" class="v15-upload-preview" alt="Uploaded signature preview"></div><label class="v21-consent"><input id="v15SignatureConsent" type="checkbox"><span>I have reviewed this controlled document and consent to apply my electronic signature.</span></label><button class="v21-sign-primary" data-action="v21-apply-signature" data-signer="${index}" data-document="${doc.id}">${icon('edit')} Sign and continue</button><button class="v21-sign-secondary" data-action="close-modal">Save and finish later</button>`;
+
+    const body=`<div class="v21-esign-shell"><section class="v21-esign-document"><header class="v21-esign-toolbar"><div class="v21-esign-toolbar-left"><button class="v21-doc-tool" data-action="close-modal">${icon('chevron-left')} Back</button><div><strong>${escapeHTML(doc.name)}</strong><small>${escapeHTML(doc.version)} · ${escapeHTML(envelope.id)}</small></div></div><div class="v21-esign-toolbar-right"><button class="v21-doc-tool" data-action="document-zoom">100%</button><button class="v21-doc-tool" data-action="download-format" data-id="${doc.id}" data-format="pdf">${icon('download')} PDF</button></div></header><div class="v21-esign-scroll">${v21SignaturePaper(doc,envelope,index)}</div></section><aside class="v21-esign-panel"><div class="v21-sign-panel-head"><div class="v21-sign-panel-title"><span>${icon('edit')}</span><div><h3>E-sign document</h3><p>${escapeHTML(doc.name)} · secure execution</p></div></div><div class="v21-sign-steps"><div class="v21-sign-step done"><span>${icon('check')}</span>Review</div><div class="v21-sign-step ${step2}"><span>${completed?icon('check'):'2'}</span>Sign</div><div class="v21-sign-step ${step3}"><span>${completed?icon('check'):'3'}</span>Complete</div></div></div><div class="v21-sign-panel-body"><div class="v21-signer-card">${personAvatar(signer[0])}<span><strong>${escapeHTML(signer[0])}</strong><small>${escapeHTML(signer[1])}<br>${escapeHTML(v21SignerEmail(signer[0]))}</small></span>${statusPill(signer[2],signer[2]==='Signed'?'success':'warning')}</div>${signingControls}<section class="v21-other-signers"><header><h4>Signing order</h4><small>${envelope.recipients.filter(r=>r[2]==='Signed').length} of ${envelope.recipients.length} signed</small></header>${otherSigners}</section><div class="v21-security-line">${icon('shield')} Encrypted · consent and audit evidence recorded</div></div></aside></div>`;
+    showModal('Electronic Signature',`${doc.name} · ${envelope.id}`,body,'',{variant:'signature',size:'fullscreen',eyebrow:'Simple secure signing'});
+    if(!alreadySigned && !completed){requestAnimationFrame(()=>requestAnimationFrame(v15InitSignaturePad));setTimeout(v15InitSignaturePad,120);}
+  }
+
+  function v21ApplySignature(trigger){
+    const envelope=signatureEnvelopes.find(item=>item.id===state.selectedEnvelopeId) || signatureEnvelopes[0];
+    const index=Number(trigger.dataset.signer||0);
+    const signer=envelope.recipients[index];
+    if(!signer)return;
+    if(!$('#v15SignatureConsent')?.checked){toast('Consent required','Confirm that you reviewed the controlled document.','warning');return;}
+    const mode=state.v15SignatureCaptureMode||'draw';
+    let dataUrl=''; let legalName=signer[0];
+    if(mode==='draw'){
+      if(!state.v15HasDrawnSignature||!state.v15SignatureInk){toast('Signature required','Draw your signature before continuing.','warning');return;}
+      dataUrl=state.v15SignatureInk;
+    }else if(mode==='type'){
+      legalName=$('#v15TypedSignatureName')?.value.trim()||'';
+      if(!legalName){toast('Name required','Enter the signer legal name.','warning');return;}
+    }else{
+      if(!state.v15UploadedSignature){toast('Signature image required','Upload a PNG or JPG signature image.','warning');return;}
+      dataUrl=state.v15UploadedSignature;
+    }
+    state.v15SignatureEvidence[v15SignatureKey(envelope.id,index)]={mode,dataUrl,legalName,signedAt:new Date().toISOString(),auth:'Email + OTP'};
+    signer[2]='Signed';
+    envelope.progress=Math.round(envelope.recipients.filter(item=>item[2]==='Signed').length/envelope.recipients.length*100);
+    envelope.status=envelope.progress===100?'Completed':'Waiting for others';
+    const doc=documents.find(item=>item.id===trigger.dataset.document)||documents.find(item=>item.id===envelope.documentId);
+    if(doc)doc.signatureStatus=envelope.status==='Completed'?'Completed':'Partially signed';
+    toast('Signature applied',`${signer[0]} signed the controlled document.`);
+    closeOverlays();render();
+    setTimeout(()=>v21ShowESign(doc?.id||envelope.documentId,envelope.id,index),0);
+  }
+
+  const v21BaseShowSignatureStudio=showSignatureStudio;
+  showSignatureStudio=function(documentId='DOC-009',envelopeId=null){v21ShowESign(documentId,envelopeId,null);};
+  v15ShowSignatureCapture=function(documentId='DOC-009',envelopeId=null,signerIndex=null){v21ShowESign(documentId,envelopeId,signerIndex);};
+
+  const v21BaseHandleAction=handleAction;
+  handleAction=function(action,trigger,event){
+    switch(action){
+      case 'open-signature-studio': v21ShowESign(trigger.dataset.id||state.selectedDocumentId||'DOC-009',trigger.dataset.envelope||null,null); return;
+      case 'sign-term-sheet': v21ShowESign(trigger.dataset.id||state.selectedDocumentId||'DOC-009',state.selectedEnvelopeId,trigger.dataset.signer); return;
+      case 'v21-focus-signature': state.signatureSelectedRecipient=Number(trigger.dataset.signer||0); v21ShowESign(state.selectedDocumentId||'DOC-009',state.selectedEnvelopeId,state.signatureSelectedRecipient); return;
+      case 'v21-apply-signature': v21ApplySignature(trigger); return;
+      default: return v21BaseHandleAction(action,trigger,event);
+    }
+  };
+
+
+  /* V22 — interaction reliability, document/report vault upgrades and responsive overlay polish */
+  state.v22VaultFolder = state.v22VaultFolder || 'all';
+  state.v22VaultSearch = state.v22VaultSearch || '';
+  state.v22VaultClassification = state.v22VaultClassification || 'All classifications';
+  state.v22VaultStatus = state.v22VaultStatus || 'All statuses';
+  state.v22VaultView = state.v22VaultView || 'list';
+  state.v22DocumentZoom = state.v22DocumentZoom || 100;
+  state.v22DocumentPage = state.v22DocumentPage || 1;
+  state.v22ReportSearch = state.v22ReportSearch || '';
+  state.v22ReportType = state.v22ReportType || 'All report types';
+  state.v22ReportPeriod = state.v22ReportPeriod || 'All periods';
+  state.v22SignatureSearch = state.v22SignatureSearch || '';
+  state.v22SignatureStatus = state.v22SignatureStatus || 'All statuses';
+
+  function v22Option(value, selected){
+    return `<option ${value===selected?'selected':''}>${escapeHTML(value)}</option>`;
+  }
+
+  function v22FilteredDocuments(){
+    const q=(state.v22VaultSearch||'').trim().toLowerCase();
+    return documents.filter(doc=>{
+      const folderOk=state.v22VaultFolder==='all'||doc.folder===state.v22VaultFolder;
+      const classOk=state.v22VaultClassification==='All classifications'||doc.classification===state.v22VaultClassification;
+      const statusOk=state.v22VaultStatus==='All statuses'||doc.status===state.v22VaultStatus;
+      const searchOk=!q||[doc.name,doc.folder,doc.owner,doc.classification,doc.status,doc.type,doc.version].some(value=>String(value||'').toLowerCase().includes(q));
+      return folderOk&&classOk&&statusOk&&searchOk;
+    });
+  }
+
+  function v22DocumentCards(items){
+    if(!items.length) return `<div class="v22-empty-state">${icon('search')}<strong>No documents match these filters</strong><p>Clear a filter or search for a different title, owner, folder or status.</p>${button('Clear filters','v22-clear-vault-filters','','refresh')}</div>`;
+    return `<div class="v22-document-grid">${items.map(doc=>`<article class="v22-document-card" data-action="preview-document" data-id="${doc.id}" tabindex="0"><div class="v22-document-card-icon">${icon(doc.type==='XLSX'?'bar-chart':'file')}</div><div class="v22-document-card-copy"><div class="v22-document-card-top"><span>${escapeHTML(doc.folder)}</span>${statusPill(doc.status)}</div><h3>${escapeHTML(doc.name)}</h3><p>${escapeHTML(doc.type)} · ${escapeHTML(doc.size)} · ${escapeHTML(doc.version)}</p><div class="v22-document-card-meta"><span><small>Owner</small><strong>${escapeHTML(doc.owner)}</strong></span><span><small>Class</small><strong>${escapeHTML(doc.classification)}</strong></span><span><small>Updated</small><strong>${escapeHTML(doc.uploaded)}</strong></span></div></div><div class="v22-document-card-actions">${button('Preview','preview-document','compact','eye',`data-id="${doc.id}"`)}${button('Download','document-download-menu','ghost compact','download',`data-id="${doc.id}"`)}${/Term Sheet|Agreement/.test(doc.name)?button('E-sign','open-signature-studio','ghost compact','edit',`data-id="${doc.id}"`):''}</div></article>`).join('')}</div>`;
+  }
+
+  vaultDocumentTable=function(items=documents){
+    if(state.v22VaultView==='grid') return v22DocumentCards(items);
+    if(!items.length) return `<div class="v22-empty-state">${icon('search')}<strong>No documents match these filters</strong><p>Clear a filter or search for a different title, owner, folder or status.</p>${button('Clear filters','v22-clear-vault-filters','','refresh')}</div>`;
+    return `<div class="table-wrap"><table><thead><tr><th>Document</th><th>Folder</th><th>Version</th><th>Owner</th><th>Classification</th><th>Signature</th><th>Status</th><th>Updated</th><th>Actions</th></tr></thead><tbody>${items.map(doc=>`<tr class="clickable v22-document-row" data-action="preview-document" data-id="${doc.id}" tabindex="0"><td class="table-primary"><span class="document-name-cell"><span class="document-row-icon">${icon(doc.type==='XLSX'?'bar-chart':'file')}</span><span>${escapeHTML(doc.name)}<small>${escapeHTML(doc.type)} · ${escapeHTML(doc.size)}</small></span></span></td><td>${escapeHTML(doc.folder)}</td><td>${escapeHTML(doc.version)}</td><td>${escapeHTML(doc.owner)}</td><td>${statusPill(doc.classification,'neutral')}</td><td>${statusPill(doc.signatureStatus,doc.signatureStatus==='Not required'?'neutral':doc.signatureStatus.includes('Awaiting')?'warning':'info')}</td><td>${statusPill(doc.status)}</td><td>${escapeHTML(doc.uploaded)}</td><td><div class="row-actions">${button('Preview','preview-document','compact','eye',`data-id="${doc.id}"`)}${button('Ledger','edit-document-ledger','ghost compact','list',`data-id="${doc.id}"`)}${button('Download','document-download-menu','ghost compact','download',`data-id="${doc.id}"`)}${/Term Sheet|Agreement/.test(doc.name)?button('E-sign','open-signature-studio','ghost compact','edit',`data-id="${doc.id}"`):''}</div></td></tr>`).join('')}</tbody></table></div>`;
+  };
+
+  renderDocumentsVault=function(){
+    const folders=[...new Set(documents.map(d=>d.folder))];
+    const filtered=v22FilteredDocuments();
+    const filterCount=(state.v22VaultClassification!=='All classifications'?1:0)+(state.v22VaultStatus!=='All statuses'?1:0);
+    return `${pageHeader('Documents Vault','Secure, classified and auditable investment-document repository with native previews, versions, access controls and e-signature.',`${button('Request document','request-document','','send')}${button('Upload files','vault-upload','primary','upload')}`,'Reporting & Records')}
+      <section class="vault-stats section-gap"><div>${icon('folder')}<span><strong>${folders.length}</strong><small>Controlled folders</small></span></div><div>${icon('file')}<span><strong>${documents.length}</strong><small>Active documents</small></span></div><div>${icon('edit')}<span><strong>${documents.filter(d=>d.signatureStatus!=='Not required').length}</strong><small>Signature-enabled</small></span></div><div>${icon('shield')}<span><strong>100%</strong><small>Encrypted & audit logged</small></span></div><div>${icon('clock')}<span><strong>2</strong><small>Retention reviews due</small></span></div></section>
+      <section class="vault-layout section-gap"><aside class="vault-folder-panel"><div class="vault-panel-head"><strong>Folders</strong>${button('','create-folder','ghost compact icon-only','plus')}</div><button class="vault-folder ${state.v22VaultFolder==='all'?'active':''}" data-action="vault-filter-folder" data-folder="all">${icon('layers')}<span>All documents<small>${documents.length} records</small></span><b>${documents.length}</b></button>${folders.map(folder=>`<button class="vault-folder ${state.v22VaultFolder===folder?'active':''}" data-action="vault-filter-folder" data-folder="${escapeHTML(folder)}">${icon('folder')}<span>${escapeHTML(folder)}<small>${documents.filter(d=>d.folder===folder).length} records</small></span><b>${documents.filter(d=>d.folder===folder).length}</b></button>`).join('')}</aside><section class="card table-card vault-records"><div class="table-toolbar"><div class="table-title-row"><h3>Document Register</h3><span class="table-badge">${filtered.length} visible · click a row to preview</span></div><div class="table-tools"><label class="table-search">${icon('search')}<input data-input-action="v22-document-search" value="${escapeHTML(state.v22VaultSearch)}" placeholder="Search documents"></label>${button(`Filters${filterCount?` · ${filterCount}`:''}`,'document-vault-filters','','filter')}${button(state.v22VaultView==='list'?'Cards':'List','toggle-vault-view','','grid')}</div></div>${vaultDocumentTable(filtered)}</section></section>`;
+  };
+
+  function v22ShowDocumentFilters(trigger){
+    const classifications=['All classifications',...new Set(documents.map(item=>item.classification))];
+    const statuses=['All statuses',...new Set(documents.map(item=>item.status))];
+    showPopover(trigger,`<div class="v22-filter-popover"><div class="popover-title">Document filters</div><label><span>Classification</span><select data-change-action="v22-vault-classification">${classifications.map(value=>v22Option(value,state.v22VaultClassification)).join('')}</select></label><label><span>Status</span><select data-change-action="v22-vault-status">${statuses.map(value=>v22Option(value,state.v22VaultStatus)).join('')}</select></label><div class="v22-popover-actions">${button('Clear','v22-clear-vault-filters','','refresh')}${button('Done','close-popover','primary','check')}</div></div>`,320);
+  }
+
+  function v22UploadDocuments(){
+    const input=document.createElement('input');
+    input.type='file'; input.multiple=true; input.accept='.pdf,.doc,.docx,.xls,.xlsx,.csv,image/*'; input.hidden=true;
+    document.body.appendChild(input);
+    input.addEventListener('change',()=>{ if(input.files?.length) uploadDocuments(input.files); input.remove(); },{once:true});
+    input.addEventListener('cancel',()=>input.remove(),{once:true});
+    input.click();
+  }
+
+  function v22DocumentInspector(tab='details'){
+    const doc=documents.find(item=>item.id===state.selectedDocumentId)||documents[0];
+    const inspector=modalLayer.querySelector('.document-inspector'); if(!inspector)return;
+    const tabs=['details','versions','activity'];
+    const tabButtons=tabs.map(value=>`<button class="${tab===value?'active':''}" data-action="v22-document-inspector-tab" data-tab="${value}">${value[0].toUpperCase()+value.slice(1)}</button>`).join('');
+    let body='';
+    if(tab==='versions') body=`<div class="v22-inspector-section"><strong>Version history</strong><div class="v22-version-list"><button data-action="preview-document" data-id="${doc.id}"><span><b>${escapeHTML(doc.version)}</b><small>Current working version · ${escapeHTML(doc.uploaded)}</small></span>${statusPill(doc.status)}</button><button data-action="generic-action"><span><b>v${Math.max(1,parseFloat(doc.version.replace('v',''))-.1).toFixed(1)}</b><small>Previous approved version · 08 Jul 2026</small></span>${statusPill('Archived','neutral')}</button><button data-action="generic-action"><span><b>v1.0</b><small>Original controlled upload</small></span>${statusPill('Archived','neutral')}</button></div>${button('Open full version ledger','edit-document-ledger','primary','list',`data-id="${doc.id}"`)}</div>`;
+    else if(tab==='activity') body=`<div class="v22-inspector-section"><strong>Recent activity</strong><div class="case-timeline"><div><span></span><strong>Preview opened</strong><small>Current session · ${escapeHTML(v11CurrentRole().name)}</small></div><div><span></span><strong>${escapeHTML(doc.status)} review</strong><small>${escapeHTML(doc.owner)} · ${escapeHTML(doc.uploaded)}</small></div><div><span></span><strong>Source evidence linked</strong><small>${doc.id}-SRC-${doc.version.replace('.','')}</small></div></div>${button('Open activity metadata','activity-menu','primary','clock',`data-context="document" data-id="${doc.id}"`)}</div>`;
+    else body=`<div class="info-list"><div class="info-row"><span>Owner</span><strong>${escapeHTML(doc.owner)}</strong></div><div class="info-row"><span>Access</span><strong>${escapeHTML(doc.access)}</strong></div><div class="info-row"><span>Classification</span><strong>${escapeHTML(doc.classification)}</strong></div><div class="info-row"><span>Retention</span><strong>${escapeHTML(doc.retention)}</strong></div><div class="info-row"><span>Signature</span><strong>${statusPill(doc.signatureStatus)}</strong></div><div class="info-row"><span>Source reference</span><strong>${doc.id}-SRC-${doc.version.replace('.','')}</strong></div><div class="info-row"><span>Checksum</span><strong>71dc…b98f</strong></div></div><div class="reason-item section-gap">${icon('shield')}<div><strong>Controlled preview</strong><small>Preview, export, edit and signature activity remains traceable to this version.</small></div></div>${doc.signatureStatus!=='Not required'?`<div class="section-gap">${button(doc.id==='DOC-009'?'Sign term sheet':'Open Signature Studio',doc.id==='DOC-009'?'sign-term-sheet':'open-signature-studio','primary','edit',`data-id="${doc.id}"`)}</div>`:''}`;
+    inspector.innerHTML=`<div class="inspector-tabs">${tabButtons}</div>${body}`; renderStaticIcons(inspector);
+  }
+
+  function v22SyncDocumentPreview(){
+    state.v22DocumentZoom=100; state.v22DocumentPage=1;
+    const zoom=modalLayer.querySelector('[data-action="document-zoom"]'); if(zoom)zoom.textContent='100%';
+    const tabs=modalLayer.querySelectorAll('.document-inspector .inspector-tabs button');
+    tabs.forEach((node,index)=>{node.dataset.action='v22-document-inspector-tab';node.dataset.tab=['details','versions','activity'][index]||'details';});
+    const paper=modalLayer.querySelector('.v15-paper,.professional-document article,.spreadsheet-sheet'); if(paper)paper.classList.add('v22-zoom-target');
+    renderStaticIcons(modalLayer);
+  }
+
+  const v22BaseShowDocumentPreview=showDocumentPreview;
+  showDocumentPreview=function(id){
+    v22BaseShowDocumentPreview(id);
+    requestAnimationFrame(v22SyncDocumentPreview);
+  };
+
+  function v22SetDocumentPage(page){
+    const n=Math.max(1,Number(page)||1); state.v22DocumentPage=n;
+    modalLayer.querySelectorAll('.pdf-thumbnail').forEach(node=>node.classList.toggle('active',Number(node.dataset.page)===n));
+    const footer=modalLayer.querySelector('.v15-paper-footer,.report-page-footer');
+    if(footer){const spans=footer.querySelectorAll('span'); if(spans.length>1){const total=(documents.find(item=>item.id===state.selectedDocumentId)||{}).pages||n;spans[spans.length-1].textContent=`Page ${n} of ${total}`;}}
+    const paper=modalLayer.querySelector('.v15-paper');
+    if(paper){let badge=paper.querySelector('.v22-page-badge'); if(!badge){badge=document.createElement('span');badge.className='v22-page-badge';paper.appendChild(badge);}badge.textContent=`Preview page ${n}`;paper.classList.remove('v22-page-pulse');void paper.offsetWidth;paper.classList.add('v22-page-pulse');}
+  }
+
+  function v22ZoomDocument(trigger,delta=10){
+    const values=[80,90,100,110,125,140];
+    let current=Number(state.v22DocumentZoom)||100;
+    if(delta===0)current=100; else {const i=values.indexOf(current); current=values[Math.max(0,Math.min(values.length-1,(i<0?2:i)+(delta>0?1:-1)))];}
+    state.v22DocumentZoom=current;
+    const target=modalLayer.querySelector('.v22-zoom-target,.v15-paper,.v21-esign-paper,.signature-page');
+    if(target){target.style.transform=`scale(${current/100})`;target.style.transformOrigin='top center';target.style.marginBottom=`${Math.max(0,(current-100)*7)}px`;}
+    if(trigger)trigger.textContent=`${current}%`;
+  }
+
+  function v22FilteredReports(){
+    const q=(state.v22ReportSearch||'').trim().toLowerCase();
+    return reportVaultItems.filter(report=>{
+      const fundOk=state.reportFilterFund==='All Funds'||report.fund===state.reportFilterFund;
+      const typeOk=state.v22ReportType==='All report types'||report.type===state.v22ReportType;
+      const statusOk=state.reportFilterStatus==='All Statuses'||report.status===state.reportFilterStatus;
+      const periodOk=state.v22ReportPeriod==='All periods'||report.period===state.v22ReportPeriod;
+      const searchOk=!q||[report.name,report.type,report.fund,report.owner,report.period,report.status].some(value=>String(value||'').toLowerCase().includes(q));
+      return fundOk&&typeOk&&statusOk&&periodOk&&searchOk;
+    });
+  }
+
+  renderReportsVault=function(){
+    const filtered=v22FilteredReports();
+    const types=['All report types',...new Set(reportVaultItems.map(r=>r.type))];
+    const periods=['All periods',...new Set(reportVaultItems.map(r=>r.period))];
+    const cards=filtered.length?filtered.map(report=>`<article class="report-vault-card v22-report-card" data-action="preview-vault-report" data-id="${report.id}" tabindex="0"><div class="report-cover professional"><span>${icon(report.type.includes('Valuation')?'trend-up':report.type.includes('IC')?'users':report.type.includes('Operations')?'bank':'file-chart')}</span><div><small>${escapeHTML(report.type)}</small><strong>${escapeHTML(report.period)}</strong></div><em>${escapeHTML(report.classification)}</em></div><div class="report-vault-body"><div class="report-vault-title"><div><h3>${escapeHTML(report.name)}</h3><p>${escapeHTML(report.fund)} · ${escapeHTML(report.version)}</p></div>${statusPill(report.status)}</div><div class="report-meta-grid"><span><small>Generated</small><strong>${escapeHTML(report.generated)}</strong></span><span><small>Pages</small><strong>${report.pages}</strong></span><span><small>Recipients</small><strong>${report.recipients}</strong></span><span><small>Owner</small><strong>${escapeHTML(report.owner)}</strong></span></div><div class="report-vault-actions">${button('Preview','preview-vault-report','','eye',`data-id="${report.id}"`)}${button('Edit ledger','edit-report-ledger','','list',`data-id="${report.id}"`)}${button('Download','report-download-menu','primary','download',`data-id="${report.id}"`)}</div></div></article>`).join(''):`<div class="v22-empty-state v22-report-empty">${icon('file-chart')}<strong>No report packs match these filters</strong><p>Adjust the fund, type, status, period or search text.</p>${button('Clear filters','v22-clear-report-filters','','refresh')}</div>`;
+    return `${pageHeader('Reports Vault','Institutional fund, portfolio, IC, valuation, cash-control and investor report packs with professional templates and editable publication ledgers.',`${button('Generate report','generate-report','','plus')}${button('Build report pack','open-report-builder','primary','file-chart')}`,'Reporting & Records')}
+      ${workspaceFilterBar([{label:'Fund',action:'report-vault-fund',selected:state.reportFilterFund,options:['All Funds',...funds.map(f=>f.name)]},{label:'Report type',action:'report-vault-type',selected:state.v22ReportType,options:types},{label:'Status',action:'report-vault-status',selected:state.reportFilterStatus,options:['All Statuses',...new Set(reportVaultItems.map(r=>r.status))]},{label:'Period',action:'report-vault-period',selected:state.v22ReportPeriod,options:periods}])}
+      <section class="metric-grid section-gap">${metricCard({label:'Published Reports',value:String(reportVaultItems.filter(r=>r.status==='Published').length),iconName:'check-circle',accent:'emerald',foot:'Distribution evidence retained',action:'reports-published'})}${metricCard({label:'In Review',value:String(reportVaultItems.filter(r=>r.status==='In Review').length),iconName:'user-check',accent:'blue',foot:'Approval and commentary workflow',action:'reports-review'})}${metricCard({label:'Total Pages',value:sum(reportVaultItems,r=>r.pages).toLocaleString(),iconName:'file',accent:'brand',foot:'Across active report versions',action:'reports-pages'})}${metricCard({label:'Scheduled Distributions',value:'8',iconName:'send',accent:'purple',foot:'LP portal and secure email',action:'reports-distributions'})}</section><section class="card v22-report-tools section-gap"><label class="table-search">${icon('search')}<input data-input-action="v22-report-search" value="${escapeHTML(state.v22ReportSearch)}" placeholder="Search reports, owners or periods"></label><span class="table-badge">${filtered.length} of ${reportVaultItems.length} packs</span></section><section class="report-vault-grid section-gap">${cards}</section>`;
+  };
+
+  function v22FilteredEnvelopes(){
+    const q=(state.v22SignatureSearch||'').trim().toLowerCase();
+    return signatureEnvelopes.filter(envelope=>{
+      const statusOk=state.v22SignatureStatus==='All statuses'||envelope.status===state.v22SignatureStatus;
+      const searchOk=!q||[envelope.id,envelope.document,envelope.subject,envelope.status,...envelope.recipients.flat()].some(value=>String(value||'').toLowerCase().includes(q));
+      return statusOk&&searchOk;
+    });
+  }
+
+  renderESignatures=function(){
+    const filtered=v22FilteredEnvelopes();
+    const rows=filtered.length?filtered.map(e=>`<tr class="clickable" data-action="open-envelope" data-id="${e.id}" tabindex="0"><td class="table-primary">${escapeHTML(e.id)}<small>${escapeHTML(e.subject)}</small></td><td><button class="text-link" data-action="open-signature-studio" data-id="${e.documentId}" data-envelope="${e.id}">${escapeHTML(e.document)}</button></td><td><div class="v22-signer-summary"><span class="v22-signer-stack">${e.recipients.slice(0,4).map(r=>personAvatar(r[0])).join('')}</span><span><strong>${e.recipients.length} signer${e.recipients.length===1?'':'s'}</strong><small>${escapeHTML(e.recipients.map(r=>r[0]).join(', '))}</small></span></div></td><td><div class="inline-progress">${progressBar(e.progress)}<span>${e.progress}%</span></div></td><td>${statusPill(e.status)}</td><td>${escapeHTML(e.sent)}</td><td>${escapeHTML(e.expires)}</td><td><div class="row-actions">${button('Open','open-envelope','compact','eye',`data-id="${e.id}"`)}${button('Activity','activity-menu','ghost compact','clock',`data-context="envelope" data-id="${e.id}"`)}</div></td></tr>`).join(''):`<tr><td colspan="8"><div class="v22-empty-state compact">${icon('edit')}<strong>No envelopes match these filters</strong><p>Try another signer, document or status.</p></div></td></tr>`;
+    return `${pageHeader('E-Signatures','Simple, controlled electronic execution with signing order, consent evidence and completion certificates.',`${button('Signature templates','signature-templates','','layers')}${button('New envelope','new-signature-envelope','primary','edit')}`,'Reporting & Records')}
+      <section class="signature-summary section-gap"><div class="signature-summary-card"><span class="signature-orb">${icon('send')}</span><div><strong>${signatureEnvelopes.filter(e=>e.status!=='Completed').length}</strong><small>Active envelopes</small></div></div><div class="signature-summary-card"><span class="signature-orb success">${icon('check')}</span><div><strong>${signatureEnvelopes.filter(e=>e.status==='Completed').length}</strong><small>Completed this month</small></div></div><div class="signature-summary-card"><span class="signature-orb warning">${icon('clock')}</span><div><strong>${signatureEnvelopes.filter(e=>e.status==='Waiting for others'||e.status==='In progress').length}</strong><small>Awaiting recipients</small></div></div><div class="signature-summary-card"><span class="signature-orb danger">${icon('alert')}</span><div><strong>${signatureEnvelopes.filter(e=>e.status==='Action required').length}</strong><small>Action required</small></div></div></section>
+      <section class="card table-card section-gap"><div class="table-toolbar"><div class="table-title-row"><h3>Signature Envelopes</h3><span class="table-badge">${filtered.length} visible · signer photos shown</span></div><div class="table-tools"><label class="table-search">${icon('search')}<input data-input-action="v22-signature-search" value="${escapeHTML(state.v22SignatureSearch)}" placeholder="Search envelope, document or signer"></label>${button(state.v22SignatureStatus==='All statuses'?'Status':state.v22SignatureStatus,'signature-filters','','filter')}</div></div><div class="table-wrap"><table><thead><tr><th>Envelope / Subject</th><th>Document</th><th>Recipients</th><th>Progress</th><th>Status</th><th>Sent</th><th>Expires</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
+  };
+
+  function v22ShowSignatureFilters(trigger){
+    const statuses=['All statuses',...new Set(signatureEnvelopes.map(e=>e.status))];
+    showPopover(trigger,`<div class="v22-filter-popover"><div class="popover-title">Signature filters</div><label><span>Status</span><select data-change-action="v22-signature-status">${statuses.map(value=>v22Option(value,state.v22SignatureStatus)).join('')}</select></label><div class="v22-popover-actions">${button('Clear','v22-clear-signature-filters','','refresh')}${button('Done','close-popover','primary','check')}</div></div>`,300);
+  }
+
+  const v22BaseShowPopover=showPopover;
+  showPopover=function(anchor,html,width=310){
+    if(!anchor?.getBoundingClientRect)return v22BaseShowPopover(anchor,html,width);
+    const viewportPad=10; const safeWidth=Math.min(width,window.innerWidth-viewportPad*2);
+    const rect=anchor.getBoundingClientRect();
+    const left=Math.min(window.innerWidth-safeWidth-viewportPad,Math.max(viewportPad,rect.right-safeWidth));
+    const below=window.innerHeight-rect.bottom-viewportPad; const above=rect.top-viewportPad;
+    const maxHeight=Math.max(180,Math.min(520,Math.max(below,above)));
+    let top=below>=Math.min(360,maxHeight)?rect.bottom+7:Math.max(viewportPad,rect.top-maxHeight-7);
+    top=Math.min(window.innerHeight-90,Math.max(viewportPad,top));
+    const popoverKind=(anchor.dataset.action||'menu').replace(/[^a-z0-9-]/gi,'');
+    popoverLayer.innerHTML=`<div class="popover popover-${popoverKind} v22-responsive-popover" style="left:${left}px;top:${top}px;width:${safeWidth}px;max-height:${maxHeight}px">${html}</div>`;
+    popoverLayer.style.pointerEvents='auto'; state.popover=true; renderStaticIcons(popoverLayer);
+  };
+
+  function v22ShowBankDetails(){
+    showModal('Bank Instructions','Controlled payment details · masked by default',`<div class="v22-bank-detail"><div class="reason-item">${icon('shield')}<div><strong>Restricted financial information</strong><small>Full account identifiers should only be returned by the backend after permission and purpose checks.</small></div></div><div class="info-list section-gap"><div class="info-row"><span>Bank</span><strong>CBZ Bank</strong></div><div class="info-row"><span>Account name</span><strong>Matanho Growth Fund II</strong></div><div class="info-row"><span>Account identifier</span><strong>•••• •••• 5678</strong></div><div class="info-row"><span>SWIFT / BIC</span><strong>COBZZWHA</strong></div><div class="info-row"><span>Currency</span><strong>USD</strong></div><div class="info-row"><span>Evidence status</span><strong>${statusPill('Verified','success')}</strong></div></div></div>`,`${button('Close','close-modal')}${button('Copy masked details','v22-copy-bank-details','primary','copy')}`,{variant:'operations',size:'md',eyebrow:'Payment instructions'});
+  }
+
+  function v22ShowResolution(){
+    showModal('Board / IC Resolution','Controlled decision record',`<div class="v22-resolution"><div class="v22-resolution-head"><span>RES-IC-2026-014</span>${statusPill('Approved with conditions','success')}</div><h2>Approval of Investment in Nova Analytics Ltd — Series B</h2><p>The committee approves the proposed investment subject to completion of the documented conditions precedent and final legal execution.</p><div class="grid cols-2 section-gap"><div class="card"><div class="card-body info-list"><div class="info-row"><span>Meeting</span><strong>28 May 2026</strong></div><div class="info-row"><span>Quorum</span><strong>6 / 7 members</strong></div><div class="info-row"><span>Decision</span><strong>Approved with conditions</strong></div><div class="info-row"><span>Execution</span><strong>In progress</strong></div></div></div><div class="card"><div class="card-body"><strong>Conditions</strong><ol class="v22-resolution-list"><li>Complete regulatory confirmation.</li><li>Finalise shareholders agreement.</li><li>Confirm first-tranche disbursement readiness.</li></ol></div></div></div></div>`,`${button('Download PDF','generic-action','','download')}${button('Close','close-modal','primary')}`,{variant:'document',size:'lg',eyebrow:'Governance decision'});
+  }
+
+  function v22PreviewCapitalCall(id){
+    const call=capitalCalls.find(item=>item.id===id)||capitalCalls[0];
+    showModal('Capital Call Preview',`${call.id} · ${call.fund}`,`<article class="v22-premium-call"><div class="v15-paper-head"><div class="v15-paper-brand">matanho<small>Investment Management ERP</small></div><div class="v15-paper-docmeta">CAPITAL CALL NOTICE<br>${escapeHTML(call.id)}<br>Controlled copy</div></div><div class="v15-paper-kicker">Investor notice</div><h1>${escapeHTML(call.fund)}</h1><p class="lead">Capital call notice prepared for authorised limited partners.</p><div class="v15-paper-summary"><div><small>Call amount</small><strong>${formatMoney(call.amount)}</strong></div><div><small>Due date</small><strong>${escapeHTML(call.dueDate||call.due||'Configured due date')}</strong></div><div><small>Status</small><strong>${escapeHTML(call.status)}</strong></div><div><small>Approval</small><strong>${escapeHTML(call.approval||'Approved')}</strong></div></div><section class="v15-paper-section"><header><span>01</span><h2>Funding instructions</h2></header><p>Please remit the called capital in accordance with the approved fund documents and the verified bank instructions available in the secure portal.</p></section><section class="v15-paper-section"><header><span>02</span><h2>Control evidence</h2></header><table class="v15-paper-table"><tbody><tr><td>Source record</td><td><strong>${escapeHTML(call.id)}</strong></td></tr><tr><td>Prepared by</td><td><strong>${escapeHTML(call.owner||'Investor Relations')}</strong></td></tr><tr><td>Distribution</td><td><strong>Secure email · LP portal</strong></td></tr></tbody></table></section></article>`,`${button('Download PDF','download-call-pack','','download',`data-id="${call.id}"`)}${button('Close','close-modal','primary')}`,{variant:'document',size:'lg',eyebrow:'Capital activity'});
+  }
+
+  const v22BaseHandleChangeAction=handleChangeAction;
+  handleChangeAction=function(action,target){
+    switch(action){
+      case 'v22-vault-classification': state.v22VaultClassification=target.value; render(); return;
+      case 'v22-vault-status': state.v22VaultStatus=target.value; render(); return;
+      case 'report-vault-fund': state.reportFilterFund=target.value; render(); return;
+      case 'report-vault-type': state.v22ReportType=target.value; render(); return;
+      case 'report-vault-status': state.reportFilterStatus=target.value; render(); return;
+      case 'report-vault-period': state.v22ReportPeriod=target.value; render(); return;
+      case 'v22-signature-status': state.v22SignatureStatus=target.value; render(); return;
+      default: return v22BaseHandleChangeAction(action,target);
+    }
+  };
+
+  const v22BaseHandleAction=handleAction;
+  handleAction=function(action,trigger,event){
+    switch(action){
+      case 'vault-upload': v22UploadDocuments(); return;
+      case 'vault-filter-folder': state.v22VaultFolder=trigger.dataset.folder||'all'; render(); return;
+      case 'document-vault-filters': v22ShowDocumentFilters(trigger); return;
+      case 'toggle-vault-view': state.v22VaultView=state.v22VaultView==='list'?'grid':'list'; render(); return;
+      case 'v22-clear-vault-filters': state.v22VaultFolder='all';state.v22VaultSearch='';state.v22VaultClassification='All classifications';state.v22VaultStatus='All statuses';closeOverlays();render();return;
+      case 'document-page': v22SetDocumentPage(trigger.dataset.page); return;
+      case 'document-zoom': v22ZoomDocument(trigger,10); return;
+      case 'signature-zoom': v22ZoomDocument(trigger,10); return;
+      case 'v22-document-inspector-tab': v22DocumentInspector(trigger.dataset.tab||'details'); return;
+      case 'close-popover': closeOverlays(); return;
+      case 'signature-filters': v22ShowSignatureFilters(trigger); return;
+      case 'v22-clear-signature-filters': state.v22SignatureStatus='All statuses';state.v22SignatureSearch='';closeOverlays();render();return;
+      case 'v22-clear-report-filters': state.reportFilterFund='All Funds';state.reportFilterStatus='All Statuses';state.v22ReportType='All report types';state.v22ReportPeriod='All periods';state.v22ReportSearch='';render();return;
+      case 'view-bank-details': v22ShowBankDetails(); return;
+      case 'v22-copy-bank-details': navigator.clipboard?.writeText('CBZ Bank · Matanho Growth Fund II · ••••5678 · COBZZWHA'); toast('Copied','Masked bank instructions copied to the clipboard.'); return;
+      case 'view-resolution': v22ShowResolution(); return;
+      case 'preview-capital-call': v22PreviewCapitalCall(trigger.dataset.id); return;
+      case 'download-call-pack': { const call=capitalCalls.find(item=>item.id===trigger.dataset.id)||capitalCalls[0]; downloadBlob(`${call.id}_capital_call_pack.pdf`,createSimplePdf(`Capital Call ${call.id}`,[`Fund: ${call.fund}`,`Amount: ${formatMoney(call.amount)}`,`Status: ${call.status}`,`Approval: ${call.approval||'Approved'}`])); return; }
+      case 'request-signatures': v21ShowESign(state.selectedDocumentId||'DOC-009',state.selectedEnvelopeId,null); return;
+      case 'performance-tab': state.fundReportingView=(trigger.textContent||'Performance').trim(); navigate('fund-performance'); return;
+      case 'permissions-matrix': state.settingsTab='roles'; navigate('settings'); return;
+      case 'select-screened-deal': { const deal=deals.find(item=>item.id===trigger.dataset.id); if(deal)openDeal(deal.id); else softFocus(trigger); return; }
+      default: return v22BaseHandleAction(action,trigger,event);
+    }
+  };
+
+  let v22InputTimer=null;
+  document.addEventListener('input',event=>{
+    const target=event.target; const action=target?.dataset?.inputAction;
+    if(!['v22-document-search','v22-report-search','v22-signature-search'].includes(action))return;
+    if(action==='v22-document-search')state.v22VaultSearch=target.value;
+    if(action==='v22-report-search')state.v22ReportSearch=target.value;
+    if(action==='v22-signature-search')state.v22SignatureSearch=target.value;
+    clearTimeout(v22InputTimer);
+    const caret=target.selectionStart; const value=target.value;
+    v22InputTimer=setTimeout(()=>{render();requestAnimationFrame(()=>{const next=document.querySelector(`[data-input-action="${action}"]`);if(next){next.focus();next.value=value;try{next.setSelectionRange(caret,caret);}catch(e){}}});},90);
+  });
+
+  document.addEventListener('keydown',event=>{
+    if(event.key==='Escape'&&(state.modal||state.drawer||state.popover||state.commandPalette)){event.preventDefault();closeOverlays();}
+    if((event.key==='Enter'||event.key===' ')&&event.target?.matches?.('[data-action][tabindex="0"]')){event.preventDefault();event.target.click();}
+  });
+
+
+  /* V22.1 — core cash-operation buttons that previously fell back to generic focus */
+  function v22ShowReservationForm(){
+    showModal('Request Cash Reservation','Reserve eligible settled cash without changing the posted ledger.',`<form id="v22ReservationForm"><div class="form-grid"><div class="form-field"><label class="required">Fund</label><select name="fund" required>${funds.map(f=>`<option>${escapeHTML(f.name)}</option>`).join('')}</select></div><div class="form-field"><label class="required">Cash account</label><select name="account" required>${cashAccounts.map(a=>`<option value="${a.id}">${a.id} · ${escapeHTML(a.masked)} · ${a.currency}</option>`).join('')}</select></div><div class="form-field full"><label class="required">Beneficiary / counterparty</label><input name="beneficiary" required placeholder="Company, investor or service provider"></div><div class="form-field"><label class="required">Purpose</label><select name="purpose" required><option>INVESTMENT_DISBURSEMENT</option><option>INVESTOR_DISTRIBUTION</option><option>FUND_EXPENSE</option><option>TRANSFER</option></select></div><div class="form-field"><label class="required">Amount</label><input name="amount" type="number" min="0.01" step="0.01" required placeholder="0.00"></div><div class="form-field"><label class="required">Required date</label><input name="required" type="date" required value="2026-08-15"></div><div class="form-field"><label class="required">Expiry</label><input name="expiry" type="date" required value="2026-08-20"></div><div class="form-field full"><label>Source event / reason</label><input name="source" value="MANUAL-RESERVATION-REQUEST"></div></div><div class="reason-item section-gap">${icon('shield')}<div><strong>Maker-checker control</strong><small>The request is created as REQUESTED and does not reduce availability until approved under the configured authority matrix.</small></div></div></form>`,`${button('Cancel','close-modal')}${button('Submit request','v22-submit-reservation','primary','lock')}`,{variant:'wizard',size:'lg',rail:['Ownership','Purpose','Availability','Approval'],eyebrow:'Cash reservation'});
+  }
+
+  function v22SubmitReservation(){
+    const form=$('#v22ReservationForm'); if(!form?.reportValidity())return;
+    const data=Object.fromEntries(new FormData(form));
+    const account=cashAccounts.find(a=>a.id===data.account)||cashAccounts[0];
+    const amount=Number(data.amount);
+    if(amount>account.deployable){toast('Insufficient deployable cash',`Requested ${formatMoney(amount,account.currency)} exceeds ${formatMoney(account.deployable,account.currency)} available under the current rule.`, 'warning');return;}
+    const id=`RSV-${String(100+cashReservations.length).padStart(5,'0')}`;
+    cashReservations.unshift({id,source:data.source||`RES-${id}`,fund:data.fund,vehicle:account.vehicle,account:account.id,beneficiary:data.beneficiary,amount,remaining:amount,required:data.required,expiry:data.expiry,purpose:data.purpose,status:'REQUESTED',owner:v11RoleMember().name,approval:'Pending checker'});
+    closeOverlays();toast('Reservation requested',`${id} was created and routed to an independent checker.`);render();
+  }
+
+  function v22ShowExceptionForm(){
+    showModal('Create Reconciliation Exception','Create an owned, evidence-linked investigation without altering the source records.',`<form id="v22ExceptionForm"><div class="form-grid"><div class="form-field"><label class="required">Batch</label><select name="batch" required>${reconciliationBatches.map(b=>`<option value="${b.id}">${b.id} · ${escapeHTML(b.account)}</option>`).join('')}</select></div><div class="form-field"><label class="required">Category</label><select name="code" required><option>UNMATCHED_EXTERNAL</option><option>UNMATCHED_INTERNAL</option><option>AMOUNT_VARIANCE</option><option>DATE_VARIANCE</option><option>DUPLICATE_SOURCE</option><option>MISSING_STATEMENT</option><option>SUSPENSE_ITEM</option></select></div><div class="form-field"><label>Amount</label><input name="amount" type="number" step="0.01" value="0"></div><div class="form-field"><label>Severity</label><select name="severity"><option>Low</option><option selected>Medium</option><option>High</option><option>Critical</option></select></div><div class="form-field"><label>Owner</label><input name="owner" value="${escapeHTML(v11RoleMember().name)}"></div><div class="form-field"><label>Due date</label><input name="due" type="date" value="2026-08-16"></div><div class="form-field full"><label class="required">Investigation / remediation</label><textarea name="resolution" required placeholder="Describe what needs to be investigated or resolved"></textarea></div></div><div class="reason-item section-gap">${icon('link')}<div><strong>Source records remain immutable</strong><small>The exception links to the affected batch and evidence; resolution does not edit the underlying bank statement or posted journal.</small></div></div></form>`,`${button('Cancel','close-modal')}${button('Create exception','v22-submit-exception','primary','plus')}`,{variant:'operations',size:'lg',eyebrow:'Reconciliation investigation'});
+  }
+
+  function v22SubmitException(){
+    const form=$('#v22ExceptionForm'); if(!form?.reportValidity())return;
+    const data=Object.fromEntries(new FormData(form)); const batch=reconciliationBatches.find(b=>b.id===data.batch)||reconciliationBatches[0];
+    const id=`EXC-${String(500+reconciliationExceptions.length).padStart(5,'0')}`;
+    reconciliationExceptions.unshift({id,batch:batch.id,code:data.code,account:batch.account.split(' ')[0],amount:Number(data.amount||0),currency:batch.currency,severity:data.severity,owner:data.owner,age:0,due:data.due,status:'OPEN',evidence:0,resolution:data.resolution});
+    closeOverlays();toast('Exception created',`${id} is open and assigned to ${data.owner}.`);render();
+  }
+
+  function v22ShowAccountSetup(){
+    showModal('Account Mappings & Configuration','Effective-dated provider, currency, tolerance and GL-control mappings.',`<div class="v22-config-grid"><section class="card table-card"><div class="table-toolbar"><div><h3>Approved account mappings</h3><p>External accounts map to one authorised fund / vehicle / purpose / currency context.</p></div>${statusPill('Effective dated','info')}</div><div class="table-wrap"><table><thead><tr><th>Account</th><th>Provider</th><th>Purpose</th><th>Currency</th><th>Tolerance</th><th>GL mapping</th><th>Status</th></tr></thead><tbody>${cashAccounts.map(a=>`<tr data-action="open-cash-account" data-id="${a.id}"><td class="table-primary">${a.id}<small>${escapeHTML(a.masked)}</small></td><td>${escapeHTML(a.provider)}</td><td>${escapeHTML(a.purpose)}</td><td>${a.currency}</td><td>${formatMoney(a.tolerance,a.currency)}</td><td>${escapeHTML(a.gl)}</td><td>${statusPill(a.status)}</td></tr>`).join('')}</tbody></table></div></section><section class="grid cols-3 section-gap"><div class="card"><div class="card-body info-list"><div class="info-row"><span>Maker-checker</span><strong>Required</strong></div><div class="info-row"><span>Duplicate mapping</span><strong>Blocked</strong></div></div></div><div class="card"><div class="card-body info-list"><div class="info-row"><span>Default timezone</span><strong>Africa/Harare</strong></div><div class="info-row"><span>Currency netting</span><strong>Disabled</strong></div></div></div><div class="card"><div class="card-body info-list"><div class="info-row"><span>Configuration history</span><strong>Retained</strong></div><div class="info-row"><span>Audit status</span><strong>Current</strong></div></div></div></section></div>`,`${button('Close','close-modal')}${button('Open settings','navigate','primary','settings','data-page="settings"')}`,{variant:'operations',size:'xl',eyebrow:'Cash account setup'});
+  }
+
+  function v22ShowLedgerTrace(){
+    const journal=cashJournals[0];
+    showModal('Source-to-Ledger Trace',`${journal.id} · ${journal.event}`,`<div class="source-lineage-wide"><div>${icon('briefcase')}<span><small>Source event</small><strong>${escapeHTML(journal.source)} · ${escapeHTML(journal.event)}</strong></span></div><i>${icon('arrow-right')}</i><div>${icon('list')}<span><small>Journal</small><strong>${escapeHTML(journal.id)} · ${escapeHTML(journal.status)}</strong></span></div><i>${icon('arrow-right')}</i><div>${icon('bank')}<span><small>Cash account</small><strong>${escapeHTML(journal.account)} · ${escapeHTML(journal.valueDate)}</strong></span></div><i>${icon('arrow-right')}</i><div>${icon('link')}<span><small>Reconciliation</small><strong>${journal.reconciled?formatMoney(journal.reconciled):'Open residual'}</strong></span></div></div><section class="grid cols-2 section-gap"><div class="card"><div class="card-body info-list"><div class="info-row"><span>Debit</span><strong>${formatMoney(journal.debit)}</strong></div><div class="info-row"><span>Credit</span><strong>${formatMoney(journal.credit)}</strong></div><div class="info-row"><span>Cash effect</span><strong>${formatMoney(journal.signed)}</strong></div></div></div><div class="card"><div class="card-body info-list"><div class="info-row"><span>Maker</span><strong>${escapeHTML(journal.maker)}</strong></div><div class="info-row"><span>Checker</span><strong>${escapeHTML(journal.checker)}</strong></div><div class="info-row"><span>Accounting</span><strong>${escapeHTML(journal.accounting)}</strong></div></div></div></section>`,`${button('Download evidence','download-journal-evidence','','download',`data-id="${journal.id}"`)}${button('Close','close-modal','primary')}`,{variant:'operations',size:'lg',eyebrow:'Immutable transaction lineage'});
+  }
+
+  function v22ShowSlaView(){
+    const buckets=[['0–1 day',reconciliationExceptions.filter(e=>e.age<=1).length],['2–3 days',reconciliationExceptions.filter(e=>e.age>=2&&e.age<=3).length],['4–5 days',reconciliationExceptions.filter(e=>e.age>=4&&e.age<=5).length],['6+ days',reconciliationExceptions.filter(e=>e.age>=6).length]];
+    showModal('Exception SLA & Ageing','Operational ageing by open reconciliation case.',`<div class="grid cols-2"><section class="card"><div class="card-head"><div><h3>Ageing distribution</h3><p>Open cases by elapsed age.</p></div></div><div class="card-body"><div class="close-trend-chart v22-sla-chart">${buckets.map(([label,value])=>`<button data-action="generic-action"><span style="height:${Math.max(20,value*38)}px"></span><b>${value}</b><small>${label}</small></button>`).join('')}</div></div></section><section class="card"><div class="card-head"><div><h3>Service levels</h3><p>Configured operating thresholds.</p></div></div><div class="card-body info-list"><div class="info-row"><span>Critical</span><strong>1 business day</strong></div><div class="info-row"><span>High</span><strong>2 business days</strong></div><div class="info-row"><span>Medium</span><strong>5 business days</strong></div><div class="info-row"><span>Low</span><strong>10 business days</strong></div></div></section></div><section class="card table-card section-gap"><div class="table-toolbar"><h3>Cases at risk</h3><span class="table-badge">${reconciliationExceptions.filter(e=>e.age>=3).length} aged 3+ days</span></div><div class="table-wrap"><table><thead><tr><th>Case</th><th>Category</th><th>Severity</th><th>Owner</th><th>Age</th><th>Due</th></tr></thead><tbody>${reconciliationExceptions.slice().sort((a,b)=>b.age-a.age).map(e=>`<tr data-action="open-exception" data-id="${e.id}"><td class="table-primary">${e.id}</td><td>${e.code}</td><td>${statusPill(e.severity)}</td><td>${escapeHTML(e.owner)}</td><td>${e.age} days</td><td>${escapeHTML(e.due)}</td></tr>`).join('')}</tbody></table></div></section>`,`${button('Export exceptions','export-exceptions','','download')}${button('Close','close-modal','primary')}`,{variant:'operations',size:'lg',eyebrow:'Exception operations'});
+  }
+
+  function v22ShowTableFilter(trigger,title,options){
+    state.v22TableFilterContext={title,values:options};
+    showPopover(trigger,`<div class="v22-filter-popover"><div class="popover-title">${escapeHTML(title)}</div>${options.map(value=>`<button class="popover-item" data-action="v22-apply-table-filter" data-value="${escapeHTML(value)}">${icon(value==='All'?'layers':'filter')}<span class="popover-item-copy"><strong>${escapeHTML(value)}</strong><small>${value==='All'?'Show every row':'Show rows containing this value'}</small></span></button>`).join('')}</div>`,290);
+  }
+
+  function v22ApplyTableTextFilter(value){
+    const table=workspace.querySelector('.table-card table'); if(!table)return;
+    table.querySelectorAll('tbody tr').forEach(row=>{row.hidden=value!=='All'&&!row.innerText.toLowerCase().includes(value.toLowerCase());});
+    const visible=[...table.querySelectorAll('tbody tr')].filter(row=>!row.hidden).length;
+    closeOverlays();toast('Table filtered',value==='All'?`${visible} rows visible.`:`${visible} row${visible===1?'':'s'} contain “${value}”.`);
+  }
+
+  const v22xBaseActivitySubject=activitySubject;
+  activitySubject=function(context,id){
+    if(context==='document')return documents.find(item=>item.id===id)||{name:id||'Document'};
+    if(context==='report')return reportVaultItems.find(item=>item.id===id)||{name:id||'Report'};
+    return v22xBaseActivitySubject(context,id);
+  };
+
+  const v22xBaseHandleAction=handleAction;
+  handleAction=function(action,trigger,event){
+    switch(action){
+      case 'create-reservation': v22ShowReservationForm();return;
+      case 'v22-submit-reservation': v22SubmitReservation();return;
+      case 'create-exception': v22ShowExceptionForm();return;
+      case 'v22-submit-exception': v22SubmitException();return;
+      case 'download-import-template': exportCSV('matanho_statement_import_error_template.csv',[['line_number','error_code','source_value','explanation','required_action'],['12','ACCOUNT_SCOPE_MISMATCH','••••3372','Account mapping does not match selected fund/vehicle','Select the approved account mapping'],['48','SIGN_AMBIGUITY','125000 DR','Provider sign cannot be normalised confidently','Review the approved provider layout']]);return;
+      case 'download-import-errors': {const item=statementImports.find(i=>i.id===trigger.dataset.id)||statementImports[0];exportCSV(`${item.id}_import_errors.csv`,[['line_number','error_code','source_value','explanation','required_action'],['12','ACCOUNT_SCOPE_MISMATCH',item.account,'Account mapping failed the selected scope','Review fund, vehicle and currency mapping'],['48','SIGN_AMBIGUITY','125000 DR','Provider sign is ambiguous','Confirm layout version before commit']]);return;}
+      case 'upload-statement': showUploadBankStatementModal();return;
+      case 'open-account-setup': v22ShowAccountSetup();return;
+      case 'trace-ledger-source': v22ShowLedgerTrace();return;
+      case 'exception-sla-view': v22ShowSlaView();return;
+      case 'cash-account-filters': v22ShowTableFilter(trigger,'Account filters',['All','USD','ZWG','ACTIVE','SUSPENDED']);return;
+      case 'ledger-filters': v22ShowTableFilter(trigger,'Ledger filters',['All','POSTED','PENDING_APPROVAL','Exported','Pending export']);return;
+      case 'reconciliation-filters': v22ShowTableFilter(trigger,'Reconciliation filters',['All','USD','ZWG','READY_TO_CLOSE','RECONCILING','BLOCKED']);return;
+      case 'exception-filters': v22ShowTableFilter(trigger,'Exception filters',['All','Critical','High','Medium','Low','OPEN','INVESTIGATING']);return;
+      case 'v22-apply-table-filter': v22ApplyTableTextFilter(trigger.dataset.value||'All');return;
+      default:return v22xBaseHandleAction(action,trigger,event);
+    }
+  };
+
+
+  /* V22.2 — uploaded-document integrity and exception drill-down */
+  uploadDocuments=function(fileList){
+    const files=Array.from(fileList||[]); if(!files.length)return;
+    const folder=state.v22VaultFolder&&state.v22VaultFolder!=='all'?state.v22VaultFolder:(state.selectedFolder&&state.selectedFolder!=='All Documents'?state.selectedFolder:'General');
+    files.forEach(file=>{
+      const ext=(file.name.split('.').pop()||'FILE').toUpperCase();
+      documents.push({id:`DOC-${String(documents.length+1).padStart(3,'0')}`,name:file.name,type:ext,version:'v1.0',owner:v11RoleMember().name,uploaded:'13 Aug 2026',status:'In review',access:'Internal',folder,classification:'Internal confidential',signatureStatus:/PDF|DOC|DOCX/.test(ext)?'Not required':'Not required',retention:'Fund life + 10 years',size:file.size>1048576?`${(file.size/1048576).toFixed(1)} MB`:`${Math.max(1,Math.round(file.size/1024))} KB`,pages:/PDF|DOC|DOCX/.test(ext)?6:1});
+    });
+    state.selectedDocumentId=documents[documents.length-files.length].id; state.v22VaultFolder=folder; closeOverlays();toast('Files uploaded',`${files.length} file${files.length===1?'':'s'} added to ${folder}.`);render();
+  };
+
+  const v22fBaseHandleAction=handleAction;
+  handleAction=function(action,trigger,event){
+    if(action==='open-exception'){showExceptionDetail(trigger.dataset.id);return;}
+    return v22fBaseHandleAction(action,trigger,event);
+  };
 
 
   window.MatanhoPortfolioUI = Object.freeze({
-    version: '11.0.0',
+    version: '23.0.0',
     hydrate: hydrateFromBackend,
     getSnapshot: publicSnapshot,
     render,
@@ -4028,13 +4844,9 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   render();
 
 
-  // Force initial page if provided (after state exists)
   if (typeof state !== 'undefined' && initialPage) {
     state.page = initialPage;
   }
-
-  // Rebind document listeners with abort signal where we can wrap new ones —
-  // patch common addEventListener calls was done via string replace below if present.
 
   if (typeof render === 'function') render();
 

@@ -29,6 +29,9 @@ import type { OrderApproval } from '@/lib/api/investment-ops-api'
 
 const tabs = [...ORDERBOOK_LIFECYCLE_TABS]
 
+/** Hidden for now — working-set blotters on Orderbook (New Blotter + Open Blotters). */
+const SHOW_WORKING_SET_BLOTTERS = false
+
 const tone = (status: string) => {
   if (
     status === 'Executed' ||
@@ -148,11 +151,6 @@ export default function OrderbookPage() {
   const [archiveOpen, setArchiveOpen] = useState(false)
   const [rejectConfOpen, setRejectConfOpen] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
-  const [sendOpen, setSendOpen] = useState(false)
-  const [sendCustodianId, setSendCustodianId] = useState('')
-  const [sendBrokerId, setSendBrokerId] = useState('')
-  const [sendValueDate, setSendValueDate] = useState('')
-  const [sendNotes, setSendNotes] = useState('')
   const [lastReplyUrl, setLastReplyUrl] = useState<string | null>(null)
   const [brokerThreadLoading, setBrokerThreadLoading] = useState(false)
   const [brokerThread, setBrokerThread] = useState<{
@@ -176,7 +174,6 @@ export default function OrderbookPage() {
       repliedAt?: string | null
     } | null
   } | null>(null)
-  const [custodians, setCustodians] = useState<{ id: string; name: string }[]>([])
   const [brokers, setBrokers] = useState<{ id: string; name: string; email: string }[]>([])
   const [confOutcome, setConfOutcome] = useState<BrokerConfirmationOutcome>('FILLED')
   const [confQty, setConfQty] = useState('')
@@ -236,17 +233,7 @@ export default function OrderbookPage() {
   }, [load])
 
   useEffect(() => {
-    void Promise.all([
-      investmentOpsApi.listCustodians().catch(() => null),
-      investmentOpsApi.listBrokers().catch(() => null),
-    ]).then(([custRes, brokerRes]) => {
-      if (custRes && custRes.success !== false) {
-        setCustodians(
-          unwrapList<{ id?: string; name?: string }>(custRes.data)
-            .map((c) => ({ id: String(c.id ?? ''), name: String(c.name ?? c.id ?? 'Custodian') }))
-            .filter((c) => c.id),
-        )
-      }
+    void investmentOpsApi.listBrokers().catch(() => null).then((brokerRes) => {
       if (brokerRes && brokerRes.success !== false) {
         setBrokers(
           unwrapList<{ id?: string; name?: string; contactEmail?: string }>(brokerRes.data)
@@ -450,15 +437,15 @@ export default function OrderbookPage() {
     ) {
       return false
     }
-    if (action === 'send' && !sendCustodianId.trim()) {
-      toast.error('Select a custodian before sending (Phase-1 authorisation).')
+    if (action === 'send' && !selected.custodianProfileId?.trim()) {
+      toast.error('This order has no custodian. Set one on the order before sending.')
       return false
     }
-    if (action === 'send' && !sendBrokerId.trim()) {
-      toast.error('Select a broker before sending — email goes to their profile contact.')
+    if (action === 'send' && !selected.brokerProfileId?.trim()) {
+      toast.error('This order has no broker. Set one on the order before sending.')
       return false
     }
-    const selectedBroker = brokers.find((b) => b.id === sendBrokerId.trim())
+    const selectedBroker = brokers.find((b) => b.id === selected.brokerProfileId?.trim())
     if (action === 'send' && selectedBroker && !selectedBroker.email) {
       toast.error(`Broker “${selectedBroker.name}” has no contact email on their record.`)
       return false
@@ -475,14 +462,12 @@ export default function OrderbookPage() {
           expectedVersion: selected.version,
           channel: 'EMAIL',
           sentAt: new Date().toISOString(),
-          notes: sendNotes.trim() || undefined,
-          brokerProfileId: sendBrokerId.trim(),
-          custodianProfileId: sendCustodianId.trim(),
-          valueDate: sendValueDate || undefined,
+          brokerProfileId: selected.brokerProfileId,
+          custodianProfileId: selected.custodianProfileId,
+          valueDate: selected.valueDateIso || undefined,
           settlementAccountId: selected.settlementAccountId || undefined,
         })
         if (res.success === false) throw new Error(formatOpsError(res, 'Failed to send order'))
-        setSendOpen(false)
         const instruction = (res as { data?: { instruction?: { replyUrl?: string; status?: string; toEmail?: string | null; deliveryError?: string | null } } })
           ?.data?.instruction
         if (instruction?.replyUrl) {
@@ -545,15 +530,6 @@ export default function OrderbookPage() {
     } finally {
       setLifeBusy(null)
     }
-  }
-
-  const openSendToBroker = () => {
-    if (!selected) return
-    setSendCustodianId(selected.custodianProfileId ?? '')
-    setSendBrokerId(selected.brokerProfileId ?? '')
-    setSendValueDate(selected.valueDateIso ?? '')
-    setSendNotes('')
-    setSendOpen(true)
   }
 
   const openRecordConfirmation = () => {
@@ -709,9 +685,11 @@ export default function OrderbookPage() {
           <button className={cn(buttonClass, 'border-blue-500/40 bg-blue-600 text-white hover:bg-blue-500')} onClick={() => setShowOrder(true)}>
             <Plus className="h-3.5 w-3.5" /> New order
           </button>
-          <button className={cn(buttonClass)} onClick={() => setNewBlotter(true)}>
-            <Plus className="h-3.5 w-3.5" /> New Blotter
-          </button>
+          {SHOW_WORKING_SET_BLOTTERS && (
+            <button className={cn(buttonClass)} onClick={() => setNewBlotter(true)}>
+              <Plus className="h-3.5 w-3.5" /> New Blotter
+            </button>
+          )}
         </div>
       }
     >
@@ -724,6 +702,7 @@ export default function OrderbookPage() {
         </div>
       )}
 
+      {SHOW_WORKING_SET_BLOTTERS && (
       <OrdersCard title="Open Blotters" eyebrow="Working sets">
         {loading ? (
           <OpsCardGridSkeleton count={6} />
@@ -762,6 +741,7 @@ export default function OrderbookPage() {
         </div>
         )}
       </OrdersCard>
+      )}
 
       <OrdersCard
         title="All orders"
@@ -980,7 +960,7 @@ export default function OrderbookPage() {
               </button>
             )}
             {canSendToBroker && (
-              <button type="button" disabled={anyLifeBusy} className={cn(buttonClass)} onClick={openSendToBroker}>
+              <button type="button" disabled={anyLifeBusy} className={cn(buttonClass)} onClick={() => void runLifecycle('send')}>
                 {lifeBusy === 'send' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
                 {sendAgain ? 'Send again' : 'Send to broker'}
               </button>
@@ -1162,109 +1142,6 @@ export default function OrderbookPage() {
       />
 
       <Modal
-        open={sendOpen}
-        onClose={() => {
-          if (lifeBusy === 'send') return
-          setSendOpen(false)
-        }}
-        title={sendAgain ? 'Send again to broker' : 'Send to broker'}
-        footer={
-          <>
-            <button
-              type="button"
-              className={buttonClass}
-              disabled={lifeBusy === 'send'}
-              onClick={() => setSendOpen(false)}
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              disabled={anyLifeBusy || !sendCustodianId.trim() || !sendBrokerId.trim()}
-              className={cn(buttonClass, 'bg-blue-600 text-white')}
-              onClick={() => void runLifecycle('send')}
-            >
-              {lifeBusy === 'send' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-              {lifeBusy === 'send' ? 'Sending…' : sendAgain ? 'Send again' : 'Send email instruction'}
-            </button>
-          </>
-        }
-      >
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Broker">
-            <select
-              className={inputClass}
-              value={sendBrokerId}
-              onChange={(e) => setSendBrokerId(e.target.value)}
-            >
-              <option value="">Select broker…</option>
-              {brokers.map((b) => (
-                <option key={b.id} value={b.id} disabled={!b.email}>
-                  {b.name}
-                  {b.email ? ` · ${b.email}` : ' · (no email)'}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Custodian">
-            <select
-              className={inputClass}
-              value={sendCustodianId}
-              onChange={(e) => setSendCustodianId(e.target.value)}
-            >
-              <option value="">Select custodian…</option>
-              {custodians.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Settlement / value date">
-            <input
-              className={inputClass}
-              type="date"
-              value={sendValueDate}
-              onChange={(e) => setSendValueDate(e.target.value)}
-            />
-          </Field>
-          <Field label="Settlement account">
-            <input
-              className={inputClass}
-              value={selected?.settlementAccount ?? '—'}
-              readOnly
-              disabled
-            />
-          </Field>
-        </div>
-        <div className="mt-4">
-          <Field label="Notes (optional)">
-            <textarea
-              className={cn(inputClass, 'min-h-[64px]')}
-              value={sendNotes}
-              onChange={(e) => setSendNotes(e.target.value)}
-              placeholder="Shown on the instruction email"
-            />
-          </Field>
-        </div>
-        {!sendBrokerId.trim() && (
-          <p className="mt-3 text-[10px] text-amber-200">
-            Broker is required — instruction email uses their profile contact email.
-          </p>
-        )}
-        {sendBrokerId.trim() && brokers.find((b) => b.id === sendBrokerId)?.email === '' && (
-          <p className="mt-3 text-[10px] text-amber-200">
-            This broker has no contact email. Add one on the broker record before sending.
-          </p>
-        )}
-        {!sendCustodianId.trim() && (
-          <p className="mt-3 text-[10px] text-amber-200">
-            Custodian is required before send — AM authorises cash/securities prep at the custodian.
-          </p>
-        )}
-      </Modal>
-
-      <Modal
         open={confirmOpen}
         onClose={() => {
           if (lifeBusy === 'record') return
@@ -1337,6 +1214,7 @@ export default function OrderbookPage() {
         )}
       </Modal>
 
+      {SHOW_WORKING_SET_BLOTTERS && (
       <Modal
         open={newBlotter}
         onClose={() => setNewBlotter(false)}
@@ -1374,6 +1252,7 @@ export default function OrderbookPage() {
           </Field>
         </div>
       </Modal>
+      )}
 
       <PlaceEquityOrderModal open={showOrder} onClose={() => setShowOrder(false)} onComplete={() => void load()} />
     </OrdersPage>

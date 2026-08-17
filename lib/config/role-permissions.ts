@@ -2638,6 +2638,8 @@ export function hasModuleAccess(
   if (moduleId === "investee-portal-v8") return true;
   // Accounting V2 redesign mocks — open during mock phase
   if (moduleId === "accounting-v2") return true;
+  // Performance Management V22.1 client design — open during comparison/mock phase
+  if (moduleId === "performance-v22") return true;
 
   const permissions = getRolePermissions(roleCode);
   if (!permissions) return false;
@@ -2675,6 +2677,7 @@ export function hasSubModuleAccess(
   if (moduleId === "fundraising-kyc") return true;
   if (moduleId === "investee-portal-v8") return true;
   if (moduleId === "accounting-v2") return true;
+  if (moduleId === "performance-v22") return true;
 
   const permissions = getRolePermissions(roleCode);
   if (!permissions) return false;

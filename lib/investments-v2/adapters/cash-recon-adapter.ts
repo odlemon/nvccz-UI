@@ -27,6 +27,17 @@ export function requireOpsData<T>(res: OpsEnvelope<T> | undefined | null, label:
 }
 
 /** Prefer ApiError.response.code / envelope code for recon import gates. */
+export function opsErrorDetails(err: unknown): Record<string, unknown> | null {
+  if (err == null || typeof err !== 'object') return null
+  const o = err as {
+    details?: unknown
+    response?: { details?: unknown; error?: { details?: unknown } }
+  }
+  const raw = o.response?.error?.details ?? o.response?.details ?? o.details
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) return raw as Record<string, unknown>
+  return null
+}
+
 export function opsErrorCode(err: unknown): string | undefined {
   if (err == null || typeof err !== 'object') return undefined
   const o = err as { code?: unknown; response?: { code?: unknown; error?: unknown } }
@@ -219,6 +230,16 @@ function mapLedgerType(raw: unknown): 'Receipt' | 'Payment' | 'Transfer' {
   return 'Transfer'
 }
 
+function ledgerMovementType(r: CashLedgerLine): 'Receipt' | 'Payment' | 'Transfer' {
+  const fromPurpose = mapLedgerType(r.type ?? r['postingPurpose'] ?? r['transactionType'])
+  if (fromPurpose !== 'Transfer') return fromPurpose
+  const debit = Number(String(r.debit ?? '0').replace(/,/g, ''))
+  const credit = Number(String(r.credit ?? '0').replace(/,/g, ''))
+  if (debit > 0 && !(credit > 0)) return 'Receipt'
+  if (credit > 0 && !(debit > 0)) return 'Payment'
+  return 'Transfer'
+}
+
 function mapApproval(raw: unknown): 'Approved' | 'Pending' {
   const t = String(raw ?? '').toUpperCase()
   if (t.includes('PEND') || t.includes('DRAFT') || t.includes('SUBMIT')) return 'Pending'
@@ -276,14 +297,23 @@ export function mapCashLedgerRows(data: unknown) {
       date: shortDate(r.valueDate ?? r.postedAt),
       fund: String(r['fundName'] ?? r.portfolioId ?? '—'),
       client: displayLabel(r['clientName'], '—'),
-      account: displayLabel(r['accountNumber'] ?? r['accountNumberMasked'], '—'),
-      cashAccount: displayLabel(
-        r['cashAccountName'] ?? r['cashAccountLabel'] ?? r['accountNumber'],
-        '—',
-      ),
+      account: cashAccountDisplayLabel({
+        clientName: r['clientName'],
+        name: r['cashAccountName'] ?? r['cashAccountLabel'],
+        accountNumber: r['accountNumber'],
+        accountNumberMasked: r['accountNumberMasked'],
+        moneyClass: r['accountPurpose'],
+      }),
+      cashAccount: cashAccountDisplayLabel({
+        clientName: r['clientName'],
+        name: r['cashAccountName'] ?? r['cashAccountLabel'],
+        accountNumber: r['accountNumber'],
+        accountNumberMasked: r['accountNumberMasked'],
+        moneyClass: r['accountPurpose'],
+      }),
       cashAccountId: String(r.cashAccountId ?? ''),
       bank: displayLabel(r['providerName'] ?? r['bankName'], '—'),
-      type: mapLedgerType(r.type),
+      type: ledgerMovementType(r),
       description: String(r.description ?? '—'),
       debit: r.debit && r.debit !== '0' && r.debit !== '0.00' ? formatMoneyDisplay(r.debit) : '—',
       credit: r.credit && r.credit !== '0' && r.credit !== '0.00' ? formatMoneyDisplay(r.credit) : '—',
@@ -327,7 +357,13 @@ export function mapCurrencyPie(
   }))
 }
 
-export type FundWorkspaceEntry = { id: string; date: string; description: string; amount: number }
+export type FundWorkspaceEntry = {
+  id: string
+  date: string
+  description: string
+  amount: number
+  matchStatus?: string
+}
 export type FundBreakRow = { id: string; date: string; type: string; details: string; amount: number }
 export type FundSuggestion = {
   internal: string
@@ -407,15 +443,25 @@ export function mapFundWorkspace(data: BatchWorkspace | null | undefined) {
       date: shortDate(r.valueDate ?? r.postedAt ?? r.date),
       description: String(r.description ?? r.reference ?? r.id ?? '—'),
       amount: Number.isFinite(signed) ? signed : 0,
+      matchStatus: r.matchStatus != null ? String(r.matchStatus) : undefined,
     }
   }
 
-  const flatInternal = unwrapList(data.unmatchedInternal)
-  const flatExternal = unwrapList(data.unmatchedExternal)
-  const nestedInternal = unwrapList(data.internal)
-  const nestedExternal = unwrapList(data.external)
-  const internal = (flatInternal.length ? flatInternal : nestedInternal).map(mapEntry)
-  const external = (flatExternal.length ? flatExternal : nestedExternal).map(mapEntry)
+  const unmatchedInternal = unwrapList(data.unmatchedInternal)
+  const unmatchedExternal = unwrapList(data.unmatchedExternal)
+  const nestedInternalObj = data.internal as { entries?: unknown } | unknown[] | undefined
+  const nestedExternalObj = data.external as { entries?: unknown } | unknown[] | undefined
+  const nestedInternal = Array.isArray(nestedInternalObj)
+    ? nestedInternalObj
+    : unwrapList((nestedInternalObj as { entries?: unknown } | undefined)?.entries)
+  const nestedExternal = Array.isArray(nestedExternalObj)
+    ? nestedExternalObj
+    : unwrapList((nestedExternalObj as { entries?: unknown } | undefined)?.entries)
+  const allInternal = unwrapList(data.allInternal)
+  const allExternal = unwrapList(data.allExternal)
+  const internal = (allInternal.length ? allInternal : nestedInternal.length ? nestedInternal : unmatchedInternal).map(mapEntry)
+  const external = (allExternal.length ? allExternal : nestedExternal.length ? nestedExternal : unmatchedExternal).map(mapEntry)
+  const isUnmatched = (e: FundWorkspaceEntry) => String(e.matchStatus ?? 'UNMATCHED').toUpperCase() !== 'MATCHED'
 
   const flatBreaks = unwrapList(data.breaks)
   const nestedResults = unwrapList(data.results)
@@ -441,7 +487,7 @@ export function mapFundWorkspace(data: BatchWorkspace | null | undefined) {
       id: String(r.linkId ?? r.id ?? `m_${i}`),
       date: shortDate(r.createdAt ?? r.date),
       type: String(r.method ?? r.topology ?? 'Match'),
-      details: `${formatWorkspaceLineRef(r.details, r.internalLineId)} ↔ ${formatWorkspaceLineRef(r.details, r.externalLineId)}`,
+      details: `${formatWorkspaceLineRef(internal.find((e) => e.id === String(r.internalLineId ?? ''))?.description ?? r.details, r.internalLineId)} ↔ ${formatWorkspaceLineRef(external.find((e) => e.id === String(r.externalLineId ?? ''))?.description ?? r.details, r.externalLineId)}`,
       amount: Number(String(r.matchedAmount ?? 0).replace(/,/g, '')) || 0,
     }
   })
@@ -520,14 +566,14 @@ export function mapFundWorkspace(data: BatchWorkspace | null | undefined) {
     breaks,
     matched,
     unmatched: [
-      ...internal.map((e) => ({
+      ...internal.filter(isUnmatched).map((e) => ({
         id: e.id,
         date: e.date,
         type: 'Unmatched Internal',
         details: e.description,
         amount: e.amount,
       })),
-      ...external.map((e) => ({
+      ...external.filter(isUnmatched).map((e) => ({
         id: e.id,
         date: e.date,
         type: 'Unmatched External',
@@ -538,7 +584,7 @@ export function mapFundWorkspace(data: BatchWorkspace | null | undefined) {
     suggestions,
     matchedCount: matched.length,
     breakCount: breaks.length,
-    unmatchedCount: internal.length + external.length,
+    unmatchedCount: internal.filter(isUnmatched).length + external.filter(isUnmatched).length,
   }
 }
 
@@ -648,10 +694,12 @@ export function mapExceptions(data: unknown) {
         cashAccountId: String(e['cashAccountId'] ?? ''),
         portfolioId: String(e['portfolioId'] ?? e['fundId'] ?? ''),
         portfolio: displayLabel(e['fundName'] ?? e['portfolioName'], '—'),
-        account: displayLabel(
-          e['accountNumber'] ?? e['cashAccountLabel'] ?? e['cashAccountName'] ?? e['accountLabel'],
-          '—',
-        ),
+        account: cashAccountDisplayLabel({
+          clientName: e['clientName'] ?? e['clientOrVehicleName'],
+          name: e['cashAccountLabel'] ?? e['cashAccountName'] ?? e['accountLabel'],
+          accountNumber: e['accountNumber'],
+          accountNumberMasked: e['accountNumberMasked'],
+        }),
         client: displayLabel(e['clientName'] ?? e['clientOrVehicleName'], '—'),
         source: String(e['source'] ?? e.category ?? '—'),
         reason: String(e['reason'] ?? e.category ?? e['title'] ?? 'Exception'),
@@ -675,6 +723,37 @@ export function mapExceptions(data: unknown) {
   }
 }
 
+function nestedFinite(value: unknown): number | null {
+  if (value == null || value === '') return null
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null
+  if (typeof value === 'string') {
+    const n = Number(value.replace(/,/g, '').replace(/%/g, '').trim())
+    return Number.isFinite(n) ? n : null
+  }
+  if (typeof value === 'object') {
+    const o = value as Record<string, unknown>
+    return nestedFinite(o.count ?? o.pct ?? o.value ?? o.total)
+  }
+  return null
+}
+
+function nestedMoney(value: unknown): string {
+  if (value == null || value === '') return '—'
+  if (typeof value === 'object') {
+    const o = value as Record<string, unknown>
+    return nestedMoney(o.valueUsd ?? o.amount ?? o.value)
+  }
+  const formatted = formatMoneyDisplay(value)
+  if (!formatted || /^nan$/i.test(formatted)) return '—'
+  return formatted
+}
+
+function nestedPct(value: unknown): string {
+  const n = nestedFinite(value)
+  if (n == null) return '—'
+  return `${n % 1 === 0 ? n.toFixed(0) : n.toFixed(1)}%`
+}
+
 export function mapExceptionsSummary(data: Record<string, unknown> | null | undefined) {
   if (!data) {
     return {
@@ -685,34 +764,42 @@ export function mapExceptionsSummary(data: Record<string, unknown> | null | unde
       criticalAmount: '—',
       overdueAmount: '—',
       pendingAmount: '—',
+      open: 0,
+      investigating: 0,
+      autoConfirmed: 0,
+      matchLinks: 0,
     }
   }
-  const bySeverity = (data.bySeverity ?? {}) as Record<string, number>
-  const critical = Number(
-    data.criticalExceptions ?? data.critical ?? bySeverity.CRITICAL ?? 0,
-  )
-  const overdue = Number(data.overdueApprovals ?? data.overdue ?? 0)
-  const pending = Number(data.pendingAdjustments ?? data.pendingApproval ?? data.pending ?? 0)
-  const stpRaw = data.straightThroughMatchRate ?? data.stpRate ?? data.matchRate
+  const bySeverity = (data.bySeverity ?? {}) as Record<string, unknown>
+  const criticalOnly =
+    nestedFinite(data.criticalExceptions) ??
+    nestedFinite(data.critical) ??
+    nestedFinite(bySeverity.CRITICAL) ??
+    0
+  const high = nestedFinite(bySeverity.HIGH) ?? 0
+  const medium = nestedFinite(bySeverity.MEDIUM) ?? 0
+  const low = nestedFinite(bySeverity.LOW) ?? 0
+  const overdue =
+    nestedFinite(data.overdueApprovals) ?? nestedFinite(data.overdue) ?? 0
+  const pending =
+    nestedFinite(data.pendingAdjustments) ??
+    nestedFinite(data.pendingApproval) ??
+    nestedFinite(data.pending) ??
+    0
+  const openFromApi = nestedFinite(data.open)
+  const open = openFromApi ?? criticalOnly + high + medium + low
   return {
-    critical,
+    critical: criticalOnly + high,
     overdue,
     pending,
-    stpRate: stpRaw != null && stpRaw !== '' ? `${Number(stpRaw).toFixed(2)}%` : '—',
-    criticalAmount:
-      data.criticalAmount != null && data.criticalAmount !== ''
-        ? formatMoneyDisplay(data.criticalAmount)
-        : '—',
-    overdueAmount:
-      data.overdueAmount != null && data.overdueAmount !== ''
-        ? formatMoneyDisplay(data.overdueAmount)
-        : '—',
-    pendingAmount:
-      data.pendingAmount != null && data.pendingAmount !== ''
-        ? formatMoneyDisplay(data.pendingAmount)
-        : '—',
-    open: Number(data.open ?? 0),
-    investigating: Number(data.investigating ?? 0),
+    stpRate: nestedPct(data.straightThroughMatchRate ?? data.stpRate ?? data.matchRate),
+    criticalAmount: nestedMoney(data.criticalAmount ?? data.criticalExceptions),
+    overdueAmount: nestedMoney(data.overdueAmount ?? data.overdueApprovals),
+    pendingAmount: nestedMoney(data.pendingAmount ?? data.pendingAdjustments),
+    open,
+    investigating: nestedFinite(data.investigating) ?? 0,
+    autoConfirmed: nestedFinite(data.autoConfirmedCount) ?? nestedFinite(data.confirmedAutoMatches) ?? 0,
+    matchLinks: nestedFinite(data.matchLinkCount) ?? nestedFinite(data.allLinks) ?? 0,
   }
 }
 
@@ -732,6 +819,22 @@ export function mapExceptionTimeline(data: unknown) {
     return ((data as { events: Record<string, unknown>[] }).events).map(mapItem)
   }
   return items.map(mapItem)
+}
+
+function flattenStatementMovements(sections: Record<string, unknown>): Record<string, unknown>[] {
+  if (Array.isArray(sections.movements) && sections.movements.length) {
+    return sections.movements as Record<string, unknown>[]
+  }
+  const out: Record<string, unknown>[] = []
+  for (const key of ['receipts', 'payments', 'fees', 'realisedGainsLosses']) {
+    const block = sections[key]
+    const items =
+      block && typeof block === 'object' && Array.isArray((block as { items?: unknown }).items)
+        ? ((block as { items: Record<string, unknown>[] }).items)
+        : []
+    for (const item of items) out.push(item)
+  }
+  return out
 }
 
 export function mapStatements(data: unknown) {
@@ -760,7 +863,7 @@ export function mapStatements(data: unknown) {
       const sections = (s['sections'] && typeof s['sections'] === 'object'
         ? s['sections']
         : {}) as Record<string, unknown>
-      const movements = Array.isArray(sections.movements) ? sections.movements : []
+      const movements = flattenStatementMovements(sections)
       return {
         id: s.id,
         period: `${shortDate(periodFrom)} – ${shortDate(periodTo)}`.replace(/^— – | – —$/g, '') || '—',
@@ -782,14 +885,12 @@ export function mapStatements(data: unknown) {
         generatedOn: formatActivity(s['generatedAt'] ?? s['createdAt']),
         version: s.version,
         cashAccountId: cashAccountId || undefined,
-        account: displayLabel(
-          s['accountNumber'] ??
-            s['cashAccountLabel'] ??
-            s['cashAccountName'] ??
-            run.accountNumber ??
-            run.cashAccountLabel,
-          '—',
-        ),
+        account: cashAccountDisplayLabel({
+          clientName: s['clientName'] ?? run.clientName ?? s['clientOrVehicleName'],
+          name: s['cashAccountLabel'] ?? s['cashAccountName'] ?? run.cashAccountLabel ?? run.cashAccountName,
+          accountNumber: s['accountNumber'] ?? run.accountNumber,
+          accountNumberMasked: s['accountNumberMasked'] ?? run.accountNumberMasked,
+        }),
         clientName: displayLabel(s['clientName'] ?? run.clientName ?? s['clientOrVehicleName'], '—'),
         clientOrVehicleId: clientOrVehicleId || undefined,
         currency,
@@ -1143,11 +1244,36 @@ export function resolveCashAccountLabel(
   if (id == null || id === '') return fallback
   const s = String(id)
   const hit = accounts.find((a) => a.id === s)
-  if (hit?.label && !isOpaqueId(hit.label)) return hit.label
+  if (hit?.label && !isOpaqueId(hit.label) && !isMaskedAccountLabel(hit.label)) return hit.label
   return displayLabel(s, fallback)
 }
 
-/** Human label for a cash account row — never falls back to a DB id. */
+/** Seeded masks like ****FUND / ****TRADING — not useful as a picker label. */
+export function isMaskedAccountLabel(value: unknown): boolean {
+  const s = String(value ?? '').trim()
+  if (!s) return true
+  if (/^\*+[A-Z][A-Z0-9_]*$/i.test(s)) return true
+  if (/^[•]+[A-Z][A-Z0-9_]*$/i.test(s)) return true
+  return false
+}
+
+function cashPurposeLabel(value: unknown): string {
+  const s = String(value ?? '').trim().toUpperCase()
+  if (!s) return ''
+  const map: Record<string, string> = {
+    FUND_CASH: 'Fund cash',
+    TRADING_CASH: 'Trading cash',
+    FUND: 'Fund cash',
+    TRADING: 'Trading cash',
+    OMNIBUS: 'Fund cash',
+    CLIENT: 'Client cash',
+    CUSTODY: 'Custody cash',
+  }
+  if (map[s]) return map[s]
+  return s.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+/** Human label for a cash account row — never falls back to a DB id or ****FUND mask. */
 export function cashAccountDisplayLabel(a: {
   accountNumber?: unknown
   accountNumberMasked?: unknown
@@ -1156,15 +1282,28 @@ export function cashAccountDisplayLabel(a: {
   clientOrVehicleName?: unknown
   name?: unknown
   label?: unknown
+  moneyClass?: unknown
+  accountType?: unknown
+  accountPurpose?: unknown
+  currency?: unknown
+  baseCurrency?: unknown
 }): string {
+  const client = displayLabel(a.clientName ?? a.clientOrVehicleName, '')
+  if (client && !isMaskedAccountLabel(client)) return client
+
+  const named = displayLabel(a.name ?? a.label, '')
+  if (named && !isMaskedAccountLabel(named) && !isOpaqueId(named)) return named
+
+  const purpose = cashPurposeLabel(a.moneyClass ?? a.accountPurpose ?? a.accountType)
+  const ccy = displayLabel(a.currency ?? a.baseCurrency, '')
+  if (purpose) return ccy ? `${purpose} · ${ccy}` : purpose
+
   const number = displayLabel(
-    a.accountNumber ?? a.accountNumberMasked ?? a.maskedIdentifier ?? a.label ?? a.name,
+    a.accountNumber ?? a.accountNumberMasked ?? a.maskedIdentifier,
     '',
   )
-  if (number) return number
-  const client = displayLabel(a.clientName ?? a.clientOrVehicleName, '')
-  if (client) return client
-  return 'Account'
+  if (number && !isMaskedAccountLabel(number)) return number
+  return 'Cash account'
 }
 
 /** Map listClientCashAccounts payload into id/label options for resolveCashAccountLabel. */

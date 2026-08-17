@@ -261,11 +261,26 @@ export default function ReportingPage() {
       if (!(blob instanceof Blob) || blob.size === 0) {
         throw new Error('Empty download response')
       }
+      // Guard against API JSON errors saved as .docx/.pdf (looks "corrupt" in Word/Acrobat)
+      const head = await blob.slice(0, 32).text()
+      if (head.trimStart().startsWith('{') || head.trimStart().startsWith('<!DOCTYPE') || head.trimStart().startsWith('<html')) {
+        let msg = 'Download failed'
+        try {
+          const j = JSON.parse(await blob.text())
+          msg = j?.message || j?.error || msg
+        } catch {
+          /* keep default */
+        }
+        throw new Error(msg)
+      }
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
       const ext = FORMAT_EXTENSION[String(run.format).toUpperCase()] ?? String(run.format).toLowerCase()
-      a.download = `${run.reportTypeName || run.reportType}-${run.id}.${ext}`
+      const professional =
+        (run as any).downloadFileName ||
+        `${run.reportTypeName || 'Investment Report'} - ${format(new Date(run.createdAt), 'dd MMM yyyy')}.${ext}`
+      a.download = String(professional).replace(/[<>:"/\\|?*]+/g, ' ').trim()
       a.click()
       URL.revokeObjectURL(url)
       toast.success('Download started')
@@ -280,7 +295,7 @@ export default function ReportingPage() {
   const processingReports = reportRuns.filter((run) => run.status.toUpperCase() === 'PROCESSING').length
 
   return (
-    <div ref={rootRef} className="min-h-full bg-background p-3 text-foreground dark:bg-[#05090f] sm:p-5">
+    <div ref={rootRef} className="min-h-full bg-background p-3 text-foreground sm:p-5">
       <div className="mx-auto max-w-[1600px] space-y-4">
         <section className="rounded-[24px] border border-border bg-[linear-gradient(120deg,var(--card),var(--secondary)_58%,var(--background))] p-5 shadow-[0_24px_80px_rgba(0,0,0,.18)]">
           <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
@@ -453,7 +468,12 @@ export default function ReportingPage() {
       </div>
 
       {showGenerate && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-3 backdrop-blur-sm sm:p-5" onMouseDown={() => setShowGenerate(false)}>
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-3 backdrop-blur-sm sm:p-5"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setShowGenerate(false)
+          }}
+        >
           <section className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-[24px] border border-border bg-card shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>
             <div className="flex items-start justify-between border-b border-border p-5">
               <div>
@@ -498,9 +518,9 @@ export default function ReportingPage() {
               </div>
               {selectedTemplate?.requiresFundId && <div><label className="mb-1.5 block text-[9px] uppercase tracking-wider text-muted-foreground">Fund</label><Input value={fundName(selectedFundId) ?? '—'} disabled readOnly className="rounded-full border-input bg-muted text-[10px] text-foreground" /></div>}
               {selectedTemplate?.requiresClientId && <div><label className="mb-1.5 block text-[9px] uppercase tracking-wider text-muted-foreground">Client ID</label><Input value={form.clientId} onChange={(event) => setForm((previous) => ({ ...previous, clientId: event.target.value }))} placeholder="Client mandate ID" className="rounded-full border-input bg-muted font-mono text-[10px] text-foreground" /></div>}
-              {paramFields.includes('periodStart') && <div><label className="mb-1.5 block text-[9px] uppercase tracking-wider text-muted-foreground">Period Start</label><DatePicker value={form.periodStart} onChange={(date) => setForm((previous) => ({ ...previous, periodStart: date }))} className="w-full bg-muted text-[10px]" container={themeContainer} /></div>}
-              {paramFields.includes('periodEnd') && <div><label className="mb-1.5 block text-[9px] uppercase tracking-wider text-muted-foreground">Period End</label><DatePicker value={form.periodEnd} onChange={(date) => setForm((previous) => ({ ...previous, periodEnd: date }))} className="w-full bg-muted text-[10px]" container={themeContainer} /></div>}
-              {paramFields.includes('valuationDate') && <div><label className="mb-1.5 block text-[9px] uppercase tracking-wider text-muted-foreground">Valuation Date</label><DatePicker value={form.valuationDate} onChange={(date) => setForm((previous) => ({ ...previous, valuationDate: date }))} className="w-full bg-muted text-[10px]" container={themeContainer} /></div>}
+              {paramFields.includes('periodStart') && <div><label className="mb-1.5 block text-[9px] uppercase tracking-wider text-muted-foreground">Period Start</label><DatePicker value={form.periodStart} onChange={(date) => setForm((previous) => ({ ...previous, periodStart: date }))} className="w-full bg-muted text-[10px]" allowFutureDates container={themeContainer} /></div>}
+              {paramFields.includes('periodEnd') && <div><label className="mb-1.5 block text-[9px] uppercase tracking-wider text-muted-foreground">Period End</label><DatePicker value={form.periodEnd} onChange={(date) => setForm((previous) => ({ ...previous, periodEnd: date }))} className="w-full bg-muted text-[10px]" allowFutureDates container={themeContainer} /></div>}
+              {paramFields.includes('valuationDate') && <div><label className="mb-1.5 block text-[9px] uppercase tracking-wider text-muted-foreground">Valuation Date</label><DatePicker value={form.valuationDate} onChange={(date) => setForm((previous) => ({ ...previous, valuationDate: date }))} className="w-full bg-muted text-[10px]" allowFutureDates container={themeContainer} /></div>}
               {paramFields.includes('benchmarkName') && <div><label className="mb-1.5 block text-[9px] uppercase tracking-wider text-muted-foreground">Benchmark Name</label><Input value={form.benchmarkName} onChange={(event) => setForm((previous) => ({ ...previous, benchmarkName: event.target.value }))} placeholder="e.g. ZSE Industrial Index" className="rounded-full border-input bg-muted text-[10px] text-foreground" /></div>}
               {paramFields.includes('assetManagerName') && <div><label className="mb-1.5 block text-[9px] uppercase tracking-wider text-muted-foreground">Asset Manager Name</label><Input value={form.assetManagerName} onChange={(event) => setForm((previous) => ({ ...previous, assetManagerName: event.target.value }))} placeholder="e.g. Arcus Asset Management" className="rounded-full border-input bg-muted text-[10px] text-foreground" /></div>}
               {paramFields.length === 0 && !selectedTemplate?.requiresFundId && !selectedTemplate?.requiresClientId && <div className="rounded-2xl bg-muted p-4 text-[10px] text-muted-foreground sm:col-span-2 xl:col-span-3">This report type takes no additional parameters.</div>}

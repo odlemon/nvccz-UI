@@ -67,12 +67,7 @@ Then refresh the UI, open **New order** again → **Review Order**. Cash should 
 ## C — Send email instruction to broker
 
 1. With the order selected, click **Send to broker**.
-2. In the modal:
-   - **Broker** — select the broker (dropdown shows `Name · email`). Must have an email.
-   - **Custodian** — select custodian.
-   - **Value date** — optional (today + 2 days is fine).
-   - **Notes** — optional.
-3. Click **Send email instruction**.
+2. That sends immediately using the broker and custodian already on the order (broker must have a contact email).
 
 **Expect:**
 - Toast that email was sent (or that a reply link was created).
@@ -135,9 +130,7 @@ Then on Orderbook: **Reject / keep looking** or **Fail** the order — do **not*
 After **Reject / keep looking**:
 
 1. Order status returns to **Sent to Broker** (no open confirmation).
-2. Click **Send again**.
-3. In the modal, pick the **same broker** or a **different broker** (must have contact email).
-4. Click **Send again** — a **new email** and **new reply link** are created (the old link is one-time only).
+2. Click **Send again** — sends immediately to the broker already on the order (must have a contact email). A **new email** and **new reply link** are created (the old link is one-time only).
 
 **Expect:** Broker communication panel shows a new outbound instruction. You can repeat until filled or you **Fail** the order.
 

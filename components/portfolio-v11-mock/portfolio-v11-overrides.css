@@ -1,33 +1,28 @@
-/* SharedTopbar offset + toast/overlay fixes for Portfolio V11 */
+/* Portfolio V11: expanded sidebar, full-viewport shell. */
 
 .portfolio-v11-root {
   position: relative;
-  min-height: calc(100vh - 5rem);
-  overflow-x: clip;
-  overflow-y: visible;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .portfolio-v11-root .app-shell {
-  min-height: calc(100vh - 5rem);
+  height: 100%;
+  min-height: 0;
 }
 
 .portfolio-v11-root .sidebar {
-  position: absolute;
+  position: fixed;
   top: 0;
+  right: auto;
   bottom: 0;
-  height: auto;
+  left: 0;
+  height: 100dvh;
 }
 
 .portfolio-v11-root .workspace {
-  min-height: calc(100vh - 5rem);
-}
-
-.portfolio-v11-root .scrim,
-.portfolio-v11-root .modal-layer,
-.portfolio-v11-root .drawer,
-.portfolio-v11-root .command-palette,
-.portfolio-v11-root .popover-layer {
-  /* keep overlays below Arcus SharedTopbar */
+  min-height: 0;
 }
 
 .portfolio-v11-root .toast-stack {

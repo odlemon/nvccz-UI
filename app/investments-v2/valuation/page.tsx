@@ -221,6 +221,7 @@ export default function ValuationPage() {
 
   const fundName = (id: string) => portfolios.find((p) => p.id === id)?.name ?? '—'
   const runLabel = (run: ValuationRun) => formatValuationRunLabel(run)
+  const methodValue = METHOD_OPTIONS.find((m) => m.label === method)?.value ?? METHOD_OPTIONS[0].value
 
   const fundOptions = useMemo(
     () => (portfolios.length ? portfolios.map((p) => p.name) : ['No portfolios available']),

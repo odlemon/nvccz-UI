@@ -18,12 +18,10 @@ import {
   investmentOpsApi,
   formatOpsError,
   unwrapList,
-  type ApprovalRoute,
   type Instrument,
   type OrderPreview,
   type OpsFund,
 } from '@/lib/api/investment-ops-api'
-import { stockPickerCashApi } from '@/lib/api/stock-picker-cash-api'
 import { mapComplianceOutcomeLabel } from '@/lib/investments-v2/adapters/orders-adapter'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
@@ -86,16 +84,8 @@ export function PlaceEquityOrderModal({ open, onClose, onComplete }: PlaceEquity
   const [validity, setValidity] = useState(() => new Date(Date.now() + 86400000).toISOString().slice(0, 10))
   const [brokerId, setBrokerId] = useState('')
   const [custodianId, setCustodianId] = useState('')
-  const [settlementAccountId, setSettlementAccountId] = useState('')
-  const [approvalRouteId, setApprovalRouteId] = useState('')
   const [brokers, setBrokers] = useState<{ id: string; name: string }[]>([])
   const [custodians, setCustodians] = useState<{ id: string; name: string }[]>([])
-  const [settlementAccounts, setSettlementAccounts] = useState<{ id: string; name: string }[]>([])
-  const [fundCashAvailable, setFundCashAvailable] = useState<number | null>(null)
-  const [fundCashCurrency, setFundCashCurrency] = useState('USD')
-  const [fundCashLoading, setFundCashLoading] = useState(false)
-  const [fundCashLabel, setFundCashLabel] = useState<string | null>(null)
-  const [approvalRoutes, setApprovalRoutes] = useState<{ id: string; name: string }[]>([])
   const [chartPeriod, setChartPeriod] = useState<ChartPeriod>('1D')
   const [skipConfirmation, setSkipConfirmation] = useState(false)
   const [reviewed, setReviewed] = useState(false)
@@ -145,11 +135,6 @@ export function PlaceEquityOrderModal({ open, onClose, onComplete }: PlaceEquity
   const taxes = taxAmount
   const feesAndTaxes = feeAmount + taxAmount
   const consideration = netAmount ?? (side === 'BUY' ? orderValue + feesAndTaxes : Math.max(0, orderValue - feesAndTaxes))
-  const cashShortfall =
-    side === 'BUY' &&
-    fundCashAvailable != null &&
-    Number.isFinite(consideration) &&
-    consideration > fundCashAvailable
   const exposureImpact = n(est.exposure?.exposureImpactPct) ?? n(est.exposureImpactPct)
   const chartPoints =
     historyPoints.length >= 2
@@ -261,13 +246,11 @@ export function PlaceEquityOrderModal({ open, onClose, onComplete }: PlaceEquity
     setLoadingMeta(true)
     setLoadError(null)
     try {
-      const [fundsRes, instrRes, brokersRes, custodiansRes, routesRes, cashRes] = await Promise.all([
+      const [fundsRes, instrRes, brokersRes, custodiansRes] = await Promise.all([
         investmentOpsApi.listPortfolios(),
         investmentOpsApi.listInstruments({ page: 1, pageSize: 200, status: 'ACTIVE' }),
         investmentOpsApi.listBrokers().catch(() => null),
         investmentOpsApi.listCustodians().catch(() => null),
-        investmentOpsApi.listApprovalRoutes({ pageSize: 100 }).catch(() => null),
-        stockPickerCashApi.listClientCashAccounts({ pageSize: 100 }).catch(() => null),
       ])
       if (fundsRes.success === false) throw new Error(formatOpsError(fundsRes))
       if (instrRes.success === false) throw new Error(formatOpsError(instrRes))
@@ -288,26 +271,6 @@ export function PlaceEquityOrderModal({ open, onClose, onComplete }: PlaceEquity
           .filter((c) => c.id)
         setCustodians(rows)
         setCustodianId((prev) => prev || rows[0]?.id || '')
-      }
-      if (routesRes && routesRes.success !== false) {
-        const rows = unwrapList<ApprovalRoute>(routesRes.data)
-          .map((r) => ({ id: String(r.id ?? ''), name: String(r.name ?? r.id ?? 'Route') }))
-          .filter((r) => r.id)
-        setApprovalRoutes(rows)
-        setApprovalRouteId((prev) => prev || rows[0]?.id || '')
-      }
-      if (cashRes && (cashRes as { success?: boolean }).success !== false) {
-        const rows = unwrapList<{ id?: string; accountNumber?: string; clientName?: string }>(
-          (cashRes as { data?: unknown }).data,
-        )
-          .map((a) => ({
-            id: String(a.id ?? ''),
-            name: String(a.accountNumber ?? a.clientName ?? a.id ?? 'Cash account'),
-          }))
-          .filter((a) => a.id)
-        setSettlementAccounts(rows)
-        // Do NOT auto-select — these may be recon client cash accounts, not fund settlement cash.
-        // Sending a wrong settlementAccountId makes preview fail with "Persisted available cash is insufficient".
       }
       if (!fundId && nextFunds[0]?.id) setFundId(nextFunds[0].id)
       if (!instrumentId && nextInstr[0]?.id) {
@@ -332,76 +295,8 @@ export function PlaceEquityOrderModal({ open, onClose, onComplete }: PlaceEquity
 
   useEffect(() => {
     if (!open) return
-    setSettlementAccountId('')
     void loadMeta()
   }, [open, loadMeta])
-
-  useEffect(() => {
-    if (!open || !fundId) {
-      setFundCashAvailable(null)
-      setFundCashLabel(null)
-      return
-    }
-    let cancelled = false
-    setFundCashLoading(true)
-    setFundCashLabel(null)
-    void (async () => {
-      try {
-        const [overviewRes, fundCashRes] = await Promise.all([
-          investmentOpsApi.getPortfolioOverview(fundId).catch(() => null),
-          stockPickerCashApi.getFundCashSummary({ fundId }).catch(() => null),
-        ])
-        if (cancelled) return
-
-        const overview =
-          overviewRes && overviewRes.success !== false ? (overviewRes.data as Record<string, unknown> | undefined) : null
-        const fundCash =
-          fundCashRes && fundCashRes.success !== false ? (fundCashRes.data as Record<string, unknown> | undefined) : null
-
-        const pick = (...vals: unknown[]) => {
-          for (const v of vals) {
-            const num = n(v)
-            if (num != null) return num
-          }
-          return null
-        }
-
-        const available = pick(
-          fundCash?.orderEligibleAvailableCash,
-          fundCash?.totalOrderEligibleAvailableCash,
-          fundCash?.availableCash,
-          fundCash?.available,
-          overview?.orderEligibleAvailableCash,
-          overview?.availableCash,
-          overview?.cashBalance,
-        )
-        const ccy = String(
-          fundCash?.currency ??
-            fundCash?.baseCurrency ??
-            overview?.baseCurrency ??
-            fund?.baseCurrencyCode ??
-            'USD',
-        )
-        setFundCashAvailable(available)
-        setFundCashCurrency(ccy)
-        if (available == null) {
-          setFundCashLabel('Available cash not returned for this fund')
-        } else {
-          setFundCashLabel(null)
-        }
-      } catch {
-        if (!cancelled) {
-          setFundCashAvailable(null)
-          setFundCashLabel('Could not load fund cash')
-        }
-      } finally {
-        if (!cancelled) setFundCashLoading(false)
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [open, fundId, fund?.baseCurrencyCode])
 
   useEffect(() => {
     if (!open || !instrument?.listedEquitySecurityId) {
@@ -440,7 +335,6 @@ export function PlaceEquityOrderModal({ open, onClose, onComplete }: PlaceEquity
     setReviewed(false)
     setPreview(null)
     setError(null)
-    setSettlementAccountId('')
     onClose()
   }
 
@@ -459,9 +353,6 @@ export function PlaceEquityOrderModal({ open, onClose, onComplete }: PlaceEquity
     notes: `TIF=${timeInForce}`,
     brokerProfileId: brokerId || undefined,
     custodianProfileId: custodianId || undefined,
-    // Only send when user explicitly picks one — empty means use fund default cash
-    ...(settlementAccountId ? { settlementAccountId } : {}),
-    approvalRouteId: approvalRouteId || undefined,
   })
 
   const runPreview = async () => {
@@ -488,7 +379,7 @@ export function PlaceEquityOrderModal({ open, onClose, onComplete }: PlaceEquity
         /insufficient/i.test(raw) && /cash/i.test(raw)
       setError(
         isCash
-          ? `${raw}. This fund’s order-eligible cash in the ledger is below the order cost (or a wrong settlement account was selected). Clear Settlement account (leave Optional), try a tiny Limit buy, or ask BE to top up / re-seed available cash for this portfolio.`
+          ? `${raw}. This fund’s order-eligible cash in the ledger is below the order cost.`
           : raw,
       )
     } finally {
@@ -856,7 +747,6 @@ export function PlaceEquityOrderModal({ open, onClose, onComplete }: PlaceEquity
                   value={fundId}
                   onChange={(value) => {
                     setFundId(value)
-                    setSettlementAccountId('')
                     setReviewed(false)
                     setPreview(null)
                   }}
@@ -868,39 +758,6 @@ export function PlaceEquityOrderModal({ open, onClose, onComplete }: PlaceEquity
                     </option>
                   ))}
                 </SelectField>
-                {fundId ? (
-                  <p
-                    className={cn(
-                      'mt-1.5 text-[9px]',
-                      cashShortfall ? 'text-amber-300' : 'text-slate-400',
-                    )}
-                    title="Order-eligible cash from the fund ledger (what pre-trade uses to check buys). Leave Settlement account empty unless you know the fund’s settlement cash account."
-                  >
-                    {fundCashLoading
-                      ? 'Loading available cash…'
-                      : fundCashAvailable != null
-                        ? `Available cash: ${fundCashCurrency} ${fundCashAvailable.toLocaleString(undefined, {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}`
-                        : fundCashLabel ?? 'Available cash: —'}
-                    {side === 'BUY' && !fundCashLoading && Number.isFinite(orderValue) && orderValue > 0 ? (
-                      <span className="text-slate-500">
-                        {' '}
-                        · Est. order ~{currency}{' '}
-                        {consideration.toLocaleString(undefined, {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
-                      </span>
-                    ) : null}
-                    {cashShortfall ? (
-                      <span className="block text-amber-200">
-                        Order looks larger than available cash — lower qty/price or ask BE to top up this fund.
-                      </span>
-                    ) : null}
-                  </p>
-                ) : null}
               </div>
               <div>
                 <Label help>Instrument</Label>
@@ -1070,45 +927,6 @@ export function PlaceEquityOrderModal({ open, onClose, onComplete }: PlaceEquity
                   {custodians.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.name}
-                    </option>
-                  ))}
-                </SelectField>
-              </div>
-              <div>
-                <Label help>Settlement account</Label>
-                <SelectField
-                  value={settlementAccountId}
-                  onChange={(value) => {
-                    setSettlementAccountId(value)
-                    setReviewed(false)
-                    setPreview(null)
-                  }}
-                >
-                  <option value="">Optional — use fund default cash</option>
-                  {settlementAccounts.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name}
-                    </option>
-                  ))}
-                </SelectField>
-                <p className="mt-1 text-[9px] text-slate-500">
-                  Leave empty unless you know the fund settlement account. A recon client cash account can cause “insufficient cash”.
-                </p>
-              </div>
-              <div>
-                <Label help>Approval route</Label>
-                <SelectField
-                  value={approvalRouteId}
-                  onChange={(value) => {
-                    setApprovalRouteId(value)
-                    setReviewed(false)
-                    setPreview(null)
-                  }}
-                >
-                  <option value="">Optional…</option>
-                  {approvalRoutes.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.name}
                     </option>
                   ))}
                 </SelectField>

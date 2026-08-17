@@ -1,13 +1,16 @@
-# Portfolio V11 — UI handoff
+# Portfolio Management (V23) — UI handoff
 
-> **Status:** Integrated — client Matanho Portfolio Management V11 under `/portfolio-v11`.  
-> **Source:** `C:\Users\lysp\Downloads\Matanho_Portfolio_Management_v11_Production_Handoff`  
-> **Mode:** Interactive mock (Mode A runtime host) — no live API.  
-> **Live module left alone:** `/portfolio` (Portfolio Management)
+> **Status:** Integrated — client Matanho Portfolio Management **V23** hosted at `/portfolio-v11`.  
+> **Source:** `Matanho_Portfolio_Management_v23_Production_Handoff` (2026-08-17)  
+> **Prior source:** V11 handoff (same SPA lineage; V23 = blue theme + V22 ops polish + API handoff)  
+> **Mode:** Interactive mock (Mode A runtime host) — mock data; live API optional via client bootstrap contract.  
+> **Live module left alone:** `/portfolio` (legacy Portfolio Management)
+
+See comparison: [portfolio-v23-comparison.md](./portfolio-v23-comparison.md)
 
 ## What shipped
 
-Full client V11 suite hosted in Next.js:
+Full client V23 suite (upgraded from V11 in-place):
 
 - Shell (collapsed sidebar, topbar, command palette, drawers, modals, toasts)
 - Investments: Dashboard, Deal Flow, Funds, Capital Calls, Portfolio Companies (+ detail pages)
@@ -54,7 +57,7 @@ Full client V11 suite hosted in Next.js:
 | CSS | `portfolio-v11.css` + `portfolio-v11-overrides.css` |
 | Nav | `lib/portfolio-v11-mock/nav.ts` |
 | Assets | `public/portfolio-v11/assets/` |
-| Extract script | `scripts/extract-portfolio-v11.mjs` |
+| Extract script | `scripts/extract-portfolio-v23.mjs` (re-run to refresh from client package) |
 
 ## Deviations
 
@@ -73,7 +76,7 @@ Full client V11 suite hosted in Next.js:
 
 ## Verify
 
-1. Open `/portfolio-v11` — dashboard loads with client sidebar
+1. Open `/portfolio-v11` — dashboard loads with client sidebar (**blue** accent theme)
 2. Walk all sidebar workspaces
 3. Open a fund/company/deal detail — URL updates
 4. App Switcher shows **Portfolio (V11)** next to live **Portfolio Management**

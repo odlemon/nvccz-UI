@@ -49,17 +49,36 @@ const reducedMotionTransition = {
   duration: 0.2,
 }
 
+const VIEWPORT_LOCKED_PREFIXES = [
+  "/home-v3",
+  "/payroll-v6",
+  "/portfolio-v11",
+  "/investee-portal-v8",
+  "/fundraising-kyc",
+  "/accounting-v2",
+  "/performance-v22",
+]
+
+function isViewportLockedPath(pathname: string) {
+  return VIEWPORT_LOCKED_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+  )
+}
+
 export function RouteTransition({ children }: RouteTransitionProps) {
   const pathname = usePathname()
   const [isNavigating, setIsNavigating] = useState(false)
+  const viewportLocked = isViewportLockedPath(pathname)
   
   // Check for reduced motion preference
   const prefersReducedMotion = typeof window !== 'undefined' 
     ? window.matchMedia('(prefers-reduced-motion: reduce)').matches 
     : false
 
-  const variants = prefersReducedMotion ? reducedMotionVariants : pageVariants
-  const transition = prefersReducedMotion ? reducedMotionTransition : pageTransition
+  const variants =
+    prefersReducedMotion || viewportLocked ? reducedMotionVariants : pageVariants
+  const transition =
+    prefersReducedMotion || viewportLocked ? reducedMotionTransition : pageTransition
 
   // Show a quick top loader on route change
   useEffect(() => {
@@ -78,7 +97,7 @@ export function RouteTransition({ children }: RouteTransitionProps) {
         exit="out"
         variants={variants}
         transition={transition}
-        className="min-h-screen"
+        className={viewportLocked ? "h-dvh overflow-hidden" : "min-h-screen"}
       >
         {/* Top loading bar */}
         {isNavigating && (

@@ -3,10 +3,10 @@
 import type React from "react"
 import { useEffect, useState } from "react"
 import { usePathname, useRouter } from "next/navigation"
-import { SharedTopbar } from "./shared-topbar"
 import { LpPortalTopbar } from "./lp-portal-topbar"
 import { LpPortalSidebar } from "./lp-portal-sidebar"
-import { MODULE_CONFIG, getModuleByPath } from "@/lib/config/modules"
+import { ClientDesignAppSwitcher } from "./client-design-app-switcher"
+import { getModuleByPath } from "@/lib/config/modules"
 import { useRolePermissions } from "@/lib/hooks/useRolePermissions"
 import { toast } from "sonner"
 
@@ -27,6 +27,18 @@ export function LpPortalLayout({ children }: LpPortalLayoutProps) {
   }, [pathname])
 
   useEffect(() => {
+    const html = document.documentElement
+    const { overflow: prevHtml } = html.style
+    const { overflow: prevBody } = document.body.style
+    html.style.overflow = "hidden"
+    document.body.style.overflow = "hidden"
+    return () => {
+      html.style.overflow = prevHtml
+      document.body.style.overflow = prevBody
+    }
+  }, [])
+
+  useEffect(() => {
     if (isLoading) return
     if (!isAuthenticated) {
       router.replace("/login")
@@ -37,12 +49,6 @@ export function LpPortalLayout({ children }: LpPortalLayoutProps) {
       router.replace("/")
     }
   }, [isLoading, isAuthenticated, hasModuleAccess, router])
-
-  const handleModuleSelect = (module: string) => {
-    setCurrentModule(module)
-    const moduleConfig = MODULE_CONFIG.find((m) => m.id === module)
-    if (moduleConfig) window.location.href = moduleConfig.path
-  }
 
   if (isLoading) {
     return (
@@ -55,17 +61,17 @@ export function LpPortalLayout({ children }: LpPortalLayoutProps) {
   if (!canAccessPortal) return null
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
-      <SharedTopbar onModuleSelect={handleModuleSelect} currentModule={currentModule} />
+    <div className="flex h-dvh flex-col overflow-hidden bg-background">
       <LpPortalTopbar />
-      <div className="flex min-h-0 flex-1">
-        <div className="hidden h-full shrink-0 lg:block">
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        <div className="hidden h-full shrink-0 lg:flex">
           <LpPortalSidebar />
         </div>
-        <main className="min-w-0 flex-1 overflow-y-auto bg-[#f5f7fb]">
-          <div className="mx-auto min-h-full w-full max-w-[1500px] p-3 lg:p-4">{children}</div>
+        <main className="min-h-0 min-w-0 flex-1 overflow-y-auto bg-[#f5f7fb]">
+          <div className="mx-auto w-full max-w-[1500px] p-3 lg:p-4">{children}</div>
         </main>
       </div>
+      <ClientDesignAppSwitcher currentModule={currentModule} showHeaderButton={false} />
     </div>
   )
 }

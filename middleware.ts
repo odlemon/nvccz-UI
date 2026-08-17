@@ -139,6 +139,14 @@ export function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl
 
+  // Legacy /performance → current Performance Management (V22)
+  if (
+    pathname === "/performance" ||
+    (pathname.startsWith("/performance/") && !pathname.startsWith("/performance-v22"))
+  ) {
+    return NextResponse.redirect(new URL("/performance-v22", request.url))
+  }
+
   // Pass-through routes: always render regardless of auth state.
   // These are public-facing pages reached via shared links (RSVP tokens,
   // vendor quotation submissions, public tenders, KYC token forms, etc.)
@@ -157,6 +165,7 @@ export function middleware(request: NextRequest) {
     '/home-v3',               // Home Version 3 mock — public preview (no API / no login)
     '/portfolio-v11',         // Portfolio V11 client design — public preview
     '/payroll-v6',            // Payroll HR V6 client design — public preview
+    '/performance-v22',       // Performance Management V22.1 client design — public preview
     '/fundraising-kyc',       // Investor KYC onboarding client design — public preview
     '/investee-portal-v8',    // Investee Portal V8 client design — public preview
     '/broker-instruction',    // Broker magic-link reply to trade instruction (no login)

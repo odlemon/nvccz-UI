@@ -3,17 +3,10 @@
 import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import {
-  Bell,
-  Building2,
-  CalendarDays,
-  FileText,
-  Landmark,
-  Menu,
-  Search,
-  X,
-} from "lucide-react"
+import { Bell, Building2, CalendarDays, FileText, Menu, Search, X } from "lucide-react"
+import { CiLogout, CiSettings, CiUser } from "react-icons/ci"
 import { Button } from "@/components/ui/button"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,12 +18,18 @@ import {
 import { Input } from "@/components/ui/input"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { TooltipProvider } from "@/components/ui/tooltip"
 import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { useLpPortal } from "@/components/lp-portal/lp-portal-context"
 import { LpPortalSidebar } from "@/components/layout/lp-portal-sidebar"
+import { ModuleSwitcherButton } from "@/components/layout/module-switcher-button"
 import { lpPortalApi } from "@/lib/api/lp-portal-api"
 import { formatDate } from "@/lib/lp-portal/format"
 import { mapDocumentRow } from "@/lib/lp-portal/mappers"
+import { getModuleById } from "@/lib/config/modules"
+import { useAppDispatch, useAppSelector } from "@/lib/store"
+import { logoutUser } from "@/lib/store/slices/authSlice"
+import { toast } from "sonner"
 
 const navigationResults = [
   { label: "Dashboard", detail: "Portfolio overview", href: "/lp-portal", icon: Building2 },
@@ -144,9 +143,13 @@ function PortalSearch({ mobile = false }: { mobile?: boolean }) {
   )
 }
 
-/** Module context strip — sits below SharedTopbar (LP fund/as-of controls only). */
+/** Investor Portal header — fund/as-of controls plus module switcher, notifications, and profile. */
 export function LpPortalTopbar() {
   const [mobileNavigationOpen, setMobileNavigationOpen] = React.useState(false)
+  const [isLoggingOut, setIsLoggingOut] = React.useState(false)
+  const dispatch = useAppDispatch()
+  const { user, userDetails } = useAppSelector((state) => state.auth)
+  const moduleName = getModuleById("lp-portal")?.name ?? "LP Portal"
   const {
     client,
     funds,
@@ -161,6 +164,22 @@ export function LpPortalTopbar() {
   } = useLpPortal()
 
   const orgName = client?.legalName ?? "Investor Portal"
+  const userInitials = user
+    ? `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`.toUpperCase()
+    : "U"
+
+  const handleLogout = async () => {
+    setIsLoggingOut(true)
+    try {
+      await dispatch(logoutUser()).unwrap()
+      toast.success("Logged out successfully!")
+      window.location.href = "/login"
+    } catch {
+      toast.error("Logout failed. Please try again.")
+    } finally {
+      setIsLoggingOut(false)
+    }
+  }
 
   const formattedAsOfDate = React.useMemo(
     () =>
@@ -178,6 +197,7 @@ export function LpPortalTopbar() {
     unreadCounts.requests + unreadCounts.messages + unreadCounts.notices
 
   return (
+    <TooltipProvider>
     <div className="shrink-0 border-b border-border bg-card/80 backdrop-blur-sm">
       <div className="flex h-12 items-center gap-2 px-3 sm:px-4 lg:gap-3 lg:px-6">
         <Sheet open={mobileNavigationOpen} onOpenChange={setMobileNavigationOpen}>
@@ -209,10 +229,21 @@ export function LpPortalTopbar() {
           </SheetContent>
         </Sheet>
 
-        <div className="hidden min-w-0 items-center gap-2 sm:flex lg:min-w-[200px]">
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-            <Landmark className="size-4" />
-          </span>
+        <Link
+          href="/home-v3"
+          className="flex shrink-0 items-center gap-2 transition-opacity hover:opacity-80"
+          aria-label="Matanho home"
+        >
+          <img
+            src="/new_logo.png"
+            alt="Matanho"
+            className="h-8 w-auto object-contain sm:h-9"
+            height={36}
+            width={126}
+          />
+        </Link>
+
+        <div className="hidden min-w-0 items-center gap-2 sm:flex">
           <div className="min-w-0 leading-tight">
             <p className="truncate text-xs font-semibold text-foreground">Investor Portal</p>
             <p className="truncate text-[10px] text-muted-foreground">{orgName}</p>
@@ -348,6 +379,72 @@ export function LpPortalTopbar() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+
+          <ModuleSwitcherButton currentModule="lp-portal" moduleName={moduleName} onClick={() => window.__openArcusAppSwitcher?.()} />
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="flex size-9 shrink-0 items-center justify-center rounded-full hover:bg-accent"
+                aria-label="Open profile menu"
+              >
+                <Avatar className="size-8">
+                  <AvatarFallback className="bg-primary text-[10px] font-semibold text-primary-foreground">
+                    {userInitials}
+                  </AvatarFallback>
+                </Avatar>
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56 rounded-xl">
+              <div className="flex items-center gap-2 p-2">
+                <Avatar className="size-9">
+                  <AvatarFallback className="bg-primary text-xs font-semibold text-primary-foreground">
+                    {userInitials}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="min-w-0 flex-col">
+                  <span className="block truncate text-sm font-medium">
+                    {user ? `${user.firstName} ${user.lastName}` : "User"}
+                  </span>
+                  <span className="block truncate text-xs capitalize text-muted-foreground">
+                    {userDetails?.roleCode || userDetails?.role?.name || "User"}
+                  </span>
+                </div>
+              </div>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <Link href="/lp-portal/organisation">
+                  <CiUser size={18} className="mr-2" />
+                  Profile
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/lp-portal/settings">
+                  <CiSettings size={18} className="mr-2" />
+                  Settings
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="text-destructive"
+                onClick={() => void handleLogout()}
+                disabled={isLoggingOut}
+              >
+                {isLoggingOut ? (
+                  <>
+                    <div className="mr-2 size-4 animate-spin rounded-full border-2 border-red-300 border-t-red-600" />
+                    Signing out...
+                  </>
+                ) : (
+                  <>
+                    <CiLogout size={18} className="mr-2" />
+                    Sign Out
+                  </>
+                )}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -365,5 +462,6 @@ export function LpPortalTopbar() {
         </label>
       </div>
     </div>
+    </TooltipProvider>
   )
 }

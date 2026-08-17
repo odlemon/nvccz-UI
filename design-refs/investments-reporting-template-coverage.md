@@ -7,11 +7,16 @@
 
 ## Yellow / blue authoring rules
 
-Templates keep yellow-highlighted placeholders and blue `INSTRUCTION:` boxes for authors. On client download:
+Templates keep yellow-highlighted placeholders and blue `INSTRUCTION:` / `EDITOR NOTE:` boxes for authors.
+On client download (`docxClientReleaseCleanup`):
 
-1. Yellow `<w:highlight w:val="yellow"/>` and fill `FFF2CC` are stripped / whitened.
-2. Tables matching instruction markers are removed.
-3. Internal sections “Arcus Audit, Version and Publication Controls” and “Final Release Checklist” are removed.
+1. **Fill** — Docxtemplater merges `{placeholders}` from the report data builders (per-template instructions are what those builders implement).
+2. **Strip yellow** — remove `<w:highlight w:val="yellow"/>` and whitene `FFF2CC` / `FFFF00` fills.
+3. **Delete blue instruction boxes** — nested-aware removal of tables/short paragraphs matching `INSTRUCTION:`, “Delete all blue…”, “Blue instruction boxes”, `EDITOR NOTE:`, etc.
+4. **Remove internal sections** — “Arcus Audit, Version and Publication Controls” and “Final Release Checklist” (precise `<w:p` matching so OOXML stays valid).
+
+Verify: `node scripts/smoke-docx-client-release-cleanup.js` → **ALL_PASS 16**.
+
 
 ## DOCX catalog (16)
 

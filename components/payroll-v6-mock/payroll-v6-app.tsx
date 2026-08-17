@@ -52,9 +52,8 @@ export function PayrollV6App() {
   return (
     <div
       ref={rootRef}
-      className="payroll-v6-root"
+      className="payroll-v6-root h-full"
       data-theme="light"
-      style={{ minHeight: "calc(100vh - 5rem)", position: "relative" }}
     />
   )
 }

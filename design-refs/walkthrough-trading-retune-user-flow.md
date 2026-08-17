@@ -57,18 +57,7 @@ Use today’s date where a date is needed. If a dropdown name below is missing i
 
 ## Step 4 — Send to broker
 
-1. Click **Send to broker**
-2. In the modal, set:
-
-| Field | What to enter / select |
-|--------|-------------------------|
-| Custodian | Same custodian as on the order (required) |
-| Settlement / value date | Same as order value date (e.g. `2026-07-25`) |
-| Settlement account | Shown from the order (read-only) |
-| Broker | Shown from the order (read-only) |
-| Notes | `Instruction emailed to broker` |
-
-3. Click **Send instruction**
+1. Click **Send to broker** — uses the broker and custodian already on the order (no extra modal).
 
 **You should see:** Status **Sent to Broker**. Still nothing on Trade Blotter.
 

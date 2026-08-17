@@ -25,7 +25,8 @@ import {
   CiMedal,
   CiText,
   CiTrophy,
-  CiLock
+  CiLock,
+  CiBellOn
 } from "react-icons/ci"
 import {
   ShoppingCart,
@@ -107,6 +108,7 @@ export const SUPERSEDED_MODULE_IDS = new Set([
   "portfolio-management",
   "payroll",
   "accounting",
+  "performance-management",
 ])
 
 export const MODULE_CONFIG: ModuleConfig[] = [
@@ -253,6 +255,7 @@ export const MODULE_CONFIG: ModuleConfig[] = [
     icon: CiViewTimeline,
     color: "oklch(0.58 0.09 260)",
     path: "/performance",
+    hiddenFromSwitcher: true,
     subModules: [
       { id: "performance-dashboard", name: "Dashboard", path: "/performance", icon: CiGrid41, description: "Overview and metrics" },
       { id: "config-strategy", name: "Company Strategy", path: "/performance/configuration/strategy", icon: CiFileOn, description: "Vision and strategy cycles" },
@@ -287,6 +290,27 @@ export const MODULE_CONFIG: ModuleConfig[] = [
           { id: "config-pillars", name: "BSC Pillars", path: "/performance/configuration/pillars", icon: CiViewBoard, description: "BSC pillars and goal weights" },
         ]
       }
+    ]
+  },
+  {
+    id: "performance-v22",
+    name: "Performance Management",
+    description: "Matanho Performance Management — command centre, scorecards, reviews and compliance",
+    icon: CiViewTimeline,
+    color: "oklch(0.55 0.16 280)",
+    path: "/performance-v22",
+    subModules: [
+      { id: "pm22-dashboard", name: "Command Centre", path: "/performance-v22", icon: CiGrid41, description: "Command Centre" },
+      { id: "pm22-strategy", name: "Company Strategy", path: "/performance-v22/strategy", icon: CiFileOn, description: "Company Strategy" },
+      { id: "pm22-scorecards", name: "Scorecards", path: "/performance-v22/scorecards", icon: CiViewTable, description: "Scorecards" },
+      { id: "pm22-objectives", name: "Objectives & KPIs", path: "/performance-v22/objectives", icon: CiCircleCheck, description: "Objectives & KPIs" },
+      { id: "pm22-tasks", name: "Tasks & Projects", path: "/performance-v22/tasks", icon: CiViewList, description: "Tasks & Projects" },
+      { id: "pm22-reviews", name: "Performance Reviews", path: "/performance-v22/reviews", icon: CiFileOn, description: "Performance Reviews" },
+      { id: "pm22-corrective", name: "Corrective Actions", path: "/performance-v22/corrective", icon: CiViewTimeline, description: "Corrective Actions" },
+      { id: "pm22-reports", name: "Reports & Compliance", path: "/performance-v22/reports", icon: CiViewTable, description: "Reports & Compliance" },
+      { id: "pm22-vault", name: "Document Vault", path: "/performance-v22/vault", icon: CiFileOn, description: "Document Vault" },
+      { id: "pm22-alerts", name: "Alerts & Audit", path: "/performance-v22/alerts", icon: CiBellOn, description: "Alerts & Audit" },
+      { id: "pm22-access", name: "Access & Settings", path: "/performance-v22/access", icon: CiSettings, description: "Access & Settings" },
     ]
   },
   {
@@ -560,14 +584,13 @@ export const MODULE_CONFIG: ModuleConfig[] = [
         icon: Scale,
         path: "/investments-v2/reconciliation/trade",
         items: [
-          { id: "investments-reconciliation-trade", name: "Trade Reconciliation", path: "/investments-v2/reconciliation/trade", icon: CiGrid41, description: "Three-way blotter × broker × custodian reconciliation" },
-          // Hidden for now — client / cash recon surfaces
-          // { id: "investments-reconciliation-overview", name: "Client Accounts Overview", path: "/investments-v2/reconciliation", icon: CiGrid41, description: "Client cash accounts and reconciliation health" },
-          // { id: "investments-reconciliation-cash-ledger", name: "Cash Ledger", path: "/investments-v2/reconciliation/cash-ledger", icon: CiGrid41, description: "Trading and fund cash ledgers" },
-          // { id: "investments-reconciliation-fund-cash", name: "Fund Cash Reconciliation", path: "/investments-v2/reconciliation/fund-cash", icon: CiGrid41, description: "Internal ledger vs bank statement workspace" },
-          // { id: "investments-reconciliation-broker-custodian", name: "Broker & Custodian", path: "/investments-v2/reconciliation/broker-custodian", icon: CiGrid41, description: "Three-way broker and custodian reconciliation" },
-          // { id: "investments-reconciliation-exceptions", name: "Exceptions", path: "/investments-v2/reconciliation/exceptions", icon: CiGrid41, description: "Reconciliation exceptions and approvals" },
-          // { id: "investments-reconciliation-statements", name: "Client Statements", path: "/investments-v2/reconciliation/statements", icon: CiGrid41, description: "Investor and client cash statements" },
+          { id: "investments-reconciliation-overview", name: "Reconciliation Overview", path: "/investments-v2/reconciliation", icon: CiGrid41, description: "Us × Broker × Bank control panel" },
+          { id: "investments-reconciliation-trade", name: "Trade Match", path: "/investments-v2/reconciliation/trade", icon: CiGrid41, description: "Us blotter × broker × bank/custodian trade match" },
+          { id: "investments-reconciliation-fund-cash", name: "Cash Match", path: "/investments-v2/reconciliation/fund-cash", icon: CiGrid41, description: "Our cash ledger vs bank statement" },
+          { id: "investments-reconciliation-positions", name: "Positions", path: "/investments-v2/reconciliation/positions", icon: CiGrid41, description: "Holdings vs settled trades breaks" },
+          { id: "investments-reconciliation-cash-ledger", name: "Cash Ledger", path: "/investments-v2/reconciliation/cash-ledger", icon: CiGrid41, description: "Trading and fund cash ledgers" },
+          { id: "investments-reconciliation-exceptions", name: "Exceptions", path: "/investments-v2/reconciliation/exceptions", icon: CiGrid41, description: "Reconciliation exceptions and approvals" },
+          { id: "investments-reconciliation-statements", name: "Client Statements", path: "/investments-v2/reconciliation/statements", icon: CiGrid41, description: "Investor and client cash statements" },
         ],
       },
       {
@@ -848,13 +871,18 @@ export const getSubModuleByPath = (path: string): SubModuleConfig | undefined =>
   return undefined
 }
 
+function pathMatches(base: string, path: string) {
+  const b = base.split("?")[0]
+  return path === b || path.startsWith(`${b}/`)
+}
+
 export const getModuleByPath = (path: string): ModuleConfig | undefined => {
   return MODULE_CONFIG.find(module =>
-    path === module.path ||
-    module.subModules.some(sub => path.startsWith(sub.path)) ||
+    pathMatches(module.path, path) ||
+    module.subModules.some(sub => pathMatches(sub.path, path)) ||
     (module.groups ? module.groups.some(g => {
-      if (g.path && path.startsWith(g.path.split("?")[0])) return true
-      return g.items ? g.items.some(sub => path.startsWith(sub.path.split("?")[0])) : false
+      if (g.path && pathMatches(g.path, path)) return true
+      return g.items ? g.items.some(sub => pathMatches(sub.path, path)) : false
     }) : false)
   )
 }

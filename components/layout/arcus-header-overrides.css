@@ -1,0 +1,48 @@
+/**
+ * Uniform module-switcher styling across client-design mock shells.
+ * One grid icon per header — hide duplicate "Modules" pills when Arcus SharedTopbar is present.
+ */
+
+body:has([data-arcus-shared-topbar]) .payroll-v6-root #appLauncher,
+body:has([data-arcus-shared-topbar]) .payroll-v6-root .app-launcher,
+body:has([data-arcus-shared-topbar]) .home-v3-root .app-launcher-top[data-arcus-modules],
+body:has([data-arcus-shared-topbar]) .portfolio-v11-root .module-pill[data-arcus-modules],
+body:has([data-arcus-shared-topbar]) .performance-v22-root .app-launcher[data-arcus-modules],
+body:has([data-arcus-shared-topbar]) .performance-v22-root .icon-button.apps[data-arcus-modules] {
+  display: none !important;
+}
+
+.home-v3-root .top-actions .secondary-btn[data-arcus-modules] {
+  display: none !important;
+}
+
+.portfolio-v11-root .module-pill[data-arcus-modules] > span:not([data-icon]) {
+  display: none !important;
+}
+
+.portfolio-v11-root .module-pill[data-arcus-modules] {
+  gap: 0 !important;
+  min-width: 2.25rem;
+  padding-inline: 0.5rem !important;
+}
+
+/* Shared pill appearance for in-shell launchers */
+.home-v3-root .top-actions .app-launcher-top[data-arcus-modules],
+.payroll-v6-root .app-launcher[data-arcus-modules],
+#appLauncher[data-arcus-modules],
+.portfolio-v11-root .module-pill[data-arcus-modules],
+.performance-v22-root .app-launcher[data-arcus-modules],
+.performance-v22-root .icon-button.apps[data-arcus-modules] {
+  color: oklch(0.6 0.18 252) !important;
+  background: oklch(0.6 0.18 252 / 0.12) !important;
+  border-radius: 9999px !important;
+}
+
+.home-v3-root .top-actions .app-launcher-top[data-arcus-modules]:hover,
+.payroll-v6-root .app-launcher[data-arcus-modules]:hover,
+#appLauncher[data-arcus-modules]:hover,
+.portfolio-v11-root .module-pill[data-arcus-modules]:hover,
+.performance-v22-root .app-launcher[data-arcus-modules]:hover,
+.performance-v22-root .icon-button.apps[data-arcus-modules]:hover {
+  background: oklch(0.6 0.18 252 / 0.2) !important;
+}

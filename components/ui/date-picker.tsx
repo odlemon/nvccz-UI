@@ -33,6 +33,7 @@ export function DatePicker({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
+          type="button"
           variant="outline"
           className={cn(
             "w-full h-10 rounded-full border-gray-300 focus:border-blue-500 focus:ring-blue-500 justify-between text-left font-normal",
@@ -50,7 +51,7 @@ export function DatePicker({
           <ChevronDownIcon className="h-4 w-4 flex-shrink-0 ml-2" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="start" container={container}>
+      <PopoverContent className="z-[220] w-auto p-0" align="start" container={container}>
         <Calendar
           mode="single"
           selected={value}

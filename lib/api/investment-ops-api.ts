@@ -278,6 +278,16 @@ export type TradeReconTemplate = {
   [key: string]: unknown
 }
 
+export type TradeReconLeg = {
+  symbol?: string | null
+  side?: string | null
+  qty?: string | null
+  price?: string | null
+  date?: string | null
+  ref?: string | null
+  currency?: string | null
+}
+
 export type TradeReconMatch = {
   id: string
   how?: 'AUTO' | 'MANUAL' | string
@@ -289,6 +299,9 @@ export type TradeReconMatch = {
   brokerQty?: string | null
   custodianQty?: string | null
   price?: string | null
+  us?: TradeReconLeg | null
+  broker?: TradeReconLeg | null
+  custodian?: TradeReconLeg | null
   [key: string]: unknown
 }
 
@@ -330,9 +343,22 @@ export type TradeReconException = {
   [key: string]: unknown
 }
 
+export type ClientAccountReconBreak = {
+  securityId: string
+  symbol: string | null
+  positionQuantity: string
+  expectedFromSettledTrades: string
+  variance: string
+  status: string
+}
+
 export type ClientAccountReconciliation = {
-  fundId?: string
-  breaks?: Array<Record<string, unknown>>
+  fundId: string
+  asOf: string
+  positionCount: number
+  settledTradeCount: number
+  breakCount: number
+  breaks: ClientAccountReconBreak[]
   [key: string]: unknown
 }
 
@@ -867,6 +893,7 @@ export interface ReportRun {
   createdAt: string
   completedAt: string | null
   downloadAvailable: boolean
+  downloadFileName?: string
 }
 
 export interface ReportRunListResult {
@@ -1070,6 +1097,7 @@ export interface ModelPortfolio {
   baseCurrencyCode: string
   isActive: boolean
   linkedFundId?: string | null
+  currentVersionNo?: number | string
   createdAt: string
   updatedAt: string
   allocations: ModelPortfolioAllocation[]
@@ -1919,8 +1947,13 @@ class InvestmentOpsApiService {
     return apiClient.get(`${this.BASE}/model-portfolios`)
   }
 
+  async getModelPortfolio(id: string): Promise<InvestmentOpsResponse<ModelPortfolio>> {
+    return apiClient.get(`${this.BASE}/model-portfolios/${id}`)
+  }
+
   async createModelPortfolio(data: {
     name: string
+    strategyCode?: string
     allocations: Array<{ allocationType: string; allocationKey: string; targetWeightPct: number }>
     linkedFundId?: string
   }): Promise<InvestmentOpsResponse<ModelPortfolio>> {
@@ -1931,11 +1964,21 @@ class InvestmentOpsApiService {
     id: string,
     data: {
       name?: string
+      strategyCode?: string
       allocations?: Array<{ allocationType: string; allocationKey: string; targetWeightPct: number }>
       linkedFundId?: string | null
+      expectedVersion?: number | string
     },
   ): Promise<InvestmentOpsResponse<ModelPortfolio>> {
-    return apiClient.patch(`${this.BASE}/model-portfolios/${id}`, data)
+    const { expectedVersion, ...body } = data
+    const headers = expectedVersion != null
+      ? { ...idempotencyHeaders(), "If-Match": String(expectedVersion) }
+      : idempotencyHeaders()
+    return apiClient.patch(
+      `${this.BASE}/model-portfolios/${id}`,
+      expectedVersion != null ? { ...body, expectedVersion } : body,
+      { headers },
+    )
   }
 
   async getModelPortfolioDrift(modelId: string, fundId: string): Promise<InvestmentOpsResponse<ModelPortfolioDrift>> {

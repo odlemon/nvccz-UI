@@ -1,0 +1,12 @@
+/* Integration-only safeguards. The original V22 styling remains the visual source of truth. */
+[aria-busy="true"] { cursor: progress !important; opacity: .72; }
+[data-backend-error="true"] { outline: 2px solid rgba(217, 71, 92, .45); outline-offset: 2px; }
+@media (max-width: 900px) {
+  .workspace { overscroll-behavior: contain; }
+  .page-head > .actions { width: 100%; }
+  .page-head > .actions > .btn { flex: 1 1 auto; }
+}
+@media (max-width: 640px) {
+  .modal, .drawer, .sc83-modal, .sc83-modal.xl { max-width: 100vw !important; }
+  .table-wrap, .v20-table-wrap, .v21-risk-table-wrap { -webkit-overflow-scrolling: touch; }
+}

@@ -58,10 +58,13 @@ const navItems = [
     icon: Scale,
     href: '/investments-v2/reconciliation',
     children: [
-      { label: 'Cash Recon', href: '/investments-v2/reconciliation/fund-cash' },
-      { label: 'Holdings', href: '/investments-v2/reconciliation/broker-custodian' },
-      { label: 'Trade Recon', href: '/investments-v2/orders/blotter' },
+      { label: 'Overview', href: '/investments-v2/reconciliation' },
+      { label: 'Trade match', href: '/investments-v2/reconciliation/trade' },
+      { label: 'Cash match', href: '/investments-v2/reconciliation/fund-cash' },
+      { label: 'Positions', href: '/investments-v2/reconciliation/positions' },
+      { label: 'Cash ledger', href: '/investments-v2/reconciliation/cash-ledger' },
       { label: 'Exceptions', href: '/investments-v2/reconciliation/exceptions' },
+      { label: 'Statements', href: '/investments-v2/reconciliation/statements' },
     ],
   },
   {

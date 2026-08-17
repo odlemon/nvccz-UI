@@ -22,8 +22,20 @@ export function AccountingV2Layout({ children }: { children: React.ReactNode }) 
     if (moduleConfig) window.location.href = moduleConfig.path
   }
 
+  useEffect(() => {
+    const html = document.documentElement
+    const { overflow: prevHtml } = html.style
+    const { overflow: prevBody } = document.body.style
+    html.style.overflow = "hidden"
+    document.body.style.overflow = "hidden"
+    return () => {
+      html.style.overflow = prevHtml
+      document.body.style.overflow = prevBody
+    }
+  }, [])
+
   return (
-    <div className="min-h-screen bg-[#F5F8FC]">
+    <div className="h-dvh overflow-hidden bg-[#F5F8FC] flex flex-col">
       <SharedTopbar onModuleSelect={handleModuleSelect} currentModule={currentModule} />
       <Suspense fallback={<div className="p-8 text-sm text-[#6B7280]">Loading Accounting…</div>}>
         <AccountingMockShell>{children}</AccountingMockShell>

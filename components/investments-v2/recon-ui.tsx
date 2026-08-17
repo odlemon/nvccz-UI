@@ -25,13 +25,13 @@ export const reconSubtle = 'text-muted-foreground'
 export const reconDivider = 'border-border'
 
 const navLinks = [
-  { href: '/investments-v2/reconciliation/trade', label: 'Trade' },
-  // Hidden for now — client / cash recon surfaces
-  // { href: '/investments-v2/reconciliation', label: 'Client', exact: true },
-  // { href: '/investments-v2/reconciliation/fund-cash', label: 'Cash' },
-  // { href: '/investments-v2/reconciliation/cash-ledger', label: 'Cash ledger' },
-  // { href: '/investments-v2/reconciliation/exceptions', label: 'Exceptions' },
-  // { href: '/investments-v2/reconciliation/statements', label: 'Statements' },
+  { href: '/investments-v2/reconciliation', label: 'Overview', exact: true },
+  { href: '/investments-v2/reconciliation/trade', label: 'Trade match' },
+  { href: '/investments-v2/reconciliation/fund-cash', label: 'Cash match' },
+  { href: '/investments-v2/reconciliation/positions', label: 'Positions' },
+  { href: '/investments-v2/reconciliation/cash-ledger', label: 'Cash ledger' },
+  { href: '/investments-v2/reconciliation/exceptions', label: 'Exceptions' },
+  { href: '/investments-v2/reconciliation/statements', label: 'Statements' },
 ]
 
 /** Pill segment control for Trading|Fund / Client|Investor switches on the same route. */

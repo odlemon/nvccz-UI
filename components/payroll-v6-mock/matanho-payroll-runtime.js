@@ -512,8 +512,7 @@ init();
   if (topAvatar) topAvatar.innerHTML = `<img class="top-profile-photo" src="${v2Assets.portraits['EMP-0007']}" alt="Tariro Moyo">`;
 
   const app = document.querySelector('#app');
-  const previousSidebarState = safeStorage.getItem('matanho-payroll-sidebar');
-  app.classList.toggle('collapsed', previousSidebarState === null ? true : previousSidebarState === 'collapsed');
+  app.classList.remove('collapsed');
   document.querySelector('#collapseBtn')?.remove();
 
   const sidebarFoot = document.querySelector('.sidebar-foot');

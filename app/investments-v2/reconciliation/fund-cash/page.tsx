@@ -1,6 +1,7 @@
 'use client'
 
-import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
+import { type ReactNode, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import {
   AlertTriangle,
   Calendar,
@@ -18,6 +19,8 @@ import {
   Scale,
   Search,
   Settings,
+  Download,
+  Trash2,
   Upload,
   X,
 } from 'lucide-react'
@@ -34,10 +37,8 @@ import {
   mapActiveReconciliationRules,
   formatBatchLabel,
   formatWorkspaceLineRef,
-  mapImportControlTotals,
-  mergeImportControlTotals,
   mapImportLineErrors,
-  opsErrorCode,
+  opsErrorDetails,
   opsErrorMessage,
   requireOpsData,
   resolvePortfolioName,
@@ -54,13 +55,58 @@ import { cn } from '@/lib/utils'
 
 type ResultTab = 'Matched' | 'Breaks' | 'Unmatched'
 
+const SESSION_KEY = 'investments-v2.cash-recon.session'
+
+type CashReconSession = {
+  batchId: string | null
+  fundFilter: string
+  autoMatch: boolean
+}
+
+function loadCashSession(): CashReconSession | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = sessionStorage.getItem(SESSION_KEY)
+    if (!raw) return null
+    return JSON.parse(raw) as CashReconSession
+  } catch {
+    return null
+  }
+}
+
+function saveCashSession(session: CashReconSession) {
+  if (typeof window === 'undefined') return
+  try {
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify(session))
+  } catch {
+    /* quota / private mode */
+  }
+}
+
 function formatAmt(n: number) {
   const abs = Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   return n < 0 ? `-${abs}` : abs
 }
 
 export default function FundCashReconciliationPage() {
-  const [autoMatch, setAutoMatch] = useState(true)
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-full bg-background p-5 sm:p-6">
+          <p className="text-[13px] text-muted-foreground">Loading cash match…</p>
+        </main>
+      }
+    >
+      <FundCashReconciliationInner />
+    </Suspense>
+  )
+}
+
+function FundCashReconciliationInner() {
+  const searchParams = useSearchParams()
+  const deepFundId = searchParams.get('fundId')
+  const saved = useMemo(() => loadCashSession(), [])
+  const [autoMatch, setAutoMatch] = useState(saved?.autoMatch ?? true)
   const [resultTab, setResultTab] = useState<ResultTab>('Breaks')
   const [selectedInternal, setSelectedInternal] = useState('')
   const [selectedBank, setSelectedBank] = useState('')
@@ -81,10 +127,10 @@ export default function FundCashReconciliationPage() {
   const [workspaceLoading, setWorkspaceLoading] = useState(false)
   const [lastRunAt, setLastRunAt] = useState<string | null>(null)
   const [scopeAccountId, setScopeAccountId] = useState('all')
-  const [batchId, setBatchId] = useState<string | null>(null)
+  const [batchId, setBatchId] = useState<string | null>(saved?.batchId ?? null)
   const [batchLabel, setBatchLabel] = useState('—')
   const [batchStatus, setBatchStatus] = useState<string>('—')
-  const [fundFilter, setFundFilter] = useState('All funds')
+  const [fundFilter, setFundFilter] = useState(saved?.fundFilter ?? 'All funds')
   const [batches, setBatches] = useState<
     {
       id: string
@@ -113,7 +159,6 @@ export default function FundCashReconciliationPage() {
   const [providers, setProviders] = useState<{ id: string; name: string }[]>([])
   const [layouts, setLayouts] = useState<{ id: string; name: string }[]>([])
   const [batchAccountId, setBatchAccountId] = useState('')
-  const [batchFundId, setBatchFundId] = useState('')
   const [batchCurrency, setBatchCurrency] = useState('USD')
   const [batchFrom, setBatchFrom] = useState(() => new Date().toISOString().slice(0, 10))
   const [batchTo, setBatchTo] = useState(() => new Date().toISOString().slice(0, 10))
@@ -123,37 +168,22 @@ export default function FundCashReconciliationPage() {
   const [importProviderId, setImportProviderId] = useState('')
   const [importLayoutId, setImportLayoutId] = useState('')
   const [importCurrency, setImportCurrency] = useState('USD')
-  const [importBusyAction, setImportBusyAction] = useState<
-    'upload' | 'validate' | 'submit' | 'commit' | 'reject' | null
-  >(null)
-  const importBusy = importBusyAction !== null
+  const [importBusy, setImportBusy] = useState(false)
   const [importError, setImportError] = useState<string | null>(null)
-  const [importValidationFailed, setImportValidationFailed] = useState(false)
-  const [importId, setImportId] = useState<string | null>(null)
-  const [importStatus, setImportStatus] = useState('—')
-  const [importHash, setImportHash] = useState('')
   const [importFileName, setImportFileName] = useState('')
   const [importErrors, setImportErrors] = useState<{ line?: string; field?: string; code?: string; message?: string }[]>([])
-  const [importCanSubmit, setImportCanSubmit] = useState(false)
-  const [importCanCommit, setImportCanCommit] = useState(false)
-  const [importRejectReason, setImportRejectReason] = useState('')
-  const [importControlOpening, setImportControlOpening] = useState('')
-  const [importControlClosing, setImportControlClosing] = useState('')
-  const [importControl, setImportControl] = useState<{
-    opening?: string
-    movements?: string
-    closing?: string
-    expectedMovement?: string
-    balanced?: boolean
-  } | null>(null)
   const [unmatchReason, setUnmatchReason] = useState('')
+  const [batchListFilter, setBatchListFilter] = useState<'ALL' | 'DRAFT' | 'COMPLETED'>('ALL')
+  const [deleteBusyId, setDeleteBusyId] = useState<string | null>(null)
+  const selectedBatchIdRef = useRef<string | null>(saved?.batchId ?? null)
 
   const loadWorkspace = useCallback(async (id: string) => {
     setWorkspaceLoading(true)
     try {
+      const summaryFundId = fundFilter !== 'All funds' ? funds.find((f) => f.name === fundFilter)?.id : undefined
       const [wsRes, sumRes, batchSumRes] = await Promise.all([
         stockPickerCashApi.getBatchWorkspace(id),
-        stockPickerCashApi.getFundCashSummary().catch(() => null),
+        stockPickerCashApi.getFundCashSummary(summaryFundId ? { fundId: summaryFundId } : undefined).catch(() => null),
         stockPickerCashApi.getBatchSummary(id).catch(() => null),
       ])
       const ws = requireOpsData(wsRes, 'batch workspace') as Record<string, unknown>
@@ -169,8 +199,8 @@ export default function FundCashReconciliationPage() {
         breaks: mapped.breakCount,
         unmatched: mapped.unmatchedCount,
       })
-      setSelectedInternal(mapped.internal[0]?.id ?? '')
-      setSelectedBank(mapped.external[0]?.id ?? '')
+      setSelectedInternal(mapped.internal.find((e) => String(e.matchStatus ?? '').toUpperCase() !== 'MATCHED')?.id ?? mapped.internal[0]?.id ?? '')
+      setSelectedBank(mapped.external.find((e) => String(e.matchStatus ?? '').toUpperCase() !== 'MATCHED')?.id ?? mapped.external[0]?.id ?? '')
       setSelectedBreak(
         mapped.breaks[0]?.id ?? mapped.matched[0]?.id ?? mapped.unmatched[0]?.id ?? '',
       )
@@ -203,10 +233,11 @@ export default function FundCashReconciliationPage() {
     } finally {
       setWorkspaceLoading(false)
     }
-  }, [funds])
+  }, [fundFilter, funds])
 
   const selectBatch = useCallback(
     async (id: string | null) => {
+      selectedBatchIdRef.current = id
       if (!id) {
         setBatchId(null)
         setBatchLabel('No batch')
@@ -225,7 +256,6 @@ export default function FundCashReconciliationPage() {
       setBatchId(id)
       setBatchLabel(b?.label ?? '—')
       setBatchStatus(String(b?.status ?? 'OPEN'))
-      if (b?.cashAccountId) setScopeAccountId(b.cashAccountId)
       await loadWorkspace(id)
     },
     [batches, loadWorkspace],
@@ -267,7 +297,6 @@ export default function FundCashReconciliationPage() {
           setBatchCurrency((prev) => (prev === 'USD' || !prev ? rows[0]!.currency! : prev))
           setImportCurrency((prev) => (prev === 'USD' || !prev ? rows[0]!.currency! : prev))
         }
-        if (rows[0]?.fundId) setBatchFundId((prev) => prev || rows[0]!.fundId!)
       }
       if (fundsRes && fundsRes.success !== false) {
         const fundRows = unwrapList<{ id?: string; name?: string }>(fundsRes.data).map((f) => ({
@@ -279,7 +308,6 @@ export default function FundCashReconciliationPage() {
             ? prev
             : fundRows,
         )
-        setBatchFundId((prev) => prev || fundRows[0]?.id || '')
       }
       if (providersRes && (providersRes as { success?: boolean }).success !== false) {
         const provRows = unwrapList<Record<string, unknown>>((providersRes as { data?: unknown }).data).map((p) => ({
@@ -320,7 +348,7 @@ export default function FundCashReconciliationPage() {
       const [batchesRes, rulesRes] = await Promise.all([
         stockPickerCashApi.listReconciliationBatches({
           page: 1,
-          pageSize: 20,
+          pageSize: 50,
           reconType: 'CASH_STATEMENT',
           ...(fundId ? { fundId } : {}),
         }),
@@ -351,8 +379,13 @@ export default function FundCashReconciliationPage() {
         scopeAccountId === 'all'
           ? mappedBatches
           : mappedBatches.filter((b) => b.cashAccountId === scopeAccountId)
-      const batch = scoped[0] ?? mappedBatches[0]
+      const keepId = selectedBatchIdRef.current
+      const batch =
+        (keepId ? mappedBatches.find((b) => b.id === keepId) : undefined) ??
+        scoped[0] ??
+        mappedBatches[0]
       if (!batch) {
+        selectedBatchIdRef.current = null
         setBatchId(null)
         setBatchLabel('No batch')
         setBatchStatus('No batch')
@@ -364,15 +397,17 @@ export default function FundCashReconciliationPage() {
         setUnmatchedRows([])
         setSuggestions([])
         setCounts({ matched: 0, breaks: 0, unmatched: 0 })
-        const fundRes = await stockPickerCashApi.getFundCashSummary().catch(() => null)
+        const fundRes = await stockPickerCashApi
+          .getFundCashSummary(fundId ? { fundId } : undefined)
+          .catch(() => null)
         if (fundRes?.success && fundRes.data) {
           setKpis(mapFundSummaryKpis(requireOpsData(fundRes, 'fund summary')))
         }
       } else {
+        selectedBatchIdRef.current = batch.id
         setBatchId(batch.id)
         setBatchLabel(batch.label)
         setBatchStatus(String(batch.status ?? 'OPEN'))
-        if (batch.cashAccountId) setScopeAccountId(batch.cashAccountId)
         await loadWorkspace(batch.id)
       }
       if (rulesRes?.success && rulesRes.data) {
@@ -410,13 +445,38 @@ export default function FundCashReconciliationPage() {
     [batchId, batches],
   )
 
+  const filteredBatchList = useMemo(() => {
+    return batches.filter((b) => {
+      const status = String(b.status ?? '').toUpperCase()
+      const completed = status === 'COMPLETED' || status === 'CLOSED'
+      if (batchListFilter === 'DRAFT') return !completed
+      if (batchListFilter === 'COMPLETED') return completed
+      return true
+    })
+  }, [batches, batchListFilter])
+
   useEffect(() => {
     void loadMasters()
   }, [loadMasters])
 
   useEffect(() => {
+    if (!deepFundId || funds.length === 0) return
+    const match = funds.find((f) => f.id === deepFundId)
+    if (!match) return
+    setFundFilter((prev) => (prev === match.name ? prev : match.name))
+  }, [deepFundId, funds])
+
+  useEffect(() => {
     void withRefetch(refresh)
   }, [refresh, withRefetch])
+
+  useEffect(() => {
+    saveCashSession({
+      batchId,
+      fundFilter,
+      autoMatch,
+    })
+  }, [batchId, fundFilter, autoMatch])
 
   const internalRows = useMemo(
     () =>
@@ -508,6 +568,12 @@ export default function FundCashReconciliationPage() {
       setActionMsg('Select one internal line and one bank line to match.')
       return
     }
+    const internalRow = internalEntries.find((e) => e.id === selectedInternal)
+    const bankRow = bankEntries.find((e) => e.id === selectedBank)
+    if (String(internalRow?.matchStatus ?? '').toUpperCase() === 'MATCHED' || String(bankRow?.matchStatus ?? '').toUpperCase() === 'MATCHED') {
+      setActionMsg('Those lines are already matched. Pick unmatched lines, or unmatch first.')
+      return
+    }
     setBusyAction('match')
     try {
       const internalAmt = Math.abs(internalEntries.find((e) => e.id === selectedInternal)?.amount ?? 0)
@@ -559,29 +625,64 @@ export default function FundCashReconciliationPage() {
   }
 
   const resetImportReview = () => {
-    setImportId(null)
-    setImportStatus('—')
-    setImportHash('')
     setImportFileName('')
     setImportErrors([])
-    setImportCanSubmit(false)
-    setImportCanCommit(false)
-    setImportControl(null)
-    setImportControlOpening('')
-    setImportControlClosing('')
-    setImportValidationFailed(false)
     setImportError(null)
-    setImportRejectReason('')
   }
 
-  const createImportReceived = async (file: File) => {
+  const applyImportFailure = (e: unknown, fallback: string) => {
+    const details = opsErrorDetails(e)
+    const fromDetails = details?.errors != null ? mapImportLineErrors(details.errors) : []
+    setImportErrors(fromDetails)
+    const msg = opsErrorMessage(e, fallback)
+    setImportError(fromDetails.length ? `${msg}` : msg)
+  }
+
+  const ingestViaLegacySteps = async (payload: Record<string, unknown>) => {
+    const createRes = await stockPickerCashApi.createExternalStatementImport(payload)
+    const created = requireOpsData(createRes, 'create statement import') as { id?: string }
+    if (!created.id) throw new Error('Import created without id')
+    const validateRes = await stockPickerCashApi.validateExternalStatementImport(created.id, {})
+    const validated = requireOpsData(validateRes, 'validate statement import') as Record<string, unknown>
+    const failed =
+      String(validated.status ?? '').toUpperCase() === 'VALIDATION_FAILED' ||
+      validated.valid === false ||
+      (Array.isArray(validated.errors) && (validated.errors as unknown[]).length > 0)
+    if (failed) {
+      const errs = mapImportLineErrors(validated.errors)
+      const err = new Error(
+        errs.length
+          ? errs.map((x) => `${x.line ? `Line ${x.line}` : x.code || 'File'}: ${x.message}`).join('; ')
+          : 'Statement file failed validation',
+      ) as Error & { details?: { errors: unknown } }
+      err.details = { errors: validated.errors }
+      throw err
+    }
+    const movements = String(
+      (validated.controlTotals as { movements?: unknown } | undefined)?.movements ?? '0.00',
+    )
+    await stockPickerCashApi.submitExternalStatementImport(created.id)
+    const commitRes = await stockPickerCashApi.commitExternalStatementImport(created.id, {
+      controlOpening: '0.00',
+      controlClosing: movements,
+    })
+    const committed = requireOpsData(commitRes, 'commit statement import') as { matchingBatchId?: string }
+    // Live API still auto-creates a one-day batch and matches there, which hides
+    // lines on the batch the user is actually looking at. Drop that stray batch.
+    if (committed.matchingBatchId && committed.matchingBatchId !== batchId) {
+      await stockPickerCashApi.deleteReconciliationBatch(committed.matchingBatchId).catch(() => null)
+    }
+  }
+
+  const ingestStatementFile = async (file: File) => {
     if (!importAccountId || !importProviderId) {
       setImportError('Cash account and provider are required')
       return
     }
-    setImportBusyAction('upload')
+    setImportBusy(true)
     setImportError(null)
-    setImportValidationFailed(false)
+    setImportErrors([])
+    setImportFileName(file.name)
     try {
       const rawContent = await file.text()
       const buf = await file.arrayBuffer()
@@ -589,160 +690,34 @@ export default function FundCashReconciliationPage() {
       const fileHash = Array.from(new Uint8Array(hashBuffer))
         .map((b) => b.toString(16).padStart(2, '0'))
         .join('')
-      const createRes = await stockPickerCashApi.createExternalStatementImport({
+      const payload = {
         providerId: importProviderId,
         cashAccountId: importAccountId,
         currency: importCurrency || 'USD',
         fileName: file.name,
         fileHash,
-        ...(importControlOpening.trim() ? { controlOpening: importControlOpening.trim() } : {}),
-        ...(importControlClosing.trim() ? { controlClosing: importControlClosing.trim() } : {}),
         rawContent,
-      })
-      const created = requireOpsData(createRes, 'create statement import') as {
-        id?: string
-        status?: string
-        fileHash?: string
       }
-      if (!created.id) throw new Error('Import created without id')
-      setImportId(created.id)
-      setImportFileName(file.name)
-      setImportHash(String(created.fileHash ?? fileHash))
-      setImportStatus(String(created.status ?? 'RECEIVED'))
-      setImportCanSubmit(false)
-      setImportCanCommit(false)
-      setImportErrors([])
-      setActionMsg(`Import RECEIVED — hash ${fileHash.slice(0, 12)}… Validate before submit (SRD 11.2).`)
-    } catch (e) {
-      const code = opsErrorCode(e)
-      const msg = opsErrorMessage(e, 'Failed to receive statement')
-      setImportError(
-        code === 'DUPLICATE_SOURCE' || /duplicate|DUPLICATE/i.test(msg)
-          ? msg
-          : msg,
-      )
-    } finally {
-      setImportBusyAction(null)
-    }
-  }
-
-  const validateImport = async () => {
-    if (!importId) return
-    setImportBusyAction('validate')
-    setImportError(null)
-    try {
-      const controlBody = {
-        ...(importControlOpening.trim() ? { controlOpening: importControlOpening.trim() } : {}),
-        ...(importControlClosing.trim() ? { controlClosing: importControlClosing.trim() } : {}),
-        ...(importControlOpening.trim() && importControlClosing.trim()
-          ? { requireControlTotals: true }
-          : {}),
+      try {
+        await stockPickerCashApi.ingestExternalStatementImport(payload)
+      } catch (e) {
+        const status = e && typeof e === 'object' && 'status' in e ? Number((e as { status: number }).status) : 0
+        const msg = opsErrorMessage(e, '')
+        const ingestMissing =
+          status === 404 ||
+          status === 405 ||
+          (/ingest/i.test(msg) && /not found|cannot post|cannot get/i.test(msg))
+        if (!ingestMissing) throw e
+        await ingestViaLegacySteps(payload)
       }
-      const validateRes = await stockPickerCashApi.validateExternalStatementImport(importId, controlBody)
-      const validated = requireOpsData(validateRes, 'validate statement import') as Record<string, unknown>
-      const failed =
-        String(validated.status ?? '').toUpperCase() === 'VALIDATION_FAILED' ||
-        validated.valid === false ||
-        (Array.isArray(validated.errors) && (validated.errors as unknown[]).length > 0)
-      let errs = Array.isArray(validated.errors) ? mapImportLineErrors(validated.errors) : []
-      if (!errs.length) {
-        const errRes = await stockPickerCashApi.listExternalStatementImportErrors(importId).catch(() => null)
-        if (errRes?.success && errRes.data) {
-          errs = mapImportLineErrors(errRes.data)
-        }
-      }
-      setImportErrors(errs)
-      setImportStatus(String(validated.status ?? (failed ? 'VALIDATION_FAILED' : 'VALIDATED')))
-      const controls = mapImportControlTotals(validated)
-      setImportControl(controls)
-      if (controls?.opening && !importControlOpening.trim()) setImportControlOpening(controls.opening)
-      if (controls?.closing && !importControlClosing.trim()) setImportControlClosing(controls.closing)
-      const detailRes = await stockPickerCashApi.getExternalStatementImport(importId)
-      const detail = requireOpsData(detailRes, 'statement import detail') as Record<string, unknown>
-      const detailControls = mapImportControlTotals(detail)
-      setImportControl((prev) => mergeImportControlTotals(prev, detailControls))
-      const merged = mergeImportControlTotals(controls, detailControls)
-      const unbalanced = merged?.balanced === false
-      setImportCanSubmit(detail.canSubmit !== false && !failed && !unbalanced)
-      setImportCanCommit(detail.canCommit === true)
-      setImportStatus(String(detail.status ?? validated.status ?? importStatus))
-      if (failed) {
-        setImportValidationFailed(true)
-        setImportError('Validation failed — resolve line errors before Submit (SRD 11.3).')
-      } else if (unbalanced) {
-        setImportValidationFailed(true)
-        setImportError('Control totals out of tolerance — fix opening/closing before Submit/Commit (BA-R1).')
-      } else {
-        setImportValidationFailed(false)
-        setActionMsg('Validated — review controls, then Submit for approval (maker).')
-      }
-    } catch (e) {
-      setImportError(opsErrorMessage(e, 'Validate failed'))
-    } finally {
-      setImportBusyAction(null)
-    }
-  }
-
-  const submitImport = async () => {
-    if (!importId) return
-    setImportBusyAction('submit')
-    setImportError(null)
-    try {
-      await stockPickerCashApi.submitExternalStatementImport(importId)
-      const detailRes = await stockPickerCashApi.getExternalStatementImport(importId)
-      const detail = requireOpsData(detailRes, 'statement import detail') as Record<string, unknown>
-      setImportStatus(String(detail.status ?? 'PENDING_APPROVAL'))
-      setImportCanCommit(detail.canCommit === true || String(detail.status ?? '').toUpperCase().includes('PEND'))
-      setImportCanSubmit(false)
-      setActionMsg('Submitted for checker approval — Commit is a separate step (maker-checker).')
-    } catch (e) {
-      setImportError(opsErrorMessage(e, 'Submit for approval failed'))
-    } finally {
-      setImportBusyAction(null)
-    }
-  }
-
-  const commitImport = async () => {
-    if (!importId) return
-    if (!importControlOpening.trim() || !importControlClosing.trim()) {
-      setImportError('Commit requires controlOpening and controlClosing (BA-R1).')
-      return
-    }
-    setImportBusyAction('commit')
-    setImportError(null)
-    try {
-      await stockPickerCashApi.commitExternalStatementImport(importId, {
-        controlOpening: importControlOpening.trim(),
-        controlClosing: importControlClosing.trim(),
-      })
-      setImportStatus('COMMITTED')
       setImportOpen(false)
       resetImportReview()
-      setActionMsg('Import committed — immutable external lines created; matching can start.')
+      setActionMsg('Statement imported. Next: Run Reconciliation.')
       await refresh()
     } catch (e) {
-      setImportError(opsErrorMessage(e, 'Commit failed'))
+      applyImportFailure(e, 'Import failed')
     } finally {
-      setImportBusyAction(null)
-    }
-  }
-
-  const rejectImport = async () => {
-    if (!importId) return
-    if (!importRejectReason.trim()) {
-      setImportError('Reject requires a reason')
-      return
-    }
-    setImportBusyAction('reject')
-    try {
-      await stockPickerCashApi.rejectExternalStatementImport(importId, { reason: importRejectReason.trim() })
-      setImportStatus('REJECTED')
-      setActionMsg('Import rejected — file + audit retained; this version cannot be committed.')
-      resetImportReview()
-    } catch (e) {
-      setImportError(opsErrorMessage(e, 'Reject failed'))
-    } finally {
-      setImportBusyAction(null)
+      setImportBusy(false)
     }
   }
 
@@ -761,17 +736,43 @@ export default function FundCashReconciliationPage() {
         periodTo: batchTo,
         reconType: 'CASH_STATEMENT',
         autoMatchEnabled: autoMatch,
-        ...(batchFundId ? { fundId: batchFundId } : {}),
       })
       const data = requireOpsData(res, 'create reconciliation batch') as { id?: string }
       if (!data.id) throw new Error('Batch created without id')
+      selectedBatchIdRef.current = data.id
+      setBatchId(data.id)
       setBatchOpen(false)
-      setActionMsg('Reconciliation batch created — scoped to one account/currency/period (SRD 12.5).')
+      setActionMsg('Batch created. Next: Import Statements, then Run Reconciliation.')
       await refresh()
+      await selectBatch(data.id)
     } catch (e) {
       setBatchError(opsErrorMessage(e, 'Failed to create batch'))
     } finally {
       setBatchBusy(false)
+    }
+  }
+
+  const deleteBatch = async (id: string) => {
+    if (!window.confirm('Delete this cash match batch? Matches on it will be cleared. Bank statement files stay.')) {
+      return
+    }
+    setDeleteBusyId(id)
+    try {
+      const res = await stockPickerCashApi.deleteReconciliationBatch(id)
+      if (res && 'success' in res && res.success === false) {
+        throw new Error(opsErrorMessage(res, 'Failed to delete batch'))
+      }
+      if (selectedBatchIdRef.current === id) {
+        selectedBatchIdRef.current = null
+        setBatchId(null)
+        setBatchLabel('No batch')
+      }
+      setActionMsg('Batch deleted.')
+      await refresh()
+    } catch (e) {
+      setActionMsg(opsErrorMessage(e, 'Failed to delete batch'))
+    } finally {
+      setDeleteBusyId(null)
     }
   }
 
@@ -782,9 +783,9 @@ export default function FundCashReconciliationPage() {
       <div className="mx-auto max-w-[1680px] space-y-4">
         <header className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div>
-            <h1 className="text-[22px] font-semibold leading-tight tracking-[-0.01em]">Cash recon</h1>
+            <h1 className="text-[22px] font-semibold leading-tight tracking-[-0.01em]">Cash match</h1>
             <p className="mt-1.5 text-[13px]" style={{ color: C.muted }}>
-              Reconcile internal fund cash ledger against bank and custodian statements.
+              Our cash ledger vs bank statement (custodian trust account cash).
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -794,7 +795,12 @@ export default function FundCashReconciliationPage() {
             >
               Reconciliation Rules
             </GhostBtn>
-            <GhostBtn icon={<Upload className="h-3.5 w-3.5" />} onClick={() => { resetImportReview(); setImportOpen(true) }}>
+            <GhostBtn icon={<Upload className="h-3.5 w-3.5" />} onClick={() => {
+              resetImportReview()
+              if (selectedBatch?.cashAccountId) setImportAccountId(selectedBatch.cashAccountId)
+              if (selectedBatch?.currency) setImportCurrency(selectedBatch.currency)
+              setImportOpen(true)
+            }}>
               Import Statements
             </GhostBtn>
             <button
@@ -814,6 +820,113 @@ export default function FundCashReconciliationPage() {
         {actionMsg ? (
           <div className="rounded-[10px] border border-border bg-muted/40 px-3 py-2 text-[12px] text-muted-foreground">{actionMsg}</div>
         ) : null}
+
+        <section className="rounded-[12px] border p-4" style={{ background: C.card, borderColor: C.cardBorder }}>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="text-[13px] font-semibold">Batches</h2>
+              <p className="text-[11px]" style={{ color: C.muted }}>
+                Drafts stay here until you finish. Click a row to resume.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {(['ALL', 'DRAFT', 'COMPLETED'] as const).map((f) => (
+                <button
+                  key={f}
+                  type="button"
+                  className={cn(
+                    'h-8 rounded-full px-3 text-[11px]',
+                    batchListFilter === f
+                      ? 'bg-primary text-primary-foreground'
+                      : 'border border-border bg-muted text-muted-foreground',
+                  )}
+                  onClick={() => setBatchListFilter(f)}
+                >
+                  {f === 'ALL' ? 'All' : f === 'DRAFT' ? 'Drafts' : 'Completed'}
+                </button>
+              ))}
+            </div>
+          </div>
+          {filteredBatchList.length === 0 ? (
+            <p className="py-6 text-center text-[12px] text-muted-foreground">
+              No {batchListFilter === 'ALL' ? '' : `${batchListFilter.toLowerCase()} `}batches yet. Click New batch to start.
+            </p>
+          ) : (
+            <div className="mt-3 max-h-[220px] overflow-auto overscroll-contain rounded-xl border border-border/50">
+              <table className="w-full text-left text-[11px]">
+                <thead className="sticky top-0 z-[1]" style={{ background: C.card }}>
+                  <tr className="border-b border-border text-[9px] uppercase tracking-wider" style={{ color: C.muted }}>
+                    <th className="px-3 py-2">Account</th>
+                    <th className="px-3 py-2">Period</th>
+                    <th className="px-3 py-2">Currency</th>
+                    <th className="px-3 py-2">Status</th>
+                    <th className="px-3 py-2" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredBatchList.map((b) => {
+                    const active = batchId === b.id
+                    const completed = ['COMPLETED', 'CLOSED'].includes(String(b.status ?? '').toUpperCase())
+                    return (
+                      <tr
+                        key={b.id}
+                        className={cn('border-b border-border/50', active && 'bg-primary/10')}
+                      >
+                        <td className="px-3 py-2 font-medium">
+                          {resolveCashAccountLabel(b.cashAccountId, cashAccounts, b.label)}
+                        </td>
+                        <td className="px-3 py-2">
+                          {b.periodFrom || b.periodTo
+                            ? `${shortDateLabel(b.periodFrom)} – ${shortDateLabel(b.periodTo)}`
+                            : '—'}
+                        </td>
+                        <td className="px-3 py-2">{b.currency || '—'}</td>
+                        <td className="px-3 py-2">
+                          <span
+                            className={cn(
+                              'inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium',
+                              completed
+                                ? 'bg-emerald-500/15 text-emerald-400'
+                                : 'bg-amber-500/15 text-amber-400',
+                            )}
+                          >
+                            {String(b.status ?? 'OPEN').replace(/_/g, ' ')}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          <div className="flex flex-wrap items-center justify-end gap-1.5">
+                            <button
+                              type="button"
+                              className="h-7 rounded-full px-3 text-[10px] font-medium"
+                              style={{ background: C.control, color: C.text }}
+                              onClick={() => void selectBatch(b.id)}
+                            >
+                              {active ? 'Open' : 'Resume'}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={deleteBusyId != null}
+                              className="inline-flex h-7 items-center gap-1 rounded-full px-3 text-[10px] font-medium text-rose-300 disabled:opacity-50"
+                              style={{ background: 'rgba(244,63,94,0.12)' }}
+                              onClick={() => void deleteBatch(b.id)}
+                            >
+                              {deleteBusyId === b.id ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-3 w-3" />
+                              )}
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
 
         {loading ? (
           <div className="space-y-3">
@@ -842,7 +955,7 @@ export default function FundCashReconciliationPage() {
             </select>
           </label>
           <label className="block min-w-[220px] flex-1">
-            <span className="mb-1.5 block text-[11px]" style={{ color: C.muted2 }}>Batch (scoped account/currency/period)</span>
+            <span className="mb-1.5 block text-[11px]" style={{ color: C.muted2 }}>Batch</span>
             <select
               value={batchId ?? ''}
               onChange={(e) => {
@@ -1211,21 +1324,39 @@ export default function FundCashReconciliationPage() {
             <div className="mt-4 space-y-3">
               <label className="block text-[11px]" style={{ color: C.muted2 }}>
                 Cash account
-                <select value={batchAccountId} onChange={(e) => setBatchAccountId(e.target.value)} className="mt-1 h-9 w-full rounded-full border px-3 text-[12px]" style={{ background: C.control, borderColor: C.controlBorder, color: C.text }}>
+                <select
+                  value={batchAccountId}
+                  onChange={(e) => {
+                    const id = e.target.value
+                    setBatchAccountId(id)
+                    const acct = cashAccounts.find((a) => a.id === id)
+                    if (acct?.currency) setBatchCurrency(acct.currency)
+                  }}
+                  className="mt-1 h-9 w-full rounded-full border px-3 text-[12px]"
+                  style={{ background: C.control, borderColor: C.controlBorder, color: C.text }}
+                >
                   <option value="">Select…</option>
-                  {cashAccounts.map((a) => <option key={a.id} value={a.id}>{a.label}</option>)}
-                </select>
-              </label>
-              <label className="block text-[11px]" style={{ color: C.muted2 }}>
-                Fund (optional)
-                <select value={batchFundId} onChange={(e) => setBatchFundId(e.target.value)} className="mt-1 h-9 w-full rounded-full border px-3 text-[12px]" style={{ background: C.control, borderColor: C.controlBorder, color: C.text }}>
-                  <option value="">—</option>
-                  {funds.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+                  {cashAccounts.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.label}
+                    </option>
+                  ))}
                 </select>
               </label>
               <label className="block text-[11px]" style={{ color: C.muted2 }}>
                 Currency
-                <input value={batchCurrency} onChange={(e) => setBatchCurrency(e.target.value)} className="mt-1 h-9 w-full rounded-full border px-3 text-[12px]" style={{ background: C.control, borderColor: C.controlBorder, color: C.text }} />
+                <select
+                  value={batchCurrency}
+                  onChange={(e) => setBatchCurrency(e.target.value)}
+                  className="mt-1 h-9 w-full rounded-full border px-3 text-[12px]"
+                  style={{ background: C.control, borderColor: C.controlBorder, color: C.text }}
+                >
+                  {currencyOptions.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
               </label>
               <div className="grid grid-cols-2 gap-2">
                 <label className="block text-[11px]" style={{ color: C.muted2 }}>
@@ -1253,82 +1384,26 @@ export default function FundCashReconciliationPage() {
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4" onMouseDown={() => setImportOpen(false)}>
           <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-[16px] border p-5" style={{ background: C.card, borderColor: C.cardBorder }} onMouseDown={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-[15px] font-semibold">External statement ingestion</h2>
-                <p className="mt-0.5 text-[11px]" style={{ color: C.muted2 }}>
-                  RECEIVED → Validate → Submit (maker) → Commit (checker) — never skip to posting
-                </p>
-              </div>
+              <h2 className="text-[15px] font-semibold">Import bank statement</h2>
               <button type="button" onClick={() => setImportOpen(false)} className="rounded-full p-1"><X className="h-4 w-4" /></button>
             </div>
             {importError && <p className="mt-3 text-[11px] text-rose-300">{importError}</p>}
 
-            <div className="mt-3 flex flex-wrap gap-1.5 text-[10px]">
-              {['RECEIVED', 'VALIDATED', 'PENDING_APPROVAL', 'COMMITTED', 'REJECTED'].map((step) => {
-                const statusU = String(importStatus).toUpperCase().replace(/-/g, '_')
-                const active =
-                  step === 'PENDING_APPROVAL'
-                    ? statusU.includes('PENDING') || statusU === 'PENDING'
-                    : statusU === step || statusU.includes(step)
-                return (
-                  <span
-                    key={step}
-                    className="rounded-full px-2 py-0.5 font-medium"
-                    style={{
-                      background: active ? 'rgba(37,99,235,0.25)' : C.control,
-                      color: active ? '#93C5FD' : C.muted2,
-                    }}
-                  >
-                    {step}
-                  </span>
-                )
-              })}
-              <span className="rounded-full px-2 py-0.5" style={{ background: C.control, color: C.muted }}>
-                Status: {importStatus}
-              </span>
-            </div>
-
             <div className="mt-4 space-y-3">
-              <div className="rounded-[10px] border p-3 text-[11px]" style={{ borderColor: C.rowBorder, background: C.control }}>
-                <p className="font-semibold">Demo templates (CBZ_CSV_V1)</p>
-                <p className="mt-1" style={{ color: C.muted2 }}>
-                  Provider: CBZ Custody / CBZ Bank · Layout: CBZ_CSV_V1 · Currency: USD
-                </p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <a
-                    href="/demo-templates/cash-recon/cbz-csv-v1-happy-path.csv"
-                    download
-                    className="rounded-full px-3 py-1 text-[10px] font-semibold text-white"
-                    style={{ background: C.blue }}
-                  >
-                    Happy path
-                  </a>
-                  <a
-                    href="/demo-templates/cash-recon/cbz-csv-v1-breaks-demo.csv"
-                    download
-                    className="rounded-full border px-3 py-1 text-[10px] font-semibold"
-                    style={{ borderColor: C.cardBorder }}
-                  >
-                    Breaks demo
-                  </a>
-                  <a
-                    href="/demo-templates/cash-recon/cbz-csv-v1-validation-fail.csv"
-                    download
-                    className="rounded-full border px-3 py-1 text-[10px] font-semibold text-rose-300"
-                    style={{ borderColor: C.cardBorder }}
-                  >
-                    Validation fail
-                  </a>
-                  <a
-                    href="/demo-templates/cash-recon/cbz-csv-v1-debit-credit-columns.csv"
-                    download
-                    className="rounded-full border px-3 py-1 text-[10px] font-semibold"
-                    style={{ borderColor: C.cardBorder }}
-                  >
-                    Debit/credit cols
-                  </a>
-                </div>
-              </div>
+              <button
+                type="button"
+                className="inline-flex h-9 items-center gap-2 rounded-full border px-4 text-[12px] font-medium"
+                style={{ borderColor: C.cardBorder, color: C.text }}
+                onClick={() => {
+                  const a = document.createElement('a')
+                  a.href = '/demo-templates/cash-recon/bank-statement-template.csv'
+                  a.download = 'bank-statement-template.csv'
+                  a.click()
+                }}
+              >
+                <Download className="h-3.5 w-3.5" />
+                Download blank template
+              </button>
               <label className="block text-[11px]" style={{ color: C.muted2 }}>
                 Cash account
                 <select value={importAccountId} onChange={(e) => setImportAccountId(e.target.value)} className="mt-1 h-9 w-full rounded-full border px-3 text-[12px]" style={{ background: C.control, borderColor: C.controlBorder, color: C.text }}>
@@ -1342,7 +1417,6 @@ export default function FundCashReconciliationPage() {
                   <option value="">Select…</option>
                   {providers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
-                {providers.length === 0 && <span className="mt-1 block text-[10px] text-amber-300">No setup providers — seed `/setup/providers`.</span>}
               </label>
               <label className="block text-[11px]" style={{ color: C.muted2 }}>
                 Currency
@@ -1357,131 +1431,41 @@ export default function FundCashReconciliationPage() {
                   ))}
                 </select>
               </label>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="block text-[11px]" style={{ color: C.muted2 }}>
-                  Control opening
-                  <input
-                    value={importControlOpening}
-                    onChange={(e) => setImportControlOpening(e.target.value)}
-                    placeholder="Required on Commit"
-                    className="mt-1 h-9 w-full rounded-full border px-3 text-[12px]"
-                    style={{ background: C.control, borderColor: C.controlBorder, color: C.text }}
-                  />
-                </label>
-                <label className="block text-[11px]" style={{ color: C.muted2 }}>
-                  Control closing
-                  <input
-                    value={importControlClosing}
-                    onChange={(e) => setImportControlClosing(e.target.value)}
-                    placeholder="Required on Commit"
-                    className="mt-1 h-9 w-full rounded-full border px-3 text-[12px]"
-                    style={{ background: C.control, borderColor: C.controlBorder, color: C.text }}
-                  />
-                </label>
-              </div>
-              <p className="text-[10px]" style={{ color: C.muted2 }}>
-                Opening + movements must equal closing (±0.01). Validate with both filled forces control check; Commit always sends them.
-              </p>
 
-              {!importId ? (
-                <label className={cn('mt-2 flex h-28 cursor-pointer flex-col items-center justify-center rounded-[12px] border border-dashed text-[11px]', importBusyAction === 'upload' && 'pointer-events-none opacity-70')} style={{ borderColor: C.controlBorder, color: C.muted }}>
-                  {importBusyAction === 'upload' ? (
-                    <Loader2 className="mb-2 h-5 w-5 animate-spin" />
-                  ) : (
-                    <Upload className="mb-2 h-5 w-5" />
-                  )}
-                  {importBusyAction === 'upload' ? 'Uploading & receiving…' : 'Select CSV — creates RECEIVED batch + file hash'}
-                  <input
-                    type="file"
-                    accept=".csv,.txt,text/csv"
-                    className="hidden"
-                    disabled={importBusy}
-                    onChange={(e) => {
-                      const file = e.target.files?.[0]
-                      if (file) void createImportReceived(file)
-                      e.target.value = ''
-                    }}
-                  />
-                </label>
-              ) : (
-                <div className="rounded-[12px] border p-3 text-[11px]" style={{ borderColor: C.rowBorder, background: C.control }}>
-                  <p className="font-semibold">File identity</p>
-                  <p className="mt-1" style={{ color: C.muted2 }}>File: {importFileName || '—'}</p>
-                  <p className="mt-0.5 break-all font-mono text-[10px]" style={{ color: C.muted2 }}>Hash: {importHash || '—'}</p>
-                  <p className="mt-0.5" style={{ color: C.muted2 }}>Import id: {importId}</p>
-                  {importControl && (
-                    <div className="mt-2 space-y-0.5" style={{ color: C.muted }}>
-                      <p>
-                        Opening: {importControl.opening ?? '—'} · Movements: {importControl.movements ?? '—'}
-                        {importControl.expectedMovement != null ? ` (expected ${importControl.expectedMovement})` : ''} · Closing:{' '}
-                        {importControl.closing ?? '—'}
-                      </p>
-                      <p style={{ color: importControl.balanced ? C.greenSoft : C.amber }}>
-                        Control totals:{' '}
-                        {importControl.balanced == null
-                          ? 'not returned by API'
-                          : importControl.balanced
-                            ? 'balanced'
-                            : 'out of tolerance'}
-                      </p>
-                    </div>
-                  )}
-                  {importErrors.length > 0 && (
-                    <div className="mt-2 max-h-28 overflow-y-auto rounded-[8px] border p-2" style={{ borderColor: C.cardBorder }}>
-                      <p className="mb-1 font-medium text-rose-300">Line / field errors</p>
-                      {importErrors.map((err, i) => (
-                        <p key={`${err.code}-${i}`} className="text-[10px] text-rose-200">
-                          {err.line ? `L${err.line}` : err.field ? err.field : '—'}{' '}
-                          {err.code ? `[${err.code}]` : ''} {err.message}
-                        </p>
-                      ))}
-                    </div>
-                  )}
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <button type="button" disabled={importBusy} onClick={() => void validateImport()} className="inline-flex h-9 items-center gap-2 rounded-full px-4 text-[11px] font-semibold text-white disabled:opacity-50" style={{ background: C.blue }}>
-                      {importBusyAction === 'validate' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-                      Validate
-                    </button>
-                    <button type="button" disabled={importBusy || !importCanSubmit || importValidationFailed} onClick={() => void submitImport()} className="inline-flex h-9 items-center gap-2 rounded-full border px-4 text-[11px] font-semibold disabled:opacity-50" style={{ borderColor: C.cardBorder }}>
-                      {importBusyAction === 'submit' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-                      Submit for approval
-                    </button>
-                    <button
-                      type="button"
-                      disabled={
-                        importBusy ||
-                        !importCanCommit ||
-                        !importControlOpening.trim() ||
-                        !importControlClosing.trim() ||
-                        importControl?.balanced === false
-                      }
-                      onClick={() => void commitImport()}
-                      className="inline-flex h-9 items-center gap-2 rounded-full px-4 text-[11px] font-semibold text-white disabled:opacity-50"
-                      style={{ background: C.green }}
-                    >
-                      {importBusyAction === 'commit' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-                      Commit
-                    </button>
-                  </div>
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <input
-                      value={importRejectReason}
-                      onChange={(e) => setImportRejectReason(e.target.value)}
-                      placeholder="Reject reason"
-                      className="h-8 min-w-[140px] flex-1 rounded-full border px-3 text-[11px]"
-                      style={{ background: C.page, borderColor: C.controlBorder, color: C.text }}
-                    />
-                    <button type="button" disabled={importBusy || !importRejectReason.trim()} onClick={() => void rejectImport()} className="inline-flex h-8 items-center gap-2 rounded-full border px-3 text-[11px] font-semibold text-rose-300 disabled:opacity-50" style={{ borderColor: C.cardBorder }}>
-                      {importBusyAction === 'reject' ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
-                      Reject batch
-                    </button>
-                    <button type="button" disabled={importBusy} onClick={() => resetImportReview()} className="h-8 rounded-full px-3 text-[11px]" style={{ color: C.muted }}>
-                      Clear / new file
-                    </button>
-                  </div>
-                  <p className="mt-2 text-[10px]" style={{ color: C.muted2 }}>
-                    Commit requires control opening/closing and balanced totals. Maker≠checker returns 409 `MAKER_CHECKER_CONFLICT` (admins bypass). Duplicate file hash → `DUPLICATE_SOURCE`.
-                  </p>
+              <label className={cn('mt-2 flex h-28 cursor-pointer flex-col items-center justify-center rounded-[12px] border border-dashed text-[11px]', importBusy && 'pointer-events-none opacity-70')} style={{ borderColor: C.controlBorder, color: C.muted }}>
+                {importBusy ? (
+                  <Loader2 className="mb-2 h-5 w-5 animate-spin" />
+                ) : (
+                  <Upload className="mb-2 h-5 w-5" />
+                )}
+                {importBusy ? 'Importing…' : 'Select CSV'}
+                <span className="mt-1 text-[10px]" style={{ color: C.muted2 }}>
+                  File is validated and posted in one step
+                </span>
+                <input
+                  type="file"
+                  accept=".csv,.txt,text/csv"
+                  className="hidden"
+                  disabled={importBusy}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) void ingestStatementFile(file)
+                    e.target.value = ''
+                  }}
+                />
+              </label>
+              {importFileName && !importBusy && (
+                <p className="text-[11px]" style={{ color: C.muted }}>{importFileName}</p>
+              )}
+              {importErrors.length > 0 && (
+                <div className="max-h-36 overflow-y-auto rounded-[12px] border p-3" style={{ borderColor: C.cardBorder }}>
+                  <p className="mb-1 text-[11px] font-medium text-rose-300">Fix these and choose the file again</p>
+                  {importErrors.map((err, i) => (
+                    <p key={`${err.code}-${i}`} className="text-[11px] text-rose-200">
+                      {err.line ? `Line ${err.line}` : err.field ? err.field : 'File'}
+                      {err.code ? ` [${err.code}]` : ''}: {err.message}
+                    </p>
+                  ))}
                 </div>
               )}
             </div>
@@ -1587,13 +1571,15 @@ function EntryTable({
           <table className="w-full text-left text-[11px]">
             <thead>
               <tr style={{ color: C.muted2, borderBottom: `1px solid ${C.rowBorder}` }}>
-                {['Date', 'Description', 'Amount'].map((h) => (
+                {['Date', 'Description', 'Amount', 'Status'].map((h) => (
                   <th key={h} className="px-2 py-2 font-medium">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {rows.map((row, index) => (
+              {rows.map((row, index) => {
+                const matched = String(row.matchStatus ?? '').toUpperCase() === 'MATCHED'
+                return (
                 <tr
                   key={row.id}
                   onClick={() => onSelect(row.id)}
@@ -1601,13 +1587,26 @@ function EntryTable({
                   style={{
                     borderBottom: `1px solid ${C.rowBorder}`,
                     background: selectedId === row.id ? 'rgba(59,130,246,0.08)' : 'transparent',
+                    opacity: matched ? 0.7 : 1,
                   }}
                 >
                   <td className="px-2 py-2">{row.date}</td>
                   <td className="px-2 py-2">{formatWorkspaceLineRef(row.description, row.id, index)}</td>
                   <td className="px-2 py-2 text-right font-mono">{formatAmt(row.amount)}</td>
+                  <td className="px-2 py-2">
+                    <span
+                      className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                      style={{
+                        color: matched ? C.greenSoft : C.amber,
+                        background: matched ? `${C.greenSoft}22` : `${C.amber}22`,
+                      }}
+                    >
+                      {matched ? 'Matched' : 'Open'}
+                    </span>
+                  </td>
                 </tr>
-              ))}
+                )
+              })}
             </tbody>
           </table>
         )}

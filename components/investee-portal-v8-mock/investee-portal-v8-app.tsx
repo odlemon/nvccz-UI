@@ -52,9 +52,8 @@ export function InvesteePortalV8App() {
   return (
     <div
       ref={rootRef}
-      className="investee-portal-v8-root"
+      className="investee-portal-v8-root h-full"
       data-theme="light"
-      style={{ minHeight: "calc(100vh - 5rem)", position: "relative" }}
     />
   )
 }

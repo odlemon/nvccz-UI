@@ -1,801 +1,257 @@
 'use client'
 
-import { type ReactNode, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { ReconApiBanner, ReconNavTabs, reconPill, reconPrimaryPill } from '@/components/investments-v2/recon-ui'
 import {
-  Banknote,
-  Calendar,
-  ChevronDown,
-  CircleAlert,
-  Clock3,
-  Info,
-  Search,
-  ShieldAlert,
-  Star,
-  Wallet,
-  FileText,
-} from 'lucide-react'
-import {
-  Cell,
-  ComposedChart,
-  CartesianGrid,
-  Line,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts'
-import { ReconApiBanner, ReconNavTabs } from '@/components/investments-v2/recon-ui'
-import { ReconTableSkeleton } from '@/components/investments-v2/loading-skeletons'
-import { useRefetchLoading } from '@/components/investments-v2/hooks/use-refetch-loading'
-import { RefetchOverlay } from '@/components/investments-v2/ui/refetch-overlay'
-import { TablePagination } from '@/components/investments-v2/ui/table-pagination'
-import { stockPickerCashApi } from '@/lib/api/stock-picker-cash-api'
-import {
-  mapCashAccountOptions,
-  mapCashOverviewKpis,
-  mapClientAccounts,
-  mapCurrencyPie,
-  mapDailyCashMovement,
-  mapExceptions,
-  opsErrorMessage,
-  requireOpsData,
-  resolveCashAccountLabel,
-} from '@/lib/investments-v2/adapters/cash-recon-adapter'
+  formatOpsError,
+  investmentOpsApi,
+  type ClientAccountReconciliation,
+  type TradeReconBatch,
+} from '@/lib/api/investment-ops-api'
+import { stockPickerCashApi, type FundCashSummary } from '@/lib/api/stock-picker-cash-api'
+import { mapFundOptions } from '@/lib/investments-v2/adapters/orders-adapter'
 import { R as C } from '@/lib/investments-v2/recon-tokens'
 import { cn } from '@/lib/utils'
 
-type AccountRow = ReturnType<typeof mapClientAccounts>['items'][number]
-
-export default function ClientAccountsOverviewPage() {
+export default function ReconOverviewPage() {
   return (
     <Suspense
       fallback={
         <main className="min-h-full bg-background p-5 sm:p-6" style={{ background: C.page, color: C.text }}>
           <p className="text-[13px]" style={{ color: C.muted }}>
-            Loading reconciliation…
+            Loading reconciliation overview…
           </p>
         </main>
       }
     >
-      <ClientAccountsOverviewInner />
+      <ReconOverviewInner />
     </Suspense>
   )
 }
 
-function ClientAccountsOverviewInner() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-
-  // BA-TR-4 deepLink: prefer /trade wizard; also accept legacy ?tab=trade on overview
-  useEffect(() => {
-    const tab = searchParams.get('tab')
-    if (tab !== 'trade') return
-    const q = new URLSearchParams()
-    const tradeId = searchParams.get('tradeId')
-    const fundId = searchParams.get('fundId')
-    if (tradeId) q.set('tradeId', tradeId)
-    if (fundId) q.set('fundId', fundId)
-    const qs = q.toString()
-    router.replace(`/investments-v2/reconciliation/trade${qs ? `?${qs}` : ''}`)
-  }, [router, searchParams])
-
-  const [search, setSearch] = useState('')
-  const [accountType, setAccountType] = useState('All Account Types')
-  const [status, setStatus] = useState('All Statuses')
-  const [asOfDate, setAsOfDate] = useState(() => new Date().toISOString().slice(0, 10))
-  const [page, setPage] = useState(1)
-  const pageSize = 8
+function ReconOverviewInner() {
+  const [funds, setFunds] = useState<{ id: string; name: string }[]>([])
+  const [fundId, setFundId] = useState('')
   const [loading, setLoading] = useState(true)
-  const [accountsLoading, setAccountsLoading] = useState(true)
-  const { isRefetching, withRefetch } = useRefetchLoading()
   const [error, setError] = useState<string | null>(null)
-  const [accounts, setAccounts] = useState<AccountRow[]>([])
-  const [accountTotal, setAccountTotal] = useState(0)
-  const [accountTypeOptions, setAccountTypeOptions] = useState<string[]>(['All Account Types'])
-  const [kpis, setKpis] = useState<
-    {
-      label: string
-      icon: typeof Wallet
-      iconBg: string
-      iconColor: string
-      primary: string
-      secondary: string
-      trend: string
-      trendTone: string
-      exceptions?: boolean
-    }[]
-  >([])
-  const [cashByCurrency, setCashByCurrency] = useState<
-    { name: string; pct: number; value: string; color: string; amount: number }[]
-  >([])
-  const [recentAlerts, setRecentAlerts] = useState<
-    { title: string; meta: string; amount?: string; when: string; tone: 'red' | 'amber' | 'blue' }[]
-  >([])
-  const [dailyMovement, setDailyMovement] = useState<{ date: string; net: number; close: number }[]>([])
+  const [tradeBatches, setTradeBatches] = useState<TradeReconBatch[]>([])
+  const [cashSummary, setCashSummary] = useState<FundCashSummary | null>(null)
+  const [positions, setPositions] = useState<ClientAccountReconciliation | null>(null)
 
-  const statusApiValue = useMemo(() => {
-    if (status === 'Active') return 'ACTIVE'
-    if (status === 'Restricted') return 'RESTRICTED'
-    return undefined
-  }, [status])
-
-  const loadOverview = useCallback(async () => {
+  const load = useCallback(async (selectedFundId: string) => {
     setLoading(true)
     setError(null)
+    let keepLoading = false
     try {
-      const [overviewRes, exceptionsRes, movementRes, accountsRes] = await Promise.all([
-        stockPickerCashApi.getCashOverview(),
-        stockPickerCashApi.listExceptions({ page: 1, pageSize: 5 }).catch(() => null),
-        stockPickerCashApi.getCashOverviewDailyMovement({ to: asOfDate }).catch(() => null),
-        stockPickerCashApi.listClientCashAccounts({ page: 1, pageSize: 100 }).catch(() => null),
+      const [portfoliosRes, batchesRes, cashRes, posRes] = await Promise.all([
+        investmentOpsApi.listPortfolios(),
+        selectedFundId
+          ? investmentOpsApi.listTradeReconBatches({ fundId: selectedFundId, pageSize: 20 })
+          : Promise.resolve({ success: true as const, data: { items: [], total: 0 } }),
+        selectedFundId
+          ? stockPickerCashApi.getFundCashSummary({ fundId: selectedFundId })
+          : Promise.resolve({ success: true as const, data: null }),
+        selectedFundId
+          ? investmentOpsApi.getClientAccountReconciliation({ fundId: selectedFundId })
+          : Promise.resolve({ success: true as const, data: null }),
       ])
-      const overview = requireOpsData(overviewRes, 'cash overview')
-      const k = mapCashOverviewKpis(overview)
-      const unreconciled =
-        accountsRes?.success && accountsRes.data
-          ? mapClientAccounts(requireOpsData(accountsRes, 'client cash accounts')).items.reduce(
-              (s, a) => s + a.unreconciled,
-              0,
-            )
-          : 0
-      const ccy = k?.primaryCurrency ?? 'USD'
-      setCashByCurrency(mapCurrencyPie(k?.byCurrency ?? []))
-      if (movementRes?.success && movementRes.data) {
-        setDailyMovement(mapDailyCashMovement(movementRes.data))
-      } else {
-        setDailyMovement([])
+
+      const fundList = mapFundOptions(portfoliosRes.data)
+      setFunds(fundList)
+      if (!selectedFundId && fundList[0]?.id) {
+        keepLoading = true
+        setFundId(fundList[0].id)
+        return
       }
-      setKpis([
-        {
-          label: 'Total Client Cash',
-          icon: Wallet,
-          iconBg: 'rgba(59,130,246,0.15)',
-          iconColor: '#60A5FA',
-          primary: `${ccy} ${k?.totalCash ?? '0.00'}`,
-          secondary: k?.secondaryCash ? `${k.secondaryCurrency} ${k.secondaryCash}` : `${k?.accountCount ?? 0} accounts`,
-          trend: '—',
-          trendTone: 'text-[#64748B]',
-        },
-        {
-          label: 'Available Cash',
-          icon: Banknote,
-          iconBg: 'rgba(34,197,94,0.15)',
-          iconColor: '#4ADE80',
-          primary: `${ccy} ${k?.available ?? '0.00'}`,
-          secondary: k?.secondaryAvailable
-            ? `${k.secondaryCurrency} ${k.secondaryAvailable}`
-            : 'Order-eligible',
-          trend: '—',
-          trendTone: 'text-[#64748B]',
-        },
-        {
-          label: 'Pending Settlements',
-          icon: Clock3,
-          iconBg: 'rgba(245,158,11,0.15)',
-          iconColor: '#FBBF24',
-          primary: `${ccy} ${k?.reservations ?? '0.00'}`,
-          secondary: 'Active reservations',
-          trend: '—',
-          trendTone: 'text-[#64748B]',
-        },
-        {
-          label: 'Unreconciled Items',
-          icon: FileText,
-          iconBg: 'rgba(168,85,247,0.15)',
-          iconColor: '#C084FC',
-          primary: String(unreconciled),
-          secondary: 'Open breaks on accounts',
-          trend: '—',
-          trendTone: 'text-[#64748B]',
-        },
-        {
-          label: 'Exceptions',
-          icon: ShieldAlert,
-          iconBg: 'rgba(244,63,94,0.15)',
-          iconColor: '#FB7185',
-          primary: String(k?.unhealthyAccounts ?? 0),
-          secondary: 'Unhealthy accounts',
-          trend: '—',
-          trendTone: 'text-[#64748B]',
-          exceptions: true,
-        },
-      ])
-      if (exceptionsRes?.success && exceptionsRes.data) {
-        const ex = requireOpsData(exceptionsRes, 'exceptions')
-        const accountOpts =
-          accountsRes?.success && accountsRes.data ? mapCashAccountOptions(accountsRes.data) : []
-        const rowsEx = mapExceptions(ex).items
-        setRecentAlerts(
-          rowsEx.map((r) => {
-            const account =
-              r.account !== '—'
-                ? r.account
-                : resolveCashAccountLabel(r.cashAccountId, accountOpts)
-            const client = r.client !== '—' ? r.client : '—'
-            return {
-              title: r.title,
-              meta: `${account} · ${client}`,
-              amount: `USD ${r.diffUsd}`,
-              when: `${r.ageDays}d`,
-              tone: r.severity === 'Critical' || r.severity === 'High' ? 'red' : r.severity === 'Medium' ? 'amber' : 'blue',
-            }
-          }),
-        )
+
+      if (batchesRes.success === false) {
+        throw new Error(formatOpsError(batchesRes, 'Failed to load trade match batches'))
+      }
+      const batchItems =
+        (batchesRes.data as { items?: TradeReconBatch[] } | undefined)?.items ??
+        (Array.isArray(batchesRes.data) ? (batchesRes.data as TradeReconBatch[]) : [])
+      setTradeBatches(batchItems)
+
+      if (cashRes && 'success' in cashRes && cashRes.success === false) {
+        setCashSummary(null)
       } else {
-        setRecentAlerts([])
+        setCashSummary((cashRes as { data?: FundCashSummary | null }).data ?? null)
+      }
+
+      if (posRes.success === false) {
+        setPositions(null)
+      } else {
+        setPositions(posRes.data ?? null)
       }
     } catch (e) {
-      setError(opsErrorMessage(e, 'Unable to load cash overview'))
-      setKpis([])
-      setCashByCurrency([])
-      setDailyMovement([])
-      setRecentAlerts([])
+      setError(formatOpsError(e, 'Failed to load reconciliation overview'))
     } finally {
-      setLoading(false)
+      if (!keepLoading) setLoading(false)
     }
-  }, [asOfDate])
-
-  const loadAccounts = useCallback(async () => {
-    setAccountsLoading(true)
-    try {
-      const accountsRes = await stockPickerCashApi.listClientCashAccounts({
-        page,
-        pageSize,
-        ...(search.trim() ? { search: search.trim() } : {}),
-        ...(statusApiValue ? { status: statusApiValue } : {}),
-        ...(accountType !== 'All Account Types' ? { accountType } : {}),
-      })
-      const accountsData = requireOpsData(accountsRes, 'client cash accounts')
-      const mapped = mapClientAccounts(accountsData)
-      setAccounts(mapped.items)
-      setAccountTotal(mapped.total)
-      const types = Array.from(new Set(mapped.items.map((a) => a.accountType).filter((t) => t && t !== '—')))
-      if (types.length) {
-        setAccountTypeOptions(['All Account Types', ...types])
-      }
-    } catch (e) {
-      setError(opsErrorMessage(e, 'Unable to load client cash accounts'))
-      setAccounts([])
-      setAccountTotal(0)
-    } finally {
-      setAccountsLoading(false)
-    }
-  }, [accountType, page, search, statusApiValue])
+  }, [])
 
   useEffect(() => {
-    void loadOverview()
-  }, [loadOverview])
+    void load(fundId)
+  }, [fundId, load])
 
-  useEffect(() => {
-    void withRefetch(loadAccounts)
-  }, [loadAccounts, withRefetch])
-
-  const totalPages = Math.max(1, Math.ceil(accountTotal / pageSize))
-  const rows = accounts
-  const dominantCcy = cashByCurrency[0]
-  const tableBusy = accountsLoading && !isRefetching && accounts.length === 0
+  const openTradeBatches = tradeBatches.filter((b) => {
+    const s = String(b.status ?? '').toUpperCase()
+    return s && s !== 'COMPLETED' && s !== 'CLOSED'
+  }).length
+  const completedTradeBatches = tradeBatches.filter((b) =>
+    ['COMPLETED', 'CLOSED'].includes(String(b.status ?? '').toUpperCase()),
+  ).length
+  const cashBreaks = Number(cashSummary?.openBreaks ?? cashSummary?.breakCount ?? cashSummary?.unmatchedCount ?? 0)
+  const positionBreaks = Number(positions?.breakCount ?? 0)
 
   return (
-    <main className="min-h-full bg-background text-foreground p-5 sm:p-6" style={{ background: C.page, color: C.text }}>
-      <div className="mx-auto max-w-[1600px] space-y-5">
-        {/* Header */}
-        <header className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+    <main className="min-h-full bg-background p-5 text-foreground sm:p-6" style={{ background: C.page, color: C.text }}>
+      <div className="mx-auto max-w-[1400px] space-y-5">
+        <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 className="text-[22px] font-semibold leading-tight tracking-[-0.01em]" style={{ color: C.text }}>
-              Client recon overview
-            </h1>
-            <p className="mt-1.5 text-[13px] leading-snug" style={{ color: C.muted }}>
-              Client cash positions and exceptions. Use Trade / Cash tabs for statement matching after settlement.
-            </p>
+            <h1 className="text-[22px] font-semibold tracking-[-0.01em]">Reconciliation overview</h1>
           </div>
-
-          <div className="flex flex-wrap items-center gap-2.5">
-            <label
-              className="flex h-9 w-[260px] items-center gap-2 rounded-full border px-3"
-              style={{ background: C.control, borderColor: C.controlBorder }}
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              className="h-9 rounded-full border border-border bg-background px-4 text-[12px]"
+              value={fundId}
+              onChange={(e) => setFundId(e.target.value)}
             >
-              <Search className="h-3.5 w-3.5 shrink-0" style={{ color: C.muted2 }} />
-              <input
-                value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value)
-                  setPage(1)
-                }}
-                placeholder="Search accounts, clients..."
-                className="w-full bg-transparent text-[12px] outline-none placeholder:text-[#64748B]"
-                style={{ color: C.text }}
-              />
-              <span
-                className="shrink-0 rounded-md border px-1.5 py-0.5 text-[10px] font-medium"
-                style={{ color: C.muted2, borderColor: C.controlBorder, background: C.control }}
-              >
-                ⌘ K
-              </span>
-            </label>
-
-            <button
-              type="button"
-              className="inline-flex h-9 items-center gap-2 rounded-full border px-3 text-[12px]"
-              style={{ background: C.control, borderColor: C.controlBorder, color: C.text }}
-              onClick={() => {
-                const today = new Date().toISOString().slice(0, 10)
-                setAsOfDate((prev) => (prev === today ? prev : today))
-              }}
-            >
-              <Calendar className="h-3.5 w-3.5" style={{ color: C.muted }} />
-              <input
-                type="date"
-                value={asOfDate}
-                onChange={(e) => setAsOfDate(e.target.value)}
-                className="w-[108px] bg-transparent text-[12px] outline-none"
-                style={{ color: C.text }}
-                aria-label="As of date"
-              />
-              <ChevronDown className="h-3.5 w-3.5" style={{ color: C.muted2 }} />
+              {funds.length === 0 && <option value="">No funds</option>}
+              {funds.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.name}
+                </option>
+              ))}
+            </select>
+            <button type="button" className={cn(reconPill, 'h-9')} onClick={() => void load(fundId)}>
+              Refresh
             </button>
           </div>
         </header>
 
-        <ReconNavTabs variant="terminal-dark" />
+        <ReconNavTabs />
         <ReconApiBanner loading={loading} error={error} />
 
-        <section className="grid gap-3 md:grid-cols-3">
-          {[
-            {
-              href: '/investments-v2/reconciliation/trade',
-              title: 'Trade recon',
-              body: 'Internal × broker statement × custodian statement for executed trades.',
-            },
-            {
-              href: '/investments-v2/reconciliation/fund-cash',
-              title: 'Cash recon',
-              body: 'Fund cash positions vs custodian / bank movements.',
-            },
-            {
-              href: '/investments-v2/reconciliation',
-              title: 'Client overview',
-              body: 'Client cash accounts, activity and exceptions at a glance.',
-            },
-          ].map((card) => (
-            <Link
-              key={card.href + card.title}
-              href={card.href}
-              className="rounded-[16px] border px-4 py-4 transition hover:opacity-95"
-              style={{ background: C.card, borderColor: C.cardBorder }}
-            >
-              <p className="text-[13px] font-semibold" style={{ color: C.text }}>
-                {card.title}
-              </p>
-              <p className="mt-1.5 text-[12px] leading-snug" style={{ color: C.muted }}>
-                {card.body}
-              </p>
-            </Link>
-          ))}
-        </section>
-
-        {/* KPI row */}
-        <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
-          {(kpis.length ? kpis : loading ? [] : [
-            {
-              label: 'Total Client Cash',
-              icon: Wallet,
-              iconBg: 'rgba(59,130,246,0.15)',
-              iconColor: '#60A5FA',
-              primary: '—',
-              secondary: 'No data',
-              trend: '—',
-              trendTone: 'text-[#64748B]',
-            },
-          ]).map((kpi) => {
-            const Icon = kpi.icon
-            return (
-              <article
-                key={kpi.label}
-                className="rounded-[12px] border p-4"
-                style={{ background: C.card, borderColor: C.cardBorder }}
-              >
-                <div className="flex items-center gap-2">
-                  <span
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-[10px]"
-                    style={{ background: kpi.iconBg }}
-                  >
-                    <Icon className="h-4 w-4" style={{ color: kpi.iconColor }} />
-                  </span>
-                  <span className="text-[12px] font-medium" style={{ color: C.muted }}>
-                    {kpi.label}
-                  </span>
-                  <Info className="h-3 w-3" style={{ color: C.muted2 }} />
-                </div>
-                <p className="mt-3 font-mono text-[18px] font-semibold leading-none tracking-tight" style={{ color: C.text }}>
-                  {kpi.primary}
-                </p>
-                <p className="mt-1.5 font-mono text-[11px]" style={{ color: C.muted2 }}>
-                  {kpi.secondary}
-                </p>
-                <p className={cn('mt-3 text-[11px]', kpi.trendTone)}>
-                  {kpi.trend} <span style={{ color: C.muted2 }}>vs last 7 days</span>
-                </p>
-              </article>
-            )
-          })}
-        </section>
-
-        {/* Accounts table */}
-        <section
-          className="overflow-hidden rounded-[12px] border"
-          style={{ background: C.card, borderColor: C.cardBorder }}
-        >
-          <div className="flex flex-col gap-3 border-b px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between" style={{ borderColor: C.cardBorder }}>
-            <div className="flex items-center gap-2.5">
-              <h2 className="text-[14px] font-semibold" style={{ color: C.text }}>
-                Client Accounts
-              </h2>
-              <span
-                className="rounded-full px-2.5 py-0.5 text-[11px] font-medium"
-                style={{ background: C.muted, color: C.muted, border: `1px solid ${C.cardBorder}` }}
-              >
-                {accountTotal || rows.length} Accounts
-              </span>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <FilterSelect
-                value={accountType}
-                options={accountTypeOptions}
-                onChange={(v) => {
-                  setAccountType(v)
-                  setPage(1)
-                }}
-              />
-              <FilterSelect
-                value={status}
-                options={['All Statuses', 'Active', 'Restricted']}
-                onChange={(v) => {
-                  setStatus(v)
-                  setPage(1)
-                }}
-              />
-            </div>
-          </div>
-
-          <div className="relative overflow-x-auto">
-            <RefetchOverlay active={isRefetching} rows={7} cols={8} />
-            <table className="w-full min-w-[1100px] text-left">
-              <thead>
-                <tr style={{ borderBottom: `1px solid ${C.rowBorder}` }}>
-                  {[
-                    'Account Number',
-                    'Client Name',
-                    'Base Currency',
-                    'Account Type',
-                    'Cash Balance',
-                    'Available Balance',
-                    'Status',
-                    'Last Activity',
-                  ].map((head) => (
-                    <th
-                      key={head}
-                      className="px-4 py-3 text-[11px] font-medium"
-                      style={{ color: C.muted2 }}
-                    >
-                      {head === 'Last Activity' ? (
-                        <span className="inline-flex items-center gap-1">
-                          {head}
-                          <ChevronDown className="h-3 w-3" />
-                        </span>
-                      ) : (
-                        head
-                      )}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {tableBusy ? (
-                  <tr>
-                    <td colSpan={8} className="p-0">
-                      <ReconTableSkeleton rows={7} cols={8} />
-                    </td>
-                  </tr>
-                ) : null}
-                {!tableBusy && rows.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="px-4 py-10 text-center text-[12px]" style={{ color: C.muted2 }}>
-                      {error ? 'Unable to load accounts.' : 'No client cash accounts found.'}
-                    </td>
-                  </tr>
-                ) : null}
-                {!tableBusy
-                  ? rows.map((row) => (
-                  <tr key={row.id || row.accountNumber} style={{ borderBottom: `1px solid ${C.rowBorder}` }}>
-                    <td className="px-4 py-3">
-                      <span className="inline-flex items-center gap-2">
-                        {row.star === 'blue' ? (
-                          <Star className="h-3.5 w-3.5 fill-[#3B82F6] text-[#3B82F6]" />
-                        ) : row.star === 'amber' ? (
-                          <Star className="h-3.5 w-3.5 fill-[#F59E0B] text-[#F59E0B]" />
-                        ) : (
-                          <span className="inline-block h-3.5 w-3.5 rounded-full border" style={{ borderColor: '#334155' }} />
-                        )}
-                        <span className="font-mono text-[12px] font-medium" style={{ color: C.blueLink }}>
-                          {row.accountNumber}
-                        </span>
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-[12px] font-medium" style={{ color: C.text }}>
-                      {row.clientName}
-                    </td>
-                    <td className="px-4 py-3 font-mono text-[12px]" style={{ color: C.muted }}>
-                      {row.baseCurrency}
-                    </td>
-                    <td className="px-4 py-3 text-[12px]" style={{ color: C.muted }}>
-                      {row.accountType}
-                    </td>
-                    <td className="px-4 py-3 text-right font-mono text-[12px]" style={{ color: C.text }}>
-                      {row.cashBalance}
-                    </td>
-                    <td className="px-4 py-3 text-right font-mono text-[12px]" style={{ color: C.text }}>
-                      {row.availableBalance}
-                    </td>
-                    <td className="px-4 py-3">
-                      <StatusBadge status={row.status} />
-                    </td>
-                    <td className="px-4 py-3 text-[12px]" style={{ color: C.muted2 }}>
-                      {row.lastActivity}
-                    </td>
-                  </tr>
-                ))
-                  : null}
-              </tbody>
-            </table>
-          </div>
-
-          <TablePagination
-            page={page}
-            totalPages={totalPages}
-            onPageChange={setPage}
-            rowsShown={rows.length}
-            totalRows={accountTotal}
-            pageSize={pageSize}
+        <section className="grid gap-4 lg:grid-cols-3">
+          <LegCard
+            title="Trade match"
+            subtitle="Us × Broker × Bank (custodian)"
+            primary={`${openTradeBatches} open`}
+            secondary={`${completedTradeBatches} completed · ${tradeBatches.length} total batches`}
+            href={`/investments-v2/reconciliation/trade${fundId ? `?fundId=${encodeURIComponent(fundId)}` : ''}`}
+            cta="Start trade match"
+            alert={openTradeBatches > 0}
+          />
+          <LegCard
+            title="Cash match"
+            subtitle="Us ledger × Bank statement"
+            primary={cashSummary ? `${cashBreaks} open breaks` : '—'}
+            secondary={
+              cashSummary
+                ? `Unmatched ${cashSummary.unmatchedCount ?? '—'} · Match rate ${cashSummary.matchRate ?? '—'}`
+                : 'No cash summary yet'
+            }
+            href={`/investments-v2/reconciliation/fund-cash${fundId ? `?fundId=${encodeURIComponent(fundId)}` : ''}`}
+            cta="Start cash match"
+            alert={cashBreaks > 0}
+          />
+          <LegCard
+            title="Positions"
+            subtitle="Holdings × settled trades"
+            primary={`${positionBreaks} breaks`}
+            secondary={
+              positions
+                ? `${positions.positionCount} positions · ${positions.settledTradeCount} settled trades`
+                : 'No position recon yet'
+            }
+            href={`/investments-v2/reconciliation/positions${fundId ? `?fundId=${encodeURIComponent(fundId)}` : ''}`}
+            cta="Review position breaks"
+            alert={positionBreaks > 0}
           />
         </section>
 
-        {/* Bottom panels */}
-        <section className="grid grid-cols-1 gap-3 xl:grid-cols-3">
-          <article className="rounded-[12px] border p-4" style={{ background: C.card, borderColor: C.cardBorder }}>
-            <div className="mb-3 flex items-center gap-1.5">
-              <h3 className="text-[13px] font-semibold" style={{ color: C.text }}>
-                Cash by Currency
-              </h3>
-              <Info className="h-3 w-3" style={{ color: C.muted2 }} />
+        <section className="overflow-hidden rounded-[12px] border" style={{ background: C.card, borderColor: C.cardBorder }}>
+          <div className="border-b px-4 py-3 text-[12px] font-medium" style={{ borderColor: C.cardBorder }}>
+            Recent trade match batches
+          </div>
+          {tradeBatches.length === 0 ? (
+            <p className="px-4 py-8 text-center text-[12px]" style={{ color: C.muted }}>
+              No trade match batches for this fund yet.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-[12px]">
+                <thead>
+                  <tr className="text-[10px] uppercase tracking-wider" style={{ color: C.muted }}>
+                    <th className="px-4 py-3">Batch</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3">As of</th>
+                    <th className="px-4 py-3" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {tradeBatches.slice(0, 8).map((b) => (
+                    <tr key={b.id} className="border-t" style={{ borderColor: C.cardBorder }}>
+                      <td className="px-4 py-3 font-mono text-[11px]">{b.id}</td>
+                      <td className="px-4 py-3">{b.status ?? '—'}</td>
+                      <td className="px-4 py-3">{String(b.asOfDate ?? b.asOf ?? '—')}</td>
+                      <td className="px-4 py-3 text-right">
+                        <Link
+                          href={`/investments-v2/reconciliation/trade?batchId=${encodeURIComponent(b.id)}`}
+                          className="text-[11px] font-medium"
+                          style={{ color: C.blueLink }}
+                        >
+                          Open
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-            <div className="flex items-center gap-3">
-              <div className="relative h-[160px] w-[160px] shrink-0">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={cashByCurrency}
-                      dataKey="pct"
-                      nameKey="name"
-                      innerRadius={52}
-                      outerRadius={74}
-                      stroke="none"
-                      paddingAngle={1.5}
-                    >
-                      {cashByCurrency.map((entry) => (
-                        <Cell key={entry.name} fill={entry.color} />
-                      ))}
-                    </Pie>
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-[11px] font-medium" style={{ color: C.muted }}>
-                    {dominantCcy?.name ?? '—'}
-                  </span>
-                  <span className="text-[16px] font-semibold" style={{ color: C.text }}>
-                    {dominantCcy ? `${dominantCcy.pct.toFixed(1)}%` : '—'}
-                  </span>
-                </div>
-              </div>
-              <ul className="min-w-0 flex-1 space-y-2.5">
-                {cashByCurrency.length === 0 ? (
-                  <li className="text-[12px]" style={{ color: C.muted2 }}>
-                    No currency breakdown available.
-                  </li>
-                ) : (
-                  cashByCurrency.map((item) => (
-                  <li key={item.name} className="flex items-start gap-2">
-                    <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ background: item.color }} />
-                    <div className="min-w-0">
-                      <p className="text-[12px] font-medium" style={{ color: C.text }}>
-                        {item.name} {item.pct.toFixed(1)}%
-                      </p>
-                      <p className="truncate font-mono text-[10px]" style={{ color: C.muted2 }}>
-                        {item.value}
-                      </p>
-                    </div>
-                  </li>
-                  ))
-                )}
-              </ul>
-            </div>
-          </article>
-
-          <article className="rounded-[12px] border p-4" style={{ background: C.card, borderColor: C.cardBorder }}>
-            <div className="mb-2 flex items-center gap-1.5">
-              <h3 className="text-[13px] font-semibold" style={{ color: C.text }}>
-                Daily Cash Movement (USD)
-              </h3>
-              <Info className="h-3 w-3" style={{ color: C.muted2 }} />
-            </div>
-            <div className="mb-2 flex flex-wrap items-center gap-4 text-[10px]" style={{ color: C.muted }}>
-              <span className="inline-flex items-center gap-1.5">
-                <span className="h-0.5 w-3 rounded-full bg-[#3B82F6]" />
-                Net Cash Movement (USD)
-              </span>
-              <span className="inline-flex items-center gap-1.5">
-                <span className="h-0.5 w-3 rounded-full bg-[#22C55E]" />
-                Closing Cash Balance (USD)
-              </span>
-            </div>
-            <div className="h-[200px] w-full">
-              {dailyMovement.length === 0 ? (
-                <div className="flex h-full items-center justify-center text-[12px]" style={{ color: C.muted2 }}>
-                  No daily movement data returned.
-                </div>
-              ) : (
-                <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={dailyMovement} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                    <CartesianGrid stroke={C.rowBorder} strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="date" tick={{ fontSize: 10, fill: C.muted2 }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 10, fill: C.muted2 }} axisLine={false} tickLine={false} />
-                    <Tooltip
-                      contentStyle={{ background: C.card, border: `1px solid ${C.cardBorder}`, borderRadius: 8, fontSize: 11 }}
-                      labelStyle={{ color: C.muted }}
-                    />
-                    <Line type="monotone" dataKey="net" stroke="#3B82F6" strokeWidth={2} dot={false} name="Net Cash Movement (USD)" />
-                    <Line type="monotone" dataKey="close" stroke="#22C55E" strokeWidth={2} dot={false} name="Closing Cash Balance (USD)" />
-                  </ComposedChart>
-                </ResponsiveContainer>
-              )}
-            </div>
-          </article>
-
-          <article className="rounded-[12px] border p-4" style={{ background: C.card, borderColor: C.cardBorder }}>
-            <div className="mb-3 flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <h3 className="text-[13px] font-semibold" style={{ color: C.text }}>
-                  Recent Alerts & Exceptions
-                </h3>
-                <Info className="h-3 w-3" style={{ color: C.muted2 }} />
-              </div>
-              <Link href="/investments-v2/reconciliation/exceptions" className="text-[12px] font-medium" style={{ color: C.blueLink }}>
-                View all
-              </Link>
-            </div>
-            <ul>
-              {recentAlerts.length === 0 ? (
-                <li className="py-6 text-center text-[12px]" style={{ color: C.muted2 }}>
-                  No recent exceptions.
-                </li>
-              ) : (
-                recentAlerts.map((alert, index) => (
-                <li
-                  key={`${alert.title}-${alert.when}-${index}`}
-                  className="flex items-start gap-2.5 py-2.5"
-                  style={{ borderTop: index === 0 ? undefined : `1px solid ${C.rowBorder}` }}
-                >
-                  <AlertIcon tone={alert.tone} />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[12px] font-medium leading-snug" style={{ color: C.text }}>
-                      {alert.title}
-                    </p>
-                    <p className="mt-0.5 truncate text-[11px]" style={{ color: C.muted2 }}>
-                      {alert.meta}
-                    </p>
-                  </div>
-                  <div className="shrink-0 text-right">
-                    {alert.amount && (
-                      <p className="font-mono text-[11px] font-medium" style={{ color: C.text }}>
-                        {alert.amount}
-                      </p>
-                    )}
-                    <p className="mt-0.5 text-[10px]" style={{ color: C.muted2 }}>
-                      {alert.when}
-                    </p>
-                  </div>
-                </li>
-                ))
-              )}
-            </ul>
-          </article>
+          )}
         </section>
       </div>
     </main>
   )
 }
 
-function FilterSelect({
-  value,
-  options,
-  onChange,
+function LegCard({
+  title,
+  subtitle,
+  primary,
+  secondary,
+  href,
+  cta,
+  alert,
 }: {
-  value: string
-  options: string[]
-  onChange: (value: string) => void
+  title: string
+  subtitle: string
+  primary: string
+  secondary: string
+  href: string
+  cta: string
+  alert?: boolean
 }) {
   return (
-    <div className="relative">
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="h-8 appearance-none rounded-full border py-0 pl-3 pr-8 text-[11px] outline-none"
-        style={{ background: C.control, borderColor: C.controlBorder, color: C.text }}
-      >
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {option}
-          </option>
-        ))}
-      </select>
-      <ChevronDown
-        className="pointer-events-none absolute right-2.5 top-1/2 h-3 w-3 -translate-y-1/2"
-        style={{ color: C.muted2 }}
-      />
-    </div>
-  )
-}
-
-function StatusBadge({ status }: { status: 'Active' | 'Restricted' }) {
-  const active = status === 'Active'
-  return (
-    <span
-      className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-medium"
-      style={{
-        color: active ? '#4ADE80' : '#FBBF24',
-        borderColor: active ? 'rgba(74,222,128,0.35)' : 'rgba(251,191,36,0.35)',
-        background: active ? 'rgba(34,197,94,0.08)' : 'rgba(245,158,11,0.08)',
-      }}
-    >
-      <span
-        className="h-1.5 w-1.5 rounded-full"
-        style={{ background: active ? '#4ADE80' : '#FBBF24' }}
-      />
-      {status}
-    </span>
-  )
-}
-
-function AlertIcon({ tone }: { tone: 'red' | 'amber' | 'blue' }) {
-  if (tone === 'amber') {
-    return (
-      <span
-        className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full"
-        style={{ background: 'rgba(245,158,11,0.15)' }}
-      >
-        <CircleAlert className="h-3.5 w-3.5 text-[#F59E0B]" />
-      </span>
-    )
-  }
-  if (tone === 'blue') {
-    return (
-      <span
-        className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full"
-        style={{ background: 'rgba(59,130,246,0.15)' }}
-      >
-        <Info className="h-3.5 w-3.5 text-[#60A5FA]" />
-      </span>
-    )
-  }
-  return (
-    <span
-      className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full"
-      style={{ background: 'rgba(244,63,94,0.15)' }}
-    >
-      <CircleAlert className="h-3.5 w-3.5 text-[#F43F5E]" />
-    </span>
+    <article className="flex flex-col rounded-[12px] border p-4" style={{ background: C.card, borderColor: C.cardBorder }}>
+      <p className="text-[10px] uppercase tracking-wider" style={{ color: C.muted }}>
+        {subtitle}
+      </p>
+      <h2 className="mt-1 text-[16px] font-semibold">{title}</h2>
+      <p className="mt-4 text-[22px] font-semibold" style={alert ? { color: C.red } : undefined}>
+        {primary}
+      </p>
+      <p className="mt-1 text-[11px]" style={{ color: C.muted }}>
+        {secondary}
+      </p>
+      <div className="mt-auto pt-4">
+        <Link href={href} className={cn(reconPrimaryPill, 'h-9 w-full')}>
+          {cta}
+        </Link>
+      </div>
+    </article>
   )
 }
