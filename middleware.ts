@@ -6,11 +6,15 @@ import {
   LP_PORTAL_EXTERNAL_URL,
   INVESTEE_PORTAL_EXTERNAL_URL,
   APPLY_PORTAL_EXTERNAL_URL,
+  VENDOR_PORTAL_EXTERNAL_URL,
+  EVENTS_PORTAL_EXTERNAL_URL,
   isPathAllowedForPortal,
   portalHomePath,
   isAuthRoute,
   isStaffPublicPassThrough,
   shouldRedirectFundingApplicationToApplyPortal,
+  shouldRedirectVendorToPortal,
+  shouldRedirectEventsToPortal,
 } from '@/lib/portal/config'
 
 // Helper function to check if role has access to a module
@@ -240,6 +244,22 @@ export function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
+  // Vendor portal: public vendor workflows - no auth, no staff chrome.
+  if (PORTAL_ID === 'vendor') {
+    if (!isPathAllowedForPortal(pathname, PORTAL_ID)) {
+      return NextResponse.redirect(new URL('/vendor-portal', request.url))
+    }
+    return NextResponse.next()
+  }
+
+  // Events portal: public events workflows - no auth, no staff chrome.
+  if (PORTAL_ID === 'events') {
+    if (!isPathAllowedForPortal(pathname, PORTAL_ID)) {
+      return NextResponse.redirect(new URL('/events/public', request.url))
+    }
+    return NextResponse.next()
+  }
+
   // Staff portal: send external portal paths to their dedicated domains.
   if (PORTAL_ID === 'staff') {
     if (pathname === '/' && token) {
@@ -256,6 +276,21 @@ export function middleware(request: NextRequest) {
       const base = INVESTEE_PORTAL_EXTERNAL_URL.replace(/\/$/, '')
       return NextResponse.redirect(`${base}/investee-portal-v8${suffix}`)
     }
+    if (
+      shouldRedirectVendorToPortal() &&
+      (pathname.startsWith('/vendor-portal') || pathname.startsWith('/vendor/') || pathname.startsWith('/vendor-quotations') || pathname.startsWith('/public-tenders'))
+    ) {
+      const suffix = pathname.replace(/^\/(vendor-portal|vendor|vendor-quotations|public-tenders)/, '') || ''
+      return NextResponse.redirect(`${VENDOR_PORTAL_EXTERNAL_URL}${suffix}`)
+    }
+    if (
+      shouldRedirectEventsToPortal() &&
+      (pathname.startsWith('/events/rsvp') || pathname.startsWith('/events/public') || pathname.startsWith('/events/feedback'))
+    ) {
+      const suffix = pathname.replace(/^\/events/, '') || ''
+      return NextResponse.redirect(`${EVENTS_PORTAL_EXTERNAL_URL}/events${suffix}`)
+    }
+
     if (
       shouldRedirectFundingApplicationToApplyPortal() &&
       (pathname === '/funding-application' || pathname.startsWith('/funding-application/'))
