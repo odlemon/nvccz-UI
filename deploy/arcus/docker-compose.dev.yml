@@ -99,8 +99,6 @@ services:
         NEXT_PUBLIC_APPLY_PORTAL_URL: ${PUBLIC_APPLY_PORTAL_URL}
         NEXT_PUBLIC_VENDOR_PORTAL_URL: ${PUBLIC_VENDOR_PORTAL_URL}
         NEXT_PUBLIC_EVENTS_PORTAL_URL: ${PUBLIC_EVENTS_PORTAL_URL}
-        NEXT_PUBLIC_VENDOR_PORTAL_URL: ${PUBLIC_VENDOR_PORTAL_URL}
-        NEXT_PUBLIC_EVENTS_PORTAL_URL: ${PUBLIC_EVENTS_PORTAL_URL}
     restart: unless-stopped
     depends_on:
       - api
@@ -249,4 +247,11 @@ services:
       - traefik.enable=true
       - traefik.docker.network=lms_lms-network
       - traefik.http.routers.arcus-dev-ui-events.rule=Host(`dev.events.matanho.com`)
-      - traefik.http.routers.arcus-dev-ui-events.entrypoints=websec
+      - traefik.http.routers.arcus-dev-ui-events.entrypoints=websecure
+      - traefik.http.routers.arcus-dev-ui-events.tls.certresolver=le
+      - traefik.http.services.arcus-dev-ui-events.loadbalancer.server.port=3000
+
+volumes:
+  arcus_dev_mysql:
+  arcus_dev_api_storage:
+  arcus_dev_upload:
