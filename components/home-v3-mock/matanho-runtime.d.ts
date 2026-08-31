@@ -12,6 +12,8 @@ declare module "@/components/home-v3-mock/matanho-runtime" {
       }
       config?: { useMockData?: boolean; apiBaseUrl?: string }
       onNavigate?: (route: string) => void
+      onSignOut?: () => void | Promise<void>
+      liveSession?: boolean
     }
   ): {
     setRoute: (
@@ -23,6 +25,15 @@ declare module "@/components/home-v3-mock/matanho-runtime" {
         newsletterMode?: string
       }
     ) => void
+    setSessionUser: (user: {
+      name: string
+      firstName: string
+      role: string
+      location: string
+      email: string
+      initials: string
+      image?: string
+    }) => void
     destroy: () => void
   }
 }

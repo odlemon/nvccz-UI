@@ -23,12 +23,9 @@ export function AdminLayout({ children }: AdminLayoutProps) {
   }, [pathname])
 
   const handleModuleSelect = (module: string) => {
-    console.log('AdminLayout handleModuleSelect called with:', module)
     setCurrentModule(module)
-    
     const moduleConfig = MODULE_CONFIG.find(m => m.id === module)
     if (moduleConfig) {
-      console.log('Navigating to:', moduleConfig.path)
       window.location.href = moduleConfig.path
     }
   }

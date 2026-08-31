@@ -27,7 +27,7 @@ export function FpaLayout({ children }: FpaLayoutProps) {
   }
 
   return (
-    <div className="min-h-screen bg-[#f1f5f9]">
+    <div className="min-h-screen bg-[#f1f5f9]" data-module="forecasting">
       <SharedTopbar onModuleSelect={handleModuleSelect} currentModule={currentModule} />
       <div className="flex">
         <FpaSidebar />

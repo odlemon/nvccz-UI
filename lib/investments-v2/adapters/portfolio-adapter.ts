@@ -500,7 +500,12 @@ function formatInstrumentIdentifiers(raw: Record<string, unknown>): { primary: s
   const bloomberg = String(raw.bloombergCode ?? '').trim()
   const reuters = String(raw.reutersCode ?? '').trim()
   const internal = String(raw.internalRef ?? '').trim()
-  const primary = isin && isin !== '—' ? isin : bloomberg || reuters || internal || '—'
+  const instrumentCode = String(raw.instrumentCode ?? '').trim()
+  const ticker = String(raw.ticker ?? '').trim()
+  const primary =
+    isin && isin !== '—'
+      ? isin
+      : bloomberg || reuters || internal || instrumentCode || (ticker ? `Ticker ${ticker}` : '—')
   const secondary =
     bloomberg && primary !== bloomberg
       ? `BBG ${bloomberg}`
@@ -508,7 +513,9 @@ function formatInstrumentIdentifiers(raw: Record<string, unknown>): { primary: s
         ? `RIC ${reuters}`
         : internal && primary !== internal
           ? internal
-          : ''
+          : instrumentCode && primary !== instrumentCode
+            ? instrumentCode
+            : ''
   return { primary, secondary }
 }
 
@@ -543,7 +550,7 @@ export function mapInstrumentRow(raw: Record<string, unknown>): InstrumentRow {
     country: String(raw.countryCode ?? '—'),
     source: String(raw.pricingSource ?? '—'),
     createdBy,
-    updated: formatDateTime(String(raw.updatedAt ?? raw.createdAt ?? '')),
+    updated: formatDateTime(String(raw.pricedAt ?? raw.updatedAt ?? raw.createdAt ?? '')),
     coupon: raw.couponRate != null ? Number(raw.couponRate) : undefined,
     maturity: raw.maturityDate ? formatShortDate(String(raw.maturityDate)) : undefined,
   }
@@ -584,7 +591,8 @@ function mapSource(raw: string): string {
   if (u.includes('MANUAL')) return 'Manual Override'
   if (u.includes('VENDOR')) return 'Vendor Feed'
   if (u.includes('FILE') || u.includes('UPLOAD')) return 'File Upload'
-  if (u.includes('API') || u === 'OK') return 'API Confirmed'
+  if (u.includes('SEED')) return 'Seed data'
+  if (u === 'ZSE' || u.includes('MANSA') || u.includes('API') || u === 'OK') return 'API Confirmed'
   return titleCaseType(raw || 'API Confirmed')
 }
 
@@ -627,19 +635,22 @@ export function mapLatestPriceRow(raw: Record<string, unknown>, index: number): 
   const previous = prevRaw != null && prevRaw !== '' ? Number(prevRaw) : null
   const status = mapValidationStatus(String(tick.validationStatus ?? tick.validation_status ?? 'Approved'))
   const pricedAt = String(tick.pricedAt ?? tick.priced_at ?? '')
-  const ticker = String(security.symbol ?? security.ticker ?? tick.symbol ?? '—')
+  const ticker = String(security.symbol ?? security.ticker ?? tick.symbol ?? raw.symbol ?? '—')
   const name = String(security.name ?? security.shortName ?? ticker)
   const deviation = tick.deviationPct != null ? Number(tick.deviationPct) : null
+  const sourceRaw = String(
+    tick.sourceCode ?? tick.fxRateSource ?? tick.sourceStatus ?? raw.sourceCode ?? 'API',
+  )
 
   return {
     id: canReview ? apiId : `price-${index}`,
     ticker,
     name,
-    market: String(security.exchangeCode ?? security.market ?? '—'),
-    currency: String(security.listingCurrencyCode ?? 'USD'),
+    market: String(security.exchangeCode ?? security.market ?? raw.exchangeCode ?? '—'),
+    currency: String(security.listingCurrencyCode ?? raw.listingCurrencyCode ?? 'USD'),
     price,
     previous: previous != null && Number.isFinite(previous) ? previous : null,
-    source: mapSource(String(tick.fxRateSource ?? tick.sourceCode ?? tick.sourceStatus ?? 'API')),
+    source: mapSource(sourceRaw),
     status,
     time: formatDateTime(pricedAt),
     priceDate: classifyPriceDate(pricedAt),

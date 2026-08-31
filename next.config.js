@@ -14,6 +14,10 @@ const nextConfig = {
     // !! WARN !!
     ignoreBuildErrors: true,
   },
+  // Must match next.config.mjs / Docker runtime — otherwise /_next/image 404s on login bg
+  images: {
+    unoptimized: true,
+  },
 }
 
 module.exports = nextConfig

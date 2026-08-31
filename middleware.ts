@@ -1,6 +1,17 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { ROLE_PERMISSIONS_MAP, type RoleCode } from '@/lib/config/role-permissions'
+import {
+  PORTAL_ID,
+  LP_PORTAL_EXTERNAL_URL,
+  INVESTEE_PORTAL_EXTERNAL_URL,
+  APPLY_PORTAL_EXTERNAL_URL,
+  isPathAllowedForPortal,
+  portalHomePath,
+  isAuthRoute,
+  isStaffPublicPassThrough,
+  shouldRedirectFundingApplicationToApplyPortal,
+} from '@/lib/portal/config'
 
 // Helper function to check if role has access to a module
 function hasModuleAccess(roleCode: RoleCode | null, moduleId: string): boolean {
@@ -50,6 +61,49 @@ const routePermissions: Record<string, { module: string; subModule?: string }> =
   '/procurement/approvals': { module: 'procurement', subModule: 'my-approvals' },
   '/procurement/approval-configs': { module: 'procurement', subModule: 'approval-configurations' },
 
+  // Procurement V23 client design port
+  '/procurement-v23': { module: 'procurement-v23', subModule: 'pr23-dashboard' },
+  '/procurement-v23/plan': { module: 'procurement-v23', subModule: 'pr23-plan' },
+  '/procurement-v23/approvals': { module: 'procurement-v23', subModule: 'pr23-approvals' },
+  '/procurement-v23/requisitions': { module: 'procurement-v23', subModule: 'pr23-requisitions' },
+  '/procurement-v23/tenders': { module: 'procurement-v23', subModule: 'pr23-tenders' },
+  '/procurement-v23/evaluation': { module: 'procurement-v23', subModule: 'pr23-evaluation' },
+  '/procurement-v23/vendors': { module: 'procurement-v23', subModule: 'pr23-vendors' },
+  '/procurement-v23/contracts': { module: 'procurement-v23', subModule: 'pr23-contracts' },
+  '/procurement-v23/purchase-orders': { module: 'procurement-v23', subModule: 'pr23-orders' },
+  '/procurement-v23/goods-received': { module: 'procurement-v23', subModule: 'pr23-receiving' },
+  '/procurement-v23/invoices': { module: 'procurement-v23', subModule: 'pr23-invoices' },
+  '/procurement-v23/accounts': { module: 'procurement-v23', subModule: 'pr23-accounts' },
+  '/procurement-v23/documents': { module: 'procurement-v23', subModule: 'pr23-documents' },
+  '/procurement-v23/reports': { module: 'procurement-v23', subModule: 'pr23-reports' },
+  '/procurement-v23/audit': { module: 'procurement-v23', subModule: 'pr23-audit' },
+  '/procurement-v23/settings': { module: 'procurement-v23', subModule: 'pr23-settings' },
+
+  // Accounting V52 client design port
+  '/accounting-v52': { module: 'accounting-v52', subModule: 'ac52-overview' },
+  '/accounting-v52/approvals': { module: 'accounting-v52', subModule: 'ac52-approvals' },
+  '/accounting-v52/close': { module: 'accounting-v52', subModule: 'ac52-close' },
+  '/accounting-v52/general-ledger': { module: 'accounting-v52', subModule: 'ac52-ledger' },
+  '/accounting-v52/journals': { module: 'accounting-v52', subModule: 'ac52-journals' },
+  '/accounting-v52/cash-book': { module: 'accounting-v52', subModule: 'ac52-cash' },
+  '/accounting-v52/bank-reconciliation': { module: 'accounting-v52', subModule: 'ac52-recon' },
+  '/accounting-v52/payables': { module: 'accounting-v52', subModule: 'ac52-payables' },
+  '/accounting-v52/receivables': { module: 'accounting-v52', subModule: 'ac52-receivables' },
+  '/accounting-v52/expenses': { module: 'accounting-v52', subModule: 'ac52-expenses' },
+  '/accounting-v52/inventory': { module: 'accounting-v52', subModule: 'ac52-inventory' },
+  '/accounting-v52/assets': { module: 'accounting-v52', subModule: 'ac52-assets' },
+  '/accounting-v52/short-term-investments': { module: 'accounting-v52', subModule: 'ac52-investments' },
+  '/accounting-v52/reports': { module: 'accounting-v52', subModule: 'ac52-reports' },
+  '/accounting-v52/tax': { module: 'accounting-v52', subModule: 'ac52-compliance' },
+  '/accounting-v52/fx-revaluation': { module: 'accounting-v52', subModule: 'ac52-fx' },
+  '/accounting-v52/consolidation': { module: 'accounting-v52', subModule: 'ac52-consolidation' },
+  '/accounting-v52/chart-governance': { module: 'accounting-v52', subModule: 'ac52-coa' },
+  '/accounting-v52/vault': { module: 'accounting-v52', subModule: 'ac52-vault' },
+  '/accounting-v52/audit': { module: 'accounting-v52', subModule: 'ac52-audit' },
+  '/accounting-v52/access': { module: 'accounting-v52', subModule: 'ac52-access' },
+  '/accounting-v52/integrations': { module: 'accounting-v52', subModule: 'ac52-integrations' },
+  '/accounting-v52/settings': { module: 'accounting-v52', subModule: 'ac52-settings' },
+
   // Performance Management routes
   '/performance': { module: 'performance-management', subModule: 'performance-dashboard' },
   '/performance/departments': { module: 'performance-management', subModule: 'departments-management' },
@@ -79,6 +133,31 @@ const routePermissions: Record<string, { module: string; subModule?: string }> =
   '/portfolio': { module: 'portfolio-management' },
   '/portfolio/funds': { module: 'portfolio-management', subModule: 'funds' },
   '/portfolio/companies': { module: 'portfolio-management', subModule: 'companies' },
+
+  // Portfolio V11 / V23 client design (live wire target)
+  '/portfolio-v11': { module: 'portfolio-v11', subModule: 'pv11-dashboard' },
+  '/portfolio-v11/deals': { module: 'portfolio-v11', subModule: 'pv11-deals' },
+  '/portfolio-v11/funds': { module: 'portfolio-v11', subModule: 'pv11-funds' },
+  '/portfolio-v11/capital-calls': { module: 'portfolio-v11', subModule: 'pv11-capital-calls' },
+  '/portfolio-v11/companies': { module: 'portfolio-v11', subModule: 'pv11-companies' },
+  '/portfolio-v11/cash-accounts': { module: 'portfolio-v11', subModule: 'pv11-cash-accounts' },
+  '/portfolio-v11/cash-overview': { module: 'portfolio-v11', subModule: 'pv11-cash-accounts' },
+  '/portfolio-v11/cash-ledger': { module: 'portfolio-v11', subModule: 'pv11-cash-accounts' },
+  '/portfolio-v11/cash-reservations': { module: 'portfolio-v11', subModule: 'pv11-cash-accounts' },
+  '/portfolio-v11/statement-imports': { module: 'portfolio-v11', subModule: 'pv11-cash-accounts' },
+  '/portfolio-v11/reconciliations': { module: 'portfolio-v11', subModule: 'pv11-cash-accounts' },
+  '/portfolio-v11/exceptions': { module: 'portfolio-v11', subModule: 'pv11-cash-accounts' },
+  '/portfolio-v11/period-close': { module: 'portfolio-v11', subModule: 'pv11-cash-accounts' },
+  '/portfolio-v11/reporting': { module: 'portfolio-v11', subModule: 'pv11-reporting' },
+  '/portfolio-v11/fund-performance': { module: 'portfolio-v11', subModule: 'pv11-reporting' },
+  '/portfolio-v11/lps': { module: 'portfolio-v11', subModule: 'pv11-lps' },
+  '/portfolio-v11/documents': { module: 'portfolio-v11', subModule: 'pv11-documents' },
+  '/portfolio-v11/reports-vault': { module: 'portfolio-v11', subModule: 'pv11-documents' },
+  '/portfolio-v11/e-signatures': { module: 'portfolio-v11', subModule: 'pv11-documents' },
+  '/portfolio-v11/mailer-lists': { module: 'portfolio-v11', subModule: 'pv11-documents' },
+  '/portfolio-v11/settings': { module: 'portfolio-v11', subModule: 'pv11-settings' },
+  '/portfolio-v11/analytics': { module: 'portfolio-v11', subModule: 'pv11-dashboard' },
+  '/portfolio-v11/applicant-portal': { module: 'portfolio-v11', subModule: 'pv11-deals' },
 
   // Application Portal routes
   '/application-portal': { module: 'application-portal' },
@@ -139,6 +218,61 @@ export function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl
 
+  // External LP / investee / apply portals: strict route allowlist (separate deployments).
+  if (PORTAL_ID === 'lp' || PORTAL_ID === 'investee') {
+    if (pathname === '/') {
+      const dest = token ? portalHomePath(PORTAL_ID) : '/login'
+      return NextResponse.redirect(new URL(dest, request.url))
+    }
+    if (!isPathAllowedForPortal(pathname, PORTAL_ID)) {
+      return NextResponse.redirect(new URL(portalHomePath(PORTAL_ID), request.url))
+    }
+  }
+
+  // Apply portal: public funding form only — no auth, no staff chrome.
+  if (PORTAL_ID === 'apply') {
+    if (pathname === '/' || pathname === '') {
+      return NextResponse.redirect(new URL('/funding-application', request.url))
+    }
+    if (!isPathAllowedForPortal(pathname, PORTAL_ID)) {
+      return NextResponse.redirect(new URL('/funding-application', request.url))
+    }
+    return NextResponse.next()
+  }
+
+  // Staff portal: send external portal paths to their dedicated domains.
+  if (PORTAL_ID === 'staff') {
+    if (pathname === '/' && token) {
+      return NextResponse.redirect(new URL(portalHomePath(PORTAL_ID), request.url))
+    }
+    if (pathname.startsWith('/lp-portal')) {
+      const suffix = pathname.replace(/^\/lp-portal/, '') || ''
+      return NextResponse.redirect(`${LP_PORTAL_EXTERNAL_URL}${suffix}`)
+    }
+    if (pathname.startsWith('/application-portal') || pathname.startsWith('/investee-portal-v8')) {
+      const suffix = pathname.startsWith('/investee-portal-v8')
+        ? pathname.replace(/^\/investee-portal-v8/, '')
+        : pathname.replace(/^\/application-portal/, '')
+      const base = INVESTEE_PORTAL_EXTERNAL_URL.replace(/\/$/, '')
+      return NextResponse.redirect(`${base}/investee-portal-v8${suffix}`)
+    }
+    if (
+      shouldRedirectFundingApplicationToApplyPortal() &&
+      (pathname === '/funding-application' || pathname.startsWith('/funding-application/'))
+    ) {
+      const suffix = pathname.replace(/^\/funding-application/, '') || ''
+      return NextResponse.redirect(
+        `${APPLY_PORTAL_EXTERNAL_URL.replace(/\/$/, '')}/funding-application${suffix}`,
+      )
+    }
+  }
+
+  // Investee deployment: legacy application-portal → V8 UI
+  if (PORTAL_ID === 'investee' && pathname.startsWith('/application-portal')) {
+    const suffix = pathname.replace(/^\/application-portal/, '') || ''
+    return NextResponse.redirect(new URL(`/investee-portal-v8${suffix}`, request.url))
+  }
+
   // Legacy /performance → current Performance Management (V22)
   if (
     pathname === "/performance" ||
@@ -147,31 +281,8 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/performance-v22", request.url))
   }
 
-  // Pass-through routes: always render regardless of auth state.
-  // These are public-facing pages reached via shared links (RSVP tokens,
-  // vendor quotation submissions, public tenders, KYC token forms, etc.)
-  // Logged-in users opening these links must NOT be bounced to /admin.
-  const passThroughRoutes = [
-    '/permissions-matrix',
-    '/events/rsvp',           // /events/rsvp/[token] — invitee RSVP page
-    '/events/public',         // /events/public/[id] — public event details
-    '/vendor/quotation/submit', // legacy vendor quotation form
-    '/vendor/invoice/submit',   // legacy vendor invoice form
-    '/vendor-quote',          // /vendor-quote/[rfqNumber]/[requisitionId] — quote submission via shared link
-    '/vendor-portal',         // vendor portal incl. /kyc/[token], /rfq/[rfqNumber], /register
-    '/public-tenders',        // public tender browsing
-    '/applications/form',     // public application form
-    '/vendor-quotations',     // vendor quotation submission routes
-    '/home-v3',               // Home Version 3 mock — public preview (no API / no login)
-    '/portfolio-v11',         // Portfolio V11 client design — public preview
-    '/payroll-v6',            // Payroll HR V6 client design — public preview
-    '/performance-v22',       // Performance Management V22.1 client design — public preview
-    '/fundraising-kyc',       // Investor KYC onboarding client design — public preview
-    '/investee-portal-v8',    // Investee Portal V8 client design — public preview
-    '/broker-instruction',    // Broker magic-link reply to trade instruction (no login)
-    '/[token]'
-  ]
-  if (passThroughRoutes.some((route) => pathname.startsWith(route))) {
+  // Pass-through routes (staff portal only — public/token pages stay on staff domain).
+  if (PORTAL_ID === 'staff' && isStaffPublicPassThrough(pathname)) {
     return NextResponse.next()
   }
 
@@ -193,15 +304,46 @@ export function middleware(request: NextRequest) {
       const profile = JSON.parse(decodeURIComponent(userProfile.value))
       const roleName = profile.role?.name?.toLowerCase()
 
-      // Redirect applicants to their portal, everyone else to admin
-      if (roleName === 'applicant') {
-        return NextResponse.redirect(new URL('/application-portal', request.url))
+      if (PORTAL_ID === 'lp') {
+        return NextResponse.redirect(new URL('/lp-portal', request.url))
+      }
+      if (PORTAL_ID === 'investee' || roleName === 'applicant') {
+        return NextResponse.redirect(new URL('/investee-portal-v8', request.url))
       }
 
-      return NextResponse.redirect(new URL('/admin', request.url))
+      return NextResponse.redirect(new URL(portalHomePath(PORTAL_ID), request.url))
     } catch (error) {
       console.error('Error parsing user profile:', error)
     }
+  }
+
+  // LP / investee portals: require auth; investee also rejects non-applicant cookies at the edge.
+  if (PORTAL_ID === 'lp' || PORTAL_ID === 'investee') {
+    if (!token && !isAuthRoute(pathname)) {
+      const loginUrl = new URL('/login', request.url)
+      loginUrl.searchParams.set('from', pathname)
+      return NextResponse.redirect(loginUrl)
+    }
+
+    if (PORTAL_ID === 'investee' && token && userProfile && !isAuthRoute(pathname)) {
+      try {
+        const profile = JSON.parse(decodeURIComponent(userProfile.value))
+        const roleName = String(profile.role?.name || profile.roleCode || '').toLowerCase()
+        if (roleName !== 'applicant' && profile.roleCode?.toLowerCase() !== 'applicant') {
+          const loginUrl = new URL('/login', request.url)
+          loginUrl.searchParams.set('from', pathname)
+          const res = NextResponse.redirect(loginUrl)
+          res.cookies.delete(process.env.NEXT_PUBLIC_AUTH_TOKEN_KEY || 'token')
+          res.cookies.delete(process.env.NEXT_PUBLIC_AUTH_USER_KEY || 'user')
+          res.cookies.delete(process.env.NEXT_PUBLIC_AUTH_PROFILE_KEY || 'userProfile')
+          return res
+        }
+      } catch {
+        /* fall through — client will resolve session */
+      }
+    }
+
+    return NextResponse.next()
   }
 
   // If accessing protected route without auth, redirect to login
@@ -220,7 +362,7 @@ export function middleware(request: NextRequest) {
 
       // Skip permission checks if already on an error page or accessing homepage
       const isErrorRedirect = request.nextUrl.searchParams.has('error')
-      const isHomePage = pathname === '/admin' || pathname === '/'
+      const isHomePage = pathname === '/admin' || pathname === '/' || pathname === '/home-v3'
 
       // Applicants can only access application portal
       if (roleName === 'applicant') {

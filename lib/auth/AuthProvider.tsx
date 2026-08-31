@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { useAppDispatch, useAppSelector } from '@/lib/store'
 import { checkAuthStatus } from '@/lib/store/slices/authSlice'
+import { PORTAL_ID } from '@/lib/portal/config'
 
 interface AuthProviderProps {
   children: React.ReactNode
@@ -30,21 +31,26 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // Only block the app on initial session resolution — not on background profile refresh
   const waitingForSession = isLoading && !bootTimedOut
 
-  // Skip auth boot gate on login and on Home Version 3 public preview (mock, no backend).
-  const skipAuthBoot =
-    pathname === '/login' ||
-    pathname === '/home-v3' ||
-    (pathname?.startsWith('/home-v3/') ?? false) ||
-    pathname === '/portfolio-v11' ||
-    (pathname?.startsWith('/portfolio-v11/') ?? false) ||
-    pathname === '/payroll-v6' ||
-    (pathname?.startsWith('/payroll-v6/') ?? false) ||
-    pathname === '/performance-v22' ||
-    (pathname?.startsWith('/performance-v22/') ?? false) ||
-    pathname === '/fundraising-kyc' ||
-    (pathname?.startsWith('/fundraising-kyc/') ?? false) ||
-    pathname === '/investee-portal-v8' ||
-    (pathname?.startsWith('/investee-portal-v8/') ?? false)
+  const isPublicDesignPreview =
+    PORTAL_ID === 'staff' &&
+    (pathname === '/home-v3' ||
+      (pathname?.startsWith('/home-v3/') ?? false) ||
+      pathname === '/portfolio-v11' ||
+      (pathname?.startsWith('/portfolio-v11/') ?? false) ||
+      pathname === '/payroll-v6' ||
+      (pathname?.startsWith('/payroll-v6/') ?? false) ||
+      pathname === '/performance-v22' ||
+      (pathname?.startsWith('/performance-v22/') ?? false) ||
+      pathname === '/fundraising-kyc' ||
+      (pathname?.startsWith('/fundraising-kyc/') ?? false) ||
+      pathname === '/investee-portal-v8' ||
+      (pathname?.startsWith('/investee-portal-v8/') ?? false) ||
+      pathname === '/funding-application' ||
+      (pathname?.startsWith('/funding-application/') ?? false) ||
+      pathname === '/applications/form' ||
+      (pathname?.startsWith('/applications/form/') ?? false))
+
+  const skipAuthBoot = pathname === '/login' || isPublicDesignPreview
 
   // Show loading state while checking authentication, but not on login page
   if (waitingForSession && !skipAuthBoot) {

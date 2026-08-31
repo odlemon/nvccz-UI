@@ -38,14 +38,22 @@ export const PV11_PATH_TO_PAGE: Record<string, string> = Object.fromEntries(
 )
 
 export function pathToPv11Page(pathname: string): string {
-  if (pathname in PV11_PATH_TO_PAGE) return PV11_PATH_TO_PAGE[pathname]
-  if (pathname.startsWith('/portfolio-v11/deals')) return 'deals'
-  if (pathname.startsWith('/portfolio-v11/funds')) return 'funds'
-  if (pathname.startsWith('/portfolio-v11/companies')) return 'companies'
-  if (pathname.startsWith('/portfolio-v11/lps')) return 'lps'
-  if (pathname.startsWith('/portfolio-v11/capital-calls')) return 'capital-calls'
-  if (pathname.startsWith('/portfolio-v11/reconciliations')) return 'reconciliations'
-  if (pathname.startsWith('/portfolio-v11/reports-vault')) return 'reports-vault'
+  const clean = String(pathname || '').replace(/\/+$/, '') || '/portfolio-v11'
+  if (clean in PV11_PATH_TO_PAGE) return PV11_PATH_TO_PAGE[clean]
+  if (clean.startsWith('/portfolio-v11/deals/detail')) return 'deal-detail'
+  if (clean.startsWith('/portfolio-v11/deals')) return 'deals'
+  if (clean.startsWith('/portfolio-v11/funds/detail')) return 'fund-detail'
+  if (clean.startsWith('/portfolio-v11/funds')) return 'funds'
+  if (clean.startsWith('/portfolio-v11/companies/detail')) return 'company-detail'
+  if (clean.startsWith('/portfolio-v11/companies')) return 'companies'
+  if (clean.startsWith('/portfolio-v11/lps/detail')) return 'lp-detail'
+  if (clean.startsWith('/portfolio-v11/lps')) return 'lps'
+  if (clean.startsWith('/portfolio-v11/capital-calls/detail')) return 'capital-call-detail'
+  if (clean.startsWith('/portfolio-v11/capital-calls')) return 'capital-calls'
+  if (clean.startsWith('/portfolio-v11/reconciliations/workspace')) return 'reconciliation-workspace'
+  if (clean.startsWith('/portfolio-v11/reconciliations')) return 'reconciliations'
+  if (clean.startsWith('/portfolio-v11/reports-vault/builder')) return 'report-builder'
+  if (clean.startsWith('/portfolio-v11/reports-vault')) return 'reports-vault'
   return 'dashboard'
 }
 

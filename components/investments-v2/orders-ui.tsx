@@ -5,10 +5,10 @@ import { Check, ChevronDown, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export const inputClass =
-  'h-9 w-full rounded-full border border-white/10 bg-[#0a1220] px-3 text-[11px] text-slate-100 outline-none transition focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/10 placeholder:text-slate-600'
+  'h-9 w-full rounded-full border border-white/10 bg-[#0a1220] px-3 iv2-text-label text-slate-100 outline-none transition focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/10 placeholder:text-slate-600'
 
 export const buttonClass =
-  'inline-flex h-9 items-center justify-center gap-2 rounded-full border border-white/10 px-4 text-[11px] font-semibold text-slate-200 transition hover:border-blue-400/40 hover:bg-blue-500/10 disabled:cursor-not-allowed disabled:opacity-40'
+  'inline-flex h-9 items-center justify-center gap-2 rounded-full border border-white/10 px-4 iv2-text-label font-semibold text-slate-200 transition hover:border-blue-400/40 hover:bg-blue-500/10 disabled:cursor-not-allowed disabled:opacity-40'
 
 export function OrdersPage({ title, description, actions, children }: { title: string; description: string; actions?: ReactNode; children: ReactNode }) {
   return (
@@ -16,9 +16,9 @@ export function OrdersPage({ title, description, actions, children }: { title: s
       <main className="mx-auto w-full max-w-[1680px] space-y-5 p-4 sm:p-6">
         <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-blue-400">Investments / Orders</p>
+            <p className="iv2-text-caption font-semibold uppercase tracking-[0.22em] text-blue-400">Investments / Orders</p>
             <h1 className="mt-1 text-xl font-semibold tracking-tight">{title}</h1>
-            <p className="mt-1 max-w-2xl text-[11px] text-slate-500">{description}</p>
+            <p className="mt-1 max-w-2xl iv2-text-label text-slate-500">{description}</p>
           </div>
           {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
         </header>
@@ -34,7 +34,7 @@ export function OrdersCard({ title, eyebrow, actions, className, children }: { t
       {(title || actions) && (
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.06] px-4 py-3.5">
           <div>
-            {eyebrow && <div className="text-[9px] uppercase tracking-[0.2em] text-slate-500">{eyebrow}</div>}
+            {eyebrow && <div className="iv2-text-micro uppercase tracking-[0.2em] text-slate-500">{eyebrow}</div>}
             {title && <h2 className="text-[12px] font-semibold text-slate-100">{title}</h2>}
           </div>
           {actions}
@@ -54,15 +54,15 @@ export function Pill({ children, tone = 'slate' }: { children: ReactNode; tone?:
     slate: 'border-white/10 bg-white/[0.04] text-slate-400',
     violet: 'border-violet-400/20 bg-violet-400/10 text-violet-300',
   }
-  return <span className={cn('inline-flex rounded-full border px-2 py-1 text-[9px] font-semibold uppercase tracking-wider', colors[tone])}>{children}</span>
+  return <span className={cn('inline-flex rounded-full border px-2 py-1 iv2-text-micro font-semibold uppercase tracking-wider', colors[tone])}>{children}</span>
 }
 
 export function Metric({ label, value, detail, tone = 'text-white' }: { label: string; value: string; detail?: string; tone?: string }) {
   return (
     <div className="rounded-[20px] border border-white/[0.06] bg-[#080e19]/75 p-3.5">
-      <div className="text-[9px] uppercase tracking-[0.16em] text-slate-500">{label}</div>
+      <div className="iv2-text-micro uppercase tracking-[0.16em] text-slate-500">{label}</div>
       <div className={cn('mt-1 font-mono text-lg font-semibold', tone)}>{value}</div>
-      {detail && <div className="mt-1 text-[9px] text-slate-600">{detail}</div>}
+      {detail && <div className="mt-1 iv2-text-micro text-slate-600">{detail}</div>}
     </div>
   )
 }
@@ -108,7 +108,7 @@ export function SelectField({ value, onChange, children, className }: { value: s
               aria-selected={option.value === value}
               key={`${option.value}-${option.label}`}
               onClick={() => { onChange(option.value); setOpen(false) }}
-              className={cn('flex w-full items-center justify-between gap-3 rounded-full px-3 py-2 text-left text-[10px] text-slate-400 transition hover:bg-blue-500/10 hover:text-white', option.value === value && 'bg-blue-500/10 text-blue-200')}
+              className={cn('flex w-full items-center justify-between gap-3 rounded-full px-3 py-2 text-left iv2-text-caption text-slate-400 transition hover:bg-blue-500/10 hover:text-white', option.value === value && 'bg-blue-500/10 text-blue-200')}
             >
               <span className="truncate">{option.label}</span>
               {option.value === value && <Check className="h-3 w-3 shrink-0 text-blue-400" />}
@@ -123,9 +123,9 @@ export function SelectField({ value, onChange, children, className }: { value: s
 export function Field({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) {
   return (
     <label className="block min-w-0">
-      <span className="mb-1.5 block text-[9px] font-medium uppercase tracking-[0.14em] text-slate-500">{label}</span>
+      <span className="mb-1.5 block iv2-text-micro font-medium uppercase tracking-[0.14em] text-slate-500">{label}</span>
       {children}
-      {hint && <span className="mt-1 block text-[9px] text-slate-600">{hint}</span>}
+      {hint && <span className="mt-1 block iv2-text-micro text-slate-600">{hint}</span>}
     </label>
   )
 }
@@ -145,7 +145,7 @@ export function Modal({ open, title, subtitle, onClose, children, footer, width 
         <div className="flex items-center justify-between border-b border-white/[0.07] px-5 py-4">
           <div>
             <h2 className="text-sm font-semibold">{title}</h2>
-            {subtitle && <p className="mt-0.5 text-[10px] text-slate-500">{subtitle}</p>}
+            {subtitle && <p className="mt-0.5 iv2-text-caption text-slate-500">{subtitle}</p>}
           </div>
           <button onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 hover:bg-white/10 hover:text-white"><X className="h-4 w-4" /></button>
         </div>
@@ -157,4 +157,4 @@ export function Modal({ open, title, subtitle, onClose, children, footer, width 
 }
 
 export const tableWrapClass = 'overflow-x-auto'
-export const tableClass = 'w-full min-w-[1050px] border-collapse text-left text-[10px] [&_th]:whitespace-nowrap [&_th]:border-b [&_th]:border-white/[0.07] [&_th]:px-3 [&_th]:py-2.5 [&_th]:font-medium [&_th]:uppercase [&_th]:tracking-wider [&_th]:text-slate-500 [&_td]:whitespace-nowrap [&_td]:border-b [&_td]:border-white/[0.045] [&_td]:px-3 [&_td]:py-3 [&_tbody_tr]:transition [&_tbody_tr:hover]:bg-blue-500/[0.06]'
+export const tableClass = 'w-full min-w-[1050px] border-collapse text-left iv2-text-caption [&_th]:whitespace-nowrap [&_th]:border-b [&_th]:border-white/[0.07] [&_th]:px-3 [&_th]:py-2.5 [&_th]:font-medium [&_th]:uppercase [&_th]:tracking-wider [&_th]:text-slate-500 [&_td]:whitespace-nowrap [&_td]:border-b [&_td]:border-white/[0.045] [&_td]:px-3 [&_td]:py-3 [&_tbody_tr]:transition [&_tbody_tr:hover]:bg-blue-500/[0.06]'

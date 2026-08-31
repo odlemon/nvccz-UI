@@ -67,6 +67,7 @@ import {
 } from "lucide-react"
 import { IconType } from "react-icons"
 import { IoPeopleOutline, IoReceiptOutline, IoStatsChartOutline } from "react-icons/io5"
+import { INVESTEE_PORTAL_EXTERNAL_URL, LP_PORTAL_EXTERNAL_URL } from '@/lib/portal/config'
 
 export interface SubModuleConfig {
   id: string
@@ -97,6 +98,8 @@ export interface ModuleConfig {
   minLevel?: number // Add this
   /** When true, hidden from App Switcher (replaced by a client design module). */
   hiddenFromSwitcher?: boolean
+  /** Dedicated portal URL — staff switcher opens in a new tab instead of in-app route. */
+  externalPortalUrl?: string
 }
 
 /**
@@ -108,6 +111,8 @@ export const SUPERSEDED_MODULE_IDS = new Set([
   "portfolio-management",
   "payroll",
   "accounting",
+  "accounting-v2",
+  "procurement",
   "performance-management",
 ])
 
@@ -351,6 +356,65 @@ export const MODULE_CONFIG: ModuleConfig[] = [
       { id: "pr6-settings", name: "Settings", path: "/payroll-v6/settings", icon: CiSettings, description: "Settings & integrations" },
       { id: "pr6-mypay", name: "My Pay", path: "/payroll-v6/mypay", icon: CiWallet, description: "My Pay" },
     ]
+  },
+  {
+    id: "procurement-v23",
+    name: "Procurement",
+    description: "Procurement & tender management — client V23 faithful port",
+    icon: CiViewList,
+    color: "oklch(0.56 0.10 220)",
+    path: "/procurement-v23",
+    subModules: [
+      { id: "pr23-dashboard", name: "Command Centre", path: "/procurement-v23", icon: CiGrid41, description: "Command Centre" },
+      { id: "pr23-plan", name: "Annual Procurement Plan", path: "/procurement-v23/plan", icon: CiCalendar, description: "Annual procurement plan" },
+      { id: "pr23-approvals", name: "Approval Centre", path: "/procurement-v23/approvals", icon: CiFileOn, description: "Approval centre" },
+      { id: "pr23-requisitions", name: "Purchase Requisitions", path: "/procurement-v23/requisitions", icon: CiFileOn, description: "Purchase requisitions" },
+      { id: "pr23-tenders", name: "Tenders & RFx", path: "/procurement-v23/tenders", icon: CiShop, description: "Tenders and RFx" },
+      { id: "pr23-evaluation", name: "Bid Evaluation", path: "/procurement-v23/evaluation", icon: CiViewTimeline, description: "Bid evaluation" },
+      { id: "pr23-vendors", name: "Vendor Registry", path: "/procurement-v23/vendors", icon: CiUser, description: "Vendor registry" },
+      { id: "pr23-contracts", name: "Contracts & Awards", path: "/procurement-v23/contracts", icon: CiFileOn, description: "Contracts and awards" },
+      { id: "pr23-orders", name: "Purchase Orders", path: "/procurement-v23/purchase-orders", icon: CiShop, description: "Purchase orders" },
+      { id: "pr23-receiving", name: "Receiving & Inspection", path: "/procurement-v23/goods-received", icon: CiViewTimeline, description: "Goods received" },
+      { id: "pr23-invoices", name: "Invoices & 3-Way Match", path: "/procurement-v23/invoices", icon: CiWallet, description: "Invoices and matching" },
+      { id: "pr23-accounts", name: "Accounts & Asset Transfers", path: "/procurement-v23/accounts", icon: CiMoneyCheck1, description: "Accounts and transfers" },
+      { id: "pr23-documents", name: "Document Vault", path: "/procurement-v23/documents", icon: CiFileOn, description: "Document vault" },
+      { id: "pr23-reports", name: "Reports Vault", path: "/procurement-v23/reports", icon: CiViewTable, description: "Reports vault" },
+      { id: "pr23-audit", name: "Audit & Compliance", path: "/procurement-v23/audit", icon: CiViewBoard, description: "Audit and compliance" },
+      { id: "pr23-settings", name: "Configuration & RBAC", path: "/procurement-v23/settings", icon: CiSettings, description: "Settings and RBAC" },
+    ],
+  },
+  {
+    id: "accounting-v52",
+    name: "Accounting",
+    description: "Accounting operating system — client V52 faithful port",
+    icon: CiDollar,
+    color: "oklch(0.55 0.14 255)",
+    path: "/accounting-v52",
+    subModules: [
+      { id: "ac52-overview", name: "Command Centre", path: "/accounting-v52", icon: CiGrid41, description: "Accounting Command Centre" },
+      { id: "ac52-approvals", name: "Approval Queue", path: "/accounting-v52/approvals", icon: CiFileOn, description: "Approval queue" },
+      { id: "ac52-close", name: "Period Close", path: "/accounting-v52/close", icon: CiCalendar, description: "Period close" },
+      { id: "ac52-ledger", name: "General Ledger", path: "/accounting-v52/general-ledger", icon: CiFileOn, description: "General ledger" },
+      { id: "ac52-journals", name: "Journal Entries", path: "/accounting-v52/journals", icon: CiFileOn, description: "Journal entries" },
+      { id: "ac52-cash", name: "Cash & Liquidity", path: "/accounting-v52/cash-book", icon: CiMoneyCheck1, description: "Cash book" },
+      { id: "ac52-recon", name: "Bank Reconciliation", path: "/accounting-v52/bank-reconciliation", icon: CiViewTimeline, description: "Bank reconciliation" },
+      { id: "ac52-payables", name: "Payables & Payments", path: "/accounting-v52/payables", icon: CiUser, description: "Payables" },
+      { id: "ac52-receivables", name: "Receivables", path: "/accounting-v52/receivables", icon: CiUser, description: "Receivables" },
+      { id: "ac52-expenses", name: "Expenses & Claims", path: "/accounting-v52/expenses", icon: IoReceiptOutline, description: "Expenses and claims" },
+      { id: "ac52-inventory", name: "Inventory Accounting", path: "/accounting-v52/inventory", icon: CiShop, description: "Inventory" },
+      { id: "ac52-assets", name: "Fixed Assets", path: "/accounting-v52/assets", icon: CiViewBoard, description: "Fixed assets" },
+      { id: "ac52-investments", name: "Short-Term Investments", path: "/accounting-v52/short-term-investments", icon: CiCoins1, description: "Short-term investments" },
+      { id: "ac52-reports", name: "Financial Reports", path: "/accounting-v52/reports", icon: CiViewTable, description: "Financial reports" },
+      { id: "ac52-compliance", name: "Compliance & Tax", path: "/accounting-v52/tax", icon: CiFileOn, description: "Compliance and tax" },
+      { id: "ac52-fx", name: "FX Revaluation", path: "/accounting-v52/fx-revaluation", icon: CiDollar, description: "FX revaluation" },
+      { id: "ac52-consolidation", name: "Group Consolidation", path: "/accounting-v52/consolidation", icon: CiViewBoard, description: "Consolidation" },
+      { id: "ac52-coa", name: "Chart of Accounts", path: "/accounting-v52/chart-governance", icon: CiSettings, description: "Chart governance" },
+      { id: "ac52-vault", name: "Document Vault", path: "/accounting-v52/vault", icon: CiFileOn, description: "Document vault" },
+      { id: "ac52-audit", name: "Audit Trail", path: "/accounting-v52/audit", icon: CiViewBoard, description: "Audit trail" },
+      { id: "ac52-access", name: "Access Control", path: "/accounting-v52/access", icon: CiUser, description: "Access control" },
+      { id: "ac52-integrations", name: "Integrations", path: "/accounting-v52/integrations", icon: CiGrid41, description: "Integrations" },
+      { id: "ac52-settings", name: "Settings", path: "/accounting-v52/settings", icon: CiSettings, description: "Settings" },
+    ],
   },
   {
     id: "procurement",
@@ -744,6 +808,8 @@ export const MODULE_CONFIG: ModuleConfig[] = [
     icon: Building2,
     color: "oklch(0.50 0.14 275)",
     path: "/investee-portal-v8",
+    hiddenFromSwitcher: true,
+    externalPortalUrl: INVESTEE_PORTAL_EXTERNAL_URL,
     subModules: [
       { id: "ip8-dashboard", name: "Overview", path: "/investee-portal-v8", icon: CiGrid41, description: "Company overview" },
       { id: "ip8-kpis", name: "KPI Centre", path: "/investee-portal-v8/kpis", icon: Target, description: "Investor-agreed metrics" },
@@ -764,6 +830,7 @@ export const MODULE_CONFIG: ModuleConfig[] = [
     icon: CiGrid41,
     description: "Manage applications and their lifecycle",
     color: "oklch(0.68 0.12 240)",
+    hiddenFromSwitcher: true,
     subModules: [
       {
         id: "application-dashboard",
@@ -833,6 +900,8 @@ export const MODULE_CONFIG: ModuleConfig[] = [
     icon: Landmark,
     description: "Limited Partner self-service fund dashboard and document vault",
     color: "oklch(0.60 0.14 220)",
+    hiddenFromSwitcher: true,
+    externalPortalUrl: LP_PORTAL_EXTERNAL_URL,
     subModules: [
       { id: "lp-dashboard", name: "Dashboard", path: "/lp-portal", icon: BarChart3, description: "Fund overview, NAV/IRR metrics, and FX rates" },
       { id: "lp-ledger", name: "Capital Account", path: "/lp-portal/ledger", icon: DollarSign, description: "Capital calls, distributions, and fees ledger" },

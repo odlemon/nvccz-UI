@@ -1,0 +1,4 @@
+value_date,trade_date,amount,debit_credit,reference,counterparty,description
+2026-08-20,2026-08-20,25000.00,Debit,TRD-BUY-CBZ-TEST,CBZ Custody,Equity purchase settlement — CBZ 2000 @ 12.50
+2026-08-20,2026-08-20,125.00,Debit,FEE-BRK-CBZ-TEST,Imara Capital,Broker commission — CBZ buy
+2026-08-19,2026-08-19,500000.00,Credit,DEP-TEST-TOPUP,CBZ Bank,Client deposit — test sleeve funding

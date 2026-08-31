@@ -489,3 +489,13 @@
 @media(prefers-reduced-motion:reduce){.investee-portal-v8-root *, .investee-portal-v8-root *:before, .investee-portal-v8-root *:after{scroll-behavior:auto!important;animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}}
 @media print{.investee-portal-v8-root .sidebar, .investee-portal-v8-root .topbar, .investee-portal-v8-root .page-head .actions, .investee-portal-v8-root .toasts, .investee-portal-v8-root .scrim, .investee-portal-v8-root .drawer, .investee-portal-v8-root .modal-wrap, .investee-portal-v8-root .command, .investee-portal-v8-root .mobile-nav-scrim{display:none!important}.investee-portal-v8-root .app, .investee-portal-v8-root .shell{display:block;height:auto;max-height:none}.investee-portal-v8-root .workspace{overflow:visible;padding:0}.investee-portal-v8-root .page{max-width:none}.investee-portal-v8-root .card{box-shadow:none;break-inside:avoid}}
 
+/* Typography readability — Arcus dev */
+.investee-portal-v8-root{
+  --mock-text-micro:11px;--mock-text-xs:12px;--mock-text-sm:13px;--mock-text-base:14px;--mock-muted:#525f73;
+  --muted:#525f73;--muted-2:#6b778c;font-size:var(--mock-text-base);
+}
+.investee-portal-v8-root .table th{font-size:var(--mock-text-micro)!important}
+.investee-portal-v8-root .table td{font-size:var(--mock-text-sm)!important}
+.investee-portal-v8-root .tiny,.investee-portal-v8-root .field label{font-size:var(--mock-text-xs)!important}
+@media(max-width:1280px){.investee-portal-v8-root{font-size:15px}}
+

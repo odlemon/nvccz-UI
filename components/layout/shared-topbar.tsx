@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -25,8 +25,10 @@ import {
   CiUser,
   CiLogout,
   CiCalendar,
-  CiCircleInfo
+  CiCircleInfo,
+  CiCircleChevDown,
 } from "react-icons/ci"
+import { Moon, Sun } from "lucide-react"
 import { NotificationsBell } from "@/components/notifications/notifications-bell"
 import { ModuleSwitcherButton } from "./module-switcher-button"
 import {
@@ -39,10 +41,37 @@ import { setCurrency } from "@/lib/store/slices/uiSlice"
 import { logoutUser } from "@/lib/store/slices/authSlice"
 import { toast } from "sonner"
 
+/** Module root selectors that should receive the dark class for full-module theming */
+const MODULE_ROOT_SELECTORS = [
+  "#app",
+  ".app",
+  ".performance-v22-root",
+  ".portfolio-v11-root",
+  ".payroll-v6-root",
+  ".procurement-v23-root",
+  ".accounting-v52-root",
+  ".home-v3-root",
+  ".investments-terminal",
+  ".events-root",
+  ".street-rates-root",
+  ".forecasting-root",
+  ".fundraising-root",
+  ".fundraising-kyc-root",
+].join(", ")
+
+function propagateDarkClass(isDark: boolean) {
+  document.documentElement.classList.toggle("dark", isDark)
+  document.querySelectorAll(MODULE_ROOT_SELECTORS).forEach((el) => {
+    el.classList.toggle("dark", isDark)
+  })
+}
+
 interface SharedTopbarProps {
   onModuleSelect: (module: string) => void
   currentModule: string
   moduleActions?: React.ReactNode
+  /** When true, hide the built-in theme toggle (for modules that provide their own). */
+  hideThemeToggle?: boolean
 }
 
 export function SharedTopbar(props: SharedTopbarProps) {
@@ -55,12 +84,28 @@ export function SharedTopbar(props: SharedTopbarProps) {
   )
 }
 
-function SharedTopbarInner({ currentModule, moduleActions }: SharedTopbarProps) {
+function SharedTopbarInner({ currentModule, moduleActions, hideThemeToggle = false }: SharedTopbarProps) {
   const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const [isDark, setIsDark] = useState(false)
   const appSwitcher = useArcusAppSwitcher()
   const dispatch = useAppDispatch()
   const currency = useAppSelector((state) => state.ui.currency)
   const { user, token, isAuthenticated, userDetails } = useAppSelector((state) => state.auth)
+
+  // Sync theme on mount — read saved preference and apply to all roots
+  useEffect(() => {
+    const saved = localStorage.getItem("arcus-theme")
+    const shouldBeDark = saved === "dark" || (!saved && window.matchMedia("(prefers-color-scheme: dark)").matches)
+    setIsDark(shouldBeDark)
+    propagateDarkClass(shouldBeDark)
+  }, [])
+
+  const toggleTheme = useCallback(() => {
+    const next = !isDark
+    setIsDark(next)
+    propagateDarkClass(next)
+    localStorage.setItem("arcus-theme", next ? "dark" : "light")
+  }, [isDark])
 
   // Check if user is applicant
   const isApplicant = user?.role?.toLowerCase() === 'applicant'
@@ -74,7 +119,6 @@ function SharedTopbarInner({ currentModule, moduleActions }: SharedTopbarProps) 
     try {
       await dispatch(logoutUser()).unwrap()
       toast.success("Logged out successfully!")
-      // Redirect to login page after successful logout
       window.location.href = '/login'
     } catch (error) {
       toast.error("Logout failed. Please try again.")
@@ -93,7 +137,7 @@ function SharedTopbarInner({ currentModule, moduleActions }: SharedTopbarProps) 
       <>
       <header data-arcus-shared-topbar className="h-20 border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="flex items-center justify-between h-full px-6">
-          {/* Left Section - Logo and Breadcrumb */}
+          {/* Left Section - Logo */}
           <div className="flex items-center gap-4">
             <div
               className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
@@ -108,7 +152,7 @@ function SharedTopbarInner({ currentModule, moduleActions }: SharedTopbarProps) 
             <div className="relative">
               <CiSearch size={30} className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Search here..."
+                 placeholder="Search here..."
                 className="pl-14 h-12 bg-background/50 border-border/50 focus:bg-background text-base"
               />
             </div>
@@ -117,6 +161,51 @@ function SharedTopbarInner({ currentModule, moduleActions }: SharedTopbarProps) 
           {/* Right Section - Actions and Profile */}
           <div className="flex items-center gap-3">
             {moduleActions}
+
+            {/* Theme Toggle — matches investments-v2 ThemeToggle */}
+            {!hideThemeToggle && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={toggleTheme}
+                    className="flex h-9 w-9 items-center justify-center rounded-full border border-border transition-all hover:bg-accent hover:text-accent-foreground"
+                    style={{
+                      background: 'var(--secondary)',
+                      color: 'var(--muted-foreground)',
+                    }}
+                    title={`Switch to ${isDark ? 'light' : 'dark'} mode`}
+                    aria-label={`Switch to ${isDark ? 'light' : 'dark'} mode`}
+                    aria-pressed={!isDark}
+                  >
+                    {isDark ? (
+                      <Sun className="w-4 h-4" />
+                    ) : (
+                      <Moon className="w-4 h-4" />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Toggle theme</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+
+            {/* Company Selector */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-9 gap-1 px-2 text-xs font-medium">
+                  Matanho Capital
+                  <CiCircleChevDown size={14} className="opacity-50" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={() => {}}>Matanho Capital</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => {}}>Matanho Holdings</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => {}}>Matanho Advisory</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             {/* App Switcher with Active Module - Hidden for applicants */}
             {!isApplicant && (
@@ -128,18 +217,6 @@ function SharedTopbarInner({ currentModule, moduleActions }: SharedTopbarProps) 
 
             {/* Notifications */}
             {!isApplicant && <NotificationsBell />}
-
-            {/* Calendar */}
-            {/* <Tooltip>
-            <TooltipTrigger asChild>
-              <div className="p-3 cursor-pointer h-12 w-12 flex items-center justify-center rounded-md hover:bg-accent hover:text-accent-foreground transition-colors">
-                <CiCalendar size={30} />
-              </div>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Calendar</p>
-            </TooltipContent>
-          </Tooltip> */}
 
             {/* Profile Dropdown */}
             <DropdownMenu>

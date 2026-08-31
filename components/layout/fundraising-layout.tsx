@@ -27,8 +27,8 @@ export function FundraisingLayout({ children }: FundraisingLayoutProps) {
   }
 
   return (
-    <div className="min-h-screen bg-[#f1f5f9]">
-      <SharedTopbar onModuleSelect={handleModuleSelect} currentModule={currentModule} />
+    <div className="min-h-screen bg-[#f1f5f9]" data-module="fundraising">
+      <SharedTopbar onModuleSelect={handleModuleSelect} currentModule={currentModule} hideThemeToggle />
       <div className="flex">
         <FundraisingSidebar />
         <main className="flex-1 overflow-auto min-h-[calc(100vh-5rem)] bg-[#f8fafc]">{children}</main>

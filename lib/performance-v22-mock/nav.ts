@@ -8,7 +8,6 @@ export const PM22_PAGE_TO_PATH: Record<string, string> = {
   'reviews': '/performance-v22/reviews',
   'corrective': '/performance-v22/corrective',
   'reports': '/performance-v22/reports',
-  'performanceReports': '/performance-v22/reports',
   'vault': '/performance-v22/vault',
   'alerts': '/performance-v22/alerts',
   'access': '/performance-v22/access',
@@ -16,8 +15,6 @@ export const PM22_PAGE_TO_PATH: Record<string, string> = {
   'integrations': '/performance-v22/integrations',
   'kpiAnalytics': '/performance-v22/kpi-analytics',
   'timesheets': '/performance-v22/timesheets',
-  'settings': '/performance-v22/access',
-  'contracts': '/performance-v22/reviews',
 }
 
 export const PM22_PATH_TO_PAGE: Record<string, string> = Object.fromEntries(
@@ -25,17 +22,13 @@ export const PM22_PATH_TO_PAGE: Record<string, string> = Object.fromEntries(
 )
 
 export function pathToPm22Page(pathname: string): string {
-  if (pathname === '/performance-v22' || pathname === '/performance-v22/') return 'dashboard'
+  if (pathname in PM22_PATH_TO_PAGE) return PM22_PATH_TO_PAGE[pathname]
   if (pathname.startsWith('/performance-v22/')) {
     const seg = pathname.replace('/performance-v22/', '').split('/')[0]
-    // Prefer route segment over reversed alias collisions (reports/access/reviews).
     if (seg === 'kpi-analytics') return 'kpiAnalytics'
-    if (seg === 'reports') return 'reports'
-    if (seg === 'access') return 'access'
-    if (seg === 'reviews') return 'reviews'
     if (seg && PM22_PAGE_TO_PATH[seg]) return seg
   }
-  return PM22_PATH_TO_PAGE[pathname] || 'dashboard'
+  return 'dashboard'
 }
 
 export const PM22_NAV_PAGES = [

@@ -34,6 +34,8 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+      upload:
+        condition: service_healthy
     networks:
       - default
       - edge
@@ -46,6 +48,8 @@ services:
       DB_PORT: "3306"
       DATABASE_URL: mysql://arcus_dev:${MYSQL_PASSWORD}@mysql:3306/arcus_dev
       RUN_SEED: "1"
+      REMOTE_UPLOAD_SERVICE_URL: http://upload:3050/upload
+      REMOTE_MEDIA_INTERNAL_BASE: http://upload:3050/uploads
     volumes:
       - arcus_dev_api_storage:/app/storage/local-upload-mock
     labels:
@@ -56,13 +60,36 @@ services:
       - traefik.http.routers.arcus-dev-api.tls.certresolver=le
       - traefik.http.services.arcus-dev-api.loadbalancer.server.port=3009
 
-  ui:
+  upload:
+    build:
+      context: ../upload-service
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      PORT: "3050"
+      UPLOAD_ROOT: /data/uploads
+    volumes:
+      - arcus_dev_upload:/data/uploads
+    ports:
+      - "127.0.0.1:3050:3050"
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:3050/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  ui-staff:
     build:
       context: ../src/ui
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL}
         NEXT_PUBLIC_WS_URL: ${PUBLIC_WS_URL}
+        NEXT_PUBLIC_PORTAL: staff
+        NEXT_PUBLIC_LP_PORTAL_URL: ${PUBLIC_LP_PORTAL_URL}
+        NEXT_PUBLIC_INVESTEE_PORTAL_URL: ${PUBLIC_INVESTEE_PORTAL_URL}
+        NEXT_PUBLIC_APPLY_PORTAL_URL: ${PUBLIC_APPLY_PORTAL_URL}
     restart: unless-stopped
     depends_on:
       - api
@@ -80,6 +107,88 @@ services:
       - traefik.http.routers.arcus-dev-ui.tls.certresolver=le
       - traefik.http.services.arcus-dev-ui.loadbalancer.server.port=3000
 
+  ui-lp:
+    build:
+      context: ../src/ui
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL}
+        NEXT_PUBLIC_WS_URL: ${PUBLIC_WS_URL}
+        NEXT_PUBLIC_PORTAL: lp
+    restart: unless-stopped
+    depends_on:
+      - api
+    networks:
+      - default
+      - edge
+    ports:
+      - "3110:3000"
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=lms_lms-network
+      - traefik.http.routers.arcus-dev-ui-lp.rule=Host(`lp.dev.arcus.co.zw`) || Host(`dev-lp.arcus.co.zw`)
+      - traefik.http.routers.arcus-dev-ui-lp.entrypoints=websecure
+      - traefik.http.routers.arcus-dev-ui-lp.tls.certresolver=le
+      - traefik.http.services.arcus-dev-ui-lp.loadbalancer.server.port=3000
+
+  ui-investee:
+    build:
+      context: ../src/ui
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL}
+        NEXT_PUBLIC_WS_URL: ${PUBLIC_WS_URL}
+        NEXT_PUBLIC_PORTAL: investee
+    restart: unless-stopped
+    depends_on:
+      - api
+    networks:
+      - default
+      - edge
+    ports:
+      - "3120:3000"
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=lms_lms-network
+      - traefik.http.routers.arcus-dev-ui-investee.rule=Host(`investee.dev.arcus.co.zw`) || Host(`dev-investee.arcus.co.zw`)
+      - traefik.http.routers.arcus-dev-ui-investee.entrypoints=websecure
+      - traefik.http.routers.arcus-dev-ui-investee.tls.certresolver=le
+      - traefik.http.services.arcus-dev-ui-investee.loadbalancer.server.port=3000
+
+  ui-apply:
+    build:
+      context: ../src/ui
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL}
+        NEXT_PUBLIC_WS_URL: ${PUBLIC_WS_URL}
+        NEXT_PUBLIC_PORTAL: apply
+    restart: unless-stopped
+    depends_on:
+      - api
+    networks:
+      - default
+      - edge
+    ports:
+      - "3130:3000"
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=lms_lms-network
+      - traefik.http.routers.arcus-dev-ui-apply.rule=Host(`apply.dev.arcus.co.zw`) || Host(`dev-apply.arcus.co.zw`)
+      - traefik.http.routers.arcus-dev-ui-apply.entrypoints=websecure
+      - traefik.http.routers.arcus-dev-ui-apply.tls.certresolver=le
+      - traefik.http.services.arcus-dev-ui-apply.loadbalancer.server.port=3000
+
 volumes:
   arcus_dev_mysql:
   arcus_dev_api_storage:
+  arcus_dev_upload:

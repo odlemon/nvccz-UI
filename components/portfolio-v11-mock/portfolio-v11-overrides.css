@@ -28,3 +28,88 @@
 .portfolio-v11-root .toast-stack {
   z-index: 200;
 }
+
+/* Live API action busy state on buttons */
+.portfolio-v11-root .button.is-loading {
+  position: relative;
+  pointer-events: none;
+  opacity: 0.78;
+}
+.portfolio-v11-root .button.is-loading > span:first-of-type {
+  opacity: 0.85;
+}
+.portfolio-v11-root .button.is-loading::after {
+  content: "";
+  width: 12px;
+  height: 12px;
+  margin-left: 6px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  display: inline-block;
+  vertical-align: middle;
+  animation: pv11-spin 0.7s linear infinite;
+}
+@keyframes pv11-spin {
+  to { transform: rotate(360deg); }
+}
+.portfolio-v11-root.is-action-busy .button.primary,
+.portfolio-v11-root.is-action-busy .modal-footer .button:not([data-action="close-modal"]) {
+  pointer-events: none;
+  opacity: 0.7;
+}
+.portfolio-v11-root .pv11-action-busy-banner {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  z-index: 180;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid rgba(37, 99, 235, 0.2);
+  font-size: 11px;
+  font-weight: 600;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+  pointer-events: none;
+}
+
+/* Live hydrate skeletons — never flash Matanho seed as “real” data */
+.portfolio-v11-root .pv11-skeleton {
+  border-radius: 12px;
+  background: linear-gradient(90deg, #eef2f7 0%, #f8fafc 45%, #eef2f7 90%);
+  background-size: 200% 100%;
+  animation: pv11-shimmer 1.2s ease-in-out infinite;
+}
+.portfolio-v11-root .pv11-skeleton-card {
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  border-radius: 16px;
+}
+.portfolio-v11-root.is-hydrating .workspace,
+.portfolio-v11-root.is-host-loading .workspace {
+  min-height: 60vh;
+}
+@keyframes pv11-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+/* Locked deal pipeline tabs */
+.portfolio-v11-root .tab.is-locked {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.portfolio-v11-root .tab.is-locked:hover {
+  color: inherit;
+}
+.portfolio-v11-root.is-hydrating .page-header h1::after {
+  content: " · Loading";
+  font-weight: 500;
+  font-size: 0.65em;
+  color: var(--muted, #8190aa);
+}
+.portfolio-v11-root .modal-rail-step.done b {
+  background: var(--emerald, #0a9e73);
+  color: #fff;
+}

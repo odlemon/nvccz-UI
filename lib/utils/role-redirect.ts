@@ -7,7 +7,8 @@ export interface RedirectConfig {
 
 export const getRoleBasedRedirect = (
   userDetails: UserDetails | null,
-  isApplicant: boolean
+  isApplicant: boolean,
+  portal: 'staff' | 'lp' | 'investee' = 'staff'
 ): RedirectConfig => {
   // Default redirect for unauthenticated users
   if (!userDetails) {
@@ -17,19 +18,26 @@ export const getRoleBasedRedirect = (
     }
   }
 
+  if (portal === 'lp') {
+    return { path: '/lp-portal', shouldRedirect: true }
+  }
+  if (portal === 'investee') {
+    return { path: '/investee-portal-v8', shouldRedirect: true }
+  }
+
   const roleName = userDetails.role.name.toLowerCase()
 
-  // Role-based redirect mapping
+  // Role-based redirect mapping (staff portal default landing)
   const roleRedirects: Record<string, string> = {
     'applicant': '/application-portal',
     'limited_partner': '/lp-portal',
-    'admin': '/',
-    'investment_manager': '/',
-    'board_member': '/',
-    'analyst': '/',
-    'finance': '/',
-    'compliance': '/',
-    'default': '/'
+    'admin': '/home-v3',
+    'investment_manager': '/home-v3',
+    'board_member': '/home-v3',
+    'analyst': '/home-v3',
+    'finance': '/home-v3',
+    'compliance': '/home-v3',
+    'default': '/home-v3'
   }
 
   // Check if user is applicant (either from isApplicant flag or role name)

@@ -2374,12 +2374,26 @@ class InvestmentOpsApiService {
     return apiClient.post(`${this.BASE}/setup/brokers`, data)
   }
 
+  async updateBroker(
+    id: string,
+    data: { name?: string; contactEmail?: string; deliveryMode?: string; isActive?: boolean }
+  ): Promise<InvestmentOpsResponse<StakeholderProfile>> {
+    return apiClient.put(`${this.BASE}/setup/brokers/${id}`, data)
+  }
+
   async listCustodians(): Promise<InvestmentOpsResponse<StakeholderProfile[]>> {
     return apiClient.get(`${this.BASE}/setup/custodians`)
   }
 
   async createCustodian(data: { name: string; contactEmail: string }): Promise<InvestmentOpsResponse<StakeholderProfile>> {
     return apiClient.post(`${this.BASE}/setup/custodians`, data)
+  }
+
+  async updateCustodian(
+    id: string,
+    data: { name?: string; contactEmail?: string; deliveryMode?: string; isActive?: boolean }
+  ): Promise<InvestmentOpsResponse<StakeholderProfile>> {
+    return apiClient.put(`${this.BASE}/setup/custodians/${id}`, data)
   }
 
   // ── Setup — Commissions ──────────────────────────────────────────────────────

@@ -52,6 +52,7 @@ export function InvestmentsV2Layout({ children }: InvestmentsV2LayoutProps) {
           onModuleSelect={handleModuleSelect}
           currentModule={currentModule}
           moduleActions={<ThemeToggle />}
+          hideThemeToggle
         />
 
         <div className="flex min-h-0 flex-1 overflow-hidden">

@@ -780,7 +780,7 @@ export default function OrderbookPage() {
           <table className={tableClass}>
             <thead>
               <tr>
-                {['Ref', 'Portfolio', 'Instrument', 'Side', 'Qty', 'Filled', 'Px', 'Gross', 'Broker', 'Trader', 'Dates', 'Status', 'Approval', 'Routing', 'Blotter'].map((h) => (
+                {['Ref', 'Portfolio', 'Instrument', 'Side', 'Qty', 'Filled', 'Px', 'Gross', 'Broker', 'Trader', 'Dates', 'Status', 'Approval'].map((h) => (
                   <th key={h}>{h}</th>
                 ))}
               </tr>
@@ -788,7 +788,7 @@ export default function OrderbookPage() {
             <tbody>
               {loading && (
                 <tr>
-                  <td colSpan={15} className="p-0">
+                  <td colSpan={13} className="p-0">
                     <OpsTableSkeleton rows={8} cols={8} />
                   </td>
                 </tr>
@@ -849,22 +849,6 @@ export default function OrderbookPage() {
                       >
                         {order.approval}
                       </Pill>
-                    </td>
-                    <td>{order.routing}</td>
-                    <td onClick={(e) => e.stopPropagation()}>
-                      {orderHasBlotterLink(order) ? (
-                        <button
-                          type="button"
-                          onClick={() => openBlotterForOrder(order)}
-                          className="inline-flex items-center gap-1 rounded-full border border-blue-400/30 px-2 py-1 text-[9px] text-blue-300 hover:bg-blue-500/10"
-                          title="Open linked trade on Trade Blotter"
-                        >
-                          <ExternalLink className="h-3 w-3" />
-                          Open
-                        </button>
-                      ) : (
-                        <span className="text-[9px] text-slate-600">—</span>
-                      )}
                     </td>
                   </tr>
                 ))}

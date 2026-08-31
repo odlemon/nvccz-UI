@@ -6,7 +6,8 @@ import fs from "fs"
 import path from "path"
 
 const CLIENT =
-  "C:/Users/lysp/Downloads/Matanho_Performance_Management_v22_1_Deployment_Developer_Package-20260815T160741Z-1-001/Matanho_Performance_Management_v22_1_Deployment_Developer_Package"
+  process.env.PM22_CLIENT_PACKAGE ||
+  "C:/Users/lysp/Downloads/Matanho_Performance_Management_v22_1_Deployment_Developer_Package-20260828T144718Z-1-001/Matanho_Performance_Management_v22_1_Deployment_Developer_Package"
 const INDEX = path.join(CLIENT, "public/index.html")
 const ROOT = "performance-v22-root"
 const OUT_DIR = "components/performance-v22-mock"
@@ -224,6 +225,13 @@ code = code.replace(
 )
 
 const runtime = `/* Auto-extracted Matanho Performance Management V22.1 — adapted for Next.js */
+import {
+  applySessionUserToProfile,
+  buildArcusProfilePopoverHtml,
+  clientDesignSignOut,
+  getClientDesignSessionUser,
+  onClientDesignSessionUser,
+} from "@/components/client-design-mock/runtime-auth";
 export function startPerformanceV22Runtime(rootEl, options = {}) {
   const initialPage = options.initialPage || 'dashboard';
   window.__PERFORMANCE_V22_NAV__ = options.onNavigate || (() => {});
@@ -238,6 +246,7 @@ export function startPerformanceV22Runtime(rootEl, options = {}) {
   });
 
   rootEl.innerHTML = options.shellHtml || '';
+  (function pm22EnsureExpanded(){const a=rootEl.querySelector('#app');if(a){a.classList.add('expanded');}})();
 
   const __pm22Abort = new AbortController();
   const __pm22Sig = { signal: __pm22Abort.signal };
@@ -260,6 +269,8 @@ ${code}
   if (typeof render === 'function') render();
   __pm22Ready = true;
 
+  const __pm22SessionOff = onClientDesignSessionUser(() => applySessionUserToProfile(rootEl))
+
   api = {
     setPage(page) {
       if (!page) return;
@@ -269,6 +280,7 @@ ${code}
       try { $('#app')?.classList?.remove('mobile-nav'); } catch (_) {}
     },
     destroy() {
+      try { __pm22SessionOff?.() } catch (_) {}
       try { __pm22Abort.abort(); } catch (_) {}
       delete window.__PERFORMANCE_V22_NAV__;
       rootEl.innerHTML = '';
@@ -317,6 +329,41 @@ function injectSignal(src) {
 }
 
 let rt = injectSignal(runtime)
+
+// Next.js Arcus session bridge (not in client package)
+if (!rt.includes("function openUserMenu")) {
+  rt = rt.replace(
+    /function search\(\)/,
+    `function openUserMenu(anchor){
+ const sessionUser=getClientDesignSessionUser();
+ const person=sessionUser?.name||(typeof rolePerson!=='undefined'&&rolePerson[state.role])||'Tariro Moyo';
+ const r=(anchor&&anchor.getBoundingClientRect)?anchor.getBoundingClientRect():{bottom:56,right:innerWidth-20};
+ const p=document.createElement('div');p.className='popover';p.style.top=(r.bottom+8)+'px';p.style.right=Math.max(16,innerWidth-r.right)+'px';p.style.position='fixed';p.style.zIndex='120';
+ p.innerHTML=buildArcusProfilePopoverHtml(sessionUser||{name:person,email:sessionUser?.email||'',role:sessionUser?.role||state.role,initials:sessionUser?.initials||person.split(/\\s+/).map(x=>x[0]).slice(0,2).join('').toUpperCase()},icon('users'));
+ $('#popoverLayer').innerHTML='';$('#popoverLayer').appendChild(p);
+}
+function search()`
+  )
+}
+rt = rt.replace(
+  `'user-menu':()=>toast('User profile','Identity, delegated authority and access scope are centrally managed.'),`,
+  `'user-menu':()=>openUserMenu(el),\n  'client-design-sign-out':()=>{closeOverlays();clientDesignSignOut()},`
+)
+rt = rt.replace(
+  /function openApps\(anchor\)\{const r=anchor\.getBoundingClientRect\(\)/,
+  `function openApps(_anchor){if(typeof window.__openArcusAppSwitcher==='function'){window.__openArcusAppSwitcher();return;}const r=(_anchor&&_anchor.getBoundingClientRect)?_anchor.getBoundingClientRect():{bottom:56}`
+)
+if (!rt.includes("'module-switcher'")) {
+  rt = rt.replace(
+    `'apps':()=>openApps(el),`,
+    `'apps':()=>openApps(el),'module-switcher':()=>openApps(el),`
+  )
+}
+rt = rt.replace(
+  / w\.innerHTML=pages\[state\.page\]\(\); wireIcons\(\); w\.scrollTop=0;/,
+  " const __pageFn=pages[state.page];if(typeof __pageFn==='function'){w.innerHTML=__pageFn();}else{w.innerHTML=`<div class=\"page\">${pageHead('Unavailable',String(state.page||'Unknown'),'This workspace page is not registered in the current build.')}</div>`;console.warn('[performance-v22] missing page renderer',state.page);}wireIcons(); w.scrollTop=0;"
+)
+
 fs.writeFileSync(path.join(OUT_DIR, "matanho-performance-runtime.js"), rt)
 console.log("runtime", fs.statSync(path.join(OUT_DIR, "matanho-performance-runtime.js")).size)
 console.log("nav bridge", rt.includes("__PERFORMANCE_V22_NAV__"))
@@ -366,6 +413,8 @@ ${pages.map(([id, p, name]) => `  { id: 'pm22-${id}', page: '${id}', path: '${p}
 `
 fs.writeFileSync(path.join(LIB_DIR, "nav.ts"), navTs)
 
+const SKIP_NEXT_ROUTES = true
+if (!SKIP_NEXT_ROUTES) {
 const pageTpl = (label) => `/** Public fixture preview — no ModuleGuard (middleware pass-through). */
 export default function Page() {
   return <span>${label}</span>
@@ -392,6 +441,7 @@ for (const [id, p, name] of pages) {
   const dir = path.join(APP_DIR, rel)
   fs.mkdirSync(dir, { recursive: true })
   fs.writeFileSync(path.join(dir, "page.tsx"), pageTpl(name))
+}
 }
 
 console.log("done")

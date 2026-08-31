@@ -1,14 +1,12 @@
 "use client"
 
 import type React from "react"
-import { useEffect, useState } from "react"
-import { usePathname, useRouter } from "next/navigation"
+import { useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { LpPortalTopbar } from "./lp-portal-topbar"
 import { LpPortalSidebar } from "./lp-portal-sidebar"
-import { ClientDesignAppSwitcher } from "./client-design-app-switcher"
-import { getModuleByPath } from "@/lib/config/modules"
 import { useRolePermissions } from "@/lib/hooks/useRolePermissions"
-import { toast } from "sonner"
+import { PORTAL_ID } from "@/lib/portal/config"
 
 interface LpPortalLayoutProps {
   children: React.ReactNode
@@ -16,15 +14,13 @@ interface LpPortalLayoutProps {
 
 export function LpPortalLayout({ children }: LpPortalLayoutProps) {
   const router = useRouter()
-  const pathname = usePathname()
-  const [currentModule, setCurrentModule] = useState("lp-portal")
   const { hasModuleAccess, isLoading, isAuthenticated } = useRolePermissions()
-  const canAccessPortal = isAuthenticated && hasModuleAccess("lp-portal")
 
-  useEffect(() => {
-    const module = getModuleByPath(pathname)
-    if (module) setCurrentModule(module.id)
-  }, [pathname])
+  // Dedicated LP deployment: backend already validated portal access at login.
+  const canAccessPortal =
+    PORTAL_ID === "lp"
+      ? isAuthenticated
+      : isAuthenticated && hasModuleAccess("lp-portal")
 
   useEffect(() => {
     const html = document.documentElement
@@ -42,23 +38,16 @@ export function LpPortalLayout({ children }: LpPortalLayoutProps) {
     if (isLoading) return
     if (!isAuthenticated) {
       router.replace("/login")
-      return
     }
-    if (!hasModuleAccess("lp-portal")) {
-      toast.error("You do not have access to the LP Portal.")
-      router.replace("/")
-    }
-  }, [isLoading, isAuthenticated, hasModuleAccess, router])
+  }, [isLoading, isAuthenticated, router])
 
-  if (isLoading) {
+  if (isLoading || !canAccessPortal) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
+      <div className="flex min-h-screen items-center justify-center bg-[#f5f7fb]">
         <div className="size-8 animate-spin rounded-full border-2 border-slate-200 border-t-blue-600" />
       </div>
     )
   }
-
-  if (!canAccessPortal) return null
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-background">
@@ -71,7 +60,6 @@ export function LpPortalLayout({ children }: LpPortalLayoutProps) {
           <div className="mx-auto w-full max-w-[1500px] p-3 lg:p-4">{children}</div>
         </main>
       </div>
-      <ClientDesignAppSwitcher currentModule={currentModule} showHeaderButton={false} />
     </div>
   )
 }

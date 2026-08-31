@@ -31,6 +31,7 @@ export function MatanhoAuthShell({
         alt=""
         fill
         priority
+        unoptimized
         className="object-cover object-center"
         sizes="100vw"
       />
@@ -90,6 +91,7 @@ export function MatanhoAuthShell({
                 alt="Matanho — Investment Management ERP"
                 width={200}
                 height={64}
+                unoptimized
                 className="h-11 w-auto object-contain mb-3 brightness-0 invert"
                 priority
               />

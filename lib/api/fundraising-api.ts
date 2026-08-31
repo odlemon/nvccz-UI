@@ -841,6 +841,14 @@ async function signSignatory(
   return unwrapData(res)
 }
 
+async function sendAgreement(agreementId: string, body: Record<string, any> = {}) {
+  const res = await apiClient.post<ApiResponse<any>>(
+    `${FR}/agreements/${agreementId}/send`,
+    body
+  )
+  return unwrapData(res)
+}
+
 // ─── Placement agents ────────────────────────────────────────────────────────
 
 async function listPlacementAgents() {
@@ -1264,6 +1272,7 @@ export const fundraisingApi = {
   uploadAgreementVersion,
   addSignatory,
   signSignatory,
+  sendAgreement,
   // placement
   listPlacementAgents,
   createPlacementAgent,

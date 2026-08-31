@@ -55,7 +55,7 @@ export function ModuleSwitcherButton({
         <CiGrid41 size={20} style={{ color: SWITCHER_ICON }} />
       </span>
       {!hideLabel ? (
-        <span className="hidden max-w-[140px] truncate text-sm capitalize text-muted-foreground group-hover:text-foreground sm:inline">
+        <span className="hidden whitespace-nowrap text-sm capitalize text-muted-foreground group-hover:text-foreground sm:inline">
           {label.replace(/-/g, " ")}
         </span>
       ) : null}

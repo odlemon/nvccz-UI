@@ -1,6 +1,18 @@
 /* Performance V22 shell — same full-bleed pattern as payroll-v6 / portfolio-v11 / home-v3:
    fixed left rail, topbar+workspace fill the remaining viewport. No centered page gutters. */
 
+/* Hide the enterprise context bar (Matanho Capital / Enterprise Performance Command Centre …) */
+.performance-v22-root .enterprise-contextbar-v7,
+.performance-v22-root [id="enterpriseContextBarV7"] {
+  display: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+  overflow: hidden !important;
+}
+
 .performance-v22-root {
   --pm22-sidebar: 66px;
   position: relative;

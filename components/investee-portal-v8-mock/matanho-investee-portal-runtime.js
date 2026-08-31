@@ -1,17 +1,24 @@
 /* Auto-extracted Matanho Investee Portal V8 — adapted for Next.js */
+import {
+  applySessionUserToProfile,
+  clientDesignSignOut,
+  getClientDesignSessionUser,
+  onClientDesignSessionUser,
+} from "@/components/client-design-mock/runtime-auth";
 export function startInvesteePortalV8Runtime(rootEl, options = {}) {
   const initialPage = options.initialPage || 'dashboard';
+  const liveOnly = options.liveOnly !== false;
   window.__INVESTEE_V8_NAV__ = options.onNavigate || (() => {});
   window.MATANHO_CONFIG = Object.assign({
     apiBaseUrl: '',
     apiPrefix: '/api/v1/investee-portal',
-    useMockData: true,
+    useMockData: !liveOnly,
     credentials: 'include',
     authToken: '',
     csrfToken: '',
     requestTimeoutMs: 20000,
     debug: false,
-  }, window.MATANHO_CONFIG || {}, { useMockData: true });
+  }, window.MATANHO_CONFIG || {}, { useMockData: !liveOnly });
 
   rootEl.innerHTML = options.shellHtml || '';
   rootEl.dataset.theme = rootEl.dataset.theme || 'light';
@@ -50,7 +57,7 @@ const navGroups=[
  {label:'Administration',items:[['team','Team & Access','shield'],['settings','Settings','settings']]}
 ];
 const store={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}}};
-const state={page:(typeof initialPage==='string'&&initialPage&&initialPage!=='integrations')?initialPage:'dashboard',theme:store.get('matanho-investee-theme')||'light',collapsed:false,scenario:'Base case',reportTab:'schedule',activeThread:0,forecastSheet:'Operating Plan',activeForecastCell:'B3',forecastCloseDay:Number(store.get('matanho-forecast-close-day')||5),forecastLockPast:store.get('matanho-forecast-lock-past')!=='0'};
+const state={page:(typeof initialPage==='string'&&initialPage&&initialPage!=='integrations')?initialPage:'dashboard',theme:store.get('matanho-investee-theme')||'light',collapsed:false,scenario:'Base case',reportTab:'schedule',activeThread:0,forecastSheet:'Operating Plan',activeForecastCell:'B3',forecastCloseDay:Number(store.get('matanho-forecast-close-day')||5),forecastLockPast:store.get('matanho-forecast-lock-past')!=='0',liveOnly,liveData:false,livePayload:null,liveLoadError:''};
 const company={name:'Zambezi Pay Technologies',short:'Zambezi Pay',fund:'Matanho Venture Fund I',sector:'Financial technology',stage:'Series B',currency:'USD',investmentDate:'18 Jan 2022',invested:28000000,valuation:72300000,ownership:16.7,board:'Board observer',lead:'Nyasha Moyo',reporting:'Quarterly',nextBoard:'05 Sep 2026'};
 const metrics=[
  {label:'Revenue · Q2',value:'$3.42m',foot:'+18.6% vs Q2 2025',trend:'up',icon:'trending',tone:'',series:[42,48,54,57,65,74]},
@@ -233,7 +240,38 @@ function forecastsPage(){const s=scenarios[state.scenario],current=forecastCurre
  <div class="scenario-strip">${Object.entries(scenarios).map(([name,v])=>`<button class="scenario-compact ${state.scenario===name?'active':''}" data-action="scenario" data-scenario="${name}"><span><strong>${name}</strong><small>${name==='Base case'?'Board-approved plan':name==='Upside'?'Accelerated growth':'Liquidity stress case'}</small></span><span><b>$${v.revenue}m</b><small>Revenue</small></span><span><b>${v.runway} mo</b><small>Runway</small></span></button>`).join('')}</div>
  ${forecastGrid()}
  <div class="grid g3 forecast-insights"><div class="card"><div class="card-head"><div><h2>Period controls</h2><p>Automatic actual-versus-forecast classification</p></div>${pill('Active','success')}</div><div class="card-body"><dl class="detail-list"><div class="detail-row"><dt>Past months</dt><dd>Actuals · locked</dd></div><div class="detail-row"><dt>${current.label}</dt><dd>Actuals · open</dd></div><div class="detail-row"><dt>Upcoming months</dt><dd>Forecast · editable</dd></div></dl></div></div><div class="card"><div class="card-head"><div><h2>Scenario summary</h2><p>${state.scenario}</p></div></div><div class="card-body"><dl class="detail-list"><div class="detail-row"><dt>Rolling revenue</dt><dd>$${s.revenue}m</dd></div><div class="detail-row"><dt>Rolling EBITDA</dt><dd>$${s.ebitda}m</dd></div><div class="detail-row"><dt>Financing need</dt><dd>${s.raise?`$${s.raise}m`:'None'}</dd></div></dl></div></div><div class="card"><div class="card-head"><div><h2>Version control</h2><p>Controlled planning history</p></div></div><div class="card-body"><dl class="detail-list"><div class="detail-row"><dt>Working version</dt><dd>v8 Draft</dd></div><div class="detail-row"><dt>Last actual close</dt><dd>${forecastPeriods[2].label} · locked</dd></div><div class="detail-row"><dt>Owner</dt><dd>Tariro Moyo</dd></div></dl></div></div></div></section>`}
-function termsPage(){return `<section class="page">${pageHead('Term Sheet & Investment Terms','A plain-language, permission-controlled view of your executed investment terms.',`${btn('Download executed copy','download-term','primary','download')}${btn('Request clarification','term-question','','message')}`)}
+function liveEmptyCard(message) {
+  return `<div class="empty">${icon('info')}<strong>No data</strong><span>${escapeHTML(String(message || 'Nothing returned from the API yet.'))}</span></div>`;
+}
+function asLiveArray(v) {
+  if (Array.isArray(v)) return v;
+  if (v && Array.isArray(v.data)) return v.data;
+  if (v?.data?.termSheets && Array.isArray(v.data.termSheets)) return v.data.termSheets;
+  return [];
+}
+function liveTermSheets() {
+  return asLiveArray(state.livePayload?.termSheets?.data?.termSheets || state.livePayload?.termSheets);
+}
+function liveCompanyRecord() {
+  return state.livePayload?.company?.data || state.livePayload?.company || null;
+}
+function termsPage(){
+  if (state.liveOnly && state.liveData) {
+    const sheets = liveTermSheets();
+    const ts = sheets[0];
+    if (!ts) {
+      return `<section class="page">${pageHead('Term Sheet & Investment Terms','Review the investment terms prepared for your application.',`${btn('Refresh','refresh-live','','refresh')}`)}${liveEmptyCard('No term sheet has been created for your application yet. Your investor will notify you when terms are ready.')}</section>`;
+    }
+    const biz = ts.application?.businessName || liveCompanyRecord()?.name || 'Your company';
+    const amount = ts.investmentAmount != null ? fmt.money(Number(ts.investmentAmount)) : '—';
+    const equity = ts.equityPercentage != null ? `${Number(ts.equityPercentage)}%` : '—';
+    const valuation = ts.valuation != null ? fmt.money(Number(ts.valuation)) : '—';
+    const status = String(ts.status || 'DRAFT');
+    return `<section class="page">${pageHead('Term Sheet & Investment Terms','Live term sheet from your application record.',`${ts.documentUrl ? btn('Download document','download-term','primary','download') : ''}${btn('Refresh','refresh-live','','refresh')}`)}
+ <div class="term-hero"><div class="term-hero-head"><div><div class="eyebrow" style="color:#b8b0ff">${escapeHTML(String(ts.title || 'Term sheet'))}</div><h2>${escapeHTML(String(biz))}</h2><p>Status ${escapeHTML(status)} · Updated ${escapeHTML(String(ts.updatedAt || ts.createdAt || '').slice(0, 10))}</p></div>${pill(status.replace(/_/g, ' '), /signed|final|executed/i.test(status) ? 'success' : 'warning')}</div><div class="term-grid"><div class="term-stat"><span>Investment</span><strong>${amount}</strong></div><div class="term-stat"><span>Equity</span><strong>${equity}</strong></div><div class="term-stat"><span>Pre-money value</span><strong>${valuation}</strong></div><div class="term-stat"><span>Stage</span><strong>${escapeHTML(String(ts.application?.currentStage || '—'))}</strong></div></div></div>
+ <div class="card" style="margin-top:14px"><div class="card-head"><div><h2>Key terms</h2><p>From the term sheet record</p></div></div><div class="card-body"><dl class="detail-list"><div class="detail-row"><dt>Title</dt><dd>${escapeHTML(String(ts.title || '—'))}</dd></div><div class="detail-row"><dt>Key terms</dt><dd>${escapeHTML(String(ts.keyTerms || '—'))}</dd></div><div class="detail-row"><dt>Conditions</dt><dd>${escapeHTML(String(ts.conditions || '—'))}</dd></div><div class="detail-row"><dt>Timeline</dt><dd>${escapeHTML(String(ts.timeline || '—'))}</dd></div></dl></div></div></section>`;
+  }
+  return `<section class="page">${pageHead('Term Sheet & Investment Terms','A plain-language, permission-controlled view of your executed investment terms.',`${btn('Download executed copy','download-term','primary','download')}${btn('Request clarification','term-question','','message')}`)}
  <div class="term-hero"><div class="term-hero-head"><div><div class="eyebrow" style="color:#b8b0ff">SERIES B INVESTMENT</div><h2>Zambezi Pay Technologies</h2><p>Executed 18 January 2022 · Closed 02 March 2022 · Current governing version</p></div>${pill('Executed','success')}</div><div class="term-grid"><div class="term-stat"><span>Investment</span><strong>$28.0m</strong></div><div class="term-stat"><span>Security</span><strong>Series B</strong></div><div class="term-stat"><span>Fund ownership</span><strong>16.7%</strong></div><div class="term-stat"><span>Pre-money value</span><strong>$140.0m</strong></div><div class="term-stat"><span>Board rights</span><strong>Observer</strong></div></div></div>
  <div class="grid main-side-wide" style="margin-top:14px"><div class="stack"><div class="card"><div class="card-head"><div><h2>Commercial terms</h2><p>Core economics and security rights</p></div>${pill('Effective','success')}</div><div class="card-body"><dl class="detail-list"><div class="detail-row"><dt>Security issued</dt><dd>Series B preferred shares<small>1,670,000 shares issued at closing</small></dd></div><div class="detail-row"><dt>Liquidation preference</dt><dd>1.0× non-participating<small>Investor receives the greater of original investment or as-converted proceeds.</small></dd></div><div class="detail-row"><dt>Conversion</dt><dd>1:1 voluntary conversion<small>Automatic conversion on a qualified IPO or majority preferred approval.</small></dd></div><div class="detail-row"><dt>Anti-dilution</dt><dd>Broad-based weighted average<small>Applies to qualifying down-round issuances, subject to customary exclusions.</small></dd></div><div class="detail-row"><dt>Dividend</dt><dd>Non-cumulative, when declared<small>Pari passu with other preferred classes.</small></dd></div><div class="detail-row"><dt>Founder vesting</dt><dd>36 months remaining at closing<small>Monthly vesting with agreed good-leaver and bad-leaver provisions.</small></dd></div></dl></div></div>
  <div class="card"><div class="card-head"><div><h2>Rights, covenants & obligations</h2><p>What the company must do and when investor consent is required</p></div></div><div class="card-body">${[['Information rights','Monthly management accounts within 15 business days; quarterly investor report within 30 days; annual audited financial statements within 120 days.','Current'],['Pro-rata rights','Matanho may maintain its fully diluted ownership in future equity issuances, subject to customary exclusions.','Active'],['Reserved matters','New debt above $1.5m, material acquisitions, changes to share capital, executive remuneration changes and annual budget approval require investor consent.','3 pending'],['Board rights','One non-voting board observer seat, full board materials and reasonable access to management.','Current'],['ESG & compliance','Maintain approved policies, report material incidents within 48 hours and complete annual ESG questionnaire.','Current']].map(([h,p,s])=>`<div class="clause"><div class="clause-head"><h4>${h}</h4>${pill(s,s==='3 pending'?'warning':'success')}</div><p>${p}</p></div>`).join('')}</div></div></div>
@@ -342,6 +380,7 @@ function updateDilution(){const amount=Number($('#roundAmount')?.value||20000000
 document.addEventListener('click',e=>{
  const el=e.target.closest('[data-action]');if(!el)return;const a=el.dataset.action;
  if(a==='navigate')return navigate(el.dataset.page);
+ if(a==='refresh-live'){window.dispatchEvent(new CustomEvent('investee:reload-request'));return toast('Refreshing','Loading live data from the API.');}
  if(a==='mobile-menu'){return $('#app').classList.toggle('mobile-open')}
  if(a==='collapse'){state.collapsed=!state.collapsed;store.set('matanho-investee-collapsed',state.collapsed?'1':'0');return render()}
  if(a==='theme'){state.theme=state.theme==='light'?'dark':'light';store.set('matanho-investee-theme',state.theme);return render()}
@@ -374,7 +413,8 @@ document.addEventListener('click',e=>{
  if(a==='switch'){el.classList.toggle('on');return toast('Preference updated','The setting has been changed for this prototype.')}
  if(a==='thread'){state.activeThread=Number(el.dataset.index);return render()}
  if(a==='notifications')return openDrawer('Notifications','Portfolio company alerts and reminders',`<div class="action-list"><div class="action-row" data-action="open-request" data-id="REQ-204"><span class="action-icon">${icon('alert')}</span><span class="action-copy"><strong>Procurement-request drill-down due soon</strong><span>POS terminal quotations are due 09 Aug.</span></span>${pill('New','danger')}</div><div class="action-row" data-action="navigate" data-page="reports"><span class="action-icon">${icon('report')}</span><span class="action-copy"><strong>Q2 report validation completed</strong><span>Two items need attention before submission.</span></span>${pill('Today','warning')}</div><div class="action-row" data-action="navigate" data-page="governance"><span class="action-icon">${icon('governance')}</span><span class="action-copy"><strong>Consent request updated</strong><span>Namibia market-entry budget is under review.</span></span>${pill('Yesterday','info')}</div></div>`);
- if(a==='profile')return openDrawer('Your profile','Tariro Moyo · Chief Financial Officer',`<div style="text-align:center;padding:7px 0 18px"><div class="profile-avatar" style="width:64px;height:64px;margin:auto;border-radius:18px;font-size:17px">TM</div><h3 style="margin:10px 0 2px">Tariro Moyo</h3><p class="tiny muted">Chief Financial Officer · Workspace administrator</p></div><dl class="detail-list"><div class="detail-row"><dt>Email</dt><dd>tariro.moyo@zambezipay.com</dd></div><div class="detail-row"><dt>Last sign-in</dt><dd>Today · 04:48 CAT</dd></div><div class="detail-row"><dt>MFA</dt><dd>Enabled</dd></div><div class="detail-row"><dt>Approval role</dt><dd>Executive approver</dd></div></dl>`,`<button class="btn" data-action="sign-out">Sign out</button><button class="btn primary" data-action="edit-profile">Edit profile</button>`);
+ if(a==='profile'){const u=getClientDesignSessionUser()||{name:'Tariro Moyo',email:'tariro.moyo@zambezipay.com',role:'Chief Financial Officer',initials:'TM'};return openDrawer('Your profile',`${u.name} · ${u.role}`,`<div style="text-align:center;padding:7px 0 18px"><div class="profile-avatar" style="width:64px;height:64px;margin:auto;border-radius:18px;font-size:17px">${u.initials||'U'}</div><h3 style="margin:10px 0 2px">${u.name}</h3><p class="tiny muted">${u.role}</p></div><dl class="detail-list"><div class="detail-row"><dt>Email</dt><dd>${u.email||'—'}</dd></div><div class="detail-row"><dt>Last sign-in</dt><dd>Today · 04:48 CAT</dd></div><div class="detail-row"><dt>MFA</dt><dd>Enabled</dd></div><div class="detail-row"><dt>Approval role</dt><dd>Executive approver</dd></div></dl>`,`<button class="btn" data-action="sign-out">Sign out</button><button class="btn primary" data-action="edit-profile">Edit profile</button>`)}
+ if(a==='sign-out'){closeOverlays();clientDesignSignOut();return}
  if(a==='company-menu')return openDrawer('Company workspace','Select an authorised portfolio-company workspace',`<div class="action-row"><span class="company-avatar">ZP</span><span class="action-copy"><strong>Zambezi Pay Technologies</strong><span>${company.fund} · Active investment</span></span>${pill('Current','success')}</div><div class="notice brand" style="margin-top:12px"><span class="notice-icon">${icon('info')}</span><span class="notice-copy"><strong>One authorised workspace</strong><p>Additional entities and subsidiaries can be configured by your fund administrator.</p></span></div>`);
  if(a==='support')return openDrawer('Help & Support','Guidance for portfolio-company teams',`<div class="action-list"><div class="action-row" data-action="guide"><span class="action-icon">${icon('report')}</span><span class="action-copy"><strong>Reporting guide</strong><span>How to prepare and submit an investor report</span></span>${icon('chevron-right')}</div><div class="action-row" data-action="guide"><span class="action-icon">${icon('request')}</span><span class="action-copy"><strong>Capital and procurement requests</strong><span>Request funding or procurement support and answer drill-downs</span></span>${icon('chevron-right')}</div><div class="action-row" data-action="contact-support"><span class="action-icon">${icon('life-buoy')}</span><span class="action-copy"><strong>Contact Matanho support</strong><span>Open a secure support request</span></span>${icon('chevron-right')}</div></div>`);
  if(a==='simulate-upload'){el.innerHTML=`${icon('check')}<strong>Files selected successfully</strong><span>2 files · 4.7 MB · ready for validation</span>`;el.style.borderColor='var(--emerald)';return}
@@ -407,7 +447,7 @@ document.addEventListener('click',e=>{
  if(a==='open-folder'){openDrawer(el.dataset.folder,'Secure document-vault folder',`<div class="action-list">${documents.filter(d=>d.folder===el.dataset.folder).map((d,i)=>`<div class="action-row" data-action="document" data-name="${d.name}"><span class="action-icon">${icon('file')}</span><span class="action-copy"><strong>${d.name}</strong><span>${d.type} · ${d.size} · ${d.updated}</span></span>${icon('chevron-right')}</div>`).join('')||`<div class="empty">${icon('folder')}<strong>No recent documents</strong><span>Upload a document to populate this folder.</span></div>`}</div>`,`<button class="btn primary" data-action="upload-docs">${icon('upload')}Upload</button>`);return}
  if(a==='create-folder'){openModal('Create document-vault folder','Add a controlled document category.',`<div class="field"><label>Folder name</label><input placeholder="e.g. Product & Technology"></div><div class="field" style="margin-top:12px"><label>Default access</label><select><option>Investor Reporting</option><option>Executive & Board</option><option>Company only</option></select></div>`,`<button class="btn" data-action="close-overlays">Cancel</button><button class="btn primary" data-action="complete-folder">Create folder</button>`);return}
  if(a==='complete-folder'){closeOverlays();toast('Folder created','Permissions were inherited from the selected access profile.');return}
- if(a==='approval-detail'||a==='reserved-matter'||a==='shareholder-detail'||a==='user-detail'||a==='assumption-detail'||a==='view-kpi-library'||a==='external-access'||a==='security-centre'||a==='access-review'||a==='board-pack'||a==='add-board-action'||a==='conversation-info'||a==='forecast-new-sheet'||a==='edit-forecast'||a==='download-certificate'||a==='decline-signature'||a==='download-request-pack'||a==='edit-capital-request'||a==='vault-view'||a==='edit-report'||a==='edit-report-section'||a==='guide'||a==='contact-support'||a==='sign-out'||a==='edit-profile'||a==='attach'||a==='message-reviewer'||a==='disconnect')return toast('Interactive control',`${(el.dataset.name||a).replace(/-/g,' ')} opened successfully in the prototype.`);
+ if(a==='approval-detail'||a==='reserved-matter'||a==='shareholder-detail'||a==='user-detail'||a==='assumption-detail'||a==='view-kpi-library'||a==='external-access'||a==='security-centre'||a==='access-review'||a==='board-pack'||a==='add-board-action'||a==='conversation-info'||a==='forecast-new-sheet'||a==='edit-forecast'||a==='download-certificate'||a==='decline-signature'||a==='download-request-pack'||a==='edit-capital-request'||a==='vault-view'||a==='edit-report'||a==='edit-report-section'||a==='guide'||a==='contact-support'||a==='edit-profile'||a==='attach'||a==='message-reviewer'||a==='disconnect')return toast('Interactive control',`${(el.dataset.name||a).replace(/-/g,' ')} opened successfully in the prototype.`);
 }, __ip8Sig);
 document.addEventListener('focusin',e=>{if(e.target.classList.contains('forecast-cell-input'))focusForecastCell(e.target)}, __ip8Sig);
 document.addEventListener('input',e=>{if(e.target.id==='commandInput')renderCommandResults(e.target.value);if(e.target.id==='roundAmount'||e.target.id==='preMoney')updateDilution();if(e.target.classList.contains('forecast-cell-input')){const bar=$('#forecastFormulaBar');if(bar)bar.value=e.target.value}if(e.target.id==='forecastFormulaBar'){const active=$(`.forecast-cell-input[data-address="${state.activeForecastCell}"]`);if(active)active.value=e.target.value}}, __ip8Sig);
@@ -429,6 +469,8 @@ rootEl.dataset.theme = document.body.dataset.theme = state.theme;render();
   }
   if (typeof render === 'function') render();
 
+  const __ip8SessionOff = onClientDesignSessionUser(() => applySessionUserToProfile(rootEl))
+
   api = {
     setPage(page) {
       if (!pages[page]) return;
@@ -437,12 +479,28 @@ rootEl.dataset.theme = document.body.dataset.theme = state.theme;render();
       try { $('#app')?.classList?.remove('mobile-open'); } catch (_) {}
       try { closeOverlays(); } catch (_) {}
     },
+    hydrate(payload) {
+      state.livePayload = payload || null;
+      state.liveData = Boolean(payload);
+      state.liveLoadError = Array.isArray(payload?.errors) && payload.errors.length ? payload.errors.join('; ') : '';
+      const co = liveCompanyRecord();
+      if (co?.name) {
+        company.name = co.name;
+        company.short = String(co.name).split(' ').slice(0, 2).join(' ');
+      }
+      if (typeof render === 'function') render();
+    },
     destroy() {
+      try { __ip8SessionOff?.() } catch (_) {}
       try { __ip8Abort.abort(); } catch (_) {}
       delete window.__INVESTEE_V8_NAV__;
       try { delete window.MatanhoPortal; } catch (_) {}
       rootEl.innerHTML = '';
     },
   };
+  window.MatanhoInvesteeUI = Object.freeze({
+    hydrate: (payload) => api.hydrate(payload),
+    getSnapshot: () => ({ state: { ...state } }),
+  });
   return api;
 }

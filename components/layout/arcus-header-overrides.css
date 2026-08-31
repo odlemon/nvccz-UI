@@ -1,48 +1,1181 @@
 /**
- * Uniform module-switcher styling across client-design mock shells.
- * One grid icon per header — hide duplicate "Modules" pills when Arcus SharedTopbar is present.
+ * Uniform topbar chrome across client-design modules — keep all icons/controls,
+ * normalize height, search, and action cluster to match Investments / SharedTopbar.
  */
 
-body:has([data-arcus-shared-topbar]) .payroll-v6-root #appLauncher,
-body:has([data-arcus-shared-topbar]) .payroll-v6-root .app-launcher,
-body:has([data-arcus-shared-topbar]) .home-v3-root .app-launcher-top[data-arcus-modules],
-body:has([data-arcus-shared-topbar]) .portfolio-v11-root .module-pill[data-arcus-modules],
-body:has([data-arcus-shared-topbar]) .performance-v22-root .app-launcher[data-arcus-modules],
-body:has([data-arcus-shared-topbar]) .performance-v22-root .icon-button.apps[data-arcus-modules] {
-  display: none !important;
+/* Shared height + surface (matches SharedTopbar h-20) */
+.home-v3-root,
+.payroll-v6-root,
+.accounting-v52-root,
+.procurement-v23-root,
+.portfolio-v11-root,
+.performance-v22-root,
+.investee-portal-v8-root {
+  --topbar: 80px !important;
+  --top: 80px !important;
 }
 
-.home-v3-root .top-actions .secondary-btn[data-arcus-modules] {
-  display: none !important;
+.home-v3-root .topbar,
+.payroll-v6-root .topbar,
+.accounting-v52-root .topbar,
+.procurement-v23-root .topbar,
+.portfolio-v11-root .topbar,
+.portfolio-v11-root #topbar,
+.performance-v22-root .topbar,
+.investee-portal-v8-root .topbar {
+  height: 80px !important;
+  min-height: 80px !important;
+  padding: 0 24px !important;
+  gap: 12px !important;
+  display: flex !important;
+  align-items: center !important;
+  box-sizing: border-box !important;
+  background: hsl(var(--card) / 0.92) !important;
+  backdrop-filter: blur(12px) !important;
+  border-bottom: 1px solid hsl(var(--border) / 0.9) !important;
+  box-shadow: none !important;
 }
 
-.portfolio-v11-root .module-pill[data-arcus-modules] > span:not([data-icon]) {
-  display: none !important;
+.payroll-v6-root .shell,
+.accounting-v52-root .shell,
+.procurement-v23-root .shell {
+  grid-template-rows: 80px minmax(0, 1fr) !important;
 }
 
-.portfolio-v11-root .module-pill[data-arcus-modules] {
-  gap: 0 !important;
-  min-width: 2.25rem;
-  padding-inline: 0.5rem !important;
+.performance-v22-root .app {
+  grid-template-rows: 80px minmax(0, 1fr) !important;
 }
 
-/* Shared pill appearance for in-shell launchers */
+/* Search field sizing */
+.home-v3-root .topbar .search-wrap,
+.home-v3-root .topbar .search-input,
+.payroll-v6-root .topbar .search-launch,
+.accounting-v52-root .topbar .search-launch,
+.procurement-v23-root .topbar .search,
+.portfolio-v11-root .topbar .search-trigger,
+.performance-v22-root .topbar .search-trigger,
+.investee-portal-v8-root .topbar .search-wrap,
+.investee-portal-v8-root .topbar .search-launch {
+  height: 48px !important;
+  min-height: 48px !important;
+  border-radius: 12px !important;
+}
+
+/* Right-side icon buttons / pills — rounded-full Arcus style */
+.payroll-v6-root .topbar .icon-btn,
+.accounting-v52-root .topbar .icon-btn,
+.procurement-v23-root .topbar .icon-btn,
+.portfolio-v11-root .topbar .icon-button,
+.performance-v22-root .topbar .icon-button,
+.investee-portal-v8-root .topbar .icon-btn,
+.home-v3-root .topbar .icon-btn {
+  width: 40px !important;
+  height: 40px !important;
+  border-radius: 9999px !important;
+}
+
+.payroll-v6-root .topbar .top-select,
+.payroll-v6-root .topbar .selector.entity,
+.accounting-v52-root .topbar .top-select,
+.accounting-v52-root .topbar .entity-select,
+.procurement-v23-root .topbar .selector,
+.procurement-v23-root .topbar .selector.entity,
+.portfolio-v11-root .topbar .selector,
+.portfolio-v11-root .topbar .selector.entity,
+.performance-v22-root .topbar .top-select,
+.home-v3-root .topbar .entity-select,
+.home-v3-root .topbar .top-select {
+  height: 40px !important;
+  border-radius: 9999px !important;
+  padding: 0 10px !important;
+  border: 1px solid hsl(var(--border) / 0.9) !important;
+  background: hsl(var(--surface) / 1) !important;
+  color: hsl(var(--foreground)) !important;
+  font-size: 12px !important;
+}
+
+/* Module switcher pills — full label, no truncation, Arcus tint */
 .home-v3-root .top-actions .app-launcher-top[data-arcus-modules],
 .payroll-v6-root .app-launcher[data-arcus-modules],
 #appLauncher[data-arcus-modules],
+.portfolio-v11-root .module-pill,
 .portfolio-v11-root .module-pill[data-arcus-modules],
 .performance-v22-root .app-launcher[data-arcus-modules],
-.performance-v22-root .icon-button.apps[data-arcus-modules] {
+.performance-v22-root .icon-button.apps[data-arcus-modules],
+.investee-portal-v8-root [data-arcus-modules] {
   color: oklch(0.6 0.18 252) !important;
   background: oklch(0.6 0.18 252 / 0.12) !important;
   border-radius: 9999px !important;
+  max-width: none !important;
+  white-space: nowrap !important;
+}
+
+.portfolio-v11-root .module-pill > span:not([data-icon]) {
+  display: inline !important;
+  max-width: none !important;
+  overflow: visible !important;
+  text-overflow: unset !important;
+  white-space: nowrap !important;
 }
 
 .home-v3-root .top-actions .app-launcher-top[data-arcus-modules]:hover,
 .payroll-v6-root .app-launcher[data-arcus-modules]:hover,
 #appLauncher[data-arcus-modules]:hover,
-.portfolio-v11-root .module-pill[data-arcus-modules]:hover,
+.portfolio-v11-root .module-pill:hover,
 .performance-v22-root .app-launcher[data-arcus-modules]:hover,
 .performance-v22-root .icon-button.apps[data-arcus-modules]:hover {
   background: oklch(0.6 0.18 252 / 0.2) !important;
+}
+
+/* User profile button pill styling */
+.home-v3-root .topbar .user-button,
+.home-v3-root .topbar .profile-top,
+.performance-v22-root .topbar .user-button,
+.portfolio-v11-root .topbar .user-button,
+.payroll-v6-root .topbar .user-button,
+.procurement-v23-root .topbar .user-button,
+.accounting-v52-root .topbar .user-button {
+  height: 40px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 3px 12px 3px 4px !important;
+  border-radius: 9999px !important;
+  border: 1px solid hsl(var(--border) / 0.9) !important;
+  background: hsl(var(--surface) / 1) !important;
+  color: hsl(var(--foreground)) !important;
+  cursor: pointer !important;
+}
+
+.home-v3-root .topbar .user-copy,
+.performance-v22-root .topbar .user-copy,
+.portfolio-v11-root .topbar .user-copy,
+.payroll-v6-root .topbar .user-copy,
+.procurement-v23-root .topbar .user-copy,
+.accounting-v52-root .topbar .user-copy {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  text-align: left !important;
+  line-height: 1.2 !important;
+}
+
+.home-v3-root .topbar .user-copy strong,
+.performance-v22-root .topbar .user-copy strong,
+.portfolio-v11-root .topbar .user-copy strong,
+.payroll-v6-root .topbar .user-copy strong,
+.procurement-v23-root .topbar .user-copy strong,
+.accounting-v52-root .topbar .user-copy strong {
+  font-size: 11px !important;
+  font-weight: 600 !important;
+}
+
+.home-v3-root .topbar .user-copy span,
+.performance-v22-root .topbar .user-copy span,
+.portfolio-v11-root .topbar .user-copy span,
+.payroll-v6-root .topbar .user-copy span,
+.procurement-v23-root .topbar .user-copy span,
+.accounting-v52-root .topbar .user-copy span {
+  font-size: 9.5px !important;
+  opacity: 0.75 !important;
+}
+
+.home-v3-root .topbar .avatar,
+.performance-v22-root .topbar .avatar,
+.portfolio-v11-root .topbar .avatar,
+.payroll-v6-root .topbar .avatar,
+.procurement-v23-root .topbar .avatar,
+.accounting-v52-root .topbar .avatar {
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 9999px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  background: var(--brand-soft, #eaf2ff) !important;
+  color: var(--brand, #315fc2) !important;
+}
+
+/* Strict SVG sizing across topbar icons */
+.home-v3-root .topbar svg,
+.performance-v22-root .topbar svg,
+.portfolio-v11-root .topbar svg,
+.payroll-v6-root .topbar svg,
+.procurement-v23-root .topbar svg,
+.accounting-v52-root .topbar svg {
+  width: 18px !important;
+  height: 18px !important;
+  min-width: 18px !important;
+  min-height: 18px !important;
+  max-width: 18px !important;
+  max-height: 18px !important;
+  flex: none !important;
+}
+
+.home-v3-root .topbar .icon-btn,
+.home-v3-root .topbar .icon-button,
+.performance-v22-root .topbar .icon-button,
+.portfolio-v11-root .topbar .icon-button,
+.payroll-v6-root .topbar .icon-btn,
+.procurement-v23-root .topbar .icon-btn,
+.accounting-v52-root .topbar .icon-btn {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex: none !important;
+}
+
+/* Search trigger button / search input styling */
+.home-v3-root .topbar .search-trigger,
+.performance-v22-root .topbar .search-trigger,
+.portfolio-v11-root .topbar .search-trigger {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 10px !important;
+  height: 44px !important;
+  max-width: 480px !important;
+  width: 100% !important;
+  padding: 0 14px !important;
+  border-radius: 9999px !important;
+  border: 1px solid hsl(var(--border) / 0.9) !important;
+  background: hsl(var(--surface) / 1) !important;
+  color: hsl(var(--muted-foreground)) !important;
+  font-size: 12px !important;
+  cursor: pointer !important;
+}
+
+.home-v3-root .topbar .search-trigger svg,
+.performance-v22-root .topbar .search-trigger svg,
+.portfolio-v11-root .topbar .search-trigger svg {
+  width: 16px !important;
+  height: 16px !important;
+  min-width: 16px !important;
+  min-height: 16px !important;
+  max-width: 16px !important;
+  max-height: 16px !important;
+  flex: none !important;
+}
+
+.home-v3-root .topbar .search-trigger span,
+.performance-v22-root .topbar .search-trigger span,
+.portfolio-v11-root .topbar .search-trigger span {
+  flex: 1 !important;
+  text-align: left !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.home-v3-root .topbar .search-trigger kbd,
+.performance-v22-root .topbar .search-trigger kbd,
+.portfolio-v11-root .topbar .search-trigger kbd {
+  font-size: 10px !important;
+  padding: 3px 6px !important;
+  border-radius: 6px !important;
+  border: 1px solid hsl(var(--border) / 0.8) !important;
+  background: hsl(var(--muted) / 0.3) !important;
+  color: hsl(var(--muted-foreground)) !important;
+  font-family: inherit !important;
+  line-height: 1 !important;
+  flex: none !important;
+  white-space: nowrap !important;
+}
+
+/* Notification count badge */
+.home-v3-root .topbar .notification-button,
+.performance-v22-root .topbar .notification-button,
+.portfolio-v11-root .topbar .notification-button,
+.payroll-v6-root .topbar .notification-button,
+.procurement-v23-root .topbar .notification-button,
+.accounting-v52-root .topbar .notification-button {
+  position: relative !important;
+}
+
+.home-v3-root .topbar .notification-count,
+.performance-v22-root .topbar .notification-count,
+.portfolio-v11-root .topbar .notification-count,
+.payroll-v6-root .topbar .notification-count,
+.procurement-v23-root .topbar .notification-count,
+.accounting-v52-root .topbar .notification-count {
+  position: absolute !important;
+  top: -2px !important;
+  right: -2px !important;
+  width: 18px !important;
+  height: 18px !important;
+  border-radius: 9999px !important;
+  background: #ef4444 !important;
+  color: #ffffff !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border: 2px solid #ffffff !important;
+}
+
+/* ========================================================================
+ * SHARED TOPBAR REPLACEMENT — hide the HTML mock topbar when the React
+ * SharedTopbar is rendered above by ClientDesignModuleShell (data-arcus-shell).
+ * Adjust grid/block layouts so the content fills the space.
+ * ======================================================================== */
+
+/* Hide the HTML topbar in all mock-app roots when the shell wrapper is present */
+[data-arcus-shell] .performance-v22-root .topbar,
+[data-arcus-shell] .home-v3-root .topbar,
+[data-arcus-shell] .portfolio-v11-root .topbar,
+[data-arcus-shell] .payroll-v6-root .topbar,
+[data-arcus-shell] .procurement-v23-root .topbar,
+[data-arcus-shell] .accounting-v52-root .topbar,
+[data-arcus-shell] .investee-portal-v8-root .topbar {
+  display: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+/* Grid layouts: remove the topbar row so content fills 100% */
+[data-arcus-shell] .payroll-v6-root .shell,
+[data-arcus-shell] .accounting-v52-root .shell,
+[data-arcus-shell] .procurement-v23-root .shell {
+  grid-template-rows: minmax(0, 1fr) !important;
+}
+
+[data-arcus-shell] .performance-v22-root .app,
+[data-arcus-shell] .home-v3-root #app.app,
+[data-arcus-shell] .home-v3-root .app {
+  grid-template-rows: minmax(0, 1fr) !important;
+}
+
+/* Block layouts: make workspace fill 100% of the mock container */
+[data-arcus-shell] .performance-v22-root .workspace,
+[data-arcus-shell] .home-v3-root .workspace,
+[data-arcus-shell] .portfolio-v11-root .workspace,
+[data-arcus-shell] .portfolio-v11-root #workspace {
+  height: 100% !important;
+  max-height: 100% !important;
+}
+
+/* Content areas for grid-based modules */
+[data-arcus-shell] .payroll-v6-root .content,
+[data-arcus-shell] .accounting-v52-root .content,
+[data-arcus-shell] .procurement-v23-root .content {
+  height: 100% !important;
+  max-height: 100% !important;
+}
+
+/* Sidebar adjustments — when the topbar is hidden, sidebar should fill full height */
+[data-arcus-shell] .performance-v22-root .sidebar,
+[data-arcus-shell] .home-v3-root .sidebar,
+[data-arcus-shell] .portfolio-v11-root .sidebar,
+[data-arcus-shell] .payroll-v6-root .sidebar,
+[data-arcus-shell] .procurement-v23-root .sidebar,
+[data-arcus-shell] .accounting-v52-root .sidebar {
+  height: 100% !important;
+  max-height: 100% !important;
+}
+
+/* ========================================================================
+ * DARK MODE — propagate html.dark class to module root elements.
+ * Each mock app uses CSS variables; overriding them under .dark gives
+ * full-module theming without rewriting every component.
+ * ======================================================================== */
+
+/* Performance V22 dark mode */
+html.dark .performance-v22-root,
+.dark.performance-v22-root {
+  --bg: #0f1117 !important;
+  --surface: #1a1d27 !important;
+  --surface-soft: #14161e !important;
+  --surface-strong: #e2e8f0 !important;
+  --ink: #e2e8f0 !important;
+  --ink-2: #94a3b8 !important;
+  --muted: #64748b !important;
+  --muted-2: #475569 !important;
+  --line: rgba(255,255,255,0.08) !important;
+  --line-strong: rgba(255,255,255,0.12) !important;
+  --navy: #0a0d14 !important;
+  --navy-2: #0e1119 !important;
+  background: var(--bg) !important;
+  color: var(--ink) !important;
+}
+html.dark .performance-v22-root .topbar,
+.dark.performance-v22-root .topbar {
+  background: rgba(15,17,23,0.94) !important;
+  border-bottom-color: rgba(255,255,255,0.08) !important;
+}
+html.dark .performance-v22-root .sidebar,
+.dark.performance-v22-root .sidebar {
+  background: #080a10 !important;
+}
+html.dark .performance-v22-root .workspace,
+.dark.performance-v22-root .workspace {
+  background: transparent !important;
+}
+html.dark .performance-v22-root .card,
+.dark.performance-v22-root .card,
+html.dark .performance-v22-root .kpi,
+.dark.performance-v22-root .kpi {
+  background: var(--surface) !important;
+  border-color: var(--line) !important;
+  color: var(--ink) !important;
+}
+html.dark .performance-v22-root th,
+.dark.performance-v22-root th {
+  background: var(--surface-soft) !important;
+  color: var(--muted) !important;
+}
+html.dark .performance-v22-root td,
+.dark.performance-v22-root td {
+  border-top-color: var(--line) !important;
+  color: var(--ink) !important;
+}
+
+/* Home V3 dark mode */
+html.dark .home-v3-root,
+.dark.home-v3-root {
+  background: #0f1117 !important;
+  color: #e2e8f0 !important;
+}
+
+/* Portfolio V11 dark mode */
+html.dark .portfolio-v11-root,
+.dark.portfolio-v11-root {
+  background: #0f1117 !important;
+  color: #e2e8f0 !important;
+}
+
+/* Payroll V6 dark mode */
+html.dark .payroll-v6-root,
+.dark.payroll-v6-root {
+  background: #0f1117 !important;
+  color: #e2e8f0 !important;
+}
+
+/* Procurement V23 dark mode */
+html.dark .procurement-v23-root,
+.dark.procurement-v23-root {
+  background: #0f1117 !important;
+  color: #e2e8f0 !important;
+}
+
+/* Accounting V52 dark mode */
+html.dark .accounting-v52-root,
+.dark.accounting-v52-root {
+  background: #0f1117 !important;
+  color: #e2e8f0 !important;
+}
+
+/* SharedTopbar dark mode */
+html.dark [data-arcus-shared-topbar],
+.dark [data-arcus-shared-topbar] {
+  background: rgba(15,17,23,0.94) !important;
+  border-bottom-color: rgba(255,255,255,0.08) !important;
+}
+html.dark [data-arcus-shared-topbar] input,
+.dark [data-arcus-shared-topbar] input {
+  background: rgba(255,255,255,0.06) !important;
+  border-color: rgba(255,255,255,0.1) !important;
+  color: #e2e8f0 !important;
+}
+html.dark [data-arcus-shared-topbar] button,
+.dark [data-arcus-shared-topbar] button {
+  color: #cbd5e1 !important;
+}
+
+
+/* ========================================================================
+ * READABILITY & CONSISTENCY — applied across ALL modules
+ * Client spec:
+ *   Black text  = #000000
+ *   Grey text   = #111111 or #141414
+ *   Min font    = 11px
+ * ======================================================================== */
+
+/* ── ALL MODULES: Minimum 11px body text ───────────────────────────────── */
+.performance-v22-root,
+.home-v3-root,
+.portfolio-v11-root,
+.payroll-v6-root,
+.procurement-v23-root,
+.accounting-v52-root,
+.investee-portal-v8-root,
+[data-module="events"],
+[data-module="street-rates"],
+[data-module="forecasting"],
+[data-module="fundraising"],
+[data-module="fundraising-kyc"],
+.investments-terminal {
+  font-size: 11px !important;
+  color: #000000 !important;
+}
+
+.performance-v22-root td,
+.home-v3-root td,
+.portfolio-v11-root td,
+.payroll-v6-root td,
+.procurement-v23-root td,
+.accounting-v52-root td,
+[data-module="events"] td,
+[data-module="street-rates"] td,
+[data-module="forecasting"] td,
+[data-module="fundraising"] td,
+[data-module="fundraising-kyc"] td {
+  font-size: 11px !important;
+}
+
+.performance-v22-root th,
+.home-v3-root th,
+.portfolio-v11-root th,
+.payroll-v6-root th,
+.procurement-v23-root th,
+.accounting-v52-root th,
+[data-module="events"] th,
+[data-module="street-rates"] th,
+[data-module="forecasting"] th,
+[data-module="fundraising"] th,
+[data-module="fundraising-kyc"] th {
+  font-size: 11px !important;
+  color: #000000 !important;
+}
+
+.performance-v22-root .tiny,
+.performance-v22-root .badge,
+.performance-v22-root .kpi-label,
+.performance-v22-root .kpi-sub,
+.performance-v22-root .card-head p,
+.performance-v22-root .list-main span,
+.performance-v22-root .metric-box span,
+.performance-v22-root .bar-row,
+.performance-v22-root .legend-row,
+.performance-v22-root .cell-copy span {
+  font-size: 11px !important;
+}
+
+/* Nav labels and sidebar text */
+.performance-v22-root .nav-label,
+.performance-v22-root .nav-group,
+.performance-v22-root .expanded .nav-count {
+  font-size: 11px !important;
+}
+
+/* Page subtitles and captions */
+.performance-v22-root .eyebrow,
+.performance-v22-root .page-head p,
+.performance-v22-root .scope-note {
+  font-size: 11px !important;
+}
+
+/* Chart text */
+.performance-v22-root .chart text,
+.performance-v22-root .v5-chart text,
+.performance-v22-root .sparkline-v5 text {
+  font-size: 11px !important;
+}
+
+/* ── ALL MODULES: True black (#000000) for primary text ────────────────── */
+.performance-v22-root,
+.home-v3-root,
+.portfolio-v11-root,
+.payroll-v6-root,
+.procurement-v23-root,
+.accounting-v52-root {
+  color: #000000 !important;
+}
+
+/* Headings true black */
+.performance-v22-root h1,
+.performance-v22-root h2,
+.performance-v22-root h3,
+.performance-v22-root h4,
+.home-v3-root h1,
+.home-v3-root h2,
+.home-v3-root h3,
+.home-v3-root h4,
+.portfolio-v11-root h1,
+.portfolio-v11-root h2,
+.portfolio-v11-root h3,
+.portfolio-v11-root h4,
+.payroll-v6-root h1,
+.payroll-v6-root h2,
+.payroll-v6-root h3,
+.payroll-v6-root h4,
+.procurement-v23-root h1,
+.procurement-v23-root h2,
+.procurement-v23-root h3,
+.procurement-v23-root h4,
+.accounting-v52-root h1,
+.accounting-v52-root h2,
+.accounting-v52-root h3,
+.accounting-v52-root h4,
+[data-module="events"] h1,
+[data-module="events"] h2,
+[data-module="events"] h3,
+[data-module="events"] h4,
+[data-module="street-rates"] h1,
+[data-module="street-rates"] h2,
+[data-module="street-rates"] h3,
+[data-module="street-rates"] h4,
+[data-module="forecasting"] h1,
+[data-module="forecasting"] h2,
+[data-module="forecasting"] h3,
+[data-module="forecasting"] h4,
+[data-module="fundraising"] h1,
+[data-module="fundraising"] h2,
+[data-module="fundraising"] h3,
+[data-module="fundraising"] h4,
+[data-module="fundraising-kyc"] h1,
+[data-module="fundraising-kyc"] h2,
+[data-module="fundraising-kyc"] h3,
+[data-module="fundraising-kyc"] h4 {
+  color: #000000 !important;
+}
+
+/* Strong / bold text true black */
+.performance-v22-root strong,
+.performance-v22-root b,
+.home-v3-root strong,
+.home-v3-root b,
+.portfolio-v11-root strong,
+.portfolio-v11-root b,
+.payroll-v6-root strong,
+.payroll-v6-root b,
+.procurement-v23-root strong,
+.procurement-v23-root b,
+.accounting-v52-root strong,
+.accounting-v52-root b,
+[data-module="events"] strong,
+[data-module="events"] b,
+[data-module="street-rates"] strong,
+[data-module="street-rates"] b,
+[data-module="forecasting"] strong,
+[data-module="forecasting"] b,
+[data-module="fundraising"] strong,
+[data-module="fundraising"] b,
+[data-module="fundraising-kyc"] strong,
+[data-module="fundraising-kyc"] b {
+  color: #000000 !important;
+}
+
+/* ── ALL MODULES: Button text true black ───────────────────────────────── */
+.performance-v22-root .btn:not(.primary):not(.secondary),
+.home-v3-root .btn:not(.primary):not(.secondary),
+.portfolio-v11-root .btn:not(.primary):not(.secondary),
+.payroll-v6-root .btn:not(.primary):not(.secondary),
+.procurement-v23-root .btn:not(.primary):not(.secondary),
+.accounting-v52-root .btn:not(.primary):not(.secondary),
+[data-module="events"] button,
+[data-module="street-rates"] button,
+[data-module="forecasting"] button,
+[data-module="fundraising"] button,
+[data-module="fundraising-kyc"] button,
+.investments-terminal button {
+  color: #000000 !important;
+}
+.performance-v22-root .btn.primary,
+.performance-v22-root .btn.secondary,
+.performance-v22-root .btn.ghost {
+  color: #ffffff !important;
+}
+.performance-v22-root .btn.danger {
+  color: #dc2626 !important;
+}
+
+/* ── Fix lighter/discolored sidebar text ────────────────────────────────── */
+.performance-v22-root .nav-item {
+  color: #d1d9e6 !important;
+}
+.performance-v22-root .nav-item:hover {
+  color: #ffffff !important;
+}
+.performance-v22-root .nav-item.active {
+  color: #ffffff !important;
+}
+.performance-v22-root .nav-group {
+  color: #94a3b8 !important;
+}
+.performance-v22-root .collapse-btn {
+  color: #b0b8c8 !important;
+}
+.performance-v22-root .collapse-btn:hover {
+  color: #ffffff !important;
+}
+.performance-v22-root .expanded .nav-count {
+  color: #94a3b8 !important;
+}
+
+/* Payroll / Accounting / Procurement sidebar */
+.payroll-v6-root .sidebar,
+.accounting-v52-root .sidebar,
+.procurement-v23-root .sidebar {
+  color: #000000 !important;
+}
+.payroll-v6-root .sidebar .nav-item,
+.accounting-v52-root .sidebar .nav-item,
+.procurement-v23-root .sidebar .nav-item {
+  color: #111111 !important;
+}
+.payroll-v6-root .sidebar .nav-item:hover,
+.accounting-v52-root .sidebar .nav-item:hover,
+.procurement-v23-root .sidebar .nav-item:hover {
+  color: #000000 !important;
+}
+
+/* ── 4. Consistent header area ─────────────────────────────────────────── */
+.home-v3-root .topbar,
+.portfolio-v11-root .topbar,
+.payroll-v6-root .topbar,
+.procurement-v23-root .topbar,
+.accounting-v52-root .topbar {
+  height: 80px !important;
+  min-height: 80px !important;
+  padding: 0 24px !important;
+  gap: 12px !important;
+  display: flex !important;
+  align-items: center !important;
+  box-sizing: border-box !important;
+  background: rgba(255,255,255,0.92) !important;
+  backdrop-filter: blur(12px) !important;
+  border-bottom: 1px solid #e5e7eb !important;
+  box-shadow: none !important;
+}
+
+/* ── 5. Reduce visual clutter — thinner borders, softer shadows ────────── */
+.performance-v22-root .card,
+.home-v3-root .card,
+.portfolio-v11-root .card,
+.payroll-v6-root .card,
+.procurement-v23-root .card,
+.accounting-v52-root .card {
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04) !important;
+  border-width: 1px !important;
+}
+
+.performance-v22-root .kpi {
+  box-shadow: 0 1px 2px rgba(0,0,0,0.03) !important;
+}
+
+.performance-v22-root .filterbar {
+  border-width: 1px !important;
+  padding: 8px 12px !important;
+}
+
+.performance-v22-root .table-wrap th {
+  font-size: 11px !important;
+  font-weight: 600 !important;
+}
+
+.performance-v22-root .card-head h3 {
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  color: #000000 !important;
+}
+
+.performance-v22-root .page-head h1 {
+  color: #000000 !important;
+  font-weight: 600 !important;
+}
+
+/* Section titles */
+.performance-v22-root .section-title {
+  color: #000000 !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+}
+
+/* ── ALL MODULES: Tailwind grey classes → dark grey per spec ────────────── */
+/* text-[#64748b] → #141414 */
+.performance-v22-root .text-\[\#64748b\],
+.home-v3-root .text-\[\#64748b\],
+.portfolio-v11-root .text-\[\#64748b\],
+.payroll-v6-root .text-\[\#64748b\],
+.procurement-v23-root .text-\[\#64748b\],
+.accounting-v52-root .text-\[\#64748b\],
+[data-module="events"] .text-\[\#64748b\],
+[data-module="street-rates"] .text-\[\#64748b\],
+[data-module="forecasting"] .text-\[\#64748b\],
+[data-module="fundraising"] .text-\[\#64748b\],
+[data-module="fundraising-kyc"] .text-\[\#64748b\],
+.investments-terminal .text-\[\#64748b\] {
+  color: #141414 !important;
+}
+
+/* text-[#94a3b8] → #111111 */
+.performance-v22-root .text-\[\#94a3b8\],
+.home-v3-root .text-\[\#94a3b8\],
+.portfolio-v11-root .text-\[\#94a3b8\],
+.payroll-v6-root .text-\[\#94a3b8\],
+.procurement-v23-root .text-\[\#94a3b8\],
+.accounting-v52-root .text-\[\#94a3b8\],
+[data-module="events"] .text-\[\#94a3b8\],
+[data-module="street-rates"] .text-\[\#94a3b8\],
+[data-module="forecasting"] .text-\[\#94a3b8\],
+[data-module="fundraising"] .text-\[\#94a3b8\],
+[data-module="fundraising-kyc"] .text-\[\#94a3b8\],
+.investments-terminal .text-\[\#94a3b8\] {
+  color: #111111 !important;
+}
+
+/* text-[#475569] → #141414 */
+.performance-v22-root .text-\[\#475569\],
+.home-v3-root .text-\[\#475569\],
+.portfolio-v11-root .text-\[\#475569\],
+.payroll-v6-root .text-\[\#475569\],
+.procurement-v23-root .text-\[\#475569\],
+.accounting-v52-root .text-\[\#475569\],
+[data-module="events"] .text-\[\#475569\],
+[data-module="street-rates"] .text-\[\#475569\],
+[data-module="forecasting"] .text-\[\#475569\],
+[data-module="fundraising"] .text-\[\#475569\],
+[data-module="fundraising-kyc"] .text-\[\#475569\],
+.investments-terminal .text-\[\#475569\] {
+  color: #141414 !important;
+}
+
+/* text-[#4b5563] → #141414 */
+.performance-v22-root .text-\[\#4b5563\],
+.home-v3-root .text-\[\#4b5563\],
+.portfolio-v11-root .text-\[\#4b5563\],
+.payroll-v6-root .text-\[\#4b5563\],
+.procurement-v23-root .text-\[\#4b5563\],
+.accounting-v52-root .text-\[\#4b5563\],
+[data-module="events"] .text-\[\#4b5563\],
+[data-module="street-rates"] .text-\[\#4b5563\],
+[data-module="forecasting"] .text-\[\#4b5563\],
+[data-module="fundraising"] .text-\[\#4b5563\],
+[data-module="fundraising-kyc"] .text-\[\#4b5563\],
+.investments-terminal .text-\[\#4b5563\] {
+  color: #141414 !important;
+}
+
+/* text-[#334155] → #111111 */
+.performance-v22-root .text-\[\#334155\],
+.home-v3-root .text-\[\#334155\],
+.portfolio-v11-root .text-\[\#334155\],
+.payroll-v6-root .text-\[\#334155\],
+.procurement-v23-root .text-\[\#334155\],
+.accounting-v52-root .text-\[\#334155\],
+[data-module="events"] .text-\[\#334155\],
+[data-module="street-rates"] .text-\[\#334155\],
+[data-module="forecasting"] .text-\[\#334155\],
+[data-module="fundraising"] .text-\[\#334155\],
+[data-module="fundraising-kyc"] .text-\[\#334155\],
+.investments-terminal .text-\[\#334155\] {
+  color: #111111 !important;
+}
+
+/* text-[#718096] → #141414 */
+.performance-v22-root .text-\[\#718096\],
+.home-v3-root .text-\[\#718096\],
+.portfolio-v11-root .text-\[\#718096\],
+.payroll-v6-root .text-\[\#718096\],
+.procurement-v23-root .text-\[\#718096\],
+.accounting-v52-root .text-\[\#718096\],
+[data-module="events"] .text-\[\#718096\],
+[data-module="street-rates"] .text-\[\#718096\],
+[data-module="forecasting"] .text-\[\#718096\],
+[data-module="fundraising"] .text-\[\#718096\],
+[data-module="fundraising-kyc"] .text-\[\#718096\],
+.investments-terminal .text-\[\#718096\] {
+  color: #141414 !important;
+}
+
+/* text-[#2d3748] → #111111 */
+.performance-v22-root .text-\[\#2d3748\],
+.home-v3-root .text-\[\#2d3748\],
+.portfolio-v11-root .text-\[\#2d3748\],
+.payroll-v6-root .text-\[\#2d3748\],
+.procurement-v23-root .text-\[\#2d3748\],
+.accounting-v52-root .text-\[\#2d3748\],
+[data-module="events"] .text-\[\#2d3748\],
+[data-module="street-rates"] .text-\[\#2d3748\],
+[data-module="forecasting"] .text-\[\#2d3748\],
+[data-module="fundraising"] .text-\[\#2d3748\],
+[data-module="fundraising-kyc"] .text-\[\#2d3748\],
+.investments-terminal .text-\[\#2d3748\] {
+  color: #111111 !important;
+}
+
+/* text-[#0f172a] → true black */
+.performance-v22-root .text-\[\#0f172a\],
+.home-v3-root .text-\[\#0f172a\],
+.portfolio-v11-root .text-\[\#0f172a\],
+.payroll-v6-root .text-\[\#0f172a\],
+.procurement-v23-root .text-\[\#0f172a\],
+.accounting-v52-root .text-\[\#0f172a\],
+[data-module="events"] .text-\[\#0f172a\],
+[data-module="street-rates"] .text-\[\#0f172a\],
+[data-module="forecasting"] .text-\[\#0f172a\],
+[data-module="fundraising"] .text-\[\#0f172a\],
+[data-module="fundraising-kyc"] .text-\[\#0f172a\],
+.investments-terminal .text-\[\#0f172a\] {
+  color: #000000 !important;
+}
+
+/* text-[#1e293b] → true black */
+.performance-v22-root .text-\[\#1e293b\],
+.home-v3-root .text-\[\#1e293b\],
+.portfolio-v11-root .text-\[\#1e293b\],
+.payroll-v6-root .text-\[\#1e293b\],
+.procurement-v23-root .text-\[\#1e293b\],
+.accounting-v52-root .text-\[\#1e293b\],
+[data-module="events"] .text-\[\#1e293b\],
+[data-module="street-rates"] .text-\[\#1e293b\],
+[data-module="forecasting"] .text-\[\#1e293b\],
+[data-module="fundraising"] .text-\[\#1e293b\],
+[data-module="fundraising-kyc"] .text-\[\#1e293b\],
+.investments-terminal .text-\[\#1e293b\] {
+  color: #000000 !important;
+}
+
+/* text-[#1a202c] → true black */
+.performance-v22-root .text-\[\#1a202c\],
+.home-v3-root .text-\[\#1a202c\],
+.portfolio-v11-root .text-\[\#1a202c\],
+.payroll-v6-root .text-\[\#1a202c\],
+.procurement-v23-root .text-\[\#1a202c\],
+.accounting-v52-root .text-\[\#1a202c\],
+[data-module="events"] .text-\[\#1a202c\],
+[data-module="street-rates"] .text-\[\#1a202c\],
+[data-module="forecasting"] .text-\[\#1a202c\],
+[data-module="fundraising"] .text-\[\#1a202c\],
+[data-module="fundraising-kyc"] .text-\[\#1a202c\],
+.investments-terminal .text-\[\#1a202c\] {
+  color: #000000 !important;
+}
+
+/* text-[#1f2937] → true black */
+.performance-v22-root .text-\[\#1f2937\],
+.home-v3-root .text-\[\#1f2937\],
+.portfolio-v11-root .text-\[\#1f2937\],
+.payroll-v6-root .text-\[\#1f2937\],
+.procurement-v23-root .text-\[\#1f2937\],
+.accounting-v52-root .text-\[\#1f2937\],
+[data-module="events"] .text-\[\#1f2937\],
+[data-module="street-rates"] .text-\[\#1f2937\],
+[data-module="forecasting"] .text-\[\#1f2937\],
+[data-module="fundraising"] .text-\[\#1f2937\],
+[data-module="fundraising-kyc"] .text-\[\#1f2937\],
+.investments-terminal .text-\[\#1f2937\] {
+  color: #000000 !important;
+}
+
+/* text-[#1a1a1a] → true black */
+.performance-v22-root .text-\[\#1a1a1a\],
+.home-v3-root .text-\[\#1a1a1a\],
+.portfolio-v11-root .text-\[\#1a1a1a\],
+.payroll-v6-root .text-\[\#1a1a1a\],
+.procurement-v23-root .text-\[\#1a1a1a\],
+.accounting-v52-root .text-\[\#1a1a1a\],
+[data-module="events"] .text-\[\#1a1a1a\],
+[data-module="street-rates"] .text-\[\#1a1a1a\],
+[data-module="forecasting"] .text-\[\#1a1a1a\],
+[data-module="fundraising"] .text-\[\#1a1a1a\],
+[data-module="fundraising-kyc"] .text-\[\#1a1a1a\],
+.investments-terminal .text-\[\#1a1a1a\] {
+  color: #000000 !important;
+}
+
+/* Generic muted text fallback */
+[data-module="events"] .text-muted-foreground,
+[data-module="street-rates"] .text-muted-foreground,
+[data-module="forecasting"] .text-muted-foreground,
+[data-module="fundraising"] .text-muted-foreground,
+[data-module="fundraising-kyc"] .text-muted-foreground,
+.investments-terminal .text-muted-foreground,
+[data-module="events"] [class*="text-gray"],
+[data-module="street-rates"] [class*="text-gray"],
+[data-module="forecasting"] [class*="text-gray"],
+[data-module="fundraising"] [class*="text-gray"],
+[data-module="fundraising-kyc"] [class*="text-gray"],
+.investments-terminal [class*="text-gray"],
+[data-module="events"] [class*="text-slate"],
+[data-module="street-rates"] [class*="text-slate"],
+[data-module="forecasting"] [class*="text-slate"],
+[data-module="fundraising"] [class*="text-slate"],
+[data-module="fundraising-kyc"] [class*="text-slate"],
+.investments-terminal [class*="text-slate"] {
+  color: #141414 !important;
+}
+
+/* ========================================================================
+ * FPA (Forecasting) & Fundraising — true black text, dark grey secondary,
+ * minimum 11px font size. Client spec:
+ *   Black text  = #000000
+ *   Grey text   = #111111 or #141414
+ *   Min font    = 11px
+ * ======================================================================== */
+
+[data-module="forecasting"],
+[data-module="fundraising"] {
+  font-size: 11px !important;
+  color: #000000 !important;
+}
+
+/* Minimum font size enforcement */
+[data-module="forecasting"] *,
+[data-module="fundraising"] * {
+  font-size: max(var(--tw-text-base, 11px), 11px) !important;
+}
+[data-module="forecasting"] span,
+[data-module="forecasting"] p,
+[data-module="forecasting"] td,
+[data-module="forecasting"] th,
+[data-module="forecasting"] li,
+[data-module="forecasting"] a,
+[data-module="forecasting"] button,
+[data-module="forecasting"] label,
+[data-module="forecasting"] h1,
+[data-module="forecasting"] h2,
+[data-module="forecasting"] h3,
+[data-module="forecasting"] h4,
+[data-module="fundraising"] span,
+[data-module="fundraising"] p,
+[data-module="fundraising"] td,
+[data-module="fundraising"] th,
+[data-module="fundraising"] li,
+[data-module="fundraising"] a,
+[data-module="fundraising"] button,
+[data-module="fundraising"] label,
+[data-module="fundraising"] h1,
+[data-module="fundraising"] h2,
+[data-module="fundraising"] h3,
+[data-module="fundraising"] h4 {
+  font-size: max(11px, inherit) !important;
+}
+
+/* ── True black primary text ──────────────────────────────────────────── */
+[data-module="forecasting"] [style*="color: #0f172a"],
+[data-module="forecasting"] [style*="color:#0f172a"],
+[data-module="fundraising"] [style*="color: #0f172a"],
+[data-module="fundraising"] [style*="color:#0f172a"] {
+  color: #000000 !important;
+}
+
+/* Tailwind text-[#0f172a] → true black */
+[data-module="forecasting"] .text-\[\#0f172a\],
+[data-module="fundraising"] .text-\[\#0f172a\] {
+  color: #000000 !important;
+}
+
+/* Tailwind text-[#1e293b] → true black */
+[data-module="forecasting"] .text-\[\#1e293b\],
+[data-module="fundraising"] .text-\[\#1e293b\] {
+  color: #000000 !important;
+}
+
+/* Tailwind text-[#1a202c] → true black */
+[data-module="forecasting"] .text-\[\#1a202c\],
+[data-module="fundraising"] .text-\[\#1a202c\] {
+  color: #000000 !important;
+}
+
+/* Tailwind text-[#1f2937] → true black */
+[data-module="forecasting"] .text-\[\#1f2937\],
+[data-module="fundraising"] .text-\[\#1f2937\] {
+  color: #000000 !important;
+}
+
+/* Tailwind text-[#1a1a1a] → true black */
+[data-module="forecasting"] .text-\[\#1a1a1a\],
+[data-module="fundraising"] .text-\[\#1a1a1a\] {
+  color: #000000 !important;
+}
+
+/* Generic heading / strong color override */
+[data-module="forecasting"] h1,
+[data-module="forecasting"] h2,
+[data-module="forecasting"] h3,
+[data-module="forecasting"] h4,
+[data-module="fundraising"] h1,
+[data-module="fundraising"] h2,
+[data-module="fundraising"] h3,
+[data-module="fundraising"] h4 {
+  color: #000000 !important;
+}
+
+[data-module="forecasting"] strong,
+[data-module="forecasting"] b,
+[data-module="fundraising"] strong,
+[data-module="fundraising"] b {
+  color: #000000 !important;
+}
+
+/* ── Dark grey secondary text (replacing washed-out greys) ────────────── */
+
+/* Tailwind text-[#64748b] → #141414 */
+[data-module="forecasting"] .text-\[\#64748b\],
+[data-module="fundraising"] .text-\[\#64748b\] {
+  color: #141414 !important;
+}
+
+/* Tailwind text-[#94a3b8] → #111111 */
+[data-module="forecasting"] .text-\[\#94a3b8\],
+[data-module="fundraising"] .text-\[\#94a3b8\] {
+  color: #111111 !important;
+}
+
+/* Tailwind text-[#475569] → #141414 */
+[data-module="forecasting"] .text-\[\#475569\],
+[data-module="fundraising"] .text-\[\#475569\] {
+  color: #141414 !important;
+}
+
+/* Tailwind text-[#4b5563] → #141414 */
+[data-module="forecasting"] .text-\[\#4b5563\],
+[data-module="fundraising"] .text-\[\#4b5563\] {
+  color: #141414 !important;
+}
+
+/* Tailwind text-[#334155] → #111111 */
+[data-module="forecasting"] .text-\[\#334155\],
+[data-module="fundraising"] .text-\[\#334155\] {
+  color: #111111 !important;
+}
+
+/* Tailwind text-[#718096] → #141414 */
+[data-module="forecasting"] .text-\[\#718096\],
+[data-module="fundraising"] .text-\[\#718096\] {
+  color: #141414 !important;
+}
+
+/* Tailwind text-[#2d3748] → #111111 */
+[data-module="forecasting"] .text-\[\#2d3748\],
+[data-module="fundraising"] .text-\[\#2d3748\] {
+  color: #111111 !important;
+}
+
+/* Generic body / muted text fallback */
+[data-module="forecasting"] .text-muted-foreground,
+[data-module="forecasting"] [class*="text-gray"],
+[data-module="forecasting"] [class*="text-slate"],
+[data-module="fundraising"] .text-muted-foreground,
+[data-module="fundraising"] [class*="text-gray"],
+[data-module="fundraising"] [class*="text-slate"] {
+  color: #141414 !important;
+}
+
+/* ── Button text black ────────────────────────────────────────────────── */
+[data-module="forecasting"] button,
+[data-module="fundraising"] button {
+  color: #000000 !important;
+}
+[data-module="forecasting"] .text-white,
+[data-module="fundraising"] .text-white {
+  color: #ffffff !important;
+}
+
+/* Table header text — true black */
+[data-module="forecasting"] th,
+[data-module="fundraising"] th {
+  color: #000000 !important;
+}
+
+/* ── Card / surface background consistency ────────────────────────────── */
+[data-module="forecasting"] .bg-white,
+[data-module="fundraising"] .bg-white {
+  background-color: #ffffff !important;
 }

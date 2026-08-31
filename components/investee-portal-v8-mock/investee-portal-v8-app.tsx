@@ -8,12 +8,23 @@ import {
 } from "@/lib/investee-portal-v8-mock/nav"
 import { startInvesteePortalV8Runtime } from "@/components/investee-portal-v8-mock/matanho-investee-portal-runtime"
 import { INVESTEE_PORTAL_V8_SHELL_HTML } from "@/components/investee-portal-v8-mock/shell"
+import { loadInvesteePortalLiveData } from "@/lib/investee-portal-v8/live-loaders"
 import "@/components/investee-portal-v8-mock/investee-portal-v8.css"
 import "@/components/investee-portal-v8-mock/investee-portal-v8-overrides.css"
+
+declare global {
+  interface Window {
+    MatanhoInvesteeUI?: {
+      hydrate: (payload: unknown) => void
+      getSnapshot?: () => unknown
+    }
+  }
+}
 
 type RuntimeApi = {
   setPage: (page: string) => void
   destroy: () => void
+  hydrate?: (payload: unknown) => void
 }
 
 export function InvesteePortalV8App() {
@@ -32,13 +43,24 @@ export function InvesteePortalV8App() {
     apiRef.current = startInvesteePortalV8Runtime(el, {
       shellHtml: INVESTEE_PORTAL_V8_SHELL_HTML,
       initialPage,
+      liveOnly: true,
       onNavigate: (page: string) => {
         const path = IP8_PAGE_TO_PATH[page] || "/investee-portal-v8"
         if (pathnameRef.current !== path) router.push(path)
       },
     })
 
+    const loadLive = () => {
+      void loadInvesteePortalLiveData().then((payload) => {
+        apiRef.current?.hydrate?.(payload)
+        window.MatanhoInvesteeUI?.hydrate?.(payload)
+      })
+    }
+    loadLive()
+    window.addEventListener("investee:reload-request", loadLive)
+
     return () => {
+      window.removeEventListener("investee:reload-request", loadLive)
       apiRef.current?.destroy()
       apiRef.current = null
     }

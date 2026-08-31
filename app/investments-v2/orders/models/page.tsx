@@ -161,6 +161,11 @@ export default function ModelsPage() {
         </button>
       }
     >
+      <p className="rounded-2xl border border-white/[0.06] bg-white/[0.02] px-4 py-3 text-[11px] leading-relaxed text-slate-400">
+        Model portfolios define target weights (e.g. 40% equity sleeve, 60% income).
+        Select a model on the left, pick a live portfolio to compare, and review drift in the table.
+        Use <span className="text-slate-200">New model</span> to create targets; drift loads automatically when a fund is linked.
+      </p>
       {error && (
         <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-2 text-[12px] text-rose-200">
           {error}

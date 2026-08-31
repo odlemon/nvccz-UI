@@ -157,7 +157,7 @@ export function GoalViewDrawer({ goal, isOpen, onClose, onEdit, onDelete }: Goal
               </Button>
             </div>
           </div>
-        </DialogHeader>
+        </SheetHeader>
 
         <div className="mt-6 space-y-6">
           {/* Goal Header */}

@@ -7,6 +7,12 @@ const ROLE_ALIASES: Record<string, RoleCode> = {
   "CHIEF FINANCIAL OFFICER": "CFO",
   "FINANCE MANAGER": "FIN_MGR",
   "OPERATIONS MANAGER": "OPS_MGR",
+  LIMITED_PARTNER: "LIMITED_PARTNER",
+  LIMITEDPARTNER: "LIMITED_PARTNER",
+  LP_VIEWER: "LIMITED_PARTNER",
+  LP_SIGNATORY: "LIMITED_PARTNER",
+  LP_MANAGER: "LIMITED_PARTNER",
+  LP_INSTITUTIONAL_MANAGER: "LIMITED_PARTNER",
 }
 
 /** Best-effort map from login cookie / display role strings to RoleCode. */
@@ -25,5 +31,14 @@ export function resolveRoleCode(input: string | null | undefined): RoleCode | nu
   }
 
   const alias = ROLE_ALIASES[upper] ?? ROLE_ALIASES[underscored.replace(/_/g, " ")]
-  return alias ?? null
+  if (alias) return alias
+
+  // e.g. "limited_partner", "Limited Partner"
+  const normalized = underscored.replace(/_/g, "_")
+  if (ROLE_ALIASES[normalized]) return ROLE_ALIASES[normalized]
+  if (normalized === "LIMITED_PARTNER" || normalized.includes("LIMITED") && normalized.includes("PARTNER")) {
+    return "LIMITED_PARTNER"
+  }
+
+  return null
 }

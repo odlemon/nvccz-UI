@@ -11,6 +11,7 @@ export function HomeV3Layout({ children }: { children: React.ReactNode }) {
       backgroundClassName="bg-[#f5f7fb]"
       loadingFallback={<div className="p-8 text-sm text-[#64748B]">Loading Homepage…</div>}
       mockApp={<HomeV3App />}
+      hideThemeToggle
     >
       {children}
     </ClientDesignModuleShell>

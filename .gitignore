@@ -18,6 +18,8 @@ yarn-error.log*
 
 # env files
 .env*
+deploy/nvccz/CREDENTIALS.local.md
+deploy/nvccz/CREDENTIALS.nts-prod.local.md
 
 # vercel
 .vercel

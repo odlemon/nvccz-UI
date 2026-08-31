@@ -1,7 +1,8 @@
 # Performance Version 22 — UI handoff
 
 > **Status:** Integrated — client Matanho Performance Management V22.1 under `/performance-v22`.  
-> **Source:** `C:\Users\lysp\Downloads\Matanho_Performance_Management_v22_1_Deployment_Developer_Package-20260815T160741Z-1-001\Matanho_Performance_Management_v22_1_Deployment_Developer_Package`  
+> **Source:** `C:\Users\lysp\Downloads\Matanho_Performance_Management_v22_1_Deployment_Developer_Package-20260828T144718Z-1-001\Matanho_Performance_Management_v22_1_Deployment_Developer_Package`  
+> **Design update report:** [performance-v22-design-update-20260828.md](./performance-v22-design-update-20260828.md)  
 > **Mode:** Interactive mock (Mode A runtime host) — no live API.  
 > **Live / previous UI left alone:** `/performance` (Performance Management)
 

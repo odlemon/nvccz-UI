@@ -55,16 +55,21 @@ export interface UserDetailsResponse {
 export interface LoginCredentials {
   email: string
   password: string
+  portal?: 'staff' | 'lp' | 'investee'
 }
 
 export const authApiService = {
   async login(credentials: LoginCredentials): Promise<LoginResponse> {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://31.220.82.129:3009/api'}/auth/login`, {
+    const portal =
+      credentials.portal ||
+      (process.env.NEXT_PUBLIC_PORTAL as 'staff' | 'lp' | 'investee' | undefined) ||
+      'staff'
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://127.0.0.1:3009/api'}/auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(credentials),
+      body: JSON.stringify({ ...credentials, portal }),
     })
 
     if (!response.ok) {
@@ -101,7 +106,7 @@ export const authApiService = {
   },
 
   async forgotPassword(email: string): Promise<{ success: boolean; message: string }> {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://31.220.82.129:3009/api'}/auth/forgot-password`, {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://127.0.0.1:3009/api'}/auth/forgot-password`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

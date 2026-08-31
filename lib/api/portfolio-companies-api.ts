@@ -48,6 +48,18 @@ class PortfolioCompaniesApiService {
   async getById(id: string): Promise<{ success: boolean; data: PortfolioCompany }> {
     return apiClient.get<{ success: boolean; data: PortfolioCompany }>(`/portfolio-companies/${id}`)
   }
+
+  /** Admin create — POST /portfolio-companies/admin */
+  async adminCreate(data: {
+    name: string
+    industry?: string
+    fund_id?: string
+    registrationNumber?: string
+    status?: string
+    [key: string]: unknown
+  }): Promise<{ success: boolean; data: PortfolioCompany; message?: string }> {
+    return apiClient.post('/portfolio-companies/admin', data)
+  }
 }
 
 export const portfolioCompaniesApi = new PortfolioCompaniesApiService()

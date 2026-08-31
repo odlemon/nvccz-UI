@@ -27,8 +27,8 @@ export function StreetRatesLayout({ children }: StreetRatesLayoutProps) {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <SharedTopbar onModuleSelect={handleModuleSelect} currentModule={currentModule} />
+    <div className="min-h-screen bg-background" data-module="street-rates">
+      <SharedTopbar onModuleSelect={handleModuleSelect} currentModule={currentModule} hideThemeToggle />
       <div className="flex">
         <StreetRatesSidebar />
         <main className="flex-1 overflow-auto">{children}</main>

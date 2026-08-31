@@ -2632,6 +2632,10 @@ export function hasModuleAccess(
   if (moduleId === "portfolio-v11") return true;
   // Payroll HR V6 client design port — open during comparison/mock phase
   if (moduleId === "payroll-v6") return true;
+  // Accounting V52 client design port — open during comparison/mock phase
+  if (moduleId === "accounting-v52") return true;
+  // Procurement V23 client design port — open during comparison/mock phase
+  if (moduleId === "procurement-v23") return true;
   // Fundraising Investor KYC client design port — open during comparison/mock phase
   if (moduleId === "fundraising-kyc") return true;
   // Investee Portal V8 client design port — open during comparison/mock phase
@@ -2674,6 +2678,8 @@ export function hasSubModuleAccess(
   if (moduleId === "home-v3") return true;
   if (moduleId === "portfolio-v11") return true;
   if (moduleId === "payroll-v6") return true;
+  if (moduleId === "accounting-v52") return true;
+  if (moduleId === "procurement-v23") return true;
   if (moduleId === "fundraising-kyc") return true;
   if (moduleId === "investee-portal-v8") return true;
   if (moduleId === "accounting-v2") return true;

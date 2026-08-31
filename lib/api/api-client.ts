@@ -20,6 +20,7 @@ const PUBLIC_ROUTE_PREFIXES = [
   '/vendor-portal',
   '/public-tenders',
   '/applications/form',
+  '/funding-application',
   '/vendor-quotations',
 ]
 
@@ -54,7 +55,9 @@ class ApiClient {
   private baseURL: string
 
   constructor(baseURL?: string) {
-    this.baseURL = baseURL || process.env.NEXT_PUBLIC_API_BASE_URL || 'http://31.220.82.129:3009/api'
+    // Prefer explicit env; default to local BE for this workspace (not Singapore VPS).
+    this.baseURL =
+      baseURL || process.env.NEXT_PUBLIC_API_BASE_URL || 'http://127.0.0.1:3009/api'
   }
 
   // Get authentication headers

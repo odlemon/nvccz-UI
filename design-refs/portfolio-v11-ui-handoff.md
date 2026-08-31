@@ -1,10 +1,11 @@
 # Portfolio Management (V23) — UI handoff
 
-> **Status:** Integrated — client Matanho Portfolio Management **V23** hosted at `/portfolio-v11`.  
+> **Status:** Live-wired (local) — `/portfolio-v11` hydrates from NTS `arcus_dev` APIs when authenticated; gaps in [portfolio-v23-backend-asks.md](./portfolio-v23-backend-asks.md).  
 > **Source:** `Matanho_Portfolio_Management_v23_Production_Handoff` (2026-08-17)  
 > **Prior source:** V11 handoff (same SPA lineage; V23 = blue theme + V22 ops polish + API handoff)  
-> **Mode:** Interactive mock (Mode A runtime host) — mock data; live API optional via client bootstrap contract.  
-> **Live module left alone:** `/portfolio` (legacy Portfolio Management)
+> **Mode:** Auth-gated live hydrate via `lib/portfolio-v11/bootstrap.ts` → `MatanhoPortfolioUI.hydrate`; mock fixtures only if unsigned-in is somehow reached.  
+> **Live module left alone:** `/portfolio` (legacy Portfolio Management)  
+> **Deploy:** none (local only unless explicitly requested)
 
 See comparison: [portfolio-v23-comparison.md](./portfolio-v23-comparison.md)
 

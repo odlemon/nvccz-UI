@@ -1,4 +1,10 @@
 /* Auto-extracted Matanho Payroll HR V6 — adapted for Next.js */
+import {
+  applySessionUserToProfile,
+  clientDesignSignOut,
+  getClientDesignSessionUser,
+  onClientDesignSessionUser,
+} from "@/components/client-design-mock/runtime-auth";
 export function startPayrollV6Runtime(rootEl, options = {}) {
   const initialPage = options.initialPage || 'overview';
   window.__PAYROLL_V6_NAV__ = options.onNavigate || (() => {});
@@ -358,6 +364,16 @@ function render(){
  renderNav();
  const pages={overview:overviewPage,employees:employeesPage,onboarding:onboardingPage,runs:runsPage,inputs:inputsPage,exceptions:exceptionsPage,approvals:approvalsPage,close:closePage,components:componentsPage,calendar:calendarPage,tax:taxPage,training:trainingPage,leave:leavePage,vault:vaultPage,reports:reportsPage,audit:auditPage,access:accessPage,settings:settingsPage,mypay:myPayPage};
  const fn=pages[state.page]||overviewPage;$('#content').innerHTML=fn();$('#content').scrollTop=0;
+ wireTopProfile();
+}
+function wireTopProfile(){
+  const prof=$('.profile');
+  if(prof){prof.style.cursor='pointer';prof.dataset.action='profile-menu'}
+  applySessionUserToProfile(rootEl);
+}
+function openProfileMenu(){
+  const u=getClientDesignSessionUser()||{name:'Tariro Moyo',email:'',role:state.role,initials:'TM'};
+  openDrawer('Your profile',u.email||u.role,`<div class="employee-profile"><div class="photo-avatar">${u.initials||'U'}</div><div><h2 style="font-size:21px;margin:0">${u.name}</h2><div class="muted" style="margin-top:4px">${u.role}</div>${u.email?`<div class="tiny muted" style="margin-top:6px">${u.email}</div>`:''}</div></div>`,`${button('Sign out','client-design-sign-out','danger')}${button('Close','close-drawer')}`);
 }
 function openDrawer(title,sub,body,foot=''){$('#drawerHead').innerHTML=`<div><h2>${title}</h2><p>${sub}</p></div>${closeButton('drawer')}`;$('#drawerBody').innerHTML=body;$('#drawerFoot').innerHTML=foot||`<button class="btn" data-action="close-drawer">Close</button>`;$('#drawer').classList.add('open');$('#drawerBackdrop').classList.add('open')}
 function closeDrawer(){$('#drawer').classList.remove('open');$('#drawerBackdrop').classList.remove('open')}
@@ -411,6 +427,8 @@ document.addEventListener('click',e=>{
 function handleAction(action,el){
  if(pageIds.has(action)){goPage(action);return}
  switch(action){
+  case 'profile-menu':openProfileMenu();break;
+  case 'client-design-sign-out':closeDrawer();closeModal();clientDesignSignOut();break;
   case 'close-drawer':closeDrawer();break;case 'close-modal':closeModal();break;
   case 'new-employee':case 'open-onboarding':openNewEmployee();break;case 'new-run':openNewRun();break;
   case 'continue-run':goPage('approvals');break;case 'upload-document':uploadDocumentModal();break;case 'create-document':createDocumentModal();break;
@@ -1564,6 +1582,12 @@ init();
   }
   if (typeof render === 'function') render();
 
+  const __pr6SessionOff = onClientDesignSessionUser(() => {
+    applySessionUserToProfile(rootEl)
+    wireTopProfile()
+  })
+  wireTopProfile()
+
   api = {
     setPage(page) {
       if (typeof permittedPage === 'function' && !permittedPage(page)) return;
@@ -1573,6 +1597,7 @@ init();
       try { closeDrawer(); closeModal(); closeCommand(); } catch (_) {}
     },
     destroy() {
+      try { __pr6SessionOff?.() } catch (_) {}
       try { __pr6Abort.abort(); } catch (_) {}
       delete window.__PAYROLL_V6_NAV__;
       try { delete window.MatanhoUI; } catch (_) {}

@@ -1,0 +1,3 @@
+value_date,trade_date,amount,debit_credit,reference,counterparty,description
+2026-08-18,2026-08-18,1000000.00,Credit,DEP-INCOME-MANDATE-Q3,CBZ Bank,Institutional deposit — income mandate
+2026-08-20,2026-08-20,21092.10,Debit,TRD-BUY-INN-CLIENT,CBZ Custody,Equity settlement — INN BUY 500 @ 42.10 + 20bps commission (net)

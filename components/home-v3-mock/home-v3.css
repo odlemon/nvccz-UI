@@ -2121,3 +2121,12 @@
   .home-v3-root .home-assistant-priority .assistant-input input{height:48px;font-size:16px}
 }
 
+/* Typography readability — Arcus dev */
+.home-v3-root{
+  --mock-text-xs:12px;--mock-text-sm:13px;--mock-text-base:14px;--mock-muted:#5c6775;
+  --muted:#5c6775;font-size:var(--mock-text-base);
+}
+.home-v3-root .nav-label{font-size:var(--mock-text-xs)!important}
+.home-v3-root .nav-item{font-size:var(--mock-text-sm)!important}
+@media(max-width:1280px){.home-v3-root{font-size:15px}}
+

@@ -1,0 +1,51 @@
+---
+description: Portfolio V11 — progressive page-scoped API loading (primary first)
+globs: lib/portfolio-v11/**/*.{ts,tsx},components/portfolio-v11-mock/**/*.{ts,tsx,js},app/portfolio-v11/**/*
+alwaysApply: false
+---
+
+# Portfolio V11 progressive loads (mandatory)
+
+Do **not** load the entire portfolio API surface on every page. Paint the page’s main data first; load extras in the background only if that page uses them.
+
+## Rules
+
+1. **Page-scoped fetches** — use `scopesForPage(page)` + `loadPortfolioV11Scopes(scopes)` in `lib/portfolio-v11/bootstrap.ts`. Never reintroduce a single “load everything” cold path for normal navigation.
+2. **Primary → paint → secondary** — host loads each `primary` scope **one at a time**, hydrating after each; then fires `secondary` scopes independently (non-blocking).
+3. **Merge hydrate** — omit unused keys from `payload.data` so `replaceCollection` leaves other collections alone. Soft navigations must not call `beginLiveLoad` (that clears all collections).
+4. **New pages** — update `scopesForPage` + `primaryLoadLabel` with the minimum primary API; put filters/side panels in `secondary`.
+
+## Page → scopes (source of truth: `scopesForPage`)
+
+| Page | Primary (paint) | Secondary (background) |
+|------|-----------------|------------------------|
+| Deal Flow / deal detail | `applications` | `funds` |
+| Dashboard | `dashboard` | `companies`, `funds`, `applications` |
+| Funds / fund detail / fund performance | `funds` | `dashboard` |
+| Capital calls | `capitalCalls` (+ funds dependency) | — |
+| Companies | `companies` | `funds` |
+| LPs | `lps` | — |
+| Cash accounts / overview | `cashAccounts` | `funds` |
+| Cash ledger | `cashLedger` | `cashAccounts` |
+| Reservations | `cashReservations` | `cashAccounts` |
+| Statement imports | `statementImports` | — |
+| Reconciliations | `recon` | `cashAccounts` |
+| Exceptions | `exceptions` | — |
+| Period close | `periodClose` | — |
+| Reporting / reports vault | `reporting` (+ funds dependency) | — |
+| Documents | `documents` | — |
+| E-signatures | `agreements` | — |
+| Mailer lists | `mailer` (+ funds dependency) | — |
+| Settings | `settings` | — |
+| Analytics | `dashboard` | `funds` |
+
+## Anti-patterns
+
+```text
+❌ Promise.all([applications, capitalCalls, cash, recon, …]) on any single page
+❌ beginLiveLoad on every sidebar navigation
+❌ Waiting for secondary scopes before first paint
+❌ Bundling unrelated scopes into primary “just in case”
+✅ applications → hydrate deals → background funds for filters
+✅ dashboard → hydrate metrics → background companies/funds/deals
+```

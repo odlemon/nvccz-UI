@@ -1,0 +1,217 @@
+name: nvccz-prod
+
+networks:
+  edge:
+    external: true
+    name: lms_lms-network
+
+services:
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --default-authentication-plugin=mysql_native_password
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: nvccz_prod
+      MYSQL_USER: nvccz_prod
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - nvccz_prod_mysql:/var/lib/mysql
+    ports:
+      - "127.0.0.1:3327:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 5s
+      timeout: 5s
+      retries: 40
+      start_period: 20s
+
+  api:
+    build:
+      context: ../src/api
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      upload:
+        condition: service_healthy
+    networks:
+      - default
+      - edge
+    ports:
+      - "3209:3009"
+    env_file:
+      - ../secrets/prod.env
+    environment:
+      NODE_ENV: production
+      PORT: "3009"
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DATABASE_URL: mysql://nvccz_prod:${MYSQL_PASSWORD}@mysql:3306/nvccz_prod
+      RUN_SEED: "1"
+      REMOTE_UPLOAD_SERVICE_URL: http://upload:3050/upload
+      REMOTE_MEDIA_INTERNAL_BASE: http://upload:3050/uploads
+    volumes:
+      - nvccz_prod_upload:/app/storage/local-upload-mock
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=lms_lms-network
+      - traefik.http.routers.nvccz-prod-api.rule=Host(`api.nvccz.online`)
+      - traefik.http.routers.nvccz-prod-api.entrypoints=websecure
+      - traefik.http.routers.nvccz-prod-api.tls.certresolver=le
+      - traefik.http.routers.nvccz-prod-api.middlewares=nvccz-prod-api-cors@docker
+      - traefik.http.middlewares.nvccz-prod-api-cors.headers.accesscontrolallowmethods=GET,OPTIONS,PUT,POST,DELETE
+      - traefik.http.middlewares.nvccz-prod-api-cors.headers.accesscontrolalloworiginlist=https://nvccz.online,https://lp.nvccz.online,https://investee.nvccz.online,https://api.nvccz.online
+      - traefik.http.middlewares.nvccz-prod-api-cors.headers.accesscontrolmaxage=100
+      - traefik.http.middlewares.nvccz-prod-api-cors.headers.addvaryheader=true
+      - traefik.http.middlewares.nvccz-prod-api-cors.headers.accesscontrolallowcredentials=true
+      - traefik.http.middlewares.nvccz-prod-api-cors.headers.accesscontrolallowheaders=*
+      - traefik.http.services.nvccz-prod-api.loadbalancer.server.port=3009
+
+  upload:
+    build:
+      context: ../upload-service
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      PORT: "3050"
+      UPLOAD_ROOT: /data/uploads
+    volumes:
+      - nvccz_prod_upload:/data/uploads
+    ports:
+      - "127.0.0.1:3250:3050"
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:3050/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  ui-staff:
+    build:
+      context: ../src/ui
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL}
+        NEXT_PUBLIC_WS_URL: ${PUBLIC_WS_URL}
+        NEXT_PUBLIC_ORGANIZATION_NAME: ${NEXT_PUBLIC_ORGANIZATION_NAME}
+        NEXT_PUBLIC_PORTAL: staff
+        NEXT_PUBLIC_LP_PORTAL_URL: ${PUBLIC_LP_PORTAL_URL}
+        NEXT_PUBLIC_INVESTEE_PORTAL_URL: ${PUBLIC_INVESTEE_PORTAL_URL}
+        NEXT_PUBLIC_APPLY_PORTAL_URL: ${PUBLIC_APPLY_PORTAL_URL}
+        NEXT_PUBLIC_AUTH_TOKEN_KEY: nvccz_staff_token
+        NEXT_PUBLIC_AUTH_USER_KEY: nvccz_staff_user
+        NEXT_PUBLIC_AUTH_PROFILE_KEY: nvccz_staff_profile
+    restart: unless-stopped
+    depends_on:
+      - api
+    networks:
+      - default
+      - edge
+    ports:
+      - "3200:3000"
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=lms_lms-network
+      - traefik.http.routers.nvccz-prod-ui-staff.rule=Host(`${PUBLIC_STAFF_HOST}`)
+      - traefik.http.routers.nvccz-prod-ui-staff.entrypoints=websecure
+      - traefik.http.routers.nvccz-prod-ui-staff.tls.certresolver=le
+      - traefik.http.services.nvccz-prod-ui-staff.loadbalancer.server.port=3000
+
+  ui-lp:
+    build:
+      context: ../src/ui
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL}
+        NEXT_PUBLIC_WS_URL: ${PUBLIC_WS_URL}
+        NEXT_PUBLIC_ORGANIZATION_NAME: ${NEXT_PUBLIC_ORGANIZATION_NAME}
+        NEXT_PUBLIC_PORTAL: lp
+        NEXT_PUBLIC_AUTH_TOKEN_KEY: nvccz_lp_token
+        NEXT_PUBLIC_AUTH_USER_KEY: nvccz_lp_user
+        NEXT_PUBLIC_AUTH_PROFILE_KEY: nvccz_lp_profile
+    restart: unless-stopped
+    depends_on:
+      - api
+    networks:
+      - default
+      - edge
+    ports:
+      - "3210:3000"
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=lms_lms-network
+      - traefik.http.routers.nvccz-prod-ui-lp.rule=Host(`lp.nvccz.online`) || Host(`matanho-lp.nvccz.com`)
+      - traefik.http.routers.nvccz-prod-ui-lp.entrypoints=websecure
+      - traefik.http.routers.nvccz-prod-ui-lp.tls.certresolver=le
+      - traefik.http.services.nvccz-prod-ui-lp.loadbalancer.server.port=3000
+
+  ui-investee:
+    build:
+      context: ../src/ui
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL}
+        NEXT_PUBLIC_WS_URL: ${PUBLIC_WS_URL}
+        NEXT_PUBLIC_ORGANIZATION_NAME: ${NEXT_PUBLIC_ORGANIZATION_NAME}
+        NEXT_PUBLIC_PORTAL: investee
+        NEXT_PUBLIC_AUTH_TOKEN_KEY: nvccz_investee_token
+        NEXT_PUBLIC_AUTH_USER_KEY: nvccz_investee_user
+        NEXT_PUBLIC_AUTH_PROFILE_KEY: nvccz_investee_profile
+    restart: unless-stopped
+    depends_on:
+      - api
+    networks:
+      - default
+      - edge
+    ports:
+      - "3220:3000"
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=lms_lms-network
+      - traefik.http.routers.nvccz-prod-ui-investee.rule=Host(`investee.nvccz.online`) || Host(`matanho-investee.nvccz.com`)
+      - traefik.http.routers.nvccz-prod-ui-investee.entrypoints=websecure
+      - traefik.http.routers.nvccz-prod-ui-investee.tls.certresolver=le
+      - traefik.http.services.nvccz-prod-ui-investee.loadbalancer.server.port=3000
+
+  ui-apply:
+    build:
+      context: ../src/ui
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL}
+        NEXT_PUBLIC_WS_URL: ${PUBLIC_WS_URL}
+        NEXT_PUBLIC_ORGANIZATION_NAME: ${NEXT_PUBLIC_ORGANIZATION_NAME}
+        NEXT_PUBLIC_PORTAL: apply
+    restart: unless-stopped
+    depends_on:
+      - api
+    networks:
+      - default
+      - edge
+    ports:
+      - "3230:3000"
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=lms_lms-network
+      - traefik.http.routers.nvccz-prod-ui-apply.rule=Host(`nvccz.online`) || Host(`www.nvccz.online`)
+      - traefik.http.routers.nvccz-prod-ui-apply.entrypoints=websecure
+      - traefik.http.routers.nvccz-prod-ui-apply.tls.certresolver=le
+      - traefik.http.services.nvccz-prod-ui-apply.loadbalancer.server.port=3000
+
+volumes:
+  nvccz_prod_mysql:
+  nvccz_prod_upload:

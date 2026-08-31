@@ -2987,4 +2987,13 @@
 .portfolio-v11-root .v15-paper .v15-paper-table{min-width:0!important;max-width:100%;table-layout:fixed}
 .portfolio-v11-root .v15-paper .v15-paper-table th, .portfolio-v11-root .v15-paper .v15-paper-table td{overflow-wrap:anywhere}
 
+/* Typography readability — Arcus dev */
+.portfolio-v11-root{
+  --mock-text-micro:11px;--mock-text-xs:12px;--mock-text-sm:13px;--mock-text-base:14px;--mock-muted:#525f73;
+  --muted:#525f73;--muted-2:#6b778c;font-size:var(--mock-text-base);
+}
+.portfolio-v11-root .small{font-size:var(--mock-text-sm)!important}
+.portfolio-v11-root table th,.portfolio-v11-root .table th{font-size:var(--mock-text-micro)!important}
+.portfolio-v11-root table td,.portfolio-v11-root .table td{font-size:var(--mock-text-sm)!important}
+@media(max-width:1280px){.portfolio-v11-root{font-size:15px}}
 

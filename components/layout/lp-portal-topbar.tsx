@@ -198,8 +198,8 @@ export function LpPortalTopbar() {
 
   return (
     <TooltipProvider>
-    <div className="shrink-0 border-b border-border bg-card/80 backdrop-blur-sm">
-      <div className="flex h-12 items-center gap-2 px-3 sm:px-4 lg:gap-3 lg:px-6">
+    <div data-arcus-shared-topbar className="shrink-0 border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
+      <div className="flex h-20 items-center gap-2 px-6 lg:gap-3">
         <Sheet open={mobileNavigationOpen} onOpenChange={setMobileNavigationOpen}>
           <SheetTrigger asChild>
             <Button
@@ -237,9 +237,9 @@ export function LpPortalTopbar() {
           <img
             src="/new_logo.png"
             alt="Matanho"
-            className="h-8 w-auto object-contain sm:h-9"
-            height={36}
-            width={126}
+            className="h-10 w-auto object-contain"
+            height={40}
+            width={140}
           />
         </Link>
 
@@ -384,30 +384,26 @@ export function LpPortalTopbar() {
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                className="flex size-9 shrink-0 items-center justify-center rounded-full hover:bg-accent"
-                aria-label="Open profile menu"
-              >
-                <Avatar className="size-8">
-                  <AvatarFallback className="bg-primary text-[10px] font-semibold text-primary-foreground">
+              <div className="p-2 h-auto cursor-pointer flex items-center justify-center rounded-md hover:bg-accent hover:text-accent-foreground transition-colors">
+                <Avatar className="w-10 h-10">
+                  <AvatarFallback className="bg-primary text-primary-foreground text-base">
                     {userInitials}
                   </AvatarFallback>
                 </Avatar>
-              </button>
+              </div>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 rounded-xl">
+            <DropdownMenuContent align="end" className="w-56">
               <div className="flex items-center gap-2 p-2">
-                <Avatar className="size-9">
-                  <AvatarFallback className="bg-primary text-xs font-semibold text-primary-foreground">
+                <Avatar className="w-10 h-10">
+                  <AvatarFallback className="bg-primary text-primary-foreground text-base">
                     {userInitials}
                   </AvatarFallback>
                 </Avatar>
-                <div className="min-w-0 flex-col">
-                  <span className="block truncate text-sm font-medium">
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium">
                     {user ? `${user.firstName} ${user.lastName}` : "User"}
                   </span>
-                  <span className="block truncate text-xs capitalize text-muted-foreground">
+                  <span className="text-xs text-muted-foreground capitalize">
                     {userDetails?.roleCode || userDetails?.role?.name || "User"}
                   </span>
                 </div>
