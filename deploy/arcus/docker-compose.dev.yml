@@ -55,9 +55,16 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=lms_lms-network
-      - traefik.http.routers.arcus-dev-api.rule=Host(`dev-api.arcus.co.zw`)
+      - traefik.http.routers.arcus-dev-api.rule=Host(`dev-api.matanho.com`)
       - traefik.http.routers.arcus-dev-api.entrypoints=websecure
       - traefik.http.routers.arcus-dev-api.tls.certresolver=le
+      - traefik.http.routers.arcus-dev-api.middlewares=arcus-dev-api-cors@docker
+      - traefik.http.middlewares.arcus-dev-api-cors.headers.accesscontrolallowmethods=GET,OPTIONS,PUT,POST,DELETE
+      - traefik.http.middlewares.arcus-dev-api-cors.headers.accesscontrolalloworiginlist=https://dev.matanho.com,https://dev.lp.matanho.com,https://dev.investee.matanho.com,https://dev.vendor.matanho.com,https://dev.events.matanho.com,https://dev.apply.matanho.com,https://dev-api.matanho.com
+      - traefik.http.middlewares.arcus-dev-api-cors.headers.accesscontrolmaxage=100
+      - traefik.http.middlewares.arcus-dev-api-cors.headers.addvaryheader=true
+      - traefik.http.middlewares.arcus-dev-api-cors.headers.accesscontrolallowcredentials=true
+      - traefik.http.middlewares.arcus-dev-api-cors.headers.accesscontrolallowheaders=*
       - traefik.http.services.arcus-dev-api.loadbalancer.server.port=3009
 
   upload:
@@ -90,6 +97,10 @@ services:
         NEXT_PUBLIC_LP_PORTAL_URL: ${PUBLIC_LP_PORTAL_URL}
         NEXT_PUBLIC_INVESTEE_PORTAL_URL: ${PUBLIC_INVESTEE_PORTAL_URL}
         NEXT_PUBLIC_APPLY_PORTAL_URL: ${PUBLIC_APPLY_PORTAL_URL}
+        NEXT_PUBLIC_VENDOR_PORTAL_URL: ${PUBLIC_VENDOR_PORTAL_URL}
+        NEXT_PUBLIC_EVENTS_PORTAL_URL: ${PUBLIC_EVENTS_PORTAL_URL}
+        NEXT_PUBLIC_VENDOR_PORTAL_URL: ${PUBLIC_VENDOR_PORTAL_URL}
+        NEXT_PUBLIC_EVENTS_PORTAL_URL: ${PUBLIC_EVENTS_PORTAL_URL}
     restart: unless-stopped
     depends_on:
       - api
@@ -102,7 +113,7 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=lms_lms-network
-      - traefik.http.routers.arcus-dev-ui.rule=Host(`dev.arcus.co.zw`)
+      - traefik.http.routers.arcus-dev-ui.rule=Host(`dev.matanho.com`)
       - traefik.http.routers.arcus-dev-ui.entrypoints=websecure
       - traefik.http.routers.arcus-dev-ui.tls.certresolver=le
       - traefik.http.services.arcus-dev-ui.loadbalancer.server.port=3000
@@ -129,7 +140,7 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=lms_lms-network
-      - traefik.http.routers.arcus-dev-ui-lp.rule=Host(`lp.dev.arcus.co.zw`) || Host(`dev-lp.arcus.co.zw`)
+      - traefik.http.routers.arcus-dev-ui-lp.rule=Host(`dev.lp.matanho.com`)
       - traefik.http.routers.arcus-dev-ui-lp.entrypoints=websecure
       - traefik.http.routers.arcus-dev-ui-lp.tls.certresolver=le
       - traefik.http.services.arcus-dev-ui-lp.loadbalancer.server.port=3000
@@ -156,7 +167,7 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=lms_lms-network
-      - traefik.http.routers.arcus-dev-ui-investee.rule=Host(`investee.dev.arcus.co.zw`) || Host(`dev-investee.arcus.co.zw`)
+      - traefik.http.routers.arcus-dev-ui-investee.rule=Host(`dev.investee.matanho.com`)
       - traefik.http.routers.arcus-dev-ui-investee.entrypoints=websecure
       - traefik.http.routers.arcus-dev-ui-investee.tls.certresolver=le
       - traefik.http.services.arcus-dev-ui-investee.loadbalancer.server.port=3000
@@ -183,12 +194,59 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=lms_lms-network
-      - traefik.http.routers.arcus-dev-ui-apply.rule=Host(`apply.dev.arcus.co.zw`) || Host(`dev-apply.arcus.co.zw`)
+      - traefik.http.routers.arcus-dev-ui-apply.rule=Host(`dev.apply.matanho.com`)
       - traefik.http.routers.arcus-dev-ui-apply.entrypoints=websecure
       - traefik.http.routers.arcus-dev-ui-apply.tls.certresolver=le
       - traefik.http.services.arcus-dev-ui-apply.loadbalancer.server.port=3000
 
-volumes:
-  arcus_dev_mysql:
-  arcus_dev_api_storage:
-  arcus_dev_upload:
+  ui-vendor:
+    build:
+      context: ../src/ui
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL}
+        NEXT_PUBLIC_WS_URL: ${PUBLIC_WS_URL}
+        NEXT_PUBLIC_PORTAL: vendor
+    restart: unless-stopped
+    depends_on:
+      - api
+    networks:
+      - default
+      - edge
+    ports:
+      - "3140:3000"
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=lms_lms-network
+      - traefik.http.routers.arcus-dev-ui-vendor.rule=Host(`dev.vendor.matanho.com`)
+      - traefik.http.routers.arcus-dev-ui-vendor.entrypoints=websecure
+      - traefik.http.routers.arcus-dev-ui-vendor.tls.certresolver=le
+      - traefik.http.services.arcus-dev-ui-vendor.loadbalancer.server.port=3000
+
+  ui-events:
+    build:
+      context: ../src/ui
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${PUBLIC_API_BASE_URL}
+        NEXT_PUBLIC_WS_URL: ${PUBLIC_WS_URL}
+        NEXT_PUBLIC_PORTAL: events
+    restart: unless-stopped
+    depends_on:
+      - api
+    networks:
+      - default
+      - edge
+    ports:
+      - "3150:3000"
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=lms_lms-network
+      - traefik.http.routers.arcus-dev-ui-events.rule=Host(`dev.events.matanho.com`)
+      - traefik.http.routers.arcus-dev-ui-events.entrypoints=websec
