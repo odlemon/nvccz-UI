@@ -314,7 +314,7 @@ export function FundingApplicationApp() {
       <div className="funding-application-root">
         <header className="fa-topbar">
           <a className="fa-brand" href="/funding-application">
-            <span className="fa-brand-mark">A</span>
+            <img src="/new_logo.png" alt="Matanho" height={32} width={120} style={{ height: 32, width: 'auto', objectFit: 'contain' }} />
             Funding Application
           </a>
         </header>
@@ -356,7 +356,7 @@ export function FundingApplicationApp() {
     <div className="funding-application-root">
       <header className="fa-topbar">
         <a className="fa-brand" href="/funding-application">
-          <span className="fa-brand-mark">A</span>
+          <img src="/new_logo.png" alt="Matanho" height={32} width={120} style={{ height: 32, width: 'auto', objectFit: 'contain' }} />
           Funding Application
         </a>
         <div className="fa-topbar-meta">

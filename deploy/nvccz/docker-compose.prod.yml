@@ -62,7 +62,7 @@ services:
       - traefik.http.routers.nvccz-prod-api.tls.certresolver=le
       - traefik.http.routers.nvccz-prod-api.middlewares=nvccz-prod-api-cors@docker
       - traefik.http.middlewares.nvccz-prod-api-cors.headers.accesscontrolallowmethods=GET,OPTIONS,PUT,POST,DELETE
-      - traefik.http.middlewares.nvccz-prod-api-cors.headers.accesscontrolalloworiginlist=https://nvccz.online,https://lp.nvccz.online,https://investee.nvccz.online,https://api.nvccz.online,https://vendor.nvccz.online,https://events.nvccz.online,https://dev.matanho.com,https://dev.lp.matanho.com,https://dev.investee.matanho.com,https://dev.vendor.matanho.com,https://dev.events.matanho.com,https://dev.apply.matanho.com
+      - traefik.http.middlewares.nvccz-prod-api-cors.headers.accesscontrolalloworiginlist=https://nvccz.online,https://lp.nvccz.online,https://investee.nvccz.online,https://api.nvccz.online,https://vendor.nvccz.online,https://events.nvccz.online,https://nvfnvvcz.my.matanho.com,https://dev.matanho.com,https://dev-api.matanho.com,https://dev.lp.matanho.com,https://dev.investee.matanho.com,https://dev.apply.matanho.com,https://dev.vendor.matanho.com,https://dev.events.matanho.com
       - traefik.http.middlewares.nvccz-prod-api-cors.headers.accesscontrolmaxage=100
       - traefik.http.middlewares.nvccz-prod-api-cors.headers.addvaryheader=true
       - traefik.http.middlewares.nvccz-prod-api-cors.headers.accesscontrolallowcredentials=true

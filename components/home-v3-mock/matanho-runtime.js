@@ -274,7 +274,7 @@ export function startMatanhoRuntime(rootEl, options = {}) {
   function renderSidebar() {
     const groups = D.nav.map(group => `<section class="nav-section"><div class="nav-label">${group.section}</div>${group.items.map(item=>`<button class="nav-item ${state.route===item.id?'active':''}" data-nav="${item.id}" title="${item.label}">${icon(item.icon)}<span>${item.label}</span></button>`).join('')}</section>`).join('');
     return `${state.mobileNav?'<button class="sidebar-scrim" data-action="mobile-menu" aria-label="Close navigation"></button>':''}<aside class="sidebar ${state.mobileNav?'open':''} ${state.sidebarCollapsed?'collapsed':''}">
-      <div class="brand"><img class="brand-full" src="/home-v3/assets/matanho-logo.png" alt="Matanho"/><div class="brand-mark" aria-label="Matanho">m</div><button class="collapse-control" data-action="collapse-sidebar" title="${state.sidebarCollapsed?'Expand':'Collapse'} navigation">${icon(state.sidebarCollapsed?'chevron':'arrow')}</button></div>
+      <div class="brand"><button class="collapse-control" data-action="collapse-sidebar" title="${state.sidebarCollapsed?'Expand':'Collapse'} navigation">${icon(state.sidebarCollapsed?'chevron':'arrow')}</button></div>
       <div class="sidebar-scroll">${groups}</div>
       <div class="sidebar-bottom">
         <button class="nav-item utility-item" data-action="settings" title="Settings">${icon('settings')}<span>Settings</span></button>
