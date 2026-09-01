@@ -137,14 +137,8 @@ function SharedTopbarInner({ currentModule, moduleActions, hideThemeToggle = fal
       <>
       <header data-arcus-shared-topbar className="h-20 border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="flex items-center justify-between h-full px-6">
-          {/* Left Section - Logo */}
+          {/* Left Section - spacer */}
           <div className="flex items-center gap-4">
-            <div
-              className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
-              onClick={() => window.location.href = '/home-v3'}
-            >
-              <img src="/new_logo.png" alt="Matanho" height={40} width={140} className="h-10 w-auto object-contain" />
-            </div>
           </div>
 
           {/* Center Section - Search */}
