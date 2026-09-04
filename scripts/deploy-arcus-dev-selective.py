@@ -303,7 +303,11 @@ if [ -f src/ui/deploy/arcus/docker-compose.dev.yml ]; then
 fi
 {api_block}
 echo "=== rebuild DEV only: $SERVICES ==="
-$COMPOSE up -d --build --no-deps $SERVICES
+export DOCKER_BUILDKIT=1
+export BUILDKIT_PROGRESS=plain
+# Build first (plain logs), then recreate — avoids flaky SSH PTY drown-outs
+$COMPOSE build $SERVICES
+$COMPOSE up -d --no-deps --force-recreate $SERVICES
 echo '=== status ==='
 $COMPOSE ps
 echo ARCUS_DEV_SELECTIVE_DONE services=$SERVICES stamp=$STAMP
