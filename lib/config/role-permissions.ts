@@ -2627,7 +2627,7 @@ export function hasModuleAccess(
   // Employee Hub Personal Home — available to all authenticated roles (mock phase)
   if (moduleId === "employee-hub") return true;
   // Home Version 3 (client Matanho V10 port) — open during comparison/mock phase
-  if (moduleId === "home-v3") return true;
+  if (moduleId === "home") return true;
   // Portfolio V11 client design port — open during comparison/mock phase
   if (moduleId === "portfolio-v11") return true;
   // Payroll HR V6 client design port — open during comparison/mock phase
@@ -2675,7 +2675,7 @@ export function hasSubModuleAccess(
   subModuleId: string
 ): boolean {
   if (moduleId === "employee-hub") return true;
-  if (moduleId === "home-v3") return true;
+  if (moduleId === "home") return true;
   if (moduleId === "portfolio-v11") return true;
   if (moduleId === "payroll-v6") return true;
   if (moduleId === "accounting-v52") return true;

@@ -135,3 +135,51 @@ html.dark [data-arcus-shell] .performance-v22-root .sidebar,
   background: #ffffff !important;
   border-top-color: var(--line) !important;
 }
+
+
+/* Pin dark hero surfaces so host heading/background resets cannot create white-on-white text. */
+.performance-v22-root .compliance-hero {
+  background: linear-gradient(135deg, #10182b, #202b48) !important;
+  color: #fff !important;
+}
+.performance-v22-root .v21-risk-hero {
+  background: linear-gradient(135deg, #0e1a32 0%, #172a4c 60%, #293e6d 100%) !important;
+  color: #fff !important;
+}
+.performance-v22-root .v20-report-cover {
+  background: linear-gradient(135deg, #0e2342 0%, #19365c 62%, #315fc2 100%) !important;
+  color: #fff !important;
+  overflow: visible !important;
+}
+.performance-v22-root .v20-report-cover h2,
+.performance-v22-root .v20-report-cover h3,
+.performance-v22-root .v12-report-cover h3 {
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: normal !important;
+  max-width: none !important;
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+}
+.performance-v22-root .v21-risk-hero .eyebrow,
+.performance-v22-root .v21-risk-hero h2,
+.performance-v22-root .v21-risk-hero h3 {
+  overflow: visible !important;
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+}
+
+.performance-v22-root .v12-report-cover {
+  background: linear-gradient(145deg, #10213d 0%, #1d3560 55%, #5b46dc 140%) !important;
+  color: #fff !important;
+  overflow: visible !important;
+}
+.performance-v22-root .v12-report-cover h2,
+.performance-v22-root .v12-report-cover h3 {
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: normal !important;
+  max-width: none !important;
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+}

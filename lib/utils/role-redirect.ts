@@ -31,13 +31,13 @@ export const getRoleBasedRedirect = (
   const roleRedirects: Record<string, string> = {
     'applicant': '/application-portal',
     'limited_partner': '/lp-portal',
-    'admin': '/home-v3',
-    'investment_manager': '/home-v3',
-    'board_member': '/home-v3',
-    'analyst': '/home-v3',
-    'finance': '/home-v3',
-    'compliance': '/home-v3',
-    'default': '/home-v3'
+    'admin': '/home',
+    'investment_manager': '/home',
+    'board_member': '/home',
+    'analyst': '/home',
+    'finance': '/home',
+    'compliance': '/home',
+    'default': '/home'
   }
 
   // Check if user is applicant (either from isApplicant flag or role name)

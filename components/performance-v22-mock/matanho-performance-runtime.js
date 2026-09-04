@@ -426,7 +426,7 @@ function handle(action,el){
   'objective-tab':()=>{state.objectiveTab=id;render()},
   'scorecard-tab':()=>{state.scorecardTab=id||'org';render()},
   'scorecard-detail':()=>scorecardDetail(id),
-  'report-tab':()=>{state.reportTab=id;render()},
+  'report-tab':()=>{state.reportTab=id;render()},'v5-review-tab':()=>{state.reviewTabV5=el.dataset.v5ReviewTab||id||'form';render()},
   'folder':()=>{state.docFolder=id;render()},
   'open-doc':()=>openDocument(id,false),'edit-doc':()=>openDocument(id,true),'doc-edit-mode':()=>openDocument(id,true),'doc-preview-mode':()=>openDocument(id,false),
   'doc-history':()=>docHistory(id),'print-doc':()=>printDoc(id),
@@ -453,10 +453,40 @@ function handle(action,el){
  };
  (map[action]||(()=>{}))();
 }
-document.addEventListener('click',e=>{if(!e.target.closest('.user-button,#profileMenu'))closeProfileMenu();const el=e.target.closest('[data-action],[data-page]');if(!el)return;if(el.dataset.page){const p=el.dataset.page;if(!canPage(p)){toast('Access restricted',`${state.role} does not have permission to open this workspace.`);return}__setPm22Page(p);$('#app').classList.remove('mobile-nav');closeOverlays();render();return}handle(el.dataset.action,el)}, __pm22Sig);
+document.addEventListener('click',e=>{if(!e.target.closest('.user-button,#profileMenu'))closeProfileMenu();const inPageTab=e.target.closest('.tab,[data-v5-review-tab],[data-v13-action="review-tab"],[data-v12-action="report-tab"],[data-v21-action="risk-view"],[data-v21-action="risk-tab"],[data-action="report-tab"],[data-action="scorecard-tab"],[data-action="v5-review-tab"],[data-action="objective-tab"],.v13-tabs button,.v12-tabs button,.scorecard-tabs-v73 button,[data-v12-action="report-tab"]');const el=e.target.closest('[data-action],[data-page]');if(el && el.dataset.page && inPageTab){return;}if(!el)return;if(el.dataset.page){const p=el.dataset.page;if(!canPage(p)){toast('Access restricted',`${state.role} does not have permission to open this workspace.`);return}__setPm22Page(p);$('#app').classList.remove('mobile-nav');closeOverlays();render();return}if(el.dataset.action==='scorecard-tab'){state.scorecardTab=el.dataset.id||'org';if(typeof window.__pm22SwapScorecardTab==='function'){window.__pm22SwapScorecardTab(state.scorecardTab);return}render();return}handle(el.dataset.action,el)}, __pm22Sig);
 document.addEventListener('change',e=>{if(e.target.id==='roleSelect'){state.role=e.target.value;$('#userRoleCopy').textContent=state.role;closeProfileMenu();if(!canPage(state.page))__setPm22Page('dashboard');render();toast('Role context changed',`Previewing Matanho as ${state.role}.`)}if(e.target.id==='entitySelect'){state.entity=e.target.value;render()}if(e.target.id==='yearSelect'){state.year=e.target.value;render()}}, __pm22Sig);
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeOverlays();if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){e.preventDefault();search()}}, __pm22Sig);
 render();wireIcons();
+
+  window.__pm22SwapScorecardTab=function(tabId){
+    try{
+      if(tabId==='employees'){render();return}
+      const root=document.querySelector('#workspace .page');
+      if(!root || !root.querySelector('.scorecard-tabs-v73,.scorecard-tabs')){render();return}
+      const html=typeof scorecards==='function'?scorecards():'';
+      if(!html){render();return}
+      const tmp=document.createElement('div'); tmp.innerHTML=html;
+      const nextPage=tmp.querySelector('.page')||tmp.firstElementChild;
+      if(!nextPage){render();return}
+      const tabSel='.scorecard-tabs-v73,.scorecard-tabs';
+      const curTabs=root.querySelector(tabSel);
+      const nextTabs=nextPage.querySelector(tabSel);
+      if(curTabs && nextTabs){
+        let curNode=curTabs.nextSibling;
+        while(curNode){const n=curNode.nextSibling; curNode.remove(); curNode=n}
+        let nextNode=nextTabs.nextSibling;
+        const frag=document.createDocumentFragment();
+        while(nextNode){const n=nextNode.nextSibling; frag.appendChild(nextNode); nextNode=n}
+        curTabs.replaceWith(nextTabs);
+        nextTabs.after(frag);
+        if(typeof wireIcons==='function') wireIcons();
+        try{ if(typeof decoratePageV7==='function') decoratePageV7(); }catch(_){}
+        return;
+      }
+      render();
+    }catch(err){console.warn('[performance-v22] scorecard tab swap failed', err); render()}
+  };
+
 window.MatanhoPerformance=Object.freeze({version:'2.0.0',render,getState:()=>structuredClone(state),setRole:r=>{if(roles.includes(r)){state.role=r;const roleSel=$('#roleSelect');if(roleSel)roleSel.value=r;const roleCopy=$('#userRoleCopy');if(roleCopy)roleCopy.textContent=r;render()}},navigate:p=>{if(canPage(p)){__setPm22Page(p);render()}}});
 
 window.render = render;
@@ -1266,6 +1296,12 @@ window.openDocument = openDocument;
   function decoratePageV7(){
     updateContextV7();
     const p=document.querySelector('#workspace .page'); if(!p)return;
+    const skipBanner=['tasks','reviews','scorecards','corrective'];
+    if(skipBanner.includes(state.page)){
+      p.querySelectorAll('.enterprise-page-meta-v7,.enterprise-decision-strip-v7').forEach(el=>el.remove());
+      p.querySelectorAll('.card,.panel-v6,.kpi,.task-card,.metric-v6').forEach(el=>el.setAttribute('data-enterprise-surface','true'));
+      return;
+    }
     const head=p.querySelector('.page-head'); if(!head)return;
     if(!p.querySelector('.enterprise-page-meta-v7')) head.insertAdjacentHTML('afterend',pageMetaV7());
     const meta=p.querySelector('.enterprise-page-meta-v7');

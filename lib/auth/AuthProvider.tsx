@@ -33,8 +33,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const isPublicDesignPreview =
     PORTAL_ID === 'staff' &&
-    (pathname === '/home-v3' ||
-      (pathname?.startsWith('/home-v3/') ?? false) ||
+    (pathname === '/home' ||
+      (pathname?.startsWith('/home/') ?? false) ||
       pathname === '/portfolio' ||
       (pathname?.startsWith('/portfolio/') ?? false) ||
       pathname === '/payroll-v6' ||

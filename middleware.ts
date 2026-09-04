@@ -319,6 +319,12 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/performance-v22", request.url))
   }
 
+  // Legacy /home-v3 → /home
+  if (pathname === "/home-v3" || pathname.startsWith("/home-v3/")) {
+    const suffix = pathname.replace(/^\/home-v3/, "") || ""
+    return NextResponse.redirect(new URL(`/home${suffix}`, request.url))
+  }
+
   // Pass-through routes (staff portal only — public/token pages stay on staff domain).
   if (PORTAL_ID === 'staff' && isStaffPublicPassThrough(pathname)) {
     return NextResponse.next()
@@ -400,7 +406,7 @@ export function middleware(request: NextRequest) {
 
       // Skip permission checks if already on an error page or accessing homepage
       const isErrorRedirect = request.nextUrl.searchParams.has('error')
-      const isHomePage = pathname === '/admin' || pathname === '/' || pathname === '/home-v3'
+      const isHomePage = pathname === '/admin' || pathname === '/' || pathname === '/home'
 
       // Applicants can only access application portal
       if (roleName === 'applicant') {
