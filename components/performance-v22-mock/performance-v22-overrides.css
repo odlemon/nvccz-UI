@@ -1,150 +1,137 @@
-/* Performance V22 shell — same full-bleed pattern as payroll-v6 / portfolio-v11 / home-v3:
-   fixed left rail, topbar+workspace fill the remaining viewport. No centered page gutters. */
-
-/* Hide the enterprise context bar (Matanho Capital / Enterprise Performance Command Centre …) */
-.performance-v22-root .enterprise-contextbar-v7,
-.performance-v22-root [id="enterpriseContextBarV7"] {
-  display: none !important;
-  height: 0 !important;
-  min-height: 0 !important;
-  padding: 0 !important;
-  margin: 0 !important;
-  border: none !important;
-  overflow: hidden !important;
-}
-
+/*
+ * The shared Arcus shell supplies the app bar. Everything below it retains
+ * the reference Performance Management layout, including the centred page
+ * width, grid-based sidebar, original spacing and responsive behaviour.
+ */
+html.dark [data-arcus-shell] .performance-v22-root,
+.dark [data-arcus-shell] .performance-v22-root,
 .performance-v22-root {
-  --pm22-sidebar: 66px;
-  position: relative;
-  display: block;
-  width: 100% !important;
-  max-width: none !important;
-  height: 100% !important;
+  /* This reference is a light interface. Keep its body separate from the
+     user's shared-shell colour preference; the shared app bar is untouched. */
+  --bg: #f4f6fa !important;
+  --surface: #ffffff !important;
+  --surface-soft: #f8f9fc !important;
+  --surface-strong: #131827 !important;
+  --ink: #111827 !important;
+  --ink-2: #344054 !important;
+  --muted: #667085 !important;
+  --muted-2: #98a2b3 !important;
+  --line: #dfe4ed !important;
+  --line-strong: #cbd3df !important;
+  --navy: #ffffff !important;
+  --navy-2: #ffffff !important;
+  width: 100%;
+  height: 100%;
   min-height: 0;
   margin: 0 !important;
   padding: 0 !important;
-  overflow: hidden;
-  background: var(--bg, #f4f6fa);
+  box-sizing: border-box;
 }
 
-.performance-v22-root .app.expanded {
-  --pm22-sidebar: 248px;
-}
-
-.performance-v22-root #app.app,
 .performance-v22-root .app {
-  position: relative !important;
-  display: block !important;
-  width: 100% !important;
-  height: 100% !important;
-  max-width: none !important;
-  max-height: 100% !important;
-  min-height: 0 !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  overflow: hidden !important;
-  grid-template-columns: none !important;
-  grid-template-rows: none !important;
+  height: 100%;
 }
 
-/* Left rail — fixed, flush to viewport (portfolio-v11 pattern) */
-.performance-v22-root .sidebar {
-  position: fixed !important;
-  top: 0 !important;
-  right: auto !important;
-  bottom: 0 !important;
-  left: 0 !important;
-  inset: 0 auto 0 0 !important;
-  width: var(--pm22-sidebar) !important;
-  height: 100dvh !important;
-  max-height: 100dvh !important;
-  min-height: 0 !important;
-  margin: 0 !important;
-  transform: none !important;
-  overflow: hidden !important;
-  z-index: 40;
+/* Keep every executive-signal message legible on the dark gradient. A shared
+   heading reset otherwise forces this title back to black. */
+.performance-v22-root .v10-hero-main .v10-hero-copy h2 {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
 }
 
-.performance-v22-root .topbar,
-.performance-v22-root .enterprise-contextbar-v7,
-.performance-v22-root .workspace {
-  position: relative !important;
-  left: auto !important;
-  right: auto !important;
-  margin: 0 0 0 var(--pm22-sidebar) !important;
-  width: calc(100% - var(--pm22-sidebar)) !important;
-  max-width: none !important;
-  min-width: 0 !important;
-  box-sizing: border-box !important;
+.performance-v22-root .v10-hero-main .v10-hero-copy p {
+  color: #e4eaf7 !important;
 }
 
-.performance-v22-root header.topbar,
-.performance-v22-root .topbar {
-  height: var(--topbar, 62px) !important;
-  padding-bottom: 0 !important;
-  border-bottom: 1px solid var(--line, #e3e7ef) !important;
-  z-index: 30;
+/* V24.5 dark banners inherit white text, but the host application's heading
+   reset paints bare headings black. Pin the banner typography explicitly so
+   every page retains the contrast of the original HTML. */
+.performance-v22-root .compliance-hero :is(h1, h2, h3),
+.performance-v22-root .v10-hero-main :is(h1, h2, h3),
+.performance-v22-root .v11-strategy-hero-main :is(h1, h2, h3),
+.performance-v22-root .v15-strategy-hero :is(h1, h2, h3),
+.performance-v22-root .v20-report-cover :is(h1, h2, h3),
+.performance-v22-root .v21-risk-hero :is(h1, h2, h3) {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
 }
 
-.performance-v22-root .enterprise-contextbar-v7 {
-  height: var(--enterprise-row, 36px) !important;
+.performance-v22-root .v11-strategy-hero-main > p,
+.performance-v22-root .v15-strategy-hero > div > p,
+.performance-v22-root .v20-report-cover > p,
+.performance-v22-root .v21-risk-hero > div > p,
+.performance-v22-root .compliance-hero > div > p {
+  color: #e4eaf7 !important;
 }
 
-.performance-v22-root .workspace {
-  height: calc(100dvh - var(--topbar, 62px)) !important;
-  max-height: none !important;
-  min-height: 0 !important;
-  overflow-x: hidden !important;
-  overflow-y: auto !important;
-  overscroll-behavior: contain;
-  padding: 18px 20px 108px !important;
+.performance-v22-root .v11-strategy-hero-foot > span {
+  color: #aeb8d4 !important;
+  -webkit-text-fill-color: #aeb8d4 !important;
 }
 
-.performance-v22-root .app:has(.enterprise-contextbar-v7) .workspace {
-  height: calc(100dvh - var(--topbar, 62px) - var(--enterprise-row, 36px)) !important;
+.performance-v22-root .v11-strategy-hero-foot > span > strong {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
 }
 
-/* Content fills workspace — never center under a max-width */
-.performance-v22-root .page,
-.performance-v22-root #workspace .page,
-.performance-v22-root .workspace > .page {
-  max-width: none !important;
-  width: 100% !important;
-  margin: 0 !important;
-  margin-left: 0 !important;
-  margin-right: 0 !important;
-}
-
-.performance-v22-root .toast-stack {
-  z-index: 200;
-}
-
-@media (max-width: 780px) {
-  .performance-v22-root {
-    --pm22-sidebar: 0px;
-  }
-
-  .performance-v22-root .sidebar {
+/* Match the proven Portfolio V11 shell: the navigation rail owns the full
+   viewport height and covers the shared header at the left edge, while the
+   workspace continues to begin beneath the shared header. */
+@media (min-width: 781px) {
+  [data-arcus-shell] .performance-v22-root .sidebar {
     position: fixed !important;
     inset: 0 auto 0 0 !important;
-    width: min(290px, 88vw) !important;
-    height: 100% !important;
-    transform: translateX(-102%) !important;
+    width: var(--sidebar) !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    z-index: 50 !important;
   }
+}
 
-  .performance-v22-root .app.mobile-nav .sidebar {
-    transform: none !important;
-  }
+/* The React shell already renders the shared app bar. Remove the hidden
+   source topbar's grid row so the module begins immediately beneath it. */
+[data-arcus-shell] .performance-v22-root .app {
+  grid-template-rows: minmax(0, 1fr) !important;
+}
 
-  .performance-v22-root .topbar,
-  .performance-v22-root .enterprise-contextbar-v7,
-  .performance-v22-root .workspace {
-    margin-left: 0 !important;
-    width: 100% !important;
-  }
+[data-arcus-shell] .performance-v22-root .workspace {
+  grid-row: 1 !important;
+  height: 100% !important;
+  max-height: 100% !important;
+}
 
-  .performance-v22-root .workspace {
-    height: auto !important;
-    overflow: visible !important;
-  }
+/* Preserve the reference's white navigation rail despite the shared shell's
+   optional dark mode. */
+html.dark [data-arcus-shell] .performance-v22-root .sidebar,
+.dark [data-arcus-shell] .performance-v22-root .sidebar,
+.performance-v22-root .sidebar {
+  background: #ffffff !important;
+  color: #141414 !important;
+  border-right: 1px solid #e5e8ef !important;
+}
+
+.performance-v22-root .nav-item {
+  color: #141414 !important;
+}
+
+.performance-v22-root .nav-item:hover {
+  background: #f7f5ff !important;
+  color: #5420c0 !important;
+}
+
+.performance-v22-root .nav-item.active {
+  background: linear-gradient(90deg, #f1ecff, #f7f4ff) !important;
+  color: #5b20ce !important;
+  box-shadow: inset 3px 0 var(--brand) !important;
+}
+
+.performance-v22-root .nav-group,
+.performance-v22-root .collapse-btn,
+.performance-v22-root .expanded .nav-count {
+  color: #667085 !important;
+}
+
+.performance-v22-root .sidebar-foot {
+  background: #ffffff !important;
+  border-top-color: var(--line) !important;
 }

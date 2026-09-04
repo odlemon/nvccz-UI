@@ -1,18 +1,12 @@
-/* Auto-extracted Matanho Portfolio V23 runtime — adapted for Next.js (/portfolio-v11) */
-import {
-  applySessionUserToProfile,
-  buildArcusProfilePopoverHtml,
-  clientDesignSignOut,
-  getClientDesignSessionUser,
-  onClientDesignSessionUser,
-} from "@/components/client-design-mock/runtime-auth";
+/* Auto-extracted Matanho Portfolio V25 runtime — adapted for Next.js (/portfolio) */
 export function startPortfolioV11Runtime(rootEl, options = {}) {
   const initialPage = options.initialPage || 'dashboard';
-  const liveOnly = options.liveOnly !== false;
+  const liveOnly = Boolean(options.liveOnly);
   window.__PORTFOLIO_V11_NAV__ = options.onNavigate || (() => {});
 
   rootEl.innerHTML = options.shellHtml || '';
   rootEl.dataset.theme = 'light';
+  rootEl.classList.add('portfolio-v11-root');
 
   const __pv11Abort = new AbortController();
   const __pv11Sig = { signal: __pv11Abort.signal };
@@ -31,51 +25,41 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     const number = (abs / divisor).toLocaleString(undefined, { maximumFractionDigits: suffix ? 1 : 0 });
     return `${value < 0 ? '-' : ''}${symbols[currency] || `${currency} `}${number}${suffix}`;
   };
-  const formatDate = (value, fallback = '-') => {
-    if (value == null || value === '') return fallback;
-    const raw = String(value).trim();
-    if (!raw || raw === '-' || raw === '—') return fallback;
-    // Already human-readable (contains a month name or space-separated day)
-    if (/[A-Za-z]{3}/.test(raw) && !/^\d{4}-/.test(raw)) return raw;
-    const d = new Date(raw);
-    if (Number.isNaN(d.getTime())) return raw;
-    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-  };
   const pct = value => `${Number(value).toFixed(1)}%`;
   const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
   const escapeHTML = value => String(value ?? '').replace(/[&<>'"]/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[char]));
   const initials = name => name.split(/\s+/).map(part => part[0]).join('').slice(0,2).toUpperCase();
 
   const PROFILE_PHOTO_POOL = [
-    "/portfolio-v11/assets/employee-1.jpg",
-    "/portfolio-v11/assets/employee-2.jpg",
-    "/portfolio-v11/assets/employee-3.jpg",
-    "/portfolio-v11/assets/employee-4.jpg",
-    "/portfolio-v11/assets/employee-5.jpg",
-    "/portfolio-v11/assets/employee-6.jpg",
-    "/portfolio-v11/assets/employee-7.jpg",
-    "/portfolio-v11/assets/employee-8.jpg",
-    "/portfolio-v11/assets/employee-9.jpg"
+    "/portfolio/assets/employee-1.jpg",
+    "/portfolio/assets/employee-2.jpg",
+    "/portfolio/assets/employee-3.jpg",
+    "/portfolio/assets/employee-4.jpg",
+    "/portfolio/assets/employee-5.jpg",
+    "/portfolio/assets/employee-6.jpg",
+    "/portfolio/assets/employee-7.jpg",
+    "/portfolio/assets/employee-8.jpg",
+    "/portfolio/assets/employee-9.jpg"
   ];
 
   const PROFILE_PHOTO_EXACT = {
-    "Tendai Moyo": "/portfolio-v11/assets/employee-1.jpg",
-    "Rudo Chikore": "/portfolio-v11/assets/employee-2.jpg",
-    "Tariro Kasere": "/portfolio-v11/assets/employee-3.jpg",
-    "Nyasha Moyo": "/portfolio-v11/assets/employee-4.jpg",
-    "Chipo Dube": "/portfolio-v11/assets/employee-5.jpg",
-    "Farai Chikore": "/portfolio-v11/assets/employee-6.jpg",
-    "Laura Chen": "/portfolio-v11/assets/employee-7.jpg",
-    "Tendai Sibanda": "/portfolio-v11/assets/employee-8.jpg",
-    "Anita Kapoor": "/portfolio-v11/assets/employee-9.jpg",
-    "Tawanda Kasere": "/portfolio-v11/assets/employee-1.jpg",
-    "Rudo Maposa": "/portfolio-v11/assets/employee-2.jpg",
-    "Farai Dube": "/portfolio-v11/assets/employee-3.jpg",
-    "Chipo Ndlovu": "/portfolio-v11/assets/employee-4.jpg",
-    "Tinashe Chaka": "/portfolio-v11/assets/employee-5.jpg",
-    "Lerato Maseko": "/portfolio-v11/assets/employee-6.jpg",
-    "Danai Chirwa": "/portfolio-v11/assets/employee-7.jpg",
-    "Tariro Moyo": "/portfolio-v11/assets/employee-8.jpg"
+    "Tendai Moyo": "/portfolio/assets/employee-1.jpg",
+    "Rudo Chikore": "/portfolio/assets/employee-2.jpg",
+    "Tariro Kasere": "/portfolio/assets/employee-3.jpg",
+    "Nyasha Moyo": "/portfolio/assets/employee-4.jpg",
+    "Chipo Dube": "/portfolio/assets/employee-5.jpg",
+    "Farai Chikore": "/portfolio/assets/employee-6.jpg",
+    "Laura Chen": "/portfolio/assets/employee-7.jpg",
+    "Tendai Sibanda": "/portfolio/assets/employee-8.jpg",
+    "Anita Kapoor": "/portfolio/assets/employee-9.jpg",
+    "Tawanda Kasere": "/portfolio/assets/employee-1.jpg",
+    "Rudo Maposa": "/portfolio/assets/employee-2.jpg",
+    "Farai Dube": "/portfolio/assets/employee-3.jpg",
+    "Chipo Ndlovu": "/portfolio/assets/employee-4.jpg",
+    "Tinashe Chaka": "/portfolio/assets/employee-5.jpg",
+    "Lerato Maseko": "/portfolio/assets/employee-6.jpg",
+    "Danai Chirwa": "/portfolio/assets/employee-7.jpg",
+    "Tariro Moyo": "/portfolio/assets/employee-8.jpg"
   };
   function profilePhoto(name='') {
     const key=String(name||'').trim();
@@ -450,26 +434,14 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   const state = {
     page: 'dashboard',
     previousPage: null,
-    sidebarCollapsed: storage.get('matanho-portfolio-sidebar-v2','expanded') === 'collapsed',
+    sidebarCollapsed: storage.get('matanho-portfolio-sidebar','collapsed') !== 'expanded',
     mobileNavOpen: false,
     theme: storage.get('matanho-portfolio-theme','light'),
     activeFund: 'All Funds',
-    asOfDate: 'Latest',
-    liveData: false,
-    liveOnly: liveOnly,
-    hydrating: true,
-    selectedDealId: null,
+    asOfDate: '31 Jul 2026',
+    selectedDealId: 'DL-013',
     dealTab: 'overview',
-    applicationSection: 0,
     dealView: 'list',
-    dealFundFilter: 'All Funds',
-    dealStageFilter: 'All stages',
-    dealOwnerFilter: 'All owners',
-    dealAgeFilter: 'All ages',
-    dealListColumns: {
-      deal: true, stage: true, sector: true, round: true, ask: true,
-      owner: true, age: true, score: true, priority: true, nextAction: true,
-    },
     selectedCompanyId: 'CO-001',
     selectedFundId: 'FUND-001',
     selectedLPId: 'LP-001',
@@ -573,68 +545,8 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     target.splice(0, target.length, ...incoming);
   }
 
-  function clearCollectionsForLiveLoad() {
-    replaceCollection(funds, []);
-    replaceCollection(companies, []);
-    replaceCollection(deals, []);
-    replaceCollection(capitalCalls, []);
-    replaceCollection(lps, []);
-    replaceCollection(reports, []);
-    replaceCollection(documents, []);
-    replaceCollection(cashAccounts, []);
-    replaceCollection(cashJournals, []);
-    replaceCollection(cashReservations, []);
-    replaceCollection(statementImports, []);
-    replaceCollection(reconciliationBatches, []);
-    replaceCollection(reconciliationExceptions, []);
-    replaceCollection(reportVaultItems, []);
-    replaceCollection(signatureEnvelopes, []);
-    replaceCollection(mailerLists, []);
-    replaceCollection(closeControls, []);
-    state.dashboardMetrics = null;
-    state.dashboardCharts = null;
-    state.dealDetail = null;
-  }
-
-  function beginLiveLoad() {
-    state.hydrating = true;
-    state.liveData = false;
-    state.liveLoadError = null;
-    clearCollectionsForLiveLoad();
-    state.asOfDate = 'Latest';
-    state.activeFund = 'All Funds';
-    state.selectedCompanyId = null;
-    state.selectedFundId = null;
-    state.selectedLPId = null;
-    state.selectedDocumentId = null;
-    state.selectedFolder = 'Application';
-    state.selectedCapitalCallId = null;
-    state.selectedEnvelopeId = null;
-    state.selectedMailerListId = null;
-    state.selectedReconciliationId = null;
-    state.customFolders = [];
-    state.dueDiligenceTasks = [];
-    state.closingConditions = [];
-    state.dealVote = {};
-    rootEl.classList.add('is-hydrating');
-    // Empty chrome only — Matanho fixtures stay cleared while liveOnly.
-    render();
-  }
-
-  function failLiveLoad(message = 'Live data failed to load') {
-    state.hydrating = false;
-    state.liveData = false;
-    clearCollectionsForLiveLoad();
-    rootEl.classList.remove('is-hydrating');
-    state.liveLoadError = String(message || 'Live data failed to load');
-    render();
-  }
-
   function hydrateFromBackend(payload = {}) {
     const source = payload.data || payload;
-    const mergeOnly = Boolean(payload.meta?.partial || payload.meta?.merge);
-    state.liveLoadError = null;
-    // Partial/page-scoped payloads omit keys on purpose — replaceCollection skips non-arrays.
     replaceCollection(funds, source.funds);
     replaceCollection(companies, source.companies || source.portfolioCompanies);
     replaceCollection(deals, source.deals);
@@ -651,37 +563,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     replaceCollection(reportVaultItems, source.reportVaultItems);
     replaceCollection(signatureEnvelopes, source.signatureEnvelopes);
     replaceCollection(mailerLists, source.mailerLists);
-    if (Array.isArray(source.closeControls)) replaceCollection(closeControls, source.closeControls);
-    if (source.dashboardMetrics) state.dashboardMetrics = source.dashboardMetrics;
-    if (source.dashboardCharts) state.dashboardCharts = source.dashboardCharts;
-    if (payload.meta?.loadedAt) state.dataRefreshedAt = payload.meta.loadedAt;
-    if (payload.state && typeof payload.state === 'object') {
-      const next = { ...payload.state };
-      // Never let partial state wipe the live flags mid-hydrate.
-      delete next.hydrating;
-      // Preserve in-page navigation / deal register UX across partial hydrates.
-      delete next.page;
-      delete next.selectedDealId;
-      delete next.dealTab;
-      delete next.dealDetail;
-      delete next.dealView;
-      delete next.tableSearch;
-      delete next.dealFundFilter;
-      delete next.dealStageFilter;
-      delete next.dealOwnerFilter;
-      delete next.dealAgeFilter;
-      delete next.dealListColumns;
-      Object.assign(state, next);
-    }
-    state.liveData = true;
-    state.hydrating = false;
-    if (liveOnly) state.liveOnly = true;
-    rootEl.classList.remove('is-hydrating');
-    if (state.page === 'deal-detail' && !state.selectedDealId) {
-      persistSelectedDealId(readDealIdFromLocation());
-    }
-    if (mergeOnly) rootEl.dataset.hydrate = 'partial';
-    else rootEl.dataset.hydrate = 'full';
+    if (payload.state && typeof payload.state === 'object') Object.assign(state, payload.state);
     render();
     window.dispatchEvent(new CustomEvent('matanho:data-hydrated', { detail: publicSnapshot() }));
   }
@@ -764,7 +646,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
 
   function pageHeader(title, subtitle, actions = '', context = '') {
     return `<header class="page-header">
-      <div><div class="page-title-row"><h1 class="page-title">${escapeHTML(title)}</h1>${context ? `<span class="page-context">${escapeHTML(context)}</span>` : ''}</div>${subtitle ? `<p class="page-subtitle">${escapeHTML(subtitle)}</p>` : ''}</div>
+      <div><div class="page-title-row"><h1 class="page-title">${escapeHTML(title)}</h1>${context ? `<span class="page-context">${escapeHTML(context)}</span>` : ''}</div><p class="page-subtitle">${escapeHTML(subtitle)}</p></div>
       <div class="page-actions">${actions}</div>
     </header>`;
   }
@@ -777,129 +659,12 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     return `<button type="button" class="button ${style}" data-action="${action}" ${attrs}>${iconName ? icon(iconName) : ''}<span>${escapeHTML(label)}</span></button>`;
   }
 
-  function liveNavBadge(pageId) {
-    if (state.hydrating) return '…';
-    if (!state.liveData) return null;
-    const map = {
-      deals: deals.length,
-      'capital-calls': capitalCalls.length,
-      companies: companies.length,
-      funds: funds.length,
-      'cash-accounts': cashAccounts.length,
-      'cash-reservations': cashReservations.length,
-      'statement-imports': statementImports.length,
-      reconciliations: reconciliationBatches.length,
-      exceptions: reconciliationExceptions.length,
-      reporting: reports.length,
-      'documents-vault': documents.length,
-      'reports-vault': reportVaultItems.length,
-      'e-signatures': signatureEnvelopes.length,
-      'mailer-lists': mailerLists.length,
-    };
-    if (!(pageId in map)) return null;
-    return String(map[pageId]);
-  }
-
-  function skeletonBlock(height = 120, className = '') {
-    return `<div class="pv11-skeleton ${className}" style="min-height:${height}px" aria-hidden="true"></div>`;
-  }
-
-  function pageTitleFor(page = state.page) {
-    const titles = {
-      dashboard: 'Portfolio Dashboard',
-      deals: 'Deal Flow',
-      'deal-detail': 'Deal detail',
-      funds: 'Funds',
-      'fund-detail': 'Fund detail',
-      'capital-calls': 'Capital Calls',
-      'capital-call-detail': 'Capital call',
-      companies: 'Portfolio Companies',
-      'company-detail': 'Company detail',
-      reporting: 'Reporting Schedules',
-      'fund-performance': 'Fund Performance Reporting',
-      lps: 'LP Management',
-      'lp-detail': 'LP detail',
-      'cash-accounts': 'Client / Fund Accounts',
-      'cash-overview': 'Cash Overview',
-      'cash-ledger': 'Cash Ledger',
-      'cash-reservations': 'Cash Reservations',
-      'statement-imports': 'External Statement Imports',
-      reconciliations: 'Reconciliation Dashboard',
-      'reconciliation-workspace': 'Reconciliation Workspace',
-      exceptions: 'Reconciliation Exceptions',
-      'period-close': 'Period Close & General-Ledger Control',
-      'documents-vault': 'Documents Vault',
-      'reports-vault': 'Reports Vault',
-      'e-signatures': 'E-Signatures',
-      'mailer-lists': 'Mailer Lists',
-      'report-builder': 'Report Builder',
-      'applicant-portal': 'Applicant Portal',
-      settings: 'Settings & Access Control',
-      'analytics-detail': 'Analytics',
-    };
-    return titles[page] || 'Portfolio';
-  }
-
-  function renderHydratingDashboard() {
-    const title = pageTitleFor(state.page);
-    if (state.liveLoadError && !state.hydrating) {
-      return `${pageHeader(title,'Live portfolio data could not be loaded.','','Error')}
-        <div class="empty-state"><h3>Could not load live data</h3><p class="muted">${escapeHTML(state.liveLoadError)}</p><p class="muted">Showing empty workspace (Matanho demo fixtures are blocked).</p><div class="section-gap">${button('Retry','retry-live-load','primary','refresh')}</div></div>`;
-    }
-    return `${pageHeader(title,'Loading live data…')}
-      <section class="metric-grid section-gap">${Array.from({length:6},()=>`<article class="metric-card">${skeletonBlock(72)}</article>`).join('')}</section>
-      <section class="chart-grid">${skeletonBlock(280,'pv11-skeleton-card')}${skeletonBlock(280,'pv11-skeleton-card')}</section>
-      <section class="card table-card">${skeletonBlock(240)}</section>`;
-  }
-
-  function filteredDeals(source = deals) {
-    const q = String(state.tableSearch || '').trim().toLowerCase();
-    return source.filter((deal) => {
-      if (state.dealFundFilter && state.dealFundFilter !== 'All Funds' && deal.fund !== state.dealFundFilter) return false;
-      if (state.dealStageFilter && state.dealStageFilter !== 'All stages' && deal.stage !== state.dealStageFilter) return false;
-      if (state.dealOwnerFilter && state.dealOwnerFilter !== 'All owners' && deal.owner !== state.dealOwnerFilter) return false;
-      if (state.dealAgeFilter === '0–30 days' && !(deal.age >= 0 && deal.age <= 30)) return false;
-      if (state.dealAgeFilter === '31–60 days' && !(deal.age >= 31 && deal.age <= 60)) return false;
-      if (state.dealAgeFilter === '61+ days' && !(deal.age >= 61)) return false;
-      if (q) {
-        const hay = [deal.name, deal.id, deal.sector, deal.owner, deal.stage, deal.round, deal.fund]
-          .map((v) => String(v || '').toLowerCase())
-          .join(' ');
-        if (!hay.includes(q)) return false;
-      }
-      return true;
-    });
-  }
-
-  function dealNextAction(deal) {
-    const map = {
-      Sourcing: 'Source / qualify',
-      Screening: 'Review application',
-      'Initial Review': 'Complete screening',
-      'Investment Committee': 'Prepare IC memo',
-      'Due Diligence': 'Resolve DD findings',
-      'Term Sheet': 'Finalise terms',
-      Portfolio: 'Monitor portfolio',
-      Rejected: 'Archive',
-    };
-    return map[deal.stage] || 'Review application';
-  }
-
-  function dealColumnVisible(key) {
-    const cols = state.dealListColumns || {};
-    if (key === 'deal') return true;
-    return cols[key] !== false;
-  }
-
   function workspaceFilterBar(items = []) {
     if (!items.length) return '';
-    const refreshed = state.dataRefreshedAt
-      ? new Date(state.dataRefreshedAt).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-      : (state.liveData ? '—' : '31 Jul 2026 · 18:45 CAT');
     return `<div class="workspace-filter-bar">${items.map(item => {
       if (item.type === 'button') return button(item.label,item.action,item.style||'compact',item.icon||'filter',item.attrs||'');
       return `<label class="workspace-filter"><span>${escapeHTML(item.label)}</span><select data-change-action="${escapeHTML(item.action)}">${item.options.map(option=>`<option ${option===item.selected?'selected':''}>${escapeHTML(option)}</option>`).join('')}</select></label>`;
-    }).join('')}<span class="filter-freshness">${icon('clock')} Data refreshed ${escapeHTML(refreshed)}</span></div>`;
+    }).join('')}<span class="filter-freshness">${icon('clock')} Data refreshed 31 Jul 2026 · 18:45 CAT</span></div>`;
   }
 
   function softFocus(target) {
@@ -1037,11 +802,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
 
   function renderNav() {
     const activePage = state.page === 'analytics-detail' ? (state.drilldown?.sourcePage || 'dashboard') : state.page;
-    primaryNav.innerHTML = navGroups.map(group => `<div class="nav-group"><div class="nav-group-label">${group.label}</div>${group.items.map(item => {
-      const badge = liveNavBadge(item.id);
-      const showBadge = badge != null ? badge : item.badge;
-      return `<button class="nav-item ${activePage === item.id ? 'active' : ''}" data-action="navigate" data-page="${item.id}" title="${escapeHTML(item.label)}">${icon(item.icon)}<span class="nav-label">${escapeHTML(item.label)}</span>${showBadge != null && showBadge !== '' ? `<span class="nav-badge">${escapeHTML(String(showBadge))}</span>` : ''}</button>`;
-    }).join('')}</div>`).join('');
+    primaryNav.innerHTML = navGroups.map(group => `<div class="nav-group"><div class="nav-group-label">${group.label}</div>${group.items.map(item => `<button class="nav-item ${activePage === item.id ? 'active' : ''}" data-action="navigate" data-page="${item.id}" title="${escapeHTML(item.label)}">${icon(item.icon)}<span class="nav-label">${escapeHTML(item.label)}</span>${item.badge ? `<span class="nav-badge">${item.badge}</span>` : ''}</button>`).join('')}</div>`).join('');
   }
 
   function globalPageActions({ includeFund = true, includeDate = true, extra = '' } = {}) {
@@ -1159,7 +920,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       <section class="analytics-secondary-grid">
         ${card('Dimension Breakdown',donutChart(distribution,formatMoney(totalValue),'Total value',170),{subtitle:'Click a segment or legend row to isolate a dimension'})}
         ${card('Drivers & Exceptions',`<div class="analytics-insight"><strong>${leading ? escapeHTML(leading.name) : 'No leading record'}</strong><p>Largest contributor at ${leading ? formatMoney(leading.value) : '$0'}, representing ${leading ? ((leading.value/Math.max(1,totalValue))*100).toFixed(1) : '0.0'}% of the selected value.</p></div><div class="analytics-insight"><strong>${exceptionCount} exception${exceptionCount===1?'':'s'} detected</strong><p>Items are flagged using status, deadline and performance thresholds in this frontend model.</p></div><div class="analytics-insight"><strong>Quarterly movement</strong><p>The latest period moved ${actualDelta>=0?'up':'down'} ${Math.abs(actualDelta).toFixed(1)}% compared with the preceding quarter.</p></div>`)}
-        ${card('Status & Data Lineage',`<div class="analytics-source-list">${statusRows}<div class="analytics-source-row"><span>Reporting date</span><strong>${escapeHTML(state.asOfDate)}</strong></div><div class="analytics-source-row"><span>Base currency</span><strong>USD</strong></div><div class="analytics-source-row"><span>Source mode</span><strong>${state.liveData ? 'Live API + derived charts' : 'Interactive prototype data'}</strong></div></div>`,{footer: state.liveData ? '<span class="muted small">Where series are missing from the API, charts show empty states instead of demo figures.</span>' : '<span class="muted small">All figures shown are frontend demonstration data.</span>'})}
+        ${card('Status & Data Lineage',`<div class="analytics-source-list">${statusRows}<div class="analytics-source-row"><span>Reporting date</span><strong>${escapeHTML(state.asOfDate)}</strong></div><div class="analytics-source-row"><span>Base currency</span><strong>USD</strong></div><div class="analytics-source-row"><span>Source mode</span><strong>Interactive prototype data</strong></div></div>`,{footer:'<span class="muted small">All figures shown are frontend demonstration data.</span>'})}
       </section>
       <section class="card table-card analytics-records"><div class="table-toolbar"><div class="table-title-row"><h3>Underlying Records</h3><span class="table-badge">${records.length} records</span></div><div class="table-tools">${button('Export table','analytics-export','','download')}</div></div><div class="table-wrap"><table><thead><tr><th>Record</th><th>Type</th><th>Primary Dimension</th><th>Owner / Fund</th><th>Status</th><th>Value</th><th>Indicator</th><th>Contribution</th></tr></thead><tbody>${tableRows}</tbody></table></div><div class="card-footer"><span class="muted small">Select a row to open the full deal, fund, company or LP record.</span><strong>${formatMoney(totalValue)} total selected value</strong></div></section>`;
   }
@@ -1168,21 +929,22 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   const cashContextBar = (accountId = state.selectedCashAccountId) => {
     const account = cashAccounts.find(item => item.id === accountId) || cashAccounts[0];
     if (!account) {
-      return `<div class="cash-context-bar"><div><span>Manager legal entity</span><strong>—</strong></div><div><span>Fund / Vehicle</span><strong>—</strong></div><div><span>External account</span><strong>—</strong></div><div><span>Purpose / Currency</span><strong>—</strong></div><div><span>As of</span><strong>${escapeHTML(state.asOfDate)} · Africa/Harare</strong></div></div>`;
+      return `<div class="cash-context-bar"><div><span>Manager legal entity</span><strong>Matanho Capital Zimbabwe</strong></div><div><span>Fund / Vehicle</span><strong>No cash accounts loaded</strong></div><div><span>External account</span><strong>—</strong></div><div><span>Purpose / Currency</span><strong>—</strong></div><div><span>As of</span><strong>${escapeHTML(state.asOfDate || '—')} · Africa/Harare</strong></div></div>`;
     }
-    return `<div class="cash-context-bar"><div><span>Manager legal entity</span><strong>${state.liveData ? '—' : 'Matanho Capital Zimbabwe'}</strong></div><div><span>Fund / Vehicle</span><strong>${escapeHTML(account.fund)} · ${escapeHTML(account.vehicle)}</strong></div><div><span>External account</span><strong>${escapeHTML(account.provider)} ${escapeHTML(account.masked)}</strong></div><div><span>Purpose / Currency</span><strong>${escapeHTML(account.purpose.replaceAll('_',' '))} · ${escapeHTML(account.currency)}</strong></div><div><span>As of</span><strong>${escapeHTML(state.asOfDate)} · Africa/Harare</strong></div></div>`;
+    const purpose = String(account.purpose || 'FUND_OPERATING_BANK').replaceAll('_',' ');
+    return `<div class="cash-context-bar"><div><span>Manager legal entity</span><strong>Matanho Capital Zimbabwe</strong></div><div><span>Fund / Vehicle</span><strong>${escapeHTML(account.fund || '—')} · ${escapeHTML(account.vehicle || '—')}</strong></div><div><span>External account</span><strong>${escapeHTML(account.provider || '—')} ${escapeHTML(account.masked || '••••')}</strong></div><div><span>Purpose / Currency</span><strong>${escapeHTML(purpose)} · ${escapeHTML(account.currency || 'USD')}</strong></div><div><span>As of</span><strong>${escapeHTML(state.asOfDate || '—')} · Africa/Harare</strong></div></div>`;
   };
 
   function renderCashAccounts() {
-    const rows = cashAccounts.map(account => `<tr class="clickable" data-action="open-cash-account" data-id="${account.id}"><td class="table-primary"><span class="document-name-cell"><span class="document-row-icon folder">${icon('bank')}</span><span>${escapeHTML(account.id)}<small>${escapeHTML(account.masked)}</small></span></span></td><td>${escapeHTML(account.fund)}<small>${escapeHTML(account.vehicle)}</small></td><td>${escapeHTML(account.purpose.replaceAll('_',' '))}</td><td>${escapeHTML(account.provider)}</td><td>${escapeHTML(account.currency)}</td><td>${statusPill(account.status)}</td><td>${formatMoney(account.settled,account.currency)}</td><td>${pct(account.reconHealth)}</td><td>${statusPill(account.reconHealth>=98?'Healthy':account.reconHealth>=90?'Review':'At risk',account.reconHealth>=98?'success':account.reconHealth>=90?'warning':'danger')}</td></tr>`).join('');
+    const rows = cashAccounts.map(account => `<tr class="clickable" data-action="open-cash-account" data-id="${account.id}"><td class="table-primary"><span class="document-name-cell"><span class="document-row-icon folder">${icon('bank')}</span><span>${escapeHTML(account.id)}<small>${escapeHTML(account.masked)}</small></span></span></td><td>${escapeHTML(account.fund)}<small>${escapeHTML(account.vehicle)}</small></td><td>${escapeHTML(String(account.purpose||'FUND_OPERATING_BANK').replaceAll('_',' '))}</td><td>${escapeHTML(account.provider)}</td><td>${escapeHTML(account.currency)}</td><td>${statusPill(account.status)}</td><td>${formatMoney(account.settled,account.currency)}</td><td>${pct(account.reconHealth)}</td><td>${statusPill(account.reconHealth>=98?'Healthy':account.reconHealth>=90?'Review':'At risk',account.reconHealth>=98?'success':account.reconHealth>=90?'warning':'danger')}</td></tr>`).join('');
     const totalSettled=sum(cashAccounts.filter(a=>a.currency==='USD'),a=>a.settled);
     return `${pageHeader('Client / Fund Accounts','Authorised fund, vehicle and investor-linked cash accounts with lifecycle, provider mapping and reconciliation health.',`${button('Export accounts','export-cash-accounts','','download')}${button('Create account','create-cash-account','primary','plus')}`,'Cash & Reconciliation')}
       ${cashContextBar()}
       <section class="metric-grid section-gap">
-        ${metricCard({label:'Active Accounts',value:String(cashAccounts.filter(a=>a.status==='ACTIVE').length),iconName:'bank',accent:'brand',foot:demoOnly('Across 5 funds and 6 vehicles', cashAccounts.length ? (cashAccounts.length + ' accounts') : 'No accounts'),action:'cash-accounts-active'})}
+        ${metricCard({label:'Active Accounts',value:String(cashAccounts.filter(a=>a.status==='ACTIVE').length),iconName:'bank',accent:'brand',foot:'Across 5 funds and 6 vehicles',action:'cash-accounts-active'})}
         ${metricCard({label:'Settled USD Cash',value:formatMoney(totalSettled),iconName:'dollar',accent:'emerald',foot:'Ledger-derived · not statement balance',action:'cash-settled-explain'})}
-        ${metricCard({label:'Reserved Cash',value:formatMoney(sum(cashAccounts.filter(a=>a.currency==='USD'),a=>a.reserved)),iconName:'lock',accent:'amber',foot:demoOnly('4 active or approved reservations', cashReservations.length + ' reservations'),action:'navigate-cash-reservations'})}
-        ${metricCard({label:'Reconciliation Health',value:pct(sum(cashAccounts,a=>a.reconHealth)/cashAccounts.length),iconName:'refresh',accent:'blue',foot:'Weighted account health',action:'navigate-reconciliations'})}
+        ${metricCard({label:'Reserved Cash',value:formatMoney(sum(cashAccounts.filter(a=>a.currency==='USD'),a=>a.reserved)),iconName:'lock',accent:'amber',foot:'4 active or approved reservations',action:'navigate-cash-reservations'})}
+        ${metricCard({label:'Reconciliation Health',value:pct(cashAccounts.length?sum(cashAccounts,a=>a.reconHealth)/cashAccounts.length:0),iconName:'refresh',accent:'blue',foot:'Weighted account health',action:'navigate-reconciliations'})}
         ${metricCard({label:'Accounts Needing Review',value:String(cashAccounts.filter(a=>a.reconHealth<95||a.status!=='ACTIVE').length),iconName:'alert',accent:'red',foot:'Missing evidence, breaks or holds',trend:'negative',action:'navigate-exceptions'})}
         ${metricCard({label:'Available to Deploy',value:formatMoney(sum(cashAccounts.filter(a=>a.currency==='USD'),a=>a.deployable)),iconName:'trend-up',accent:'cyan',foot:'After reservations, holds and buffers',action:'cash-available-explain'})}
       </section>
@@ -1192,7 +954,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   function renderCashOverview() {
     const accounts=cashAccounts.filter(a=>state.cashCurrency==='All'||a.currency===state.cashCurrency);
     const settled=sum(accounts,a=>a.settled), reserved=sum(accounts,a=>a.reserved), held=sum(accounts,a=>a.held), expectedIn=sum(accounts,a=>a.expectedIn), expectedOut=sum(accounts,a=>a.expectedOut), deployable=sum(accounts,a=>a.deployable), distributable=sum(accounts,a=>a.distributable);
-    const waterfall=[{label:'Settled',value:settled},{label:'Reusable proceeds',value:isLiveMode()?0:8500000},{label:'Reservations',value:-reserved},{label:'Holds',value:-held},{label:'Pending outflows',value:-expectedOut},{label:'Deployable',value:deployable}];
+    const waterfall=[{label:'Settled',value:settled},{label:'Reusable proceeds',value:8500000},{label:'Reservations',value:-reserved},{label:'Holds',value:-held},{label:'Pending outflows',value:-expectedOut},{label:'Deployable',value:deployable}];
     const rows=accounts.map(a=>`<tr class="clickable" data-action="open-cash-account" data-id="${a.id}"><td class="table-primary">${escapeHTML(a.fund)}<small>${escapeHTML(a.vehicle)} · ${escapeHTML(a.masked)}</small></td><td>${escapeHTML(a.currency)}</td><td>${formatMoney(a.posted,a.currency)}</td><td>${formatMoney(a.settled,a.currency)}</td><td>${formatMoney(a.reserved,a.currency)}</td><td>${formatMoney(a.held,a.currency)}</td><td class="positive">${formatMoney(a.deployable,a.currency)}</td><td>${formatMoney(a.distributable,a.currency)}</td><td>${button('Explain','explain-cash-position','compact','info',`data-id="${a.id}"`)}</td></tr>`).join('');
     return `${pageHeader('Cash Overview','Posted, settled, reserved, held, expected, deployable, distributable and projected cash by authorised ownership scope.',`${selectControl('Currency',['USD','ZWG','All'],state.cashCurrency,'cash-currency')}${button('Export cash view','export-cash-overview','','download')}`,'Cash & Reconciliation')}${cashContextBar()}
       <section class="metric-grid section-gap">
@@ -1213,7 +975,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   function renderCashLedger() {
     const rows=cashJournals.map(j=>`<tr class="clickable" data-action="open-journal" data-id="${j.id}"><td class="table-primary">${escapeHTML(j.id)}<small>${escapeHTML(j.source)}</small></td><td>${escapeHTML(j.event)}</td><td>${escapeHTML(j.fund)}<small>${escapeHTML(j.account)}</small></td><td>${escapeHTML(j.valueDate)}</td><td>${formatMoney(j.debit)}</td><td>${formatMoney(j.credit)}</td><td class="${j.signed>=0?'positive':'negative'}">${formatMoney(j.signed)}</td><td>${statusPill(j.status)}</td><td>${formatMoney(j.reconciled)}</td><td>${statusPill(j.accounting)}</td></tr>`).join('');
     return `${pageHeader('Cash Ledger','Immutable double-entry journals, source events, cash lines, accounting status and reconciliation evidence.',`${button('Export approved journals','export-ledger','','download')}${button('Create manual journal','create-manual-journal','primary','plus')}`,'Cash & Reconciliation')}${cashContextBar()}
-      <section class="summary-strip section-gap"><div class="summary-item"><span>Posted journals</span><strong>${cashJournals.filter(j=>j.status==='POSTED').length}</strong><small>Current visible population</small></div><div class="summary-item"><span>Total debits</span><strong>${formatMoney(sum(cashJournals,j=>j.debit))}</strong><small>Exactly equals credits</small></div><div class="summary-item"><span>Total credits</span><strong>${formatMoney(sum(cashJournals,j=>j.credit))}</strong><small>Balanced by currency</small></div><div class="summary-item"><span>Reconciled amount</span><strong>${formatMoney(sum(cashJournals,j=>j.reconciled))}</strong><small>External proof linked</small></div><div class="summary-item"><span>Pending approvals</span><strong>${cashJournals.filter(j=>j.status!=='POSTED').length}</strong><small>Maker-checker required</small></div><div class="summary-item"><span>GL export status</span><strong>${demoOnly('4 / 5','—')}</strong><small>${demoOnly('One pending export','No GL export API')}</small></div></section>
+      <section class="summary-strip section-gap"><div class="summary-item"><span>Posted journals</span><strong>${cashJournals.filter(j=>j.status==='POSTED').length}</strong><small>Current visible population</small></div><div class="summary-item"><span>Total debits</span><strong>${formatMoney(sum(cashJournals,j=>j.debit))}</strong><small>Exactly equals credits</small></div><div class="summary-item"><span>Total credits</span><strong>${formatMoney(sum(cashJournals,j=>j.credit))}</strong><small>Balanced by currency</small></div><div class="summary-item"><span>Reconciled amount</span><strong>${formatMoney(sum(cashJournals,j=>j.reconciled))}</strong><small>External proof linked</small></div><div class="summary-item"><span>Pending approvals</span><strong>${cashJournals.filter(j=>j.status!=='POSTED').length}</strong><small>Maker-checker required</small></div><div class="summary-item"><span>GL export status</span><strong>4 / 5</strong><small>One pending export</small></div></section>
       <section class="card table-card section-gap"><div class="table-toolbar"><div class="table-title-row"><h3>Journal Register</h3><span class="table-badge">Posted history cannot be edited or deleted</span></div><div class="table-tools">${button('Filters','ledger-filters','','filter')}${button('Trace source','trace-ledger-source','','link')}</div></div><div class="table-wrap"><table><thead><tr><th>Journal / Source</th><th>Economic Event</th><th>Fund / Account</th><th>Value Date</th><th>Debit</th><th>Credit</th><th>Cash Effect</th><th>Status</th><th>Reconciled</th><th>Accounting</th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
   }
 
@@ -1221,7 +983,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     const rows=cashReservations.map(r=>`<tr class="clickable" data-action="open-reservation" data-id="${r.id}"><td class="table-primary">${escapeHTML(r.id)}<small>${escapeHTML(r.source)}</small></td><td>${escapeHTML(r.fund)}<small>${escapeHTML(r.vehicle)} · ${escapeHTML(r.account)}</small></td><td>${escapeHTML(r.beneficiary)}</td><td>${escapeHTML(r.purpose.replaceAll('_',' '))}</td><td>${formatMoney(r.amount)}</td><td>${formatMoney(r.remaining)}</td><td>${escapeHTML(r.required)}</td><td>${escapeHTML(r.expiry)}</td><td>${statusPill(r.status)}</td><td>${escapeHTML(r.owner)}</td></tr>`).join('');
     return `${pageHeader('Cash Reservations','Controlled commitments of eligible settled cash that reduce availability without changing the posted ledger.',`${button('Export reservations','export-reservations','','download')}${button('Request reservation','create-reservation','primary','lock')}`,'Cash & Reconciliation')}${cashContextBar()}
       <section class="reservation-lifecycle section-gap">${['REQUESTED','APPROVED','ACTIVE','PARTIALLY CONSUMED','CONSUMED / RELEASED'].map((s,i)=>`<div class="lifecycle-stage ${i===2?'active':''}"><span>${i+1}</span><strong>${s}</strong><small>${i<2?'Approval workflow':i===2?'Reduces available cash':i===3?'Residual remains visible':'Terminal with audit'}</small></div>`).join('')}</section>
-      <section class="metric-grid section-gap">${metricCard({label:'Active Reserved',value:formatMoney(sum(cashReservations.filter(r=>/ACTIVE|PARTIALLY/.test(r.status)),r=>r.remaining)),iconName:'lock',accent:'amber',foot:'Included in available-cash deductions',action:'reservation-active'})}${metricCard({label:'Requested',value:formatMoney(sum(cashReservations.filter(r=>r.status==='REQUESTED'),r=>r.amount)),iconName:'clock',accent:'blue',foot:'Awaiting independent checker',action:'reservation-requested'})}${metricCard({label:'Partially Consumed',value:formatMoney(sum(cashReservations.filter(r=>r.status==='PARTIALLY_CONSUMED'),r=>r.remaining)),iconName:'pie-chart',accent:'purple',foot:'Remaining amount is explainable',action:'reservation-partial'})}${metricCard({label:'Expiring in 14 Days',value:demoOnly('3','—'),iconName:'alert',accent:'red',foot:demoOnly('Escalated under configured policy','No expiry API'),trend:'negative',action:'reservation-expiring'})}</section>
+      <section class="metric-grid section-gap">${metricCard({label:'Active Reserved',value:formatMoney(sum(cashReservations.filter(r=>/ACTIVE|PARTIALLY/.test(r.status)),r=>r.remaining)),iconName:'lock',accent:'amber',foot:'Included in available-cash deductions',action:'reservation-active'})}${metricCard({label:'Requested',value:formatMoney(sum(cashReservations.filter(r=>r.status==='REQUESTED'),r=>r.amount)),iconName:'clock',accent:'blue',foot:'Awaiting independent checker',action:'reservation-requested'})}${metricCard({label:'Partially Consumed',value:formatMoney(sum(cashReservations.filter(r=>r.status==='PARTIALLY_CONSUMED'),r=>r.remaining)),iconName:'pie-chart',accent:'purple',foot:'Remaining amount is explainable',action:'reservation-partial'})}${metricCard({label:'Expiring in 14 Days',value:'3',iconName:'alert',accent:'red',foot:'Escalated under configured policy',trend:'negative',action:'reservation-expiring'})}</section>
       <section class="card table-card section-gap"><div class="table-toolbar"><div class="table-title-row"><h3>Reservation Register</h3><span class="table-badge">${cashReservations.length} records</span></div><div class="table-tools">${button('Lifecycle policy','reservation-policy','','info')}</div></div><div class="table-wrap"><table><thead><tr><th>Reservation / Source</th><th>Fund / Account</th><th>Beneficiary</th><th>Purpose</th><th>Original</th><th>Remaining</th><th>Required</th><th>Expiry</th><th>Status</th><th>Owner</th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
   }
 
@@ -1236,25 +998,21 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     const rows=reconciliationBatches.map(r=>`<tr class="clickable" data-action="open-reconciliation" data-id="${r.id}"><td class="table-primary">${escapeHTML(r.id)}<small>${escapeHTML(r.account)}</small></td><td>${escapeHTML(r.fund)}</td><td>${escapeHTML(r.period)}</td><td>${escapeHTML(r.currency)}</td><td>${formatMoney(r.internal,r.currency)}</td><td>${formatMoney(r.external,r.currency)}</td><td class="${Math.abs(r.variance)<=100?'positive':'negative'}">${formatMoney(r.variance,r.currency)}</td><td><div class="inline-progress">${progressBar(r.matched)}<span>${r.matched.toFixed(1)}%</span></div></td><td>${r.breaks}</td><td>${statusPill(r.status)}</td><td>${escapeHTML(r.owner)}</td></tr>`).join('');
     const matched=sum(reconciliationBatches,r=>r.matched)/reconciliationBatches.length;
     return `${pageHeader('Reconciliation Dashboard','Transaction, event, balance, omnibus and subledger-to-GL reconciliation by account, currency and period.',`${button('Export evidence pack','export-reconciliation-pack','','download')}${button('Start batch','start-reconciliation','primary','refresh')}`,'Cash & Reconciliation')}${cashContextBar()}
-      <section class="metric-grid section-gap">${metricCard({label:'Average Matched',value:pct(matched),iconName:'refresh',accent:'emerald',foot:'Transaction population',action:'recon-matched'})}${metricCard({label:'Open Breaks',value:String(sum(reconciliationBatches,r=>r.breaks)),iconName:'alert',accent:'red',foot:'Each has owner, SLA and evidence',trend:'negative',action:'navigate-exceptions'})}${metricCard({label:'Ready to Close',value:String(reconciliationBatches.filter(r=>r.status==='READY_TO_CLOSE').length),iconName:'check-circle',accent:'blue',foot:'All close controls passed',action:'navigate-period-close'})}${metricCard({label:'Total Variance',value:formatMoney(sum(reconciliationBatches.filter(r=>r.currency==='USD'),r=>r.variance)),iconName:'bar-chart',accent:'amber',foot:'Adjusted external less internal',action:'recon-variance'})}${metricCard({label:'Missing Statements',value:demoOnly('1','—'),iconName:'file',accent:'purple',foot:demoOnly('FBC Custody · critical blocker','No API'),action:'navigate-exceptions'})}${metricCard({label:'Pending Approvals',value:demoOnly('4', String(reconciliationBatches.filter(r=>/pending|approval/i.test(String(r.status||''))).length)),iconName:'user-check',accent:'cyan',foot:demoOnly('Independent checker or CFO','From batches'),action:'recon-approvals'})}</section>
-      <section class="reconciliation-dashboard-grid section-gap">${card('Reconciliation Health by Account',barChart({labels:reconciliationBatches.map(r=>r.account.split(' · ')[0]),series:[{name:'Matched %',color:'var(--brand)',values:reconciliationBatches.map(r=>r.matched)}],height:300,yLabel:'Percent',format:v=>`${v}%`,action:'recon-health-drill'}),{subtitle:'Click an account to open the reconciliation workspace.'})}${card('Break Ageing', isLiveMode() ? (reconciliationExceptions.length ? donutChart([{label:'Open',value:reconciliationExceptions.filter(e=>!/closed|resolved/i.test(String(e.status||''))).length||1,color:'var(--amber)'},{label:'Closed',value:reconciliationExceptions.filter(e=>/closed|resolved/i.test(String(e.status||''))).length,color:'var(--emerald)'}], String(reconciliationExceptions.length), 'Exceptions', 155) : liveEmptyCard('No break-ageing series from API.')) : donutChart([{label:'0–2 days',value:5,color:'var(--emerald)'},{label:'3–5 days',value:6,color:'var(--amber)'},{label:'6–10 days',value:2,color:'var(--orange)'},{label:'Over 10 days',value:1,color:'var(--red)'}],'14','Open items',155),{subtitle:state.liveData?'Derived from exception cases when ageing buckets are unavailable.':'Ageing is measured on the configured business calendar.'})}</section>
+      <section class="metric-grid section-gap">${metricCard({label:'Average Matched',value:pct(matched),iconName:'refresh',accent:'emerald',foot:'Transaction population',action:'recon-matched'})}${metricCard({label:'Open Breaks',value:String(sum(reconciliationBatches,r=>r.breaks)),iconName:'alert',accent:'red',foot:'Each has owner, SLA and evidence',trend:'negative',action:'navigate-exceptions'})}${metricCard({label:'Ready to Close',value:String(reconciliationBatches.filter(r=>r.status==='READY_TO_CLOSE').length),iconName:'check-circle',accent:'blue',foot:'All close controls passed',action:'navigate-period-close'})}${metricCard({label:'Total Variance',value:formatMoney(sum(reconciliationBatches.filter(r=>r.currency==='USD'),r=>r.variance)),iconName:'bar-chart',accent:'amber',foot:'Adjusted external less internal',action:'recon-variance'})}${metricCard({label:'Missing Statements',value:'1',iconName:'file',accent:'purple',foot:'FBC Custody · critical blocker',action:'navigate-exceptions'})}${metricCard({label:'Pending Approvals',value:'4',iconName:'user-check',accent:'cyan',foot:'Independent checker or CFO',action:'recon-approvals'})}</section>
+      <section class="reconciliation-dashboard-grid section-gap">${card('Reconciliation Health by Account',barChart({labels:reconciliationBatches.map(r=>r.account.split(' · ')[0]),series:[{name:'Matched %',color:'var(--brand)',values:reconciliationBatches.map(r=>r.matched)}],height:300,yLabel:'Percent',format:v=>`${v}%`,action:'recon-health-drill'}),{subtitle:'Click an account to open the reconciliation workspace.'})}${card('Break Ageing',donutChart([{label:'0–2 days',value:5,color:'var(--emerald)'},{label:'3–5 days',value:6,color:'var(--amber)'},{label:'6–10 days',value:2,color:'var(--orange)'},{label:'Over 10 days',value:1,color:'var(--red)'}],'14','Open items',155),{subtitle:'Ageing is measured on the configured business calendar.'})}</section>
       <section class="card table-card section-gap"><div class="table-toolbar"><div class="table-title-row"><h3>Account / Period Batches</h3><span class="table-badge">Balanced does not always mean fully reconciled</span></div><div class="table-tools">${button('Filters','reconciliation-filters','','filter')}</div></div><div class="table-wrap"><table><thead><tr><th>Batch / Account</th><th>Fund</th><th>Period</th><th>Currency</th><th>Internal Closing</th><th>External Closing</th><th>Variance</th><th>Matched</th><th>Breaks</th><th>Status</th><th>Owner</th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
   }
 
   function renderReconciliationWorkspace() {
     const batch=reconciliationBatches.find(r=>r.id===state.selectedReconciliationId)||reconciliationBatches[0];
-    if (state.liveData && !batch) {
-      return `${pageHeader('Reconciliation Workspace','No reconciliation batch selected.','','Cash & Reconciliation')}${cashContextBar()}
-        <div class="empty-state"><h3>No reconciliation batch</h3><p class="muted">Load reconciliations from the API or start a batch.</p></div>`;
-    }
-    const internal= state.liveData ? [] : [['JRN-07198','Capital call receipt','31 Jul',15000000,'CC-2026-0038','Matched'],['JRN-07197','Investment disbursement','30 Jul',-12000025,'DISB-NOVA-001','Matched'],['JRN-07196','Bank charge expense','30 Jul',-125000,'EXP-7221','Suggested'],['JRN-07195','Portfolio proceeds','29 Jul',8500000,'PROC-EXIT-119','Partial']];
-    const external= state.liveData ? [] : [['EXT-88419','CBZ CREDIT','31 Jul',15000000,'CALL 0038 MGFII','Matched'],['EXT-88402','CBZ DEBIT','30 Jul',-12000025,'NOVA SERIES B','Matched'],['EXT-88398','SERVICE FEE','30 Jul',-125000,'CHARGE JUL','Suggested'],['EXT-88377','INWARD TT','29 Jul',7800000,'EXIT PROCEEDS','Partial']];
-    const pane=(title,rows,externalSide=false)=>`<section class="recon-pane"><div class="recon-pane-head"><div><strong>${title}</strong><small>${rows.length} visible lines · click a line for metadata</small></div>${button('Filter','reconciliation-filters','ghost compact','filter')}</div><div class="recon-line-list">${rows.length?rows.map((row,i)=>`<button class="recon-line ${i===2?'selected':''}" data-action="select-recon-line" data-side="${externalSide?'external':'internal'}" data-id="${row[0]}"><span class="recon-line-check">${i<2?icon('check-circle'):i===2?icon('sparkles'):icon('clock')}</span><span><strong>${row[0]} · ${row[1]}</strong><small>${row[2]} · ${row[4]}</small></span><b class="${row[3]>=0?'positive':'negative'}">${formatMoney(row[3])}</b><em>${statusPill(row[5])}</em></button>`).join(''):liveEmptyCard(state.liveData?'Line-level match pairs are not returned by the reconciliations API.':'No lines.')}</div></section>`;
+    const internal=[['JRN-07198','Capital call receipt','31 Jul',15000000,'CC-2026-0038','Matched'],['JRN-07197','Investment disbursement','30 Jul',-12000025,'DISB-NOVA-001','Matched'],['JRN-07196','Bank charge expense','30 Jul',-125000,'EXP-7221','Suggested'],['JRN-07195','Portfolio proceeds','29 Jul',8500000,'PROC-EXIT-119','Partial']];
+    const external=[['EXT-88419','CBZ CREDIT','31 Jul',15000000,'CALL 0038 MGFII','Matched'],['EXT-88402','CBZ DEBIT','30 Jul',-12000025,'NOVA SERIES B','Matched'],['EXT-88398','SERVICE FEE','30 Jul',-125000,'CHARGE JUL','Suggested'],['EXT-88377','INWARD TT','29 Jul',7800000,'EXIT PROCEEDS','Partial']];
+    const pane=(title,rows,externalSide=false)=>`<section class="recon-pane"><div class="recon-pane-head"><div><strong>${title}</strong><small>${rows.length} visible lines · click a line for metadata</small></div>${button('Filter','reconciliation-filters','ghost compact','filter')}</div><div class="recon-line-list">${rows.map((row,i)=>`<button class="recon-line ${i===2?'selected':''}" data-action="select-recon-line" data-side="${externalSide?'external':'internal'}" data-id="${row[0]}"><span class="recon-line-check">${i<2?icon('check-circle'):i===2?icon('sparkles'):icon('clock')}</span><span><strong>${row[0]} · ${row[1]}</strong><small>${row[2]} · ${row[4]}</small></span><b class="${row[3]>=0?'positive':'negative'}">${formatMoney(row[3])}</b><em>${statusPill(row[5])}</em></button>`).join('')}</div></section>`;
     return `${pageHeader(`Reconciliation Workspace — ${batch.id}`,`${batch.fund} · ${batch.account} · ${batch.period}`,`${button('Back to dashboard','navigate-reconciliations','','arrow-left')}${button('Upload bank statement','upload-bank-statement-modal','','upload')}${button('Export evidence','export-reconciliation-pack','','download')}`,'Cash & Reconciliation')}${cashContextBar(batch.account.split(' · ')[0])}
       ${workspaceFilterBar([{label:'Period',action:'reconciliation-period',selected:state.reconciliationPeriod,options:['Jul 2026','Jun 2026','May 2026']},{label:'Match status',action:'reconciliation-status-filter',selected:'All lines',options:['All lines','Suggested','Partial','Unmatched','Matched']},{label:'Amount range',action:'reconciliation-amount-filter',selected:'All amounts',options:['All amounts','Under $100K','$100K–$1M','Over $1M']},{type:'button',label:'Expand comparison',action:'expand-reconciliation-comparison',icon:'maximize'}])}
-      <section class="recon-proof-strip section-gap"><div><span>Internal closing</span><strong>${formatMoney(batch.internal,batch.currency)}</strong></div><div><span>External closing</span><strong>${formatMoney(batch.external,batch.currency)}</strong></div><div><span>Adjusted external</span><strong>${formatMoney(batch.adjusted,batch.currency)}</strong></div><div class="${Math.abs(batch.variance)<=100?'success':'danger'}"><span>Variance</span><strong>${formatMoney(batch.variance,batch.currency)}</strong></div><div><span>Tolerance</span><strong>${formatMoney(100,batch.currency)}</strong></div><div><span>Configuration</span><strong>${demoOnly('USD-CASH-STD v4','—')}</strong></div></section>
-      <section class="reconciliation-workspace-grid section-gap">${pane('Internal Cash Ledger',internal)}<section class="match-workbench"><div class="match-workbench-head"><strong>Source-to-ledger matching</strong>${button('Expand','expand-reconciliation-comparison','ghost compact','maximize')}</div>${state.liveData?liveEmptyCard('Suggestion scoring UI needs line pairs from the API.'):`<div class="match-score-ring"><strong>91</strong><span>suggestion score</span></div><div class="score-components"><div><span>Amount</span><b>100%</b></div><div><span>Date</span><b>90%</b></div><div><span>Reference</span><b>78%</b></div><div><span>Counterparty</span><b>95%</b></div></div><div class="reason-item warning">${icon('alert')}<div><strong>Human confirmation required</strong><small>Score is below auto-match threshold and one competing candidate exists.</small></div></div>`}${button('Confirm suggested match','confirm-recon-match','primary','check')}${button('Split / combine','split-recon-match','','layers')}${button('Raise exception','raise-recon-exception','','alert')}</section>${pane('External Statement Lines',external,true)}</section>
-      <section class="card section-gap"><div class="card-head"><div><h3>Balance Proof & Residuals</h3><p>Every difference remains visible until matched, explained or independently approved.</p></div>${statusPill(batch.status)}</div><div class="card-body"><div class="balance-proof-grid"><button data-action="recon-balance-detail"><span>Opening balance</span><strong>${formatMoney(batch.opening,batch.currency)}</strong></button><button data-action="recon-inflows-detail"><span>Posted inflows</span><strong class="positive">${demoOnly(formatMoney(23500000,batch.currency),'—')}</strong></button><button data-action="recon-outflows-detail"><span>Posted outflows</span><strong class="negative">${demoOnly(formatMoney(-8500000,batch.currency),'—')}</strong></button><button data-action="recon-closing-detail"><span>Internal closing</span><strong>${formatMoney(batch.internal,batch.currency)}</strong></button><button data-action="recon-timing-detail"><span>Timing items</span><strong>${formatMoney(batch.adjusted-batch.external,batch.currency)}</strong></button><button data-action="recon-variance-detail"><span>Unexplained variance</span><strong class="${batch.variance?'negative':'positive'}">${formatMoney(batch.variance,batch.currency)}</strong></button></div></div></section>`;
+      <section class="recon-proof-strip section-gap"><div><span>Internal closing</span><strong>${formatMoney(batch.internal,batch.currency)}</strong></div><div><span>External closing</span><strong>${formatMoney(batch.external,batch.currency)}</strong></div><div><span>Adjusted external</span><strong>${formatMoney(batch.adjusted,batch.currency)}</strong></div><div class="${Math.abs(batch.variance)<=100?'success':'danger'}"><span>Variance</span><strong>${formatMoney(batch.variance,batch.currency)}</strong></div><div><span>Tolerance</span><strong>${formatMoney(100,batch.currency)}</strong></div><div><span>Configuration</span><strong>USD-CASH-STD v4</strong></div></section>
+      <section class="reconciliation-workspace-grid section-gap">${pane('Internal Cash Ledger',internal)}<section class="match-workbench"><div class="match-workbench-head"><strong>Source-to-ledger matching</strong>${button('Expand','expand-reconciliation-comparison','ghost compact','maximize')}</div><div class="match-score-ring"><strong>91</strong><span>suggestion score</span></div><div class="score-components"><div><span>Amount</span><b>100%</b></div><div><span>Date</span><b>90%</b></div><div><span>Reference</span><b>78%</b></div><div><span>Counterparty</span><b>95%</b></div></div><div class="reason-item warning">${icon('alert')}<div><strong>Human confirmation required</strong><small>Score is below auto-match threshold and one competing candidate exists.</small></div></div>${button('Confirm suggested match','confirm-recon-match','primary','check')}${button('Split / combine','split-recon-match','','layers')}${button('Raise exception','raise-recon-exception','','alert')}</section>${pane('External Statement Lines',external,true)}</section>
+      <section class="card section-gap"><div class="card-head"><div><h3>Balance Proof & Residuals</h3><p>Every difference remains visible until matched, explained or independently approved.</p></div>${statusPill(batch.status)}</div><div class="card-body"><div class="balance-proof-grid"><button data-action="recon-balance-detail"><span>Opening balance</span><strong>${formatMoney(batch.opening,batch.currency)}</strong></button><button data-action="recon-inflows-detail"><span>Posted inflows</span><strong class="positive">${formatMoney(23500000,batch.currency)}</strong></button><button data-action="recon-outflows-detail"><span>Posted outflows</span><strong class="negative">${formatMoney(-8500000,batch.currency)}</strong></button><button data-action="recon-closing-detail"><span>Internal closing</span><strong>${formatMoney(batch.internal,batch.currency)}</strong></button><button data-action="recon-timing-detail"><span>Timing items</span><strong>${formatMoney(batch.adjusted-batch.external,batch.currency)}</strong></button><button data-action="recon-variance-detail"><span>Unexplained variance</span><strong class="${batch.variance?'negative':'positive'}">${formatMoney(batch.variance,batch.currency)}</strong></button></div></div></section>`;
   }
 
   function renderExceptions() {
@@ -1265,26 +1023,12 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   }
 
   function renderPeriodClose() {
-    const period = state.closePeriod || '2026-07';
-    const periodLabel = (() => {
-      const [y,m] = String(period).split('-');
-      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-      const mi = Number(m) - 1;
-      return Number.isFinite(mi) && months[mi] ? `${months[mi]} ${y}` : period;
-    })();
-    const legalEntityId = state.closeLegalEntityId || 'le_arcus';
-    const periodAttrs = `data-period="${escapeHTML(period)}" data-legal-entity-id="${escapeHTML(legalEntityId)}" data-id="${escapeHTML(period)}"`;
-    const passedCount = closeControls.filter(item => item.passed).length;
-    const totalControls = Math.max(closeControls.length, 1);
-    const blockerCount = closeControls.length - passedCount;
-    const readiness = state.closeReadinessPct != null
-      ? Math.round(Number(state.closeReadinessPct))
-      : Math.round(passedCount / totalControls * 100);
-    const statusLabel = state.closeCanClose ? 'READY TO CLOSE' : (state.liveData ? 'BLOCKED' : 'RECONCILING');
-    const statusTone = state.closeCanClose ? 'success' : 'warning';
-    return `${pageHeader('Period Close & General-Ledger Control','Itemised pre-check, approvals, immutable close version, reopen/restatement and idempotent accounting export.',`${button('Download evidence pack','export-close-pack','','download')}${button('Run close pre-check','run-close-precheck','primary','refresh',periodAttrs)}`,'Cash & Reconciliation')}${cashContextBar()}
-      <section class="close-hero section-gap"><div><span>Close period</span><strong>${escapeHTML(periodLabel)}</strong><small>${state.liveData ? `Period ${escapeHTML(period)} · entity ${escapeHTML(legalEntityId)}` : 'Matanho Capital Zimbabwe · 5 funds · USD and ZWG'}</small></div><div class="close-readiness"><div class="radial-progress" style="--value:${readiness}"><strong>${readiness}%</strong><small>ready</small></div><div><strong>${passedCount} controls passed</strong><span>${blockerCount} blocker${blockerCount===1?'':'s'} must be cleared before approval</span></div></div><div class="close-actions">${statusPill(statusLabel,statusTone)}${button(state.closeCanClose ? 'Close period' : 'Request approval','request-close-approval','','user-check',periodAttrs)}</div></section>
-      <section class="close-layout section-gap"><section class="card"><div class="card-head"><div><h3>Close Checklist</h3><p>${state.liveData ? 'Controls from cash period precheck.' : 'Click any control to inspect calculations, source records, evidence and remediation.'}</p></div><span class="table-badge">${passedCount} / ${closeControls.length} passed</span></div><div class="card-body close-check-list">${closeControls.length ? closeControls.map(control=>`<button class="close-check ${control.passed?'passed':'blocked'}" data-action="open-close-control" data-id="${control.id}"><span>${icon(control.passed?'check-circle':'alert')}</span><span><strong>${escapeHTML(control.title)}</strong><small>${escapeHTML(control.detail)}</small></span>${control.passed?statusPill('Passed','success'):statusPill(control.severity==='Critical'?'Critical blocker':'Blocker','danger')}${icon('chevron-right')}</button>`).join('') : `<div class="empty-state"><p>No close controls returned for ${escapeHTML(period)}.</p></div>`}</div></section><section class="side-stack">${card('Approval Route', state.liveData ? `<div class="info-list"><div class="info-row"><span>Entity</span><strong>${escapeHTML(legalEntityId)}</strong></div><div class="info-row"><span>Can close</span><strong>${state.closeCanClose?'Yes':'No'}</strong></div><div class="info-row"><span>Readiness</span><strong>${readiness}%</strong></div></div>` : `<div class="approval-route"><div class="done"><span>1</span><div><strong>Cash Operations</strong><small>Nyasha Moyo · complete 31 Jul</small></div></div><div class="done"><span>2</span><div><strong>Fund Accounting</strong><small>Laura Chen · complete 31 Jul</small></div></div><div class="current"><span>3</span><div><strong>Compliance / Risk</strong><small>Anita Kapoor · in review</small></div></div><div><span>4</span><div><strong>CFO Certification</strong><small>Tariro Kasere · pending</small></div></div></div>`)}${card('General-Ledger Export',`<div class="info-list"><div class="info-row"><span>Period</span><strong>${escapeHTML(period)}</strong></div><div class="info-row"><span>Currency</span><strong>USD</strong></div><div class="info-row"><span>Entity</span><strong>${escapeHTML(legalEntityId)}</strong></div></div><div class="section-gap">${button('Create GL export','create-gl-export','primary','send',periodAttrs)}</div>`)}</section></section>`;
+    const passedCount=closeControls.filter(item=>item.passed).length;
+    const blockerCount=closeControls.length-passedCount;
+    const readiness=Math.round(passedCount/closeControls.length*100);
+    return `${pageHeader('Period Close & General-Ledger Control','Itemised pre-check, approvals, immutable close version, reopen/restatement and idempotent accounting export.',`${button('Download evidence pack','export-close-pack','','download')}${button('Run close pre-check','run-close-precheck','primary','refresh')}`,'Cash & Reconciliation')}${cashContextBar()}
+      <section class="close-hero section-gap"><div><span>Close period</span><strong>July 2026</strong><small>Matanho Capital Zimbabwe · 5 funds · USD and ZWG</small></div><div class="close-readiness"><div class="radial-progress" style="--value:${readiness}"><strong>${readiness}%</strong><small>ready</small></div><div><strong>${passedCount} controls passed</strong><span>${blockerCount} blocker${blockerCount===1?'':'s'} must be cleared before approval</span></div></div><div class="close-actions">${statusPill('RECONCILING','warning')}${button('Request approval','request-close-approval','','user-check')}</div></section>
+      <section class="close-layout section-gap"><section class="card"><div class="card-head"><div><h3>Close Checklist</h3><p>Click any control to inspect calculations, source records, evidence and remediation.</p></div><span class="table-badge">${passedCount} / ${closeControls.length} passed</span></div><div class="card-body close-check-list">${closeControls.map(control=>`<button class="close-check ${control.passed?'passed':'blocked'}" data-action="open-close-control" data-id="${control.id}"><span>${icon(control.passed?'check-circle':'alert')}</span><span><strong>${escapeHTML(control.title)}</strong><small>${escapeHTML(control.detail)}</small></span>${control.passed?statusPill('Passed','success'):statusPill(control.severity==='Critical'?'Critical blocker':'Blocker','danger')}${icon('chevron-right')}</button>`).join('')}</div></section><section class="side-stack">${card('Approval Route',`<div class="approval-route"><div class="done"><span>1</span><div><strong>Cash Operations</strong><small>Nyasha Moyo · complete 31 Jul</small></div></div><div class="done"><span>2</span><div><strong>Fund Accounting</strong><small>Laura Chen · complete 31 Jul</small></div></div><div class="current"><span>3</span><div><strong>Compliance / Risk</strong><small>Anita Kapoor · in review</small></div></div><div><span>4</span><div><strong>CFO Certification</strong><small>Tariro Kasere · pending</small></div></div></div>`)}${card('General-Ledger Export',`<div class="info-list"><div class="info-row"><span>Approved journals</span><strong>4</strong></div><div class="info-row"><span>Debit / Credit control</span><strong>$35.6M / $35.6M</strong></div><div class="info-row"><span>Checksum</span><strong>9F2A…71C8</strong></div><div class="info-row"><span>Accounting status</span><strong>${statusPill('4 accepted · 1 pending','warning')}</strong></div></div><div class="section-gap">${button('Create GL export','create-gl-export','primary','send')}</div>`)}</section></section>`;
   }
 
   function vaultDocumentTable(items=documents) {
@@ -1292,12 +1036,10 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   }
 
   function renderDocumentsVault() {
-    const folders=[...new Set(documents.map(d=>d.folder).filter(Boolean))];
-    const empty = isLiveMode() && !documents.length;
+    const folders=[...new Set(documents.map(d=>d.folder))];
     return `${pageHeader('Documents Vault','Secure, classified and auditable investment-document repository with native previews, versions, access controls and e-signature.',`${button('Request document','request-document','','send')}${button('Upload files','vault-upload','primary','upload')}`,'Reporting & Records')}
-      <section class="vault-stats section-gap"><div>${icon('folder')}<span><strong>${folders.length}</strong><small>Controlled folders</small></span></div><div>${icon('file')}<span><strong>${documents.length}</strong><small>Active documents</small></span></div><div>${icon('edit')}<span><strong>${documents.filter(d=>d.signatureStatus&&d.signatureStatus!=='Not required').length}</strong><small>Signature-enabled</small></span></div><div>${icon('shield')}<span><strong>${isLiveMode()?'—':'100%'}</strong><small>Encrypted & audit logged</small></span></div><div>${icon('clock')}<span><strong>${demoOnly('2','—')}</strong><small>Retention reviews due</small></span></div></section>
-      ${empty ? `<section class="section-gap">${card('Document Register', liveEmptyCard('No documents returned by the documents API yet.'))}</section>` : `<section class="vault-layout section-gap"><aside class="vault-folder-panel"><div class="vault-panel-head"><strong>Folders</strong>${button('','create-folder','ghost compact icon-only','plus')}</div><button class="vault-folder active" data-action="vault-filter-folder" data-folder="all">${icon('layers')}<span>All documents<small>${documents.length} records</small></span><b>${documents.length}</b></button>${folders.map(folder=>`<button class="vault-folder" data-action="vault-filter-folder" data-folder="${escapeHTML(folder)}">${icon('folder')}<span>${escapeHTML(folder)}<small>${documents.filter(d=>d.folder===folder).length} records</small></span><b>${documents.filter(d=>d.folder===folder).length}</b></button>`).join('')}</aside><section class="card table-card vault-records"><div class="table-toolbar"><div class="table-title-row"><h3>Document Register</h3><span class="table-badge">Preview and export every record</span></div><div class="table-tools"><label class="table-search">${icon('search')}<input placeholder="Search documents"></label>${button('Filters','document-vault-filters','','filter')}${button('View','toggle-vault-view','','grid')}</div></div>${vaultDocumentTable()}</section></section>`}
-`;
+      <section class="vault-stats section-gap"><div>${icon('folder')}<span><strong>${folders.length}</strong><small>Controlled folders</small></span></div><div>${icon('file')}<span><strong>${documents.length}</strong><small>Active documents</small></span></div><div>${icon('edit')}<span><strong>${documents.filter(d=>d.signatureStatus!=='Not required').length}</strong><small>Signature-enabled</small></span></div><div>${icon('shield')}<span><strong>100%</strong><small>Encrypted & audit logged</small></span></div><div>${icon('clock')}<span><strong>2</strong><small>Retention reviews due</small></span></div></section>
+      <section class="vault-layout section-gap"><aside class="vault-folder-panel"><div class="vault-panel-head"><strong>Folders</strong>${button('','create-folder','ghost compact icon-only','plus')}</div><button class="vault-folder active" data-action="vault-filter-folder" data-folder="all">${icon('layers')}<span>All documents<small>${documents.length} records</small></span><b>${documents.length}</b></button>${folders.map(folder=>`<button class="vault-folder" data-action="vault-filter-folder" data-folder="${escapeHTML(folder)}">${icon('folder')}<span>${escapeHTML(folder)}<small>${documents.filter(d=>d.folder===folder).length} records</small></span><b>${documents.filter(d=>d.folder===folder).length}</b></button>`).join('')}</aside><section class="card table-card vault-records"><div class="table-toolbar"><div class="table-title-row"><h3>Document Register</h3><span class="table-badge">Preview and export every record</span></div><div class="table-tools"><label class="table-search">${icon('search')}<input placeholder="Search documents"></label>${button('Filters','document-vault-filters','','filter')}${button('View','toggle-vault-view','','grid')}</div></div>${vaultDocumentTable()}</section></section>`;
   }
 
   function renderReportsVault() {
@@ -1326,22 +1068,18 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   }
 
   function render() {
-    const previousScrollTop = workspace.scrollTop;
+    try {
+    const previousScrollTop = workspace ? workspace.scrollTop : 0;
     const preserveScroll = lastRenderedPage === state.page;
     rootEl.dataset.theme = state.theme; document.body.dataset.theme = state.theme;
     document.documentElement.style.colorScheme = state.theme;
-    $('#app').classList.toggle('sidebar-collapsed', state.sidebarCollapsed);
-    sidebar.classList.toggle('mobile-open', state.mobileNavOpen);
+    $('#app')?.classList.toggle('sidebar-collapsed', state.sidebarCollapsed);
+    sidebar?.classList.toggle('mobile-open', state.mobileNavOpen);
     renderNav();
     renderStaticIcons();
 
     let html = '';
-    // Hard errors + live-only first paint: never show Matanho fixtures.
-    if (state.liveLoadError && !state.hydrating) {
-      html = renderHydratingDashboard();
-    } else if (state.liveOnly && state.hydrating && !state.liveData) {
-      html = renderHydratingDashboard();
-    } else switch (state.page) {
+    switch (state.page) {
       case 'dashboard': html = renderDashboard(); break;
       case 'deals': html = renderDealFlow(); break;
       case 'funds': html = renderFunds(); break;
@@ -1374,199 +1112,105 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       case 'analytics-detail': html = renderAnalyticsDetail(); break;
       default: html = renderDashboard();
     }
-    // page-enter only when navigating to a different page — re-animating on every hydrate causes blink
-    const enterClass = preserveScroll ? '' : ' page-enter';
-    workspace.innerHTML = `<div class="page${enterClass}">${html}</div><div id="chartTooltip" class="chart-tooltip"></div>`;
+    if (!workspace) return;
+    workspace.innerHTML = `<div class="page page-enter">${html}</div><div id="chartTooltip" class="chart-tooltip"></div>`;
     renderStaticIcons(workspace);
     workspace.scrollTop = preserveScroll ? previousScrollTop : 0;
     lastRenderedPage = state.page;
     bindDynamicElements();
     emitIntegrationEvent('matanho:state-change', publicSnapshot());
+    } catch (err) {
+      console.error('[portfolio-v11] render failed', err);
+      try {
+        if (workspace) {
+          workspace.innerHTML = `<div class="page"><div class="empty-state"><h3>Unable to render this view</h3><p>${escapeHTML(err && err.message ? err.message : 'Unexpected error')}</p></div></div>`;
+        }
+      } catch (_) {}
+    }
   }
 
   function renderDashboard() {
-    if (state.hydrating) return renderHydratingDashboard();
-    const live = state.dashboardMetrics || {};
-    const useLive = Boolean(state.liveData);
-    const totalInvested = live.totalInvested != null ? Number(live.totalInvested) : (useLive ? 0 : sum(companies,c => c.invested));
+    const totalInvested = sum(companies,c => c.invested);
     const committed = sum(funds,f => f.commitment);
-    const calledTotal = sum(funds,f => f.called);
-    const drawdown = live.availableForDrawdown != null ? Number(live.availableForDrawdown) : (useLive ? Math.max(0, committed - calledTotal) : (committed - calledTotal));
-    const activeCompanies = live.companyCount != null ? Number(live.companyCount) : (useLive ? companies.length : companies.length);
-    const unrealized = live.unrealizedValue != null ? Number(live.unrealizedValue) : (useLive ? 0 : sum(companies,c => c.fairValue));
-    const grossIrrLabel = live.fundGrossIRR != null && live.fundGrossIRR !== '' ? `${Number(live.fundGrossIRR).toFixed(1)}%` : (useLive ? '—' : '—');
-    const netIrrLabel = live.lpNetIRR != null && live.lpNetIRR !== '' ? `${Number(live.lpNetIRR).toFixed(1)}%` : (useLive ? '—' : '—');
-    const tvpiLabel = live.tvpi != null && live.tvpi !== '' ? `${Number(live.tvpi).toFixed(2)}x` : (useLive ? '—' : '—');
-    const dpiFoot = live.dpi != null ? `DPI ${Number(live.dpi).toFixed(2)}x` : (useLive ? 'From live API' : 'Demo');
+    const nav = sum(funds,f => f.nav);
+    const distributed = sum(funds,f => f.distributed);
+    const activeCompanies = companies.length;
+    const unrealized = sum(companies,c => c.fairValue);
 
-    const charts = state.dashboardCharts || {};
-    const perf = charts.performance;
-    const performance = state.liveData
-      ? (perf
-          ? barChart({
-              labels: perf.labels?.length ? perf.labels : ['Activity'],
-              series: [
-                { name: 'Capital invested', color: 'var(--emerald)', values: perf.capitalInvested || [0] },
-                { name: 'Distributions', color: 'var(--blue)', values: perf.distributions || [0] },
-                { name: 'Other expenses', color: 'var(--amber)', values: perf.otherExpenses || [0] },
-                { name: 'Net cash flow', color: 'var(--navy)', values: perf.netCashFlow || [0] },
-              ],
-              yLabel: 'USD (Millions)',
-              format: (v) => `${Number(v).toFixed(1)}M`,
-            })
-          : barChart({
-              labels: ['No data'],
-              series: [
-                { name: 'Capital invested', color: 'var(--emerald)', values: [0] },
-                { name: 'Distributions', color: 'var(--blue)', values: [0] },
-                { name: 'Other expenses', color: 'var(--amber)', values: [0] },
-                { name: 'Net cash flow', color: 'var(--navy)', values: [0] },
-              ],
-              yLabel: 'USD (Millions)',
-              format: (v) => `${v}M`,
-            }))
-      : barChart({
-          labels: ['2022', '2023', '2024', '2025', '2026 YTD'],
-          series: [
-            { name: 'Capital invested', color: 'var(--emerald)', values: [20, 78, 66, 22, 8] },
-            { name: 'Distributions', color: 'var(--blue)', values: [5, -30, 28, 41, 29] },
-            { name: 'Other expenses', color: 'var(--amber)', values: [-2, 5, 4, -8, 2] },
-            { name: 'Net cash flow', color: 'var(--navy)', values: [8, 34, 82, 63, 31] },
-          ],
-          yLabel: 'USD (Millions)',
-          format: (v) => `${v}M`,
-        });
-    const jc = charts.jCurve;
-    const jCurve =
-      state.liveData && jc && jc.labels?.length
-        ? lineChart({
-            labels: jc.labels,
-            series: [{ name: 'Net Cash Flow (USD)', color: 'var(--blue)', values: jc.values || [] }],
-            yLabel: 'USD (Millions)',
-            format: (v) => `${Number(v).toFixed(1)}M`,
-          })
-        : state.liveData
-          ? lineChart({
-              labels: ['No data'],
-              series: [{ name: 'Net Cash Flow (USD)', color: 'var(--blue)', values: [0] }],
-              yLabel: 'USD (Millions)',
-              format: (v) => `${v}M`,
-            })
-          : lineChart({
-              labels: ['Year 0', 'Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5', 'Year 6+'],
-              series: [{ name: 'Net Cash Flow (USD)', color: 'var(--blue)', values: [0, -52, -75, -45, -5, 29, 51] }],
-              yLabel: 'USD (Millions)',
-              format: (v) => `${v}M`,
-            });
-    const sectorSegments =
-      state.liveData && charts.sectors?.length
-        ? charts.sectors
-        : state.liveData
-          ? [{ label: 'No allocation data', value: 1, color: '#adb5c3', display: '—' }]
-          : [
-              { label: 'Software', value: 34.2, color: '#2475f5', display: '34.2%' },
-              { label: 'Healthcare', value: 23.1, color: '#0ba780', display: '23.1%' },
-              { label: 'Consumer', value: 19.8, color: '#f5a623', display: '19.8%' },
-              { label: 'FinTech', value: 12.7, color: '#60a5fa', display: '12.7%' },
-              { label: 'Industrials', value: 6.5, color: '#11a5b7', display: '6.5%' },
-              { label: 'Other', value: 3.7, color: '#adb5c3', display: '3.7%' },
-            ];
-    const vt = charts.valueTrend;
-    const valueTrendChart =
-      state.liveData && vt && vt.labels?.length
-        ? lineChart({
-            labels: vt.labels,
-            series: [{ name: 'Gross IRR', color: 'var(--brand)', values: vt.values || [] }],
-            height: 190,
-            format: (v) => `${Number(v).toFixed(1)}%`,
-          })
-        : state.liveData
-          ? lineChart({
-              labels: ['No data'],
-              series: [{ name: 'Gross IRR', color: 'var(--brand)', values: [0] }],
-              height: 190,
-              format: (v) => `${v}%`,
-            })
-          : lineChart({
-              labels: ['Q1 2026', 'Q2 2026', 'Q3 2026', 'Q4 2026', 'Q1 2027'],
-              series: [{ name: 'Value growth', color: 'var(--brand)', values: [-10, 45, 92, 132, 148] }],
-              height: 190,
-              format: (v) => `${v}%`,
-            });
-    const activeInv = live.activeInvestments != null ? live.activeInvestments : companies.filter((c) => c.health >= 70).length;
-    const realizedInv = live.realizedInvestments != null ? live.realizedInvestments : 0;
-    const recent = (charts.recentActivity || []).length
-      ? charts.recentActivity
-      : state.liveData
-        ? deals.slice(0, 4).map((d) => ({ title: d.name, detail: `${d.stage} · ${d.age}d` }))
-        : [
-            { title: 'Nova Analytics', detail: 'Term sheet signed · 2 days ago' },
-            { title: 'GreenOrbit Energy', detail: 'Capital call · 4 days ago' },
-            { title: 'Mukuru Logistics', detail: 'Board meeting · 5 days ago' },
-            { title: 'Nyasha Foods', detail: 'Quarterly report · 1 week ago' },
-          ];
+    const performance = barChart({
+      labels:['2022','2023','2024','2025','2026 YTD'],
+      series:[
+        { name:'Capital invested', color:'var(--emerald)', values:[20,78,66,22,8] },
+        { name:'Distributions', color:'var(--blue)', values:[5,-30,28,41,29] },
+        { name:'Other expenses', color:'var(--amber)', values:[-2,5,4,-8,2] },
+        { name:'Net cash flow', color:'var(--navy)', values:[8,34,82,63,31] }
+      ],
+      yLabel:'USD (Millions)',
+      format:v => `${v}M`
+    });
+    const jCurve = lineChart({
+      labels:['Year 0','Year 1','Year 2','Year 3','Year 4','Year 5','Year 6+'],
+      series:[{ name:'Net Cash Flow (USD)', color:'var(--blue)', values:[0,-52,-75,-45,-5,29,51] }],
+      yLabel:'USD (Millions)', format:v=>`${v}M`
+    });
+    const sectorSegments = [
+      {label:'Software',value:34.2,color:'#2475f5',display:'34.2%'},
+      {label:'Healthcare',value:23.1,color:'#0ba780',display:'23.1%'},
+      {label:'Consumer',value:19.8,color:'#f5a623',display:'19.8%'},
+      {label:'FinTech',value:12.7,color:'#60a5fa',display:'12.7%'},
+      {label:'Industrials',value:6.5,color:'#11a5b7',display:'6.5%'},
+      {label:'Other',value:3.7,color:'#adb5c3',display:'3.7%'}
+    ];
 
-    const portfolioRows = companies.map(company => `<tr class="clickable" data-action="open-company" data-id="${company.id}"><td><div class="company-cell">${companyLogo(company)}<span class="table-primary">${escapeHTML(company.name)}</span></div></td><td>${escapeHTML(company.sector)}</td><td class="text-right">${formatMoney(company.invested)}</td><td class="text-right">${formatMoney(Math.max(0,company.fairValue-company.invested))}</td><td class="text-right">${formatMoney(company.fairValue)}</td><td class="text-right">${company.invested? (company.fairValue/company.invested).toFixed(2):'—'}x</td><td class="text-right positive">${pct(company.revenueGrowth)}</td><td>${healthScore(company.health)}</td><td>${statusPill(company.health >= 70 ? 'Active' : 'Watchlist')}</td></tr>`).join('');
+    const portfolioRows = companies.map(company => `<tr class="clickable" data-action="open-company" data-id="${company.id}"><td><div class="company-cell">${companyLogo(company)}<span class="table-primary">${escapeHTML(company.name)}</span></div></td><td>${escapeHTML(company.sector)}</td><td class="text-right">${formatMoney(company.invested)}</td><td class="text-right">${formatMoney(Math.max(0,company.fairValue-company.invested))}</td><td class="text-right">${formatMoney(company.fairValue)}</td><td class="text-right">${(company.fairValue/company.invested).toFixed(2)}x</td><td class="text-right positive">${pct(company.revenueGrowth)}</td><td>${healthScore(company.health)}</td><td>${statusPill(company.health >= 70 ? 'Active' : 'Watchlist')}</td></tr>`).join('');
 
-    const dashExtra = state.liveData
-      ? button('Launch investee portal','open-investee-portal','primary','external-link')
-      : button('Add Deal','add-deal','primary','plus');
-    return `${pageHeader('Portfolio Dashboard','Cross-fund performance, allocation and portfolio-company health.',globalPageActions({ extra: dashExtra }))}
-      ${workspaceFilterBar([{label:'Fund',action:'dashboard-fund-filter',selected:state.activeFund||'All Funds',options:['All Funds',...funds.map(f=>f.name)]},{label:'As of',action:'dashboard-period-filter',selected:state.asOfDate||'Latest',options:['Latest','31 Jul 2026','30 Jun 2026','31 Mar 2026','31 Dec 2025']},{label:'Currency',action:'dashboard-currency-filter',selected:state.dashboardCurrency||'USD',options:['USD','ZWG','Reporting currency']},{label:'Geography',action:'dashboard-geography-filter',selected:state.dashboardGeography||'All geographies',options:['All geographies','Southern Africa','East Africa','West Africa']},{type:'button',label:'Reset',action:'reset-dashboard-filters',icon:'refresh'}])}
+    return `${pageHeader('Portfolio Dashboard','Cross-fund performance, allocation and portfolio-company health.',globalPageActions({ extra: button('Add Deal','add-deal','primary','plus') }))}
+      ${workspaceFilterBar([{label:'Fund',action:'dashboard-fund-filter',selected:'All Funds',options:['All Funds',...funds.map(f=>f.name)]},{label:'As of',action:'dashboard-period-filter',selected:'31 Jul 2026',options:['31 Jul 2026','30 Jun 2026','31 Mar 2026','31 Dec 2025']},{label:'Currency',action:'dashboard-currency-filter',selected:'USD',options:['USD','ZWG','Reporting currency']},{label:'Geography',action:'dashboard-geography-filter',selected:'All geographies',options:['All geographies','Southern Africa','East Africa','West Africa']},{type:'button',label:'Reset',action:'reset-dashboard-filters',icon:'refresh'}])}
       <section class="metric-grid section-gap">
-        ${metricCard({label:'Total Invested',value:formatMoney(totalInvested),iconName:'dollar',accent:'emerald',foot:state.liveData?'Live API':'12.4% vs 31 Dec 2025',action:'metric-invested'})}
-        ${metricCard({label:'Available for Drawdown',value:formatMoney(drawdown),iconName:'wallet',accent:'blue',foot:committed?`${((drawdown/Math.max(committed,1))*100).toFixed(1)}% of commitments`:'Live API',action:'metric-drawdown'})}
-        ${metricCard({label:'Fund Gross IRR',value:grossIrrLabel,iconName:'trend-up',accent:'purple',foot:state.liveData?'Live API':'1.6pp vs prior period',action:'metric-irr'})}
-        ${metricCard({label:'LP Net IRR',value:netIrrLabel,iconName:'users',accent:'cyan',foot:state.liveData?'Live API':'1.3pp vs prior period',action:'metric-net-irr'})}
-        ${metricCard({label:'TVPI',value:tvpiLabel,iconName:'bar-chart',accent:'amber',foot:dpiFoot,action:'metric-tvpi'})}
+        ${metricCard({label:'Total Invested',value:formatMoney(totalInvested),iconName:'dollar',accent:'emerald',foot:'12.4% vs 31 Dec 2025',action:'metric-invested'})}
+        ${metricCard({label:'Available for Drawdown',value:formatMoney(committed-sum(funds,f=>f.called)),iconName:'wallet',accent:'blue',foot:'39.2% of commitments',action:'metric-drawdown'})}
+        ${metricCard({label:'Fund Gross IRR',value:'18.7%',iconName:'trend-up',accent:'purple',foot:'1.6pp vs prior period',action:'metric-irr'})}
+        ${metricCard({label:'LP Net IRR',value:'14.9%',iconName:'users',accent:'cyan',foot:'1.3pp vs prior period',action:'metric-net-irr'})}
+        ${metricCard({label:'TVPI',value:'2.18x',iconName:'bar-chart',accent:'amber',foot:'DPI 0.62x',action:'metric-tvpi'})}
         ${metricCard({label:'Unrealized Value',value:formatMoney(unrealized),iconName:'pie-chart',accent:'brand',foot:`${activeCompanies} active companies`,action:'metric-unrealized'})}
       </section>
       <section class="chart-grid">
-        ${card('Performance Overview',performance,{subtitle:state.liveData?'From /portfolio/dashboard performanceOverview':'By activity type (USD)',tools:selectControl('Performance fund',['All Funds',...funds.map(f=>f.name)],state.activeFund||'All Funds','dashboard-chart-fund'),classes:'chart-card'})}
-        ${card('J-Curve',jCurve,{subtitle:state.liveData?'From /portfolio/dashboard jCurve':'Net cash flow since inception',tools:selectControl('J-curve fund',['All Funds',...funds.map(f=>f.name)],state.activeFund||'All Funds','dashboard-chart-fund'),classes:'chart-card'})}
+        ${card('Performance Overview',performance,{subtitle:'By activity type (USD)',tools:selectControl('Performance fund',['All Funds','Growth Funds','Venture Funds'],'All Funds','dashboard-chart-fund'),classes:'chart-card'})}
+        ${card('J-Curve',jCurve,{subtitle:'Net cash flow since inception',tools:selectControl('J-curve fund',['All Funds','Fund II','Venture I'],'All Funds','dashboard-chart-fund'),classes:'chart-card'})}
       </section>
       <section class="dashboard-lower">
-        ${card('Sector Allocation',donutChart(sectorSegments,formatMoney(committed||sectorSegments.reduce((s,x)=>s+Number(x.value||0),0)),'Committed',112),{footer:'<button class="card-link" data-action="chart-drilldown" data-chart-label="Sector Allocation" data-chart-value="Committed capital by sector">View full allocation</button>'})}
-        ${card('Portfolio Value Trend',valueTrendChart,{footer:'<button class="card-link" data-action="chart-drilldown" data-chart-label="Portfolio Value Trend" data-chart-value="Quarterly portfolio mark movements">View detailed analytics</button>'})}
-        ${card('Quick Overview',`<ul class="activity-list"><li class="activity-item"><span class="activity-icon" style="color:var(--blue);background:var(--blue-soft)">${icon('building')}</span><span class="activity-copy"><strong>Active Investments</strong><small>Across ${funds.length} funds</small></span><span class="activity-amount">${activeInv}</span></li><li class="activity-item"><span class="activity-icon" style="color:var(--emerald);background:var(--emerald-soft)">${icon('check-circle')}</span><span class="activity-copy"><strong>Realised Investments</strong><small>From portfolio summary</small></span><span class="activity-amount">${realizedInv}</span></li><li class="activity-item"><span class="activity-icon" style="color:var(--orange);background:var(--orange-soft)">${icon('briefcase')}</span><span class="activity-copy"><strong>Total Companies</strong><small>Active and realised</small></span><span class="activity-amount">${activeCompanies}</span></li><li class="activity-item"><span class="activity-icon" style="color:var(--purple);background:var(--purple-soft)">${icon('trend-up')}</span><span class="activity-copy"><strong>Unrealized Value</strong><small>Current fair value</small></span><span class="activity-amount">${formatMoney(unrealized)}</span></li></ul>`) }
-        ${card('Recent Activity',recent.length?`<ul class="activity-list">${recent.map((item,i)=>`<li class="activity-item"><span class="status-dot" style="background:${i%2?'var(--amber)':'var(--blue)'}"></span><span class="activity-copy"><strong>${escapeHTML(item.title)}</strong><small>${escapeHTML(item.detail)}</small></span></li>`).join('')}</ul>`:`<p class="empty-state">No recent deal activity from API.</p>`,{tools:'<button class="card-link" data-action="navigate" data-page="deals">View all</button>'})}
+        ${card('Sector Allocation',donutChart(sectorSegments,formatMoney(committed),'Committed',112),{footer:'<button class="card-link" data-action="chart-drilldown" data-chart-label="Sector Allocation" data-chart-value="Committed capital by sector">View full allocation</button>'})}
+        ${card('Portfolio Value Trend',lineChart({labels:['Q1 2026','Q2 2026','Q3 2026','Q4 2026','Q1 2027'],series:[{name:'Value growth',color:'var(--brand)',values:[-10,45,92,132,148]}],height:190,format:v=>`${v}%`}),{footer:'<button class="card-link" data-action="chart-drilldown" data-chart-label="Portfolio Value Trend" data-chart-value="Quarterly portfolio mark movements">View detailed analytics</button>'})}
+        ${card('Quick Overview',`<ul class="activity-list"><li class="activity-item"><span class="activity-icon" style="color:var(--blue);background:var(--blue-soft)">${icon('building')}</span><span class="activity-copy"><strong>Active Investments</strong><small>Across 5 funds</small></span><span class="activity-amount">18</span></li><li class="activity-item"><span class="activity-icon" style="color:var(--emerald);background:var(--emerald-soft)">${icon('check-circle')}</span><span class="activity-copy"><strong>Realised Investments</strong><small>Since inception</small></span><span class="activity-amount">7</span></li><li class="activity-item"><span class="activity-icon" style="color:var(--orange);background:var(--orange-soft)">${icon('briefcase')}</span><span class="activity-copy"><strong>Total Companies</strong><small>Active and realised</small></span><span class="activity-amount">25</span></li><li class="activity-item"><span class="activity-icon" style="color:var(--purple);background:var(--purple-soft)">${icon('trend-up')}</span><span class="activity-copy"><strong>Unrealized Value</strong><small>Current fair value</small></span><span class="activity-amount">${formatMoney(unrealized)}</span></li></ul>`) }
+        ${card('Recent Activity',`<ul class="activity-list"><li class="activity-item"><span class="status-dot online"></span><span class="activity-copy"><strong>Nova Analytics</strong><small>Term sheet signed · 2 days ago</small></span></li><li class="activity-item"><span class="status-dot" style="background:var(--amber)"></span><span class="activity-copy"><strong>GreenOrbit Energy</strong><small>Capital call · 4 days ago</small></span></li><li class="activity-item"><span class="status-dot" style="background:var(--red)"></span><span class="activity-copy"><strong>Mukuru Logistics</strong><small>Board meeting · 5 days ago</small></span></li><li class="activity-item"><span class="status-dot" style="background:var(--blue)"></span><span class="activity-copy"><strong>Nyasha Foods</strong><small>Quarterly report · 1 week ago</small></span></li></ul>`,{tools:'<button class="card-link" data-action="open-activity">View all</button>'})}
       </section>
       <section class="card table-card">
         <div class="table-toolbar"><div class="table-title-row"><h3>Portfolio Summary</h3><span class="table-badge">${companies.length} companies</span></div><div class="table-tools"><div class="table-search">${icon('search')}<input type="text" placeholder="Filter portfolio..." data-input-action="table-search" value="${escapeHTML(state.tableSearch)}"></div>${button('Export summary','export-companies','compact','download')}</div></div>
-        <div class="table-wrap"><table><thead><tr><th>Company</th><th>Sector</th><th class="text-right">Investment Cost</th><th class="text-right">Value Created</th><th class="text-right">Fair Market Value</th><th class="text-right">MOIC</th><th class="text-right">Revenue Growth</th><th>Health</th><th>Status</th></tr></thead><tbody>${portfolioRows||'<tr><td colspan="9">No portfolio companies returned by API.</td></tr>'}</tbody></table></div>
+        <div class="table-wrap"><table><thead><tr><th>Company</th><th>Sector</th><th class="text-right">Investment Cost</th><th class="text-right">Value Created</th><th class="text-right">Fair Market Value</th><th class="text-right">MOIC</th><th class="text-right">Revenue Growth</th><th>Health</th><th>Status</th></tr></thead><tbody>${portfolioRows}</tbody></table></div>
       </section>`;
   }
 
   function renderDealFlow() {
     const stageColors = {'Sourcing':'#3b82f6','Screening':'#0ea5a8','Initial Review':'#60a5fa','Investment Committee':'#f59e0b','Due Diligence':'#2563eb','Term Sheet':'#0ea5a8','Portfolio':'#10b981','Rejected':'#ef4444'};
-    const visibleDeals = filteredDeals();
-    const pipelineValue=sum(visibleDeals,d=>d.amount);
-    const wonDeals=visibleDeals.filter(d=>d.stage==='Portfolio');
-    const lostDeals=visibleDeals.filter(d=>d.stage==='Rejected');
+    const pipelineValue=sum(deals,d=>d.amount);
+    const wonDeals=deals.filter(d=>d.stage==='Portfolio');
+    const lostDeals=deals.filter(d=>d.stage==='Rejected');
     const metrics=[
-      {label:'Pipeline Value',value:formatMoney(pipelineValue),iconName:'dollar',accent:'emerald',foot:state.liveData?'Filtered view':'18.6% vs prior period',action:'metric-pipeline'},
-      {label:'Active Deals',value:String(visibleDeals.filter(d=>!['Portfolio','Rejected'].includes(d.stage)).length),iconName:'briefcase',accent:'blue',foot:'Across filtered stages',action:'metric-active-deals'},
-      {label:'Due Diligence',value:String(visibleDeals.filter(d=>d.stage==='Due Diligence').length),iconName:'search',accent:'purple',foot:formatMoney(sum(visibleDeals.filter(d=>d.stage==='Due Diligence'),d=>d.amount)),action:'metric-dd'},
-      {label:'IC Pending',value:String(visibleDeals.filter(d=>d.stage==='Investment Committee').length),iconName:'users',accent:'amber',foot:formatMoney(sum(visibleDeals.filter(d=>d.stage==='Investment Committee'),d=>d.amount)),action:'metric-ic'},
+      {label:'Pipeline Value',value:formatMoney(pipelineValue),iconName:'dollar',accent:'emerald',foot:'18.6% vs prior period',action:'metric-pipeline'},
+      {label:'Active Deals',value:String(deals.filter(d=>!['Portfolio','Rejected'].includes(d.stage)).length),iconName:'briefcase',accent:'blue',foot:'Across all stages',action:'metric-active-deals'},
+      {label:'Due Diligence',value:String(deals.filter(d=>d.stage==='Due Diligence').length),iconName:'search',accent:'purple',foot:formatMoney(sum(deals.filter(d=>d.stage==='Due Diligence'),d=>d.amount)),action:'metric-dd'},
+      {label:'IC Pending',value:String(deals.filter(d=>d.stage==='Investment Committee').length),iconName:'users',accent:'amber',foot:formatMoney(sum(deals.filter(d=>d.stage==='Investment Committee'),d=>d.amount)),action:'metric-ic'},
       {label:'Won',value:String(wonDeals.length),iconName:'check-circle',accent:'emerald',foot:formatMoney(sum(wonDeals,d=>d.amount)),action:'metric-won'},
       {label:'Lost',value:String(lostDeals.length),iconName:'x',accent:'red',foot:formatMoney(sum(lostDeals,d=>d.amount)),trend:'negative',action:'metric-lost'}
     ];
-    const kanban=`<div class="kanban-shell"><div class="kanban">${dealStages.map(stage=>{const stageDeals=visibleDeals.filter(deal=>deal.stage===stage);const value=sum(stageDeals,d=>d.amount);return `<section class="kanban-column" data-stage="${stage}" style="--kanban-tint:${stageColors[stage]}18"><div class="kanban-head"><div class="kanban-title" style="color:${stageColors[stage]}">${escapeHTML(stage)}<span class="kanban-count">${stageDeals.length}</span></div><span class="kanban-value">${formatMoney(value)}</span></div>${stageDeals.map(deal=>`<article class="deal-card" draggable="true" data-deal-id="${escapeHTML(deal.id)}" data-action="open-deal"><div class="deal-card-head"><div><h4>${escapeHTML(deal.name)}</h4><p>${escapeHTML(deal.sector)}</p></div>${statusPill(deal.round,'neutral')}</div><div class="deal-meta"><span>Round <strong>${escapeHTML(deal.round)}</strong></span><span>Ask <strong>${formatMoney(deal.amount)}</strong></span><span>Age <strong>${deal.age} days</strong></span><span>Score <strong>${deal.score}/100</strong></span></div><div class="deal-card-foot"><span class="owner-mini">${avatar(deal.owner,deal.id.charCodeAt(deal.id.length-1))}${escapeHTML(deal.owner.split(' ')[0])}</span><span class="priority ${deal.priority.toLowerCase()}">${escapeHTML(deal.priority)}</span></div></article>`).join('')}${stageDeals.length<4&&!['Portfolio','Rejected'].includes(stage)&&!state.liveData?`<button class="button ghost compact" style="width:100%;margin-top:7px" data-action="add-deal" data-stage="${stage}">${icon('plus')} Add deal</button>`:''}</section>`}).join('')}</div></div>`;
-    const col = (key, label, extra='') => dealColumnVisible(key) ? `<th${extra}>${label}</th>` : '';
-    const cell = (key, html) => dealColumnVisible(key) ? html : '';
-    const listRows = visibleDeals.length
-      ? visibleDeals.map((deal,index)=>`<tr class="clickable" data-action="open-deal" data-deal-id="${escapeHTML(deal.id)}">${cell('deal',`<td class="table-primary">${escapeHTML(deal.name)}<small>${escapeHTML(deal.id)}</small></td>`)}${cell('stage',`<td>${statusPill(deal.stage,deal.stage==='Rejected'?'danger':deal.stage==='Portfolio'?'success':'info')}</td>`)}${cell('sector',`<td>${escapeHTML(deal.sector)}</td>`)}${cell('round',`<td>${escapeHTML(deal.round)}</td>`)}${cell('ask',`<td class="text-right">${formatMoney(deal.amount)}</td>`)}${cell('owner',`<td><span class="owner-mini">${avatar(deal.owner,index)}${escapeHTML(deal.owner)}</span></td>`)}${cell('age',`<td>${deal.age} days</td>`)}${cell('score',`<td><div class="inline-progress">${progressBar(deal.score)}<span>${deal.score}</span></div></td>`)}${cell('priority',`<td><span class="priority ${deal.priority.toLowerCase()}">${escapeHTML(deal.priority)}</span></td>`)}${cell('nextAction',`<td>${escapeHTML(dealNextAction(deal))}</td>`)}<td>${button('Open','open-deal','compact','eye',`data-deal-id="${escapeHTML(deal.id)}"`)}</td></tr>`).join('')
-      : `<tr><td colspan="12" class="muted" style="text-align:center;padding:24px">${state.hydrating ? 'Loading applications…' : 'No deals match the current filters or search.'}</td></tr>`;
-    const listView=`<section class="card table-card deal-list-view"><div class="table-toolbar"><div class="table-title-row"><h3>Deal Register</h3><span class="table-badge">${visibleDeals.length} of ${deals.length} opportunities</span></div><div class="table-tools"><label class="table-search">${icon('search')}<input data-input-action="table-search" value="${escapeHTML(state.tableSearch)}" placeholder="Search deals"></label>${button('Columns','deal-list-columns','','grid')}${button('Export','export-deals','','download')}</div></div><div class="table-wrap"><table><thead><tr>${col('deal','Deal')}${col('stage','Stage')}${col('sector','Sector')}${col('round','Round')}${col('ask','Ask',' class="text-right"')}${col('owner','Owner')}${col('age','Age')}${col('score','Score')}${col('priority','Priority')}${col('nextAction','Next action')}<th></th></tr></thead><tbody>${listRows}</tbody></table></div></section>`;
-    const calendarDays=Array.from({length:35},(_,i)=>{const day=i-1;const display=day<=0?day+30:day>31?day-31:day;const muted=day<=0||day>31;const dayDeals=visibleDeals.filter((_,idx)=>((idx*3+4)%28)+1===display&&!muted);return `<button class="deal-calendar-day ${muted?'muted':''} ${dayDeals.length?'has-deals':''}" data-action="deal-calendar-day" data-day="${display}"><span>${display}</span>${dayDeals.slice(0,2).map(deal=>`<em style="--stage-color:${stageColors[deal.stage]}">${escapeHTML(deal.name)}</em>`).join('')}${dayDeals.length>2?`<small>+${dayDeals.length-2} more</small>`:''}</button>`}).join('');
+    const kanban=`<div class="kanban-shell"><div class="kanban">${dealStages.map(stage=>{const stageDeals=deals.filter(deal=>deal.stage===stage);const value=sum(stageDeals,d=>d.amount);return `<section class="kanban-column" data-stage="${stage}" style="--kanban-tint:${stageColors[stage]}18"><div class="kanban-head"><div class="kanban-title" style="color:${stageColors[stage]}">${escapeHTML(stage)}<span class="kanban-count">${stageDeals.length}</span></div><span class="kanban-value">${formatMoney(value)}</span></div>${stageDeals.map(deal=>`<article class="deal-card" draggable="true" data-deal-id="${deal.id}" data-action="open-deal"><div class="deal-card-head"><div><h4>${escapeHTML(deal.name)}</h4><p>${escapeHTML(deal.sector)}</p></div>${statusPill(deal.round,'neutral')}</div><div class="deal-meta"><span>Round <strong>${escapeHTML(deal.round)}</strong></span><span>Ask <strong>${formatMoney(deal.amount)}</strong></span><span>Age <strong>${deal.age} days</strong></span><span>Score <strong>${deal.score}/100</strong></span></div><div class="deal-card-foot"><span class="owner-mini">${avatar(deal.owner,deal.id.charCodeAt(deal.id.length-1))}${escapeHTML(deal.owner.split(' ')[0])}</span><span class="priority ${deal.priority.toLowerCase()}">${escapeHTML(deal.priority)}</span></div></article>`).join('')}${stageDeals.length<4&&!['Portfolio','Rejected'].includes(stage)?`<button class="button ghost compact" style="width:100%;margin-top:7px" data-action="add-deal" data-stage="${stage}">${icon('plus')} Add deal</button>`:''}</section>`}).join('')}</div></div>`;
+    const listView=`<section class="card table-card deal-list-view"><div class="table-toolbar"><div class="table-title-row"><h3>Deal Register</h3><span class="table-badge">${deals.length} opportunities</span></div><div class="table-tools"><label class="table-search">${icon('search')}<input placeholder="Search deals"></label>${button('Columns','deal-list-columns','','grid')}${button('Export','export-deals','','download')}</div></div><div class="table-wrap"><table><thead><tr><th>Deal</th><th>Stage</th><th>Sector</th><th>Round</th><th class="text-right">Ask</th><th>Owner</th><th>Age</th><th>Score</th><th>Priority</th><th>Next action</th><th></th></tr></thead><tbody>${deals.map((deal,index)=>`<tr class="clickable" data-action="open-deal" data-deal-id="${deal.id}"><td class="table-primary">${escapeHTML(deal.name)}<small>${escapeHTML(deal.id)}</small></td><td>${statusPill(deal.stage,deal.stage==='Rejected'?'danger':deal.stage==='Portfolio'?'success':'info')}</td><td>${escapeHTML(deal.sector)}</td><td>${escapeHTML(deal.round)}</td><td class="text-right">${formatMoney(deal.amount)}</td><td><span class="owner-mini">${avatar(deal.owner,index)}${escapeHTML(deal.owner)}</span></td><td>${deal.age} days</td><td><div class="inline-progress">${progressBar(deal.score)}<span>${deal.score}</span></div></td><td><span class="priority ${deal.priority.toLowerCase()}">${escapeHTML(deal.priority)}</span></td><td>${['Review application','Complete screening','Prepare IC memo','Resolve DD findings','Finalise terms'][index%5]}</td><td>${button('Open','open-deal','compact','eye',`data-deal-id="${deal.id}"`)}</td></tr>`).join('')}</tbody></table></div></section>`;
+    const calendarDays=Array.from({length:35},(_,i)=>{const day=i-1;const display=day<=0?day+30:day>31?day-31:day;const muted=day<=0||day>31;const dayDeals=deals.filter((_,idx)=>((idx*3+4)%28)+1===display&&!muted);return `<button class="deal-calendar-day ${muted?'muted':''} ${dayDeals.length?'has-deals':''}" data-action="deal-calendar-day" data-day="${display}"><span>${display}</span>${dayDeals.slice(0,2).map(deal=>`<em style="--stage-color:${stageColors[deal.stage]}">${escapeHTML(deal.name)}</em>`).join('')}${dayDeals.length>2?`<small>+${dayDeals.length-2} more</small>`:''}</button>`}).join('');
     const calendarView=`<section class="card deal-calendar-card"><div class="card-head"><div><h3>Deal activity calendar</h3><p>Reviews, IC meetings, diligence deadlines and closing milestones.</p></div>${button('Add milestone','add-deal-milestone','primary compact','plus')}</div><div class="card-body"><div class="deal-calendar-week">${['MON','TUE','WED','THU','FRI','SAT','SUN'].map(day=>`<span>${day}</span>`).join('')}</div><div class="deal-calendar-grid">${calendarDays}</div></div></section>`;
     const view=state.dealView==='board'?kanban:state.dealView==='calendar'?calendarView:listView;
     const viewSwitch=`<div class="segmented-control deal-view-switch"><button class="${state.dealView==='list'?'active':''}" data-action="deal-view" data-view="list">${icon('list')} List</button><button class="${state.dealView==='board'?'active':''}" data-action="deal-view" data-view="board">${icon('grid')} Board</button><button class="${state.dealView==='calendar'?'active':''}" data-action="deal-view" data-view="calendar">${icon('calendar')} Calendar</button></div>`;
-    const dealFlowExtra = state.liveData
-      ? `${viewSwitch}${button('Filters','deal-filters','','filter')}${button('Launch investee portal','open-investee-portal','primary','external-link')}`
-      : `${viewSwitch}${button('Filters','deal-filters','','filter')}${button('Launch investee portal','open-investee-portal','','external-link')}${button('Add Deal','add-deal','primary','plus')}`;
-    return `${pageHeader('Deal Flow','Track investment opportunities from sourcing through investment, closing or rejection.',globalPageActions({includeDate:false,extra:dealFlowExtra}))}
-      ${workspaceFilterBar([{label:'Fund',action:'deal-fund-filter',selected:state.dealFundFilter||'All Funds',options:['All Funds',...funds.map(f=>f.name)]},{label:'Stage',action:'deal-stage-filter',selected:state.dealStageFilter||'All stages',options:['All stages',...dealStages]},{label:'Owner',action:'deal-owner-filter',selected:state.dealOwnerFilter||'All owners',options:['All owners',...Array.from(new Set(deals.map(d=>d.owner).filter(Boolean)))]},{label:'Age',action:'deal-age-filter',selected:state.dealAgeFilter||'All ages',options:['All ages','0–30 days','31–60 days','61+ days']}])}
+    return `${pageHeader('Deal Flow','Track investment opportunities from sourcing through investment, closing or rejection.',globalPageActions({includeDate:false,extra:`${viewSwitch}${button('Filters','deal-filters','','filter')}${button('Launch applicant portal','open-applicant-portal','','external-link')}${button('Add Deal','add-deal','primary','plus')}`}))}
+      ${workspaceFilterBar([{label:'Fund',action:'deal-fund-filter',selected:'All Funds',options:['All Funds',...funds.map(f=>f.name)]},{label:'Stage',action:'deal-stage-filter',selected:'All stages',options:['All stages',...dealStages]},{label:'Owner',action:'deal-owner-filter',selected:'All owners',options:['All owners',...Array.from(new Set(deals.map(d=>d.owner)))]},{label:'Age',action:'deal-age-filter',selected:'All ages',options:['All ages','0–30 days','31–60 days','61+ days']}])}
       <section class="metric-grid section-gap">${metrics.map(metricCard).join('')}</section>${view}`;
   }
 
@@ -1578,39 +1222,22 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     const strategies = {};
     funds.forEach(f=>strategies[f.strategy]=(strategies[f.strategy]||0)+f.commitment);
     const strategySegments = Object.entries(strategies).map(([label,value],index)=>({label,value,color:['#2475f5','#0ba780','#60a5fa','#f5a623','#0f98b6'][index],display:`${pct(value/totalCommitment*100)} · ${formatMoney(value)}`}));
-    const geoMap = {};
-    funds.forEach((f) => {
-      const label = f.geography || 'Unspecified';
-      geoMap[label] = (geoMap[label] || 0) + (Number(f.commitment) || 0);
-    });
-    const geoColors = ['#2475f5','#0ba780','#60a5fa','#f5a623','#0f98b6','#94a3b8'];
-    let geographies = Object.entries(geoMap).map(([label,value],index)=>({
-      label,
-      value,
-      color: geoColors[index % geoColors.length],
-      display: totalCommitment ? `${pct(value/totalCommitment*100)} · ${formatMoney(value)}` : formatMoney(value),
-    }));
-    if (!state.liveData && !geographies.length) {
-      geographies = [
-        {label:'Southern Africa',value:52.7,color:'#2475f5',display:'52.7%'},
-        {label:'East Africa',value:19.8,color:'#0ba780',display:'19.8%'},
-        {label:'West Africa',value:14.2,color:'#60a5fa',display:'14.2%'},
-        {label:'Pan-African / Other',value:13.3,color:'#f5a623',display:'13.3%'}
-      ];
-    }
-    if (state.liveData && !geographies.length) {
-      geographies = [{label:'No geography',value:1,color:'#94a3b8',display:formatMoney(0)}];
-    }
+    const geographies = [
+      {label:'Southern Africa',value:52.7,color:'#2475f5',display:'52.7%'},
+      {label:'East Africa',value:19.8,color:'#0ba780',display:'19.8%'},
+      {label:'West Africa',value:14.2,color:'#60a5fa',display:'14.2%'},
+      {label:'Pan-African / Other',value:13.3,color:'#f5a623',display:'13.3%'}
+    ];
     const rows = funds.map(fund=>`<tr class="clickable" data-action="open-fund" data-id="${fund.id}"><td><div class="company-cell"><span class="company-logo" style="background:linear-gradient(145deg,#6094dc,#0a8f76)">${escapeHTML(fund.id.slice(-1))}</span><span class="table-primary">${escapeHTML(fund.name)}</span></div></td><td>${fund.vintage}</td><td>${escapeHTML(fund.strategy)}</td><td>${fund.currency}</td><td class="text-right">${formatMoney(fund.commitment,fund.currency)}</td><td><div class="inline-progress">${progressBar(fund.called/fund.commitment*100)}<span>${pct(fund.called/fund.commitment*100)}</span></div></td><td class="text-right">${formatMoney(fund.nav,fund.currency)}</td><td class="text-right">${formatMoney(fund.distributed,fund.currency)}</td><td class="text-right positive">${pct(fund.grossIrr)}</td><td class="text-right positive">${pct(fund.netIrr)}</td><td class="text-right">${fund.tvpi.toFixed(2)}x</td><td class="text-right">${fund.dpi.toFixed(2)}x</td><td>${statusPill(fund.status)}</td></tr>`).join('');
     return `${pageHeader('Funds','Monitor fund-level performance, capital activity and structure across the portfolio.',globalPageActions({extra:button('Create fund','create-fund','primary','plus')}))}
       ${workspaceFilterBar([{label:'Vintage',action:'fund-vintage-filter',selected:'All vintages',options:['All vintages',...Array.from(new Set(funds.map(f=>String(f.vintage))))]},{label:'Strategy',action:'fund-strategy-filter',selected:'All strategies',options:['All strategies',...Array.from(new Set(funds.map(f=>f.strategy)))]},{label:'Status',action:'fund-status-filter',selected:'All statuses',options:['All statuses','Investing','Realising','Closed']},{label:'Currency',action:'fund-currency-filter',selected:'All currencies',options:['All currencies','USD','ZWG']}])}
       <section class="metric-grid section-gap">
-        ${metricCard({label:'Total Commitments',value:formatMoney(totalCommitment),iconName:'dollar',accent:'emerald',foot:state.liveData?'From /funds':'12.4% vs prior period',action:'metric-funds'})}
-        ${metricCard({label:'Called Capital',value:formatMoney(called),iconName:'wallet',accent:'blue',foot:`${pct(called/Math.max(totalCommitment,1)*100)} of commitments`,action:'metric-called'})}
-        ${metricCard({label:'Distributed Capital',value:formatMoney(distributed),iconName:'trend-up',accent:'purple',foot:`${pct(distributed/Math.max(totalCommitment,1)*100)} of commitments`,action:'metric-distributed'})}
-        ${metricCard({label:'Remaining Dry Powder',value:formatMoney(dryPowder),iconName:'bar-chart',accent:'amber',foot:`${pct(dryPowder/Math.max(totalCommitment,1)*100)} of commitments`,action:'metric-dry-powder'})}
-        ${metricCard({label:'Gross IRR (Portfolio)',value:(state.dashboardMetrics?.fundGrossIRR!=null?`${Number(state.dashboardMetrics.fundGrossIRR).toFixed(1)}%`:(state.liveData?'—':'18.7%')),iconName:'trend-up',accent:'cyan',foot:state.liveData?'From /portfolio/dashboard':'1.6pp vs prior period',action:'metric-irr'})}
-        ${metricCard({label:'TVPI (Portfolio)',value:(state.dashboardMetrics?.tvpi!=null?`${Number(state.dashboardMetrics.tvpi).toFixed(2)}x`:(state.liveData?'—':'2.18x')),iconName:'pie-chart',accent:'brand',foot:state.liveData?'From /portfolio/dashboard':'0.14x vs prior period',action:'metric-tvpi'})}
+        ${metricCard({label:'Total Commitments',value:formatMoney(totalCommitment),iconName:'dollar',accent:'emerald',foot:'12.4% vs prior period',action:'metric-funds'})}
+        ${metricCard({label:'Called Capital',value:formatMoney(called),iconName:'wallet',accent:'blue',foot:`${pct(called/totalCommitment*100)} of commitments`,action:'metric-called'})}
+        ${metricCard({label:'Distributed Capital',value:formatMoney(distributed),iconName:'trend-up',accent:'purple',foot:`${pct(distributed/totalCommitment*100)} of commitments`,action:'metric-distributed'})}
+        ${metricCard({label:'Remaining Dry Powder',value:formatMoney(dryPowder),iconName:'bar-chart',accent:'amber',foot:`${pct(dryPowder/totalCommitment*100)} of commitments`,action:'metric-dry-powder'})}
+        ${metricCard({label:'Gross IRR (Portfolio)',value:'18.7%',iconName:'trend-up',accent:'cyan',foot:'1.6pp vs prior period',action:'metric-irr'})}
+        ${metricCard({label:'TVPI (Portfolio)',value:'2.18x',iconName:'pie-chart',accent:'brand',foot:'0.14x vs prior period',action:'metric-tvpi'})}
       </section>
       <section class="grid cols-3">
         ${card('Fund Mix by Strategy',donutChart(strategySegments,formatMoney(totalCommitment),'Total Commitments',120),{footer:'<button class="card-link" data-action="chart-drilldown" data-chart-label="Fund Mix" data-chart-value="Commitments by strategy">View full breakdown</button>'})}
@@ -1619,7 +1246,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       </section>
       <section class="card table-card"><div class="table-toolbar"><div class="table-title-row"><h3>Funds Overview</h3><span class="table-badge">${funds.length} funds</span></div><div class="table-tools"><div class="table-search">${icon('search')}<input type="text" placeholder="Search funds..." data-input-action="table-search" value="${escapeHTML(state.tableSearch)}"></div>${button('Filter','fund-filters','compact','filter')}${button('Export','export-funds','compact','download')}</div></div><div class="table-wrap"><table><thead><tr><th>Fund Name</th><th>Vintage</th><th>Strategy</th><th>Currency</th><th class="text-right">Commitment</th><th>Called</th><th class="text-right">NAV</th><th class="text-right">Distributed</th><th class="text-right">Gross IRR</th><th class="text-right">Net IRR</th><th class="text-right">TVPI</th><th class="text-right">DPI</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div></section>
       <section class="grid cols-3 section-gap">
-        ${card('Upcoming Reporting Deadlines',`<div class="info-list">${reports.slice(0,4).map(report=>`<div class="list-row"><span class="calendar-day" style="width:38px;height:38px;aspect-ratio:auto;background:var(--surface-soft)">${report.due.split(' ')[0]}<small style="font-size:7px">JUL</small></span><span class="list-row-main"><strong>${escapeHTML(report.fund)}</strong><small>${escapeHTML(report.type)}</small></span><span class="warning-text small">${escapeHTML(report.status)}</span></div>`).join('')}</div>`,{tools:'<button class="card-link" data-action="navigate" data-page="reporting">View all</button>'})}
+        ${card('Upcoming Reporting Deadlines',`<div class="info-list">${reports.slice(0,4).map(report=>`<div class="list-row"><span class="calendar-day" style="width:38px;height:38px;aspect-ratio:auto;background:var(--surface-soft)">${report.due.split(' ')[0]}<small style="font-size:10px">JUL</small></span><span class="list-row-main"><strong>${escapeHTML(report.fund)}</strong><small>${escapeHTML(report.type)}</small></span><span class="warning-text small">${escapeHTML(report.status)}</span></div>`).join('')}</div>`,{tools:'<button class="card-link" data-action="navigate" data-page="reporting">View all</button>'})}
         ${card('Recent Capital Activity',`<div class="info-list">${capitalCalls.slice(0,4).map((call,index)=>`<div class="list-row"><span class="activity-icon" style="color:${index%2?'var(--emerald)':'var(--blue)'};background:${index%2?'var(--emerald-soft)':'var(--blue-soft)'}">${icon(index%2?'trend-up':'wallet')}</span><span class="list-row-main"><strong>${index%2?'Distribution':'Capital Call'}</strong><small>${escapeHTML(call.fund)}</small></span><strong class="${index%2?'positive':'negative'} small">${formatMoney(index%2?call.collected:call.amount)}</strong></div>`).join('')}</div>`,{tools:'<button class="card-link" data-action="navigate" data-page="capital-calls">View all</button>'})}
         ${card('Top Performing Funds',`<div class="info-list">${[...funds].sort((a,b)=>b.grossIrr-a.grossIrr).slice(0,4).map((fund,index)=>`<div class="list-row"><span class="risk-score good">${index+1}</span><span class="list-row-main"><strong>${escapeHTML(fund.name)}</strong><small>${pct(fund.grossIrr)} Gross IRR</small></span><strong class="positive">${fund.tvpi.toFixed(2)}x</strong></div>`).join('')}</div>`,{tools:'<button class="card-link" data-action="chart-drilldown" data-chart-label="Fund Ranking" data-chart-value="Performance ranking by Gross IRR">View all</button>'})}
       </section>`;
@@ -1634,24 +1261,24 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     const collectionSegments = [
       {label:'Collected',value:collected,color:'#07936d',display:formatMoney(collected)},
       {label:'Outstanding',value:outstanding,color:'#f59e0b',display:formatMoney(outstanding)},
-      {label:'Overdue',value:sum(capitalCalls.filter(c=>/overdue|partial/i.test(c.status)),c=>Math.max(0,c.amount-c.collected)),color:'#d9475c',display:formatMoney(sum(capitalCalls.filter(c=>/overdue|partial/i.test(c.status)),c=>Math.max(0,c.amount-c.collected)))},
-      {label:'Draft',value:sum(capitalCalls.filter(c=>/draft/i.test(c.status)),c=>c.amount),color:'#aab3c2',display:formatMoney(sum(capitalCalls.filter(c=>/draft/i.test(c.status)),c=>c.amount))}
+      {label:'Overdue',value:12600000,color:'#d9475c',display:formatMoney(12600000)},
+      {label:'Draft',value:11000000,color:'#aab3c2',display:formatMoney(11000000)}
     ];
     return `${pageHeader('Capital Calls','Plan, issue and track capital calls and drawdowns across funds.',globalPageActions({extra:button('New Capital Call','new-capital-call','primary','plus')}))}
       <section class="metric-grid">
         ${metricCard({label:'Upcoming Calls',value:String(upcoming),iconName:'calendar',accent:'blue',foot:formatMoney(sum(capitalCalls.filter(c=>c.status!=='Closed'),c=>c.amount)),action:'metric-upcoming-calls'})}
         ${metricCard({label:'Outstanding Amount',value:formatMoney(outstanding),iconName:'dollar',accent:'emerald',foot:'Across active notices',action:'metric-outstanding'})}
-        ${metricCard({label:'Collected This Quarter',value:formatMoney(collected),iconName:'check',accent:'emerald',foot:demoOnly('18.7% vs Q2 2026','From capital calls'),action:'metric-collected'})}
-        ${metricCard({label:'Overdue LPs',value:demoOnly(String(overdue*7), String(overdue)),iconName:'alert',accent:'amber',foot:demoOnly(formatMoney(12600000), formatMoney(sum(capitalCalls.filter(c=>/partial|overdue/i.test(c.status)),c=>Math.max(0,c.amount-c.collected)))),trend:'negative',action:'metric-overdue-lps'})}
-        ${metricCard({label:'Notice Period Compliance',value:demoOnly('96.3%','—'),iconName:'shield',accent:'blue',foot:demoOnly('3.4pp vs last month','No API'),action:'metric-compliance'})}
-        ${metricCard({label:'Average Collection Time',value:demoOnly('18.4 days','—'),iconName:'clock',accent:'purple',foot:demoOnly('2.1 days faster','No API'),action:'metric-collection-time'})}
+        ${metricCard({label:'Collected This Quarter',value:formatMoney(collected),iconName:'check',accent:'emerald',foot:'18.7% vs Q2 2026',action:'metric-collected'})}
+        ${metricCard({label:'Overdue LPs',value:String(overdue*7),iconName:'alert',accent:'amber',foot:formatMoney(12600000),trend:'negative',action:'metric-overdue-lps'})}
+        ${metricCard({label:'Notice Period Compliance',value:'96.3%',iconName:'shield',accent:'blue',foot:'3.4pp vs last month',action:'metric-compliance'})}
+        ${metricCard({label:'Average Collection Time',value:'18.4 days',iconName:'clock',accent:'purple',foot:'2.1 days faster',action:'metric-collection-time'})}
       </section>
       <section class="card"><div class="table-toolbar"><div class="table-title-row"><h3>Capital Call Notices</h3><span class="table-badge">${capitalCalls.length} notices</span></div><div class="table-tools"><div class="table-search">${icon('search')}<input type="text" placeholder="Search notices..." data-input-action="table-search"></div>${selectControl('Status',['All Statuses','Issued','Partially Collected','Closed','Draft'],'All Statuses','capital-call-status')}${button('New Capital Call','new-capital-call','primary compact','plus')}</div></div><div class="table-wrap"><table><thead><tr><th>Notice ID</th><th>Fund</th><th>Call Date</th><th>Due Date</th><th>Purpose</th><th class="text-right">Total Amount</th><th>LP Count</th><th>Collection Progress</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></section>
       <section class="grid cols-4 section-gap">
         ${card('Call Allocation by LP',`<div class="info-list">${lps.map(lp=>`<div><div class="info-row"><span>${escapeHTML(lp.name)}</span><strong>${formatMoney(lp.commitment*.05)}</strong></div>${progressBar(lp.called/lp.commitment*100)}</div>`).join('')}</div>`,{footer:'<button class="card-link" data-action="navigate" data-page="lps">View full allocation</button>'})}
         ${card('Collection Progress',donutChart(collectionSegments,formatMoney(outstanding),'Outstanding',112),{footer:'<button class="card-link" data-action="chart-drilldown" data-chart-label="Collection Progress" data-chart-value="Capital call collection by status">View detailed analysis</button>'})}
-        ${card('Cash Requirement Timeline', state.liveData ? (capitalCalls.length ? barChart({labels:capitalCalls.slice(0,6).map(c=>c.callDate||c.id),series:[{name:'Call amount',color:'var(--blue)',values:capitalCalls.slice(0,6).map(c=>(Number(c.amount)||0)/1e6)}],height:205,format:v=>`${Number(v).toFixed(1)}M`}) : liveEmptyCard('No capital-call forecast series from API.')) : barChart({labels:['Jul','Aug','Sep','Oct','Nov','Dec'],series:[{name:'Scheduled Calls',color:'var(--blue)',values:[42.5,76,38.5,55,26,18.5]}],height:205,format:v=>`${Math.round(v)}M`}),{footer:state.liveData?'':'<button class="card-link" data-action="chart-drilldown" data-chart-label="Cash Forecast" data-chart-value="Six month capital requirement forecast">View cash forecast</button>'})}
-        ${card('Recent Payment Confirmations', state.liveData ? liveEmptyCard('Payment confirmation feed is not returned by the capital-calls API.') : `<div class="info-list">${lps.map((lp,index)=>`<div class="list-row"><span class="activity-icon" style="color:var(--emerald);background:var(--emerald-soft)">${icon('check-circle')}</span><span class="list-row-main"><strong>${escapeHTML(lp.name)}</strong><small>${escapeHTML(funds[index%funds.length].name)}</small></span><strong class="small">${formatMoney([5,7.5,6.3,4,3][index]*1000000)}</strong></div>`).join('')}</div>`,{footer:state.liveData?'':'<button class="card-link" data-action="chart-drilldown" data-chart-label="Payments" data-chart-value="Recent confirmed capital call payments">View all payments</button>'})}
+        ${card('Cash Requirement Timeline',barChart({labels:['Jul','Aug','Sep','Oct','Nov','Dec'],series:[{name:'Scheduled Calls',color:'var(--blue)',values:[42.5,76,38.5,55,26,18.5]}],height:205,format:v=>`${Math.round(v)}M`}),{footer:'<button class="card-link" data-action="chart-drilldown" data-chart-label="Cash Forecast" data-chart-value="Six month capital requirement forecast">View cash forecast</button>'})}
+        ${card('Recent Payment Confirmations',`<div class="info-list">${lps.map((lp,index)=>`<div class="list-row"><span class="activity-icon" style="color:var(--emerald);background:var(--emerald-soft)">${icon('check-circle')}</span><span class="list-row-main"><strong>${escapeHTML(lp.name)}</strong><small>${escapeHTML(funds[index%funds.length].name)}</small></span><strong class="small">${formatMoney([5,7.5,6.3,4,3][index]*1000000)}</strong></div>`).join('')}</div>`,{footer:'<button class="card-link" data-action="chart-drilldown" data-chart-label="Payments" data-chart-value="Recent confirmed capital call payments">View all payments</button>'})}
       </section>`;
   }
 
@@ -1672,26 +1299,26 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     const sectorSegments = Object.entries(sectorValues).map(([label,value],index)=>({label,value,color:['#2475f5','#0ba780','#60a5fa','#f5a623','#0f98b6','#d9475c'][index],display:formatMoney(value)}));
     return `${pageHeader('Portfolio Companies','Portfolio health, fair value, growth and value-creation oversight.',globalPageActions({extra:`${button('Filters','company-filters','','filter')}${button('Add company','add-company','primary','plus')}`}))}
       <section class="metric-grid">
-        ${metricCard({label:'Active Portfolio Companies',value:String(companies.length),iconName:'building',accent:'emerald',foot:demoOnly('+4 vs 31 Dec 2025','From portfolio companies'),action:'metric-companies'})}
-        ${metricCard({label:'Total Fair Value',value:formatMoney(totalFairValue),iconName:'dollar',accent:'purple',foot:demoOnly('12.4% vs prior period','Sum of fair value'),action:'metric-fair-value',spark:state.liveData?undefined:[120,132,126,141,136,151,155]})}
-        ${metricCard({label:'Average Revenue Growth',value:companies.length?pct(avgGrowth):'—',iconName:'trend-up',accent:'blue',foot:demoOnly('5.3pp vs prior period','From companies'),action:'metric-revenue-growth',spark:state.liveData?undefined:[18,21,26,23,27,29,31]})}
-        ${metricCard({label:'Average Gross Margin',value:companies.length?pct(avgMargin):'—',iconName:'pie-chart',accent:'amber',foot:demoOnly('2.1pp vs prior period','From companies'),action:'metric-ebitda',spark:state.liveData?undefined:[54,57,61,59,64,65,67]})}
-        ${metricCard({label:'Follow-on Pipeline',value:demoOnly(formatMoney(462500000),'—'),iconName:'filter',accent:'cyan',foot:demoOnly('16 opportunities','No API'),action:'metric-follow-on'})}
+        ${metricCard({label:'Active Portfolio Companies',value:String(companies.length),iconName:'building',accent:'emerald',foot:'+4 vs 31 Dec 2025',action:'metric-companies'})}
+        ${metricCard({label:'Total Fair Value',value:formatMoney(totalFairValue),iconName:'dollar',accent:'purple',foot:'12.4% vs prior period',action:'metric-fair-value',spark:[120,132,126,141,136,151,155]})}
+        ${metricCard({label:'Average Revenue Growth',value:pct(avgGrowth),iconName:'trend-up',accent:'blue',foot:'5.3pp vs prior period',action:'metric-revenue-growth',spark:[18,21,26,23,27,29,31]})}
+        ${metricCard({label:'Average Gross Margin',value:pct(avgMargin),iconName:'pie-chart',accent:'amber',foot:'2.1pp vs prior period',action:'metric-ebitda',spark:[54,57,61,59,64,65,67]})}
+        ${metricCard({label:'Follow-on Pipeline',value:formatMoney(462500000),iconName:'filter',accent:'cyan',foot:'16 opportunities',action:'metric-follow-on'})}
         ${metricCard({label:'At-Risk Companies',value:String(atRisk),iconName:'shield',accent:'red',foot:`${pct(atRisk/companies.length*100)} of portfolio`,trend:'negative',action:'metric-at-risk'})}
       </section>
       <section class="card"><div class="table-toolbar"><div class="table-title-row"><h3>Portfolio Companies</h3><span class="table-badge">${companies.length}</span></div><div class="table-tools"><div class="table-search">${icon('search')}<input type="text" placeholder="Search companies..." data-input-action="table-search" value="${escapeHTML(state.tableSearch)}"></div>${button('Export','export-companies','compact','download')}</div></div><div class="table-wrap"><table><thead><tr><th>Company</th><th>Sector</th><th>Stage</th><th>Entry Date</th><th class="text-right">Invested Amount</th><th class="text-right">Fair Value</th><th class="text-right">Ownership</th><th class="text-right">Revenue Growth</th><th>Runway</th><th>Health Score</th><th>Next Board Date</th><th>Last Reporting Update</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></section>
       <section class="grid cols-5 section-gap">
         ${card('Portfolio Health Distribution',donutChart(healthSegments,String(companies.length),'Companies',104),{footer:'<span class="muted small">Weighted score</span><strong>${Math.round(sum(companies,c=>c.health)/companies.length)}</strong>'})}
         ${card('Value by Sector',donutChart(sectorSegments,formatMoney(totalFairValue),'Fair Value',104),{footer:'<button class="card-link" data-action="chart-drilldown" data-chart-label="Sector Value" data-chart-value="Fair value by sector">View sector breakdown</button>'})}
-        ${card('Key Milestones Tracker', state.liveData ? liveEmptyCard('Milestone tracker is not returned by the companies API.') : `<div class="info-list">${companies.slice(0,5).map((company,index)=>`<div class="list-row">${companyLogo(company)}<span class="list-row-main"><strong>${escapeHTML(company.name)}</strong><small>${['$100M ARR','Series C Raise','US Market Launch','Break-even EBITDA','ISO 27001'][index]}</small></span>${statusPill(index===3?'Behind':index===1?'At Risk':'On Track')}</div>`).join('')}</div>`,{footer:state.liveData?'':'<button class="card-link" data-action="open-milestones">View all milestones</button>'})}
-        ${card('Value Creation Initiatives', state.liveData ? liveEmptyCard('Value-creation initiatives are not returned by the API.') : `<div class="info-list">${[['Go-to-market expansion',68],['Product & Technology',57],['Operational Excellence',63],['Talent & Organisation',50]].map(item=>`<div><div class="info-row"><span>${item[0]}</span><strong>${item[1]}%</strong></div>${progressBar(item[1])}</div>`).join('')}</div>`,{footer:state.liveData?'':'<button class="card-link" data-action="open-value-creation">View all initiatives</button>'})}
-        ${card('Alerts & Actions', state.liveData ? liveEmptyCard('Company alert queue is not returned by the API.') : `<div class="info-list">${[['3 companies','Missing Q2 Reports','Overdue'],['2 companies','Board materials overdue','Overdue'],['1 company','Runway < 9 months','High'],['4 companies','Health score declined','Medium'],['2 companies','Regulatory filing due','Medium']].map(item=>`<div class="list-row"><span class="activity-icon" style="color:var(--red);background:var(--red-soft)">${icon('alert')}</span><span class="list-row-main"><strong>${item[0]}</strong><small>${item[1]}</small></span>${statusPill(item[2])}</div>`).join('')}</div>`,{footer:state.liveData?'':'<button class="card-link" data-action="open-alerts">View all alerts</button>'})}
+        ${card('Key Milestones Tracker',`<div class="info-list">${companies.slice(0,5).map((company,index)=>`<div class="list-row">${companyLogo(company)}<span class="list-row-main"><strong>${escapeHTML(company.name)}</strong><small>${['$100M ARR','Series C Raise','US Market Launch','Break-even EBITDA','ISO 27001'][index]}</small></span>${statusPill(index===3?'Behind':index===1?'At Risk':'On Track')}</div>`).join('')}</div>`,{footer:'<button class="card-link" data-action="open-milestones">View all milestones</button>'})}
+        ${card('Value Creation Initiatives',`<div class="info-list">${[['Go-to-market expansion',68],['Product & Technology',57],['Operational Excellence',63],['Talent & Organisation',50]].map(item=>`<div><div class="info-row"><span>${item[0]}</span><strong>${item[1]}%</strong></div>${progressBar(item[1])}</div>`).join('')}</div>`,{footer:'<button class="card-link" data-action="open-value-creation">View all initiatives</button>'})}
+        ${card('Alerts & Actions',`<div class="info-list">${[['3 companies','Missing Q2 Reports','Overdue'],['2 companies','Board materials overdue','Overdue'],['1 company','Runway < 9 months','High'],['4 companies','Health score declined','Medium'],['2 companies','Regulatory filing due','Medium']].map(item=>`<div class="list-row"><span class="activity-icon" style="color:var(--red);background:var(--red-soft)">${icon('alert')}</span><span class="list-row-main"><strong>${item[0]}</strong><small>${item[1]}</small></span>${statusPill(item[2])}</div>`).join('')}</div>`,{footer:'<button class="card-link" data-action="open-alerts">View all alerts</button>'})}
       </section>`;
   }
 
   function renderReporting() {
-    const complete=reports.filter(r=>r.status==='Complete').length + (state.liveData ? 0 : 46);
-    const overdue=reports.filter(r=>r.status==='Overdue').length + (state.liveData ? 0 : 4);
+    const complete=reports.filter(r=>r.status==='Complete').length+46;
+    const overdue=reports.filter(r=>r.status==='Overdue').length+4;
     const [year,month]=state.reportingMonth.split('-').map(Number);
     const monthName=new Intl.DateTimeFormat('en',{month:'long',year:'numeric'}).format(new Date(year,month-1,1));
     const firstDay=(new Date(year,month-1,1).getDay()+6)%7;
@@ -1701,23 +1328,26 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     const selectedEvents=reportingCalendarEvents.filter(event=>event.date===state.selectedCalendarDate);
     const rows=reports.map(report=>`<tr class="clickable" data-action="preview-scheduled-report" data-id="${report.id}"><td><div class="company-cell"><span class="activity-icon" style="color:var(--blue);background:var(--blue-soft)">${icon('file')}</span><span class="table-primary">${escapeHTML(report.type)}</span></div></td><td>${escapeHTML(report.fund)}</td><td>${escapeHTML(report.entity)}</td><td><span class="owner-mini">${avatar(report.owner,report.id.charCodeAt(report.id.length-1))}${escapeHTML(report.owner)}</span></td><td>${escapeHTML(report.frequency)}</td><td>${report.due}</td><td>${statusPill(report.status)}</td><td><div class="inline-progress">${progressBar(report.progress)}<span>${report.progress}%</span></div></td><td>${escapeHTML(report.channel)}</td><td>${button('Preview','preview-scheduled-report','compact','eye',`data-id="${report.id}"`)}</td></tr>`).join('');
     return `${pageHeader('Reporting Schedules','Coordinate internal and external reporting obligations across PE and VC funds.',globalPageActions({extra:button('Filters','report-filters','','filter')}))}
-      <section class="metric-grid">${metricCard({label:'Reports Due This Month',value:demoOnly('28', String(reports.length)),iconName:'calendar',accent:'blue',foot:demoOnly('16% vs Jun 2026','From schedules'),action:'metric-reports-due'})}${metricCard({label:'Completed Reports',value:String(complete),iconName:'check-circle',accent:'emerald',foot:demoOnly('22% vs Jun 2026','From schedules'),action:'metric-reports-complete'})}${metricCard({label:'Overdue Reports',value:String(overdue),iconName:'alert',accent:'red',foot:demoOnly('+2 vs Jun 2026','From schedules'),trend:'negative',action:'metric-reports-overdue'})}${metricCard({label:'Upcoming Board Packs',value:demoOnly('12','—'),iconName:'clipboard',accent:'purple',foot:demoOnly('8% vs Jun 2026','No API'),action:'metric-board-packs'})}${metricCard({label:'Investor Letters Scheduled',value:demoOnly('8','—'),iconName:'mail',accent:'amber',foot:demoOnly('14% vs Jun 2026','No API'),action:'metric-investor-letters'})}${metricCard({label:'Avg. Turnaround Time',value:demoOnly('4.2 days','—'),iconName:'clock',accent:'cyan',foot:demoOnly('0.6 days faster','No API'),action:'metric-report-turnaround'})}</section>
+      <section class="metric-grid">${metricCard({label:'Reports Due This Month',value:'28',iconName:'calendar',accent:'blue',foot:'16% vs Jun 2026',action:'metric-reports-due'})}${metricCard({label:'Completed Reports',value:String(complete),iconName:'check-circle',accent:'emerald',foot:'22% vs Jun 2026',action:'metric-reports-complete'})}${metricCard({label:'Overdue Reports',value:String(overdue),iconName:'alert',accent:'red',foot:'+2 vs Jun 2026',trend:'negative',action:'metric-reports-overdue'})}${metricCard({label:'Upcoming Board Packs',value:'12',iconName:'clipboard',accent:'purple',foot:'8% vs Jun 2026',action:'metric-board-packs'})}${metricCard({label:'Investor Letters Scheduled',value:'8',iconName:'mail',accent:'amber',foot:'14% vs Jun 2026',action:'metric-investor-letters'})}${metricCard({label:'Avg. Turnaround Time',value:'4.2 days',iconName:'clock',accent:'cyan',foot:'0.6 days faster',action:'metric-report-turnaround'})}</section>
       <section class="calendar-layout interactive-reporting-calendar"><section class="card"><div class="calendar"><div class="calendar-head"><div><strong>${monthName}</strong><small>Click a date to view reporting activity</small></div><div class="calendar-controls">${button('','calendar-prev','ghost compact icon-only','chevron-left','aria-label="Previous month"')}${button('Today','calendar-today','compact')}${button('','calendar-next','ghost compact icon-only','chevron-right','aria-label="Next month"')}</div></div><div class="calendar-grid">${['MON','TUE','WED','THU','FRI','SAT','SUN'].map(d=>`<div class="calendar-day-label">${d}</div>`).join('')}${cells}</div><div class="calendar-agenda"><div class="calendar-agenda-head"><div><strong>${new Intl.DateTimeFormat('en',{weekday:'long',day:'numeric',month:'long'}).format(new Date(state.selectedCalendarDate+'T12:00:00'))}</strong><small>${selectedEvents.length} scheduled item${selectedEvents.length===1?'':'s'}</small></div>${button('Add schedule','new-report-schedule','compact','plus')}</div>${selectedEvents.length?selectedEvents.map(event=>`<button class="calendar-agenda-item" data-action="open-calendar-event" data-id="${event.id}"><span>${icon(event.type.includes('Board')?'clipboard':event.type.includes('Valuation')?'trend-up':'file')}</span><span><strong>${escapeHTML(event.title)}</strong><small>${escapeHTML(event.owner)} · ${escapeHTML(event.channel)}</small></span>${statusPill(event.status)}${icon('chevron-right')}</button>`).join(''):'<div class="empty-state compact"><div><div class="empty-state-icon">'+icon('calendar')+'</div><h3>No reporting events</h3><p>Select another date or create a schedule.</p></div></div>'}</div></div></section>
         <section class="card table-card"><div class="table-toolbar"><div class="table-title-row"><h3>Upcoming Due Dates</h3><span class="table-badge">${reports.length}</span></div><div class="table-tools">${button('New schedule','new-report-schedule','compact','plus')}</div></div><div class="table-wrap"><table><thead><tr><th>Report Type</th><th>Fund</th><th>Entity</th><th>Owner</th><th>Frequency</th><th>Due Date</th><th>Status</th><th>Draft Progress</th><th>Delivery Channel</th><th>Preview</th></tr></thead><tbody>${rows}</tbody></table></div></section></section>`;
   }
 
   function renderFundPerformance() {
     const selectedFund = funds.find(f=>f.name===state.activeFund) || funds[0];
+    if (!selectedFund) {
+      return `${pageHeader('Fund Performance Reporting','Track performance, cash flows, attribution and benchmarks across reporting periods.','')}<div class="empty-state"><h3>No funds loaded</h3><p>Live fund data is still loading or has not been seeded yet.</p></div>`;
+    }
     const metrics = [
-      {label:'Gross IRR',value:pct(selectedFund.grossIrr),iconName:'trend-up',accent:'emerald',foot:demoOnly('1.6pp vs Q1 2026','From fund'),action:'metric-gross-irr'},
-      {label:'Net IRR',value:pct(selectedFund.netIrr),iconName:'users',accent:'cyan',foot:demoOnly('1.3pp vs Q1 2026','From fund'),action:'metric-net-irr'},
-      {label:'TVPI',value:`${selectedFund.tvpi.toFixed(2)}x`,iconName:'bar-chart',accent:'amber',foot:demoOnly('0.14x vs Q1 2026','From fund'),action:'metric-tvpi'},
-      {label:'DPI',value:`${selectedFund.dpi.toFixed(2)}x`,iconName:'dollar',accent:'purple',foot:demoOnly('0.08x vs Q1 2026','From fund'),action:'metric-dpi'},
-      {label:'RVPI',value:`${Math.max(0,selectedFund.tvpi-selectedFund.dpi).toFixed(2)}x`,iconName:'trend-up',accent:'blue',foot:demoOnly('0.06x vs Q1 2026','Derived'),action:'metric-rvpi'},
-      {label:'NAV',value:formatMoney(selectedFund.nav),iconName:'dollar',accent:'emerald',foot:demoOnly('+8.7M vs Q1 2026','From fund'),action:'metric-nav'}
+      {label:'Gross IRR',value:pct(selectedFund.grossIrr||0),iconName:'trend-up',accent:'emerald',foot:'1.6pp vs Q1 2026',action:'metric-gross-irr'},
+      {label:'Net IRR',value:pct(selectedFund.netIrr||0),iconName:'users',accent:'cyan',foot:'1.3pp vs Q1 2026',action:'metric-net-irr'},
+      {label:'TVPI',value:`${Number(selectedFund.tvpi||0).toFixed(2)}x`,iconName:'bar-chart',accent:'amber',foot:'0.14x vs Q1 2026',action:'metric-tvpi'},
+      {label:'DPI',value:`${Number(selectedFund.dpi||0).toFixed(2)}x`,iconName:'dollar',accent:'purple',foot:'0.08x vs Q1 2026',action:'metric-dpi'},
+      {label:'RVPI',value:`${Math.max(0,Number(selectedFund.tvpi||0)-Number(selectedFund.dpi||0)).toFixed(2)}x`,iconName:'trend-up',accent:'blue',foot:'0.06x vs Q1 2026',action:'metric-rvpi'},
+      {label:'NAV',value:formatMoney(selectedFund.nav||0),iconName:'dollar',accent:'emerald',foot:'+8.7M vs Q1 2026',action:'metric-nav'}
     ];
-    const performanceChart = isLiveMode() ? liveEmptyCard('Quarterly IRR series is not returned by the funds API. Point metrics above are live.') : lineChart({labels:['Q2 2024','Q3 2024','Q4 2024','Q1 2025','Q2 2025','Q3 2025','Q4 2025','Q1 2026','Q2 2026'],series:[{name:'Net IRR',color:'var(--emerald)',values:[1,6,7,9,10,12,13.8,14.2,14.9]},{name:'Gross IRR',color:'var(--blue)',values:[3,9,10,12,14,16,17.1,18,18.7]}],height:220,format:v=>`${Math.round(v)}%`});
-    const pmeChart = isLiveMode() ? liveEmptyCard('PME benchmark series is not returned by the API.') : lineChart({labels:['Q2 2024','Q3 2024','Q4 2024','Q1 2025','Q2 2025','Q3 2025','Q4 2025','Q1 2026','Q2 2026'],series:[{name:'Matanho Fund II (Net IRR)',color:'var(--blue)',values:[0,4,7,9.5,12,14,16,17.5,18.7]},{name:'Private Markets PME',color:'var(--emerald)',values:[0,2,4,5.5,7,8.5,10,11.2,12.5]}],height:220,format:v=>`${Math.round(v)}%`});
+    const performanceChart = lineChart({labels:['Q2 2024','Q3 2024','Q4 2024','Q1 2025','Q2 2025','Q3 2025','Q4 2025','Q1 2026','Q2 2026'],series:[{name:'Net IRR',color:'var(--emerald)',values:[1,6,7,9,10,12,13.8,14.2,14.9]},{name:'Gross IRR',color:'var(--blue)',values:[3,9,10,12,14,16,17.1,18,18.7]}],height:220,format:v=>`${Math.round(v)}%`});
+    const pmeChart = lineChart({labels:['Q2 2024','Q3 2024','Q4 2024','Q1 2025','Q2 2025','Q3 2025','Q4 2025','Q1 2026','Q2 2026'],series:[{name:'Matanho Fund II (Net IRR)',color:'var(--blue)',values:[0,4,7,9.5,12,14,16,17.5,18.7]},{name:'Private Markets PME',color:'var(--emerald)',values:[0,2,4,5.5,7,8.5,10,11.2,12.5]}],height:220,format:v=>`${Math.round(v)}%`});
     const attributionRows = companies.slice(0,5).map(c=>`<tr><td class="table-primary">${escapeHTML(c.name)}</td><td class="text-right">${pct(c.revenueGrowth/6)}</td><td class="text-right">${pct(c.fairValue/sum(companies,x=>x.fairValue)*100)}</td><td class="text-right positive">↑ ${pct(c.health/100)}</td></tr>`).join('');
     return `${pageHeader('Fund Performance Reporting','Track performance, cash flows, attribution and benchmarks across reporting periods.',`${selectControl('Fund',funds.map(f=>f.name),selectedFund.name,'fund-filter')}${selectControl('Period',['Q2 2026 (Apr - Jun 2026)','Q1 2026 (Jan - Mar 2026)','Q4 2025 (Oct - Dec 2025)'],'Q2 2026 (Apr - Jun 2026)','performance-period')}${statusPill('Review in progress','info')}${button('Generate Report','generate-report','primary','file-chart')}${button('Export','export-performance','','download')}${button('Submit for approval','submit-performance','','send')}`)}
       <section class="metric-grid">${metrics.map(metricCard).join('')}</section>
@@ -1729,13 +1359,13 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
             ${card('PME Benchmark Comparison',pmeChart,{subtitle:'Public-market equivalent comparison'})}
           </section>
           <section class="grid cols-2 section-gap">
-            ${card('Cash Flow Bridge', isLiveMode() ? liveEmptyCard('Cash-flow bridge components are not returned by the funds API.') : waterfallChart([{label:'Opening NAV',value:151200000,total:true},{label:'Contributions',value:25600000},{label:'Distributions',value:-19800000},{label:'Fees',value:-6100000},{label:'Value Change',value:17500000},{label:'Closing NAV',value:168400000,total:true}]),{subtitle:'USD'})}
+            ${card('Cash Flow Bridge',waterfallChart([{label:'Opening NAV',value:151200000,total:true},{label:'Contributions',value:25600000},{label:'Distributions',value:-19800000},{label:'Fees',value:-6100000},{label:'Value Change',value:17500000},{label:'Closing NAV',value:168400000,total:true}]),{subtitle:'USD'})}
             ${card('Attribution by Company',`<div class="table-wrap"><table class="criteria-table"><thead><tr><th>Company</th><th class="text-right">Contribution to IRR</th><th class="text-right">% of Net IRR</th><th class="text-right">Change</th></tr></thead><tbody>${attributionRows}<tr><td class="table-primary">Total</td><td class="text-right table-primary">14.9%</td><td class="text-right table-primary">100.0%</td><td class="text-right positive">↑ 2.0%</td></tr></tbody></table></div>`,{subtitle:'Q2 2026'})}
           </section>
           <section class="card table-card"><div class="table-toolbar"><div class="table-title-row"><h3>Reporting Periods</h3></div><div class="table-tools">${button('Open report builder','open-report-builder','compact','edit')}</div></div><div class="table-wrap"><table><thead><tr><th>Period</th><th>Version</th><th>Prepared by</th><th>Prepared on</th><th>Reviewed by</th><th>Reviewed on</th><th>Status</th><th>Published on</th><th></th></tr></thead><tbody>${[['Q2 2026 (Apr - Jun 2026)','v1.0','Tendai Makoni','10 Jul 2026','Chipo Muzenhamo','13 Jul 2026','Review in progress','-'],['Q1 2026 (Jan - Mar 2026)','v2.1','Tendai Makoni','15 Apr 2026','Chipo Muzenhamo','17 Apr 2026','Approved','20 Apr 2026'],['Q4 2025 (Oct - Dec 2025)','v2.0','Tendai Makoni','16 Jan 2026','Chipo Muzenhamo','19 Jan 2026','Approved','22 Jan 2026'],['Q3 2025 (Jul - Sep 2025)','v2.0','Tendai Makoni','17 Oct 2025','Chipo Muzenhamo','20 Oct 2025','Approved','23 Oct 2025']].map(row=>`<tr class="clickable" data-action="open-report-builder">${row.map((cell,i)=>`<td class="${i===0?'table-primary':''}">${i===6?statusPill(cell):escapeHTML(cell)}</td>`).join('')}<td><button class="button ghost compact icon-only" data-action="activity-menu" data-context="report" data-id="${escapeHTML(row[0])}" aria-label="Report activity">${icon('clock')}</button></td></tr>`).join('')}</tbody></table></div></section>
         </div>
         <div class="side-stack" style="display:flex">
-          ${card('Validation Summary', isLiveMode() ? liveEmptyCard('Validation checklist is not returned by the API.') : `<div style="margin-bottom:11px">${statusPill('All validations passed','success')}</div><div class="info-list">${[['Cash flows reconciled','Net cash flow variance: $0.00'],['NAV balanced','NAV per books matches investment data'],['Valuations up to date','All portfolio valuations current'],['Expense allocation','Allocated in accordance with LPA'],['Capital accounts','LP capital accounts in balance']].map(item=>`<div class="reason-item">${icon('check-circle')}<div><strong>${item[0]}</strong><small>${item[1]}</small></div></div>`).join('')}</div>`,{footer:state.liveData?'':'<button class="card-link" data-action="open-validations">View validation details</button>'})}
+          ${card('Validation Summary',`<div style="margin-bottom:11px">${statusPill('All validations passed','success')}</div><div class="info-list">${[['Cash flows reconciled','Net cash flow variance: $0.00'],['NAV balanced','NAV per books matches investment data'],['Valuations up to date','All portfolio valuations current'],['Expense allocation','Allocated in accordance with LPA'],['Capital accounts','LP capital accounts in balance']].map(item=>`<div class="reason-item">${icon('check-circle')}<div><strong>${item[0]}</strong><small>${item[1]}</small></div></div>`).join('')}</div>`,{footer:'<button class="card-link" data-action="open-validations">View validation details</button>'})}
           ${card('Reporting Controls',`<div class="info-list"><div class="info-row"><span>Data lock date</span><strong>30 Jun 2026</strong></div><div class="info-row"><span>FX source</span><strong>Reserve Bank / Refinitiv</strong></div><div class="info-row"><span>Valuation policy</span><strong>IPEV 2025</strong></div><div class="info-row"><span>Benchmark</span><strong>Private Markets PME</strong></div><div class="info-row"><span>Last validated</span><strong>13 Jul 2026 · 10:24</strong></div></div>`,{footer:'<button class="card-link" data-action="performance-settings">Configure controls</button>'})}
         </div>
       </section>`;
@@ -1745,421 +1375,95 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     const totalCommitments = sum(lps,lp=>lp.commitment);
     const unfunded = sum(lps,lp=>lp.unfunded);
     const distributed = sum(lps,lp=>lp.distributed);
-    const rows = lps.map(lp=>`<tr class="clickable" data-action="open-lp" data-id="${lp.id}"><td><div class="company-cell"><span class="company-logo" style="background:${lp.color}">${escapeHTML(initials(lp.name))}</span><span class="table-primary brand-text">${escapeHTML(lp.name)}</span></div></td><td>${escapeHTML(lp.type)}</td><td>${escapeHTML(lp.geography)}</td><td class="text-right">${formatMoney(lp.commitment)}</td><td><div class="inline-progress">${progressBar(lp.called/lp.commitment*100)}<span>${pct(lp.called/lp.commitment*100)}</span></div></td><td class="text-right">${formatMoney(lp.distributed)}</td><td class="text-right positive">${pct(lp.netIrr)}</td><td>${escapeHTML(lp.owner)}</td><td>${lp.lastInteraction}</td><td>${statusPill(lp.kyc)}</td><td>${statusPill(lp.portal)}</td><td><button class="button ghost compact icon-only" data-action="activity-menu" data-context="lp" data-id="${lp.id}" aria-label="LP activity">${icon('clock')}</button></td></tr>`).join('');
+    const rows = lps.map(lp=>`<tr class="clickable" data-action="open-lp" data-id="${lp.id}"><td><div class="company-cell"><span class="company-logo" style="background:${lp.color}">${escapeHTML(initials(lp.name))}</span><span class="table-primary brand-text">${escapeHTML(lp.name)}</span></div></td><td>${escapeHTML(lp.type)}</td><td>${escapeHTML(lp.geography)}</td><td class="text-right">${formatMoney(lp.commitment)}</td><td><div class="inline-progress">${progressBar((lp.commitment?lp.called/lp.commitment:0)*100)}<span>${pct((lp.commitment?lp.called/lp.commitment:0)*100)}</span></div></td><td class="text-right">${formatMoney(lp.distributed)}</td><td class="text-right positive">${pct(lp.netIrr)}</td><td>${escapeHTML(lp.owner)}</td><td>${lp.lastInteraction}</td><td>${statusPill(lp.kyc)}</td><td>${statusPill(lp.portal)}</td><td><button class="button ghost compact icon-only" data-action="activity-menu" data-context="lp" data-id="${lp.id}" aria-label="LP activity">${icon('clock')}</button></td></tr>`).join('');
     const geography = {};
     lps.forEach(lp=>geography[lp.geography]=(geography[lp.geography]||0)+lp.commitment);
     const geosegments = Object.entries(geography).map(([label,value],i)=>({label,value,color:['#2475f5','#0ba780','#60a5fa','#f5a623'][i],display:`${pct(value/totalCommitments*100)} · ${formatMoney(value)}`}));
     return `${pageHeader('LP Management','Manage investors, commitments, communications, KYC and account history.',`${selectControl('LP filter',['All LPs','Pension Funds','Family Offices','Insurance','Funds of Funds'],'All LPs','lp-filter')}${selectControl('Date',['31 Jul 2026','30 Jun 2026'],'31 Jul 2026','date-filter')}${button('Export','export-lps','','download')}${button('Add LP','add-lp','primary','plus')}`)}
       <section class="metric-grid">
-        ${metricCard({label:'Active LPs',value:String(lps.length),iconName:'users',accent:'emerald',foot:state.liveData?'From /clients':'5.0% vs 31 Dec 2025',action:'metric-active-lps'})}
-        ${metricCard({label:'Total Commitments',value:formatMoney(totalCommitments),iconName:'wallet',accent:'blue',foot:state.liveData?'From /clients':'8.7% vs 31 Dec 2025',action:'metric-lp-commitments'})}
-        ${metricCard({label:'Unfunded Commitments',value:formatMoney(unfunded),iconName:'pie-chart',accent:'amber',foot:state.liveData?'Derived from clients':'6.3% vs 31 Dec 2025',action:'metric-unfunded'})}
-        ${metricCard({label:'Distributions This Quarter',value:formatMoney(distributed),iconName:'dollar',accent:'purple',foot:state.liveData?'Sum of LP distributed':'12.5% vs Q1 2026',action:'metric-lp-distributions'})}
-        ${metricCard({label:'Investor Satisfaction',value:state.liveData?'—':'4.6 / 5.0',iconName:'sparkles',accent:'emerald',foot:state.liveData?'No API':'+0.2 vs prior period',action:'metric-satisfaction'})}
-        ${metricCard({label:'Documents Pending',value:state.liveData?'—':'18',iconName:'file',accent:'amber',foot:state.liveData?'No API':'3 fewer than prior period',trend:'negative',action:'metric-lp-docs'})}
+        ${metricCard({label:'Active LPs',value:'42',iconName:'users',accent:'emerald',foot:'5.0% vs 31 Dec 2025',action:'metric-active-lps'})}
+        ${metricCard({label:'Total Commitments',value:formatMoney(totalCommitments),iconName:'wallet',accent:'blue',foot:'8.7% vs 31 Dec 2025',action:'metric-lp-commitments'})}
+        ${metricCard({label:'Unfunded Commitments',value:formatMoney(unfunded),iconName:'pie-chart',accent:'amber',foot:'6.3% vs 31 Dec 2025',action:'metric-unfunded'})}
+        ${metricCard({label:'Distributions This Quarter',value:formatMoney(distributed),iconName:'dollar',accent:'purple',foot:'12.5% vs Q1 2026',action:'metric-lp-distributions'})}
+        ${metricCard({label:'Investor Satisfaction',value:'4.6 / 5.0',iconName:'sparkles',accent:'emerald',foot:'+0.2 vs prior period',action:'metric-satisfaction'})}
+        ${metricCard({label:'Documents Pending',value:'18',iconName:'file',accent:'amber',foot:'3 fewer than prior period',trend:'negative',action:'metric-lp-docs'})}
       </section>
-      <section class="card"><div class="table-toolbar"><div class="table-title-row"><h3>LP Directory</h3><span class="table-badge">${lps.length} LPs</span></div><div class="table-tools"><div class="table-search">${icon('search')}<input type="text" placeholder="Search LPs..." data-input-action="table-search"></div>${button('Filters','lp-filters','compact','filter')}</div></div><div class="table-wrap"><table><thead><tr><th>LP Name</th><th>Type</th><th>Geography</th><th class="text-right">Committed Amount</th><th>Called</th><th class="text-right">Distributed</th><th class="text-right">Net IRR</th><th>Contact Owner</th><th>Last Interaction</th><th>KYC Status</th><th>Portal Status</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></section>
+      <section class="card"><div class="table-toolbar"><div class="table-title-row"><h3>LP Directory</h3><span class="table-badge">42 LPs</span></div><div class="table-tools"><div class="table-search">${icon('search')}<input type="text" placeholder="Search LPs..." data-input-action="table-search"></div>${button('Filters','lp-filters','compact','filter')}</div></div><div class="table-wrap"><table><thead><tr><th>LP Name</th><th>Type</th><th>Geography</th><th class="text-right">Committed Amount</th><th>Called</th><th class="text-right">Distributed</th><th class="text-right">Net IRR</th><th>Contact Owner</th><th>Last Interaction</th><th>KYC Status</th><th>Portal Status</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></section>
       <section class="grid cols-4 section-gap">
-        ${card('Commitment Concentration',donutChart(geosegments.length?geosegments:[{label:'No geography',value:1,color:'#94a3b8',display:formatMoney(totalCommitments)}],formatMoney(totalCommitments),'Total Commitments',112),{footer:state.liveData?'':'<button class="card-link" data-action="chart-drilldown" data-chart-label="Commitment Concentration" data-chart-value="LP commitments by geography">View full breakdown</button>'})}
-        ${card('Contact Activity', state.liveData ? `<div class="empty-state compact"><p class="muted">LP interaction log API not available.</p></div>` : `<div class="timeline">${[['3 Jul 2026','Email with Zambezi Pension Fund','Quarterly update & NAV report shared'],['2 Jul 2026','Call with Savannah Insurance','Discussed re-up and diversification'],['1 Jul 2026','Meeting with Baobab Growth Partners','Onboarding documentation review']].map(item=>`<div class="timeline-item"><strong>${item[1]}</strong><small>${item[0]} · ${item[2]}</small></div>`).join('')}</div>`,{tools:state.liveData?'':'<button class="card-link" data-action="open-contacts">View all</button>'})}
-        ${card('Outstanding Documents', state.liveData ? `<div class="empty-state compact"><p class="muted">LP document queue API not available.</p></div>` : `<div class="info-list">${[['Side Letter Acknowledgement','Horizon Family Office','Overdue'],['LPA Amendment','Savannah Insurance','2 days'],['KYC Annual Review','Baobab Growth Partners','5 days']].map(item=>`<div class="list-row"><span class="activity-icon" style="color:var(--red);background:var(--red-soft)">${icon('file')}</span><span class="list-row-main"><strong>${item[0]}</strong><small>${item[1]}</small></span>${statusPill(item[2])}</div>`).join('')}</div>`,{tools:state.liveData?'':'<button class="card-link" data-action="open-lp-documents">View all</button>'})}
-        ${card('Onboarding & Communications', state.liveData ? `<div class="empty-state compact"><p class="muted">Use Send communication to create a fundraising communication, or capital-call notices for call delivery.</p></div>` : `<div><div class="info-row"><strong>Onboarding Progress</strong><strong>60%</strong></div>${progressBar(60)}</div><div class="info-list" style="margin-top:13px"><div class="list-row"><span class="activity-icon" style="color:var(--blue);background:var(--blue-soft)">${icon('mail')}</span><span class="list-row-main"><strong>Q2 2026 Investor Update</strong><small>Sent to 42 LPs · 7 Jul 2026</small></span></div><div class="list-row"><span class="activity-icon" style="color:var(--purple);background:var(--purple-soft)">${icon('file')}</span><span class="list-row-main"><strong>Capital Call Notice - Fund II</strong><small>Sent to 38 LPs · 1 Jul 2026</small></span></div></div>`,{footer:state.liveData?'<button class="card-link" data-action="new-communication">Send communication</button>':'<button class="card-link" data-action="new-communication">Send communication</button>'})}
+        ${card('Commitment Concentration',donutChart(geosegments,formatMoney(totalCommitments),'Total Commitments',112),{footer:'<button class="card-link" data-action="chart-drilldown" data-chart-label="Commitment Concentration" data-chart-value="LP commitments by geography">View full breakdown</button>'})}
+        ${card('Contact Activity',`<div class="timeline">${[['3 Jul 2026','Email with Zambezi Pension Fund','Quarterly update & NAV report shared'],['2 Jul 2026','Call with Savannah Insurance','Discussed re-up and diversification'],['1 Jul 2026','Meeting with Baobab Growth Partners','Onboarding documentation review']].map(item=>`<div class="timeline-item"><strong>${item[1]}</strong><small>${item[0]} · ${item[2]}</small></div>`).join('')}</div>`,{tools:'<button class="card-link" data-action="open-contacts">View all</button>'})}
+        ${card('Outstanding Documents',`<div class="info-list">${[['Side Letter Acknowledgement','Horizon Family Office','Overdue'],['LPA Amendment','Savannah Insurance','2 days'],['KYC Annual Review','Baobab Growth Partners','5 days']].map(item=>`<div class="list-row"><span class="activity-icon" style="color:var(--red);background:var(--red-soft)">${icon('file')}</span><span class="list-row-main"><strong>${item[0]}</strong><small>${item[1]}</small></span>${statusPill(item[2])}</div>`).join('')}</div>`,{tools:'<button class="card-link" data-action="open-lp-documents">View all</button>'})}
+        ${card('Onboarding & Communications',`<div><div class="info-row"><strong>Onboarding Progress</strong><strong>60%</strong></div>${progressBar(60)}</div><div class="info-list" style="margin-top:13px"><div class="list-row"><span class="activity-icon" style="color:var(--blue);background:var(--blue-soft)">${icon('mail')}</span><span class="list-row-main"><strong>Q2 2026 Investor Update</strong><small>Sent to 42 LPs · 7 Jul 2026</small></span></div><div class="list-row"><span class="activity-icon" style="color:var(--purple);background:var(--purple-soft)">${icon('file')}</span><span class="list-row-main"><strong>Capital Call Notice - Fund II</strong><small>Sent to 38 LPs · 1 Jul 2026</small></span></div></div>`,{footer:'<button class="card-link" data-action="new-communication">Send communication</button>'})}
       </section>`;
   }
 
-  function renderDealDetailSkeletonBody() {
-    return `<section class="deal-detail-skeleton" aria-busy="true" aria-label="Loading deal">
-      <section class="metric-grid section-gap">${Array.from({ length: 4 }, () => `<article class="metric-card">${skeletonBlock(64)}</article>`).join('')}</section>
-      <section class="grid cols-2 section-gap">${skeletonBlock(210, 'pv11-skeleton-card')}${skeletonBlock(210, 'pv11-skeleton-card')}</section>
-      <section class="grid cols-3 section-gap">${skeletonBlock(140, 'pv11-skeleton-card')}${skeletonBlock(140, 'pv11-skeleton-card')}${skeletonBlock(140, 'pv11-skeleton-card')}</section>
-    </section>`;
-  }
-
   function renderDealDetail() {
-    const selectedId = persistSelectedDealId(state.selectedDealId || readDealIdFromLocation());
-    let deal = selectedId ? deals.find(d => String(d.id) === selectedId) : null;
-    // Live: keep a stub so the shell renders while applications hydrate / detail loads.
-    if (!deal && selectedId && state.liveData) {
-      deal = {
-        id: selectedId,
-        name: 'Deal',
-        sector: '-',
-        round: '-',
-        amount: 0,
-        owner: '-',
-        age: 0,
-        priority: 'Medium',
-        stage: 'Screening',
-        score: 0,
-        fund: '-',
-      };
-    }
-    if (!deal && !isLiveMode()) {
-      deal = deals.find(d => d.featured) || deals[0];
-    }
-    if (!deal) {
-      return `${pageHeader('Deal detail','No deal selected.',button('Back to Deal Flow','back-to-deals','','arrow-left'))}<p class="empty-state">Select a deal from Deal Flow.${selectedId ? ` Requested id ${escapeHTML(selectedId)} was not found in the loaded applications.` : ''}</p>`;
-    }
-    if (selectedId) syncDealDetailUrl(selectedId);
-
-    const detailLoading =
-      isLiveMode() &&
-      (state.dealDetailLoading || !state.dealDetail || state.dealDetail._stub);
-    if (detailLoading) {
-      const title =
-        deal.name && deal.name !== 'Deal' && deal.name !== 'Loading deal…'
-          ? deal.name
-          : 'Deal detail';
-      return `${pageHeader(title, 'Loading investment workspace…', button('Back to Deal Flow','back-to-deals','','arrow-left'), 'Loading')}
-        <section class="detail-hero" style="padding:16px">
-          <div class="detail-hero-top" style="gap:12px;align-items:center">
-            ${skeletonBlock(44, 'pv11-skeleton-card')}
-            <div style="flex:1;min-width:0">${skeletonBlock(22)}${skeletonBlock(14)}</div>
-          </div>
-          <div class="hero-meta section-gap" style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-top:14px">
-            ${Array.from({ length: 5 }, () => skeletonBlock(48, 'pv11-skeleton-card')).join('')}
-          </div>
-        </section>
-        <div class="tabs" style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 14px">
-          ${Array.from({ length: 7 }, () => `<span style="display:inline-block;width:88px">${skeletonBlock(28)}</span>`).join('')}
-        </div>
-        ${renderDealDetailSkeletonBody()}`;
-    }
-
-    const detail = state.dealDetail || {};
-    const hero = detail.hero || {};
-    const ownership = hero.ownership != null && hero.ownership !== '' ? `${Number(hero.ownership).toFixed(1)}%` : (state.liveData ? '-' : '17.5%');
-    const preMoney = hero.preMoney != null && hero.preMoney !== '' && Number(hero.preMoney) !== 0 ? formatMoney(hero.preMoney) : (state.liveData ? '-' : '$85.0M');
-    const score = hero.score != null ? hero.score : (hero.aiScore != null ? hero.aiScore : deal.score);
-    const displayName = (hero.companyName || detail.application?.companyName || detail.application?.businessName || (deal.name !== 'Loading deal…' ? deal.name : '')) || deal.name;
-    const displayRound = hero.businessStage || deal.round;
-    const displayStage = deal.stage || hero.stage || 'Review';
+    const deal = deals.find(d=>d.id===state.selectedDealId) || deals.find(d=>d.featured) || deals[0];
     const tabs = [
       ['overview','Overview'],['application','Application'],['screening','AI Screening'],['diligence','Due Diligence'],['term','Term Sheet'],['ic','Board & IC Decision'],['disbursement','Disbursement'],['documents','Documents']
     ];
-    const tabGate = dealTabGate(detail);
     const currentStep = {overview:5,application:1,screening:2,diligence:3,term:4,ic:5,disbursement:6,documents:5}[state.dealTab] || 5;
-    const stepLabels = [['Application Submitted','Complete'],['AI Screening', score!=null?`Score · ${score}/100`:'Pending'],['Due Diligence', detail.dueDiligence ? 'Loaded' : (state.liveData?'Not started':'Complete · 6/6')],['Term Sheet', detail.termSheet ? String(detail.termSheet.status||'Loaded') : (state.liveData?'None':'Conditional')],['Board & IC Decision', detail.boardReview ? String(detail.boardReview.status||'Loaded') : (state.liveData?'None':'In review')],['Disbursement', detail.investmentImplementation ? 'Implementation' : (state.liveData?'Locked':'Locked')]];
-    const actions = `${selectControl('Fund',funds.map(f=>f.name),deal.fund,'deal-fund')}${button('Back to Deal Flow','back-to-deals','','arrow-left')}${button('Activity','activity-menu','','clock',`data-context="deal" data-id="${escapeHTML(deal.id)}"`)}`;
-    return `${pageHeader(`${displayName} - ${displayRound}`,'Investment application and execution workspace.',actions, state.liveData ? String(displayStage) : 'Committee Review')}
-      <section class="detail-hero"><div class="detail-hero-top"><div class="entity-title"><span class="entity-logo" style="background:linear-gradient(145deg,#23314d,#5e93dd)">${escapeHTML(initials(displayName))}</span><div><h1>${escapeHTML(displayName)}</h1><p>${escapeHTML(hero.industry || deal.sector)} · ${escapeHTML(displayRound)} · ${escapeHTML(hero.fundName || deal.fund)}</p></div></div>${statusPill(displayStage,'info')}</div><div class="hero-meta"><div class="hero-meta-item"><span>Requested Investment (USD)</span><strong>${formatMoney(hero.requestedAmount || deal.amount)}</strong></div><div class="hero-meta-item"><span>Proposed Ownership</span><strong>${ownership}</strong></div><div class="hero-meta-item"><span>Pre-Money Valuation</span><strong>${preMoney}</strong></div><div class="hero-meta-item"><span>Lead Investor</span><strong>${escapeHTML(hero.fundName || deal.fund)}</strong></div><div class="hero-meta-item"><span>AI Screening Score</span><strong>${score != null ? score : '-'}/100</strong></div></div></section>
-      <div class="tabs">${tabs.map(tab=>{
-        const locked = state.liveData && tabGate[tab[0]] && !tabGate[tab[0]].open;
-        return `<button class="tab ${state.dealTab===tab[0]?'active':''} ${locked?'is-locked':''}" data-action="deal-tab" data-tab="${tab[0]}" ${locked?`title="${escapeHTML(tabGate[tab[0]].reason||'Complete prior steps first')}"`:''}>${tab[1]}${locked?' · Locked':''}</button>`;
-      }).join('')}</div>
+    const stepLabels = [['Application Submitted','Complete'],['AI Screening','Shortlisted · 86/100'],['Due Diligence','Complete · 6/6'],['Term Sheet','Conditional · 15/17'],['Board & IC Decision','In review'],['Disbursement','Locked']];
+    const actions = `${selectControl('Fund',funds.map(f=>f.name),deal.fund,'deal-fund')}${button('Back to Deal Flow','back-to-deals','','arrow-left')}${button('Activity','activity-menu','','clock',`data-context="deal" data-id="${deal.id}"`)}`;
+    return `${pageHeader(`${deal.name} - ${deal.round}`,'Investment application and execution workspace.',actions,'Committee Review')}
+      <section class="detail-hero"><div class="detail-hero-top"><div class="entity-title"><span class="entity-logo" style="background:linear-gradient(145deg,#23314d,#5e93dd)">${escapeHTML(initials(deal.name))}</span><div><h1>${escapeHTML(deal.name)}</h1><p>${escapeHTML(deal.sector)} · ${escapeHTML(deal.round)} · ${escapeHTML(deal.fund)}</p></div></div>${statusPill(state.dealTab==='disbursement'?'Approved - Closing':'Committee Review',state.dealTab==='disbursement'?'success':'info')}</div><div class="hero-meta"><div class="hero-meta-item"><span>Requested Investment (USD)</span><strong>${formatMoney(deal.amount)}</strong></div><div class="hero-meta-item"><span>Proposed Ownership</span><strong>17.5%</strong></div><div class="hero-meta-item"><span>Pre-Money Valuation</span><strong>$85.0M</strong></div><div class="hero-meta-item"><span>Lead Investor</span><strong>${escapeHTML(deal.fund)}</strong></div><div class="hero-meta-item"><span>AI Screening Score</span><strong>${deal.score}/100</strong></div></div></section>
+      <div class="tabs">${tabs.map(tab=>`<button class="tab ${state.dealTab===tab[0]?'active':''}" data-action="deal-tab" data-tab="${tab[0]}">${tab[1]}</button>`).join('')}</div>
       <div class="stepper">${stepLabels.map((step,index)=>`<div class="step ${index+1<currentStep?'complete':index+1===currentStep?'current':''}"><span class="step-index">${index+1<currentStep?icon('check'):index+1}</span><span class="step-copy"><strong>${step[0]}</strong><small>${step[1]}</small></span></div>`).join('')}</div>
       ${renderDealTab(deal)}`;
   }
 
-  /** Live deal pipeline gates: later tabs stay locked until prior artefacts exist. Documents always open. */
-  function dealTabGate(detail = {}) {
-    const stage = String(detail?.hero?.stage || detail?.application?.currentStage || '').toUpperCase();
-    const hasDd = Boolean(detail?.dueDiligence?.id || detail?.dueDiligence);
-    const ddComplete = String(detail?.dueDiligence?.status || '').toUpperCase() === 'COMPLETED';
-    const hasTerm = Boolean(detail?.termSheet?.id || detail?.termSheet);
-    const hasBoard = Boolean(detail?.boardReview?.id || detail?.boardReview);
-    const boardDone = /APPROVED|CONDITIONAL|COMPLETED/.test(String(detail?.boardReview?.status || '').toUpperCase());
-    const screeningDone = Boolean(
-      detail?.hero?.score != null ||
-      detail?.application?.screeningScore != null ||
-      detail?.application?.initialScreeningScore != null ||
-      /SHORTLISTED|ACTIVE_DD|DUE_DILIGENCE|TERM_SHEET|BOARD|IMPLEMENTATION|DISBURSED|FUNDED|PORTFOLIO/.test(stage)
-    );
-    return {
-      overview: { open: true },
-      application: { open: true },
-      screening: { open: true },
-      diligence: {
-        open: screeningDone || hasDd,
-        reason: 'Complete AI screening before starting due diligence',
-      },
-      term: {
-        open: ddComplete || hasTerm,
-        reason: 'Complete due diligence before opening the term sheet',
-      },
-      ic: {
-        open: hasTerm || hasBoard,
-        reason: 'Create a term sheet before board / IC review',
-      },
-      disbursement: {
-        open: boardDone || Boolean(detail?.investmentImplementation),
-        reason: 'Complete board / IC approval before disbursement',
-      },
-      documents: { open: true },
-    };
-  }
-
   function renderDealTab(deal) {
-    const detail = state.dealDetail;
-    if (state.liveData && (!detail || detail._stub || state.dealDetailLoading)) {
-      return renderDealDetailSkeletonBody();
-    }
-    // Single visual implementation for mock and live — only the data source changes.
     switch (state.dealTab) {
-      case 'application': return renderDealApplication(deal, detail);
-      case 'screening': return renderDealScreening(deal, detail);
-      case 'diligence': return renderDealDiligence(deal, detail);
-      case 'term': return renderDealTermSheet(deal, detail);
-      case 'ic': return renderDealIC(deal, detail);
-      case 'disbursement': return renderDealDisbursement(deal, detail);
-      case 'documents': return renderDealDocuments(deal, detail);
-      default: return renderDealOverview(deal, detail);
+      case 'application': return renderDealApplication(deal);
+      case 'screening': return renderDealScreening(deal);
+      case 'diligence': return renderDealDiligence(deal);
+      case 'term': return renderDealTermSheet(deal);
+      case 'ic': return renderDealIC(deal);
+      case 'disbursement': return renderDealDisbursement(deal);
+      case 'documents': return renderDealDocuments(deal);
+      default: return renderDealOverview(deal);
     }
   }
 
-  function isLiveMode() {
-    return Boolean(state.liveData || state.liveOnly);
-  }
-
-  function liveOrDemo(liveValue, demoValue) {
-    if (isLiveMode()) return liveValue == null || liveValue === '' ? '-' : liveValue;
-    return demoValue;
-  }
-
-  /** Demo/sample figures only when not in live mode — never paint fake numbers as live. */
-  function demoOnly(demoValue, liveValue = '—') {
-    return isLiveMode() ? liveValue : demoValue;
-  }
-
-  function liveEmptyCard(message) {
-    return `<div class="empty-state compact"><p class="muted">${escapeHTML(message)}</p></div>`;
-  }
-
-  function dealDetailCtx(deal, detail) {
-    const d = detail || {};
-    const app = d.application || {};
-    const hero = d.hero || {};
-    return { d, app, hero };
-  }
-
-  function liveKv(rows) {
-    return `<div class="info-list">${rows.map(([k,v])=>`<div class="info-row"><span>${escapeHTML(k)}</span><strong>${v == null || v === '' ? '—' : (typeof v === 'string' && v.includes('<') ? v : escapeHTML(String(v)))}</strong></div>`).join('')}</div>`;
-  }
-
-  function fileExt(name = '') {
-    const m = String(name).toLowerCase().match(/\.([a-z0-9]+)(?:\?|$)/);
-    return m ? m[1] : '';
-  }
-
-  function isPreviewableDoc(doc) {
-    const ext = fileExt(doc.fileName || doc.name || doc.fileUrl || '');
-    const mime = String(doc.mimeType || doc.type || '').toLowerCase();
-    if (/pdf|png|jpe?g|gif|webp|txt|html?/.test(ext)) return true;
-    if (/pdf|image\//.test(mime)) return true;
-    return false;
-  }
-
-  function renderDealDocumentsPanel(docs, title = 'Documents') {
-    if (!docs.length) {
-      return `<section class="section-gap">${card(title, '<p class="muted">No documents on this application yet.</p>')}</section>`;
-    }
-    const rows = docs.map((d, i) => {
-      const name = d.name || d.fileName || d.title || `Document ${i + 1}`;
-      const type = d.documentType || d.type || fileExt(name).toUpperCase() || '-';
-      const url = d.fileUrl || d.url || d.downloadUrl || '';
-      const id = d.id || String(i);
-      const previewBtn = url && isPreviewableDoc(d)
-        ? button('Preview', 'preview-deal-document', 'ghost compact', 'eye', `data-url="${escapeHTML(url)}" data-name="${escapeHTML(name)}" data-type="${escapeHTML(type)}"`)
-        : '';
-      const downloadBtn = url
-        ? button('Download', 'download-deal-document', 'compact', 'download', `data-url="${escapeHTML(url)}" data-name="${escapeHTML(name)}"`)
-        : '<span class="muted small">No file URL</span>';
-      return `<tr><td class="table-primary">${escapeHTML(name)}<small>${escapeHTML(String(d.status || (d.isSubmitted ? 'Submitted' : '')))}</small></td><td>${escapeHTML(String(type))}</td><td><div class="row-actions">${previewBtn}${downloadBtn}</div></td></tr>`;
-    }).join('');
-    return `<section class="section-gap">${card(title, `<div class="table-wrap"><table><thead><tr><th>Name</th><th>Type</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table></div>`)}</section>`;
-  }
-
-  function asArraySafe(v) {
-    if (Array.isArray(v)) return v;
-    if (v && Array.isArray(v.items)) return v.items;
-    if (v && Array.isArray(v.data)) return v.data;
-    return [];
-  }
-
-  function renderDealOverview(deal, detail) {
-    const { d, app, hero } = dealDetailCtx(deal, detail);
-    const live = isLiveMode();
-    const legalName = live
-      ? (app.businessName || app.companyName || hero.companyName || deal.name || '-')
-      : 'Nova Analytics (Pvt) Ltd';
-    const location = live
-      ? (hero.country || app.country || app.applicantAddress || hero.address || '-')
-      : 'Harare, Zimbabwe';
-    const contact = live
-      ? (app.applicantName || app.contactPerson || '-')
-      : 'Tariro Kasere, CEO';
-    const ownershipLabel = live
-      ? (hero.ownership != null ? `${Number(hero.ownership).toFixed(1)}%` : '-')
-      : '17.5%';
-    const score = live ? (hero.score != null ? hero.score : deal.score) : deal.score;
-    const outcome = live ? (hero.screeningOutcome || 'Pending') : 'SHORTLISTED';
-    const docs = live
-      ? asArraySafe(d.documents || app.documents)
-      : documents.slice(0, 8);
-    const dd = d.dueDiligence;
-    const ddComplete = isDDCompleteRecord(dd);
-    const workstreamNames = live
-      ? (dd
-          ? asArraySafe(dd.tasks || dd.workstreams).map((w) => w.name || w.title || w.workstream).filter(Boolean)
-          : [])
-      : ['Market Research','Financial Assessment','Competitive Analysis','Management Team Evaluation','Legal Compliance','Risk Assessment'];
-    const wsFallback = ['Market Research','Financial Assessment','Competitive Analysis','Management Team Evaluation','Legal Compliance','Risk Assessment'];
-    const wsRows = (workstreamNames.length ? workstreamNames : (live ? [] : wsFallback));
-    const docsList = docs.length
-      ? `<div class="info-list">${docs.slice(0,8).map((doc,i)=>{
-          const name = doc.name || doc.fileName || doc.title || `Document ${i+1}`;
-          const meta = live ? (doc.documentType || doc.type || '') : `${doc.version||''} · ${doc.status||''}`;
-          const action = live && (doc.fileUrl||doc.url)
-            ? `data-action="preview-deal-document" data-url="${escapeHTML(doc.fileUrl||doc.url)}" data-name="${escapeHTML(name)}"`
-            : `data-action="preview-document" data-id="${escapeHTML(doc.id||'')}"`;
-          return `<button type="button" class="list-row v17-document-list-row" ${action}><span class="activity-icon" style="color:var(--red);background:var(--red-soft)">${icon('file')}</span><span class="list-row-main"><strong>${escapeHTML(name)}</strong><small>${escapeHTML(String(meta))}</small></span><span class="button ghost compact icon-only" aria-hidden="true">${icon('eye')}</span></button>`;
-        }).join('')}</div>`
-      : `<p class="muted small">${live ? 'No documents on this application yet.' : 'No documents.'}</p>`;
-    const wsTable = wsRows.length
-      ? `<div class="table-wrap" style="overflow-x:auto"><table class="criteria-table" style="table-layout:fixed;width:100%"><thead><tr><th style="width:28%">Workstream</th><th style="width:22%">Analyst</th><th style="width:16%">Due Date</th><th style="width:20%">Progress</th><th style="width:14%">Status</th></tr></thead><tbody>${wsRows.map((name,index)=>{
-          const task = live && dd ? asArraySafe(dd.tasks)[index] : null;
-          const analyst = live
-            ? (task?.team?.[0] ? `${task.team[0].firstName||''} ${task.team[0].lastName||''}`.trim() : (task?.owner || '-'))
-            : ['Nyasha Moyo','Tendai Moyo','Rudo Ndlovu','Chipo Dube','Farai Chikore','Tinashe Sibanda'][index];
-          const due = live ? formatDate(task?.date || task?.dueDate) : `${10+index} Jul 2026`;
-          const status = live ? String(task?.status || dd?.status || 'Pending') : 'Complete';
-          const pctVal = live ? (status.toUpperCase()==='COMPLETE'||status.toUpperCase()==='COMPLETED'?100:40) : 100;
-          return `<tr><td class="table-primary">${escapeHTML(typeof name==='string'?name:String(name))}</td><td><span class="owner-mini">${avatar(analyst||'NA',index)}${escapeHTML(analyst||'-')}</span></td><td>${escapeHTML(String(due))}</td><td><div class="inline-progress">${progressBar(pctVal,'var(--emerald)')}<span>${pctVal}%</span></div></td><td>${statusPill(status)}</td></tr>`;
-        }).join('')}</tbody></table></div>`
-      : `<p class="muted small">${live ? (dd ? 'No workstream tasks yet.' : 'Due diligence not started.') : ''}</p>`;
-    const board = d.boardReview;
-    const term = d.termSheet;
-    const impl = d.investmentImplementation;
-    const boardRec = live ? (board?.recommendation || board?.status || '-') : 'Approve with conditions';
-    const termAgreed = live ? (term ? String(term.status || 'Loaded') : 'None') : null;
+  function renderDealOverview(deal) {
+    const company = companies[0];
+    const workstreams = ['Market Research','Financial Assessment','Competitive Analysis','Management Team Evaluation','Legal Compliance','Risk Assessment'];
     return `<section class="split-layout"><div>
       <section class="grid cols-3">
-        ${card('Company Overview',`<div class="info-list"><div class="info-row"><span>Legal name</span><strong>${escapeHTML(legalName)}</strong></div><div class="info-row"><span>Sector</span><strong>${escapeHTML(hero.industry || deal.sector || '-')}</strong></div><div class="info-row"><span>Location</span><strong>${escapeHTML(String(location))}</strong></div><div class="info-row"><span>Founded</span><strong>${escapeHTML(live ? formatDate(app.foundingDate) : '2021')}</strong></div><div class="info-row"><span>Employees</span><strong>${escapeHTML(live ? (app.employeeCount != null ? String(app.employeeCount) : '-') : '62')}</strong></div><div class="info-row"><span>Primary Contact</span><strong>${escapeHTML(String(contact))}</strong></div></div>`) }
-        ${card('Application Snapshot',`<div class="grid cols-3" style="align-items:start"><div style="min-width:0"><span class="muted small">Requested Investment</span><div class="metric-value" style="font-size:17px">${formatMoney(hero.requestedAmount || deal.amount)}</div></div><div style="min-width:0"><span class="muted small">Funding Round</span><div class="metric-value" style="font-size:17px;word-break:break-word">${escapeHTML(hero.businessStage || deal.round || '-')}</div></div><div style="min-width:0"><span class="muted small">Ownership</span><div class="metric-value" style="font-size:17px">${escapeHTML(ownershipLabel)}</div></div></div><div class="grid cols-3 section-gap" style="align-items:start"><div style="min-width:0"><span class="muted small">${live?'Progress':'FY2025E Revenue'}</span><strong style="display:block;margin-top:4px">${live ? (hero.progress != null ? `${hero.progress}%` : '-') : '$13.2M'}</strong></div><div style="min-width:0"><span class="muted small">${live?'Email':'ARR'}</span><strong style="display:block;margin-top:4px;word-break:break-word;overflow-wrap:anywhere">${live ? escapeHTML(hero.email || app.applicantEmail || '-') : '$14.5M'}</strong></div><div style="min-width:0"><span class="muted small">${live?'Phone':'Gross Margin'}</span><strong style="display:block;margin-top:4px;word-break:break-word">${live ? escapeHTML(hero.phone || app.applicantPhone || '-') : '73%'}</strong></div></div>`) }
-        ${card('AI Screening',`<div class="score-panel"><div><div class="score-big"><strong>${score != null ? score : '-'}</strong><span>/100</span></div><div class="score-confidence">${live ? (hero.screeningSummary ? 'From application screening' : 'Score from application') : '94% confidence'}</div></div>${statusPill(String(outcome), /SHORT|APPROV|PASS/i.test(String(outcome))?'success':'info')}</div><div class="grid cols-3 section-gap"><div class="text-center"><strong class="positive" style="font-size:18px">${live?'-':'8'}</strong><div class="muted small">Passed</div></div><div class="text-center"><strong class="warning-text" style="font-size:18px">${live?'-':'2'}</strong><div class="muted small">Review</div></div><div class="text-center"><strong class="negative" style="font-size:18px">${live?'-':'0'}</strong><div class="muted small">Failed</div></div></div><button class="button ghost compact" style="width:100%;margin-top:12px" data-action="deal-tab" data-tab="screening">Open screening</button>`) }
+        ${card('Company Overview',`<div class="info-list"><div class="info-row"><span>Legal name</span><strong>Nova Analytics (Pvt) Ltd</strong></div><div class="info-row"><span>Sector</span><strong>${escapeHTML(deal.sector)}</strong></div><div class="info-row"><span>Location</span><strong>Harare, Zimbabwe</strong></div><div class="info-row"><span>Founded</span><strong>2021</strong></div><div class="info-row"><span>Employees</span><strong>62</strong></div><div class="info-row"><span>Primary Contact</span><strong>Tariro Kasere, CEO</strong></div></div>`) }
+        ${card('Application Snapshot',`<div class="grid cols-3"><div><span class="muted small">Requested Investment</span><div class="metric-value" style="font-size:17px">${formatMoney(deal.amount)}</div></div><div><span class="muted small">Funding Round</span><div class="metric-value" style="font-size:17px">${escapeHTML(deal.round)}</div></div><div><span class="muted small">Ownership</span><div class="metric-value" style="font-size:17px">17.5%</div></div></div><div class="grid cols-3 section-gap"><div><span class="muted small">FY2025E Revenue</span><strong style="display:block;margin-top:4px">$13.2M</strong></div><div><span class="muted small">ARR</span><strong style="display:block;margin-top:4px">$14.5M</strong></div><div><span class="muted small">Gross Margin</span><strong style="display:block;margin-top:4px">73%</strong></div></div>`) }
+        ${card('AI Screening',`<div class="score-panel"><div><div class="score-big"><strong>${deal.score}</strong><span>/100</span></div><div class="score-confidence">94% confidence</div></div>${statusPill('SHORTLISTED','success')}</div><div class="grid cols-3 section-gap"><div class="text-center"><strong class="positive" style="font-size:18px">8</strong><div class="muted small">Passed</div></div><div class="text-center"><strong class="warning-text" style="font-size:18px">2</strong><div class="muted small">Review</div></div><div class="text-center"><strong class="negative" style="font-size:18px">0</strong><div class="muted small">Failed</div></div></div><button class="button ghost compact" style="width:100%;margin-top:12px" data-action="deal-tab" data-tab="screening">Open screening</button>`) }
       </section>
       <section class="grid cols-2 section-gap">
-        ${card('Attached Documents', docsList, {tools:button('Data room','deal-tab','compact','folder','data-tab="documents"')})}
-        ${card('Due Diligence Workstreams', wsTable, {tools: ddComplete ? '' : button('Add workstream','add-workstream','compact','plus')})}
+        ${card('Attached Documents',`<div class="info-list">${documents.slice(0,8).map(doc=>`<button type="button" class="list-row v17-document-list-row" data-action="preview-document" data-id="${doc.id}"><span class="activity-icon" style="color:${doc.type==='XLSX'?'var(--emerald)':'var(--red)'};background:${doc.type==='XLSX'?'var(--emerald-soft)':'var(--red-soft)'}">${icon('file')}</span><span class="list-row-main"><strong>${escapeHTML(doc.name)}</strong><small>${escapeHTML(doc.version)} · ${escapeHTML(doc.status)}</small></span><span class="button ghost compact icon-only" aria-hidden="true">${icon('eye')}</span></button>`).join('')}</div>`,{tools:button('Data room','deal-tab','compact','folder','data-tab="documents"')})}
+        ${card('Due Diligence Workstreams',`<div class="table-wrap"><table class="criteria-table"><thead><tr><th>Workstream</th><th>Analyst</th><th>Due Date</th><th>Progress</th><th>Status</th></tr></thead><tbody>${workstreams.map((name,index)=>`<tr><td class="table-primary">${name}</td><td><span class="owner-mini">${avatar(['Nyasha Moyo','Tendai Moyo','Rudo Ndlovu','Chipo Dube','Farai Chikore','Tinashe Sibanda'][index],index)}${['Nyasha Moyo','Tendai Moyo','Rudo Ndlovu','Chipo Dube','Farai Chikore','Tinashe Sibanda'][index]}</span></td><td>${10+index} Jul 2026</td><td><div class="inline-progress">${progressBar(100,'var(--emerald)')}<span>100%</span></div></td><td>${statusPill('Complete')}</td></tr>`).join('')}</tbody></table></div>`,{tools:button('Assign tasks','assign-dd-task','compact','plus')})}
       </section>
     </div><div class="side-stack" style="display:flex">
-      ${card('Board & Investment Committee',`<div class="info-list"><div class="info-row"><span>Status</span><strong>${escapeHTML(live ? String(board?.status || 'Not started') : '15 Jul 2026 · 10:00 SAST')}</strong></div><div class="info-row"><span>${live?'Reviewer':'Voting members'}</span><strong>${escapeHTML(live ? (board?.reviewer ? `${board.reviewer.firstName||''} ${board.reviewer.lastName||''}`.trim() : '-') : '7')}</strong></div><div class="info-row"><span>Recommendation</span><strong class="positive">${escapeHTML(String(boardRec))}</strong></div></div><p class="muted small section-gap">Cast votes from the Investment Committee tab.</p>`,{footer:'<button class="card-link" data-action="deal-tab" data-tab="ic">Open Investment Committee</button>'}) }
-      ${card('Term Sheet Status', live
-        ? `<div class="info-list"><div class="info-row"><span>Status</span><strong>${escapeHTML(termAgreed || 'None')}</strong></div><div class="info-row"><span>Investment</span><strong>${term?.investmentAmount != null ? formatMoney(term.investmentAmount) : '-'}</strong></div><div class="info-row"><span>Equity</span><strong>${term?.equityPercentage != null ? `${term.equityPercentage}%` : '-'}</strong></div></div>`
-        : `<div class="grid cols-3"><div class="text-center"><strong style="font-size:17px">17</strong><div class="muted small">Sections</div></div><div class="text-center"><strong class="positive" style="font-size:17px">15</strong><div class="muted small">Agreed</div></div><div class="text-center"><strong class="warning-text" style="font-size:17px">2</strong><div class="muted small">Open</div></div></div><div class="reason-list section-gap"><div class="reason-item warning">${icon('alert')}<div><strong>Liquidation preference</strong><small>Economic rights</small></div></div><div class="reason-item warning">${icon('alert')}<div><strong>Board observer rights</strong><small>Governance</small></div></div></div>`,{footer:'<button class="card-link" data-action="deal-tab" data-tab="term">Open term sheet</button>'})}
-      ${card('Disbursement Readiness', live
-        ? `<div class="info-list"><div class="info-row"><span>Implementation</span><strong>${escapeHTML(impl?.status || 'Not started')}</strong></div><div class="info-row"><span>Disbursements</span><strong>${String(asArraySafe(d.disbursements).length)}</strong></div></div>`
-        : `<div class="info-row"><span>Readiness</span><strong>72%</strong></div>${progressBar(72,'var(--emerald)')}<div class="reason-list section-gap"><div class="reason-item">${icon('check-circle')}<div><strong>KYC verified</strong></div></div><div class="reason-item">${icon('check-circle')}<div><strong>Bank details verified</strong></div></div><div class="reason-item warning">${icon('alert')}<div><strong>Legal conditions</strong><small>3 of 4 complete</small></div></div><div class="reason-item warning">${icon('clock')}<div><strong>Board resolution</strong><small>Pending</small></div></div></div>`,{footer:'<button class="card-link" data-action="deal-tab" data-tab="disbursement">View readiness</button>'})}
-      ${card('Audit Trail', live
-        ? `<div class="timeline"><div class="timeline-item"><strong>Stage</strong><small>${escapeHTML(hero.stage || deal.stage || '-')}</small></div><div class="timeline-item"><strong>Application</strong><small>${escapeHTML(app.id || deal.id)}</small></div></div>`
-        : `<div class="timeline">${[['10 Jul 2026, 09:08','Nyasha Moyo updated Pitch Deck.pdf'],['9 Jul 2026, 17:45','Nyasha Moyo completed Market Research'],['9 Jul 2026, 14:32','Rudo Ndlovu completed Financial Assessment'],['8 Jul 2026, 14:32','Farai Chikore requested legal documents'],['1 Jul 2026, 10:15','Application submitted by Nova Analytics']].map(item=>`<div class="timeline-item"><strong>${item[1]}</strong><small>${item[0]}</small></div>`).join('')}</div>`,{tools:'<button class="card-link" data-action="open-audit">View all</button>'})}
+      ${card('Board & Investment Committee',`<div class="info-list"><div class="info-row"><span>Date & time</span><strong>15 Jul 2026 · 10:00 SAST</strong></div><div class="info-row"><span>Voting members</span><strong>7</strong></div><div class="info-row"><span>Recommendation</span><strong class="positive">Approve with conditions</strong></div></div><div class="grid cols-2 section-gap">${button('Approve','vote-approve','success compact','check')}${button('Approve with conditions','vote-conditions','compact','shield')}${button('Defer','vote-defer','compact','clock')}${button('Reject','vote-reject','danger compact','x')}</div>`) }
+      ${card('Term Sheet Status',`<div class="grid cols-3"><div class="text-center"><strong style="font-size:17px">17</strong><div class="muted small">Sections</div></div><div class="text-center"><strong class="positive" style="font-size:17px">15</strong><div class="muted small">Agreed</div></div><div class="text-center"><strong class="warning-text" style="font-size:17px">2</strong><div class="muted small">Open</div></div></div><div class="reason-list section-gap"><div class="reason-item warning">${icon('alert')}<div><strong>Liquidation preference</strong><small>Economic rights</small></div></div><div class="reason-item warning">${icon('alert')}<div><strong>Board observer rights</strong><small>Governance</small></div></div></div>`,{footer:'<button class="card-link" data-action="deal-tab" data-tab="term">Open term sheet</button>'})}
+      ${card('Disbursement Readiness',`<div class="info-row"><span>Readiness</span><strong>72%</strong></div>${progressBar(72,'var(--emerald)')}<div class="reason-list section-gap"><div class="reason-item">${icon('check-circle')}<div><strong>KYC verified</strong></div></div><div class="reason-item">${icon('check-circle')}<div><strong>Bank details verified</strong></div></div><div class="reason-item warning">${icon('alert')}<div><strong>Legal conditions</strong><small>3 of 4 complete</small></div></div><div class="reason-item warning">${icon('clock')}<div><strong>Board resolution</strong><small>Pending</small></div></div></div>`,{footer:'<button class="card-link" data-action="deal-tab" data-tab="disbursement">View readiness</button>'})}
+      ${card('Audit Trail',`<div class="timeline">${[['10 Jul 2026, 09:08','Nyasha Moyo updated Pitch Deck.pdf'],['9 Jul 2026, 17:45','Nyasha Moyo completed Market Research'],['9 Jul 2026, 14:32','Rudo Ndlovu completed Financial Assessment'],['8 Jul 2026, 14:32','Farai Chikore requested legal documents'],['1 Jul 2026, 10:15','Application submitted by Nova Analytics']].map(item=>`<div class="timeline-item"><strong>${item[1]}</strong><small>${item[0]}</small></div>`).join('')}</div>`,{tools:'<button class="card-link" data-action="open-audit">View all</button>'})}
     </div></section>`;
   }
 
-  function renderDealApplication(deal, detail) {
-    const { app, hero } = dealDetailCtx(deal, detail);
-    const live = isLiveMode();
-    const form = (app.applicationFormData && typeof app.applicationFormData === 'object')
-      ? app.applicationFormData
-      : {};
+  function renderDealApplication(deal) {
     const sections = ['Company Information','Ownership & Governance','Business & Market','Financial Information','Funding Request','Impact & ESG','Declarations & Consent'];
-    const sectionIdx = Math.max(0, Math.min(sections.length - 1, Number(state.applicationSection) || 0));
-    const legal = live ? (app.businessName || app.companyName || deal.name || '-') : 'Nova Analytics (Pvt) Ltd';
-    const website = live ? (form.website || app.website || app.companyWebsite || '-') : 'nova-analytics.co.zw';
-    const reg = live ? (app.registrationNumber || app.companyRegistration || '-') : '1234567';
-    const sector = live ? (hero.industry || deal.sector || '-') : 'Enterprise Software / AI Analytics';
-    const country = live ? (hero.country || app.country || '-') : 'Zimbabwe';
-    const employees = live ? (app.employeeCount != null ? String(app.employeeCount) : '-') : '62';
-    const desc = live ? (hero.description || app.businessDescription || app.description || '') : 'Nova Analytics provides an AI-powered analytics platform that helps enterprises transform complex data into actionable insights. The platform enables predictive forecasting, operational optimisation and intelligent decision-making.';
-    const problem = live ? (form.problemSolution || app.problemSolution || app.problemAndSolution || '') : 'Enterprises in emerging markets lack affordable, easy-to-use analytics tools, resulting in poor data utilisation and slow decision-making. Nova Analytics delivers an intuitive, scalable platform built for these operating environments.';
-    const ownership = live
-      ? (hero.ownership != null
-          ? Number(hero.ownership).toFixed(1) + '%'
-          : (form.proposedOwnership ? String(form.proposedOwnership) + (String(form.proposedOwnership).includes('%') ? '' : '%') : '-'))
-      : '17.5%';
-    const preMoney = live
-      ? (hero.preMoney != null && Number(hero.preMoney) !== 0
-          ? formatMoney(hero.preMoney)
-          : (form.preMoneyValuation ? String(form.preMoneyValuation) : '-'))
-      : '$85.0M';
-    const submitted = live ? formatDate(app.submittedAt || app.createdAt) : '1 Jul 2026 · 10:15';
-    const appId = live ? (app.id || deal.id || '-') : 'APP-2026-0048';
-    const completeness = live ? (hero.progress != null ? hero.progress + '%' : (app.applicationProgress != null ? app.applicationProgress + '%' : '-')) : '100%';
-    const applicant = live ? (app.applicantName || app.contactPerson || '-') : 'Tariro Kasere, CEO';
-    const amended = live ? formatDate(app.updatedAt) : '30 Jun 2026';
-    const statusLabel = live ? (hero.stage || deal.stage || app.status || 'Submitted') : 'Submitted';
-    const uofRows = Array.isArray(form.useOfFunds) ? form.useOfFunds.filter((r) => r && (r.category || r.allocation)) : [];
-    const uofColors = ['var(--blue)','var(--emerald)','var(--orange)','var(--purple)','var(--red)','#64748b'];
-    const useOfFundsHtml = !live
-      ? `<div class="section-gap"><div class="chart-legend"><span class="legend-item" style="color:var(--blue)"><i class="legend-dot"></i>40% Product</span><span class="legend-item" style="color:var(--emerald)"><i class="legend-dot"></i>35% Regional Expansion</span><span class="legend-item" style="color:var(--orange)"><i class="legend-dot"></i>25% Sales</span></div><div class="progress" style="height:10px;margin-top:8px"><span style="width:40%;background:var(--blue)"></span></div></div>`
-      : (uofRows.length
-          ? `<div class="section-gap"><div class="chart-legend">${uofRows.map((row,i)=>{
-              const pctVal = Number(String(row.allocation||'').replace(/[^0-9.]/g,'')) || 0;
-              const label = row.category || row.description || ('Item '+(i+1));
-              return `<span class="legend-item" style="color:${uofColors[i%uofColors.length]}"><i class="legend-dot"></i>${escapeHTML(String(pctVal))}% ${escapeHTML(String(label))}</span>`;
-            }).join('')}</div><div class="progress" style="height:10px;margin-top:8px;display:flex">${uofRows.map((row,i)=>{
-              const pctVal = Number(String(row.allocation||'').replace(/[^0-9.]/g,'')) || 0;
-              return `<span style="width:${Math.max(0,Math.min(100,pctVal))}%;background:${uofColors[i%uofColors.length]}"></span>`;
-            }).join('')}</div><div class="info-list section-gap">${uofRows.map((row)=>`<div class="info-row"><span>${escapeHTML(String(row.category||'-'))}</span><strong>${escapeHTML(String(row.allocation||'-'))}${row.description?` · ${escapeHTML(String(row.description))}`:''}</strong></div>`).join('')}</div></div>`
-          : liveEmptyCard('No use-of-funds breakdown on this application. New submissions store it in applicationFormData.'));
-    const decls = form.declarations || {};
-    const declarationsHtml = !live
-      ? `<div class="reason-list"><div class="reason-item">${icon('check-circle')}<div><strong>All information is true and accurate</strong></div></div><div class="reason-item">${icon('check-circle')}<div><strong>Consent to data processing and sharing</strong></div></div><div class="reason-item">${icon('check-circle')}<div><strong>Authorised representative confirmed</strong></div></div></div>`
-      : ((decls.accurate != null || decls.consent != null)
-          ? `<div class="reason-list">
-              <div class="reason-item">${icon(decls.accurate ? 'check-circle' : 'alert')}<div><strong>Information is true and accurate</strong><small>${decls.accurate ? 'Accepted' : 'Not accepted'}</small></div></div>
-              <div class="reason-item">${icon(decls.consent ? 'check-circle' : 'alert')}<div><strong>Consent to data processing</strong><small>${decls.consent ? 'Accepted' : 'Not accepted'}</small></div></div>
-            </div>`
-          : liveEmptyCard('No declaration attestations stored for this application yet.'));
-    const progressPct = live ? (hero.progress != null ? Number(hero.progress) : (app.applicationProgress != null ? Number(app.applicationProgress) : 0)) : 100;
-    const docsCount = live ? asArraySafe(detail?.documents || app.documents).length : 8;
-
-    const sectionBodies = [
-      card('Company Information',`<div class="form-grid"><div class="form-field"><label>Legal name</label><input value="${escapeHTML(String(legal))}" readonly></div><div class="form-field"><label>Website</label><input value="${escapeHTML(String(website))}" readonly></div><div class="form-field"><label>Registration No.</label><input value="${escapeHTML(String(reg))}" readonly></div><div class="form-field"><label>Sector</label><input value="${escapeHTML(String(sector))}" readonly></div><div class="form-field"><label>Country</label><input value="${escapeHTML(String(country))}" readonly></div><div class="form-field"><label>Employees</label><input value="${escapeHTML(String(employees))}" readonly></div><div class="form-field full"><label>Business description</label><textarea readonly>${escapeHTML(String(desc || (live ? 'No description on application.' : '')))}</textarea></div><div class="form-field full"><label>Problem & solution</label><textarea readonly>${escapeHTML(String(problem || (live ? 'Not provided.' : '')))}</textarea></div></div>`),
-      card('Ownership & Governance', live
-        ? `<div class="form-grid"><div class="form-field"><label>Founder ownership %</label><input value="${escapeHTML(String(form.ownershipPercent || '-'))}" readonly></div><div class="form-field"><label>Board composition</label><input value="${escapeHTML(String(form.boardComposition || '-'))}" readonly></div><div class="form-field full"><label>Key shareholders</label><textarea readonly>${escapeHTML(String(form.keyShareholders || 'Not provided.'))}</textarea></div><div class="form-field full"><label>Governance notes</label><textarea readonly>${escapeHTML(String(form.governanceNotes || 'Not provided.'))}</textarea></div></div>`
-        : `<div class="form-grid"><div class="form-field"><label>Founder ownership %</label><input value="62" readonly></div><div class="form-field"><label>Board composition</label><input value="5 directors" readonly></div><div class="form-field full"><label>Key shareholders</label><textarea readonly>Founders 62%; angels 18%; ESOP 10%; other 10%.</textarea></div></div>`),
-      card('Business & Market', live
-        ? `<div class="form-grid"><div class="form-field full"><label>Product overview</label><textarea readonly>${escapeHTML(String(form.productOverview || '-'))}</textarea></div><div class="form-field full"><label>Market size</label><textarea readonly>${escapeHTML(String(form.marketSize || '-'))}</textarea></div><div class="form-field full"><label>Competitors</label><textarea readonly>${escapeHTML(String(form.competitors || '-'))}</textarea></div><div class="form-field full"><label>Go-to-market</label><textarea readonly>${escapeHTML(String(form.goToMarket || '-'))}</textarea></div></div>`
-        : `<div class="form-grid"><div class="form-field full"><label>Product overview</label><textarea readonly>AI analytics platform for enterprises.</textarea></div></div>`),
-      card('Financial Information', live
-        ? `<div class="form-grid"><div class="form-field"><label>Revenue model</label><input value="${escapeHTML(String(form.revenueModel || '-'))}" readonly></div><div class="form-field"><label>Burn rate</label><input value="${escapeHTML(String(form.burnRate || '-'))}" readonly></div><div class="form-field"><label>Historical revenue</label><input value="${escapeHTML(String(form.historicalRevenue || '-'))}" readonly></div><div class="form-field"><label>Projected revenue</label><input value="${escapeHTML(String(form.projectedRevenue || '-'))}" readonly></div><div class="form-field"><label>Runway (months)</label><input value="${escapeHTML(String(form.runwayMonths || '-'))}" readonly></div></div>`
-        : `<div class="form-grid"><div class="form-field"><label>Revenue model</label><input value="SaaS subscription" readonly></div></div>`),
-      card('Funding Request Summary',`<div class="grid cols-4"><div><span class="muted small">Funding Round</span><strong style="display:block;margin-top:4px">${escapeHTML(form.fundingRound || hero.businessStage || deal.round || '-')}</strong></div><div><span class="muted small">Requested Investment</span><strong style="display:block;margin-top:4px">${formatMoney(hero.requestedAmount || deal.amount)}</strong></div><div><span class="muted small">Proposed Ownership</span><strong style="display:block;margin-top:4px">${escapeHTML(ownership)}</strong></div><div><span class="muted small">Pre-Money Valuation</span><strong style="display:block;margin-top:4px">${escapeHTML(preMoney)}</strong></div></div>${useOfFundsHtml}${form.fundingRationale ? `<div class="section-gap"><strong class="small">Rationale</strong><p class="muted small">${escapeHTML(String(form.fundingRationale))}</p></div>` : ''}`,{classes:'section-gap'}),
-      card('Impact & ESG', live
-        ? `<div class="form-grid"><div class="form-field full"><label>Impact statement</label><textarea readonly>${escapeHTML(String(form.impactStatement || 'Not provided.'))}</textarea></div><div class="form-field full"><label>ESG practices</label><textarea readonly>${escapeHTML(String(form.esgPractices || 'Not provided.'))}</textarea></div><div class="form-field"><label>Jobs created</label><input value="${escapeHTML(String(form.jobsCreated || '-'))}" readonly></div></div>`
-        : `<div class="form-grid"><div class="form-field full"><label>Impact statement</label><textarea readonly>Enabling data-driven decisions across African enterprises.</textarea></div></div>`),
-      card('Declarations & Consent', declarationsHtml),
-    ];
-
     return `<section class="split-layout"><div>
-      <section class="summary-strip"><div class="summary-item"><span>Submitted online</span><strong>${escapeHTML(String(submitted))}</strong></div><div class="summary-item"><span>Application ID</span><strong>${escapeHTML(String(appId))}</strong></div><div class="summary-item"><span>Completeness</span><strong class="positive">${escapeHTML(String(completeness))}</strong></div><div class="summary-item"><span>Applicant</span><strong>${escapeHTML(String(applicant))}</strong></div><div class="summary-item"><span>Last amended</span><strong>${escapeHTML(String(amended))}</strong></div><div class="summary-item"><span>Status</span><strong>${statusPill(String(statusLabel))}</strong></div></section>
-      <section class="grid" style="grid-template-columns:230px minmax(0,1fr)"><div class="term-sections" style="display:block">${sections.map((section,index)=>`<button type="button" class="term-section ${index===sectionIdx?'active':''}" data-action="application-section" data-section="${index}"><span>${icon(index===0?'building':index===1?'users':index===2?'trend-up':index===3?'file-chart':index===4?'dollar':index===5?'sparkles':'shield')} ${escapeHTML(section)}</span>${icon('check-circle')}</button>`).join('')}</div>
-        <div>${sectionBodies[sectionIdx]}</div>
+      <section class="summary-strip"><div class="summary-item"><span>Submitted online</span><strong>1 Jul 2026 · 10:15</strong></div><div class="summary-item"><span>Application ID</span><strong>APP-2026-0048</strong></div><div class="summary-item"><span>Completeness</span><strong class="positive">100%</strong></div><div class="summary-item"><span>Applicant</span><strong>Tariro Kasere, CEO</strong></div><div class="summary-item"><span>Last amended</span><strong>30 Jun 2026</strong></div><div class="summary-item"><span>Status</span><strong>${statusPill('Submitted')}</strong></div></section>
+      <section class="grid" style="grid-template-columns:230px minmax(0,1fr)"><div class="term-sections" style="display:block">${sections.map((section,index)=>`<button class="term-section ${index===0?'active':''}" data-action="application-section"><span>${icon(index===0?'building':index===1?'users':index===2?'trend-up':index===3?'file-chart':index===4?'dollar':index===5?'sparkles':'shield')} ${escapeHTML(section)}</span>${icon('check-circle')}</button>`).join('')}</div>
+        <div>${card('Company Information',`<div class="form-grid"><div class="form-field"><label>Legal name</label><input value="Nova Analytics (Pvt) Ltd" readonly></div><div class="form-field"><label>Website</label><input value="nova-analytics.co.zw" readonly></div><div class="form-field"><label>Registration No.</label><input value="1234567" readonly></div><div class="form-field"><label>Sector</label><input value="Enterprise Software / AI Analytics" readonly></div><div class="form-field"><label>Country</label><input value="Zimbabwe" readonly></div><div class="form-field"><label>Employees</label><input value="62" readonly></div><div class="form-field full"><label>Business description</label><textarea readonly>Nova Analytics provides an AI-powered analytics platform that helps enterprises transform complex data into actionable insights. The platform enables predictive forecasting, operational optimisation and intelligent decision-making.</textarea></div><div class="form-field full"><label>Problem & solution</label><textarea readonly>Enterprises in emerging markets lack affordable, easy-to-use analytics tools, resulting in poor data utilisation and slow decision-making. Nova Analytics delivers an intuitive, scalable platform built for these operating environments.</textarea></div></div>`) }
+        ${card('Funding Request Summary',`<div class="grid cols-4"><div><span class="muted small">Funding Round</span><strong style="display:block;margin-top:4px">${escapeHTML(deal.round)}</strong></div><div><span class="muted small">Requested Investment</span><strong style="display:block;margin-top:4px">${formatMoney(deal.amount)}</strong></div><div><span class="muted small">Proposed Ownership</span><strong style="display:block;margin-top:4px">17.5%</strong></div><div><span class="muted small">Pre-Money Valuation</span><strong style="display:block;margin-top:4px">$85.0M</strong></div></div><div class="section-gap"><div class="chart-legend"><span class="legend-item" style="color:var(--blue)"><i class="legend-dot"></i>40% Product</span><span class="legend-item" style="color:var(--emerald)"><i class="legend-dot"></i>35% Regional Expansion</span><span class="legend-item" style="color:var(--orange)"><i class="legend-dot"></i>25% Sales</span></div><div class="progress" style="height:10px;margin-top:8px"><span style="width:40%;background:var(--blue)"></span></div></div>`,{classes:'section-gap'})}</div>
       </section>
     </div><div class="side-stack" style="display:flex">
-      ${card('Application Overview',`<div class="info-list"><div><div class="info-row"><span>Section progress</span><strong>${live ? (progressPct + '%') : '7 / 7 complete'}</strong></div>${progressBar(progressPct,'var(--emerald)')}</div><div><div class="info-row"><span>Required documents</span><strong>${live ? (docsCount + ' on file') : '8 / 8 received'}</strong></div>${progressBar(live ? Math.min(100, docsCount ? 100 : 0) : 100,'var(--emerald)')}</div><div><div class="info-row"><span>Completeness</span><strong>${escapeHTML(String(completeness))}</strong></div>${progressBar(progressPct,'var(--emerald)')}</div></div>`) }
-      ${card('Declarations', declarationsHtml) }
-      ${card('Applicant Activity', live
-        ? `<div class="timeline"><div class="timeline-item"><strong>Stage</strong><small>${escapeHTML(hero.stage || deal.stage || '-')}</small></div><div class="timeline-item"><strong>Last update</strong><small>${escapeHTML(String(amended))}</small></div></div>`
-        : `<div class="timeline">${sections.slice().reverse().map((section,index)=>`<div class="timeline-item"><strong>${escapeHTML(section)} completed</strong><small>30 Jun 2026 · ${9+index}:45</small></div>`).join('')}</div>`) }
+      ${card('Application Overview',`<div class="info-list"><div><div class="info-row"><span>Section progress</span><strong>7 / 7 complete</strong></div>${progressBar(100,'var(--emerald)')}</div><div><div class="info-row"><span>Required documents</span><strong>8 / 8 received</strong></div>${progressBar(100,'var(--emerald)')}</div><div><div class="info-row"><span>Completeness</span><strong>100%</strong></div>${progressBar(100,'var(--emerald)')}</div></div>`) }
+      ${card('Declarations',`<div class="reason-list"><div class="reason-item">${icon('check-circle')}<div><strong>All information is true and accurate</strong></div></div><div class="reason-item">${icon('check-circle')}<div><strong>Consent to data processing and sharing</strong></div></div><div class="reason-item">${icon('check-circle')}<div><strong>Authorised representative confirmed</strong></div></div></div>`) }
+      ${card('Applicant Activity',`<div class="timeline">${sections.slice().reverse().map((section,index)=>`<div class="timeline-item"><strong>${escapeHTML(section)} completed</strong><small>30 Jun 2026 · ${9+index}:45</small></div>`).join('')}</div>`) }
       <div class="grid">${button('Request clarification','request-clarification','','mail')}${button('Download application','download-application','primary','download')}</div>
     </div></section>`;
   }
 
-  function renderDealScreening(deal, detail) {
-    const { app, hero } = dealDetailCtx(deal, detail);
-    const live = isLiveMode();
-    const aiScore = hero.aiScore != null ? hero.aiScore : app.initialScreeningScore;
-    const analystScore = hero.analystScore != null ? hero.analystScore : app.screeningScore;
-    const score = live
-      ? (hero.score != null ? hero.score : (analystScore != null ? analystScore : (aiScore != null ? aiScore : deal.score)))
-      : deal.score;
-    const outcome = live ? (hero.screeningOutcome || app.screeningOutcome || 'Pending') : 'SHORTLISTED';
-    const summary = live
-      ? String(hero.screeningSummary || app.screeningRejectionReason || app.screeningNotes || '').trim()
-      : `${deal.name} demonstrates strong strategic alignment and product-market fit with a scalable analytics platform for enterprise clients across Africa. Financials are solid with strong revenue growth and healthy unit economics.`;
-    const criteria = live ? [] : [
+  function renderDealScreening(deal) {
+    const criteria = [
       ['Strategic Fit',20,92,'Strong alignment to fund thesis; addresses a real enterprise pain point.','Strong'],
       ['Market Attractiveness',20,84,'Large, growing TAM in enterprise analytics across Africa.','Strong'],
       ['Financial Quality',15,81,'Growth 68% YoY; improving unit economics and margin profile.','Strong'],
@@ -2168,181 +1472,63 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       ['Governance & Compliance',10,76,'Adequate policies; board structure to be strengthened.','Adequate'],
       ['ESG & Impact',5,80,'Positive impact with basic ESG reporting in place.','Strong']
     ];
-    const shortlist = deals.filter(d=> (d.score||0) >= (live ? 60 : 75)).slice(0,6);
-    const criteriaBody = criteria.length
-      ? criteria.map(row=>`<tr><td class="table-primary">${row[0]}</td><td>${row[1]}%</td><td class="positive table-primary">${row[2]}</td><td>${row[3]}</td><td>${statusPill(row[4],row[4]==='Adequate'?'warning':'success')}</td></tr>`).join('')
-      : `<tr><td colspan="5" class="muted">Weighted criteria breakdown is not stored on the application. Overall score and outcome reflect screening fields on the record.</td></tr>`;
-    return `<section class="summary-strip"><div class="summary-item"><span>Total applications</span><strong>${demoOnly('85', String(deals.length))}</strong></div><div class="summary-item"><span>Meet criteria</span><strong class="positive">${demoOnly('24', String(deals.filter(d=>(d.score||0)>=75).length))}</strong></div><div class="summary-item"><span>Do not meet criteria</span><strong class="negative">${demoOnly('61', String(deals.filter(d=>(d.score||0)<60).length))}</strong></div><div class="summary-item"><span>Need human review</span><strong class="warning-text">${demoOnly('6', String(deals.filter(d=>{const sc=d.score||0; return sc>=60 && sc<75;}).length))}</strong></div><div class="summary-item"><span>Model version</span><strong>${demoOnly('Matanho Screen v3.2', 'Application screening')}</strong></div><div class="summary-item"><span>Last run</span><strong>${demoOnly('1 Jul 2026 · 10:18', formatDate(app.updatedAt || app.screeningDate))}</strong></div></section>
+    const shortlist = deals.filter(d=>d.score>=75).slice(0,6);
+    return `<section class="summary-strip"><div class="summary-item"><span>Total applications</span><strong>85</strong></div><div class="summary-item"><span>Meet criteria</span><strong class="positive">24</strong></div><div class="summary-item"><span>Do not meet criteria</span><strong class="negative">61</strong></div><div class="summary-item"><span>Need human review</span><strong class="warning-text">6</strong></div><div class="summary-item"><span>Model version</span><strong>Matanho Screen v3.2</strong></div><div class="summary-item"><span>Last run</span><strong>1 Jul 2026 · 10:18</strong></div></section>
       <section class="split-layout"><div class="grid" style="grid-template-columns:350px minmax(0,1fr)">
-        <section class="card"><div class="tabs"><button class="tab active">Meets criteria · ${demoOnly('24', String(deals.filter(d=>(d.score||0)>=75).length))}</button><button class="tab">Does not meet · ${demoOnly('61', String(deals.filter(d=>(d.score||0)<60).length))}</button></div><div class="card-body" style="padding-top:12px"><div class="table-search" style="margin-bottom:10px">${icon('search')}<input style="width:100%" placeholder="Search applications..."></div><div class="info-list">${shortlist.length ? shortlist.map(candidate=>`<button class="list-row" style="border:1px solid ${candidate.id===deal.id?'var(--brand)':'var(--line)'};border-radius:10px;background:${candidate.id===deal.id?'var(--brand-soft)':'transparent'};padding:9px;width:100%;text-align:left;cursor:pointer" data-action="select-screened-deal" data-id="${candidate.id}"><span class="activity-icon" style="color:var(--brand);background:var(--brand-soft)">${icon('building')}</span><span class="list-row-main"><strong>${escapeHTML(candidate.name)}</strong><small>${escapeHTML(candidate.sector)} · ${formatMoney(candidate.amount)}</small></span><strong class="positive">${candidate.score != null ? candidate.score : '-'}</strong>${statusPill(live ? (candidate.score>=75?'SHORTLISTED':'REVIEW') : 'SHORTLISTED','success')}</button>`).join('') : liveEmptyCard('No other scored applications in the current list.')}</div></div></section>
-        <div>${card(deal.name,`<div style="display:flex;justify-content:space-between;gap:12px"><div class="score-panel"><div><div class="score-big"><strong>${score != null ? score : '-'}</strong><span>/100</span></div><div class="score-confidence">${demoOnly('94% confidence', (aiScore != null ? 'AI ' + aiScore : 'From application'))}</div></div></div>${statusPill(String(outcome), /SHORT|APPROV|PASS/i.test(String(outcome))?'success':'info')}</div><div class="section-gap"><strong class="small">AI summary</strong><p class="muted" style="font-size:9.5px;line-height:1.6">${escapeHTML(summary || 'No screening narrative stored for this application yet.')}</p></div><div class="table-wrap"><table class="criteria-table"><thead><tr><th>Criteria</th><th>Weight</th><th>Score</th><th>Evidence (AI summary)</th><th>Status</th></tr></thead><tbody>${criteriaBody}</tbody></table></div>`,{tools:button('Re-run screening','rerun-screening','compact','refresh')})}
-        <section class="grid cols-2 section-gap">${card('Reasons for shortlist', live ? liveEmptyCard('Structured shortlist reasons are not returned by the API.') : `<div class="reason-list"><div class="reason-item">${icon('check-circle')}<div><strong>AI platform with defensible IP and a strong data flywheel</strong><small>Evidence: 68% YoY revenue growth; 90%+ gross retention.</small></div></div><div class="reason-item">${icon('check-circle')}<div><strong>Large addressable market with accelerating adoption</strong><small>TAM $1.2B; 22% CAGR to 2030.</small></div></div><div class="reason-item">${icon('check-circle')}<div><strong>Experienced founding team with proven execution</strong><small>150+ enterprise clients; ARR $13.2M.</small></div></div></div>`) }${card('Review flags', live ? liveEmptyCard('No structured review flags on this application.') : `<div class="reason-list"><div class="reason-item warning">${icon('alert')}<div><strong>Customer concentration</strong><small>Top 3 customers represent 46% of revenue.</small></div></div><div class="reason-item warning">${icon('alert')}<div><strong>FY2025 EBITDA loss</strong><small>EBITDA -$2.1M; path to profitability in FY2026.</small></div></div></div>`) }</section></div>
+        <section class="card"><div class="tabs"><button class="tab active">Meets criteria · 24</button><button class="tab">Does not meet · 61</button></div><div class="card-body" style="padding-top:12px"><div class="table-search" style="margin-bottom:10px">${icon('search')}<input style="width:100%" placeholder="Search applications..."></div><div class="info-list">${shortlist.map(candidate=>`<button class="list-row" style="border:1px solid ${candidate.id===deal.id?'var(--brand)':'var(--line)'};border-radius:10px;background:${candidate.id===deal.id?'var(--brand-soft)':'transparent'};padding:9px;width:100%;text-align:left;cursor:pointer" data-action="select-screened-deal" data-id="${candidate.id}"><span class="activity-icon" style="color:var(--brand);background:var(--brand-soft)">${icon('building')}</span><span class="list-row-main"><strong>${escapeHTML(candidate.name)}</strong><small>${escapeHTML(candidate.sector)} · ${formatMoney(candidate.amount)}</small></span><strong class="positive">${candidate.score}</strong>${statusPill('SHORTLISTED','success')}</button>`).join('')}</div></div></section>
+        <div>${card(deal.name,`<div style="display:flex;justify-content:space-between;gap:12px"><div class="score-panel"><div><div class="score-big"><strong>${deal.score}</strong><span>/100</span></div><div class="score-confidence">94% confidence</div></div></div>${statusPill('SHORTLISTED','success')}</div><div class="section-gap"><strong class="small">AI summary</strong><p class="muted" style="font-size:10px;line-height:1.6">${escapeHTML(deal.name)} demonstrates strong strategic alignment and product-market fit with a scalable analytics platform for enterprise clients across Africa. Financials are solid with strong revenue growth and healthy unit economics.</p></div><div class="table-wrap"><table class="criteria-table"><thead><tr><th>Criteria</th><th>Weight</th><th>Score</th><th>Evidence (AI summary)</th><th>Status</th></tr></thead><tbody>${criteria.map(row=>`<tr><td class="table-primary">${row[0]}</td><td>${row[1]}%</td><td class="positive table-primary">${row[2]}</td><td>${row[3]}</td><td>${statusPill(row[4],row[4]==='Adequate'?'warning':'success')}</td></tr>`).join('')}</tbody></table></div>`,{tools:button('Re-run screening','rerun-screening','compact','refresh')})}
+        <section class="grid cols-2 section-gap">${card('Reasons for shortlist',`<div class="reason-list"><div class="reason-item">${icon('check-circle')}<div><strong>AI platform with defensible IP and a strong data flywheel</strong><small>Evidence: 68% YoY revenue growth; 90%+ gross retention.</small></div></div><div class="reason-item">${icon('check-circle')}<div><strong>Large addressable market with accelerating adoption</strong><small>TAM $1.2B; 22% CAGR to 2030.</small></div></div><div class="reason-item">${icon('check-circle')}<div><strong>Experienced founding team with proven execution</strong><small>150+ enterprise clients; ARR $13.2M.</small></div></div></div>`) }${card('Review flags',`<div class="reason-list"><div class="reason-item warning">${icon('alert')}<div><strong>Customer concentration</strong><small>Top 3 customers represent 46% of revenue.</small></div></div><div class="reason-item warning">${icon('alert')}<div><strong>FY2025 EBITDA loss</strong><small>EBITDA -$2.1M; path to profitability in FY2026.</small></div></div></div>`) }</section></div>
       </div><div class="side-stack" style="display:flex">
         ${card('Decision',`<div class="grid">${button('Confirm shortlist','confirm-shortlist','success','check')}${button('Move to human review','human-review','warning','users')}${button('Does not meet criteria','screen-reject','danger','x')}</div>`) }
         ${card('Screening Rules',`<div class="info-list"><div class="info-row"><span>Shortlist</span><strong class="positive">Score ≥ 75</strong></div><div class="info-row"><span>Human review</span><strong class="warning-text">60 - 74</strong></div><div class="info-row"><span>Does not meet criteria</span><strong class="negative">&lt; 60</strong></div></div>`) }
-        ${card('Evidence Sources', live
-          ? `<div class="info-row"><span>AI score</span><strong>${aiScore != null ? aiScore + '/100' : '-'}</strong></div><div class="info-row"><span>Analyst score</span><strong>${analystScore != null ? analystScore + '/100' : '-'}</strong></div><p class="muted small">Scores come from application screening fields. Manager discretion applies.</p>`
-          : `<div class="info-row"><span>Reviewed</span><strong>12 / 12 · 100%</strong></div>${progressBar(100,'var(--emerald)')}<p class="muted small">Scores are generated from application data, submitted evidence and weighted criteria. Manager discretion applies.</p>`) }
-        ${card('Audit Trail',`<div class="timeline"><div class="timeline-item"><strong>Screening ${live ? 'fields loaded' : 'completed'}</strong><small>${demoOnly('1 Jul 2026 · 10:18', formatDate(app.updatedAt))}</small></div><div class="timeline-item"><strong>${demoOnly('Model version Matanho Screen v3.2', 'Outcome · ' + String(outcome))}</strong><small>${demoOnly('1 Jul 2026 · 10:18', String(hero.stage || deal.stage || '-'))}</small></div></div>`,{footer:'<span class="muted small">AI recommendation requires manager confirmation.</span>'})}
+        ${card('Evidence Sources',`<div class="info-row"><span>Reviewed</span><strong>12 / 12 · 100%</strong></div>${progressBar(100,'var(--emerald)')}<p class="muted small">Scores are generated from application data, submitted evidence and weighted criteria. Manager discretion applies.</p>`) }
+        ${card('Audit Trail',`<div class="timeline"><div class="timeline-item"><strong>Screening completed</strong><small>1 Jul 2026 · 10:18</small></div><div class="timeline-item"><strong>Model version Matanho Screen v3.2</strong><small>1 Jul 2026 · 10:18</small></div><div class="timeline-item"><strong>Evidence sources updated</strong><small>1 Jul 2026 · 10:10</small></div></div>`,{footer:'<span class="muted small">AI recommendation requires manager confirmation.</span>'})}
       </div></section>`;
   }
 
-  function renderDealDiligence(deal, detail) {
-    const { d } = dealDetailCtx(deal, detail);
-    const live = isLiveMode();
-    const dd = d.dueDiligence;
-    const dealId = deal?.id || state.selectedDealId;
-    const docs = live ? asArraySafe(d.documents || d.application?.documents) : documents;
-    const demoWorkstreams = [
+  function renderDealDiligence() {
+    const workstreams = [
       ['Market Research','Nyasha Moyo',5,'10 Jul 2026'],['Financial Assessment','Tendai Moyo',5,'11 Jul 2026'],['Competitive Analysis','Rudo Ndlovu',5,'12 Jul 2026'],['Management Team Evaluation','Chipo Dube',5,'13 Jul 2026'],['Legal Compliance','Farai Chikore',4,'14 Jul 2026'],['Risk Assessment','Tinashe Sibanda',4,'14 Jul 2026']
     ];
-    const liveTasks = dd ? asArraySafe(dd.tasks || dd.workstreams || dd.activities) : [];
-    const ddComplete = isDDCompleteRecord(dd);
-    const completeGate = live && dd ? canCompleteDueDiligence(dd, liveTasks) : { ok: false, reason: '' };
-    const workstreamRows = live
-      ? liveTasks.map((t, index) => ({
-          id: t.id,
-          name: resolveDDWorkstreamLabel(t, 'primary'),
-          workstream: resolveDDWorkstreamLabel(t, 'workstream'),
-          analyst: (t.team && t.team[0] ? `${t.team[0].firstName || ''} ${t.team[0].lastName || ''}`.trim() : '') || (t.creator ? `${t.creator.firstName || ''} ${t.creator.lastName || ''}`.trim() : '') || (t.owner || t.assignee || '-'),
-          taskCount: (() => {
-            const docs = collectTaskEvidenceDocuments(t);
-            const acts = asArraySafe(t.activityLogs || t.activities);
-            if (docs.length) return `${docs.length} file${docs.length === 1 ? '' : 's'}`;
-            if (acts.length) return `${acts.length} update${acts.length === 1 ? '' : 's'}`;
-            return isDDTaskComplete(t) ? 'Complete' : '—';
-          })(),
-          due: formatDate(t.date || t.dueDate),
-          status: mapDDTaskStage(t.stage || t.status || dd?.status || 'Pending'),
-          index,
-        }))
-      : demoWorkstreams.map((w, index) => ({
-          id: '',
-          name: w[0],
-          analyst: w[1],
-          taskCount: `${w[2]} / ${w[2]}`,
-          due: w[3],
-          status: 'Complete',
-          index,
-        }));
-    const completed = live
-      ? liveTasks.filter((t) => isDDTaskComplete(t)).length
-      : state.dueDiligenceTasks.filter((t) => t.status === 'Complete').length;
-    const taskTotal = live ? Math.max(liveTasks.length, 1) : state.dueDiligenceTasks.length;
-    const progressPct = live
-      ? (dd ? (/complete/i.test(String(dd.status || '')) ? 100 : Math.round((completed / Math.max(liveTasks.length, 1)) * 100)) : 0)
-      : 100;
-    if (live && !dd) {
-      return `<section class="section-gap">${card('Due diligence', `<div class="empty-state compact"><p class="muted">No due diligence record yet.</p><div class="section-gap">${button('Start due diligence','start-due-diligence','primary','plus',`data-deal-id="${escapeHTML(dealId)}"`)}</div></div>`)}</section>`;
-    }
+    const completed = state.dueDiligenceTasks.filter(t=>t.status==='Complete').length;
     return `<section class="metric-grid">
-      ${metricCard({label:'Overall Progress',value: progressPct + '%',iconName:'pie-chart',accent:'blue',foot: live ? (dd ? String(dd.status || 'In progress') : 'Not started') : 'Complete',action:'dd-progress'})}
-      ${metricCard({label:'Workstreams',value: live ? (workstreamRows.length + (dd ? '' : ' / —')) : '6 / 6',iconName:'briefcase',accent:'purple',foot: live ? (dd ? 'From API' : 'None') : 'Complete',action:'dd-workstreams'})}
-      ${metricCard({label:'Tasks',value: `${completed} / ${live ? liveTasks.length : taskTotal}`,iconName:'clipboard',accent:'emerald',foot: live ? 'Assigned' : 'Complete',action:'dd-tasks'})}
-      ${metricCard({label:'Critical Findings',value: demoOnly('0', dd?.criticalFindings != null ? String(dd.criticalFindings) : '—'),iconName:'shield',accent:'emerald',foot:'Open',action:'dd-findings'})}
-      ${metricCard({label:'Conditions Raised',value: demoOnly('3', dd?.conditions != null ? String(asArraySafe(dd.conditions).length || dd.conditions) : '—'),iconName:'alert',accent:'amber',foot:'Open',action:'dd-conditions'})}
-      ${metricCard({label:'Data Room',value:String(docs.length),iconName:'file',accent:'blue',foot:'Files',action:'deal-tab'})}
+      ${metricCard({label:'Overall Progress',value:'100%',iconName:'pie-chart',accent:'blue',foot:'Complete',action:'dd-progress'})}
+      ${metricCard({label:'Workstreams',value:'6 / 6',iconName:'briefcase',accent:'purple',foot:'Complete',action:'dd-workstreams'})}
+      ${metricCard({label:'Tasks',value:`${completed} / ${state.dueDiligenceTasks.length}`,iconName:'clipboard',accent:'emerald',foot:'Complete',action:'dd-tasks'})}
+      ${metricCard({label:'Critical Findings',value:'0',iconName:'shield',accent:'emerald',foot:'Open',action:'dd-findings'})}
+      ${metricCard({label:'Conditions Raised',value:'3',iconName:'alert',accent:'amber',foot:'Open',action:'dd-conditions'})}
+      ${metricCard({label:'Data Room',value:String(documents.length),iconName:'file',accent:'blue',foot:'Files',action:'deal-tab'})}
     </section>
     <section class="split-layout"><div>
-      ${card('Due Diligence Workstreams', workstreamRows.length
-        ? `<div class="table-wrap"><table class="criteria-table"><thead><tr><th>Workstream</th><th>Lead Analyst</th><th>Activity</th><th>Due Date</th><th>Progress</th><th>Findings</th><th>Status</th></tr></thead><tbody>${workstreamRows.map((row)=>{const st=row.status||'Pending'; const done=/complete/i.test(String(st)); const pctVal=done?100:0; const trAttrs=live&&row.id?` class="clickable" data-action="open-dd-task" data-id="${escapeHTML(String(row.id))}"`:''; return `<tr${trAttrs}><td class="table-primary">${escapeHTML(String(row.name))}<small class="muted" style="display:block;margin-top:2px">${escapeHTML(String(row.workstream||''))}</small></td><td><span class="owner-mini">${avatar(String(row.analyst||'NA'),row.index)}${escapeHTML(String(row.analyst||'-'))}</span></td><td>${escapeHTML(String(row.taskCount))}</td><td>${escapeHTML(String(row.due))}</td><td><div class="inline-progress">${progressBar(pctVal,'var(--emerald)')}<span>${pctVal}%</span></div></td><td>${live?'—':(row.index===2?1:0)}</td><td>${statusPill(String(st))}</td></tr>`;}).join('')}</tbody></table></div>${live&&workstreamRows.length?`<p class="muted small" style="margin-top:8px">${isDefaultDDTaskPack(liveTasks)?'Four standard workstreams were auto-assigned when due diligence started. Click a row for details, or use Add workstream for more.':'Click a row to open task details.'}</p>`:''}`
-        : liveEmptyCard(dd ? 'No workstream tasks yet. Use Add workstream or Assign tasks to begin.' : 'Due diligence not started.'),
-        {tools:`${ddComplete ? '' : button('Add workstream','add-workstream','compact','plus')}${live && dd && !ddComplete ? button('Fill assessment','open-dd-assessment','compact','edit') : ''}${live&&liveTasks.length?button('View tasks','open-all-dd-tasks','compact','external-link'):''}${live && dd && !ddComplete ? button('Complete due diligence','complete-due-diligence','compact','check',`data-deal-id="${escapeHTML(dealId)}"${completeGate.ok ? '' : ' disabled title="'+escapeHTML(completeGate.reason)+'"'}`) : ''}`})}
-      <section class="section-gap">${card('Financial Assessment', live
-        ? (docs.length
-            ? `<div class="table-wrap"><table class="criteria-table"><thead><tr><th>Name</th><th>Type</th><th>Actions</th></tr></thead><tbody>${docs.slice(0,12).map((doc,i)=>{const name=doc.name||doc.fileName||doc.title||('Document '+(i+1)); const type=doc.documentType||doc.type||'-'; const url=doc.fileUrl||doc.url||''; return `<tr><td class="table-primary">${escapeHTML(name)}</td><td>${escapeHTML(String(type))}</td><td>${url?button('Preview','preview-deal-document','ghost compact','eye',`data-url="${escapeHTML(url)}" data-name="${escapeHTML(name)}"`):'<span class="muted small">No URL</span>'}</td></tr>`;}).join('')}</tbody></table></div>`
-            : liveEmptyCard('No DD documents or task board detail from API yet.'))
-        : `<div class="workstream-grid"><div class="task-column"><div class="task-column-head"><span>To Do</span><span class="table-badge">0</span></div><div class="empty-state"><div><div class="empty-state-icon">${icon('check-circle')}</div><h3>All tasks completed</h3></div></div></div><div class="task-column"><div class="task-column-head"><span>In Review</span><span class="table-badge">0</span></div><div class="empty-state"><div><div class="empty-state-icon">${icon('check-circle')}</div><h3>No pending reviews</h3></div></div></div><div class="task-column"><div class="task-column-head"><span>Complete</span><span class="table-badge">${completed}</span></div>${state.dueDiligenceTasks.map((task,index)=>`<article class="task-card" data-action="open-dd-task" data-id="${task.id}"><strong>${escapeHTML(task.title)}</strong><div class="task-meta"><span>${avatar(task.analyst,index)} ${escapeHTML(task.analyst)}</span><span>${task.due}</span></div><div class="task-meta"><span class="priority ${task.priority.toLowerCase()}">${task.priority}</span><span>${task.evidence} files · ${task.comments} comments</span></div></article>`).join('')}</div></div>`,
-        {tools:button('View all tasks','open-all-dd-tasks','compact','external-link')})}</section>
+      ${card('Due Diligence Workstreams',`<div class="table-wrap"><table class="criteria-table"><thead><tr><th>Workstream</th><th>Lead Analyst</th><th>Tasks</th><th>Due Date</th><th>Progress</th><th>Findings</th><th>Status</th></tr></thead><tbody>${workstreams.map((w,index)=>`<tr><td class="table-primary">${w[0]}</td><td><span class="owner-mini">${avatar(w[1],index)}${w[1]}</span></td><td>${w[2]} / ${w[2]}</td><td>${w[3]}</td><td><div class="inline-progress">${progressBar(100,'var(--emerald)')}<span>100%</span></div></td><td>${index===2?1:0}</td><td>${statusPill('Complete')}</td></tr>`).join('')}</tbody></table></div>`,{tools:`${button('Assign tasks','assign-dd-task','compact','users')}${button('Add workstream','add-workstream','compact','plus')}`})}
+      <section class="section-gap">${card('Financial Assessment',`<div class="workstream-grid"><div class="task-column"><div class="task-column-head"><span>To Do</span><span class="table-badge">0</span></div><div class="empty-state"><div><div class="empty-state-icon">${icon('check-circle')}</div><h3>All tasks completed</h3></div></div></div><div class="task-column"><div class="task-column-head"><span>In Review</span><span class="table-badge">0</span></div><div class="empty-state"><div><div class="empty-state-icon">${icon('check-circle')}</div><h3>No pending reviews</h3></div></div></div><div class="task-column"><div class="task-column-head"><span>Complete</span><span class="table-badge">${completed}</span></div>${state.dueDiligenceTasks.map((task,index)=>`<article class="task-card" data-action="open-dd-task" data-id="${task.id}"><strong>${escapeHTML(task.title)}</strong><div class="task-meta"><span>${avatar(task.analyst,index)} ${escapeHTML(task.analyst)}</span><span>${task.due}</span></div><div class="task-meta"><span class="priority ${task.priority.toLowerCase()}">${task.priority}</span><span>${task.evidence} files · ${task.comments} comments</span></div></article>`).join('')}</div></div>`,{tools:button('View all tasks','open-all-dd-tasks','compact','external-link')})}</section>
     </div><div class="side-stack" style="display:flex">
-      ${card('Analyst Workload', live
-        ? liveEmptyCard('Analyst utilisation metrics are not returned by the DD API.')
-        : `<div class="info-list">${demoWorkstreams.map((w,index)=>`<div><div class="info-row"><span class="owner-mini">${avatar(w[1],index)}${w[1]}</span><strong>${[78,72,69,75,64,68][index]}%</strong></div>${progressBar([78,72,69,75,64,68][index],'var(--emerald)')}</div>`).join('')}</div>`) }
-      ${card('Investment Assessment', live
-        ? renderDDAssessmentCompact(dd)
-        : `<div class="reason-list"><div class="reason-item">${icon('check-circle')}<div><strong>Revenue growth supported by contracted pipeline</strong><small>Low severity · Tendai Moyo</small></div></div><div class="reason-item">${icon('check-circle')}<div><strong>Strong unit economics and CAC payback</strong><small>Low severity · Nyasha Moyo</small></div></div><div class="reason-item warning">${icon('alert')}<div><strong>Customer concentration above threshold</strong><small>Medium severity · Rudo Ndlovu</small></div></div></div>`,{footer: live ? (dd ? `<button class="card-link" data-action="view-dd-assessment">View checklist</button>${!/complete/i.test(String(dd.status||'')) ? `<button class="card-link" data-action="open-dd-assessment">Fill assessment</button>` : ''}` : '') : '<button class="card-link" data-action="open-findings">View all findings</button>'})}
-      ${card('Key Findings', live
-        ? (dd?.finalComments
-            ? `<div class="reason-list"><div class="reason-item">${icon(/reject/i.test(String(dd?.recommendation||''))?'alert':'check-circle')}<div><strong>${escapeHTML(String(dd?.recommendation || 'Assessment in progress'))}</strong><small>Score ${escapeHTML(dd?.overallScore != null ? String(dd.overallScore) : `${ddAssessmentScore(dd)}/6`)}</small></div></div><p class="muted small">${escapeHTML(String(dd.finalComments))}</p></div>`
-            : liveEmptyCard('Final comments appear here after you save the assessment.'))
-        : `<div class="reason-list"><div class="reason-item">${icon('check-circle')}<div><strong>Revenue growth supported by contracted pipeline</strong><small>Low severity · Tendai Moyo</small></div></div><div class="reason-item">${icon('check-circle')}<div><strong>Strong unit economics and CAC payback</strong><small>Low severity · Nyasha Moyo</small></div></div><div class="reason-item warning">${icon('alert')}<div><strong>Customer concentration above threshold</strong><small>Medium severity · Rudo Ndlovu</small></div></div></div>`,{footer: live ? '' : '<button class="card-link" data-action="open-findings">View all findings</button>'})}
-      ${card('Conditions for Approval', live
-        ? liveEmptyCard('Conditions are not returned as a structured list yet.')
-        : `<div class="info-list">${[['1','Long-term customer contracts for top 5 accounts'],['2','Evidence of EBITDA sustainability'],['3','Legal title confirmation for IP assets']].map(item=>`<div class="list-row"><span class="risk-score medium">${item[0]}</span><span class="list-row-main"><strong>${item[1]}</strong></span>${statusPill('Open','warning')}</div>`).join('')}</div>`,{footer: live ? '' : '<button class="card-link" data-action="open-conditions">View all conditions</button>'})}
-      ${card('Recent Activity', live
-        ? `<div class="timeline"><div class="timeline-item"><strong>Status</strong><small>${escapeHTML(dd?.status || 'Not started')}</small></div><div class="timeline-item"><strong>Recommendation</strong><small>${escapeHTML(dd?.recommendation || '-')}</small></div></div>`
-        : `<div class="timeline"><div class="timeline-item"><strong>All Financial Assessment tasks marked complete</strong><small>13 Jul 2026 · 12:20</small></div><div class="timeline-item"><strong>Tax position completed</strong><small>11 Jul 2026 · 11:10</small></div><div class="timeline-item"><strong>New evidence uploaded</strong><small>10 Jul 2026 · 15:45</small></div></div>`) }
+      ${card('Analyst Workload',`<div class="info-list">${workstreams.map((w,index)=>`<div><div class="info-row"><span class="owner-mini">${avatar(w[1],index)}${w[1]}</span><strong>${[78,72,69,75,64,68][index]}%</strong></div>${progressBar([78,72,69,75,64,68][index],'var(--emerald)')}</div>`).join('')}</div>`) }
+      ${card('Key Findings',`<div class="reason-list"><div class="reason-item">${icon('check-circle')}<div><strong>Revenue growth supported by contracted pipeline</strong><small>Low severity · Tendai Moyo</small></div></div><div class="reason-item">${icon('check-circle')}<div><strong>Strong unit economics and CAC payback</strong><small>Low severity · Nyasha Moyo</small></div></div><div class="reason-item warning">${icon('alert')}<div><strong>Customer concentration above threshold</strong><small>Medium severity · Rudo Ndlovu</small></div></div></div>`,{footer:'<button class="card-link" data-action="open-findings">View all findings</button>'})}
+      ${card('Conditions for Approval',`<div class="info-list">${[['1','Long-term customer contracts for top 5 accounts'],['2','Evidence of EBITDA sustainability'],['3','Legal title confirmation for IP assets']].map(item=>`<div class="list-row"><span class="risk-score medium">${item[0]}</span><span class="list-row-main"><strong>${item[1]}</strong></span>${statusPill('Open','warning')}</div>`).join('')}</div>`,{footer:'<button class="card-link" data-action="open-conditions">View all conditions</button>'})}
+      ${card('Recent Activity',`<div class="timeline"><div class="timeline-item"><strong>All Financial Assessment tasks marked complete</strong><small>13 Jul 2026 · 12:20</small></div><div class="timeline-item"><strong>Tax position completed</strong><small>11 Jul 2026 · 11:10</small></div><div class="timeline-item"><strong>New evidence uploaded</strong><small>10 Jul 2026 · 15:45</small></div></div>`) }
     </div></section>`;
   }
 
-  function renderDealTermSheet(deal, detail) {
-    const { d, hero } = dealDetailCtx(deal, detail);
-    const live = isLiveMode();
-    const ts = d.termSheet;
-    const dealId = deal?.id || state.selectedDealId;
-    if (live && !ts) {
-      return `<section class="summary-strip"><div class="summary-item"><span>Version</span><strong>—</strong></div><div class="summary-item"><span>Clauses</span><strong>—</strong></div><div class="summary-item"><span>Agreed</span><strong class="positive">—</strong></div><div class="summary-item"><span>Open</span><strong class="warning-text">—</strong></div><div class="summary-item"><span>Last updated</span><strong>—</strong></div><div class="summary-item"><span>Signature status</span><strong>${statusPill('Not prepared')}</strong></div></section>
-        <section class="section-gap">${card('Term sheet', `<div class="empty-state"><div><div class="empty-state-icon">${icon('file')}</div><h3>No term sheet</h3><p class="muted">Create a term sheet to lock investment amount, equity and valuation.</p><div class="section-gap">${button('Create term sheet','create-term-sheet','primary','plus',`data-deal-id="${escapeHTML(dealId)}"`)}</div></div></div>`)}</section>`;
-    }
-    if (live && ts) {
-      const clauses = asArraySafe(ts.clauses || ts.sections || ts.terms);
-      const equity = ts.equityPercentage != null ? ts.equityPercentage : hero.ownership;
-      const valuation = ts.valuation != null ? ts.valuation : (ts.preMoneyValuation != null ? ts.preMoneyValuation : hero.preMoney);
-      const docUrl = ts.documentUrl || ts.document?.url || '';
-      const docName = ts.documentFileName || ts.document?.fileName || 'Term sheet document';
-      const docBlock = docUrl
-        ? `<div class="section-gap">${card('Term sheet document', `<div class="info-list"><div class="info-row"><span>File</span><strong>${escapeHTML(docName)}</strong></div>${ts.documentSize ? `<div class="info-row"><span>Size</span><strong>${Math.round(Number(ts.documentSize) / 1024)} KB</strong></div>` : ''}</div><div class="page-actions section-gap">${button('Preview','preview-deal-document','compact','eye',`data-url="${escapeHTML(docUrl)}" data-name="${escapeHTML(docName)}"`)}${button('Download','download-deal-document','compact','download',`data-url="${escapeHTML(docUrl)}" data-name="${escapeHTML(docName)}"`)}</div>`)}</div>`
-        : card('Term sheet document', liveEmptyCard('No PDF attached yet. Create a new version with a document if required.'), { classes: 'section-gap' });
-      return `<section class="summary-strip"><div class="summary-item"><span>Version</span><strong>${escapeHTML(String(ts.version || ts.currentVersion || '-'))}</strong></div><div class="summary-item"><span>Clauses</span><strong>${clauses.length || '—'}</strong></div><div class="summary-item"><span>Status</span><strong>${statusPill(String(ts.status || 'Loaded'))}</strong></div><div class="summary-item"><span>Investment</span><strong>${ts.investmentAmount != null ? formatMoney(ts.investmentAmount) : '-'}</strong></div><div class="summary-item"><span>Equity</span><strong>${equity != null && equity !== '' ? equity + '%' : '-'}</strong></div><div class="summary-item"><span>Valuation</span><strong>${valuation != null && Number(valuation) !== 0 ? formatMoney(valuation) : '-'}</strong></div></section>
-        ${card('Term sheet', liveKv([
-          ['ID', ts.id],
-          ['Title', ts.title || '-'],
-          ['Key terms', ts.keyTerms || '-'],
-          ['Conditions', ts.conditions || '-'],
-          ['Timeline', ts.timeline || '-'],
-          ['Updated', ts.updatedAt || '-'],
-        ]), { classes: 'section-gap', tools: button('Refresh','reload-deal-detail','compact','refresh',`data-deal-id="${escapeHTML(dealId)}"`) })}
-        ${docBlock}
-        ${clauses.length ? card('Clauses', `<div class="table-wrap"><table class="criteria-table"><thead><tr><th>Title</th><th>Status</th><th>Value</th></tr></thead><tbody>${clauses.slice(0,40).map(c=>`<tr><td class="table-primary">${escapeHTML(c.title || c.name || '-')}</td><td>${statusPill(String(c.status || '-'))}</td><td>${escapeHTML(String(c.value || c.matanhoPosition || '-'))}</td></tr>`).join('')}</tbody></table></div>`, { classes: 'section-gap' }) : ''}`;
-    }
+  function renderDealTermSheet() {
     const selectedSection=termSheetSections[state.termSection]||termSheetSections[0];
     const decisions=state.termDecisions||{};
-    const clauses=selectedSection.clauses.map((clause,index)=>({...clause,status:decisions[state.termSection + ':' + index]||clause.status}));
-    const agreed=termSheetSections.flatMap((section,sIndex)=>section.clauses.map((clause,cIndex)=>decisions[sIndex + ':' + cIndex]||clause.status)).filter(status=>status==='Agreed').length;
+    const clauses=selectedSection.clauses.map((clause,index)=>({...clause,status:decisions[`${state.termSection}:${index}`]||clause.status}));
+    const agreed=termSheetSections.flatMap((section,sIndex)=>section.clauses.map((clause,cIndex)=>decisions[`${sIndex}:${cIndex}`]||clause.status)).filter(status=>status==='Agreed').length;
     const total=termSheetSections.reduce((count,section)=>count+section.clauses.length,0);
     const open=total-agreed;
     const envelope=signatureEnvelopes.find(item=>item.documentId==='DOC-009');
     return `<section class="summary-strip"><div class="summary-item"><span>Version</span><strong>v4</strong></div><div class="summary-item"><span>Clauses</span><strong>${total}</strong></div><div class="summary-item"><span>Agreed</span><strong class="positive">${agreed}</strong></div><div class="summary-item"><span>Open</span><strong class="warning-text">${open}</strong></div><div class="summary-item"><span>Last updated</span><strong>13 Jul 2026 · 16:20</strong></div><div class="summary-item"><span>Signature status</span><strong>${statusPill(envelope?.status||'Not prepared')}</strong></div></section>
       ${workspaceFilterBar([{label:'Version',action:'term-version-filter',selected:'v4 Current',options:['v4 Current','v3 Company redline','v2 Internal draft']},{label:'Clause status',action:'term-status-filter',selected:'All clauses',options:['All clauses','Open only','Agreed only']},{label:'Owner',action:'term-owner-filter',selected:'All owners',options:['All owners','Farai Chikore','Tendai Moyo','Nyasha Moyo']},{type:'button',label:'Activity',action:'activity-menu',icon:'clock',attrs:'data-context="term-sheet" data-id="DL-013"'}])}
-      <section class="term-layout"><div class="term-sections">${termSheetSections.map((section,index)=>{const sectionStatuses=section.clauses.map((clause,cIndex)=>decisions[index + ':' + cIndex]||clause.status);const complete=sectionStatuses.filter(status=>status==='Agreed').length;return `<button class="term-section ${state.termSection===index?'active':''}" data-action="term-section" data-section="${index}"><span>${icon(section.icon)} ${escapeHTML(section.name)}</span><span class="${complete<section.clauses.length?'warning-text':'positive'}">${complete} / ${section.clauses.length}</span></button>`}).join('')}</div>
+      <section class="term-layout"><div class="term-sections">${termSheetSections.map((section,index)=>{const sectionStatuses=section.clauses.map((clause,cIndex)=>decisions[`${index}:${cIndex}`]||clause.status);const complete=sectionStatuses.filter(status=>status==='Agreed').length;return `<button class="term-section ${state.termSection===index?'active':''}" data-action="term-section" data-section="${index}"><span>${icon(section.icon)} ${escapeHTML(section.name)}</span><span class="${complete<section.clauses.length?'warning-text':'positive'}">${complete} / ${section.clauses.length}</span></button>`}).join('')}</div>
       <div><div class="page-actions term-toolbar">${button('Preview PDF','preview-document','','eye','data-id="DOC-009"')}${button('Generate PDF','generate-term-pdf','','file')}${button(envelope?.status==='Completed'?'View signed term sheet':'Sign term sheet','sign-term-sheet','primary','edit')}${button('Signature Studio','share-term','','send')}${button('Compare versions','open-version-history','','layers')}${button('New version','new-term-version','','plus')}</div>
         <section class="term-signing-status"><div><span class="term-signing-icon">${icon('edit')}</span><div><strong>Electronic signing workflow</strong><small>${envelope?.recipients.map(recipient=>`${recipient[0]} · ${recipient[2]}`).join('  •  ')||'Envelope not prepared'}</small></div></div><div><div class="inline-progress">${progressBar(envelope?.progress||0)}<span>${envelope?.progress||0}%</span></div>${statusPill(envelope?.status||'Draft')}</div></section>
         <div class="term-section-heading"><div><span class="overlay-eyebrow">Clause workspace</span><h3>${escapeHTML(selectedSection.name)}</h3><p>${clauses.filter(c=>c.status==='Agreed').length} agreed · ${clauses.filter(c=>c.status!=='Agreed').length} requiring attention · source-linked redlines</p></div><div class="term-section-health">${statusPill(clauses.every(c=>c.status==='Agreed')?'Complete':'Negotiating',clauses.every(c=>c.status==='Agreed')?'success':'warning')}</div></div>
-        <div class="term-clause-grid">${clauses.map((clause,index)=>`<article class="clause-card interactive-clause ${clause.status==='Open'?'open-clause':''}" data-action="open-term-clause" data-section="${state.termSection}" data-clause="${index}"><div class="clause-head"><div><strong>${escapeHTML(clause.title)}</strong><div class="muted small">${escapeHTML(clause.reference)} · ${escapeHTML(clause.source)}</div></div>${statusPill(clause.status,clause.status==='Open'?'warning':'success')}</div><div class="clause-summary"><div><span>Current value</span><strong>${escapeHTML(clause.value)}</strong></div><div><span>Owner</span><strong>${escapeHTML(clause.owner)}</strong></div><div><span>Updated</span><strong>${escapeHTML(clause.updated)}</strong></div></div><div class="clause-preview"><div><small>Matanho position</small><p>${escapeHTML(clause.matanho)}</p></div><div><small>Company position</small><p>${escapeHTML(clause.company)}</p></div></div><div class="clause-actions">${button('Open clause','open-term-clause','compact','eye',`data-section="${state.termSection}" data-clause="${index}"`)}${clause.status==='Open'?`${button('Accept counter','accept-counter','compact','check',`data-section="${state.termSection}" data-clause="${index}"`)}${button('Retain position','retain-position','compact','gavel',`data-section="${state.termSection}" data-clause="${index}"`)} `:button('Activity','activity-menu','ghost compact','clock',`data-context="term-clause" data-id="${state.termSection}:${index}"`)}</div></article>`).join('')}</div>
+        <div class="term-clause-grid">${clauses.map((clause,index)=>`<article class="clause-card interactive-clause ${clause.status==='Open'?'open-clause':''}" data-action="open-term-clause" data-section="${state.termSection}" data-clause="${index}"><div class="clause-head"><div><strong>${escapeHTML(clause.title)}</strong><div class="muted small">${escapeHTML(clause.reference)} · ${escapeHTML(clause.source)}</div></div>${statusPill(clause.status,clause.status==='Open'?'warning':'success')}</div><div class="clause-summary"><div><span>Current value</span><strong>${escapeHTML(clause.value)}</strong></div><div><span>Owner</span><strong>${escapeHTML(clause.owner)}</strong></div><div><span>Updated</span><strong>${escapeHTML(clause.updated)}</strong></div></div><div class="clause-preview"><div><small>Matanho position</small><p>${escapeHTML(clause.matanho)}</p></div><div><small>Company position</small><p>${escapeHTML(clause.company)}</p></div></div><div class="clause-actions">${button('Open clause','open-term-clause','compact','eye',`data-section="${state.termSection}" data-clause="${index}"`)}${clause.status==='Open'?`${button('Accept counter','accept-counter','compact','check',`data-section="${state.termSection}" data-clause="${index}"`)}${button('Retain position','retain-position','compact','gavel',`data-section="${state.termSection}" data-clause="${index}"`)}`:button('Activity','activity-menu','ghost compact','clock',`data-context="term-clause" data-id="${state.termSection}:${index}"`)}</div></article>`).join('')}</div>
       </div><div class="side-stack" style="display:flex">${card('Signing Parties',`<div class="signature-party-list">${(envelope?.recipients||[]).map((recipient,index)=>`<div>${personAvatar(recipient[0])}<span><strong>${escapeHTML(recipient[0])}</strong><small>${escapeHTML(recipient[1])}</small></span>${statusPill(recipient[2],recipient[2]==='Signed'?'success':'warning')}</div>`).join('')}</div>`,{footer:`<button class="card-link" data-action="sign-term-sheet">Open signing page</button>`})}${card('Approval Routing',`<div class="approval-route"><div class="done"><span>1</span><div><strong>Legal review</strong><small>Farai Chikore · complete</small></div></div><div class="done"><span>2</span><div><strong>Investment Director</strong><small>Tariro Kasere · complete</small></div></div><div class="current"><span>3</span><div><strong>Company signature</strong><small>${envelope?.progress||0}% complete</small></div></div><div><span>4</span><div><strong>Completion certificate</strong><small>Generated after all parties sign</small></div></div></div>`)}${card('Source Data',`<div class="info-list"><div class="info-row"><span>Investment memo</span><strong>IM-NOVA-v7</strong></div><div class="info-row"><span>Valuation model</span><strong>VAL-NOVA-Q2-2026</strong></div><div class="info-row"><span>Cap table</span><strong>CAP-NOVA-v8</strong></div><div class="info-row"><span>Legal redline</span><strong>TS-NOVA-v4</strong></div><div class="info-row"><span>Last sync</span><strong>13 Jul · 16:20 CAT</strong></div></div>`,{footer:'<button class="card-link" data-action="preview-document" data-id="DOC-009">Preview current term sheet</button>'})}</div></section>`;
   }
 
-  function renderDealIC(deal, detail) {
-    const { d, hero } = dealDetailCtx(deal, detail);
-    const live = isLiveMode();
-    const br = d.boardReview;
-    const dealId = deal?.id || state.selectedDealId;
-    if (live && !br) {
-      return `<section class="summary-strip"><div class="summary-item"><span>Meeting</span><strong>Board & IC Review</strong></div><div class="summary-item"><span>Date</span><strong>—</strong></div><div class="summary-item"><span>Time</span><strong>—</strong></div><div class="summary-item"><span>Voting members</span><strong>—</strong></div><div class="summary-item"><span>Status</span><strong>${statusPill('Not started')}</strong></div><div class="summary-item"><span>Meeting tools</span><strong>—</strong></div></section>
-        <section class="section-gap">${card('Board & IC', `<div class="empty-state"><div><div class="empty-state-icon">${icon('users')}</div><h3>No board / IC review</h3><p class="muted">Start a board review with an investment memorandum to open voting.</p><div class="section-gap">${button('Start board review','start-board-review','primary','plus',`data-deal-id="${escapeHTML(dealId)}"`)}</div></div></div>`)}</section>`;
-    }
-    if (live && br) {
-      const votes = asArraySafe(br.votes || br.members || br.committeeVotes);
-      const ownership = hero.ownership != null ? Number(hero.ownership).toFixed(1) + '%' : '-';
-      const preMoney = hero.preMoney != null && Number(hero.preMoney) !== 0 ? formatMoney(hero.preMoney) : '-';
-      const score = hero.score != null ? hero.score : deal.score;
-      return `<section class="summary-strip"><div class="summary-item"><span>Meeting</span><strong>Board & IC Review</strong></div><div class="summary-item"><span>Date</span><strong>${escapeHTML(String(br.meetingDate || br.scheduledAt || '-'))}</strong></div><div class="summary-item"><span>Status</span><strong>${statusPill(String(br.status || 'In progress'))}</strong></div><div class="summary-item"><span>Decision</span><strong>${escapeHTML(String(br.decision || br.recommendation || '-'))}</strong></div><div class="summary-item"><span>Votes</span><strong>${votes.length || '—'}</strong></div><div class="summary-item"><span>Meeting tools</span><strong><button class="card-link" data-action="open-meeting-pack">Open pack</button></strong></div></section>
-        <section class="grid cols-2 section-gap">
-          ${card('Decision Brief', `<div class="grid cols-5"><div><span class="muted small">Recommendation</span><strong class="positive" style="display:block;margin-top:4px">${escapeHTML(String(br.recommendation || br.decision || '-'))}</strong></div><div><span class="muted small">Requested</span><strong style="display:block;margin-top:4px">${formatMoney(hero.requestedAmount || deal.amount)}</strong></div><div><span class="muted small">Ownership</span><strong style="display:block;margin-top:4px">${escapeHTML(ownership)}</strong></div><div><span class="muted small">Valuation</span><strong style="display:block;margin-top:4px">${escapeHTML(preMoney)}</strong></div><div><span class="muted small">AI Score</span><strong style="display:block;margin-top:4px">${score != null ? score : '-'}/100</strong></div></div>`)}
-          ${card('Cast / update vote', `<div class="grid cols-2">${button('Approve','final-vote','success compact','check','data-vote="Approve"')}${button('Approve with conditions','final-vote','compact','shield','data-vote="Approve with conditions"')}${button('Defer','final-vote','compact','clock','data-vote="Defer"')}${button('Reject','final-vote','danger compact','x','data-vote="Reject"')}</div>`)}
-        </section>
-        ${votes.length ? card('Votes / members', `<div class="table-wrap"><table class="criteria-table"><thead><tr><th>Member</th><th>Vote</th><th>Status</th></tr></thead><tbody>${votes.map(v=>`<tr><td>${escapeHTML(v.name || v.member || v.userName || '-')}</td><td>${escapeHTML(String(v.vote || v.decision || '-'))}</td><td>${statusPill(String(v.status || '-'))}</td></tr>`).join('')}</tbody></table></div>`, { classes: 'section-gap' }) : card('Votes / members', liveEmptyCard('No vote rows returned for this board review.'), { classes: 'section-gap' })}`;
-    }
+  function renderDealIC(deal) {
     const votes = Object.values(state.dealVote);
     const voteCounts = ['Approve','Approve with conditions','Pending','Reject'].map(label=>({label,value:votes.filter(v=>v===label).length,color:label==='Approve'?'#07936d':label==='Approve with conditions'?'#2475f5':label==='Pending'?'#f59e0b':'#d9475c',display:String(votes.filter(v=>v===label).length)}));
     return `<section class="summary-strip"><div class="summary-item"><span>Meeting</span><strong>Board & IC Review</strong></div><div class="summary-item"><span>Date</span><strong>15 Jul 2026</strong></div><div class="summary-item"><span>Time</span><strong>10:00 - 11:30 SAST</strong></div><div class="summary-item"><span>Voting members</span><strong>7 · Quorum 7/7</strong></div><div class="summary-item"><span>Status</span><strong>${statusPill('In progress','success')}</strong></div><div class="summary-item"><span>Meeting tools</span><strong><button class="card-link" data-action="open-meeting-pack">Open pack</button></strong></div></section>
@@ -2357,25 +1543,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       </div></section>`;
   }
 
-  function renderDealDisbursement(deal, detail) {
-    const { d, hero, app } = dealDetailCtx(deal, detail);
-    const live = isLiveMode();
-    const impl = d.investmentImplementation;
-    const disbursements = asArraySafe(d.disbursements);
-    const dealId = deal?.id || state.selectedDealId;
-    if (live) {
-      if (!impl && !disbursements.length) {
-        return `<section class="summary-strip"><div class="summary-item"><span>Resolution</span><strong>—</strong></div><div class="summary-item"><span>Decision</span><strong>—</strong></div><div class="summary-item"><span>Approved amount</span><strong>${formatMoney(hero.requestedAmount || deal.amount)}</strong></div><div class="summary-item"><span>Disbursement plan</span><strong>—</strong></div><div class="summary-item"><span>Readiness</span><strong>—</strong></div><div class="summary-item"><span>Target close</span><strong>—</strong></div></section>
-          <section class="section-gap">${card('Disbursement', `<div class="empty-state"><div><div class="empty-state-icon">${icon('dollar')}</div><h3>No disbursement / implementation</h3><p class="muted">Initiate investment implementation after board approval.</p><div class="section-gap">${button('Initiate implementation','start-implementation','primary','plus',`data-deal-id="${escapeHTML(dealId)}"`)}</div></div></div>`)}</section>`;
-      }
-      return `<section class="summary-strip"><div class="summary-item"><span>Implementation</span><strong>${escapeHTML(impl?.status || '—')}</strong></div><div class="summary-item"><span>Committed</span><strong>${impl?.totalCommittedAmount != null ? formatMoney(impl.totalCommittedAmount) : '-'}</strong></div><div class="summary-item"><span>Mode</span><strong>${escapeHTML(impl?.disbursementMode || '-')}</strong></div><div class="summary-item"><span>Disbursements</span><strong>${disbursements.length}</strong></div><div class="summary-item"><span>Approved amount</span><strong>${formatMoney(hero.requestedAmount || deal.amount)}</strong></div><div class="summary-item"><span>Updated</span><strong>${escapeHTML(String(impl?.updatedAt || '-'))}</strong></div></section>
-        <section class="page-actions section-gap">${button('Request tranche','release-tranche','primary compact','dollar',`data-deal-id="${escapeHTML(dealId)}"`)}${button('Refresh','reload-deal-detail','compact','refresh',`data-deal-id="${escapeHTML(dealId)}"`)}</section>
-        <section class="grid cols-2 section-gap">
-          ${card('Implementation', impl ? liveKv([['ID', impl.id],['Status', impl.status],['Committed', impl.totalCommittedAmount != null ? formatMoney(impl.totalCommittedAmount) : '-'],['Mode', impl.disbursementMode || '-'],['Updated', impl.updatedAt || '-']]) : liveEmptyCard('No implementation record.'))}
-          ${card('Beneficiary', liveKv([['Company', app.businessName || app.companyName || deal.name],['Fund', hero.fundName || deal.fund],['Bank details', 'Not returned by API']]))}
-        </section>
-        ${card('Disbursements', disbursements.length ? `<div class="table-wrap"><table class="criteria-table"><thead><tr><th>ID</th><th>Amount</th><th>Status</th><th>Date</th></tr></thead><tbody>${disbursements.map(row=>`<tr><td>${escapeHTML(row.id || '-')}</td><td>${formatMoney(row.amount || row.disbursedAmount || 0)}</td><td>${statusPill(String(row.status || '-'))}</td><td>${escapeHTML(String(row.date || row.disbursementDate || row.scheduledAt || '-'))}</td></tr>`).join('')}</tbody></table></div>` : liveEmptyCard('No disbursement rows yet.'), { classes: 'section-gap' })}`;
-    }
+  function renderDealDisbursement(deal) {
     const completeCount = state.closingConditions.filter(c=>c.complete).length;
     const readiness = Math.round(completeCount/state.closingConditions.length*100);
     const canRelease = completeCount === state.closingConditions.length;
@@ -2399,117 +1567,19 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       </div></section>`;
   }
 
-  function renderDealDocuments(deal, detail) {
-    const live = isLiveMode();
-    const dataRoom = detail?.dataRoom || detail?.application?.dataRoom || null;
-    const liveDocs = asArraySafe(detail?.documents || detail?.application?.documents).map((doc, i) => {
-      const uploadedRaw = doc.uploadedAt || doc.createdAt || null;
-      return {
-        id: doc.id || `LIVE-DOC-${i}`,
-        name: doc.name || doc.fileName || doc.title || `Document ${i + 1}`,
-        type: doc.documentType || doc.type || fileExt(doc.fileName || doc.name || '').toUpperCase() || 'FILE',
-        version: doc.version || 'v1.0',
-        owner: doc.uploadedBy || doc.owner || detail?.application?.applicantName || detail?.hero?.companyName || '-',
-        uploaded: uploadedRaw ? formatDate(uploadedRaw) : '-',
-        uploadedRaw,
-        status: doc.status || (doc.isSubmitted ? 'Submitted' : doc.isRequired ? 'Required' : 'Available'),
-        access: doc.access || 'Internal',
-        folder: doc.folder || doc.documentType || 'Application',
-        fileUrl: doc.fileUrl || doc.url || doc.downloadUrl || '',
-        fileSize: doc.fileSize,
-        versionHistory: asArraySafe(doc.versionHistory),
-        reviewers: asArraySafe(doc.reviewers),
-      };
-    });
-    const sourceDocs = live ? liveDocs : documents;
-    const folderOrder = ['Application', 'BUSINESS_PLAN', 'PROOF_OF_CONCEPT', 'MARKET_RESEARCH', 'PROJECTED_CASH_FLOWS', 'HISTORICAL_FINANCIALS'];
-    const folders = live
-      ? [...new Set([...folderOrder, ...liveDocs.map((d) => d.folder).filter(Boolean), ...(state.customFolders || [])])].filter((f) =>
-          liveDocs.some((d) => d.folder === f) || f === 'Application' || (state.customFolders || []).includes(f),
-        )
-      : [...['Application','Corporate & Legal','Financial','Commercial','Due Diligence','Term Sheet','Committee Pack','Closing & Disbursement'], ...(state.customFolders || [])];
-    const activeFolder = (() => {
-      if (folders.includes(state.selectedFolder) && sourceDocs.some((d) => d.folder === state.selectedFolder)) {
-        return state.selectedFolder;
-      }
-      const firstWithDocs = folders.find((f) => sourceDocs.some((d) => d.folder === f));
-      return firstWithDocs || folders[0] || 'Application';
-    })();
-    const filtered = sourceDocs.filter((doc) => doc.folder === activeFolder);
-    const tableRows = filtered.length ? filtered : sourceDocs;
-    const selected = sourceDocs.find((doc) => doc.id === state.selectedDocumentId) || tableRows[0] || sourceDocs[0];
-
-    function renderDataRoomAccessCard() {
-      const groups = asArraySafe(dataRoom?.accessGroups);
-      if (!groups.length) {
-        return card('Data Room Access', liveEmptyCard('No access roster on this application.'));
-      }
-      const rows = groups.map((g) =>
-        `<div class="info-row"><span>${escapeHTML(String(g.label || 'Group'))}</span><strong>${Number(g.count || asArraySafe(g.users).length || 0)} user${Number(g.count || 0) === 1 ? '' : 's'}</strong></div>`,
-      ).join('');
-      const userList = groups.flatMap((g) => asArraySafe(g.users).slice(0, 4).map((u, idx) =>
-        `<div class="list-row"><span class="list-row-main"><strong>${escapeHTML(String(u.name || '-'))}</strong><small>${escapeHTML(String(u.role || g.label || ''))}</small></span></div>`,
-      )).join('');
-      return card('Data Room Access', `<div class="info-list">${rows}</div>${userList ? `<div class="info-list section-gap">${userList}</div>` : ''}`);
-    }
-
-    function renderPermissionsCard() {
-      const perms = asArraySafe(dataRoom?.permissionsSummary);
-      if (!perms.length) {
-        return card('Permissions Summary', liveEmptyCard('No permission summary on this application.'));
-      }
-      return card('Permissions Summary', `<div class="info-list">${perms.map((p) =>
-        `<div class="info-row"><span>${escapeHTML(String(p.label || '-'))}</span><strong>${Number(p.count || 0)} user${Number(p.count || 0) === 1 ? '' : 's'}</strong></div>`,
-      ).join('')}</div>`);
-    }
-
-    function renderDocumentRequestsCard() {
-      const requests = asArraySafe(dataRoom?.documentRequests);
-      if (!requests.length) {
-        return card('Document Requests', `<p class="muted small">All required application documents are on file.</p>`);
-      }
-      return card('Document Requests', `<div class="info-list">${requests.map((req) =>
-        `<div class="list-row"><span class="activity-icon" style="color:var(--amber);background:var(--amber-soft)">${icon('file')}</span><span class="list-row-main"><strong>${escapeHTML(String(req.title || req.documentType || 'Document'))}</strong><small>${escapeHTML(String(req.status || 'Outstanding'))}</small></span></div>`,
-      ).join('')}</div>`, { tools: statusPill(`${requests.length} outstanding`, 'warning') });
-    }
-
-    function renderVersionHistoryPanel(doc) {
-      const history = asArraySafe(doc?.versionHistory);
-      const reviewers = asArraySafe(doc?.reviewers);
-      if (!history.length && !reviewers.length) {
-        return liveEmptyCard('No version history on this document yet.');
-      }
-      const historyHtml = history.length
-        ? `<div class="timeline section-gap">${history.map((h) =>
-            `<div class="timeline-item"><strong>${escapeHTML(String(h.version || 'v1.0'))} · Current</strong><small>${escapeHTML(formatDate(h.uploadedAt || doc.uploadedRaw))} · ${escapeHTML(String(h.note || h.uploadedBy || doc.owner || ''))}</small></div>`,
-          ).join('')}</div>`
-        : '';
-      const reviewersHtml = reviewers.length
-        ? `<div class="info-list section-gap">${reviewers.map((r) =>
-            `<div class="list-row"><span class="list-row-main"><strong>${escapeHTML(String(r.name || '-'))}</strong><small>${escapeHTML(String(r.role || 'Reviewer'))}</small></span>${statusPill(String(r.status || 'Pending'))}</div>`,
-          ).join('')}</div>`
-        : '';
-      return `${historyHtml}${reviewersHtml ? `<div class="muted small" style="margin-bottom:6px">Reviewers</div>${reviewersHtml}` : ''}`;
-    }
-
-    if (live && !sourceDocs.length) {
-      return `<section class="document-layout"><div class="folder-list">${folders.map(folder=>`<button class="folder-button ${activeFolder===folder?'active':''}" data-action="select-folder" data-folder="${escapeHTML(folder)}">${icon('folder')}<span>${escapeHTML(folder)}</span><strong>0</strong></button>`).join('')}</div>
-        <div>${card('Data room', liveEmptyCard('No documents on this application yet.'))}</div>
-        <div class="side-stack" style="display:flex">${renderDataRoomAccessCard()}${card('Storage & Security', `<div class="reason-list"><div class="reason-item">${icon('check-circle')}<div><strong>Encryption</strong><small>${dataRoom?.encryptionEnabled ? 'Enabled' : '—'}</small></div></div><div class="reason-item">${icon('check-circle')}<div><strong>Audit logging</strong><small>${dataRoom?.auditLoggingEnabled ? 'Enabled' : '—'}</small></div></div></div>`)}</div></section>`;
-    }
-    const previewName = selected ? selected.name : '—';
-    const rowActions = (doc) => live && doc.fileUrl
-      ? `${button('','preview-deal-document','ghost compact icon-only','eye',`data-url="${escapeHTML(doc.fileUrl)}" data-name="${escapeHTML(doc.name)}"`)}${button('','download-deal-document','ghost compact icon-only','download',`data-url="${escapeHTML(doc.fileUrl)}" data-name="${escapeHTML(doc.name)}"`)}`
-      : `${button('','preview-document','ghost compact icon-only','eye',`data-id="${doc.id}"`)}${button('','download-document','ghost compact icon-only','download',`data-id="${doc.id}"`)}`;
-    return `<section class="document-layout"><div class="folder-list">${folders.map(folder=>`<button class="folder-button ${activeFolder===folder?'active':''}" data-action="select-folder" data-folder="${escapeHTML(folder)}">${icon('folder')}<span>${escapeHTML(folder.replace(/_/g,' '))}</span><strong>${sourceDocs.filter(doc=>doc.folder===folder).length}</strong></button>`).join('')}</div>
-      <div><div class="page-actions" style="justify-content:space-between;margin-bottom:10px"><div class="table-search">${icon('search')}<input style="width:280px" placeholder="Search in ${escapeHTML(activeFolder.replace(/_/g,' '))}..."></div><div class="page-actions"><label class="button primary" style="cursor:pointer">${icon('upload')} Upload files<input type="file" multiple hidden data-file-action="upload-document"></label>${button('Create folder','create-folder','','folder')}${button('Request document','request-document','','file')}</div></div>
-        <section class="card"><div class="table-wrap"><table><thead><tr><th><input type="checkbox"></th><th>Name</th><th>Type</th><th>Version</th><th>Owner</th><th>Uploaded</th><th>Review Status</th><th>Access</th><th>Actions</th></tr></thead><tbody>${tableRows.map(doc=>`<tr class="clickable" data-action="select-document" data-id="${doc.id}"><td><input type="checkbox"></td><td class="table-primary brand-text"><button type="button" class="v17-document-name" data-action="${live && doc.fileUrl ? 'preview-deal-document' : 'preview-document'}" ${live && doc.fileUrl ? `data-url="${escapeHTML(doc.fileUrl)}" data-name="${escapeHTML(doc.name)}"` : `data-id="${doc.id}"`}><span class="document-row-icon">${icon(doc.type==='XLSX'?'file-chart':'file')}</span><span>${escapeHTML(doc.name)}</span></button></td><td>${escapeHTML(String(doc.type))}</td><td>${statusPill(String(doc.version),'info')}</td><td>${escapeHTML(String(doc.owner))}</td><td>${escapeHTML(String(doc.uploaded))}</td><td>${statusPill(String(doc.status))}</td><td>${escapeHTML(String(doc.access))}</td><td><div class="page-actions" style="justify-content:flex-start">${rowActions(doc)}</div></td></tr>`).join('')}</tbody></table></div></section>
-        ${selected ? `<section class="document-preview section-gap"><div class="document-preview-head"><span class="file-icon">${icon('file')}</span><div style="flex:1"><strong>${escapeHTML(previewName)}</strong><div class="muted small">${escapeHTML(String(selected.folder).replace(/_/g,' '))} · ${escapeHTML(String(selected.version))} · ${escapeHTML(String(selected.status))}</div></div>${statusPill(String(selected.status))}</div><div class="grid cols-2 section-gap"><div class="info-list"><div class="info-row"><span>Type</span><strong>${escapeHTML(String(selected.type))} Document</strong></div><div class="info-row"><span>Version</span><strong>${escapeHTML(String(selected.version))}</strong></div><div class="info-row"><span>Uploaded by</span><strong>${escapeHTML(String(selected.owner))}</strong></div><div class="info-row"><span>Uploaded on</span><strong>${escapeHTML(String(selected.uploaded))}</strong></div><div class="info-row"><span>Access</span><strong>${escapeHTML(String(selected.access))}</strong></div>${selected.fileSize ? `<div class="info-row"><span>File size</span><strong>${escapeHTML(String(Math.round(Number(selected.fileSize) / 1024)) + ' KB')}</strong></div>` : ''}</div><div>${live ? renderVersionHistoryPanel(selected) : `<div class="tabs"><button class="tab active">Version history</button><button class="tab">Reviewers</button><button class="tab">Comments (2)</button><button class="tab">E-signatures</button></div><div class="timeline section-gap"><div class="timeline-item"><strong>${selected.version} · Current</strong><small>${selected.uploaded} · Updated registered office address</small></div><div class="timeline-item"><strong>v2.0</strong><small>7 Jul 2026 · Reissued certificate</small></div><div class="timeline-item"><strong>v1.0</strong><small>30 Jun 2026 · Initial upload</small></div></div>`}</div></div></section>` : ''}
+  function renderDealDocuments() {
+    const folders = [...['Application','Corporate & Legal','Financial','Commercial','Due Diligence','Term Sheet','Committee Pack','Closing & Disbursement'], ...(state.customFolders || [])];
+    const filtered = documents.filter(doc=>doc.folder===state.selectedFolder);
+    const selected = documents.find(doc=>doc.id===state.selectedDocumentId) || filtered[0] || documents[0];
+    return `<section class="document-layout"><div class="folder-list">${folders.map(folder=>`<button class="folder-button ${state.selectedFolder===folder?'active':''}" data-action="select-folder" data-folder="${escapeHTML(folder)}">${icon('folder')}<span>${escapeHTML(folder)}</span><strong>${documents.filter(doc=>doc.folder===folder).length}</strong></button>`).join('')}</div>
+      <div><div class="page-actions" style="justify-content:space-between;margin-bottom:10px"><div class="table-search">${icon('search')}<input style="width:280px" placeholder="Search in ${escapeHTML(state.selectedFolder)}..."></div><div class="page-actions"><label class="button primary" style="cursor:pointer">${icon('upload')} Upload files<input type="file" multiple hidden data-file-action="upload-document"></label>${button('Create folder','create-folder','','folder')}${button('Request document','request-document','','file')}</div></div>
+        <section class="card"><div class="table-wrap"><table><thead><tr><th><input type="checkbox"></th><th>Name</th><th>Type</th><th>Version</th><th>Owner</th><th>Uploaded</th><th>Review Status</th><th>Access</th><th>Actions</th></tr></thead><tbody>${filtered.map(doc=>`<tr class="clickable" data-action="select-document" data-id="${doc.id}"><td><input type="checkbox"></td><td class="table-primary brand-text"><button type="button" class="v17-document-name" data-action="preview-document" data-id="${doc.id}"><span class="document-row-icon">${icon(doc.type==='XLSX'?'file-chart':'file')}</span><span>${escapeHTML(doc.name)}</span></button></td><td>${doc.type}</td><td>${statusPill(doc.version,'info')}</td><td>${escapeHTML(doc.owner)}</td><td>${doc.uploaded}</td><td>${statusPill(doc.status)}</td><td>${escapeHTML(doc.access)}</td><td><div class="page-actions" style="justify-content:flex-start">${button('','preview-document','ghost compact icon-only','eye',`data-id="${doc.id}"`)}${button('','download-document','ghost compact icon-only','download',`data-id="${doc.id}"`)}</div></td></tr>`).join('')}</tbody></table></div></section>
+        <section class="document-preview section-gap"><div class="document-preview-head"><span class="file-icon">${icon('file')}</span><div style="flex:1"><strong>${escapeHTML(selected.name)}</strong><div class="muted small">${escapeHTML(selected.folder)} · ${escapeHTML(selected.version)} · ${escapeHTML(selected.status)}</div></div>${statusPill(selected.status)}</div><div class="grid cols-2 section-gap"><div class="info-list"><div class="info-row"><span>Type</span><strong>${escapeHTML(selected.type)} Document</strong></div><div class="info-row"><span>Version</span><strong>${escapeHTML(selected.version)}</strong></div><div class="info-row"><span>Uploaded by</span><strong>${escapeHTML(selected.owner)}</strong></div><div class="info-row"><span>Uploaded on</span><strong>${escapeHTML(selected.uploaded)}</strong></div><div class="info-row"><span>Access</span><strong>${escapeHTML(selected.access)}</strong></div></div><div><div class="tabs"><button class="tab active">Version history</button><button class="tab">Reviewers</button><button class="tab">Comments (2)</button><button class="tab">E-signatures</button></div><div class="timeline section-gap"><div class="timeline-item"><strong>${selected.version} · Current</strong><small>${selected.uploaded} · Updated registered office address</small></div><div class="timeline-item"><strong>v2.0</strong><small>7 Jul 2026 · Reissued certificate</small></div><div class="timeline-item"><strong>v1.0</strong><small>30 Jun 2026 · Initial upload</small></div></div></div></div></section>
       </div><div class="side-stack" style="display:flex">
-        ${live ? renderDataRoomAccessCard() : card('Data Room Access', `<div class="info-list"><div class="info-row"><span>Internal Team</span><strong>6 users</strong></div><div class="info-row"><span>Nova Analytics</span><strong>5 users</strong></div><div class="info-row"><span>External Counsel</span><strong>3 users</strong></div></div><div class="grid cols-2 section-gap">${button('Change permissions','change-permissions','compact','shield')}${button('Revoke access','revoke-access','danger compact','lock')}</div>`) }
-        ${live ? renderPermissionsCard() : card('Permissions Summary', `<div class="info-list"><div class="info-row"><span>View only</span><strong>10 users</strong></div><div class="info-row"><span>Edit</span><strong>2 users</strong></div><div class="info-row"><span>Download</span><strong>10 users</strong></div><div class="info-row"><span>Upload</span><strong>3 users</strong></div><div class="info-row"><span>Full control</span><strong>2 users</strong></div></div>`,{footer:'<button class="card-link" data-action="permissions-matrix">View permission matrix</button>'})}
-        ${live ? renderDocumentRequestsCard() : card('Document Requests', `<div class="info-list"><div class="list-row"><span class="activity-icon" style="color:var(--amber);background:var(--amber-soft)">${icon('file')}</span><span class="list-row-main"><strong>Audited Financial Statements FY2025</strong><small>Due 15 Jul 2026</small></span></div><div class="list-row"><span class="activity-icon" style="color:var(--amber);background:var(--amber-soft)">${icon('file')}</span><span class="list-row-main"><strong>Beneficial Ownership Declaration</strong><small>Due 16 Jul 2026</small></span></div><div class="list-row"><span class="activity-icon" style="color:var(--amber);background:var(--amber-soft)">${icon('file')}</span><span class="list-row-main"><strong>Board Resolutions</strong><small>Due 17 Jul 2026</small></span></div></div>`,{tools:statusPill('3 outstanding','warning')})}
-        ${card('Storage & Security',`<div class="reason-list"><div class="reason-item">${icon('check-circle')}<div><strong>Encryption</strong><small>${live ? (dataRoom?.encryptionEnabled ? 'Enabled' : 'Enabled') : 'Enabled'}</small></div></div><div class="reason-item">${icon('check-circle')}<div><strong>Watermarking</strong><small>${live ? '—' : 'Enabled'}</small></div></div><div class="reason-item">${icon('check-circle')}<div><strong>Audit logging</strong><small>${live ? (dataRoom?.auditLoggingEnabled ? 'Enabled' : 'Enabled') : 'Enabled'}</small></div></div><div class="reason-item">${icon('check-circle')}<div><strong>ISO 27001 aligned</strong><small>${live ? '—' : 'Certified'}</small></div></div></div>`) }
+        ${card('Data Room Access',`<div class="info-list"><div class="info-row"><span>Internal Team</span><strong>6 users</strong></div><div class="info-row"><span>Nova Analytics</span><strong>5 users</strong></div><div class="info-row"><span>External Counsel</span><strong>3 users</strong></div></div><div class="grid cols-2 section-gap">${button('Change permissions','change-permissions','compact','shield')}${button('Revoke access','revoke-access','danger compact','lock')}</div>`) }
+        ${card('Permissions Summary',`<div class="info-list"><div class="info-row"><span>View only</span><strong>10 users</strong></div><div class="info-row"><span>Edit</span><strong>2 users</strong></div><div class="info-row"><span>Download</span><strong>10 users</strong></div><div class="info-row"><span>Upload</span><strong>3 users</strong></div><div class="info-row"><span>Full control</span><strong>2 users</strong></div></div>`,{footer:'<button class="card-link" data-action="permissions-matrix">View permission matrix</button>'})}
+        ${card('Document Requests',`<div class="info-list"><div class="list-row"><span class="activity-icon" style="color:var(--amber);background:var(--amber-soft)">${icon('file')}</span><span class="list-row-main"><strong>Audited Financial Statements FY2025</strong><small>Due 15 Jul 2026</small></span></div><div class="list-row"><span class="activity-icon" style="color:var(--amber);background:var(--amber-soft)">${icon('file')}</span><span class="list-row-main"><strong>Beneficial Ownership Declaration</strong><small>Due 16 Jul 2026</small></span></div><div class="list-row"><span class="activity-icon" style="color:var(--amber);background:var(--amber-soft)">${icon('file')}</span><span class="list-row-main"><strong>Board Resolutions</strong><small>Due 17 Jul 2026</small></span></div></div>`,{tools:statusPill('3 outstanding','warning')})}
+        ${card('Storage & Security',`<div class="reason-list"><div class="reason-item">${icon('check-circle')}<div><strong>Encryption</strong><small>Enabled</small></div></div><div class="reason-item">${icon('check-circle')}<div><strong>Watermarking</strong><small>Enabled</small></div></div><div class="reason-item">${icon('check-circle')}<div><strong>Audit logging</strong><small>Enabled</small></div></div><div class="reason-item">${icon('check-circle')}<div><strong>ISO 27001 aligned</strong><small>Certified</small></div></div></div>`) }
       </div></section>`;
   }
 
@@ -2526,28 +1596,19 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   }
 
   function renderFundOverviewTab(fund, fundCompanies, allocation) {
-    const holdings = fundCompanies.length ? fundCompanies : (isLiveMode() ? [] : companies.slice(0,4));
-    const navChart = isLiveMode()
-      ? liveEmptyCard('Cumulative NAV / called series is not returned by the funds API.')
-      : barChart({labels:['2021','2022','2023','2024','2025','2026 YTD'],series:[{name:'Cumulative Distributions',color:'var(--emerald)',values:[12,38,52,71,86,97]},{name:'Cumulative Called',color:'var(--navy)',values:[20,58,82,112,143,168]}],height:270,format:v=>`${Math.round(v)}M`});
-    const jCurveChart = isLiveMode()
-      ? liveEmptyCard('Fund J-curve series is not returned by the funds API.')
-      : lineChart({labels:['Year 0','Year 1','Year 2','Year 3','Year 4','Year 5+'],series:[{name:'Net Cash Flow',color:'var(--blue)',values:[0,-72,-68,-18,25,43]}],height:270,format:v=>`${Math.round(v)}M`});
-    const obligations = isLiveMode()
-      ? liveEmptyCard('Upcoming obligations are not returned by the funds API.')
-      : `<div class="info-list">${[['Capital Call','$18.0M','28 Jul 2026','warning'],['Management Fee Q3 2026','$375,000','15 Aug 2026','warning'],['Carried Interest Provision','$2.6M','30 Sep 2026','warning'],['Capital Call','$20.0M','29 Oct 2026','success'],['Management Fee Q4 2026','$375,000','15 Nov 2026','success']].map(item=>`<div class="list-row"><span class="status-dot" style="background:${item[3]==='success'?'var(--emerald)':'var(--orange)'}"></span><span class="list-row-main"><strong>${item[0]}</strong><small>${item[2]}</small></span><strong>${item[1]}</strong></div>`).join('')}</div>`;
+    const holdings = fundCompanies.length ? fundCompanies : companies.slice(0,4);
     return `<section class="profile-tab-panel fund-profile-panel section-gap">
       <div class="profile-tab-summary"><div><strong>Fund overview workspace</strong><span>Portfolio value, cash-flow position, concentration, obligations and governing terms.</span></div>${button('Update fund snapshot','edit-fund','primary','edit')}</div>
       <section class="fund-primary-grid section-gap">
-        ${card('NAV and Cumulative Cash Flows',navChart,{subtitle:isLiveMode()?'Live fund metrics only':'USD millions · select a bar for period detail'})}
-        ${card('J-Curve',jCurveChart,{subtitle:isLiveMode()?'No series API':'Since inception · click a point for the underlying cash flows'})}
-        ${card('Allocation by Sector (NAV %)',donutChart(allocation.length?allocation:[{label:'No allocation',value:1,color:'#94a3b8'}],formatMoney(fund.nav),'NAV',145),{subtitle:'Current fair-value concentration'})}
+        ${card('NAV and Cumulative Cash Flows',barChart({labels:['2021','2022','2023','2024','2025','2026 YTD'],series:[{name:'Cumulative Distributions',color:'var(--emerald)',values:[12,38,52,71,86,97]},{name:'Cumulative Called',color:'var(--navy)',values:[20,58,82,112,143,168]}],height:270,format:v=>`${Math.round(v)}M`}),{subtitle:'USD millions · select a bar for period detail'})}
+        ${card('J-Curve',lineChart({labels:['Year 0','Year 1','Year 2','Year 3','Year 4','Year 5+'],series:[{name:'Net Cash Flow',color:'var(--blue)',values:[0,-72,-68,-18,25,43]}],height:270,format:v=>`${Math.round(v)}M`}),{subtitle:'Since inception · click a point for the underlying cash flows'})}
+        ${card('Allocation by Sector (NAV %)',donutChart(allocation,formatMoney(fund.nav),'NAV',145),{subtitle:'Current fair-value concentration'})}
       </section>
       <section class="fund-secondary-grid section-gap">
-        ${card('Top Holdings by NAV',holdings.length?`<div class="info-list">${holdings.slice(0,5).map(company=>`<button type="button" class="list-row" data-action="open-company" data-id="${company.id}">${companyLogo(company)}<span class="list-row-main"><strong>${escapeHTML(company.name)}</strong><small>${escapeHTML(company.sector)} · ${pct(company.ownership)} ownership</small></span><strong>${formatMoney(company.fairValue)}<br><span class="muted">${pct(company.fairValue/fund.nav*100)}</span></strong></button>`).join('')}</div>`:liveEmptyCard('No holdings linked to this fund.'),{footer:'<button type="button" class="card-link" data-action="fund-profile-tab" data-tab="investments">View all investments</button>'})}
-        ${card('Recent Capital Activity',capitalCalls.length?`<div class="info-list">${capitalCalls.slice(0,5).map((call,index)=>`<button type="button" class="list-row" data-action="open-capital-call" data-id="${call.id}"><span class="activity-icon" style="color:${index%2?'var(--emerald)':'var(--blue)'};background:${index%2?'var(--emerald-soft)':'var(--blue-soft)'}">${icon(index%2?'trend-up':'wallet')}</span><span class="list-row-main"><strong>${index%2?'Distribution / follow-on':'Capital Call'}</strong><small>${escapeHTML(call.fund)}</small></span><strong class="${index%2?'positive':'negative'}">${formatMoney(index%2?call.collected:call.amount)}</strong></button>`).join('')}</div>`:liveEmptyCard('No capital calls loaded.'),{footer:'<button type="button" class="card-link" data-action="fund-profile-tab" data-tab="capital">Open capital activity</button>'})}
-        ${card('Upcoming Obligations',obligations,{footer:'<button type="button" class="card-link" data-action="fund-profile-tab" data-tab="reporting">View reporting and obligations</button>'})}
-        ${card('Fund Terms',`<div class="info-list"><div class="info-row"><span>Fund Entity</span><strong>${escapeHTML(fund.name)}, L.P.</strong></div><div class="info-row"><span>Vintage Year</span><strong>${fund.vintage}</strong></div><div class="info-row"><span>Fund Size</span><strong>${formatMoney(fund.commitment)}</strong></div><div class="info-row"><span>Strategy</span><strong>${escapeHTML(fund.strategy)}</strong></div><div class="info-row"><span>Primary Geography</span><strong>${escapeHTML(fund.geography)}</strong></div><div class="info-row"><span>Management Fee</span><strong>${escapeHTML(fund.managementFee||'—')}</strong></div><div class="info-row"><span>Carried Interest</span><strong>${escapeHTML(fund.carry||'—')}</strong></div><div class="info-row"><span>Status</span><strong>${statusPill(fund.status)}</strong></div></div>`,{footer:'<button type="button" class="card-link" data-action="fund-profile-tab" data-tab="documents">View fund documents</button>'})}
+        ${card('Top Holdings by NAV',`<div class="info-list">${holdings.slice(0,5).map(company=>`<button type="button" class="list-row" data-action="open-company" data-id="${company.id}">${companyLogo(company)}<span class="list-row-main"><strong>${escapeHTML(company.name)}</strong><small>${escapeHTML(company.sector)} · ${pct(company.ownership)} ownership</small></span><strong>${formatMoney(company.fairValue)}<br><span class="muted">${pct(company.fairValue/fund.nav*100)}</span></strong></button>`).join('')}</div>`,{footer:'<button type="button" class="card-link" data-action="fund-profile-tab" data-tab="investments">View all investments</button>'})}
+        ${card('Recent Capital Activity',`<div class="info-list">${capitalCalls.slice(0,5).map((call,index)=>`<button type="button" class="list-row" data-action="open-capital-call" data-id="${call.id}"><span class="activity-icon" style="color:${index%2?'var(--emerald)':'var(--blue)'};background:${index%2?'var(--emerald-soft)':'var(--blue-soft)'}">${icon(index%2?'trend-up':'wallet')}</span><span class="list-row-main"><strong>${index%2?'Distribution / follow-on':'Capital Call'}</strong><small>${escapeHTML(call.fund)}</small></span><strong class="${index%2?'positive':'negative'}">${formatMoney(index%2?call.collected:call.amount)}</strong></button>`).join('')}</div>`,{footer:'<button type="button" class="card-link" data-action="fund-profile-tab" data-tab="capital">Open capital activity</button>'})}
+        ${card('Upcoming Obligations',`<div class="info-list">${[['Capital Call','$18.0M','28 Jul 2026','warning'],['Management Fee Q3 2026','$375,000','15 Aug 2026','warning'],['Carried Interest Provision','$2.6M','30 Sep 2026','warning'],['Capital Call','$20.0M','29 Oct 2026','success'],['Management Fee Q4 2026','$375,000','15 Nov 2026','success']].map(item=>`<div class="list-row"><span class="status-dot" style="background:${item[3]==='success'?'var(--emerald)':'var(--orange)'}"></span><span class="list-row-main"><strong>${item[0]}</strong><small>${item[2]}</small></span><strong>${item[1]}</strong></div>`).join('')}</div>`,{footer:'<button type="button" class="card-link" data-action="fund-profile-tab" data-tab="reporting">View reporting and obligations</button>'})}
+        ${card('Fund Terms',`<div class="info-list"><div class="info-row"><span>Fund Entity</span><strong>${escapeHTML(fund.name)}, L.P.</strong></div><div class="info-row"><span>Vintage Year</span><strong>${fund.vintage}</strong></div><div class="info-row"><span>Fund Size</span><strong>${formatMoney(fund.commitment)}</strong></div><div class="info-row"><span>Strategy</span><strong>${escapeHTML(fund.strategy)}</strong></div><div class="info-row"><span>Primary Geography</span><strong>${escapeHTML(fund.geography)}</strong></div><div class="info-row"><span>Management Fee</span><strong>${escapeHTML(fund.managementFee)}</strong></div><div class="info-row"><span>Carried Interest</span><strong>${escapeHTML(fund.carry)}</strong></div><div class="info-row"><span>Status</span><strong>${statusPill(fund.status)}</strong></div></div>`,{footer:'<button type="button" class="card-link" data-action="fund-profile-tab" data-tab="documents">View fund documents</button>'})}
       </section>
     </section>`;
   }
@@ -2728,20 +1789,6 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   }
 
   function renderCompanyOverviewTab(company) {
-    if (isLiveMode()) {
-      const hasSeries = Array.isArray(company.revenue) && company.revenue.length;
-      return `<section class="profile-tab-panel section-gap">
-      <section class="metric-grid section-gap">
-        ${metricCard({label:'Invested',value:formatMoney(company.invested||0),iconName:'wallet',accent:'blue',foot:escapeHTML(company.fund||'-'),action:'company-invested'})}
-        ${metricCard({label:'Fair value',value:formatMoney(company.fairValue||0),iconName:'trend-up',accent:'emerald',foot:company.ownership!=null?`${Number(company.ownership).toFixed(1)}% ownership`:'Ownership —',action:'company-fair-value'})}
-        ${metricCard({label:'Sector',value:escapeHTML(company.sector||'-'),iconName:'building',accent:'brand',foot:escapeHTML(company.stage||company.city||'-'),action:'company-sector'})}
-        ${metricCard({label:'Health',value:company.health!=null?String(company.health):'—',iconName:'activity',accent:'amber',foot:'From companies API',action:'company-health'})}
-      </section>
-      ${hasSeries
-        ? card('Revenue & EBITDA', lineChart({labels:company.revenue.map((_,i)=>`Y${i+1}`),series:[{name:'Revenue',color:'var(--blue)',values:company.revenue},{name:'EBITDA',color:'var(--emerald)',values:company.ebitda||[]}],height:260,format:v=>`${Number(v).toFixed(1)}M`}))
-        : card('Operating detail', liveEmptyCard('Milestones, team, board packs and KPI history are not returned by the portfolio-companies API yet.'))}
-    </section>`;
-    }
     const labels = ['FY23 Actual','FY24 Actual','FY25 Actual','FY26 Budget','FY27 Forecast'];
     const performanceRows = ['Revenue','Gross Profit','EBITDA','Net Profit'].map((metric,index)=>{
       const base = [company.revenue,company.revenue.map(v=>v*company.margin/100),company.ebitda,company.ebitda.map(v=>v*.62)][index];
@@ -2767,9 +1814,6 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   }
 
   function renderCompanyPerformanceTab(company) {
-    if (isLiveMode()) {
-      return `<section class="profile-tab-panel section-gap">${card('Performance', liveEmptyCard('Quarterly performance series are not returned by the portfolio-companies API yet.'))}</section>`;
-    }
     const quarters=['Q3 2025','Q4 2025','Q1 2026','Q2 2026','Q3 2026E','Q4 2026E'];
     const revenue=[6.1,6.8,7.4,8.6,9.4,10.2];
     const ebitda=[1.2,1.5,1.7,2.1,2.4,2.8];
@@ -2789,9 +1833,6 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   }
 
   function renderCompanyValueCreationTab(company) {
-    if (isLiveMode()) {
-      return `<section class="profile-tab-panel section-gap">${card('ValueCreation', liveEmptyCard('Value-creation initiatives are not returned by the API yet.'))}</section>`;
-    }
     const initiatives=[['Go-to-market expansion','Rudo Chikomo','Revenue growth','$19.0M ARR','$30.0M ARR',68,'On Track'],['Product & Technology','Tinashe Nyoni','Release velocity','1 major release/qtr','2 major releases/qtr',57,'On Track'],['Operational Excellence','Farai Mutasa','EBITDA margin','18%','26%',63,'On Track'],['Talent & Organisation','Tendai Moyo','Critical-role coverage','72%','95%',50,'Watch'],['Cybersecurity readiness','Tinashe Nyoni','ISO 27001','Gap assessment','Certified',44,'At Risk']];
     return `<section class="profile-tab-panel section-gap">
       <div class="profile-tab-summary"><div><strong>Value-creation operating plan</strong><span>Initiatives, owners, target outcomes, milestones and fund-team interventions.</span></div>${button('Add initiative','open-value-creation','primary','plus')}</div>
@@ -2809,9 +1850,6 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   }
 
   function renderCompanyBoardTab(company) {
-    if (isLiveMode()) {
-      return `<section class="profile-tab-panel section-gap">${card('Board', liveEmptyCard('Board / governance packs are not returned by the API yet.'))}</section>`;
-    }
     return `<section class="profile-tab-panel section-gap">
       <div class="profile-tab-summary"><div><strong>Board and governance workspace</strong><span>Meetings, committees, resolutions, reserved matters, declarations and governance actions.</span></div>${button('Generate board pack','company-board-pack','primary','clipboard')}</div>
       <section class="grid cols-3 section-gap">
@@ -2831,9 +1869,6 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   }
 
   function renderCompanyFinancialsTab(company) {
-    if (isLiveMode()) {
-      return `<section class="profile-tab-panel section-gap">${card('Financials', liveEmptyCard('Management-account series are not returned by the API yet.'))}</section>`;
-    }
     const periods=['FY23A','FY24A','FY25A','FY26B','FY26E','FY27E'];
     return `<section class="profile-tab-panel section-gap">
       <div class="profile-tab-summary"><div><strong>Financial monitoring workspace</strong><span>Management accounts, forecasts, liquidity, working capital, variances and covenant monitoring.</span></div>${button('Upload management accounts','profile-company-upload','','upload')}</div>
@@ -2851,22 +1886,6 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   }
 
   function renderCompanyDocumentsTab(company) {
-    if (isLiveMode()) {
-      const companyDocs = documents.filter((doc) => {
-        const owner = String(doc.owner || doc.entity || '').toLowerCase();
-        const name = String(company?.name || '').toLowerCase();
-        return name && owner.includes(name);
-      });
-      return `<section class="profile-tab-panel section-gap">
-      <div class="profile-tab-summary"><div><strong>Company document workspace</strong><span>Documents linked to this portfolio company from the live vault.</span></div><div class="page-actions">${button('Request document','request-document','','send')}${button('Upload files','profile-company-upload','primary','upload')}</div></div>
-      <section class="metric-grid section-gap">
-        ${metricCard({label:'Linked Documents',value:String(companyDocs.length),iconName:'file',accent:'blue',foot:'From documents API',action:'company-documents'})}
-      </section>
-      ${card('Document Register', companyDocs.length
-        ? `<div class="table-wrap"><table><thead><tr><th>Name</th><th>Folder</th><th>Owner</th><th>Uploaded</th><th>Status</th></tr></thead><tbody>${companyDocs.map(doc=>`<tr><td class="table-primary">${escapeHTML(doc.name||doc.title||'-')}</td><td>${escapeHTML(String(doc.folder||'-'))}</td><td>${escapeHTML(String(doc.owner||'-'))}</td><td>${escapeHTML(String(doc.uploaded||doc.uploadedAt||'-'))}</td><td>${statusPill(String(doc.status||'-'))}</td></tr>`).join('')}</tbody></table></div>`
-        : liveEmptyCard('No company-linked documents returned by the API yet.'), {footer:`<span class="muted small">Company: ${escapeHTML(company?.name||'-')}</span>`})}
-    </section>`;
-    }
     const companyDocs = documents.filter(doc=>['Corporate & Legal','Financial','Commercial','Committee Pack'].includes(doc.folder));
     return `<section class="profile-tab-panel section-gap">
       <div class="profile-tab-summary"><div><strong>Company document workspace</strong><span>Governance papers, management accounts, legal records, board packs and evidence history.</span></div><div class="page-actions">${button('Request document','request-document','','send')}${button('Upload files','profile-company-upload','primary','upload')}</div></div>
@@ -2884,9 +1903,6 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   }
 
   function renderCompanyActivityTab(company) {
-    if (isLiveMode()) {
-      return `<section class="profile-tab-panel section-gap">${card('Activity', liveEmptyCard('Company activity / audit feed is not returned by the API yet.'))}</section>`;
-    }
     const events=[['31 Jul 2026 · 14:22','Management update published','Tariro Moyo','Operating performance','Revenue and EBITDA forecast refreshed','Complete'],['30 Jul 2026 · 09:45','Board paper uploaded','Farai Mutasa','Board & Governance','Q2 management accounts added to the August pack','Complete'],['29 Jul 2026 · 16:10','Milestone status changed','Tinashe Nyoni','Value Creation','ISO 27001 certification moved from On Track to At Risk','Attention'],['28 Jul 2026 · 11:08','Valuation reviewed','Nyasha Moyo','Valuation','$128.4M fair value retained after review','Approved'],['25 Jul 2026 · 13:35','Comment added','Rudo Chikomo','Commercial','South Africa pipeline assumptions updated','Complete'],['22 Jul 2026 · 08:50','Document requested','System','Documents','Tax clearance certificate renewal requested','Pending']];
     return `<section class="profile-tab-panel section-gap">
       <div class="profile-tab-summary"><div><strong>Company activity and audit trail</strong><span>Chronological operating updates, approvals, document changes and user actions.</span></div><div class="page-actions">${button('Add update','company-update','primary','plus')}${button('Export audit','export-drilldown','','download')}</div></div>
@@ -2900,10 +1916,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   }
 
   function renderCompanyDetail() {
-    const company = companies.find(c=>c.id===state.selectedCompanyId) || (!isLiveMode() ? companies[0] : null);
-    if (!company) {
-      return `${pageHeader('Company detail','No company selected.',button('Back to companies','navigate','','arrow-left','data-page="companies"'))}<p class="empty-state">Select a company from Portfolio Companies.</p>`;
-    }
+    const company = companies.find(c=>c.id===state.selectedCompanyId) || companies[0];
     const tabs=[['overview','Overview'],['performance','Performance'],['value-creation','Value Creation'],['board','Board & Governance'],['financials','Financials'],['documents','Documents'],['activity','Activity']];
     const content = state.companyTab==='performance' ? renderCompanyPerformanceTab(company)
       : state.companyTab==='value-creation' ? renderCompanyValueCreationTab(company)
@@ -3208,116 +2221,13 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     closeOverlays();
     if (typeof window.__PORTFOLIO_V11_NAV__ === 'function') window.__PORTFOLIO_V11_NAV__(page);
     render();
-    requestAnimationFrame(() => { try { workspace.focus({preventScroll:true}); } catch (_) {} });
-  }
-
-  function resolveDealIdFromDom(trigger) {
-    if (!trigger) return '';
-    const direct =
-      trigger.getAttribute?.('data-deal-id') ||
-      trigger.dataset?.dealId ||
-      trigger.dataset?.id ||
-      trigger.getAttribute?.('data-id') ||
-      '';
-    if (direct) return String(direct).trim();
-    const host = trigger.closest?.('[data-deal-id], [data-id]');
-    if (!host) return '';
-    return String(
-      host.getAttribute('data-deal-id') ||
-      host.dataset?.dealId ||
-      host.getAttribute('data-id') ||
-      host.dataset?.id ||
-      '',
-    ).trim();
-  }
-
-  function readDealIdFromLocation() {
-    try {
-      const params = new URLSearchParams(window.location.search || '');
-      const fromQuery = params.get('id') || params.get('dealId') || params.get('applicationId');
-      if (fromQuery) return String(fromQuery).trim();
-    } catch (_) {}
-    try {
-      return String(sessionStorage.getItem('pv11.selectedDealId') || '').trim();
-    } catch (_) {
-      return '';
-    }
-  }
-
-  function persistSelectedDealId(dealId) {
-    const id = dealId != null ? String(dealId).trim() : '';
-    state.selectedDealId = id || null;
-    try {
-      if (id) sessionStorage.setItem('pv11.selectedDealId', id);
-      else sessionStorage.removeItem('pv11.selectedDealId');
-    } catch (_) {}
-    return id;
-  }
-
-  function syncDealDetailUrl(dealId) {
-    const id = dealId != null ? String(dealId).trim() : '';
-    if (!id) return;
-    const path = `/portfolio-v11/deals/detail?id=${encodeURIComponent(id)}`;
-    const current = `${window.location.pathname}${window.location.search || ''}`;
-    if (current === path) return;
-    try {
-      window.history.replaceState({ portfolioV11: 'deal-detail', dealId: id }, '', path);
-      if (typeof window.__PORTFOLIO_V11_PATH_REF__ === 'object' && window.__PORTFOLIO_V11_PATH_REF__) {
-        window.__PORTFOLIO_V11_PATH_REF__.current = path.split('?')[0];
-      }
-    } catch (_) {}
+    requestAnimationFrame(() => { try { workspace?.focus?.({preventScroll:true}); } catch (_) {} });
   }
 
   function openDeal(id) {
-    const dealId = persistSelectedDealId(id || readDealIdFromLocation());
-    if (!dealId) {
-      toast('Deal required', 'Could not open deal - missing application id.', 'warning');
-      return;
-    }
-    const existing = deals.find((d) => String(d.id) === String(dealId));
-    const sameDetail =
-      state.dealDetail &&
-      String(state.dealDetail?.application?.id || state.dealDetail?.hero?.applicationId || '') === String(dealId) &&
-      !state.dealDetail?._stub;
-    if (!sameDetail) {
-      // Seed from list row so tabs paint immediately while detail APIs load.
-      state.dealDetail = {
-        _stub: true,
-        application: {
-          id: dealId,
-          businessName: existing?.name,
-          industry: existing?.sector,
-          businessStage: existing?.round,
-          requestedAmount: existing?.amount,
-          currentStage: existing?.stage,
-        },
-        hero: {
-          applicationId: dealId,
-          companyName: existing?.name || 'Deal',
-          requestedAmount: existing?.amount || 0,
-          industry: existing?.sector || '',
-          businessStage: existing?.round || '',
-          fundName: existing?.fund || '',
-          stage: existing?.stage || '',
-          score: existing?.score ?? null,
-        },
-        dueDiligence: null,
-        termSheet: null,
-        boardReview: null,
-        investmentImplementation: null,
-        documents: [],
-        disbursements: [],
-      };
-    }
-    if (!['overview','application','screening','diligence','term','ic','disbursement','documents'].includes(state.dealTab)) {
-      state.dealTab = 'overview';
-    }
+    state.selectedDealId = id || 'DL-013';
+    state.dealTab = 'overview';
     navigate('deal-detail');
-    syncDealDetailUrl(dealId);
-    if (state.liveData && !sameDetail) {
-      window.MatanhoPortfolioUI?.setDealDetailLoading?.(true);
-      emitIntegrationEvent('matanho:load-deal-detail', { applicationId: dealId });
-    }
   }
 
   function openCompany(id) { state.selectedCompanyId = id; state.companyTab = 'overview'; navigate('company-detail'); }
@@ -3350,17 +2260,8 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     const variant=options.variant||overlayVariant(title,'modal');
     const size=options.size||(/document|signature|reconciliation|import/.test(variant)?'xl':/wizard|approval|operations/.test(variant)?'lg':'md');
     const railItems=options.rail||({wizard:['Details','Ownership','Review'],approval:['Impact','Evidence','Approval'],operations:['Context','Controls','Action'],compose:['Message','Recipients','Delivery'],inspector:['Properties','Permissions','Audit']}[variant]||[]);
-    const railStep = options.railStep != null ? Number(options.railStep) : 0;
-    const railMax = options.railMax != null ? Number(options.railMax) : railStep;
     state.modal = { title, variant };
-    modalLayer.innerHTML = `<section class="modal modal-${variant} modal-${size}" role="dialog" aria-modal="true" aria-label="${escapeHTML(title)}">${railItems.length?`<aside class="modal-rail"><span class="modal-rail-icon">${icon(options.icon||({wizard:'plus',approval:'shield',operations:'refresh',compose:'send',inspector:'settings'}[variant]||'file'))}</span><strong>${escapeHTML(options.eyebrow||variant.replaceAll('-',' '))}</strong>${railItems.map((item,index)=>{
-      const active = index === railStep ? 'active' : '';
-      const done = index < railStep ? 'done' : '';
-      const clickable = options.rail && index <= railMax;
-      return clickable
-        ? `<button type="button" class="modal-rail-step ${active} ${done}" data-action="wizard-step" data-step="${index}"><b>${index+1}</b>${escapeHTML(item)}</button>`
-        : `<span class="modal-rail-step ${active} ${done}"><b>${index+1}</b>${escapeHTML(item)}</span>`;
-    }).join('')}</aside>`:''}<div class="modal-main"><div class="modal-head"><div><span class="overlay-eyebrow">${escapeHTML(options.eyebrow||variant.replaceAll('-',' '))}</span><h2>${escapeHTML(title)}</h2>${subtitle ? `<p>${escapeHTML(subtitle)}</p>` : ''}</div><button class="icon-button" data-action="close-modal">${icon('x')}</button></div><div class="modal-body">${body}</div>${footer ? `<div class="modal-foot">${footer}</div>` : ''}</div></section>`;
+    modalLayer.innerHTML = `<section class="modal modal-${variant} modal-${size}" role="dialog" aria-modal="true" aria-label="${escapeHTML(title)}">${railItems.length?`<aside class="modal-rail"><span class="modal-rail-icon">${icon(options.icon||({wizard:'plus',approval:'shield',operations:'refresh',compose:'send',inspector:'settings'}[variant]||'file'))}</span><strong>${escapeHTML(options.eyebrow||variant.replaceAll('-',' '))}</strong>${railItems.map((item,index)=>`<span class="modal-rail-step ${index===0?'active':''}"><b>${index+1}</b>${escapeHTML(item)}</span>`).join('')}</aside>`:''}<div class="modal-main"><div class="modal-head"><div><span class="overlay-eyebrow">${escapeHTML(options.eyebrow||variant.replaceAll('-',' '))}</span><h2>${escapeHTML(title)}</h2>${subtitle ? `<p>${escapeHTML(subtitle)}</p>` : ''}</div><button class="icon-button" data-action="close-modal">${icon('x')}</button></div><div class="modal-body">${body}</div>${footer ? `<div class="modal-foot">${footer}</div>` : ''}</div></section>`;
     modalLayer.classList.add('visible');
     scrim.classList.add('visible');
     renderStaticIcons(modalLayer);
@@ -3382,11 +2283,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     if(context==='company') return companies.find(item=>item.id===id) || companies[0];
     if(context==='lp') return lps.find(item=>item.id===id) || lps[0];
     if(context==='capital-call') return capitalCalls.find(item=>item.id===id) || capitalCalls[0];
-    if (context==='deal'||context==='term-sheet') {
-      return (id && deals.find(item=>String(item.id)===String(id)))
-        || (!state.liveData && (deals.find(item=>item.featured) || deals[0]))
-        || { name: id || 'Deal', id };
-    }
+    if(context==='deal'||context==='term-sheet') return deals.find(item=>item.id===id) || deals.find(item=>item.featured) || deals[0];
     if(context==='envelope') return signatureEnvelopes.find(item=>item.id===id) || signatureEnvelopes[0];
     if(context==='mailer-list') return mailerLists.find(item=>item.id===id) || mailerLists[0];
     return {name:id||'Portfolio record'};
@@ -3567,232 +2464,13 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   }
 
   function showAddDealModal(defaultStage = 'Sourcing') {
-    if (state.liveData) {
-      state.modalWizard = {
-        kind: 'add-deal',
-        step: 0,
-        maxReached: 0,
-        draft: {},
-        defaultStage,
-      };
-      renderAddDealWizard();
-      return;
-    }
     showModal('Add investment opportunity','Create a frontend-only pipeline record.',`<form id="addDealForm"><div class="form-grid"><div class="form-field"><label class="required">Company name</label><input name="name" required placeholder="e.g. AfriCloud"></div><div class="form-field"><label class="required">Sector</label><select name="sector"><option>Enterprise Software</option><option>FinTech</option><option>Climate Tech</option><option>HealthTech</option><option>Consumer</option><option>Mobility & Logistics</option></select></div><div class="form-field"><label class="required">Funding round</label><select name="round"><option>Seed</option><option>Series A</option><option>Series B</option><option>Growth</option><option>Buyout</option></select></div><div class="form-field"><label class="required">Requested amount (USD)</label><input name="amount" type="number" min="100000" value="10000000" required></div><div class="form-field"><label class="required">Stage</label><select name="stage">${dealStages.map(stage=>`<option ${stage===defaultStage?'selected':''}>${stage}</option>`).join('')}</select></div><div class="form-field"><label>Owner</label><select name="owner"><option>Nyasha Moyo</option><option>Sarah Chen</option><option>Michael Park</option><option>Priya Nair</option><option>Alex Johnson</option></select></div><div class="form-field"><label>Priority</label><select name="priority"><option>Medium</option><option>High</option><option>Low</option></select></div><div class="form-field"><label>Target fund</label><select name="fund">${funds.map(f=>`<option>${escapeHTML(f.name)}</option>`).join('')}</select></div><div class="form-field full"><label>Investment note</label><textarea name="note" placeholder="Add sourcing context, thesis fit and next action..."></textarea></div></div></form>`,`${button('Cancel','close-modal')}${button('Add to pipeline','submit-add-deal','primary','plus')}`);
-  }
-
-  function captureModalWizardDraft() {
-    if (!state.modalWizard) return;
-    const formId = state.modalWizard.kind === 'create-term-sheet' ? 'createTermSheetForm' : 'addDealForm';
-    const form = document.getElementById(formId);
-    if (!form) return;
-    const data = Object.fromEntries(new FormData(form));
-    if (state.modalWizard.kind === 'create-term-sheet') delete data.document;
-    state.modalWizard.draft = { ...state.modalWizard.draft, ...data };
-  }
-
-  function captureAddDealDraft() {
-    captureModalWizardDraft();
-  }
-
-  function renderModalWizard() {
-    if (!state.modalWizard) return;
-    if (state.modalWizard.kind === 'create-term-sheet') renderCreateTermSheetWizard();
-    else renderAddDealWizard();
-  }
-
-  function modalWizardMaxStep() {
-    return 2;
-  }
-
-  function renderAddDealWizard() {
-    const wiz = state.modalWizard || { step: 0, draft: {}, maxReached: 0 };
-    const step = wiz.step || 0;
-    wiz.maxReached = Math.max(wiz.maxReached || 0, step);
-    const d = wiz.draft || {};
-    const fundOptions = funds.length
-      ? funds.map(f => `<option value="${escapeHTML(f.id)}" ${String(d.fundId) === String(f.id) ? 'selected' : ''}>${escapeHTML(f.name)}</option>`).join('')
-      : '<option value="">No funds available</option>';
-    const steps = ['Details', 'Ownership', 'Review'];
-    let body = '';
-    if (step === 0) {
-      body = `<form id="addDealForm"><div class="form-grid">
-        <div class="form-field"><label class="required">Company / business name</label><input name="name" required placeholder="e.g. AfriCloud" value="${escapeHTML(d.name || '')}"></div>
-        <div class="form-field"><label class="required">Industry / sector</label><select name="sector"><option ${!d.sector || d.sector==='Enterprise Software'?'selected':''}>Enterprise Software</option><option ${d.sector==='FinTech'?'selected':''}>FinTech</option><option ${d.sector==='Climate Tech'?'selected':''}>Climate Tech</option><option ${d.sector==='HealthTech'?'selected':''}>HealthTech</option><option ${d.sector==='Consumer'?'selected':''}>Consumer</option><option ${d.sector==='Mobility & Logistics'?'selected':''}>Mobility & Logistics</option></select></div>
-        <div class="form-field"><label class="required">Business stage</label><select name="round"><option ${!d.round || d.round==='Seed'?'selected':''}>Seed</option><option ${d.round==='Series A'?'selected':''}>Series A</option><option ${d.round==='Series B'?'selected':''}>Series B</option><option ${d.round==='Growth'?'selected':''}>Growth</option><option ${d.round==='Buyout'?'selected':''}>Buyout</option></select></div>
-        <div class="form-field"><label class="required">Requested amount (USD)</label><input name="amount" type="number" min="100000" value="${escapeHTML(String(d.amount || '10000000'))}" required></div>
-        <div class="form-field"><label class="required">Applicant name</label><input name="applicantName" required placeholder="Primary contact" value="${escapeHTML(d.applicantName || '')}"></div>
-        <div class="form-field"><label class="required">Applicant email</label><input name="applicantEmail" type="email" required placeholder="contact@company.com" value="${escapeHTML(d.applicantEmail || '')}"></div>
-        <div class="form-field"><label class="required">Applicant phone</label><input name="applicantPhone" required placeholder="+263 …" value="${escapeHTML(d.applicantPhone || '')}"></div>
-        <div class="form-field"><label class="required">Applicant address</label><input name="applicantAddress" required placeholder="City, country" value="${escapeHTML(d.applicantAddress || '')}"></div>
-        <div class="form-field full"><label class="required">Target fund</label><select name="fundId" required>${fundOptions}</select></div>
-        <div class="form-field full"><label class="required">Business description</label><textarea name="note" required placeholder="Thesis fit, product, market and ask…">${escapeHTML(d.note || '')}</textarea></div>
-      </div></form>`;
-    } else if (step === 1) {
-      body = `<form id="addDealForm"><div class="form-grid">
-        <div class="form-field"><label>Proposed ownership (%)</label><input name="proposedOwnership" type="number" min="0" max="100" step="0.1" placeholder="e.g. 15.5" value="${escapeHTML(String(d.proposedOwnership || ''))}"></div>
-        <div class="form-field"><label>Pre-money valuation (USD)</label><input name="preMoneyValuation" type="number" min="0" placeholder="e.g. 85000000" value="${escapeHTML(String(d.preMoneyValuation || ''))}"></div>
-        <div class="form-field"><label>Country</label><input name="country" placeholder="Zimbabwe" value="${escapeHTML(d.country || '')}"></div>
-        <div class="form-field"><label>Lead contact role</label><input name="contactRole" placeholder="CEO / Founder" value="${escapeHTML(d.contactRole || '')}"></div>
-        <div class="form-field full"><p class="muted small" style="margin:0">Ownership and pre-money are collected here for the deal record. Persist to the application API when the backend fields are available.</p></div>
-      </div></form>`;
-    } else {
-      body = `<form id="addDealForm"><div class="form-grid">
-        <div class="form-field full">${card('Review summary', liveKv([
-          ['Company', d.name || '-'],
-          ['Sector', d.sector || '-'],
-          ['Stage', d.round || '-'],
-          ['Ask', d.amount ? formatMoney(Number(d.amount)) : '-'],
-          ['Applicant', `${d.applicantName || '-'} · ${d.applicantEmail || '-'}`],
-          ['Ownership', d.proposedOwnership ? `${d.proposedOwnership}%` : '-'],
-          ['Pre-money', d.preMoneyValuation ? formatMoney(Number(d.preMoneyValuation)) : '-'],
-          ['Country', d.country || '-'],
-        ]))}</div>
-        <div class="form-field"><label class="required">Business plan</label><input name="fileBusinessPlan" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg" required></div>
-        <div class="form-field"><label class="required">Proof of concept</label><input name="filePoc" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg" required></div>
-        <div class="form-field"><label class="required">Market research</label><input name="fileMarket" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg" required></div>
-        <div class="form-field"><label class="required">Projected cash flows</label><input name="fileCashFlows" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg" required></div>
-      </div></form>`;
-    }
-    const footer = step === 0
-      ? `${button('Cancel','close-modal')}${button('Next','wizard-next','primary','arrow-right')}`
-      : step === 1
-        ? `${button('Back','wizard-back')}${button('Next','wizard-next','primary','arrow-right')}`
-        : `${button('Back','wizard-back')}${button('Create application','submit-add-deal','primary','plus')}`;
-    showModal(
-      'Add investment opportunity',
-      steps[step] === 'Review' ? 'Upload required documents and confirm.' : 'Creates a live screening application on the selected fund.',
-      body,
-      footer,
-      {
-        variant: 'wizard',
-        size: 'lg',
-        eyebrow: 'Deal intake',
-        rail: steps,
-        railStep: step,
-        railMax: wiz.maxReached,
-      },
-    );
-  }
-
-  function showCreateTermSheetModal(dealId) {
-    const deal = deals.find(d => String(d.id) === String(dealId));
-    const detail = state.dealDetail || {};
-    const hero = detail.hero || {};
-    state.modalWizard = {
-      kind: 'create-term-sheet',
-      dealId: String(dealId),
-      step: 0,
-      maxReached: 0,
-      draft: {
-        title: `${deal?.name || hero.businessName || 'Deal'} Term Sheet`,
-        investmentAmount: String(deal?.amount || hero.requestedAmount || ''),
-        equityPercentage: hero.ownership != null ? String(hero.ownership) : '',
-        valuation: hero.preMoney != null ? String(hero.preMoney) : '',
-        keyTerms: '',
-        conditions: '',
-        timeline: '',
-      },
-    };
-    renderCreateTermSheetWizard();
-  }
-
-  function renderCreateTermSheetWizard() {
-    const wiz = state.modalWizard || { step: 0, draft: {}, maxReached: 0 };
-    if (wiz.kind !== 'create-term-sheet') return;
-    const step = wiz.step || 0;
-    wiz.maxReached = Math.max(wiz.maxReached || 0, step);
-    const d = wiz.draft || {};
-    const steps = ['Terms', 'Ownership', 'Review'];
-    let body = '';
-    if (step === 0) {
-      body = `<form id="createTermSheetForm"><div class="form-grid">
-        <div class="form-field full"><label class="required">Title</label><input name="title" required value="${escapeHTML(d.title || '')}"></div>
-        <div class="form-field"><label class="required">Investment amount (USD)</label><input name="investmentAmount" type="number" min="1" required value="${escapeHTML(String(d.investmentAmount || ''))}"></div>
-        <div class="form-field full"><label>Key terms</label><textarea name="keyTerms" placeholder="Key commercial terms">${escapeHTML(d.keyTerms || '')}</textarea></div>
-        <div class="form-field full"><label>Conditions</label><textarea name="conditions" placeholder="Conditions precedent">${escapeHTML(d.conditions || '')}</textarea></div>
-        <div class="form-field full"><label>Timeline</label><textarea name="timeline" placeholder="Signing and closing timeline">${escapeHTML(d.timeline || '')}</textarea></div>
-      </div></form>`;
-    } else if (step === 1) {
-      body = `<form id="createTermSheetForm"><div class="form-grid">
-        <div class="form-field"><label class="required">Equity %</label><input name="equityPercentage" type="number" step="0.1" min="0" max="100" required placeholder="e.g. 15" value="${escapeHTML(String(d.equityPercentage || ''))}"></div>
-        <div class="form-field"><label class="required">Pre-money valuation (USD)</label><input name="valuation" type="number" min="1" required placeholder="Pre-money valuation" value="${escapeHTML(String(d.valuation || ''))}"></div>
-        <div class="form-field full"><p class="muted small" style="margin:0">Ownership and valuation are saved on the term sheet record and shown on the deal hero after creation.</p></div>
-      </div></form>`;
-    } else {
-      body = `<form id="createTermSheetForm"><div class="form-grid">
-        <div class="form-field full">${card('Review summary', liveKv([
-          ['Title', d.title || '-'],
-          ['Investment', d.investmentAmount ? formatMoney(Number(d.investmentAmount)) : '-'],
-          ['Equity', d.equityPercentage ? `${d.equityPercentage}%` : '-'],
-          ['Pre-money valuation', d.valuation ? formatMoney(Number(d.valuation)) : '-'],
-          ['Key terms', d.keyTerms || '-'],
-          ['Conditions', d.conditions || '-'],
-          ['Timeline', d.timeline || '-'],
-        ]))}</div>
-        <div class="form-field full"><label class="required">Term sheet document (PDF)</label><input name="document" type="file" required accept=".pdf,application/pdf"></div>
-      </div></form>`;
-    }
-    const footer = step === 0
-      ? `${button('Cancel','close-modal')}${button('Next','wizard-next','primary','arrow-right')}`
-      : step === 1
-        ? `${button('Back','wizard-back')}${button('Next','wizard-next','primary','arrow-right')}`
-        : `${button('Back','wizard-back')}${button('Create term sheet','submit-create-term-sheet','primary','plus')}`;
-    const deal = deals.find(item => String(item.id) === String(wiz.dealId));
-    showModal(
-      'Create term sheet',
-      step === 2 ? 'Upload the signed or draft term sheet PDF and confirm.' : (deal?.name || 'Application'),
-      body,
-      footer,
-      {
-        variant: 'wizard',
-        size: 'lg',
-        eyebrow: 'Term sheet',
-        rail: steps,
-        railStep: step,
-        railMax: wiz.maxReached,
-      },
-    );
   }
 
   function submitAddDeal() {
     const form = $('#addDealForm');
     if (!form?.reportValidity()) return;
-    captureAddDealDraft();
-    const data = { ...(state.modalWizard?.draft || {}), ...Object.fromEntries(new FormData(form)) };
-    if (state.liveData) {
-      const bp = form.querySelector('[name="fileBusinessPlan"]')?.files?.[0];
-      const poc = form.querySelector('[name="filePoc"]')?.files?.[0];
-      const market = form.querySelector('[name="fileMarket"]')?.files?.[0];
-      const cash = form.querySelector('[name="fileCashFlows"]')?.files?.[0];
-      if (!bp || !poc || !market || !cash) {
-        toast('Documents required', 'Upload all four required application documents.', 'warning');
-        return;
-      }
-      const address = [data.applicantAddress, data.country].filter(Boolean).join(', ');
-      emitIntegrationEvent('matanho:before-action', {
-        action: 'api-create-application',
-        dataset: {
-          applicantName: String(data.applicantName || ''),
-          applicantEmail: String(data.applicantEmail || ''),
-          applicantPhone: String(data.applicantPhone || ''),
-          applicantAddress: String(address || data.applicantAddress || ''),
-          businessName: String(data.name || ''),
-          businessDescription: String(data.note || data.name || ''),
-          industry: String(data.sector || ''),
-          businessStage: String(data.round || 'Seed'),
-          foundingDate: new Date().toISOString().slice(0, 10),
-          requestedAmount: String(data.amount || ''),
-          fundId: String(data.fundId || ''),
-          proposedOwnership: String(data.proposedOwnership || ''),
-          preMoneyValuation: String(data.preMoneyValuation || ''),
-          country: String(data.country || ''),
-        },
-        files: { businessPlan: bp, proofOfConcept: poc, marketResearch: market, projectedCashFlows: cash },
-        state: publicSnapshot().state,
-      }, true);
-      return;
-    }
+    const data = Object.fromEntries(new FormData(form));
     const deal = { id:`DL-${String(deals.length+1).padStart(3,'0')}`, name:data.name, sector:data.sector, round:data.round, amount:Number(data.amount), owner:data.owner, age:0, priority:data.priority, stage:data.stage, score:0, fund:data.fund };
     deals.push(deal);
     closeOverlays();
@@ -3802,10 +2480,6 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   }
 
   function showCapitalCallModal() {
-    if (state.liveData) {
-      showModal('New Capital Call','Creates a live capital call on the selected fund (call % of commitments).',`<form id="capitalCallForm"><div class="form-grid"><div class="form-field full"><label class="required">Fund</label><select name="fundId" required>${funds.map(f=>`<option value="${escapeHTML(f.id)}">${escapeHTML(f.name)}</option>`).join('')}</select></div><div class="form-field"><label class="required">Call percent</label><input name="callPercent" type="number" min="0.01" max="100" step="0.01" value="10" required></div><div class="form-field"><label class="required">Transaction date</label><input name="transactionDate" type="date" value="${new Date().toISOString().slice(0,10)}" required></div><div class="form-field"><label class="required">Payment due date</label><input name="paymentDueDate" type="date" value="${new Date(Date.now()+30*86400000).toISOString().slice(0,10)}" required></div><div class="form-field full"><label class="required">Bank instructions</label><textarea name="bankInstructions" required>Please remit to the fund collection account per LPA.</textarea></div></div></form>`,`${button('Cancel','close-modal')}${button('Create capital call','submit-capital-call','primary','plus')}`);
-      return;
-    }
     showModal('New Capital Call','Create a draft capital call notice.',`<form id="capitalCallForm"><div class="form-grid"><div class="form-field full"><label class="required">Fund</label><select name="fund">${funds.map(f=>`<option>${escapeHTML(f.name)}</option>`).join('')}</select></div><div class="form-field"><label class="required">Call date</label><input name="callDate" type="date" value="2026-08-01"></div><div class="form-field"><label class="required">Due date</label><input name="dueDate" type="date" value="2026-08-31"></div><div class="form-field"><label class="required">Total amount (USD)</label><input name="amount" type="number" value="25000000"></div><div class="form-field"><label class="required">Purpose</label><select name="purpose"><option>New investments</option><option>Follow-on investments</option><option>Management fees</option><option>Fund expenses</option><option>Co-investments</option></select></div><div class="form-field full"><label>Notes</label><textarea name="notes">Capital required to fund the approved investment programme and related fund expenses.</textarea></div></div></form>`,`${button('Cancel','close-modal')}${button('Create draft','submit-capital-call','primary','plus')}`);
   }
 
@@ -3813,20 +2487,6 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     const form = $('#capitalCallForm');
     if (!form?.reportValidity()) return;
     const data = Object.fromEntries(new FormData(form));
-    if (state.liveData) {
-      emitIntegrationEvent('matanho:before-action', {
-        action: 'api-create-capital-call',
-        dataset: {
-          fundId: String(data.fundId || ''),
-          callPercent: String(data.callPercent || ''),
-          paymentDueDate: String(data.paymentDueDate || ''),
-          transactionDate: String(data.transactionDate || ''),
-          bankInstructions: String(data.bankInstructions || ''),
-        },
-        state: publicSnapshot().state,
-      }, true);
-      return;
-    }
     const id = `CC-2026-${String(39 + capitalCalls.length).padStart(4,'0')}`;
     const call = { id, fund:data.fund, callDate:new Date(data.callDate).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}), dueDate:new Date(data.dueDate).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}), purpose:data.purpose, amount:Number(data.amount), lpCount:38, collected:0, status:'Draft', approval:'Draft' };
     capitalCalls.unshift(call);
@@ -3844,10 +2504,6 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   function submitCompany() {
     const form = $('#companyForm');
     if (!form?.reportValidity()) return;
-    if (state.liveData) {
-      toast('Not available live', 'Portfolio company create is not exposed on the current API. Companies come from investments / applications.', 'warning');
-      return;
-    }
     const data = Object.fromEntries(new FormData(form));
     const colors = ['#1d4ed8','#0d9488','#ea580c','#0284c7','#0284c7'];
     const company = { id:`CO-${String(companies.length+1).padStart(3,'0')}`, name:data.name, sector:data.sector, stage:data.stage, entry:'31 Jul 2026', invested:Number(data.invested), fairValue:Number(data.fairValue), ownership:Number(data.ownership), revenueGrowth:0, runway:18, health:75, boardDate:'TBC', lastReport:'Not submitted', fund:data.fund, city:data.city, revenue:[0,0,0,0,0], ebitda:[0,0,0,0,0], arr:0, margin:0, nrr:0, clients:0, esg:[0,0,0], color:colors[companies.length%colors.length] };
@@ -3865,22 +2521,6 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     const form = $('#lpForm');
     if (!form?.reportValidity()) return;
     const data = Object.fromEntries(new FormData(form));
-    if (state.liveData) {
-      emitIntegrationEvent('matanho:before-action', {
-        action: 'api-add-lp',
-        dataset: {
-          name: String(data.name || ''),
-          email: String(data.email || `lp.${Date.now()}@example.com`),
-          type: String(data.type || 'entity'),
-          country: String(data.geography || data.country || 'ZW'),
-          amount: String(data.commitment || ''),
-          fundId: funds[0]?.id || '',
-        },
-        state: publicSnapshot().state,
-      }, true);
-      closeOverlays();
-      return;
-    }
     const commitment = Number(data.commitment);
     const lp = { id:`LP-${String(lps.length+1).padStart(3,'0')}`, name:data.name, type:data.type, geography:data.geography, commitment, called:0, distributed:0, netIrr:0, owner:data.owner, lastInteraction:'Not contacted', kyc:'Not Started', portal:'Invited', unfunded:commitment, tvpi:0, dpi:0, color:'#2563eb' };
     lps.push(lp);
@@ -3922,12 +2562,12 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   }
 
   function showAccountDetail(id) {
-    const a=cashAccounts.find(item=>item.id===id)||cashAccounts[0]; state.selectedCashAccountId=a.id;
-    showDrawer(`${a.id} · ${a.masked}`,`${a.fund} · ${a.vehicle}`,`<section class="drawer-account-hero"><div><span>${icon('bank')}</span><div><strong>${escapeHTML(a.provider)}</strong><small>${escapeHTML(a.purpose.replaceAll('_',' '))} · ${escapeHTML(a.currency)}</small></div></div>${statusPill(a.status)}</section><section class="drawer-section"><div class="account-cash-grid"><div><span>Posted</span><strong>${formatMoney(a.posted,a.currency)}</strong></div><div><span>Settled</span><strong>${formatMoney(a.settled,a.currency)}</strong></div><div><span>Reserved</span><strong>${formatMoney(a.reserved,a.currency)}</strong></div><div><span>Held</span><strong>${formatMoney(a.held,a.currency)}</strong></div><div class="highlight"><span>Deployable</span><strong>${formatMoney(a.deployable,a.currency)}</strong></div><div><span>Distributable</span><strong>${formatMoney(a.distributable,a.currency)}</strong></div></div></section><section class="drawer-section"><h3>Ownership & Configuration</h3><div class="info-list"><div class="info-row"><span>Manager legal entity</span><strong>Matanho Capital Zimbabwe</strong></div><div class="info-row"><span>Fund / Vehicle</span><strong>${escapeHTML(a.fund)} / ${escapeHTML(a.vehicle)}</strong></div><div class="info-row"><span>Ownership model</span><strong>${escapeHTML(a.ownership)}</strong></div><div class="info-row"><span>Tolerance policy</span><strong>${escapeHTML(a.currency)}-CASH-STD · ${formatMoney(a.tolerance,a.currency)}</strong></div><div class="info-row"><span>GL mapping</span><strong>${escapeHTML(a.gl)}</strong></div><div class="info-row"><span>Last statement</span><strong>${escapeHTML(a.lastStatement)}</strong></div></div></section><section class="drawer-section"><h3>Reconciliation health</h3><div class="inline-progress">${progressBar(a.reconHealth)}<span>${a.reconHealth.toFixed(1)}%</span></div><div class="section-gap">${button('Open reconciliation','open-reconciliation-for-account','primary','refresh',`data-id="${a.id}"`)}</div></section>`,`${button('Explain balance','explain-cash-position','','info',`data-id="${a.id}"`)}${button('View ledger','navigate-cash-ledger','primary','list')}`,{variant:'operations',icon:'bank',eyebrow:'Fund cash account'});
+    const a=cashAccounts.find(item=>item.id===id)||cashAccounts[0]; if(!a){toast('No cash accounts','Seed cash accounts to open this view.','warning');return;} state.selectedCashAccountId=a.id;
+    showDrawer(`${a.id} · ${a.masked}`,`${a.fund} · ${a.vehicle}`,`<section class="drawer-account-hero"><div><span>${icon('bank')}</span><div><strong>${escapeHTML(a.provider)}</strong><small>${escapeHTML(String(a.purpose||'FUND_OPERATING_BANK').replaceAll('_',' '))} · ${escapeHTML(a.currency)}</small></div></div>${statusPill(a.status)}</section><section class="drawer-section"><div class="account-cash-grid"><div><span>Posted</span><strong>${formatMoney(a.posted,a.currency)}</strong></div><div><span>Settled</span><strong>${formatMoney(a.settled,a.currency)}</strong></div><div><span>Reserved</span><strong>${formatMoney(a.reserved,a.currency)}</strong></div><div><span>Held</span><strong>${formatMoney(a.held,a.currency)}</strong></div><div class="highlight"><span>Deployable</span><strong>${formatMoney(a.deployable,a.currency)}</strong></div><div><span>Distributable</span><strong>${formatMoney(a.distributable,a.currency)}</strong></div></div></section><section class="drawer-section"><h3>Ownership & Configuration</h3><div class="info-list"><div class="info-row"><span>Manager legal entity</span><strong>Matanho Capital Zimbabwe</strong></div><div class="info-row"><span>Fund / Vehicle</span><strong>${escapeHTML(a.fund)} / ${escapeHTML(a.vehicle)}</strong></div><div class="info-row"><span>Ownership model</span><strong>${escapeHTML(a.ownership)}</strong></div><div class="info-row"><span>Tolerance policy</span><strong>${escapeHTML(a.currency)}-CASH-STD · ${formatMoney(a.tolerance,a.currency)}</strong></div><div class="info-row"><span>GL mapping</span><strong>${escapeHTML(a.gl)}</strong></div><div class="info-row"><span>Last statement</span><strong>${escapeHTML(a.lastStatement)}</strong></div></div></section><section class="drawer-section"><h3>Reconciliation health</h3><div class="inline-progress">${progressBar(a.reconHealth)}<span>${a.reconHealth.toFixed(1)}%</span></div><div class="section-gap">${button('Open reconciliation','open-reconciliation-for-account','primary','refresh',`data-id="${a.id}"`)}</div></section>`,`${button('Explain balance','explain-cash-position','','info',`data-id="${a.id}"`)}${button('View ledger','navigate-cash-ledger','primary','list')}`,{variant:'operations',icon:'bank',eyebrow:'Fund cash account'});
   }
 
   function showCashExplanation(id=state.selectedCashAccountId) {
-    const a=cashAccounts.find(item=>item.id===id)||cashAccounts[0];
+    const a=cashAccounts.find(item=>item.id===id)||cashAccounts[0]; if(!a){toast('No cash accounts','Seed cash accounts to open this view.','warning');return;}
     const components=[['Eligible settled cash',a.settled,'ledger lines'],['Reusable proceeds / credit',a.purpose==='PORTFOLIO_PROCEEDS'?8500000:0,'approved policy'],['Active reservations',-a.reserved,'reservation register'],['Compliance and operating holds',-a.held,'holds register'],['Pending payments / distributions',-Math.min(a.expectedOut,2400000),'expected movements'],['Minimum cash buffer',-Math.max(0,a.settled+a.reserved-a.deployable-a.held-Math.min(a.expectedOut,2400000)),'effective fund policy']];
     showModal('Explain Available Cash',`${a.fund} · ${a.masked} · ${a.currency} · as of ${state.asOfDate}`,`<div class="cash-explanation"><div class="formula-banner"><strong>Eligible settled cash + approved additions − reservations − holds − pending outflows − buffers</strong><span>Calculation version AVAIL-${a.currency}-v4</span></div><div class="cash-component-list">${components.map(([label,value,source],i)=>`<button data-action="cash-component-drill" data-component="${i}"><span>${label}<small>${source}</small></span><strong class="${value>=0?'positive':'negative'}">${formatMoney(value,a.currency)}</strong>${icon('chevron-right')}</button>`).join('')}</div><div class="cash-explanation-total"><span>Diagnostic available cash</span><strong>${formatMoney(a.deployable,a.currency)}</strong><small>Deployment-eligible amount is floored at zero; the diagnostic value remains available for controls.</small></div><div class="data-freshness">${icon('clock')} Ledger current · external statement last received ${escapeHTML(a.lastStatement)} · Africa/Harare</div></div>`,`${button('Export explanation','download-cash-explanation','','download',`data-id="${a.id}"`)}${button('Open underlying ledger','navigate-cash-ledger','primary','list')}`,{variant:'operations',size:'lg',eyebrow:'Reproducible cash calculation'});
   }
@@ -4017,22 +2657,10 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   function handleAction(action, trigger, event) {
     switch (action) {
       case 'go-home': navigate('dashboard'); break;
-      case 'toggle-sidebar': state.sidebarCollapsed = !state.sidebarCollapsed; storage.set('matanho-portfolio-sidebar-v2',state.sidebarCollapsed?'collapsed':'expanded'); render(); break;
+      case 'toggle-sidebar': state.sidebarCollapsed = !state.sidebarCollapsed; storage.set('matanho-portfolio-sidebar',state.sidebarCollapsed?'collapsed':'expanded'); render(); break;
       case 'toggle-mobile-nav': state.mobileNavOpen = !state.mobileNavOpen; sidebar.classList.toggle('mobile-open',state.mobileNavOpen); scrim.classList.toggle('visible',state.mobileNavOpen); break;
-      case 'retry-live-load':
-        state.liveLoadError = null;
-        if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
-          window.dispatchEvent(new CustomEvent('pv11:retry-live-load'));
-        }
-        break;
       case 'navigate': navigate(trigger.dataset.page); break;
-      case 'open-deal':
-        if (event.type === 'click') {
-          event.preventDefault?.();
-          event.stopPropagation?.();
-          openDeal(resolveDealIdFromDom(trigger));
-        }
-        break;
+      case 'open-deal': if (event.type === 'click') openDeal(trigger.dataset.dealId || trigger.dataset.id); break;
       case 'open-company': openCompany(trigger.dataset.id); break;
       case 'open-fund': openFund(trigger.dataset.id); break;
       case 'open-lp': openLP(trigger.dataset.id); break;
@@ -4071,19 +2699,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       case 'open-calendar-event': showCalendarEvent(trigger.dataset.id); break;
       case 'deal-view': state.dealView=trigger.dataset.view||'list'; render(); break;
       case 'deal-calendar-day': showRecordMetadata('deal-calendar',`Day ${trigger.dataset.day}`); break;
-      case 'deal-tab': {
-        const nextTab = trigger.dataset.tab || trigger.dataset.dataTab || 'overview';
-        if (state.liveData) {
-          const gate = dealTabGate(state.dealDetail || {});
-          if (gate[nextTab] && !gate[nextTab].open) {
-            toast('Step locked', gate[nextTab].reason || 'Complete prior steps first.', 'warning');
-            break;
-          }
-        }
-        state.dealTab = nextTab;
-        render();
-        break;
-      }
+      case 'deal-tab': state.dealTab = trigger.dataset.tab || trigger.dataset.dataTab || 'overview'; render(); break;
       case 'term-section': state.termSection=Number(trigger.dataset.section||0); render(); break;
       case 'sign-term-sheet': showTermSigningConfirmation(); break;
       case 'confirm-term-signature': { const form=$('#termSignatureForm'); if(!form?.reportValidity()) break; if(!$('#termSignConsent')?.checked){toast('Consent required','Confirm that the signatory reviewed the current term sheet.','warning');break;} const envelope=signatureEnvelopes.find(item=>item.documentId==='DOC-009'); const index=Number(new FormData(form).get('signerIndex')); if(envelope&&envelope.recipients[index]) envelope.recipients[index][2]='Signed'; if(envelope){envelope.progress=Math.round(envelope.recipients.filter(r=>r[2]==='Signed').length/envelope.recipients.length*100);envelope.status=envelope.progress===100?'Completed':'Waiting for others';} const doc=documents.find(item=>item.id==='DOC-009'); if(doc) doc.signatureStatus=envelope?.status==='Completed'?'Completed':'Partially signed'; closeOverlays();toast('Term sheet signed','Electronic consent, signature evidence and the controlled document hash were recorded.');render();break;}
@@ -4091,37 +2707,11 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       case 'company-profile-tab': state.companyTab = trigger.dataset.tab || 'overview'; render(); revealActiveProfileTab(); break;
       case 'fund-profile-tab': state.fundTab = trigger.dataset.tab || 'overview'; render(); revealActiveProfileTab(); break;
       case 'lp-profile-tab': state.lpTab = trigger.dataset.tab || 'overview'; render(); revealActiveProfileTab(); break;
-      case 'back-to-deals':
-        persistSelectedDealId('');
-        navigate('deals');
-        break;
-      case 'open-applicant-portal':
-      case 'open-investee-portal': {
-        const external = (typeof window !== 'undefined' && window.__INVESTEE_PORTAL_URL__)
-          ? String(window.__INVESTEE_PORTAL_URL__).replace(/\/$/, '')
-          : '';
-        const url = external ? `${external}/investee-portal-v8` : '/investee-portal-v8';
-        window.open(url, '_blank', 'noopener,noreferrer');
-        break;
-      }
+      case 'back-to-deals': navigate('deals'); break;
+      case 'open-applicant-portal': navigate('applicant-portal'); break;
       case 'open-report-builder': navigate('report-builder'); break;
       case 'open-report-review': navigate('report-builder'); break;
-      case 'add-deal':
-        // Live intake is the public funding application — no staff Add Deal form.
-        if (state.liveData) {
-          window.open(
-            (typeof window !== 'undefined' && window.__APPLY_PORTAL_URL__)
-              ? String(window.__APPLY_PORTAL_URL__).replace(/\/$/, '') + '/funding-application'
-              : '/funding-application',
-            '_blank',
-            'noopener,noreferrer',
-          );
-          break;
-        }
-        // Always open the modal in-place. Never navigate / reload — that remounts
-        // the portfolio host and flashes the dashboard hydrate shell.
-        showAddDealModal(trigger.dataset.stage || 'Sourcing');
-        break;
+      case 'add-deal': showAddDealModal(trigger.dataset.stage || 'Sourcing'); break;
       case 'submit-add-deal': submitAddDeal(); break;
       case 'new-capital-call': showCapitalCallModal(); break;
       case 'submit-capital-call': submitCapitalCall(); break;
@@ -4145,7 +2735,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       case 'save-communication': closeOverlays(); toast('Draft saved','The communication remains in Draft status.'); break;
       case 'close-overlays': closeOverlays(); state.mobileNavOpen=false; sidebar.classList.remove('mobile-open'); break;
       case 'close-drawer': drawer.classList.remove('open'); drawer.innerHTML=''; scrim.classList.remove('visible'); state.drawer=null; break;
-      case 'close-modal': modalLayer.classList.remove('visible'); modalLayer.innerHTML=''; scrim.classList.remove('visible'); state.modal=null; state.modalWizard=null; break;
+      case 'close-modal': modalLayer.classList.remove('visible'); modalLayer.innerHTML=''; scrim.classList.remove('visible'); state.modal=null; break;
       case 'close-toast': $(`#${trigger.dataset.id}`)?.remove(); break;
       case 'toggle-theme': state.theme = state.theme === 'light' ? 'dark' : 'light'; storage.set('matanho-portfolio-theme',state.theme); render(); toast('Theme changed',`${state.theme[0].toUpperCase()+state.theme.slice(1)} mode is now active.`); break;
       case 'open-search': openCommandPalette(); break;
@@ -4179,206 +2769,6 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       }
       case 'export-drilldown': exportCSV('matanho-drilldown.csv',[['Metric','Value'],['Selection','Prototype drill-down'],['Fund',state.activeFund],['As of',state.asOfDate]]); break;
       case 'deal-filters': showDealFilters(); break;
-      case 'export-deals': {
-        const rows = filteredDeals();
-        exportCSV('deal-register.csv', [
-          ['ID','Deal','Stage','Sector','Round','Ask','Owner','Age','Score','Priority','Fund','Next action'],
-          ...rows.map(d => [d.id, d.name, d.stage, d.sector, d.round, d.amount, d.owner, d.age, d.score, d.priority, d.fund, dealNextAction(d)]),
-        ]);
-        break;
-      }
-      case 'deal-list-columns': {
-        const labels = {
-          deal: 'Deal', stage: 'Stage', sector: 'Sector', round: 'Round', ask: 'Ask',
-          owner: 'Owner', age: 'Age', score: 'Score', priority: 'Priority', nextAction: 'Next action',
-        };
-        const items = Object.keys(labels).map((key) => {
-          const on = dealColumnVisible(key);
-          const locked = key === 'deal';
-          return `<button type="button" class="popover-item" data-action="toggle-deal-column" data-column="${key}" ${locked ? 'disabled' : ''}>
-            <span class="popover-item-copy"><strong>${escapeHTML(labels[key])}</strong><small>${locked ? 'Always visible' : (on ? 'Visible' : 'Hidden')}</small></span>
-            <span>${on ? icon('check') : ''}</span>
-          </button>`;
-        }).join('');
-        showPopover(trigger, `<div class="popover-section"><strong>Table columns</strong><p class="muted small">Show or hide Deal Register columns. Export always includes all fields for the filtered rows.</p>${items}</div>`, 280);
-        break;
-      }
-      case 'toggle-deal-column': {
-        const key = trigger.dataset.column;
-        if (!key || key === 'deal') break;
-        if (!state.dealListColumns) state.dealListColumns = {};
-        state.dealListColumns[key] = !dealColumnVisible(key);
-        closeOverlays();
-        render();
-        break;
-      }
-      case 'save-deal-stage': {
-        const dealId = trigger.dataset.dealId || state.selectedDealId;
-        const select = $('#liveDealStageSelect');
-        const nextStage = state.pendingDealStage || select?.value || '';
-        if (!dealId || !nextStage) {
-          toast('Stage required', 'Choose a pipeline stage before saving.', 'warning');
-          break;
-        }
-        const deal = deals.find(d => String(d.id) === String(dealId));
-        if (deal && deal.stage === nextStage) {
-          toast('No change', `${deal.name} is already in ${nextStage}.`);
-          break;
-        }
-        if (state.liveData) {
-          if (deal) deal.stage = nextStage;
-          render();
-          emitIntegrationEvent('matanho:before-action', {
-            action: 'api-change-deal-stage',
-            dataset: {
-              applicationId: String(dealId),
-              dealId: String(dealId),
-              stage: nextStage,
-              notes: `Detail: moved to ${nextStage}`,
-            },
-            state: publicSnapshot().state,
-          }, true);
-        } else if (deal) {
-          deal.stage = nextStage;
-          toast('Stage updated', `${deal.name} → ${nextStage}`);
-          render();
-        }
-        break;
-      }
-      case 'start-due-diligence': {
-        const dealId = trigger.dataset.dealId || state.selectedDealId;
-        if (!dealId) { toast('Deal required', 'Open a deal first.', 'warning'); break; }
-        if (isLiveMode()) {
-          emitIntegrationEvent('matanho:before-action', {
-            action: 'api-initiate-due-diligence',
-            dataset: { applicationId: String(dealId), dealId: String(dealId) },
-            state: publicSnapshot().state,
-          }, true);
-        } else toast('Demo only', 'Due diligence initiate is available in live mode.');
-        break;
-      }
-      case 'complete-due-diligence': {
-        const dealId = trigger.dataset.dealId || state.selectedDealId;
-        if (!dealId) { toast('Deal required', 'Open a deal first.', 'warning'); break; }
-        const dd = state.dealDetail?.dueDiligence;
-        const tasks = dd ? asArraySafe(dd.tasks || dd.workstreams || dd.activities) : [];
-        const gate = canCompleteDueDiligence(dd, tasks);
-        if (!gate.ok) {
-          toast('Cannot complete due diligence', gate.reason, 'warning');
-          if (dd && (!dd.finalComments || !dd.recommendation || dd.overallScore == null)) showDDAssessmentModal();
-          break;
-        }
-        if (state.liveData) {
-          emitIntegrationEvent('matanho:before-action', {
-            action: 'api-complete-due-diligence',
-            uiAction: 'complete-due-diligence',
-            dataset: { applicationId: String(dealId), dealId: String(dealId) },
-            state: publicSnapshot().state,
-          }, true);
-        }
-        break;
-      }
-      case 'open-dd-assessment': closeOverlays(); showDDAssessmentModal(); break;
-      case 'view-dd-assessment': showDDAssessmentDrawer(); break;
-      case 'create-term-sheet': {
-        const dealId = trigger.dataset.dealId || state.selectedDealId;
-        if (!dealId) { toast('Deal required', 'Open a deal first.', 'warning'); break; }
-        showCreateTermSheetModal(dealId);
-        break;
-      }
-      case 'submit-create-term-sheet': {
-        const form = document.getElementById('createTermSheetForm');
-        if (!form?.reportValidity()) break;
-        captureModalWizardDraft();
-        const fileInput = form.querySelector('input[type="file"][name="document"]');
-        const file = fileInput?.files?.[0];
-        const dealId = state.modalWizard?.dealId || trigger.dataset.dealId || state.selectedDealId;
-        if (!file) {
-          toast('Document required', 'Upload the term sheet PDF on the Review step.', 'warning');
-          break;
-        }
-        if (file.type && file.type !== 'application/pdf') {
-          toast('Invalid file', 'Term sheet document must be a PDF.', 'warning');
-          break;
-        }
-        const d = state.modalWizard?.draft || Object.fromEntries(new FormData(form));
-        if (state.liveData) {
-          emitIntegrationEvent('matanho:before-action', {
-            action: 'api-create-term-sheet',
-            dataset: {
-              applicationId: String(dealId),
-              dealId: String(dealId),
-              title: String(d.title || ''),
-              investmentAmount: String(d.investmentAmount || ''),
-              equityPercentage: String(d.equityPercentage || ''),
-              valuation: String(d.valuation || ''),
-              keyTerms: String(d.keyTerms || ''),
-              conditions: String(d.conditions || ''),
-              timeline: String(d.timeline || ''),
-            },
-            files: { document: file },
-            state: publicSnapshot().state,
-          }, true);
-        } else {
-          closeOverlays();
-          toast('Term sheet created', `${d.title || 'Term sheet'} saved (demo mode).`);
-          state.dealTab = 'term';
-          render();
-        }
-        break;
-      }
-      case 'start-board-review': {
-        const dealId = trigger.dataset.dealId || state.selectedDealId;
-        if (!dealId) { toast('Deal required', 'Open a deal first.', 'warning'); break; }
-        showModal('Start board review', 'Upload the investment memorandum to open IC voting.', `<form id="startBoardReviewForm"><div class="form-field"><label class="required">Investment memorandum</label><input name="document" type="file" required accept=".pdf,.doc,.docx"></div></form>`, `${button('Cancel','close-modal')}${button('Start review','submit-start-board-review','primary','users',`data-deal-id="${escapeHTML(dealId)}"`)}`);
-        break;
-      }
-      case 'submit-start-board-review': {
-        const form = $('#startBoardReviewForm');
-        if (!form?.reportValidity()) break;
-        const fileInput = form.querySelector('input[type="file"]');
-        const file = fileInput?.files?.[0];
-        const dealId = trigger.dataset.dealId || state.selectedDealId;
-        if (!file) { toast('File required', 'Choose an investment memorandum.', 'warning'); break; }
-        if (state.liveData) {
-          emitIntegrationEvent('matanho:before-action', {
-            action: 'api-create-board-review',
-            dataset: { applicationId: String(dealId), dealId: String(dealId) },
-            files: { document: file },
-            state: publicSnapshot().state,
-          }, true);
-        }
-        break;
-      }
-      case 'start-implementation': {
-        const dealId = trigger.dataset.dealId || state.selectedDealId;
-        const detail = state.dealDetail || {};
-        const hero = detail.hero || {};
-        const fundId = hero.fundId || funds[0]?.id || '';
-        const portfolioCompanyId = hero.portfolioCompanyId || '';
-        if (!dealId) { toast('Deal required', 'Open a deal first.', 'warning'); break; }
-        if (state.liveData) {
-          emitIntegrationEvent('matanho:before-action', {
-            action: 'api-initiate-implementation',
-            dataset: {
-              applicationId: String(dealId),
-              dealId: String(dealId),
-              fundId: String(fundId),
-              portfolioCompanyId: String(portfolioCompanyId),
-              amount: String(hero.requestedAmount || deals.find(d => String(d.id) === String(dealId))?.amount || 0),
-            },
-            state: publicSnapshot().state,
-          }, true);
-        }
-        break;
-      }
-      case 'reload-deal-detail': {
-        const dealId = trigger.dataset.dealId || state.selectedDealId;
-        if (!dealId) break;
-        window.MatanhoPortfolioUI?.setDealDetailLoading?.(true);
-        emitIntegrationEvent('matanho:load-deal-detail', { applicationId: String(dealId) });
-        break;
-      }
       case 'company-filters': showCompanyFilters(); break;
       case 'fund-filters': genericFilterDrawer('Fund filters',['Strategy','Vintage year','Status','Currency','Geography']); break;
       case 'report-filters': genericFilterDrawer('Reporting filters',['Report type','Fund','Owner','Status','Due date']); break;
@@ -4386,72 +2776,8 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       case 'create-fund': showCreateFundModal(); break;
       case 'new-report-schedule': showReportScheduleModal(); break;
       case 'company-update': showCompanyUpdateModal(); break;
-      case 'assign-dd-task':
-      case 'add-workstream': {
-        if (isLiveMode() && isDDCompleteRecord(state.dealDetail?.dueDiligence)) {
-          toast('Due diligence complete', 'Workstreams are locked after due diligence is completed.', 'warning');
-          break;
-        }
-        openPrepareDDTaskModal({
-          mode: 'workstream',
-          applicationId: String(state.selectedDealId || trigger.dataset.dealId || ''),
-        });
-        break;
-      }
-      case 'open-all-dd-tasks': {
-        if (isLiveMode()) showAllDDTasksDrawer();
-        else showRecordMetadata('workspace-control', action);
-        break;
-      }
-      case 'preview-deal-document': {
-        const url = trigger.dataset.url;
-        const name = trigger.dataset.name || 'Document';
-        if (!url) { toast('No file', 'Document URL is missing.', 'warning'); break; }
-        showModal('Document preview', name, `<div class="document-viewer" style="min-height:70vh"><iframe src="${escapeHTML(url)}" title="${escapeHTML(name)}" style="width:100%;height:70vh;border:0;border-radius:12px;background:#fff"></iframe></div>`, `${button('Open in new tab','open-deal-document-external','','external-link',`data-url="${escapeHTML(url)}"`)}${button('Download','download-deal-document','','download',`data-url="${escapeHTML(url)}" data-name="${escapeHTML(name)}"`)}${button('Close','close-modal','primary')}`, { variant: 'document', size: 'fullscreen', eyebrow: 'Deal document' });
-        break;
-      }
-      case 'download-deal-document':
-      case 'open-deal-document-external': {
-        const url = trigger.dataset.url;
-        const name = trigger.dataset.name || 'document';
-        if (!url) { toast('No file', 'Document URL is missing.', 'warning'); break; }
-        const a = document.createElement('a');
-        a.href = url;
-        a.target = '_blank';
-        a.rel = 'noopener noreferrer';
-        if (trigger.dataset.action === 'download-deal-document') a.download = name;
-        a.click();
-        break;
-      }
-      case 'wizard-step': {
-        const step = Number(trigger.dataset.step || 0);
-        if (state.modalWizard) {
-          captureModalWizardDraft();
-          if (step > (state.modalWizard.maxReached || 0)) break;
-          state.modalWizard.step = step;
-          renderModalWizard();
-        }
-        break;
-      }
-      case 'wizard-next': {
-        if (state.modalWizard) {
-          const formId = state.modalWizard.kind === 'create-term-sheet' ? 'createTermSheetForm' : 'addDealForm';
-          const form = document.getElementById(formId);
-          if (form && !form.reportValidity()) break;
-          captureModalWizardDraft();
-          state.modalWizard.step = Math.min(modalWizardMaxStep(), (state.modalWizard.step || 0) + 1);
-          renderModalWizard();
-        }
-        break;
-      }
-      case 'wizard-back': {
-        if (state.modalWizard) {
-          captureModalWizardDraft();
-          state.modalWizard.step = Math.max(0, (state.modalWizard.step || 0) - 1);
-          renderModalWizard();
-        }
-        break;
-      }
+      case 'assign-dd-task': showDDTaskModal(); break;
+      case 'add-workstream': genericDetailDrawer('Add Due Diligence Workstream','Configure a new workstream, owner, due date and task template.'); break;
       case 'open-dd-task': showDDTaskDrawer(trigger.dataset.id); break;
       case 'toggle-closing-condition': {
         const condition = state.closingConditions.find(item=>item.id===trigger.dataset.id);
@@ -4484,91 +2810,13 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       case 'save-settings': toast('Settings saved','Workspace preferences were saved in browser memory.'); break;
       case 'configure-integration': genericDetailDrawer('Integration Configuration','Frontend prototype connector settings'); break;
       case 'ic-vote': break;
-      case 'final-vote': {
-        const deal = deals.find(d => String(d.id) === String(state.selectedDealId));
-        showDecisionConfirmation(trigger.dataset.vote==='Reject'?'reject':trigger.dataset.vote==='Defer'?'defer':'approve',`${trigger.dataset.vote} investment decision`,`${deal?.name || 'Deal'} · ${deal?.round || ''} · Investment Committee`,{'Decision':trigger.dataset.vote,'Investment':formatMoney(deal?.amount||0),'Current stage':deal?.stage||'—','Application':deal?.id||'—'},'Confirm vote');
-        state.pendingDecision = { ...(state.pendingDecision || {}), vote: trigger.dataset.vote, applicationId: deal?.id };
-        break;
-      }
+      case 'final-vote': showDecisionConfirmation(trigger.dataset.vote==='Reject'?'reject':trigger.dataset.vote==='Defer'?'defer':'approve',`${trigger.dataset.vote} investment decision`,`Nova Analytics · Series B · Investment Committee`,{'Decision':trigger.dataset.vote,'Investment':'USD 18.0M','Proposed ownership':'17.5%','Resolution':'RES-IC-2026-014','Open conditions':'3'},'Confirm vote'); state.pendingDecision.vote=trigger.dataset.vote; break;
       case 'rerun-screening': toast('Screening completed','Matanho Screen v3.2 returned a score of 86/100 with 94% confidence.'); break;
-      case 'application-section': {
-        const idx = Number(trigger.dataset.section);
-        if (!Number.isNaN(idx)) {
-          state.applicationSection = idx;
-          render();
-        }
-        break;
-      }
-      case 'confirm-shortlist': {
-        const deal = deals.find(d => String(d.id) === String(state.selectedDealId)) || deals[0];
-        if (state.liveData && deal) {
-          emitIntegrationEvent('matanho:before-action', {
-            action: 'api-change-deal-stage',
-            dataset: { applicationId: deal.id, dealId: deal.id, stage: 'Initial Review', beStage: 'ACTIVE_DD', notes: 'Confirmed shortlist' },
-            state: publicSnapshot().state,
-          }, true);
-        } else {
-          toast('Shortlist confirmed', `${deal?.name || 'Deal'} is confirmed for due diligence.`);
-        }
-        break;
-      }
-      case 'human-review': {
-        const deal = deals.find(d => String(d.id) === String(state.selectedDealId)) || deals[0];
-        if (state.liveData && deal) {
-          emitIntegrationEvent('matanho:before-action', {
-            action: 'api-change-deal-stage',
-            dataset: { applicationId: deal.id, dealId: deal.id, stage: 'Human Review', beStage: 'BELOW_THRESHOLD', notes: 'Moved to human review' },
-            state: publicSnapshot().state,
-          }, true);
-        } else {
-          toast('Human review requested', 'The application was assigned to the screening manager.', 'warning');
-        }
-        break;
-      }
-      case 'screen-reject': {
-        const deal = deals.find(d => String(d.id) === String(state.selectedDealId)) || deals[0];
-        showDecisionConfirmation('reject','Reject screening application',`${deal?.name || 'Deal'} · screening`,{'Application':deal?.id||'—','Screening score':`${deal?.score ?? '—'} / 100`,'Requested investment':formatMoney(deal?.amount||0),'Current stage':deal?.stage||'—'},'Confirm rejection');
-        state.pendingDecision = { ...(state.pendingDecision || {}), rejectDeal: true, applicationId: deal?.id };
-        break;
-      }
+      case 'confirm-shortlist': toast('Shortlist confirmed','Nova Analytics is confirmed for due diligence.'); break;
+      case 'human-review': toast('Human review requested','The application was assigned to the screening manager.','warning'); break;
+      case 'screen-reject': showDecisionConfirmation('reject','Reject screening application','Nova Analytics · AI screening and human review',{'Application':'DL-013','Screening score':'86 / 100','Requested investment':'USD 18.0M','Current stage':'AI Screening'},'Confirm rejection'); break;
       case 'request-clarification': showClarificationModal(); break;
-      case 'download-application': {
-        const deal = deals.find(d => String(d.id) === String(state.selectedDealId)) || deals[0];
-        const detail = state.dealDetail || {};
-        const app = detail.application || {};
-        const form = (app.applicationFormData && typeof app.applicationFormData === 'object') ? app.applicationFormData : {};
-        const hero = detail.hero || {};
-        const lines = [
-          `Deal: ${deal?.name || app.businessName || '-'}`,
-          `Application ID: ${app.id || deal?.id || '-'}`,
-          `Applicant: ${app.applicantName || '-'} · ${app.applicantEmail || '-'}`,
-          `Phone: ${app.applicantPhone || '-'}`,
-          `Industry: ${hero.industry || app.industry || deal?.sector || '-'}`,
-          `Stage: ${hero.stage || deal?.stage || app.currentStage || '-'}`,
-          `Requested: ${formatMoney(hero.requestedAmount || deal?.amount || app.requestedAmount || 0)}`,
-          `Founded: ${formatDate(app.foundingDate)}`,
-          `Submitted: ${formatDate(app.submittedAt || app.createdAt)}`,
-          '',
-          'Business description:',
-          String(app.businessDescription || hero.description || '-'),
-          '',
-          'Use of funds:',
-          ...(Array.isArray(form.useOfFunds) && form.useOfFunds.length
-            ? form.useOfFunds.map((r) => ` - ${r.category || '-'}: ${r.allocation || '-'} (${r.description || ''})`)
-            : [' - (none stored)']),
-          '',
-          'Declarations:',
-          ` - Accurate: ${form.declarations?.accurate === true ? 'Yes' : form.declarations?.accurate === false ? 'No' : 'n/a'}`,
-          ` - Consent: ${form.declarations?.consent === true ? 'Yes' : form.declarations?.consent === false ? 'No' : 'n/a'}`,
-          '',
-          'Impact & ESG:',
-          String(form.impactStatement || '-'),
-        ];
-        const fileName = `${(deal?.name || app.businessName || 'application').toString().replace(/[^a-z0-9]+/gi,'_')}_application.pdf`;
-        downloadBlob(fileName, createSimplePdf(`Funding application · ${deal?.name || app.businessName || 'Deal'}`, lines));
-        toast('Application downloaded', `Saved ${fileName}`);
-        break;
-      }
+      case 'download-application': toast('Application downloaded','The application pack was prepared as a sample PDF.'); break;
       case 'accept-counter': { const s=Number(trigger.dataset.section??state.termSection), c=Number(trigger.dataset.clause??state.termClause); const clause=termSheetSections[s]?.clauses[c]||termSheetSections[3].clauses[3]; showDecisionConfirmation('approve','Accept company counterproposal',`${clause.title} · ${clause.reference}`,{'Clause':clause.title,'Matanho position':clause.matanho,'Company counter':clause.company,'Source':clause.source},'Accept counter'); state.pendingDecision.term={section:s,clause:c,decision:'Agreed'}; break; }
       case 'retain-position': { const s=Number(trigger.dataset.section??state.termSection), c=Number(trigger.dataset.clause??state.termClause); const clause=termSheetSections[s]?.clauses[c]||termSheetSections[3].clauses[3]; showDecisionConfirmation('defer','Retain Matanho negotiating position',`${clause.title} · ${clause.reference}`,{'Clause':clause.title,'Current position':clause.matanho,'Company counter':clause.company,'Next action':'Return redline to company'},'Retain position'); state.pendingDecision.term={section:s,clause:c,decision:'Open'}; break; }
       case 'add-term-comment': showSimpleCommentModal('Add term sheet comment'); break;
@@ -4639,7 +2887,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       case 'confirm-split-match': closeOverlays();toast('Allocation links created','The split/combine links and residual amounts were saved in the demonstration workspace.');break;
       default:
         if (action.startsWith('metric-') || action.startsWith('company-') || action.startsWith('fund-') || action.startsWith('lp-') || action.startsWith('dd-') || action.endsWith('-metric')) openAnalyticsDetail(trigger);
-        else if (['open-analyst-workload','open-ic-calendar','open-owner-completion','performance-settings','permissions-matrix','manage-lp-access','manage-roles','security-settings','fund-documents','open-version-history','open-conflicts','view-resolution','request-signatures','view-bank-details','download-call-pack','preview-capital-call','open-meeting-pack','open-team','open-board-calendar','open-interaction','email-contact','call-contact','add-interaction','view-bank-details','export-closing','activity-chart-detail','term-version-chart'].includes(action)) showRecordMetadata('workspace-control',action);
+        else if (['open-analyst-workload','open-ic-calendar','open-owner-completion','performance-settings','permissions-matrix','manage-lp-access','manage-roles','security-settings','fund-documents','open-version-history','open-conflicts','view-resolution','request-signatures','view-bank-details','download-call-pack','preview-capital-call','open-meeting-pack','open-team','open-board-calendar','open-interaction','email-contact','call-contact','add-interaction','open-all-dd-tasks','view-bank-details','export-closing','activity-chart-detail','term-version-chart'].includes(action)) showRecordMetadata('workspace-control',action);
         else softFocus(trigger);
     }
   }
@@ -4655,14 +2903,12 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   }
 
   function showUserMenu(anchor) {
-    const sessionUser = getClientDesignSessionUser();
-    const name = sessionUser?.name || "Tariro Moyo";
-    const roleLine = sessionUser?.role || "Investment Director";
-    const email = sessionUser?.email || "";
-    showPopover(anchor, `${buildArcusProfilePopoverHtml(sessionUser || { name, email, role: roleLine, initials: sessionUser?.initials || "TM" }, icon("settings"))}
+    showPopover(anchor, `<div class="popover-title">Signed in as</div>
+      <div class="popover-item" style="cursor:default">${personAvatar("Tariro Moyo","avatar-gradient")}<span class="popover-item-copy"><strong>Tariro Moyo</strong><small>Investment Director · Matanho Capital</small></span></div>
       <div class="popover-divider"></div>
       <button class="popover-item" data-action="navigate" data-page="settings">${icon('settings')}<span class="popover-item-copy"><strong>Workspace settings</strong><small>Preferences, permissions and integrations</small></span></button>
-      <button class="popover-item" data-action="toggle-theme">${icon(state.theme==='light'?'moon':'sun')}<span class="popover-item-copy"><strong>${state.theme==='light'?'Use dark theme':'Use light theme'}</strong><small>Change appearance on this browser</small></span></button>`, 330);
+      <button class="popover-item" data-action="toggle-theme">${icon(state.theme==='light'?'moon':'sun')}<span class="popover-item-copy"><strong>${state.theme==='light'?'Use dark theme':'Use light theme'}</strong><small>Change appearance on this browser</small></span></button>
+      <div class="popover-divider"></div><button class="popover-item" data-action="sign-out-demo">${icon('external-link')}<span class="popover-item-copy"><strong>Sign out</strong><small>Demo action only</small></span></button>`, 330);
   }
 
   function showModuleSwitcher(anchor) {
@@ -4699,20 +2945,6 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     const form = $('#createFundForm');
     if (!form?.reportValidity()) return;
     const data = Object.fromEntries(new FormData(form));
-    if (state.liveData) {
-      emitIntegrationEvent('matanho:before-action', {
-        action: 'api-create-fund',
-        dataset: {
-          name: String(data.name || ''),
-          description: String(data.strategy || 'Private markets fund'),
-          totalAmount: String(data.commitment || '10000000'),
-          focusIndustries: String(data.strategy || 'Private Equity'),
-        },
-        state: publicSnapshot().state,
-      }, true);
-      closeOverlays();
-      return;
-    }
     const fund = { id:`FUND-${String(funds.length+1).padStart(3,'0')}`, name:data.name, vintage:Number(data.vintage), strategy:data.strategy, currency:data.currency, commitment:Number(data.commitment), called:0, nav:0, distributed:0, grossIrr:0, netIrr:0, tvpi:0, dpi:0, status:'Fundraising', geography:data.geography, managementFee:data.managementFee, carry:data.carry };
     funds.push(fund); state.selectedFundId=fund.id; closeOverlays(); toast('Fund created',`${fund.name} is ready for setup.`); state.page='fund-detail'; render();
   }
@@ -4733,431 +2965,19 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     showModal('Add company update',`Record the latest operating update for ${company.name}.`, `<form id="companyUpdateForm"><div class="form-grid"><div class="form-field"><label>Reporting period</label><select><option>July 2026</option><option>Q2 2026</option><option>June 2026</option></select></div><div class="form-field"><label>Update type</label><select><option>Business Update</option><option>Board Update</option><option>Financial Update</option><option>Milestone Update</option></select></div><div class="form-field"><label>Revenue (USD M)</label><input type="number" step="0.1" value="36.5"></div><div class="form-field"><label>EBITDA (USD M)</label><input type="number" step="0.1" value="12.5"></div><div class="form-field full"><label>Management commentary</label><textarea style="min-height:150px">Revenue continued to grow through enterprise expansion and improved retention. Key product milestones remain on track, while ISO 27001 certification requires focused management attention.</textarea></div><div class="form-field full"><label>Supporting files</label><label class="button" style="justify-content:flex-start">${icon('upload')} Attach board pack or management accounts<input type="file" hidden></label></div></div></form>`, `${button('Save draft','save-company-update')}${button('Publish update','publish-company-update','primary','send')}`);
   }
 
-  const DD_WORKSTREAM_OPTIONS = [
-    'Financial Assessment',
-    'Market Research',
-    'Competitive Analysis',
-    'Management Team Evaluation',
-    'Legal Compliance',
-    'Risk Assessment',
-  ];
-
-  function mapDDTaskStage(stage) {
-    const s = String(stage || '').toLowerCase();
-    if (/complete|completed|done|closed|approved/.test(s)) return 'Complete';
-    if (/review|pending_approval|pending approval/.test(s)) return 'In Review';
-    if (/progress|active|open|in_progress/.test(s)) return 'In Progress';
-    if (s === 'todo') return 'To do';
-    return stage ? String(stage) : 'Pending';
-  }
-
-  function isDDTaskComplete(task) {
-    return /complete|completed|done|closed|approved/i.test(String(task?.stage || task?.status || ''));
-  }
-
-  function isInternalDDCategory(value) {
-    return String(value || '').toUpperCase() === 'PMS_ACTIVE_DD_ENTRY';
-  }
-
-  /** Prefer human task title over internal PMS category codes in DD UI. */
-  function resolveDDWorkstreamLabel(task, kind = 'primary') {
-    if (!task) return kind === 'workstream' ? '—' : 'Task';
-    const title = String(task.title || '').trim();
-    const category = String(task.category || task.workstream || '').trim();
-    if (kind === 'workstream') {
-      if (category && !isInternalDDCategory(category)) return category;
-      if (title) {
-        const parts = title.split(/[—–-]/).map((s) => s.trim()).filter(Boolean);
-        if (parts.length > 1 && /^due diligence$/i.test(parts[0])) return parts.slice(1).join(' · ');
-        return title;
-      }
-      return 'Due diligence';
-    }
-    if (title) return title;
-    if (category && !isInternalDDCategory(category)) return category;
-    return 'Due diligence task';
-  }
-
-  function isDefaultDDTaskPack(tasks) {
-    const list = asArraySafe(tasks);
-    if (!list.length) return false;
-    return list.every((t) => isInternalDDCategory(t.category) || /due diligence\s*[—–-]/i.test(String(t.title || '')));
-  }
-
-  function sanitizeActivityDescription(text) {
-    return String(text || '')
-      .replace(/\[DOCUMENTS:[\s\S]*?\]/g, '')
-      .replace(/\[APPROVAL:[^\]]*\]/g, '')
-      .replace(/\n{3,}/g, '\n\n')
-      .trim();
-  }
-
-  function parseActivityDocuments(activity) {
-    const direct = asArraySafe(activity?.documents);
-    if (direct.length) return direct;
-    const raw = String(activity?.description || '');
-    const match = raw.match(/\[DOCUMENTS:(\[[\s\S]*?\])\]/);
-    if (!match) return [];
-    try {
-      return JSON.parse(match[1]);
-    } catch {
-      try {
-        return JSON.parse(match[1].replace(/\\"/g, '"').replace(/\\\\/g, '\\'));
-      } catch {
-        return [];
-      }
-    }
-  }
-
-  function collectTaskEvidenceDocuments(task) {
-    const activities = asArraySafe(task?.activityLogs || task?.activities);
-    const seen = new Set();
-    const docs = [];
-    activities.forEach((a) => {
-      parseActivityDocuments(a).forEach((doc) => {
-        const key = String(doc.fileUrl || doc.url || doc.fileName || doc.name || JSON.stringify(doc));
-        if (seen.has(key)) return;
-        seen.add(key);
-        docs.push(doc);
-      });
-    });
-    return docs;
-  }
-
-  function renderDDActivityDocuments(docs) {
-    if (!docs.length) return '';
-    return `<div class="info-list">${docs.map((doc) => {
-      const name = doc.fileName || doc.name || 'File';
-      const url = doc.fileUrl || doc.url || '';
-      const size = doc.fileSize ? `${Math.round(Number(doc.fileSize) / 1024)} KB` : '';
-      return `<div class="list-row"><span class="activity-icon" style="color:var(--blue);background:var(--blue-soft)">${icon('file')}</span><span class="list-row-main"><strong>${escapeHTML(String(name))}</strong>${size ? `<small>${escapeHTML(size)}</small>` : ''}</span>${url ? `<span>${button('Preview', 'preview-deal-document', 'ghost compact', 'eye', `data-url="${escapeHTML(url)}" data-name="${escapeHTML(String(name))}"`)}${button('Download', 'download-deal-document', 'ghost compact', 'download', `data-url="${escapeHTML(url)}" data-name="${escapeHTML(String(name))}"`)}</span>` : '<span class="muted small">No URL</span>'}</div>`;
-    }).join('')}</div>`;
-  }
-
-  function renderDDActivityTimeline(activities, task) {
-    const list = asArraySafe(activities);
-    if (!list.length) {
-      if (task && isDDTaskComplete(task)) {
-        return `<div class="reason-item">${icon('check-circle')}<div><strong>Workstream marked complete</strong><small>No detailed activity or file uploads were recorded on this task.</small></div></div>`;
-      }
-      return liveEmptyCard('No analyst activity on this workstream yet.');
-    }
-    return `<div class="timeline">${list.map((a) => {
-      const entry = formatDDActivityEntry(a);
-      const docs = parseActivityDocuments(a);
-      const body = sanitizeActivityDescription(entry.body || a.description || '');
-      const when = a.createdAt || a.date ? formatDate(a.createdAt || a.date) : '';
-      const approval = a.status
-        ? statusPill(String(a.status).replace(/_/g, ' '), /approved/i.test(String(a.status)) ? 'success' : /reject/i.test(String(a.status)) ? 'danger' : 'warning')
-        : '';
-      const metrics = [];
-      if (a.monetaryValueAchieved != null && a.monetaryValueAchieved !== '') metrics.push(`Value: ${a.monetaryValueAchieved}`);
-      if (a.percentValueAchieved != null && a.percentValueAchieved !== '') metrics.push(`${a.percentValueAchieved}% achieved`);
-      return `<div class="timeline-item"><div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;flex-wrap:wrap"><div><strong>${escapeHTML(entry.title)}</strong><small>${escapeHTML(entry.by || 'System')}${when ? ` · ${when}` : ''}</small></div>${approval}</div>${body ? `<p class="muted small">${escapeHTML(body.slice(0, 600))}</p>` : ''}${metrics.length ? `<p class="muted small">${escapeHTML(metrics.join(' · '))}</p>` : ''}${renderDDActivityDocuments(docs)}</div>`;
-    }).join('')}</div>`;
-  }
-
-  function ddAssessmentScore(dd) {
-    if (!dd) return 0;
-    return [
-      dd.marketResearchViable,
-      dd.financialViable,
-      dd.competitiveOpportunities,
-      dd.managementTeamQualified,
-      dd.legalCompliant,
-      dd.riskTolerable,
-    ].filter(Boolean).length;
-  }
-
-  function isDDCompleteRecord(dd) {
-    return Boolean(dd && /complete/i.test(String(dd.status || '')));
-  }
-
-  function canCompleteDueDiligence(dd, tasks) {
-    if (!dd) return { ok: false, reason: 'Start due diligence first' };
-    if (isDDCompleteRecord(dd)) return { ok: false, reason: 'Due diligence is already completed' };
-    const required = [
-      ['marketResearchViable', 'Market research'],
-      ['financialViable', 'Financial assessment'],
-      ['legalCompliant', 'Legal compliance'],
-      ['managementTeamQualified', 'Management assessment'],
-    ];
-    for (const [field, label] of required) {
-      if (!dd[field]) return { ok: false, reason: `${label} must be marked as met in the assessment` };
-    }
-    if (dd.overallScore == null) return { ok: false, reason: 'Save the assessment to calculate overall score' };
-    if (!dd.recommendation) return { ok: false, reason: 'Recommendation is required in the assessment' };
-    if (!dd.finalComments) return { ok: false, reason: 'Final comments are required in the assessment' };
-    const list = asArraySafe(tasks);
-    for (const task of list) {
-      if (isDDTaskComplete(task)) continue;
-      const activities = asArraySafe(task.activityLogs || task.activities);
-      if (activities.length > 0) {
-        const unapproved = activities.filter((a) => a.status && String(a.status) !== 'approved');
-        if (unapproved.length) {
-          return { ok: false, reason: `Workstream "${resolveDDWorkstreamLabel(task, 'primary')}" has unapproved activity` };
-        }
-      } else {
-        return { ok: false, reason: `Workstream "${resolveDDWorkstreamLabel(task, 'primary')}" must be marked complete` };
-      }
-    }
-    return { ok: true, reason: '' };
-  }
-
-  function renderDDAssessmentCompact(dd) {
-    if (!dd) return liveEmptyCard('Assessment not started.');
-    const score = dd.overallScore != null ? String(dd.overallScore) : `${ddAssessmentScore(dd)}/6`;
-    const rec = String(dd.recommendation || 'Not set');
-    return `<div class="info-list"><div class="info-row"><span>Score</span><strong>${escapeHTML(score)}</strong></div><div class="info-row"><span>Criteria met</span><strong>${ddAssessmentScore(dd)} / 6</strong></div><div class="info-row"><span>Recommendation</span><strong>${statusPill(rec, /approve/i.test(rec) ? 'success' : /reject/i.test(rec) ? 'danger' : 'warning')}</strong></div></div>`;
-  }
-
-  function renderDDAssessmentSummary(dd) {
-    if (!dd) return liveEmptyCard('Assessment not started.');
-    const score = dd.overallScore != null ? String(dd.overallScore) : `${ddAssessmentScore(dd)}/6`;
-    const rows = [
-      ['Market research', dd.marketResearchViable, dd.marketResearchComments],
-      ['Financial viability', dd.financialViable, dd.financialComments],
-      ['Competitive landscape', dd.competitiveOpportunities, dd.competitiveComments],
-      ['Management team', dd.managementTeamQualified, dd.managementComments],
-      ['Legal compliance', dd.legalCompliant, dd.legalComments],
-      ['Risk assessment', dd.riskTolerable, dd.riskComments],
-    ];
-    return `<div class="info-list"><div class="info-row"><span>Overall score</span><strong>${escapeHTML(score)}</strong></div><div class="info-row"><span>Recommendation</span><strong>${statusPill(String(dd.recommendation || 'Pending'), /approve/i.test(String(dd.recommendation || '')) ? 'success' : /reject/i.test(String(dd.recommendation || '')) ? 'danger' : 'warning')}</strong></div></div><div class="section-gap">${rows.map(([label, pass, comment]) => `<div class="list-row"><span class="activity-icon" style="color:var(${pass ? '--emerald' : '--amber'});background:var(${pass ? '--emerald-soft' : '--amber-soft'})">${icon(pass ? 'check-circle' : 'alert')}</span><span class="list-row-main"><strong>${escapeHTML(String(label))}</strong>${comment ? `<small>${escapeHTML(String(comment).slice(0, 120))}</small>` : '<small class="muted">No comments</small>'}</span>${statusPill(pass ? 'Pass' : 'Review', pass ? 'success' : 'warning')}</div>`).join('')}</div>${dd.finalComments ? `<p class="muted small section-gap"><strong>Final comments:</strong> ${escapeHTML(String(dd.finalComments))}</p>` : ''}`;
-  }
-
-  function showDDAssessmentDrawer() {
-    const dd = state.dealDetail?.dueDiligence;
-    if (!dd?.id) {
-      toast('Start due diligence first', 'Initiate due diligence before viewing the assessment.', 'warning');
-      return;
-    }
-    const score = dd.overallScore != null ? String(dd.overallScore) : `${ddAssessmentScore(dd)}/6`;
-    const editable = !/complete/i.test(String(dd.status || ''));
-    showDrawer(
-      'Investment assessment',
-      `Score ${score} · ${escapeHTML(String(dd.recommendation || 'No recommendation yet'))}`,
-      renderDDAssessmentSummary(dd),
-      `${editable ? button('Edit assessment', 'open-dd-assessment', 'primary', 'edit') : ''}${button('Close', 'close-drawer')}`,
-    );
-  }
-
-  function showDDAssessmentModal() {
-    const dd = state.dealDetail?.dueDiligence;
-    if (!dd?.id) {
-      toast('Start due diligence first', 'Initiate due diligence before filling the assessment.', 'warning');
-      return;
-    }
-    const section = (title, name, commentsName, viable, comments) => `<section class="drawer-section"><h3>${escapeHTML(title)}</h3><label class="checkbox-row"><input type="checkbox" name="${name}" value="1"${viable ? ' checked' : ''}> Criteria met</label><div class="form-field section-gap"><label>Comments</label><textarea name="${commentsName}" placeholder="Assessment notes...">${escapeHTML(String(comments || ''))}</textarea></div></section>`;
-    showModal(
-      'Due diligence assessment',
-      'Complete the investment checklist and recommendation before closing due diligence.',
-      `<form id="ddAssessmentForm"><div class="info-list section-gap"><div class="info-row"><span>Current score</span><strong>${escapeHTML(dd.overallScore != null ? String(dd.overallScore) : `${ddAssessmentScore(dd)}/6`)}</strong></div></div>${section('Market research', 'marketResearchViable', 'marketResearchComments', dd.marketResearchViable, dd.marketResearchComments)}${section('Financial viability', 'financialViable', 'financialComments', dd.financialViable, dd.financialComments)}${section('Competitive opportunities', 'competitiveOpportunities', 'competitiveComments', dd.competitiveOpportunities, dd.competitiveComments)}${section('Management team', 'managementTeamQualified', 'managementComments', dd.managementTeamQualified, dd.managementComments)}${section('Legal compliance', 'legalCompliant', 'legalComments', dd.legalCompliant, dd.legalComments)}${section('Risk assessment', 'riskTolerable', 'riskComments', dd.riskTolerable, dd.riskComments)}<section class="drawer-section"><h3>Final recommendation</h3><div class="form-grid"><div class="form-field"><label class="required">Recommendation</label><select name="recommendation" required><option value="APPROVE"${String(dd.recommendation || '') === 'APPROVE' ? ' selected' : ''}>Approve</option><option value="CONDITIONAL"${String(dd.recommendation || '') === 'CONDITIONAL' ? ' selected' : ''}>Conditional approval</option><option value="REJECT"${String(dd.recommendation || '') === 'REJECT' ? ' selected' : ''}>Reject</option></select></div><div class="form-field full"><label class="required">Final comments</label><textarea name="finalComments" required placeholder="Summary recommendation and conditions...">${escapeHTML(String(dd.finalComments || ''))}</textarea></div></div></section></form>`,
-      `${button('Cancel', 'close-modal')}${button('Save assessment', 'submit-dd-assessment', 'primary', 'save')}`,
-      { variant: 'default', rail: [], size: 'lg', eyebrow: 'Due diligence' },
-    );
-  }
-
-  function submitDDAssessment() {
-    const form = $('#ddAssessmentForm');
-    if (!form?.reportValidity()) return;
-    const applicationId = state.selectedDealId;
-    if (!applicationId) { toast('Deal required', 'Open a deal before saving the assessment.', 'warning'); return; }
-    const data = Object.fromEntries(new FormData(form));
-    const checked = (name) => Boolean(form.querySelector(`[name="${name}"]`)?.checked);
-    v23Emit('api-update-due-diligence', {
-      applicationId: String(applicationId),
-      dealId: String(applicationId),
-      marketResearchViable: checked('marketResearchViable'),
-      marketResearchComments: data.marketResearchComments || '',
-      financialViable: checked('financialViable'),
-      financialComments: data.financialComments || '',
-      competitiveOpportunities: checked('competitiveOpportunities'),
-      competitiveComments: data.competitiveComments || '',
-      managementTeamQualified: checked('managementTeamQualified'),
-      managementComments: data.managementComments || '',
-      legalCompliant: checked('legalCompliant'),
-      legalComments: data.legalComments || '',
-      riskTolerable: checked('riskTolerable'),
-      riskComments: data.riskComments || '',
-      recommendation: data.recommendation || 'APPROVE',
-      finalComments: data.finalComments || '',
-    });
-  }
-
-  function sanitizeDDTaskDescription(text) {
-    return String(text || '')
-      .replace(/\s*\[DueDiligenceApplication:[^\]\s]+\]\s*/gi, '')
-      .replace(/\n{3,}/g, '\n\n')
-      .trim();
-  }
-
-  function formatDDActivityEntry(activity) {
-    if (!activity) return { title: 'Activity', body: '', by: '' };
-    const by =
-      activity.by ||
-      (activity.byUser ? `${activity.byUser.firstName || ''} ${activity.byUser.lastName || ''}`.trim() : '') ||
-      (activity.user ? `${activity.user.firstName || ''} ${activity.user.lastName || ''}`.trim() : '') ||
-      '';
-
-    function fromPayload(obj) {
-      const content = String(obj.content || obj.text || obj.message || '').trim();
-      const eventType = String(obj.eventType || obj.kind || activity.activityType || activity.type || '').trim();
-      let title = 'Activity';
-      if (eventType === 'TASK_CREATED' || /task.?created/i.test(content)) title = 'Task created';
-      else if (obj.kind === 'system') title = 'System update';
-      else if (eventType) title = eventType.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-      return { title, body: sanitizeActivityDescription(content), by };
-    }
-
-    let raw = activity.description ?? activity.activity ?? activity.message ?? '';
-    if (typeof raw === 'object' && raw !== null) return fromPayload(raw);
-
-    const text = String(raw || '').trim();
-    if (text.startsWith('{') && text.includes('"content"')) {
-      try {
-        return fromPayload(JSON.parse(text));
-      } catch {
-        /* fall through */
-      }
-    }
-
-    const fallbackTitle = String(activity.title || activity.activityType || activity.type || 'Activity');
-    const body = sanitizeActivityDescription(text);
-    return {
-      title: fallbackTitle === 'System Message' && !body ? 'System update' : fallbackTitle,
-      body,
-      by,
-    };
-  }
-
-  function getLiveDDTasks() {
-    const dd = state.dealDetail?.dueDiligence;
-    return asArraySafe(dd?.tasks || dd?.workstreams || []);
-  }
-
-  function findDDTask(id) {
-    if (isLiveMode()) return getLiveDDTasks().find((t) => String(t.id) === String(id));
-    return state.dueDiligenceTasks.find((t) => t.id === id);
-  }
-
-  function openPrepareDDTaskModal(opts = {}) {
-    state.ddTaskModalOpts = { mode: 'assign', ...opts };
-    if (isLiveMode()) {
-      const dd = state.dealDetail?.dueDiligence;
-      if (!dd?.id) {
-        toast('Start due diligence first', 'Initiate due diligence on this deal before adding workstreams or assigning tasks.', 'warning');
-        state.ddTaskModalOpts = null;
-        return;
-      }
-      emitIntegrationEvent('matanho:prepare-dd-task-modal', {
-        applicationId: String(opts.applicationId || state.selectedDealId || ''),
-        mode: state.ddTaskModalOpts.mode,
-      });
-      return;
-    }
-    showDDTaskModal(state.investmentUsers || [], state.ddTaskModalOpts);
-    state.ddTaskModalOpts = null;
-  }
-
-  function showDDTaskModal(users = [], opts = {}) {
-    const modalOpts = { mode: 'workstream', ...(state.ddTaskModalOpts || {}), ...opts };
-    const list = Array.isArray(users) && users.length ? users : (state.investmentUsers || []);
-    const analystOptions = list.length
-      ? list.map((u) => {
-          const id = u.id || u.userId;
-          const label = `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.email || id;
-          const roleHint = u.departmentRole || u.roleCode || '';
-          return `<option value="${escapeHTML(String(id))}">${escapeHTML(label)}${roleHint ? ` · ${escapeHTML(String(roleHint))}` : ''}${u.email ? ` (${escapeHTML(u.email)})` : ''}</option>`;
-        }).join('')
-      : '';
-    const due = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
-    const workstreamOptions = DD_WORKSTREAM_OPTIONS.map((name) => `<option>${escapeHTML(name)}</option>`).join('');
-    const analystField = list.length
-      ? `<div class="form-field"><label class="required">Assign to (Investments)</label><select name="assigneeId" required>${analystOptions}</select></div>`
-      : `<div class="form-field full"><div class="reason-item warning">${icon('alert')}<div><strong>No Investments analysts available</strong><small>Seed or create a user in the Investments department (e.g. investments.analyst@nts.com) before assigning workstreams.</small></div></div></div>`;
-    showModal(
-      'Add due diligence workstream',
-      list.length
-        ? 'Create a workstream task with owner, due date and evidence requirements.'
-        : 'An Investments department user is required to own the workstream.',
-      `<form id="ddTaskForm"><div class="form-grid"><div class="form-field"><label class="required">Workstream</label><select name="workstream" required>${workstreamOptions}</select></div><div class="form-field full"><label>Task title</label><input name="title" placeholder="Optional — defaults to workstream name"></div>${analystField}<div class="form-field"><label>Due date</label><input name="due" type="date" value="${due}"></div><div class="form-field"><label>Priority</label><select name="priority"><option>Medium</option><option>High</option><option>Low</option></select></div><div class="form-field full"><label class="required">Description / evidence required</label><textarea name="evidence" required placeholder="Describe the work to perform and evidence needed to close this task..."></textarea></div></div></form>`,
-      `${button('Cancel','close-modal')}${button('Add workstream', 'submit-dd-task', 'primary', 'plus', list.length ? '' : 'disabled')}`,
-      { variant: 'default', rail: [], size: 'md', eyebrow: 'Due diligence' },
-    );
-    state.ddTaskModalOpts = null;
+  function showDDTaskModal() {
+    showModal('Assign due diligence task','Create a task in the selected diligence workstream.', `<form id="ddTaskForm"><div class="form-grid"><div class="form-field full"><label class="required">Task</label><input name="title" required placeholder="e.g. Verify regulatory licences"></div><div class="form-field"><label>Workstream</label><select name="workstream"><option>Financial Assessment</option><option>Market Research</option><option>Legal Compliance</option><option>Risk Assessment</option><option>Management Team Evaluation</option></select></div><div class="form-field"><label>Analyst</label><select name="analyst"><option>Tendai Moyo</option><option>Nyasha Moyo</option><option>Rudo Ndlovu</option><option>Chipo Dube</option><option>Farai Chikore</option></select></div><div class="form-field"><label>Due date</label><input name="due" type="date" value="2026-08-07"></div><div class="form-field"><label>Priority</label><select name="priority"><option>Medium</option><option>High</option><option>Low</option></select></div><div class="form-field full"><label>Evidence required</label><textarea name="evidence" placeholder="Describe the evidence needed to close this task..."></textarea></div></div></form>`, `${button('Cancel','close-modal')}${button('Assign task','submit-dd-task','primary','clipboard')}`);
   }
 
   function submitDDTask() {
     const form=$('#ddTaskForm'); if(!form?.reportValidity()) return;
     const data=Object.fromEntries(new FormData(form));
-    const title = String(data.title || '').trim() || String(data.workstream || '').trim() || 'Due diligence task';
-    if (isLiveMode()) {
-      const applicationId = state.selectedDealId || deals[0]?.id;
-      if (!applicationId) { toast('Deal required','Open a deal before assigning diligence tasks.','warning'); return; }
-      if (!data.assigneeId) { toast('Analyst required','Select an Investments department user.','warning'); return; }
-      v23Emit('api-assign-dd-task', {
-        applicationId,
-        dealId: applicationId,
-        title,
-        workstream: data.workstream,
-        priority: data.priority,
-        due: data.due,
-        dueDate: data.due,
-        evidence: data.evidence || '',
-        description: data.evidence || title,
-        assigneeId: String(data.assigneeId),
-      });
-      return;
-    }
-    state.dueDiligenceTasks.push({id:`T${state.dueDiligenceTasks.length+1}`,title,analyst:data.analyst||'Unassigned',due:new Date(data.due).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}),priority:data.priority,status:'To Do',evidence:0,comments:0});
-    closeOverlays(); toast('Task assigned',`${title} was assigned.`); render();
-  }
-
-  function showAllDDTasksDrawer() {
-    const tasks = getLiveDDTasks();
-    if (!tasks.length) {
-      toast('No tasks', 'Assign a workstream or task to begin due diligence.', 'warning');
-      return;
-    }
-    const rows = tasks.map((task, index) => {
-      const analyst = (task.team && task.team[0] ? `${task.team[0].firstName || ''} ${task.team[0].lastName || ''}`.trim() : '') || '—';
-      const due = formatDate(task.date || task.dueDate);
-      const status = mapDDTaskStage(task.stage || task.status);
-      return `<button class="list-row" type="button" data-action="open-dd-task" data-id="${escapeHTML(String(task.id))}"><span class="owner-mini">${avatar(analyst, index)}${escapeHTML(resolveDDWorkstreamLabel(task, 'workstream'))}</span><span class="list-row-main"><strong>${escapeHTML(resolveDDWorkstreamLabel(task, 'primary'))}</strong><small>${escapeHTML(analyst)} · Due ${escapeHTML(due)}</small></span>${statusPill(status)}</button>`;
-    }).join('');
-    showDrawer('Due diligence tasks', `${tasks.length} assigned workstreams`, `<section class="drawer-section"><div class="info-list">${rows}</div></section>`, `${isDDCompleteRecord(state.dealDetail?.dueDiligence) ? '' : button('Add workstream','add-workstream')}${button('Close','close-drawer','primary')}`);
+    state.dueDiligenceTasks.push({id:`T${state.dueDiligenceTasks.length+1}`,title:data.title,analyst:data.analyst,due:new Date(data.due).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}),priority:data.priority,status:'To Do',evidence:0,comments:0});
+    closeOverlays(); toast('Task assigned',`${data.title} was assigned to ${data.analyst}.`); render();
   }
 
   function showDDTaskDrawer(id) {
-    if (isLiveMode()) {
-      const task = findDDTask(id);
-      if (!task) { toast('Task not found', 'Refresh the deal detail and try again.', 'warning'); return; }
-      const analyst = (task.team && task.team[0] ? `${task.team[0].firstName || ''} ${task.team[0].lastName || ''}`.trim() : '') || (task.creator ? `${task.creator.firstName || ''} ${task.creator.lastName || ''}`.trim() : '') || '—';
-      const due = formatDate(task.date || task.dueDate);
-      const status = mapDDTaskStage(task.stage || task.status);
-      const priority = String(task.priority || 'medium');
-      const priorityTone = /high/i.test(priority) ? 'danger' : /low/i.test(priority) ? 'success' : 'warning';
-      const activities = asArraySafe(task.activityLogs || task.activities || []);
-      const evidenceDocs = collectTaskEvidenceDocuments(task);
-      const activityHtml = renderDDActivityTimeline(activities, task);
-      const evidenceHtml = evidenceDocs.length
-        ? renderDDActivityDocuments(evidenceDocs)
-        : liveEmptyCard('No files uploaded on this workstream yet.');
-      const done = isDDTaskComplete(task);
-      const ddLocked = isDDCompleteRecord(state.dealDetail?.dueDiligence);
-      const footer = done
-        ? `${ddLocked ? '' : button('Reopen workstream', 'reopen-dd-task', '', 'refresh', `data-id="${escapeHTML(String(task.id))}"`)}${button('Close', 'close-drawer', 'primary')}`
-        : `${button('Mark complete', 'complete-dd-task', 'primary', 'check', `data-id="${escapeHTML(String(task.id))}"`)}${button('Close', 'close-drawer')}`;
-      showDrawer(
-        resolveDDWorkstreamLabel(task, 'primary'),
-        `${analyst} · Due ${due}`,
-        `<section class="drawer-section"><div class="info-list"><div class="info-row"><span>Workstream</span><strong>${escapeHTML(resolveDDWorkstreamLabel(task, 'workstream'))}</strong></div><div class="info-row"><span>Status</span><strong>${statusPill(status)}</strong></div><div class="info-row"><span>Priority</span><strong>${statusPill(priority, priorityTone)}</strong></div><div class="info-row"><span>Stage</span><strong>${statusPill(mapDDTaskStage(task.stage || 'todo'))}</strong></div><div class="info-row"><span>Lead analyst</span><strong>${escapeHTML(analyst)}</strong></div><div class="info-row"><span>Evidence files</span><strong>${evidenceDocs.length}</strong></div></div></section><section class="drawer-section"><h3>Description</h3><p class="muted">${escapeHTML(sanitizeDDTaskDescription(task.description) || '—')}</p></section><section class="drawer-section"><h3>Work performed</h3>${activityHtml}</section><section class="drawer-section"><h3>Uploaded files</h3>${evidenceHtml}</section>`,
-        footer,
-      );
-      return;
-    }
     const task=state.dueDiligenceTasks.find(t=>t.id===id)||state.dueDiligenceTasks[0];
-    if (!task) return;
     showDrawer(task.title,`${task.analyst} · Due ${task.due}`, `<section class="drawer-section"><div class="grid cols-2"><div class="info-list"><div class="info-row"><span>Status</span><strong>${statusPill(task.status)}</strong></div><div class="info-row"><span>Priority</span><strong>${statusPill(task.priority,task.priority==='High'?'danger':task.priority==='Medium'?'warning':'success')}</strong></div><div class="info-row"><span>Evidence</span><strong>${task.evidence} files</strong></div><div class="info-row"><span>Comments</span><strong>${task.comments}</strong></div></div><div class="score-card"><strong>Finding</strong><span class="metric-value" style="font-size:24px">Low</span><small>Controls appear adequate</small></div></div></section><section class="drawer-section"><h3>Analyst conclusion</h3><p class="muted">Testing performed against management accounts, supporting contracts and the current diligence request list. No material exceptions were identified in the prototype record.</p></section><section class="drawer-section"><h3>Evidence</h3><div class="info-list">${Array.from({length:Math.max(task.evidence,1)},(_,i)=>`<div class="list-row"><span class="activity-icon" style="color:var(--red);background:var(--red-soft)">${icon('file')}</span><span class="list-row-main"><strong>Evidence document ${i+1}.pdf</strong><small>Verified · 10 Jul 2026</small></span>${button('','download-document','ghost compact icon-only','download')}</div>`).join('')}</div></section>`, `${button('Add comment','add-dd-comment')}${button(task.status==='Complete'?'Reopen task':'Mark complete','toggle-dd-task','primary','check',`data-id="${task.id}"`)}`);
   }
 
@@ -5188,10 +3008,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   }
 
   function showClarificationModal() {
-    const deal = deals.find(d => String(d.id) === String(state.selectedDealId)) || deals[0];
-    const app = (state.dealDetail && state.dealDetail.application) || {};
-    const to = app.applicantEmail || '';
-    showModal('Request clarification','Ask the applicant to clarify information in the submitted application.', `<form id="clarificationForm"><div class="form-field"><label>Recipient</label><input name="recipientEmail" type="email" value="${escapeHTML(to)}" placeholder="applicant@email.com"></div><div class="form-field"><label>Application section</label><select name="section"><option>Financial Information</option><option>Business & Market</option><option>Ownership & Governance</option><option>Funding Request</option><option>Impact & ESG</option><option>Declarations & Consent</option></select></div><div class="form-field"><label class="required">Subject</label><input name="subject" required value="Clarification needed · ${escapeHTML(deal?.name || app.businessName || 'Application')}"></div><div class="form-field section-gap"><label class="required">Question</label><textarea name="message" required style="min-height:150px" placeholder="Describe what the applicant should clarify..."></textarea></div><label class="checkbox-row section-gap"><input name="notifyEmail" type="checkbox" checked> Notify applicant by email</label></form>`, `${button('Cancel','close-modal')}${button('Send clarification','submit-clarification','primary','send')}`);
+    showModal('Request clarification','Ask the applicant to clarify information in the submitted application.', `<form id="clarificationForm"><div class="form-field"><label>Application section</label><select><option>Financial Information</option><option>Business & Market</option><option>Ownership & Governance</option><option>Funding Request</option><option>Impact & ESG</option></select></div><div class="form-field section-gap"><label class="required">Question</label><textarea required style="min-height:150px">Please provide additional detail supporting the customer-concentration assumptions and upload the latest top-ten customer schedule.</textarea></div><label class="checkbox-row section-gap"><input type="checkbox" checked> Notify applicant by secure email</label></form>`, `${button('Cancel','close-modal')}${button('Send clarification','submit-clarification','primary','send')}`);
   }
 
   function showSimpleCommentModal(title) {
@@ -5221,55 +3038,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       case 'reconciliation-period': state.reconciliationPeriod=target.value; render(); break;
       case 'report-vault-fund': state.reportFilterFund=target.value; render(); break;
       case 'report-vault-status': state.reportFilterStatus=target.value; render(); break;
-      case 'term-version-filter': case 'term-status-filter': case 'term-owner-filter': case 'reconciliation-status-filter': case 'reconciliation-amount-filter': case 'expanded-recon-date': case 'expanded-recon-status': case 'expanded-recon-tolerance': case 'report-vault-type': case 'report-vault-period': case 'mailer-type-filter': case 'mailer-status-filter': case 'mailer-channel-filter': case 'fund-vintage-filter': case 'fund-strategy-filter': case 'fund-status-filter': case 'fund-currency-filter': toast('Filter updated',target.value); softFocus(target.closest('.workspace-filter-bar')||target); break;
-      case 'deal-fund-filter': state.dealFundFilter = target.value; render(); break;
-      case 'deal-stage-filter': state.dealStageFilter = target.value; render(); break;
-      case 'deal-owner-filter': state.dealOwnerFilter = target.value; render(); break;
-      case 'deal-age-filter': state.dealAgeFilter = target.value; render(); break;
-      case 'deal-detail-stage-draft': state.pendingDealStage = target.value; break;
-      case 'dashboard-fund-filter':
-      case 'dashboard-chart-fund':
-        state.activeFund = target.value;
-        if (state.liveData) {
-          emitIntegrationEvent('matanho:reload-request', { fundName: target.value, asOfDate: state.asOfDate });
-          toast('Reloading', `Fund filter → ${target.value}`);
-        } else toast('Filter updated', target.value);
-        softFocus(target.closest('.workspace-filter-bar')||target);
-        break;
-      case 'dashboard-period-filter':
-        state.asOfDate = target.value;
-        if (state.liveData) {
-          emitIntegrationEvent('matanho:reload-request', { fundName: state.activeFund, asOfDate: target.value });
-          toast('Reloading', `As of → ${target.value}`);
-        } else toast('Filter updated', target.value);
-        softFocus(target.closest('.workspace-filter-bar')||target);
-        break;
-      case 'dashboard-currency-filter':
-        state.dashboardCurrency = target.value;
-        if (state.liveData) {
-          emitIntegrationEvent('matanho:reload-request', {
-            fundName: state.activeFund,
-            asOfDate: state.asOfDate,
-            currencyCode: target.value === 'Reporting currency' ? undefined : target.value,
-            geography: state.dashboardGeography,
-          });
-          toast('Reloading', `Currency → ${target.value}`);
-        } else toast('Filter updated', target.value);
-        softFocus(target.closest('.workspace-filter-bar')||target);
-        break;
-      case 'dashboard-geography-filter':
-        state.dashboardGeography = target.value;
-        if (state.liveData) {
-          emitIntegrationEvent('matanho:reload-request', {
-            fundName: state.activeFund,
-            asOfDate: state.asOfDate,
-            currencyCode: state.dashboardCurrency,
-            geography: target.value,
-          });
-          toast('Reloading', `Geography → ${target.value}`);
-        } else toast('Filter updated', target.value);
-        softFocus(target.closest('.workspace-filter-bar')||target);
-        break;
+      case 'term-version-filter': case 'term-status-filter': case 'term-owner-filter': case 'reconciliation-status-filter': case 'reconciliation-amount-filter': case 'expanded-recon-date': case 'expanded-recon-status': case 'expanded-recon-tolerance': case 'report-vault-type': case 'report-vault-period': case 'mailer-type-filter': case 'mailer-status-filter': case 'mailer-channel-filter': case 'dashboard-fund-filter': case 'dashboard-period-filter': case 'dashboard-currency-filter': case 'dashboard-geography-filter': case 'deal-fund-filter': case 'deal-stage-filter': case 'deal-owner-filter': case 'deal-age-filter': case 'fund-vintage-filter': case 'fund-strategy-filter': case 'fund-status-filter': case 'fund-currency-filter': toast('Filter updated',target.value); softFocus(target.closest('.workspace-filter-bar')||target); break;
       case 'ic-vote': state.dealVote[target.dataset.member]=target.value; toast('Vote updated',`${target.dataset.member}: ${target.value}`); render(); break;
       default: toast('Selection updated',target.value || 'Value changed');
     }
@@ -5600,69 +3369,16 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     switch(action){
       case 'submit-create-fund': submitCreateFund(); return;
       case 'submit-report-schedule': submitReportSchedule(); return;
-      case 'reset-dashboard-filters':
-        state.activeFund = 'All Funds';
-        state.asOfDate = 'Latest';
-        state.dashboardCurrency = 'USD';
-        state.dashboardGeography = 'All geographies';
-        if (state.liveData) {
-          emitIntegrationEvent('matanho:reload-request', { fundName: 'All Funds', asOfDate: 'Latest' });
-          toast('Dashboard filters reset', 'Reloading live dashboard…');
-        } else toast('Dashboard filters reset','All funds, USD and the latest as-of date are selected.');
-        softFocus(trigger.closest('.workspace-filter-bar'));
-        return;
+      case 'reset-dashboard-filters': toast('Dashboard filters reset','All funds, USD and the latest as-of date are selected.'); softFocus(trigger.closest('.workspace-filter-bar')); return;
       case 'save-company-update': closeOverlays(); toast('Update saved','The company update remains in draft.'); return;
       case 'publish-company-update': closeOverlays(); toast('Company update published','Portfolio monitoring and activity feeds were refreshed.'); render(); return;
       case 'submit-dd-task': submitDDTask(); return;
-      case 'submit-dd-assessment': submitDDAssessment(); return;
-      case 'complete-dd-task':
-      case 'reopen-dd-task': {
-        if (!isLiveMode()) break;
-        const taskId = trigger.dataset.id;
-        const applicationId = state.selectedDealId;
-        if (!taskId) { toast('Task required', 'Open a workstream and try again.', 'warning'); return; }
-        if (!applicationId) { toast('Deal required', 'Open a deal before updating workstreams.', 'warning'); return; }
-        v23Emit('api-update-dd-task-stage', {
-          applicationId: String(applicationId),
-          dealId: String(applicationId),
-          taskId: String(taskId),
-          stage: action === 'reopen-dd-task' ? 'todo' : 'completed',
-        });
-        return;
-      }
       case 'toggle-dd-task': { const task=state.dueDiligenceTasks.find(t=>t.id===trigger.dataset.id); if(task){task.status=task.status==='Complete'?'In Review':'Complete'; closeOverlays(); toast('Task updated',`${task.title}: ${task.status}`); render();} return; }
       case 'add-dd-comment': showSimpleCommentModal('Add diligence comment'); return;
       case 'confirm-release-tranche': closeOverlays(); toast('Release request created','USD 12.0M is awaiting two authorised signatories.'); return;
       case 'submit-create-folder': submitCreateFolder(); return;
       case 'submit-document-request': { const form=$('#requestDocumentForm'); if(!form?.reportValidity())return; const doc=new FormData(form).get('document'); closeOverlays(); toast('Document requested',`${doc} was requested through the secure portal.`); return; }
-      case 'submit-clarification': {
-        const form = $('#clarificationForm');
-        if (!form?.reportValidity()) return;
-        const data = Object.fromEntries(new FormData(form));
-        if (!data.notifyEmail) {
-          toast('Email required', 'Unchecking email delivery is not supported — clarification is sent by email.', 'warning');
-          return;
-        }
-        const deal = deals.find(d => String(d.id) === String(state.selectedDealId)) || deals[0];
-        if (state.liveData && deal) {
-          emitIntegrationEvent('matanho:before-action', {
-            action: 'api-request-clarification',
-            dataset: {
-              applicationId: deal.id,
-              dealId: deal.id,
-              subject: String(data.subject || ''),
-              message: `[${data.section || 'General'}]\n\n${data.message || ''}`,
-              recipientEmail: String(data.recipientEmail || ''),
-            },
-            state: publicSnapshot().state,
-          }, true);
-          closeOverlays();
-        } else {
-          closeOverlays();
-          toast('Clarification sent', 'The applicant was notified through the secure portal.');
-        }
-        return;
-      }
+      case 'submit-clarification': closeOverlays(); toast('Clarification sent','The applicant was notified through the secure portal.'); return;
       case 'submit-comment': closeOverlays(); toast('Comment added','The note was saved to the record and audit trail.'); return;
       case 'submit-fund-edit': submitFundEdit(); return;
       case 'apply-filters': closeOverlays(); toast('Filters applied','The workspace view was refreshed.'); return;
@@ -5670,8 +3386,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       case 'switch-module-demo': toast('Module switcher',`${trigger.dataset.module} would open in the full Matanho platform.`); closeOverlays(); return;
       case 'tenant-demo': toast('Workspace switcher','Tenant switching is simulated in this frontend prototype.'); closeOverlays(); return;
       case 'workspace-admin': closeOverlays(); navigate('settings'); return;
-      case 'sign-out-demo':
-      case 'client-design-sign-out': closeOverlays(); clientDesignSignOut(); return;
+      case 'sign-out-demo': closeOverlays(); toast('Demo session','Sign-out is disabled in this frontend-only preview.','warning'); return;
       default: return originalHandleAction(action,trigger,event);
     }
   };
@@ -5840,15 +3555,6 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     const visibleCompanies = fundCompanies.length ? fundCompanies : companies.slice(0,5);
     const totalFV = sum(visibleCompanies,company=>company.fairValue) || 1;
     if (view === 'Cash Flows') {
-      if (state.liveData) {
-        const charts = state.dashboardCharts || {};
-        const perf = charts.performance || {};
-        const jc = charts.jCurve || {};
-        const labels = (perf.labels && perf.labels.length) ? perf.labels : (jc.labels || ['Period']);
-        const contrib = (perf.capitalInvested && perf.capitalInvested.length) ? perf.capitalInvested : [0];
-        const dist = (perf.distributions && perf.distributions.length) ? perf.distributions : [0];
-        return `<section class="grid cols-2">${card('Capital invested vs distributions',barChart({labels,series:[{name:'Capital invested',color:'var(--blue)',values:contrib},{name:'Distributions',color:'var(--emerald)',values:dist}],height:310,yLabel:'USD millions',format:value=>`${Number(value).toFixed(1)}M`}),{subtitle:'From /portfolio/dashboard performanceOverview'})}${card('J-Curve (cumulative)', (jc.labels||[]).length ? lineChart({labels:jc.labels,series:[{name:'Cumulative',color:'var(--brand)',values:jc.values||[]}],height:310,yLabel:'USD millions',format:value=>`${Number(value).toFixed(1)}M`}) : '<p class="muted">No jCurve series on dashboard.</p>',{subtitle:'From dashboard jCurve'})}</section><section class="card section-gap"><div class="card-body"><p class="muted">Detailed fund cash-flow ledger rows are not exposed by the current portfolio dashboard API. Use Cash Ledger under Fund Operations for journal detail.</p></div></section>`;
-      }
       const rows = [
         ['04 Apr 2026','Capital call receipt','LP collection account','Contribution',25000000,'Reconciled'],
         ['29 Apr 2026','Follow-on investment','Nova Analytics','Investment',-12000000,'Posted'],
@@ -5865,35 +3571,11 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       return `<section class="grid cols-2">${card('Fair Value by Sector',donutChart(sectorSegments,formatMoney(totalFV),'Portfolio fair value',158),{subtitle:'Current approved valuation'})}${card('Portfolio Operating Trend',lineChart({labels:['Q2 2025','Q3 2025','Q4 2025','Q1 2026','Q2 2026'],series:[{name:'Revenue growth',color:'var(--blue)',values:[18,21,24,26,29]},{name:'EBITDA growth',color:'var(--emerald)',values:[11,14,16,19,23]}],height:310,yLabel:'Percent',format:value=>`${Math.round(value)}%`}),{subtitle:'Weighted portfolio indicators'})}</section><section class="card table-card section-gap"><div class="table-toolbar"><div><h3>Investment-Level Performance</h3><p>Cost, fair value, MOIC, operating momentum and monitoring status.</p></div>${button('Portfolio filters','company-filters','compact','filter')}</div><div class="table-wrap"><table><thead><tr><th>Company</th><th>Sector</th><th class="text-right">Invested</th><th class="text-right">Fair value</th><th class="text-right">MOIC</th><th class="text-right">Ownership</th><th class="text-right">Revenue growth</th><th>Health</th></tr></thead><tbody>${visibleCompanies.map(company=>`<tr class="clickable" data-action="open-company" data-id="${company.id}"><td class="table-primary">${escapeHTML(company.name)}</td><td>${escapeHTML(company.sector)}</td><td class="text-right">${formatMoney(company.invested)}</td><td class="text-right">${formatMoney(company.fairValue)}</td><td class="text-right">${(company.fairValue/company.invested).toFixed(2)}x</td><td class="text-right">${pct(company.ownership)}</td><td class="text-right positive">${pct(company.revenueGrowth)}</td><td>${statusPill(company.health>=75?'On track':company.health>=65?'Watch':'Attention')}</td></tr>`).join('')}</tbody></table></div></section>`;
     }
     if (view === 'Attribution') {
-      if (state.liveData) {
-        return `<section class="card"><div class="card-body"><p class="muted">Company-level IRR attribution is not available from the current dashboard API. Portfolio company fair values are shown under Portfolio.</p></div></section>`;
-      }
       const attributionRows = visibleCompanies.map((company,index)=>{const contribution=[4.3,3.1,2.4,1.9,1.2,.8][index]||.6;return `<tr class="clickable" data-action="chart-drilldown" data-chart-label="${escapeHTML(company.name)} attribution" data-chart-value="${contribution.toFixed(1)} percentage points"><td class="table-primary">${escapeHTML(company.name)}</td><td class="text-right">${contribution.toFixed(1)}pp</td><td class="text-right">${pct(contribution/fund.netIrr*100)}</td><td>${index<2?'Operating performance':index===2?'Multiple expansion':'Revenue and margin'}</td><td class="text-right positive">+${pct(company.revenueGrowth/10)}</td></tr>`}).join('');
       return `<section class="grid cols-2">${card('Net IRR Attribution',waterfallChart([{label:'Opening return',value:10.2,total:true},{label:'Revenue growth',value:3.8},{label:'Margin expansion',value:2.1},{label:'Multiple movement',value:1.6},{label:'Leverage / cash',value:1.0},{label:'FX & fees',value:-.9},{label:'Net IRR',value:17.8,total:true}]),{subtitle:'Percentage-point contribution'})}${card('Value-Creation Drivers',barChart({labels:['Revenue growth','Margin expansion','Pricing','Working capital','Strategic initiatives','FX / macro'],series:[{name:'Contribution',color:'var(--brand)',values:[38,24,15,11,9,-3]}],height:310,yLabel:'Percent of value creation',format:value=>`${Math.round(value)}%`}),{subtitle:'Current period attribution'})}</section><section class="card table-card section-gap"><div class="table-toolbar"><div><h3>Company Attribution Schedule</h3><p>Contribution to fund return and the underlying value-creation driver.</p></div>${button('Methodology','performance-settings','compact','settings')}</div><div class="table-wrap"><table><thead><tr><th>Company</th><th class="text-right">Contribution to net IRR</th><th class="text-right">Share of net IRR</th><th>Primary driver</th><th class="text-right">Quarter movement</th></tr></thead><tbody>${attributionRows}<tr class="table-primary"><td>Total</td><td class="text-right">${pct(fund.netIrr)}</td><td class="text-right">100.0%</td><td>Fund total</td><td class="text-right positive">+1.3pp</td></tr></tbody></table></div></section>`;
     }
     if (view === 'Benchmarks') {
-      if (state.liveData) {
-        const charts = state.dashboardCharts || {};
-        const vt = charts.valueTrend || {};
-        const trend = (vt.labels || []).length
-          ? lineChart({labels:vt.labels,series:[{name:`${fund.name} IRR`,color:'var(--blue)',values:vt.values||[]}],height:310,yLabel:'Percent',format:value=>`${Number(value).toFixed(1)}%`})
-          : '<p class="muted">No irrByQuarter series on dashboard.</p>';
-        return `<section class="grid cols-2">${card('IRR by quarter',trend,{subtitle:'From /portfolio/dashboard irrByQuarter'})}${card('Fund vs peers',`<div class="info-list"><div class="info-row"><span>Fund net IRR</span><strong>${pct(fund.netIrr)}</strong></div><div class="info-row"><span>Fund gross IRR</span><strong>${pct(fund.grossIrr)}</strong></div><div class="info-row"><span>TVPI</span><strong>${Number(fund.tvpi||0).toFixed(2)}x</strong></div><div class="info-row"><span>DPI</span><strong>${Number(fund.dpi||0).toFixed(2)}x</strong></div><div class="info-row"><span>Peer / PME</span><strong class="muted">Not provided by API</strong></div></div>`,{subtitle:'Live fund metrics only'})}</section>`;
-      }
       return `<section class="grid cols-2">${card('PME and Peer Comparison',lineChart({labels:['Q2 2024','Q3 2024','Q4 2024','Q1 2025','Q2 2025','Q3 2025','Q4 2025','Q1 2026','Q2 2026'],series:[{name:`${fund.name} net IRR`,color:'var(--blue)',values:[0,4,7,9.5,12,14,16,17.5,fund.netIrr]},{name:state.fundReportingBenchmark,color:'var(--emerald)',values:[0,2,4,5.5,7,8.5,10,11.2,12.5]},{name:'Peer median',color:'var(--amber)',values:[0,2.8,4.9,6.8,8.2,9.7,11.3,12.1,13.4]}],height:310,yLabel:'Percent',format:value=>`${Math.round(value)}%`}),{subtitle:`${state.fundReportingBasis} basis · ${state.fundReportingBenchmark}`})}${card('Quartile Position',barChart({labels:['Net IRR','TVPI','DPI','Revenue growth','Loss ratio'],series:[{name:'Fund percentile',color:'var(--brand)',values:[78,74,69,82,66]}],height:310,yLabel:'Percentile',format:value=>`${Math.round(value)}th`}),{subtitle:'Illustrative peer cohort percentile'})}</section><section class="grid cols-2 section-gap">${card('Benchmark Summary',`<div class="table-wrap"><table><thead><tr><th>Measure</th><th class="text-right">Fund</th><th class="text-right">Peer median</th><th class="text-right">Top quartile</th><th>Position</th></tr></thead><tbody><tr><td>Net IRR</td><td class="text-right">${pct(fund.netIrr)}</td><td class="text-right">13.4%</td><td class="text-right">17.2%</td><td>${statusPill('Top quartile','success')}</td></tr><tr><td>TVPI</td><td class="text-right">${fund.tvpi.toFixed(2)}x</td><td class="text-right">1.67x</td><td class="text-right">2.02x</td><td>${statusPill('Top quartile','success')}</td></tr><tr><td>DPI</td><td class="text-right">${fund.dpi.toFixed(2)}x</td><td class="text-right">0.41x</td><td class="text-right">0.58x</td><td>${statusPill('Top quartile','success')}</td></tr></tbody></table></div>`,{subtitle:'Selected peer cohort'})}${card('Methodology & Controls',`<div class="info-list"><div class="info-row"><span>Benchmark</span><strong>${escapeHTML(state.fundReportingBenchmark)}</strong></div><div class="info-row"><span>Return basis</span><strong>${escapeHTML(state.fundReportingBasis)}</strong></div><div class="info-row"><span>Currency</span><strong>${escapeHTML(state.fundReportingCurrency)}</strong></div><div class="info-row"><span>Cash-flow convention</span><strong>Daily dated cash flows</strong></div><div class="info-row"><span>Peer cohort</span><strong>2020-2023 Africa growth / buyout</strong></div><div class="info-row"><span>Last validated</span><strong>31 Jul 2026 · 17:10 CAT</strong></div></div>`,{footer:'<button class="card-link" data-action="performance-settings">Configure methodology</button>'})}</section>`;
-    }
-    if (state.liveData) {
-      const charts = state.dashboardCharts || {};
-      const vt = charts.valueTrend || {};
-      const jc = charts.jCurve || {};
-      const sectors = charts.sectors || [];
-      const irrTrend = (vt.labels || []).length
-        ? lineChart({labels:vt.labels,series:[{name:'Fund IRR',color:'var(--emerald)',values:vt.values||[]}],height:310,yLabel:'Percent',format:value=>`${Number(value).toFixed(1)}%`})
-        : lineChart({labels:['Current'],series:[{name:'Net IRR',color:'var(--emerald)',values:[fund.netIrr]},{name:'Gross IRR',color:'var(--blue)',values:[fund.grossIrr]}],height:310,yLabel:'Percent',format:value=>`${Number(value).toFixed(1)}%`});
-      const jCurveChart = (jc.labels || []).length
-        ? lineChart({labels:jc.labels,series:[{name:'Cumulative net cash',color:'var(--brand)',values:jc.values||[]}],height:310,yLabel:'USD millions',format:value=>`${Number(value).toFixed(1)}M`})
-        : '<p class="muted">No jCurve data.</p>';
-      return `<section class="grid cols-2">${card('IRR trend',irrTrend,{subtitle:'From dashboard irrByQuarter (or fund snapshot)'})}${card('J-Curve',jCurveChart,{subtitle:'From dashboard jCurve'})}</section><section class="grid cols-2 section-gap">${card('Sector allocation', sectors.length ? donutChart(sectors,formatMoney(sum(sectors,s=>s.value)),'Allocation',158) : '<p class="muted">No sector allocation.</p>',{subtitle:'From dealAllocation / AUM sectors'})}${card('Performance Schedule',`<div class="table-wrap"><table><thead><tr><th>Metric</th><th class="text-right">Current</th><th>Source</th></tr></thead><tbody><tr><td>Gross IRR</td><td class="text-right">${pct(fund.grossIrr)}</td><td>Fund</td></tr><tr><td>Net IRR</td><td class="text-right">${pct(fund.netIrr)}</td><td>Fund</td></tr><tr><td>TVPI</td><td class="text-right">${Number(fund.tvpi||0).toFixed(2)}x</td><td>Fund</td></tr><tr><td>DPI</td><td class="text-right">${Number(fund.dpi||0).toFixed(2)}x</td><td>Fund</td></tr><tr><td>NAV</td><td class="text-right">${formatMoney(fund.nav)}</td><td>Fund</td></tr></tbody></table></div>`,{subtitle:'Live fund record'})}</section>`;
     }
     return `<section class="grid cols-2">${card('Gross and Net Performance Trend',lineChart({labels:['Q2 2024','Q3 2024','Q4 2024','Q1 2025','Q2 2025','Q3 2025','Q4 2025','Q1 2026','Q2 2026'],series:[{name:'Net IRR',color:'var(--emerald)',values:[1,6,7,9,10,12,13.8,14.2,fund.netIrr]},{name:'Gross IRR',color:'var(--blue)',values:[3,9,10,12,14,16,17.1,18,fund.grossIrr]}],height:310,yLabel:'Percent',format:value=>`${Math.round(value)}%`}),{subtitle:'Quarterly progression'})}${card('Investment Multiple Progression',lineChart({labels:['Q2 2024','Q3 2024','Q4 2024','Q1 2025','Q2 2025','Q3 2025','Q4 2025','Q1 2026','Q2 2026'],series:[{name:'TVPI',color:'var(--brand)',values:[1.02,1.11,1.22,1.36,1.48,1.63,1.82,2.01,fund.tvpi]},{name:'DPI',color:'var(--amber)',values:[0,.03,.08,.14,.21,.28,.38,.47,fund.dpi]}],height:310,yLabel:'Multiple',format:value=>`${Number(value).toFixed(2)}x`}),{subtitle:'Since inception'})}</section><section class="grid cols-2 section-gap">${card('NAV and Paid-In Capital',barChart({labels:['Q2 2025','Q3 2025','Q4 2025','Q1 2026','Q2 2026'],series:[{name:'NAV',color:'var(--blue)',values:[112,126,139,151,168]},{name:'Paid-in capital',color:'var(--emerald)',values:[156,171,187,196,211]}],height:310,yLabel:'USD millions',format:value=>`${Math.round(value)}M`}),{subtitle:'Quarter-end balances'})}${card('Performance Schedule',`<div class="table-wrap"><table><thead><tr><th>Metric</th><th class="text-right">Current</th><th class="text-right">Prior quarter</th><th class="text-right">Since inception</th><th>Validation</th></tr></thead><tbody><tr><td>Gross IRR</td><td class="text-right">${pct(fund.grossIrr)}</td><td class="text-right">${pct(fund.grossIrr-1.6)}</td><td class="text-right">${pct(fund.grossIrr)}</td><td>${statusPill('Passed','success')}</td></tr><tr><td>Net IRR</td><td class="text-right">${pct(fund.netIrr)}</td><td class="text-right">${pct(fund.netIrr-1.3)}</td><td class="text-right">${pct(fund.netIrr)}</td><td>${statusPill('Passed','success')}</td></tr><tr><td>TVPI</td><td class="text-right">${fund.tvpi.toFixed(2)}x</td><td class="text-right">${Math.max(0,fund.tvpi-.14).toFixed(2)}x</td><td class="text-right">${fund.tvpi.toFixed(2)}x</td><td>${statusPill('Passed','success')}</td></tr><tr><td>DPI</td><td class="text-right">${fund.dpi.toFixed(2)}x</td><td class="text-right">${Math.max(0,fund.dpi-.08).toFixed(2)}x</td><td class="text-right">${fund.dpi.toFixed(2)}x</td><td>${statusPill('Passed','success')}</td></tr></tbody></table></div>`,{subtitle:'Current reporting period'})}</section>`;
   }
@@ -5901,20 +3583,15 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   renderFundPerformance = function() {
     const selectedFund = funds.find(fund=>fund.name===state.activeFund) || funds[0];
     if (!selectedFund) {
-      return `${pageHeader('Fund Reporting','Interactive performance reporting.','','Fund Reporting')}<section class="empty-state"><p>No funds returned from API.</p></section>`;
+      return `${pageHeader('Fund Reporting','Interactive performance, cash-flow, portfolio, attribution and benchmark reporting.',`${button('Refresh','reset-fund-reporting-filters','','refresh')}`,'Fund Reporting')}<div class="empty-state"><div class="empty-state-icon">${icon('file-chart')}</div><h3>No funds loaded</h3><p>Live fund data is still loading or has not been seeded yet.</p></div>`;
     }
     const views = ['Performance','Cash Flows','Portfolio','Attribution','Benchmarks'];
-    const liveFoot = state.liveData ? 'From live API' : null;
     const metricSets = {
-      Performance:[['Gross IRR',pct(selectedFund.grossIrr),'trend-up','emerald',liveFoot||'+1.6pp vs prior quarter'],['Net IRR',pct(selectedFund.netIrr),'users','cyan',liveFoot||'+1.3pp vs prior quarter'],['TVPI',`${selectedFund.tvpi.toFixed(2)}x`,'bar-chart','amber',liveFoot||'+0.14x vs prior quarter'],['DPI',`${selectedFund.dpi.toFixed(2)}x`,'dollar','purple',liveFoot||'+0.08x vs prior quarter'],['RVPI',`${Math.max(0,selectedFund.tvpi-selectedFund.dpi).toFixed(2)}x`,'trend-up','blue','Residual value multiple'],['NAV',formatMoney(selectedFund.nav),'dollar','emerald',liveFoot||'Approved period close']],
-      'Cash Flows': state.liveData
-        ? [['Unfunded',formatMoney(Math.max(0,selectedFund.commitment-selectedFund.called)),'wallet','purple','Remaining commitment'],['Called',formatMoney(selectedFund.called),'trend-down','blue','From fund'],['Distributed',formatMoney(selectedFund.distributed),'trend-up','emerald','From fund'],['NAV',formatMoney(selectedFund.nav),'dollar','emerald','From fund'],['Commitment',formatMoney(selectedFund.commitment),'bank','cyan','From fund'],['Cash detail','See Cash Ledger','bank','amber','Fund Ops']]
-        : [['Contributions','USD 25.6M','trend-down','blue','Current quarter'],['Distributions','USD 19.8M','trend-up','emerald','Current quarter'],['Net cash flow','USD 5.8M','refresh','cyan','Before fees and expenses'],['Fees & expenses','USD 6.1M','file','amber','Current quarter'],['Unfunded',formatMoney(Math.max(0,selectedFund.commitment-selectedFund.called)),'wallet','purple','Remaining commitment'],['Available cash','USD 94.8M','bank','emerald','Reconciled cash position']],
-      Portfolio:[['Portfolio companies',String(companies.filter(c=>!selectedFund||c.fund===selectedFund.name).length || companies.length),'building','blue',liveFoot||'Active investments'],['Fair value',formatMoney(selectedFund.nav),'dollar','emerald',liveFoot||'Approved valuation'],['Weighted revenue growth',state.liveData?'—':'28.9%','trend-up','cyan',state.liveData?'No API':'Current quarter'],['Weighted EBITDA growth',state.liveData?'—':'22.7%','bar-chart','purple',state.liveData?'No API':'Current quarter'],['On-track companies',state.liveData?'—':'82%','check-circle','emerald',state.liveData?'No API':'Weighted by fair value'],['Watch items',state.liveData?'—':'3','alert','amber',state.liveData?'No API':'Require intervention']],
-      Attribution: state.liveData
-        ? [['Attribution','—','trend-up','emerald','No API'],['Coverage','—','check-circle','blue','No API'],['Top contributor','—','building','cyan','No API'],['Operating','—','bar-chart','purple','No API'],['Multiple','—','wallet','amber','No API'],['FX','—','refresh','red','No API']]
-        : [['Operating performance','+5.9pp','trend-up','emerald','Net IRR contribution'],['Multiple movement','+1.6pp','bar-chart','blue','Net IRR contribution'],['Leverage / cash','+1.0pp','wallet','purple','Net IRR contribution'],['FX & macro','-0.9pp','refresh','red','Net IRR drag'],['Top contributor','Nova Analytics','building','cyan','4.3pp contribution'],['Attribution coverage','100%','check-circle','emerald','All investments mapped']],
-      Benchmarks:[['Fund net IRR',pct(selectedFund.netIrr),'trend-up','emerald','Selected basis'],['Peer median',state.liveData?'—':'13.4%','users','blue',state.liveData?'No API':'Illustrative cohort'],['Top quartile',state.liveData?'—':'17.2%','sparkles','purple',state.liveData?'No API':'Illustrative cohort'],['Excess return',state.liveData?'—':`+${(selectedFund.netIrr-12.5).toFixed(1)}pp`,'bar-chart','cyan',state.liveData?'No API':'Versus PME'],['TVPI percentile',state.liveData?'—':'74th','trend-up','amber',state.liveData?'No API':'Peer cohort'],['Benchmark coverage',state.liveData?'Fund only':'100%','check-circle','emerald',state.liveData?'Live fund metrics':'Cash flows mapped']]
+      Performance:[['Gross IRR',pct(selectedFund.grossIrr||0),'trend-up','emerald','+1.6pp vs prior quarter'],['Net IRR',pct(selectedFund.netIrr||0),'users','cyan','+1.3pp vs prior quarter'],['TVPI',`${Number(selectedFund.tvpi||0).toFixed(2)}x`,'bar-chart','amber','+0.14x vs prior quarter'],['DPI',`${Number(selectedFund.dpi||0).toFixed(2)}x`,'dollar','purple','+0.08x vs prior quarter'],['RVPI',`${Math.max(0,Number(selectedFund.tvpi||0)-Number(selectedFund.dpi||0)).toFixed(2)}x`,'trend-up','blue','Residual value multiple'],['NAV',formatMoney(selectedFund.nav||0),'dollar','emerald','Approved period close']],
+      'Cash Flows':[['Contributions','USD 25.6M','trend-down','blue','Current quarter'],['Distributions','USD 19.8M','trend-up','emerald','Current quarter'],['Net cash flow','USD 5.8M','refresh','cyan','Before fees and expenses'],['Fees & expenses','USD 6.1M','file','amber','Current quarter'],['Unfunded',formatMoney(Math.max(0,(selectedFund.commitment||0)-(selectedFund.called||0))),'wallet','purple','Remaining commitment'],['Available cash','USD 94.8M','bank','emerald','Reconciled cash position']],
+      Portfolio:[['Portfolio companies',String(Math.max(0,companies.filter(c=>c.fund===selectedFund.name).length)),'building','blue','Active investments'],['Fair value',formatMoney(selectedFund.nav||0),'dollar','emerald','Approved valuation'],['Weighted revenue growth','28.9%','trend-up','cyan','Current quarter'],['Weighted EBITDA growth','22.7%','bar-chart','purple','Current quarter'],['On-track companies','82%','check-circle','emerald','Weighted by fair value'],['Watch items','3','alert','amber','Require intervention']],
+      Attribution:[['Operating performance','+5.9pp','trend-up','emerald','Net IRR contribution'],['Multiple movement','+1.6pp','bar-chart','blue','Net IRR contribution'],['Leverage / cash','+1.0pp','wallet','purple','Net IRR contribution'],['FX & macro','-0.9pp','refresh','red','Net IRR drag'],['Top contributor','Nova Analytics','building','cyan','4.3pp contribution'],['Attribution coverage','100%','check-circle','emerald','All investments mapped']],
+      Benchmarks:[['Fund net IRR',pct(selectedFund.netIrr||0),'trend-up','emerald','Selected basis'],['Peer median','13.4%','users','blue','Illustrative cohort'],['Top quartile','17.2%','sparkles','purple','Illustrative cohort'],['Excess return',`+${(Number(selectedFund.netIrr||0)-12.5).toFixed(1)}pp`,'bar-chart','cyan','Versus PME'],['TVPI percentile','74th','trend-up','amber','Peer cohort'],['Benchmark coverage','100%','check-circle','emerald','Cash flows mapped']]
     };
     const metrics = metricSets[state.fundReportingView] || metricSets.Performance;
     const filters = workspaceFilterBar([
@@ -6094,36 +3771,13 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   const v11BaseHydrate = hydrateFromBackend;
   hydrateFromBackend = function(payload={}) {
     const source=payload.data || payload;
-    const incoming=source.rbac || payload.state?.rbac;
+    const incoming=source.rbac;
     if (incoming?.roles) incoming.roles.forEach(role=>{
       if (!role?.id) return;
-      const normalised = {
-        ...role,
-        short: role.short || role.name,
-        icon: role.icon || 'users',
-        description: role.description || role.scope || '',
-        approvalLimit: role.approvalLimit || 'Organisation policy',
-        scope: role.scope || 'Organisation',
-        permissions: role.permissions || v11FullPermissions(),
-        colour: role.colour || '#2563eb',
-      };
-      if (v11RoleDefinitions[role.id]) Object.assign(v11RoleDefinitions[role.id], normalised);
-      else v11RoleDefinitions[role.id]=normalised;
+      if (v11RoleDefinitions[role.id]) Object.assign(v11RoleDefinitions[role.id],role);
+      else v11RoleDefinitions[role.id]=role;
     });
-    if (Array.isArray(incoming?.users)) {
-      const mapped = incoming.users.map((u,i)=>({
-        id: u.id || `USR-${i+1}`,
-        name: u.name || u.email || 'User',
-        initials: (u.name || u.email || 'U').split(/\s+/).map(p=>p[0]).join('').slice(0,2).toUpperCase(),
-        role: u.role || 'user',
-        title: u.title || u.department || 'Staff',
-        email: u.email || '',
-        status: u.status || 'Active',
-        scope: u.scope || 'Organisation',
-        lastActive: u.lastActive || '—',
-      }));
-      v11RoleMembers.splice(0,v11RoleMembers.length,...mapped);
-    }
+    if (Array.isArray(incoming?.users)) v11RoleMembers.splice(0,v11RoleMembers.length,...incoming.users);
     if (incoming?.activeRole && v11RoleDefinitions[incoming.activeRole]) state.currentRole=incoming.activeRole;
     return v11BaseHydrate(payload);
   };
@@ -6132,11 +3786,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   renderNav = function() {
     const activePage=v11PageResource(state.page);
     const visibleGroups=navGroups.map(group=>({ ...group, items:group.items.filter(item=>v11CanRead(item.id)) })).filter(group=>group.items.length);
-    primaryNav.innerHTML=visibleGroups.map(group=>`<div class="nav-group"><div class="nav-group-label">${group.label}</div>${group.items.map(item=>{
-      const badge = typeof liveNavBadge==='function' ? liveNavBadge(item.id) : null;
-      const showBadge = badge != null ? badge : item.badge;
-      return `<button class="nav-item ${activePage===item.id?'active':''}" data-action="navigate" data-page="${item.id}" title="${escapeHTML(item.label)}">${icon(item.icon)}<span class="nav-label">${escapeHTML(item.label)}</span>${showBadge!=null&&showBadge!==''?`<span class="nav-badge">${escapeHTML(String(showBadge))}</span>`:''}</button>`;
-    }).join('')}</div>`).join('');
+    primaryNav.innerHTML=visibleGroups.map(group=>`<div class="nav-group"><div class="nav-group-label">${group.label}</div>${group.items.map(item=>`<button class="nav-item ${activePage===item.id?'active':''}" data-action="navigate" data-page="${item.id}" title="${escapeHTML(item.label)}">${icon(item.icon)}<span class="nav-label">${escapeHTML(item.label)}</span>${item.badge?`<span class="nav-badge">${item.badge}</span>`:''}</button>`).join('')}</div>`).join('');
   };
 
   const v11SettingsTabs = [
@@ -7179,38 +4829,6 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   uploadDocuments=function(fileList){
     const files=Array.from(fileList||[]); if(!files.length)return;
     const folder=state.v22VaultFolder&&state.v22VaultFolder!=='all'?state.v22VaultFolder:(state.selectedFolder&&state.selectedFolder!=='All Documents'?state.selectedFolder:'General');
-    if (isLiveMode()) {
-      const file = files[0];
-      if (state.page === 'deal-detail' && state.selectedDealId) {
-        emitIntegrationEvent('matanho:before-action', {
-          action: 'api-upload-application-document',
-          dataset: {
-            applicationId: state.selectedDealId,
-            title: file.name,
-            fileName: file.name,
-            documentType: folder || 'OTHER',
-            fileRef: file.name,
-          },
-          state: publicSnapshot().state,
-          files,
-        }, true);
-        return;
-      }
-      const fundId = funds[0]?.id || '';
-      if (!fundId) { toast('Fund required','Open a fund-scoped workspace before uploading documents.','warning'); return; }
-      emitIntegrationEvent('matanho:before-action', {
-        action: 'api-upload-document',
-        dataset: {
-          fundId,
-          title: file.name,
-          fileName: file.name,
-          documentType: folder,
-          fileRef: file.name,
-        },
-        state: publicSnapshot().state,
-      }, true);
-      return;
-    }
     files.forEach(file=>{
       const ext=(file.name.split('.').pop()||'FILE').toUpperCase();
       documents.push({id:`DOC-${String(documents.length+1).padStart(3,'0')}`,name:file.name,type:ext,version:'v1.0',owner:v11RoleMember().name,uploaded:'13 Aug 2026',status:'In review',access:'Internal',folder,classification:'Internal confidential',signatureStatus:/PDF|DOC|DOCX/.test(ext)?'Not required':'Not required',retention:'Fund life + 10 years',size:file.size>1048576?`${(file.size/1048576).toFixed(1)} MB`:`${Math.max(1,Math.round(file.size/1024))} KB`,pages:/PDF|DOC|DOCX/.test(ext)?6:1});
@@ -7224,445 +4842,64 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     return v22fBaseHandleAction(action,trigger,event);
   };
 
-  /* V23 — live API emits (no toast-only success when state.liveData) */
-  function v23FundIdFromName(name) {
-    if (!name || name === 'All Funds') return funds[0]?.id || '';
-    const byId = funds.find(f => f.id === name);
-    if (byId) return byId.id;
-    const byName = funds.find(f => f.name === name);
-    return byName?.id || funds[0]?.id || '';
+
+  function __pv11ClearFixtures() {
+    const cols = [funds, companies, deals, capitalCalls, lps, reports, documents, cashAccounts, cashJournals, cashReservations, statementImports, reconciliationBatches, reconciliationExceptions, reportVaultItems, signatureEnvelopes, mailerLists];
+    cols.forEach((c) => { if (Array.isArray(c)) c.splice(0, c.length); });
   }
-
-  function v23Emit(action, dataset = {}) {
-    return emitIntegrationEvent('matanho:before-action', {
-      action,
-      dataset: Object.fromEntries(Object.entries(dataset).map(([k, v]) => [k, v == null ? '' : String(v)])),
-      state: publicSnapshot().state,
-    }, true);
+  function __pv11BeginLiveLoad() {
+    try { rootEl.classList.add('is-hydrating'); } catch (_) {}
+    __pv11ClearFixtures();
+    if (typeof render === 'function') render();
   }
-
-  function v23ReadFileBase64(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const result = String(reader.result || '');
-        const comma = result.indexOf(',');
-        resolve(comma >= 0 ? result.slice(comma + 1) : result);
-      };
-      reader.onerror = () => reject(reader.error || new Error('Failed to read file'));
-      reader.readAsDataURL(file);
-    });
+  function __pv11FailLiveLoad(message) {
+    try { rootEl.classList.remove('is-hydrating'); rootEl.classList.add('is-host-error'); } catch (_) {}
+    if (typeof toast === 'function') toast('Live data failed', message || 'Could not load portfolio data.', 'error');
   }
-
-  const v23LiveBlocked = new Set([
-    'create-custom-role','add-role-member','submit-role-member','remove-role-member','confirm-remove-role-member',
-    'toggle-role-permission','save-settings','create-service-account','create-webhook','edit-retention-policy',
-    'configure-integration','test-integration','create-manual-journal','submit-manual-journal',
-    'split-recon-match','confirm-split-match','v22-submit-exception',
-    'publish-company-update','save-company-update','submit-report-schedule','submit-create-folder',
-    'submit-document-request','submit-clarification','submit-fund-edit','send-signature-envelope',
-    'apply-signature','save-signature-draft','sign-term-sheet',
-  ]);
-
-  const v23PrevBind = bindDynamicElements;
-  bindDynamicElements = function() {
-    v23PrevBind();
-    if (!state.liveData) return;
-    $$('.kanban-column').forEach(column => {
-      column.addEventListener('drop', event => {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        column.classList.remove('drag-over');
-        const dealId = event.dataTransfer.getData('text/plain') || state.dragDealId;
-        const deal = deals.find(item => item.id === dealId);
-        const nextStage = column.dataset.stage;
-        if (!deal || !nextStage || deal.stage === nextStage) return;
-        const from = deal.stage;
-        deal.stage = nextStage;
-        render();
-        // Host preventDefault makes emit return false even when the API call is accepted.
-        // Rehydrate / error toast corrects the board after the request settles.
-        v23Emit('api-change-deal-stage', {
-          applicationId: deal.id,
-          dealId: deal.id,
-          stage: nextStage,
-          notes: `Kanban: ${from} → ${nextStage}`,
-        });
-      }, true);
-    });
-  };
-
-  submitCompany = function() {
-    const form = $('#companyForm');
-    if (!form?.reportValidity()) return;
-    const data = Object.fromEntries(new FormData(form));
-    if (state.liveData) {
-      v23Emit('api-create-company', {
-        name: data.name,
-        sector: data.sector,
-        industry: data.sector,
-        fundId: data.fundId || v23FundIdFromName(data.fund),
-        fund: data.fund,
-      });
-      return;
-    }
-    const colors = ['#1d4ed8','#0d9488','#ea580c','#0284c7','#0284c7'];
-    const company = { id:`CO-${String(companies.length+1).padStart(3,'0')}`, name:data.name, sector:data.sector, stage:data.stage, entry:'31 Jul 2026', invested:Number(data.invested), fairValue:Number(data.fairValue), ownership:Number(data.ownership), revenueGrowth:0, runway:18, health:75, boardDate:'TBC', lastReport:'Not submitted', fund:data.fund, city:data.city, revenue:[0,0,0,0,0], ebitda:[0,0,0,0,0], arr:0, margin:0, nrr:0, clients:0, esg:[0,0,0], color:colors[companies.length%colors.length] };
-    companies.push(company);
-    closeOverlays();
-    toast('Company added', `${company.name} is now in portfolio monitoring.`);
-    state.page = 'companies'; render();
-  };
-
-  showCompanyModal = function() {
-    if (state.liveData) {
-      showModal('Add portfolio company','Creates a live portfolio company via admin API.',`<form id="companyForm"><div class="form-grid"><div class="form-field"><label class="required">Company name</label><input name="name" required></div><div class="form-field"><label class="required">Industry / sector</label><input name="sector" required value="Enterprise Software"></div><div class="form-field full"><label class="required">Fund</label><select name="fundId" required>${funds.map(f=>`<option value="${escapeHTML(f.id)}">${escapeHTML(f.name)}</option>`).join('')}</select></div></div></form>`,`${button('Cancel','close-modal')}${button('Add company','submit-company','primary','plus')}`);
-      return;
-    }
-    showModal('Add portfolio company','Add an existing investment to the monitoring workspace.',`<form id="companyForm"><div class="form-grid"><div class="form-field"><label class="required">Company name</label><input name="name" required></div><div class="form-field"><label class="required">Sector</label><input name="sector" required value="Enterprise Software"></div><div class="form-field"><label class="required">Fund</label><select name="fund">${funds.map(f=>`<option>${escapeHTML(f.name)}</option>`).join('')}</select></div><div class="form-field"><label>Stage</label><select name="stage"><option>Growth</option><option>Series B</option><option>Series A</option><option>Buyout</option></select></div><div class="form-field"><label class="required">Invested amount</label><input name="invested" type="number" value="15000000"></div><div class="form-field"><label>Fair value</label><input name="fairValue" type="number" value="15000000"></div><div class="form-field"><label>Ownership %</label><input name="ownership" type="number" value="15"></div><div class="form-field"><label>Location</label><input name="city" value="Harare, Zimbabwe"></div></div></form>`,`${button('Cancel','close-modal')}${button('Add company','submit-company','primary','plus')}`);
-  };
-
-  submitMailerList = function() {
-    const form=$('#mailerListForm'); if(!form?.reportValidity()) return;
-    const data=Object.fromEntries(new FormData(form));
-    if (state.liveData) {
-      const fundId = v23FundIdFromName(data.fund);
-      if (!fundId) { toast('Fund required','Pick a concrete fund for the distribution list.','warning'); return; }
-      v23Emit('api-create-mailer-list', { name: data.name, fundId, description: data.description || '' });
-      return;
-    }
-    const list={id:`ML-${String(mailerLists.length+1).padStart(3,'0')}`,name:data.name,description:data.description||'Governed portfolio communication audience.',source:data.source,members:24,active:22,pending:2,bounced:0,owner:data.owner,updated:'01 Aug 2026 · just now',status:'Draft',channels:[data.channel],tags:[data.fund==='All Funds'?'Cross-fund':data.fund,'New'],funds:[data.fund],consent:'Review required',campaigns:0};
-    mailerLists.unshift(list); state.selectedMailerListId=list.id; closeOverlays(); toast('Mailer list created',`${list.name} was created in Draft with 24 preview recipients.`); render();
-  };
-
-  showCreateMailerListModal = function() {
-    if (state.liveData) {
-      showModal('Create Mailer List','Creates a fund distribution list on the reporting API.',`<form id="mailerListForm"><div class="form-grid"><div class="form-field full"><label class="required">List name</label><input name="name" required placeholder="e.g. Fund II Quarterly LPs"></div><div class="form-field full"><label class="required">Fund</label><select name="fund" required>${funds.map(f=>`<option value="${escapeHTML(f.name)}">${escapeHTML(f.name)}</option>`).join('')}</select></div><div class="form-field full"><label>Description</label><textarea name="description" placeholder="Purpose"></textarea></div></div></form>`,`${button('Cancel','close-modal')}${button('Create list','submit-mailer-list','primary','plus')}`,{variant:'wizard',size:'md',eyebrow:'Audience builder'});
-      return;
-    }
-    showModal('Create Mailer List','Build a governed, reusable audience from approved contact sources and delivery permissions.',`<form id="mailerListForm"><div class="form-grid"><div class="form-field full"><label class="required">List name</label><input name="name" required placeholder="e.g. Fund II Quarterly LPs"></div><div class="form-field full"><label>Description</label><textarea name="description" placeholder="Purpose and permitted communications"></textarea></div><div class="form-field"><label>Audience source</label><select name="source"><option>LP master + portal consent</option><option>Commitment register</option><option>Portfolio contacts</option><option>Governance register</option><option>Compliance contact register</option></select></div><div class="form-field"><label>Fund scope</label><select name="fund"><option>All Funds</option>${funds.map(f=>`<option>${escapeHTML(f.name)}</option>`).join('')}</select></div><div class="form-field"><label>Primary channel</label><select name="channel"><option>Secure email</option><option>Secure email + LP portal</option><option>Email</option><option>Event portal</option></select></div><div class="form-field"><label>Owner</label><select name="owner"><option>Nyasha Moyo</option><option>Rudo Ndlovu</option><option>Tendai Moyo</option><option>Anita Kapoor</option></select></div></div></form>`,`${button('Cancel','close-modal')}${button('Create list','submit-mailer-list','primary','plus')}`,{variant:'wizard',size:'lg',rail:['Purpose','Source rules','Delivery controls','Review'],eyebrow:'Audience builder'});
-  };
-
-  submitDDTask = function() {
-    const form=$('#ddTaskForm'); if(!form?.reportValidity()) return;
-    const data=Object.fromEntries(new FormData(form));
-    const title = String(data.title || '').trim() || String(data.workstream || '').trim() || 'Due diligence task';
-    if (isLiveMode()) {
-      const applicationId = state.selectedDealId || deals[0]?.id;
-      if (!applicationId) { toast('Deal required','Open a deal before assigning diligence tasks.','warning'); return; }
-      if (!data.assigneeId) { toast('Analyst required','Select an Investments department user.','warning'); return; }
-      v23Emit('api-assign-dd-task', {
-        applicationId,
-        dealId: applicationId,
-        title,
-        workstream: data.workstream,
-        priority: data.priority,
-        due: data.due,
-        dueDate: data.due,
-        evidence: data.evidence || '',
-        description: data.evidence || title,
-        assigneeId: String(data.assigneeId),
-      });
-      return;
-    }
-    state.dueDiligenceTasks.push({id:`T${state.dueDiligenceTasks.length+1}`,title,analyst:data.analyst||'Unassigned',due:new Date(data.due).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}),priority:data.priority,status:'To Do',evidence:0,comments:0});
-    closeOverlays(); toast('Task assigned',`${title} was assigned.`); render();
-  };
-
-  v22SubmitReservation = function(){
-    const form=$('#v22ReservationForm'); if(!form?.reportValidity())return;
-    const data=Object.fromEntries(new FormData(form));
-    if (state.liveData) {
-      const account=cashAccounts.find(a=>a.id===data.account)||cashAccounts[0];
-      v23Emit('api-create-reservation', {
-        portfolioId: v23FundIdFromName(data.fund),
-        fundId: v23FundIdFromName(data.fund),
-        cashAccountId: data.account || account?.id,
-        accountId: data.account || account?.id,
-        currency: account?.currency || 'USD',
-        amount: data.amount,
-        purpose: data.purpose,
-        source: data.source || '',
-      });
-      return;
-    }
-    const account=cashAccounts.find(a=>a.id===data.account)||cashAccounts[0];
-    const amount=Number(data.amount);
-    if(amount>account.deployable){toast('Insufficient deployable cash',`Requested ${formatMoney(amount,account.currency)} exceeds ${formatMoney(account.deployable,account.currency)} available under the current rule.`, 'warning');return;}
-    const id=`RSV-${String(100+cashReservations.length).padStart(5,'0')}`;
-    cashReservations.unshift({id,source:data.source||`RES-${id}`,fund:data.fund,vehicle:account.vehicle,account:account.id,beneficiary:data.beneficiary,amount,remaining:amount,required:data.required,expiry:data.expiry,purpose:data.purpose,status:'REQUESTED',owner:v11RoleMember().name,approval:'Pending checker'});
-    closeOverlays();toast('Reservation requested',`${id} was created and routed to an independent checker.`);render();
-  };
-
-  showCommunicationModal = function() {
-    if (state.liveData) {
-      showModal('Send investor communication','Creates a fundraising communication record.',`<form id="communicationForm"><div class="form-grid"><div class="form-field full"><label class="required">Fund</label><select name="fundId" required>${funds.map(f=>`<option value="${escapeHTML(f.id)}">${escapeHTML(f.name)}</option>`).join('')}</select></div><div class="form-field full"><label class="required">Subject</label><input name="subject" required value="Q2 Portfolio Update"></div><div class="form-field full"><label class="required">Message</label><textarea name="body" required style="min-height:180px">Dear Limited Partner,\n\nPlease find the latest portfolio update.\n\nKind regards</textarea></div></div></form>`,`${button('Cancel','close-modal')}${button('Send now','send-communication','primary','send')}`);
-      return;
-    }
-    showModal('Send investor communication','Draft and schedule a secure LP communication.',`<form id="communicationForm"><div class="form-grid"><div class="form-field full"><label>Recipients</label><select><option>All active LPs (42)</option><option>Fund II LPs (12)</option><option>Selected LPs</option></select></div><div class="form-field full"><label>Subject</label><input value="Q2 2026 Portfolio Update"></div><div class="form-field full"><label>Message</label><textarea style="min-height:180px">Dear Limited Partner,\n\nPlease find attached the Q2 2026 portfolio update.\n\nKind regards,\nMatanho Investor Relations</textarea></div></div></form>`,`${button('Save draft','save-communication','','save')}${button('Send now','send-communication','primary','send')}`);
-  };
-
-  const v23ExceptionsPage = renderExceptions;
-  renderExceptions = function() {
-    if (state.liveData) {
-      return `${pageHeader('Reconciliation Exceptions','Owned investigation cases for unmatched differences.',`${button('Export exceptions','export-exceptions','','download')}`,'Cash & Reconciliation')}${cashContextBar()}
-        <section class="card table-card section-gap"><div class="table-toolbar"><div><h3>Open exceptions</h3><p class="muted">Create-exception is not available live (no create API). Assign/lifecycle uses existing exception records when present.</p></div></div>
-        <div class="table-wrap"><table><thead><tr><th>Case</th><th>Batch</th><th>Code</th><th>Severity</th><th>Owner</th><th>Status</th></tr></thead><tbody>${reconciliationExceptions.length?reconciliationExceptions.map(e=>`<tr data-action="open-exception" data-id="${e.id}"><td class="table-primary">${escapeHTML(e.id)}</td><td>${escapeHTML(e.batch)}</td><td>${escapeHTML(e.code)}</td><td>${statusPill(e.severity)}</td><td>${escapeHTML(e.owner)}</td><td>${statusPill(e.status)}</td></tr>`).join(''):`<tr><td colspan="6"><div class="empty-state"><p>No exception records from API.</p></div></td></tr>`}</tbody></table></div></section>`;
-    }
-    return v23ExceptionsPage();
-  };
-
-  const v23RenderSettings = renderSettings;
-  renderSettings = function() {
-    if (!state.liveData) return v23RenderSettings();
-    const adminCta = `<div class="reason-item section-gap">${icon('shield')}<div><strong>Not configured for Portfolio — manage in Admin</strong><small>Role invites, permission matrices and workspace policy writes are owned by the Arcus Admin module.</small></div></div><div class="page-actions section-gap">${button('Open Admin','open-admin-module','primary','settings')}</div>`;
-    if (state.settingsTab === 'roles') {
-      return `${pageHeader('Settings & Access Control','Portfolio settings are read-only when live. Manage users and roles in Admin.',`${button('Open Admin','open-admin-module','primary','settings')}`,'Workspace Administration')}<section class="v11-settings-shell">${v11SettingsNav()}<main><div class="v11-settings-content"><section class="card v11-settings-card">${adminCta}</section></main></section>`;
-    }
-    const body = `<div class="v11-settings-content"><section class="card v11-settings-card"><div class="card-head"><div><h3>${escapeHTML((v11SettingsTabs.find(t=>t[0]===state.settingsTab)||['','Settings'])[1])}</h3><p>Not configured for Portfolio — manage in Admin.</p></div></div>${adminCta}</section></div>`;
-    return `${pageHeader('Settings & Access Control','Portfolio settings are read-only when live.',`${button('Open Admin','open-admin-module','primary','settings')}`,'Workspace Administration')}<section class="v11-settings-shell">${v11SettingsNav()}<main>${body}</main></section>`;
-  };
-
-  const v23HandleAction = handleAction;
-  handleAction = function(action, trigger, event) {
-    if (action === 'new-signature-envelope' && state.liveData) {
-      v11ShowNewEnvelope();
-      return;
-    }
-
-    if (state.liveData && action === 'open-admin-module') {
-      window.location.href = '/admin';
-      return;
-    }
-    if (state.liveData && (action === 'create-exception' || action === 'v22-submit-exception')) {
-      toast('Not available live', 'Exception create has no API. Use existing exception cases or raise from recon workflow.', 'warning');
-      return;
-    }
-    if (state.liveData && v23LiveBlocked.has(action)) {
-      toast('Not available live', 'This control is demo-only or managed in Admin.', 'warning');
-      return;
-    }
-
-    if (action === 'create-cash-account' && state.liveData) {
-      showModal('Create Client / Fund Account','Registers an authorised cash account via Investment Ops.',`<form id="cashAccountForm"><div class="form-grid"><div class="form-field"><label class="required">Fund</label><select name="fundId" required>${funds.map(f=>`<option value="${escapeHTML(f.id)}">${escapeHTML(f.name)}</option>`).join('')}</select></div><div class="form-field"><label>Cash purpose</label><select name="accountType"><option>FUND_OPERATING_BANK</option><option>SUBSCRIPTION_COLLECTION</option><option>INVESTMENT_DISBURSEMENT</option><option>DISTRIBUTION_ACCOUNT</option><option>ESCROW_OR_CUSTODY</option></select></div><div class="form-field"><label>Provider</label><input name="provider" value="CBZ Bank Zimbabwe"></div><div class="form-field"><label>Currency</label><select name="currency"><option>USD</option><option>ZWG</option></select></div><div class="form-field"><label>Ownership model</label><select name="ownerModel"><option>SEGREGATED</option><option>OMNIBUS</option></select></div><div class="form-field"><label>Effective from</label><input name="effectiveFrom" type="date" value="${new Date().toISOString().slice(0,10)}"></div><div class="form-field full"><label>External account identifier</label><input name="externalAccountIdentifier" value="ext-${Date.now()}"></div></div></form>`,`${button('Cancel','close-modal')}${button('Submit for approval','submit-cash-account','primary','send')}`,{variant:'wizard',size:'lg',eyebrow:'Cash account'});
-      return;
-    }
-
-    if (action === 'submit-cash-account') {
-      const form = $('#cashAccountForm');
-      if (!form?.reportValidity()) return;
-      if (state.liveData) {
-        const data = Object.fromEntries(new FormData(form));
-        v23Emit('api-create-cash-account', {
-          fundId: data.fundId,
-          portfolioId: data.fundId,
-          accountType: data.accountType,
-          purpose: data.accountType,
-          provider: data.provider,
-          currency: data.currency,
-          ownerModel: data.ownerModel,
-          effectiveFrom: data.effectiveFrom,
-          externalAccountIdentifier: data.externalAccountIdentifier,
-        });
-        return;
-      }
-    }
-
-    if (action === 'stage-uploaded-statement' || (action === 'upload-statement' && state.liveData && trigger?.dataset?.skipModal)) {
-      /* fall through */
-    }
-
-    if (action === 'stage-uploaded-statement' && state.liveData) {
-      const fileInput = $('input[type="file"][data-file-action="upload-bank-statement"]', modalLayer) || $('input[type="file"]', modalLayer);
-      const file = fileInput?.files?.[0] || null;
-      const accountSelect = $('select', $('.statement-upload-controls', modalLayer) || modalLayer);
-      const accountId = (accountSelect?.value || cashAccounts[0]?.id || '').split(' · ')[0];
-      if (!file) { toast('File required', 'Choose a statement file before validating.', 'warning'); return; }
-      void v23ReadFileBase64(file).then(contentBase64 => {
-        v23Emit('api-upload-statement', {
-          cashAccountId: accountId,
-          accountId,
-          fileName: file.name,
-          contentBase64,
-          provider: 'provider_cbz',
-          currency: cashAccounts.find(a => a.id === accountId)?.currency || 'USD',
-        });
-      }).catch(err => toast('Upload failed', err?.message || String(err), 'error'));
-      return;
-    }
-
-    if (action === 'submit-new-envelope' && state.liveData) {
-      const form = $('#v11EnvelopeForm');
-      if (!form?.reportValidity()) return;
-      const data = Object.fromEntries(new FormData(form));
-      v23Emit('api-create-envelope', {
-        subject: data.subject,
-        title: data.subject,
-        recipientName: data.recipientName,
-        recipientEmail: data.recipientEmail,
-        recipientRole: data.recipientRole,
-        fundId: funds[0]?.id || '',
-        applicationId: state.selectedDealId || '',
-        type: 'TERM_SHEET',
-      });
-      return;
-    }
-
-    if ((action === 'schedule-mailer-campaign' || action === 'submit-mailer-campaign' || action === 'submit-performance' || action === 'generate-report') && state.liveData) {
-      if (action === 'generate-report') {
-        /* keep builder navigation for demo UX unless we force API */
-      }
-      if (action === 'schedule-mailer-campaign' || action === 'submit-mailer-campaign' || action === 'submit-performance') {
-        const fundId = v23FundIdFromName(state.activeFund) || funds[0]?.id || '';
-        v23Emit('api-trigger-report-run', { fundId, periodStart: '', periodEnd: '' });
-        return;
-      }
-    }
-
-    if (action === 'generate-report' && state.liveData) {
-      const fundId = v23FundIdFromName(state.activeFund) || funds[0]?.id || '';
-      v23Emit('api-trigger-report-run', { fundId });
-      return;
-    }
-
-    if (action === 'send-communication' && state.liveData) {
-      const form = $('#communicationForm');
-      if (!form?.reportValidity()) return;
-      const data = Object.fromEntries(new FormData(form));
-      v23Emit('api-send-lp-communication', {
-        fundId: data.fundId || funds[0]?.id || '',
-        subject: data.subject || 'Investor update',
-        body: data.body || data.message || '',
-        channel: 'EMAIL',
-      });
-      return;
-    }
-
-    if (action === 'confirm-decision' && state.liveData) {
-      if (!$('#decisionAcknowledge')?.checked) {
-        toast('Confirmation required', 'Review and acknowledge the displayed decision impact before continuing.', 'warning');
-        return;
-      }
-      const pending = state.pendingDecision || {};
-      const applicationId = pending.applicationId || state.selectedDealId || '';
-      if (pending.rejectDeal && applicationId) {
-        v23Emit('api-change-deal-stage', {
-          applicationId,
-          dealId: applicationId,
-          stage: 'Rejected',
-          beStage: 'REJECTED_SCREENING',
-          notes: 'Rejected from screening',
-        });
-        state.pendingDecision = null;
-        closeOverlays();
-        return;
-      }
-      if (pending.vote) {
-        v23Emit('api-cast-ic-vote', { applicationId, dealId: applicationId, vote: pending.vote, comment: `IC vote: ${pending.vote}` });
-        state.pendingDecision = null;
-        return;
-      }
-      if (pending.term) {
-        const apiAction = pending.term.decision === 'Agreed' ? 'api-update-term-sheet' : 'api-update-term-sheet';
-        v23Emit(apiAction, {
-          applicationId,
-          dealId: applicationId,
-          section: pending.term.section,
-          clause: pending.term.clause,
-          keyTerms: pending.term.decision === 'Agreed' ? 'Accepted company counter' : 'Retained Matanho position',
-        });
-        // Map accept vs retain via action name expected by host
-        if (pending.term.decision === 'Agreed') {
-          /* already updating via keyTerms; also emit accept-counter semantics */
+  function __pv11SetActionBusy(busy, message, actionName) {
+    try {
+      rootEl.classList.toggle('is-action-busy', Boolean(busy));
+      let banner = rootEl.querySelector('.pv11-action-busy-banner');
+      if (busy) {
+        if (!banner) {
+          banner = document.createElement('div');
+          banner.className = 'pv11-action-busy-banner';
+          rootEl.appendChild(banner);
         }
-        state.pendingDecision = null;
-        return;
-      }
-      if (pending.reconciliation) {
-        const batch = reconciliationBatches.find(r => r.id === state.selectedReconciliationId) || reconciliationBatches[0];
-        v23Emit('api-confirm-match', {
-          batchId: batch?.id || state.selectedReconciliationId || '',
-          id: batch?.id || '',
-          internalLineId: pending.internalLineId || batch?.suggestedInternalLineId || '',
-          externalLineId: pending.externalLineId || batch?.suggestedExternalLineId || '',
-          matchedAmount: pending.matchedAmount || '',
-        });
-        state.pendingDecision = null;
-        return;
-      }
-      if (pending.releaseTranche) {
-        const impl = state.dealDetail?.investmentImplementation;
-        const implementationId = impl?.id || impl?.investmentImplementationId || '';
-        v23Emit('api-release-tranche', {
-          implementationId,
-          investmentImplementationId: implementationId,
-          applicationId,
-          amount: pending.amount || impl?.firstTrancheAmount || '0',
-          autoApprove: 'false',
-        });
-        state.pendingDecision = null;
-        return;
-      }
-    }
-
-    if (action === 'confirm-recon-match' && state.liveData) {
-      const batch = reconciliationBatches.find(r => r.id === state.selectedReconciliationId) || reconciliationBatches[0];
-      showDecisionConfirmation('approve','Confirm Source-to-Ledger Match',`${batch?.id || 'Batch'} match`,{'Batch':batch?.id||'—','Account':batch?.account||'—','Approval route':'Cash Operations Checker'},'Confirm match');
-      state.pendingDecision.reconciliation = true;
-      state.pendingDecision.batchId = batch?.id;
-      return;
-    }
-
-    if (action === 'confirm-release-tranche' && state.liveData) {
-      const applicationId = state.selectedDealId || '';
-      const impl = state.dealDetail?.investmentImplementation;
-      const implementationId = impl?.id || impl?.investmentImplementationId || '';
-      if (!implementationId) {
-        toast('Not available live', 'No investment implementation on this deal yet.', 'warning');
-        return;
-      }
-      v23Emit('api-release-tranche', {
-        implementationId,
-        investmentImplementationId: implementationId,
-        applicationId,
-        amount: impl?.firstTrancheAmount || trigger?.dataset?.amount || '12000000',
-      });
-      return;
-    }
-
-    if ((action === 'manual-match' || action === 'manual-recon-match') && state.liveData) {
-      const batch = reconciliationBatches.find(r => r.id === state.selectedReconciliationId) || reconciliationBatches[0];
-      v23Emit('api-manual-match', {
-        batchId: trigger.dataset.batchId || batch?.id || '',
-        id: batch?.id || '',
-        internalLineId: trigger.dataset.internalLineId || '',
-        externalLineId: trigger.dataset.externalLineId || '',
-        matchedAmount: trigger.dataset.matchedAmount || '',
-      });
-      return;
-    }
-
-    if ((action === 'unmatch' || action === 'reverse-match') && state.liveData) {
-      const linkId = trigger.dataset.linkId || trigger.dataset.id;
-      if (!linkId) {
-        toast('Match link required', 'Select a confirmed match link before reversing.', 'warning');
-        return;
-      }
-      v23Emit('api-reverse-match', { linkId, id: linkId });
-      return;
-    }
-
-    return v23HandleAction(action, trigger, event);
-  };
-
-  // Alias api-confirm-match / api-manual-match / api-reverse-match into actions.ts names via host mapping
-  // Host already maps confirm-match; emit uses api-* so host catches startsWith api-
-
+        banner.textContent = message || (actionName ? ('Working: ' + actionName) : 'Working…');
+      } else if (banner) banner.remove();
+    } catch (_) {}
+  }
   window.MatanhoPortfolioUI = Object.freeze({
-    version: '23.0.0',
-    beginLiveLoad,
-    failLiveLoad,
-    hydrate: hydrateFromBackend,
+    version: '25.0.0',
+    hydrate: function(payload) {
+      try { rootEl.classList.remove('is-hydrating', 'is-host-error'); } catch (_) {}
+      return hydrateFromBackend(payload);
+    },
+    beginLiveLoad: __pv11BeginLiveLoad,
+    failLiveLoad: __pv11FailLiveLoad,
+    setActionBusy: __pv11SetActionBusy,
+    notify: function(title, body, tone) { if (typeof toast === 'function') toast(title, body || '', tone || 'info'); },
+    closeOverlays: function() { if (typeof closeOverlays === 'function') closeOverlays(); },
+    setDealTab: function(tab) { if (tab) { state.dealTab = tab; render(); } },
+    setDealDetail: function(detail) {
+      if (!detail || typeof detail !== 'object') return;
+      if (detail.selectedDealId != null) state.selectedDealId = detail.selectedDealId;
+      if (detail.dealDetail != null) state.dealDetail = detail.dealDetail;
+      Object.assign(state, detail);
+      render();
+    },
+    setDealDetailLoading: function(loading) {
+      state.dealDetailLoading = Boolean(loading);
+      try { rootEl.classList.toggle('is-deal-loading', Boolean(loading)); } catch (_) {}
+      render();
+    },
+    setInvestmentUsers: function(users) { state.investmentUsers = Array.isArray(users) ? users : []; },
+    openDdTaskModal: function(users) {
+      if (Array.isArray(users)) state.investmentUsers = users;
+      if (typeof showAssignDdTaskModal === 'function') showAssignDdTaskModal();
+      else if (typeof toast === 'function') toast('Assign DD task', 'Open Due Diligence on the deal to assign tasks.');
+    },
     getSnapshot: publicSnapshot,
     render,
     navigate,
@@ -7671,99 +4908,6 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     openFund,
     openLP,
     openCapitalCall,
-    setDealDetail(detail) {
-      const detailId = detail?.application?.id || detail?.hero?.applicationId || detail?.applicationId;
-      if (detailId && state.selectedDealId && String(detailId) !== String(state.selectedDealId)) {
-        return;
-      }
-      if (detailId) persistSelectedDealId(detailId);
-      state.dealDetail = detail;
-      state.dealDetailLoading = false;
-      rootEl.classList.remove('is-deal-loading');
-      // Keep the deal register row in sync when detail arrives before list hydrate finishes.
-      if (detailId && detail?.application) {
-        const app = detail.application;
-        const idx = deals.findIndex((d) => String(d.id) === String(detailId));
-        const patch = {
-          id: String(detailId),
-          applicationId: String(detailId),
-          name: String(app.businessName || app.companyName || app.applicantName || deals[idx]?.name || 'Deal'),
-          sector: String(app.industry || deals[idx]?.sector || '-'),
-          round: String(app.businessStage || deals[idx]?.round || '-'),
-          amount: Number(app.requestedAmount || deals[idx]?.amount || 0),
-          owner: String(app.assignedAnalystName || app.applicantName || deals[idx]?.owner || 'Unassigned'),
-          stage: String(deals[idx]?.stage || detail.hero?.stage || 'Screening'),
-          fund: String(app.fund?.name || detail.hero?.fundName || deals[idx]?.fund || 'Unassigned fund'),
-          score: Number(detail.hero?.score ?? deals[idx]?.score ?? 0),
-        };
-        // Prefer adapted UI stage from list when present; only overwrite from BE enum via STAGE if list missing
-        if (!deals[idx]?.stage && detail.hero?.stage) patch.stage = String(detail.hero.stage);
-        if (idx >= 0) Object.assign(deals[idx], patch);
-        else deals.unshift({ ...patch, age: 0, priority: 'Medium' });
-      }
-      render();
-    },
-    setInvestmentUsers(users) {
-      state.investmentUsers = Array.isArray(users) ? users : [];
-    },
-    openDdTaskModal(users) {
-      if (Array.isArray(users)) state.investmentUsers = users;
-      showDDTaskModal(state.investmentUsers || [], state.ddTaskModalOpts || {});
-    },
-    setDealDetailLoading(loading) {
-      const next = Boolean(loading);
-      if (state.dealDetailLoading === next) return;
-      state.dealDetailLoading = next;
-      rootEl.classList.toggle('is-deal-loading', state.dealDetailLoading);
-      // No text banner — the deal page renders a skeleton instead.
-      const banner = rootEl.querySelector('.pv11-action-busy-banner[data-kind="deal"]');
-      if (banner) banner.remove();
-      if (state.page === 'deal-detail') render();
-    },
-    setActionBusy(busy, message = 'Saving…', actionName = '') {
-      state.actionBusy = Boolean(busy);
-      rootEl.classList.toggle('is-action-busy', state.actionBusy);
-      const byAction = actionName ? $$(`[data-action="${actionName}"]`, rootEl) : [];
-      const modalPrimaries = $$('.modal-footer .button.primary, #modalLayer .button.primary', rootEl);
-      const targets = [...new Set([...byAction, ...modalPrimaries, ...$$('.button.is-loading', rootEl)])];
-      targets.forEach((btn) => {
-        if (busy) {
-          if (!btn.dataset.pv11Label) btn.dataset.pv11Label = btn.querySelector('span')?.textContent || btn.textContent || '';
-          btn.classList.add('is-loading');
-          btn.disabled = true;
-          const span = btn.querySelector('span');
-          if (span) span.textContent = message;
-        } else {
-          btn.classList.remove('is-loading');
-          btn.disabled = false;
-          const span = btn.querySelector('span');
-          if (span && btn.dataset.pv11Label) span.textContent = btn.dataset.pv11Label;
-          delete btn.dataset.pv11Label;
-        }
-      });
-      let banner = rootEl.querySelector('.pv11-action-busy-banner[data-kind="action"]');
-      if (busy) {
-        if (!banner) {
-          banner = document.createElement('div');
-          banner.className = 'pv11-action-busy-banner';
-          banner.dataset.kind = 'action';
-          rootEl.appendChild(banner);
-        }
-        banner.textContent = message;
-      } else if (banner) {
-        banner.remove();
-      }
-    },
-    notify(title, body = '', tone = 'info') {
-      const type = tone === 'error' ? 'error' : tone === 'warning' ? 'warning' : 'success';
-      toast(title, body, type);
-    },
-    closeOverlays,
-    setDealTab(tab) {
-      if (!['overview', 'application', 'screening', 'diligence', 'term', 'ic', 'disbursement', 'documents'].includes(tab)) return;
-      state.dealTab = tab;
-      if (state.page === 'deal-detail') render();
-    },
     setTheme(theme) { if (theme === 'light' || theme === 'dark') { state.theme = theme; render(); } },
     setSidebarCollapsed(collapsed) { state.sidebarCollapsed = Boolean(collapsed); render(); },
     setRole(roleId) { if (v11RoleDefinitions[roleId]) { state.currentRole = roleId; render(); } },
@@ -7773,62 +4917,41 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   });
 
   emitIntegrationEvent('matanho:ui-ready', publicSnapshot());
+  render();
+
+
+  if (liveOnly && typeof __pv11ClearFixtures === 'function') {
+    __pv11ClearFixtures();
+  }
 
   if (typeof state !== 'undefined' && initialPage) {
     state.page = initialPage;
-    if (initialPage === 'deal-detail') {
-      persistSelectedDealId(readDealIdFromLocation());
-    }
-  }
-
-  // Arcus host: wipe Matanho seed arrays before first paint so Nova / DOC-* never flash.
-  if (liveOnly) {
-    clearCollectionsForLiveLoad();
-    state.selectedCompanyId = null;
-    state.selectedFundId = null;
-    state.selectedLPId = null;
-    state.selectedDocumentId = null;
-    state.selectedFolder = 'Application';
-    state.selectedCapitalCallId = null;
-    state.selectedEnvelopeId = null;
-    state.selectedMailerListId = null;
-    state.selectedReconciliationId = null;
-    state.customFolders = [];
-    state.dueDiligenceTasks = [];
-    state.closingConditions = [];
-    state.dealVote = {};
-    state.hydrating = true;
-    state.liveData = false;
-    rootEl.classList.add('is-hydrating');
   }
 
   if (typeof render === 'function') render();
 
-  const __pv11SessionOff = onClientDesignSessionUser(() => applySessionUserToProfile(rootEl))
-
   api = {
     setPage(page, detail = {}) {
       if (detail && typeof detail === 'object') {
-        if (detail.selectedDealId != null) persistSelectedDealId(detail.selectedDealId);
+        if (detail.selectedDealId != null) state.selectedDealId = detail.selectedDealId;
         if (detail.selectedCompanyId != null) state.selectedCompanyId = detail.selectedCompanyId;
         if (detail.selectedFundId != null) state.selectedFundId = detail.selectedFundId;
         if (detail.selectedLPId != null) state.selectedLPId = detail.selectedLPId;
         if (detail.selectedCapitalCallId != null) state.selectedCapitalCallId = detail.selectedCapitalCallId;
       }
-      if (page === 'deal-detail' && !state.selectedDealId) {
-        persistSelectedDealId(readDealIdFromLocation());
-      }
       state.page = page;
       state.mobileNavOpen = false;
       render();
     },
-    beginLiveLoad,
-    failLiveLoad,
-    hydrate(payload) {
-      hydrateFromBackend(payload);
+    hydrate: (payload) => {
+      if (window.MatanhoPortfolioUI && typeof window.MatanhoPortfolioUI.hydrate === 'function') {
+        return window.MatanhoPortfolioUI.hydrate(payload);
+      }
+      return hydrateFromBackend(payload);
     },
+    beginLiveLoad: window.MatanhoPortfolioUI && window.MatanhoPortfolioUI.beginLiveLoad,
+    failLiveLoad: window.MatanhoPortfolioUI && window.MatanhoPortfolioUI.failLiveLoad,
     destroy() {
-      try { __pv11SessionOff?.() } catch (_) {}
       try { __pv11Abort.abort(); } catch (_) {}
       delete window.__PORTFOLIO_V11_NAV__;
       try { delete window.MatanhoPortfolioUI; } catch (_) {}

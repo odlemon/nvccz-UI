@@ -105,7 +105,7 @@ export function PortfolioV11App() {
       initialPage,
       liveOnly: true,
       onNavigate: (page: string) => {
-        let path = PV11_PAGE_TO_PATH[page] || "/portfolio-v11"
+        let path = PV11_PAGE_TO_PATH[page] || "/portfolio"
         if (page === "deal-detail") {
           let dealId = ""
           try {
@@ -117,7 +117,7 @@ export function PortfolioV11App() {
           } catch {
             dealId = ""
           }
-          if (dealId) path = `/portfolio-v11/deals/detail?id=${encodeURIComponent(String(dealId))}`
+          if (dealId) path = `/portfolio/deals/detail?id=${encodeURIComponent(String(dealId))}`
         }
         const pathOnly = path.split("?")[0]
         if (pathnameRef.current === pathOnly && page !== "deal-detail") return

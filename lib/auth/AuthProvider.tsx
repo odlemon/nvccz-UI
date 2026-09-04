@@ -35,8 +35,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     PORTAL_ID === 'staff' &&
     (pathname === '/home-v3' ||
       (pathname?.startsWith('/home-v3/') ?? false) ||
-      pathname === '/portfolio-v11' ||
-      (pathname?.startsWith('/portfolio-v11/') ?? false) ||
+      pathname === '/portfolio' ||
+      (pathname?.startsWith('/portfolio/') ?? false) ||
       pathname === '/payroll-v6' ||
       (pathname?.startsWith('/payroll-v6/') ?? false) ||
       pathname === '/performance-v22' ||

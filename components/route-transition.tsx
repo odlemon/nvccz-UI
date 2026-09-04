@@ -52,7 +52,7 @@ const reducedMotionTransition = {
 const VIEWPORT_LOCKED_PREFIXES = [
   "/home-v3",
   "/payroll-v6",
-  "/portfolio-v11",
+  "/portfolio",
   "/investee-portal-v8",
   "/fundraising-kyc",
   "/accounting-v2",

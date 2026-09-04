@@ -66,7 +66,7 @@ export const STAFF_PUBLIC_PASS_THROUGH = [
   '/permissions-matrix',
   '/applications/form',
   '/home-v3',
-  '/portfolio-v11',
+  '/portfolio',
   '/payroll-v6',
   '/accounting-v52',
   '/procurement-v23',

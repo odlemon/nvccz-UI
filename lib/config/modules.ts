@@ -108,7 +108,6 @@ export interface ModuleConfig {
 export const SUPERSEDED_MODULE_IDS = new Set([
   "homepage",
   "employee-hub",
-  "portfolio-management",
   "payroll",
   "accounting",
   "accounting-v2",
@@ -173,85 +172,24 @@ export const MODULE_CONFIG: ModuleConfig[] = [
     ],
   },
   {
-    id: "portfolio-v11",
+    id: "portfolio",
     name: "Portfolio Management",
     description: "Manage investment portfolios, funds, LPs and reporting",
     icon: CiShop,
     color: "oklch(0.58 0.16 280)",
-    path: "/portfolio-v11",
-    subModules: [
-      { id: "pv11-dashboard", name: "Dashboard", path: "/portfolio-v11", icon: CiGrid41, description: "Dashboard" },
-      { id: "pv11-deals", name: "Deal Flow", path: "/portfolio-v11/deals", icon: Briefcase, description: "Deal Flow" },
-      { id: "pv11-funds", name: "Funds", path: "/portfolio-v11/funds", icon: CiDollar, description: "Funds" },
-      { id: "pv11-capital-calls", name: "Capital Calls", path: "/portfolio-v11/capital-calls", icon: CiCoins1, description: "Capital Calls" },
-      { id: "pv11-companies", name: "Portfolio Companies", path: "/portfolio-v11/companies", icon: CiShop, description: "Companies" },
-      { id: "pv11-cash-accounts", name: "Fund Accounts", path: "/portfolio-v11/cash-accounts", icon: CiWallet, description: "Client / Fund Accounts" },
-      { id: "pv11-reporting", name: "Reporting", path: "/portfolio-v11/reporting", icon: CiCalendar, description: "Reporting Schedules" },
-      { id: "pv11-lps", name: "LP Management", path: "/portfolio-v11/lps", icon: Users, description: "LP Management" },
-      { id: "pv11-documents", name: "Documents", path: "/portfolio-v11/documents", icon: CiFileOn, description: "Documents Vault" },
-      { id: "pv11-settings", name: "Settings", path: "/portfolio-v11/settings", icon: CiSettings, description: "Settings" },
-    ],
-  },
-  {
-    id: "portfolio-management",
-    name: "Portfolio Management",
-    description: "Manage investment portfolios and assets",
-    icon: CiShop,
-    color: "oklch(0.72 0.12 225)",
     path: "/portfolio",
-    hiddenFromSwitcher: true,
-    // Flat shortcuts (optional)
     subModules: [
-      { id: "Dashboard", name: "Dashboard", path: "/portfolio", icon: CiGrid41, description: "Manage your portfolio" },
-      { id: "funds", name: "Funds", path: "/portfolio/funds", icon: CiDollar, description: "Manage funds and investments" },
-      { id: "capital-calls", name: "Capital Calls", path: "/portfolio/funds/capital-calls", icon: CiCoins1, description: "Fund investment capital calls" },
-      { id: "companies", name: "Companies", path: "/portfolio/companies", icon: CiShop, description: "Manage companies" },
-      { id: "reporting-schedule-configs", name: "Reporting Schedules", path: "/portfolio/reporting-schedules", icon: CiCalendar, description: "Manage reporting schedule configurations" },
-      { id: "fund-performance-reporting", name: "Fund Performance Reporting", path: "/portfolio/fund-performance-reporting", icon: CiFileOn, description: "GP operations console for LP report templates, schedules, distribution runs and delivery monitoring" },
-      { id: "lp-management", name: "LP Management", path: "/portfolio/lp-management", icon: CiUser, description: "Manage LP portal access, vault document publishing and MFA policy" }
-
+      { id: "pv11-dashboard", name: "Dashboard", path: "/portfolio", icon: CiGrid41, description: "Dashboard" },
+      { id: "pv11-deals", name: "Deal Flow", path: "/portfolio/deals", icon: Briefcase, description: "Deal Flow" },
+      { id: "pv11-funds", name: "Funds", path: "/portfolio/funds", icon: CiDollar, description: "Funds" },
+      { id: "pv11-capital-calls", name: "Capital Calls", path: "/portfolio/capital-calls", icon: CiCoins1, description: "Capital Calls" },
+      { id: "pv11-companies", name: "Portfolio Companies", path: "/portfolio/companies", icon: CiShop, description: "Companies" },
+      { id: "pv11-cash-accounts", name: "Fund Accounts", path: "/portfolio/cash-accounts", icon: CiWallet, description: "Client / Fund Accounts" },
+      { id: "pv11-reporting", name: "Reporting", path: "/portfolio/reporting", icon: CiCalendar, description: "Reporting Schedules" },
+      { id: "pv11-lps", name: "LP Management", path: "/portfolio/lps", icon: Users, description: "LP Management" },
+      { id: "pv11-documents", name: "Documents", path: "/portfolio/documents", icon: CiFileOn, description: "Documents Vault" },
+      { id: "pv11-settings", name: "Settings", path: "/portfolio/settings", icon: CiSettings, description: "Settings" },
     ],
-    // Grouped navigation per requirements
-    groups: [
-
-      {
-        id: "applications",
-        title: "Applications",
-        items: [
-          { id: "applications-dashboard", name: "Dashboard", path: "/portfolio/applications/dashboard", icon: CiViewBoard, description: "Applications dashboard" },
-          { id: "applications-all", name: "Applications", path: "/portfolio/applications", icon: CiViewList, description: "Applications" },
-          // { id: "applications-due-diligence", name: "Due Diligence", path: "/portfolio/applications/due-diligence", icon: CiViewColumn, description: "Due diligence" },
-          // { id: "applications-board-review", name: "Board Review", path: "/portfolio/applications/board-review", icon: CiViewBoard, description: "Board review" },
-          // { id: "applications-term-sheet", name: "Term Sheet", path: "/portfolio/applications/term-sheet", icon: CiFileOn, description: "Term sheet" },
-          // { id: "applications-disbursement", name: "Fund Disbursement", path: "/portfolio/applications/disbursement", icon: CiViewTimeline, description: "Fund disbursement" }
-        ]
-      },
-      // {
-      //   id: "funds",
-      //   title: "Funds",
-      //   path: "/portfolio/funds",
-
-
-      // },
-      // { id: "companies-page", title: "Companies", path: "/portfolio/companies" },
-
-      // {
-      //   id: "companies",
-      //   title: "Companies",
-      //   path: "/portfolio/companies",
-
-
-      // },
-      // {
-      //   id: "companies",
-      //   title: "Companies",
-      //   items: [
-      //     { id: "companies-page", name: "Companies", path: "/portfolio/companies", icon: CiShop, description: "Companies" },
-      //     { id: "companies-performance", name: "Performance Dashboard", path: "/portfolio/companies/performance", icon: CiGrid41, description: "Company performance" },
-      //     { id: "companies-updates", name: "Quarterly Updates", path: "/portfolio/companies/updates", icon: CiCalendar, description: "Quarterly updates" }
-      //   ]
-      // }
-    ]
   },
   {
     id: "performance-management",

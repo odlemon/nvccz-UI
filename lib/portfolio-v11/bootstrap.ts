@@ -444,7 +444,12 @@ export async function loadPortfolioV11Scopes(
   }
 
   if (wanted.includes('companies')) {
-    const companiesRes = await settle(portfolioCompaniesApi.getAllWithInvestments(), 'companies', errors)
+    // Prefer with-investments (includes disbursement totals); fall back to the full
+    // company list when demo companies have no FundDisbursement rows yet.
+    let companiesRes = await settle(portfolioCompaniesApi.getAllWithInvestments(), 'companies', errors)
+    if (!asArray(companiesRes).length) {
+      companiesRes = await settle(portfolioCompaniesApi.getAll(), 'companies:fallback', errors)
+    }
     const summary = Array.isArray(dashboardData?.portfolioSummary) ? dashboardData.portfolioSummary : []
     let companies = adaptCompanies(asArray(companiesRes), summary)
     if (filters.geography) {

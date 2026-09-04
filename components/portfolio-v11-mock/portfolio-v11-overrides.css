@@ -1,5 +1,32 @@
 /* Portfolio V11: expanded sidebar, full-viewport shell. */
 
+/* Always hide Matanho HTML topbar when Arcus SharedTopbar is present.
+   Must beat client CSS and arcus-header-overrides `.portfolio-v11-root #topbar`
+   (ID specificity) which force display:flex !important. */
+[data-arcus-shell] .portfolio-v11-root .topbar,
+[data-arcus-shell] .portfolio-v11-root header.topbar,
+[data-arcus-shell] .portfolio-v11-root #topbar,
+[data-arcus-shell] .portfolio-v11-root .app-shell > .topbar,
+[data-arcus-shell] .portfolio-v11-root .app-shell > #topbar {
+  display: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  max-height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+  border: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+[data-arcus-shell] .portfolio-v11-root .workspace,
+[data-arcus-shell] .portfolio-v11-root #workspace {
+  top: 0 !important;
+  height: 100% !important;
+  max-height: 100% !important;
+}
+
 .portfolio-v11-root {
   position: relative;
   height: 100%;

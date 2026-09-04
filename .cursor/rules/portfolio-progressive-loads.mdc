@@ -1,6 +1,6 @@
 ---
 description: Portfolio V11 — progressive page-scoped API loading (primary first)
-globs: lib/portfolio-v11/**/*.{ts,tsx},components/portfolio-v11-mock/**/*.{ts,tsx,js},app/portfolio-v11/**/*
+globs: lib/portfolio-v11/**/*.{ts,tsx},components/portfolio-v11-mock/**/*.{ts,tsx,js},app/portfolio/**/*
 alwaysApply: false
 ---
 

@@ -133,35 +133,30 @@ const routePermissions: Record<string, { module: string; subModule?: string }> =
   '/accounting/invoices': { module: 'accounting', subModule: 'invoices' },
   '/accounting/expenses': { module: 'accounting', subModule: 'expenses' },
 
-  // Portfolio Management routes
-  '/portfolio': { module: 'portfolio-management' },
-  '/portfolio/funds': { module: 'portfolio-management', subModule: 'funds' },
-  '/portfolio/companies': { module: 'portfolio-management', subModule: 'companies' },
-
-  // Portfolio V11 / V23 client design (live wire target)
-  '/portfolio-v11': { module: 'portfolio-v11', subModule: 'pv11-dashboard' },
-  '/portfolio-v11/deals': { module: 'portfolio-v11', subModule: 'pv11-deals' },
-  '/portfolio-v11/funds': { module: 'portfolio-v11', subModule: 'pv11-funds' },
-  '/portfolio-v11/capital-calls': { module: 'portfolio-v11', subModule: 'pv11-capital-calls' },
-  '/portfolio-v11/companies': { module: 'portfolio-v11', subModule: 'pv11-companies' },
-  '/portfolio-v11/cash-accounts': { module: 'portfolio-v11', subModule: 'pv11-cash-accounts' },
-  '/portfolio-v11/cash-overview': { module: 'portfolio-v11', subModule: 'pv11-cash-accounts' },
-  '/portfolio-v11/cash-ledger': { module: 'portfolio-v11', subModule: 'pv11-cash-accounts' },
-  '/portfolio-v11/cash-reservations': { module: 'portfolio-v11', subModule: 'pv11-cash-accounts' },
-  '/portfolio-v11/statement-imports': { module: 'portfolio-v11', subModule: 'pv11-cash-accounts' },
-  '/portfolio-v11/reconciliations': { module: 'portfolio-v11', subModule: 'pv11-cash-accounts' },
-  '/portfolio-v11/exceptions': { module: 'portfolio-v11', subModule: 'pv11-cash-accounts' },
-  '/portfolio-v11/period-close': { module: 'portfolio-v11', subModule: 'pv11-cash-accounts' },
-  '/portfolio-v11/reporting': { module: 'portfolio-v11', subModule: 'pv11-reporting' },
-  '/portfolio-v11/fund-performance': { module: 'portfolio-v11', subModule: 'pv11-reporting' },
-  '/portfolio-v11/lps': { module: 'portfolio-v11', subModule: 'pv11-lps' },
-  '/portfolio-v11/documents': { module: 'portfolio-v11', subModule: 'pv11-documents' },
-  '/portfolio-v11/reports-vault': { module: 'portfolio-v11', subModule: 'pv11-documents' },
-  '/portfolio-v11/e-signatures': { module: 'portfolio-v11', subModule: 'pv11-documents' },
-  '/portfolio-v11/mailer-lists': { module: 'portfolio-v11', subModule: 'pv11-documents' },
-  '/portfolio-v11/settings': { module: 'portfolio-v11', subModule: 'pv11-settings' },
-  '/portfolio-v11/analytics': { module: 'portfolio-v11', subModule: 'pv11-dashboard' },
-  '/portfolio-v11/applicant-portal': { module: 'portfolio-v11', subModule: 'pv11-deals' },
+  // Portfolio (client V25 — formerly portfolio-v11)
+  '/portfolio': { module: 'portfolio', subModule: 'pv11-dashboard' },
+  '/portfolio/deals': { module: 'portfolio', subModule: 'pv11-deals' },
+  '/portfolio/funds': { module: 'portfolio', subModule: 'pv11-funds' },
+  '/portfolio/capital-calls': { module: 'portfolio', subModule: 'pv11-capital-calls' },
+  '/portfolio/companies': { module: 'portfolio', subModule: 'pv11-companies' },
+  '/portfolio/cash-accounts': { module: 'portfolio', subModule: 'pv11-cash-accounts' },
+  '/portfolio/cash-overview': { module: 'portfolio', subModule: 'pv11-cash-accounts' },
+  '/portfolio/cash-ledger': { module: 'portfolio', subModule: 'pv11-cash-accounts' },
+  '/portfolio/cash-reservations': { module: 'portfolio', subModule: 'pv11-cash-accounts' },
+  '/portfolio/statement-imports': { module: 'portfolio', subModule: 'pv11-cash-accounts' },
+  '/portfolio/reconciliations': { module: 'portfolio', subModule: 'pv11-cash-accounts' },
+  '/portfolio/exceptions': { module: 'portfolio', subModule: 'pv11-cash-accounts' },
+  '/portfolio/period-close': { module: 'portfolio', subModule: 'pv11-cash-accounts' },
+  '/portfolio/reporting': { module: 'portfolio', subModule: 'pv11-reporting' },
+  '/portfolio/fund-performance': { module: 'portfolio', subModule: 'pv11-reporting' },
+  '/portfolio/lps': { module: 'portfolio', subModule: 'pv11-lps' },
+  '/portfolio/documents': { module: 'portfolio', subModule: 'pv11-documents' },
+  '/portfolio/reports-vault': { module: 'portfolio', subModule: 'pv11-documents' },
+  '/portfolio/e-signatures': { module: 'portfolio', subModule: 'pv11-documents' },
+  '/portfolio/mailer-lists': { module: 'portfolio', subModule: 'pv11-documents' },
+  '/portfolio/settings': { module: 'portfolio', subModule: 'pv11-settings' },
+  '/portfolio/analytics': { module: 'portfolio', subModule: 'pv11-dashboard' },
+  '/portfolio/applicant-portal': { module: 'portfolio', subModule: 'pv11-deals' },
 
   // Application Portal routes
   '/application-portal': { module: 'application-portal' },
@@ -221,6 +216,14 @@ export function middleware(request: NextRequest) {
   const userProfile = request.cookies.get(process.env.NEXT_PUBLIC_AUTH_PROFILE_KEY || 'userProfile')
 
   const { pathname } = request.nextUrl
+
+  // Permanent rename: /portfolio-v11 → /portfolio
+  if (pathname === '/portfolio-v11' || pathname.startsWith('/portfolio-v11/')) {
+    const dest = pathname.replace(/^\/portfolio-v11/, '/portfolio') || '/portfolio'
+    const url = request.nextUrl.clone()
+    url.pathname = dest
+    return NextResponse.redirect(url, 308)
+  }
 
   // External LP / investee / apply portals: strict route allowlist (separate deployments).
   if (PORTAL_ID === 'lp' || PORTAL_ID === 'investee') {

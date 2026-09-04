@@ -1,11 +1,11 @@
-# Portfolio Management (V23) — UI handoff
+# Portfolio Management (V25) — UI handoff
 
-> **Status:** Live-wired (local) — `/portfolio-v11` hydrates from NTS `arcus_dev` APIs when authenticated; gaps in [portfolio-v23-backend-asks.md](./portfolio-v23-backend-asks.md).  
-> **Source:** `Matanho_Portfolio_Management_v23_Production_Handoff` (2026-08-17)  
-> **Prior source:** V11 handoff (same SPA lineage; V23 = blue theme + V22 ops polish + API handoff)  
+> **Status:** Live-wired — public route **`/portfolio`** (formerly `/portfolio-v11`; 308 redirect kept). Hydrates from `arcus_dev` APIs when authenticated; gaps in [portfolio-v23-backend-asks.md](./portfolio-v23-backend-asks.md).  
+> **Source:** `Matanho_Portfolio_Management_v25_Production_Handoff` (Interactive Frontend v25)  
+> **Prior sources:** V23 → V11 handoff (same SPA lineage). Internal package folders remain `portfolio-v11-*`.  
 > **Mode:** Auth-gated live hydrate via `lib/portfolio-v11/bootstrap.ts` → `MatanhoPortfolioUI.hydrate`; mock fixtures only if unsigned-in is somehow reached.  
-> **Live module left alone:** `/portfolio` (legacy Portfolio Management)  
-> **Deploy:** none (local only unless explicitly requested)
+> **Top bar:** Arcus `SharedTopbar` (client HTML topbar hidden under `[data-arcus-shell]`).  
+> **Deploy:** rides staff portal image unless separately requested
 
 See comparison: [portfolio-v23-comparison.md](./portfolio-v23-comparison.md)
 
@@ -24,28 +24,28 @@ Full client V23 suite (upgraded from V11 in-place):
 
 | Client page id | Next path |
 |----------------|-----------|
-| `dashboard` | `/portfolio-v11` |
-| `deals` | `/portfolio-v11/deals` |
-| `funds` | `/portfolio-v11/funds` |
-| `capital-calls` | `/portfolio-v11/capital-calls` |
-| `companies` | `/portfolio-v11/companies` |
-| `cash-accounts` | `/portfolio-v11/cash-accounts` |
-| `cash-overview` | `/portfolio-v11/cash-overview` |
-| `cash-ledger` | `/portfolio-v11/cash-ledger` |
-| `cash-reservations` | `/portfolio-v11/cash-reservations` |
-| `statement-imports` | `/portfolio-v11/statement-imports` |
-| `reconciliations` | `/portfolio-v11/reconciliations` |
-| `exceptions` | `/portfolio-v11/exceptions` |
-| `period-close` | `/portfolio-v11/period-close` |
-| `reporting` | `/portfolio-v11/reporting` |
-| `fund-performance` | `/portfolio-v11/fund-performance` |
-| `lps` | `/portfolio-v11/lps` |
-| `documents-vault` | `/portfolio-v11/documents` |
-| `reports-vault` | `/portfolio-v11/reports-vault` |
-| `e-signatures` | `/portfolio-v11/e-signatures` |
-| `mailer-lists` | `/portfolio-v11/mailer-lists` |
-| `settings` | `/portfolio-v11/settings` |
-| detail pages | `/portfolio-v11/.../detail` (and recon workspace / report builder) |
+| `dashboard` | `/portfolio` |
+| `deals` | `/portfolio/deals` |
+| `funds` | `/portfolio/funds` |
+| `capital-calls` | `/portfolio/capital-calls` |
+| `companies` | `/portfolio/companies` |
+| `cash-accounts` | `/portfolio/cash-accounts` |
+| `cash-overview` | `/portfolio/cash-overview` |
+| `cash-ledger` | `/portfolio/cash-ledger` |
+| `cash-reservations` | `/portfolio/cash-reservations` |
+| `statement-imports` | `/portfolio/statement-imports` |
+| `reconciliations` | `/portfolio/reconciliations` |
+| `exceptions` | `/portfolio/exceptions` |
+| `period-close` | `/portfolio/period-close` |
+| `reporting` | `/portfolio/reporting` |
+| `fund-performance` | `/portfolio/fund-performance` |
+| `lps` | `/portfolio/lps` |
+| `documents-vault` | `/portfolio/documents` |
+| `reports-vault` | `/portfolio/reports-vault` |
+| `e-signatures` | `/portfolio/e-signatures` |
+| `mailer-lists` | `/portfolio/mailer-lists` |
+| `settings` | `/portfolio/settings` |
+| detail pages | `/portfolio/.../detail` (and recon workspace / report builder) |
 
 ## Code map
 
@@ -58,7 +58,8 @@ Full client V23 suite (upgraded from V11 in-place):
 | CSS | `portfolio-v11.css` + `portfolio-v11-overrides.css` |
 | Nav | `lib/portfolio-v11-mock/nav.ts` |
 | Assets | `public/portfolio-v11/assets/` |
-| Extract script | `scripts/extract-portfolio-v23.mjs` (re-run to refresh from client package) |
+| Extract script | `scripts/extract-portfolio-v25.mjs` (re-run to refresh from V25 client package) |
+| Assets | `public/portfolio/assets/` |
 
 ## Deviations
 
@@ -71,13 +72,15 @@ Full client V23 suite (upgraded from V11 in-place):
 
 ## Public preview
 
-**http://localhost:3002/portfolio-v11**
+**http://localhost:3001/portfolio** (staff portal; login `admin@nts.com` / `admin123` for live data)
 
-(No login required.)
+Old `/portfolio-v11` paths 308-redirect to `/portfolio`.
 
 ## Verify
 
-1. Open `/portfolio-v11` — dashboard loads with client sidebar (**blue** accent theme)
+1. Open `/portfolio` — dashboard loads with client sidebar (**blue** accent theme); Arcus SharedTopbar above (client HTML topbar hidden)
+2. Deal Flow shows seeded deals (NTS / Arcus Demo), not Nova Analytics fixtures when authenticated
+3. Design tokens match V25 standalone (`--brand:#2563eb`, `--topbar:68px`, min 10px type)
 2. Walk all sidebar workspaces
 3. Open a fund/company/deal detail — URL updates
 4. App Switcher shows **Portfolio (V11)** next to live **Portfolio Management**
