@@ -65,7 +65,7 @@ const AUTH_ROUTES = ['/login', '/forgot-password', '/reset-password', '/verify-e
 export const STAFF_PUBLIC_PASS_THROUGH = [
   '/permissions-matrix',
   '/applications/form',
-  '/home-v3',
+  '/home',
   '/portfolio-v11',
   '/payroll-v6',
   '/accounting-v52',
@@ -178,7 +178,7 @@ export function portalHomePath(portal: PortalId): string {
     case 'events':
       return '/events/public'
     default:
-      return '/home-v3'
+      return '/home'
   }
 }
 

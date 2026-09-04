@@ -230,7 +230,7 @@ export function LpPortalTopbar() {
         </Sheet>
 
         <Link
-          href="/home-v3"
+          href="/home"
           className="flex shrink-0 items-center gap-2 transition-opacity hover:opacity-80"
           aria-label="Matanho home"
         >

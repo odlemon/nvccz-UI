@@ -169,7 +169,7 @@
   min-height: 392px; border-radius: var(--radius-lg); overflow:hidden; position:relative; border:1px solid rgba(96,78,58,.10);
   background:linear-gradient(100deg,#f5eee4 0%,#f7f1e8 50%,#eee2d2 100%); box-shadow:var(--shadow-md);
 }
-.home-v3-root .hero::before{ content:""; position:absolute; inset:0 0 0 42%; background:url('/home-v3/assets/hero-scenes/1080p/01-sunlit-bonsai.jpg') right center/cover no-repeat; filter:saturate(.82) contrast(.96) brightness(1.06); }
+.home-v3-root .hero::before{ content:""; position:absolute; inset:0 0 0 42%; background:url('/home/assets/hero-scenes/1080p/01-sunlit-bonsai.jpg') right center/cover no-repeat; filter:saturate(.82) contrast(.96) brightness(1.06); }
 .home-v3-root .hero::after{ content:""; position:absolute; inset:0; background:linear-gradient(90deg,rgba(247,241,232,1) 0%,rgba(247,241,232,.97) 38%,rgba(247,241,232,.58) 55%,rgba(247,241,232,.04) 74%), linear-gradient(0deg,rgba(233,222,207,.26),transparent 45%); }
 .home-v3-root .hero-content{ position:relative; z-index:2; width:52%; min-height:392px; padding:51px 48px 40px; display:flex; flex-direction:column; }
 .home-v3-root .greeting{ display:flex; align-items:center; gap:12px; font-size:36px; font-weight:470; line-height:1.1; letter-spacing:-.045em; color:var(--navy); }
