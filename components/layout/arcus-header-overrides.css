@@ -325,6 +325,7 @@
 /* Hide the HTML topbar in all mock-app roots when the shell wrapper is present */
 [data-arcus-shell] .performance-v22-root .topbar,
 [data-arcus-shell] .home-v3-root .topbar,
+[data-arcus-shell] .home-v3-root header.topbar,
 [data-arcus-shell] .portfolio-v11-root .topbar,
 [data-arcus-shell] .portfolio-v11-root #topbar,
 [data-arcus-shell] .payroll-v6-root .topbar,
@@ -334,8 +335,13 @@
   display: none !important;
   height: 0 !important;
   min-height: 0 !important;
+  max-height: 0 !important;
   padding: 0 !important;
+  margin: 0 !important;
   overflow: hidden !important;
+  border: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
 }
 
 /* Grid layouts: remove the topbar row so content fills 100% */
@@ -497,6 +503,8 @@ html.dark [data-arcus-shared-topbar] button,
  * ======================================================================== */
 
 /* ── ALL MODULES: Minimum 11px body text ───────────────────────────────── */
+/* .investments-terminal intentionally excluded — owns light/dark tokens in
+   app/investments-v2/globals.css. Forcing #000 here caused invisible dark UI. */
 .performance-v22-root,
 .home-v3-root,
 .portfolio-v11-root,
@@ -508,8 +516,8 @@ html.dark [data-arcus-shared-topbar] button,
 [data-module="street-rates"],
 [data-module="forecasting"],
 [data-module="fundraising"],
-[data-module="fundraising-kyc"],
-.investments-terminal {
+[data-module="fundraising-kyc"]
+{
   font-size: 11px !important;
   color: #000000 !important;
 }
@@ -672,8 +680,8 @@ html.dark [data-arcus-shared-topbar] button,
 [data-module="street-rates"] button,
 [data-module="forecasting"] button,
 [data-module="fundraising"] button,
-[data-module="fundraising-kyc"] button,
-.investments-terminal button {
+[data-module="fundraising-kyc"] button
+{
   color: #000000 !important;
 }
 .performance-v22-root .btn.primary,
@@ -726,23 +734,11 @@ html.dark [data-arcus-shared-topbar] button,
 }
 
 /* ── 4. Consistent header area ─────────────────────────────────────────── */
-.home-v3-root .topbar,
-.portfolio-v11-root .topbar,
-.payroll-v6-root .topbar,
-.procurement-v23-root .topbar,
-.accounting-v52-root .topbar {
-  height: 80px !important;
-  min-height: 80px !important;
-  padding: 0 24px !important;
-  gap: 12px !important;
-  display: flex !important;
-  align-items: center !important;
-  box-sizing: border-box !important;
-  background: rgba(255,255,255,0.92) !important;
-  backdrop-filter: blur(12px) !important;
-  border-bottom: 1px solid #e5e7eb !important;
-  box-shadow: none !important;
-}
+/* Do NOT re-assert display:flex here. A later "html:not([data-arcus-shell])"
+   rule previously matched every page (html never has data-arcus-shell) and
+   beat the SharedTopbar hide rule — leaving an invisible 80px mock topbar
+   that pushed home content down and caused a spurious scrollbar. Early
+   chrome rules above already style the mock topbar when it is visible. */
 
 /* ── 5. Reduce visual clutter — thinner borders, softer shadows ────────── */
 .performance-v22-root .card,
@@ -799,8 +795,8 @@ html.dark [data-arcus-shared-topbar] button,
 [data-module="street-rates"] .text-\[\#64748b\],
 [data-module="forecasting"] .text-\[\#64748b\],
 [data-module="fundraising"] .text-\[\#64748b\],
-[data-module="fundraising-kyc"] .text-\[\#64748b\],
-.investments-terminal .text-\[\#64748b\] {
+[data-module="fundraising-kyc"] .text-\[\#64748b\]
+{
   color: #141414 !important;
 }
 
@@ -815,8 +811,8 @@ html.dark [data-arcus-shared-topbar] button,
 [data-module="street-rates"] .text-\[\#94a3b8\],
 [data-module="forecasting"] .text-\[\#94a3b8\],
 [data-module="fundraising"] .text-\[\#94a3b8\],
-[data-module="fundraising-kyc"] .text-\[\#94a3b8\],
-.investments-terminal .text-\[\#94a3b8\] {
+[data-module="fundraising-kyc"] .text-\[\#94a3b8\]
+{
   color: #111111 !important;
 }
 
@@ -831,8 +827,8 @@ html.dark [data-arcus-shared-topbar] button,
 [data-module="street-rates"] .text-\[\#475569\],
 [data-module="forecasting"] .text-\[\#475569\],
 [data-module="fundraising"] .text-\[\#475569\],
-[data-module="fundraising-kyc"] .text-\[\#475569\],
-.investments-terminal .text-\[\#475569\] {
+[data-module="fundraising-kyc"] .text-\[\#475569\]
+{
   color: #141414 !important;
 }
 
@@ -847,8 +843,8 @@ html.dark [data-arcus-shared-topbar] button,
 [data-module="street-rates"] .text-\[\#4b5563\],
 [data-module="forecasting"] .text-\[\#4b5563\],
 [data-module="fundraising"] .text-\[\#4b5563\],
-[data-module="fundraising-kyc"] .text-\[\#4b5563\],
-.investments-terminal .text-\[\#4b5563\] {
+[data-module="fundraising-kyc"] .text-\[\#4b5563\]
+{
   color: #141414 !important;
 }
 
@@ -863,8 +859,8 @@ html.dark [data-arcus-shared-topbar] button,
 [data-module="street-rates"] .text-\[\#334155\],
 [data-module="forecasting"] .text-\[\#334155\],
 [data-module="fundraising"] .text-\[\#334155\],
-[data-module="fundraising-kyc"] .text-\[\#334155\],
-.investments-terminal .text-\[\#334155\] {
+[data-module="fundraising-kyc"] .text-\[\#334155\]
+{
   color: #111111 !important;
 }
 
@@ -879,8 +875,8 @@ html.dark [data-arcus-shared-topbar] button,
 [data-module="street-rates"] .text-\[\#718096\],
 [data-module="forecasting"] .text-\[\#718096\],
 [data-module="fundraising"] .text-\[\#718096\],
-[data-module="fundraising-kyc"] .text-\[\#718096\],
-.investments-terminal .text-\[\#718096\] {
+[data-module="fundraising-kyc"] .text-\[\#718096\]
+{
   color: #141414 !important;
 }
 
@@ -895,8 +891,8 @@ html.dark [data-arcus-shared-topbar] button,
 [data-module="street-rates"] .text-\[\#2d3748\],
 [data-module="forecasting"] .text-\[\#2d3748\],
 [data-module="fundraising"] .text-\[\#2d3748\],
-[data-module="fundraising-kyc"] .text-\[\#2d3748\],
-.investments-terminal .text-\[\#2d3748\] {
+[data-module="fundraising-kyc"] .text-\[\#2d3748\]
+{
   color: #111111 !important;
 }
 
@@ -911,8 +907,8 @@ html.dark [data-arcus-shared-topbar] button,
 [data-module="street-rates"] .text-\[\#0f172a\],
 [data-module="forecasting"] .text-\[\#0f172a\],
 [data-module="fundraising"] .text-\[\#0f172a\],
-[data-module="fundraising-kyc"] .text-\[\#0f172a\],
-.investments-terminal .text-\[\#0f172a\] {
+[data-module="fundraising-kyc"] .text-\[\#0f172a\]
+{
   color: #000000 !important;
 }
 
@@ -927,8 +923,8 @@ html.dark [data-arcus-shared-topbar] button,
 [data-module="street-rates"] .text-\[\#1e293b\],
 [data-module="forecasting"] .text-\[\#1e293b\],
 [data-module="fundraising"] .text-\[\#1e293b\],
-[data-module="fundraising-kyc"] .text-\[\#1e293b\],
-.investments-terminal .text-\[\#1e293b\] {
+[data-module="fundraising-kyc"] .text-\[\#1e293b\]
+{
   color: #000000 !important;
 }
 
@@ -943,8 +939,8 @@ html.dark [data-arcus-shared-topbar] button,
 [data-module="street-rates"] .text-\[\#1a202c\],
 [data-module="forecasting"] .text-\[\#1a202c\],
 [data-module="fundraising"] .text-\[\#1a202c\],
-[data-module="fundraising-kyc"] .text-\[\#1a202c\],
-.investments-terminal .text-\[\#1a202c\] {
+[data-module="fundraising-kyc"] .text-\[\#1a202c\]
+{
   color: #000000 !important;
 }
 
@@ -959,8 +955,8 @@ html.dark [data-arcus-shared-topbar] button,
 [data-module="street-rates"] .text-\[\#1f2937\],
 [data-module="forecasting"] .text-\[\#1f2937\],
 [data-module="fundraising"] .text-\[\#1f2937\],
-[data-module="fundraising-kyc"] .text-\[\#1f2937\],
-.investments-terminal .text-\[\#1f2937\] {
+[data-module="fundraising-kyc"] .text-\[\#1f2937\]
+{
   color: #000000 !important;
 }
 
@@ -975,8 +971,8 @@ html.dark [data-arcus-shared-topbar] button,
 [data-module="street-rates"] .text-\[\#1a1a1a\],
 [data-module="forecasting"] .text-\[\#1a1a1a\],
 [data-module="fundraising"] .text-\[\#1a1a1a\],
-[data-module="fundraising-kyc"] .text-\[\#1a1a1a\],
-.investments-terminal .text-\[\#1a1a1a\] {
+[data-module="fundraising-kyc"] .text-\[\#1a1a1a\]
+{
   color: #000000 !important;
 }
 
@@ -986,19 +982,17 @@ html.dark [data-arcus-shared-topbar] button,
 [data-module="forecasting"] .text-muted-foreground,
 [data-module="fundraising"] .text-muted-foreground,
 [data-module="fundraising-kyc"] .text-muted-foreground,
-.investments-terminal .text-muted-foreground,
 [data-module="events"] [class*="text-gray"],
 [data-module="street-rates"] [class*="text-gray"],
 [data-module="forecasting"] [class*="text-gray"],
 [data-module="fundraising"] [class*="text-gray"],
 [data-module="fundraising-kyc"] [class*="text-gray"],
-.investments-terminal [class*="text-gray"],
 [data-module="events"] [class*="text-slate"],
 [data-module="street-rates"] [class*="text-slate"],
 [data-module="forecasting"] [class*="text-slate"],
 [data-module="fundraising"] [class*="text-slate"],
-[data-module="fundraising-kyc"] [class*="text-slate"],
-.investments-terminal [class*="text-slate"] {
+[data-module="fundraising-kyc"] [class*="text-slate"]
+{
   color: #141414 !important;
 }
 

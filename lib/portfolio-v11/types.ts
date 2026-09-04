@@ -239,23 +239,34 @@ export type Pv11Exception = {
 
 export type Pv11ReportVaultItem = {
   id: string
+  name: string
   type: string
   fund: string
   period: string
+  version: string
   status: string
   pages: number
   recipients: number
-  owner?: string
+  owner: string
+  generated: string
+  classification: string
   updated?: string
 }
 
 export type Pv11SignatureEnvelope = {
   id: string
-  name: string
+  documentId: string
+  document: string
+  subject: string
+  recipients: Array<[string, string, string]>
   status: string
+  sent: string
+  expires: string
   progress: number
-  signers: number
-  signed: number
+  /** Legacy adapter fields retained for partial live payloads */
+  name?: string
+  signers?: number
+  signed?: number
   template?: string
   owner?: string
   due?: string

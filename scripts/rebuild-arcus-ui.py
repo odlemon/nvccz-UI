@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Pack UI, upload to 31.220.82.129, rebuild UI containers only. Does not touch secrets/API/DB."""
+"""Pack UI, upload to 31.220.82.129, rebuild UI containers only. Does not touch secrets/API/DB.
+
+DEPRECATED for day-to-day Arcus Dev work:
+  Prefer `scripts/deploy-arcus-dev-selective.py` (DEV-only, portal-selective, rollback snapshot).
+  This script still rebuilds BOTH dev+demo and uses legacy service name `ui`.
+"""
 from __future__ import annotations
 
 import hashlib

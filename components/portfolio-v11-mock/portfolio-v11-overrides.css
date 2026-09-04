@@ -20,13 +20,13 @@
   pointer-events: none !important;
 }
 
-[data-arcus-shell] .portfolio-v11-root .workspace,
-[data-arcus-shell] .portfolio-v11-root #workspace {
-  top: 0 !important;
-  height: 100% !important;
-  max-height: 100% !important;
-}
-
+/*
+ * SharedTopbar lives OUTSIDE .portfolio-v11-root (ClientDesignModuleShell).
+ * Match Performance: nav rail is position:fixed to the viewport (top:0 / 100dvh)
+ * so it sits flush under the matanho brand with no white gap above the logo.
+ * Workspace stays absolute inside the flex-1 host (below SharedTopbar) so page
+ * controls are not hidden under the Arcus bar.
+ */
 .portfolio-v11-root {
   position: relative;
   height: 100%;
@@ -35,21 +35,205 @@
 }
 
 .portfolio-v11-root .app-shell {
+  position: relative;
   height: 100%;
   min-height: 0;
+  overflow: hidden;
 }
 
-.portfolio-v11-root .sidebar {
-  position: fixed;
-  top: 0;
-  right: auto;
-  bottom: 0;
-  left: 0;
-  height: 100dvh;
+/* Full-viewport rail — same pattern as performance-v22-overrides */
+@media (min-width: 981px) {
+  [data-arcus-shell] .portfolio-v11-root .sidebar,
+  [data-arcus-shell] .portfolio-v11-root #sidebar {
+    position: fixed !important;
+    inset: 0 auto 0 0 !important;
+    width: var(--sidebar) !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    z-index: 50 !important;
+  }
 }
 
-.portfolio-v11-root .workspace {
+[data-arcus-shell] .portfolio-v11-root .workspace,
+[data-arcus-shell] .portfolio-v11-root #workspace {
+  position: absolute !important;
+  top: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  left: var(--sidebar) !important;
+  height: auto !important;
+  max-height: none !important;
+  inset: 0 0 0 var(--sidebar) !important;
   min-height: 0;
+  overflow: auto !important;
+}
+
+[data-arcus-shell] .portfolio-v11-root .app-shell.sidebar-collapsed .workspace,
+[data-arcus-shell] .portfolio-v11-root .app-shell.sidebar-collapsed #workspace,
+[data-arcus-shell] .portfolio-v11-root.sidebar-collapsed .workspace,
+[data-arcus-shell] .portfolio-v11-root.sidebar-collapsed #workspace {
+  left: var(--sidebar-collapsed-width, 76px) !important;
+  inset: 0 0 0 var(--sidebar-collapsed-width, 76px) !important;
+}
+
+@media (max-width: 980px) {
+  [data-arcus-shell] .portfolio-v11-root .workspace,
+  [data-arcus-shell] .portfolio-v11-root #workspace,
+  [data-arcus-shell] .portfolio-v11-root .app-shell.sidebar-collapsed .workspace,
+  [data-arcus-shell] .portfolio-v11-root .app-shell.sidebar-collapsed #workspace {
+    left: 0 !important;
+    inset: 0 !important;
+  }
+}
+
+/*
+ * V25 faithful header / filter controls (exact design port).
+ * Do NOT force Arcus rounded-full pills on Portfolio module actions —
+ * v25 uses moderate 6–8px radii, charcoal primary, white secondary.
+ * Source: design-refs/portfolio-v25 “…v25.html” HD action-control block.
+ */
+.portfolio-v11-root {
+  --control-border: #d5dbe5;
+  --control-border-strong: #c2cad6;
+  --control-highlight: rgba(255, 255, 255, 0.78);
+  --control-shadow: 0 1px 2px rgba(15, 23, 42, 0.055);
+  --control-shadow-hover: 0 2px 5px rgba(15, 23, 42, 0.075);
+}
+
+html.dark .portfolio-v11-root,
+.dark .portfolio-v11-root,
+.portfolio-v11-root[data-theme="dark"] {
+  --control-border: #3b465a;
+  --control-border-strong: #4c5970;
+  --control-highlight: rgba(255, 255, 255, 0.04);
+  --control-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+  --control-shadow-hover: 0 2px 5px rgba(0, 0, 0, 0.19);
+}
+
+.portfolio-v11-root .button,
+.portfolio-v11-root label.button,
+.portfolio-v11-root .page-actions .button,
+.portfolio-v11-root .table-tools .button,
+.portfolio-v11-root .workspace-filter-bar .button {
+  min-height: 35px !important;
+  padding: 0 13px !important;
+  gap: 7px !important;
+  border: 1px solid var(--control-border) !important;
+  border-radius: 7px !important;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface) 98%, #fff),
+    color-mix(in srgb, var(--surface) 93%, var(--surface-soft))
+  ) !important;
+  color: var(--ink-2) !important;
+  box-shadow: inset 0 1px 0 var(--control-highlight), var(--control-shadow) !important;
+  font-size: 10.4px !important;
+  font-weight: 590 !important;
+  letter-spacing: 0.002em !important;
+}
+
+.portfolio-v11-root .button:hover,
+.portfolio-v11-root label.button:hover {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface) 96%, #fff),
+    color-mix(in srgb, var(--surface-soft) 82%, var(--surface))
+  ) !important;
+  border-color: var(--control-border-strong) !important;
+  box-shadow: inset 0 1px 0 var(--control-highlight), var(--control-shadow-hover) !important;
+  transform: translateY(-0.5px);
+  filter: none !important;
+}
+
+.portfolio-v11-root .button.primary,
+.portfolio-v11-root label.button.primary {
+  background: linear-gradient(180deg, #435168 0%, #344258 100%) !important;
+  border-color: #2f3c50 !important;
+  color: #fff !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 1px 2px rgba(15, 23, 42, 0.13) !important;
+}
+
+.portfolio-v11-root .button.primary:hover,
+.portfolio-v11-root label.button.primary:hover {
+  background: linear-gradient(180deg, #4a5a73 0%, #394a62 100%) !important;
+  border-color: #33445b !important;
+  color: #fff !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.17), 0 2px 4px rgba(15, 23, 42, 0.14) !important;
+  filter: none !important;
+}
+
+.portfolio-v11-root .button.primary:active,
+.portfolio-v11-root label.button.primary:active {
+  background: #303d51 !important;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2) !important;
+}
+
+.portfolio-v11-root .button.ghost {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.portfolio-v11-root .button.ghost:hover {
+  background: var(--surface-soft) !important;
+  border-color: var(--control-border) !important;
+  box-shadow: none !important;
+}
+
+.portfolio-v11-root .button.success {
+  background: linear-gradient(180deg, #1f8069, #176a57) !important;
+  border-color: #176451 !important;
+  color: #fff !important;
+}
+
+.portfolio-v11-root .button.danger,
+.portfolio-v11-root .button.warning {
+  background: var(--surface) !important;
+  box-shadow: var(--control-shadow) !important;
+}
+
+.portfolio-v11-root .button.compact {
+  min-height: 30px !important;
+  padding: 0 10px !important;
+  border-radius: 6px !important;
+  font-size: 10px !important;
+}
+
+.portfolio-v11-root .button.icon-only {
+  width: 31px !important;
+  min-width: 31px !important;
+  padding: 0 !important;
+}
+
+.portfolio-v11-root .button svg {
+  width: 13.5px !important;
+  height: 13.5px !important;
+  stroke-width: 1.7;
+}
+
+/* Status chips stay full pills (mint/emerald success etc.) */
+.portfolio-v11-root .status-pill,
+.portfolio-v11-root .page-actions .status-pill,
+.portfolio-v11-root .page-header .status-pill {
+  border-radius: 999px !important;
+}
+
+.portfolio-v11-root .status-pill.success {
+  color: var(--emerald) !important;
+  background: var(--emerald-soft) !important;
+}
+
+/* Filter selects / page-header selects — moderate radius, not pills */
+.portfolio-v11-root .page-actions select,
+.portfolio-v11-root .workspace-filter-bar select,
+.portfolio-v11-root .workspace-filter select,
+.portfolio-v11-root .table-tools select,
+.portfolio-v11-root .page-header select {
+  border-radius: 8px !important;
+  border: 1px solid var(--control-border, var(--line)) !important;
+  background: var(--surface) !important;
+  color: var(--ink) !important;
+  min-height: 34px !important;
 }
 
 .portfolio-v11-root .toast-stack {

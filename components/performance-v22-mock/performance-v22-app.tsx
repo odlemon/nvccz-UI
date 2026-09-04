@@ -33,7 +33,7 @@ export function PerformanceV22App() {
       shellHtml: PERFORMANCE_V22_SHELL_HTML,
       initialPage,
       onNavigate: (page: string) => {
-        const path = PM22_PAGE_TO_PATH[page] || "/performance-v22"
+        const path = PM22_PAGE_TO_PATH[page] || "/performance"
         if (pathnameRef.current !== path) router.push(path)
       },
     })

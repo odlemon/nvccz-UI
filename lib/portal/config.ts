@@ -70,7 +70,7 @@ export const STAFF_PUBLIC_PASS_THROUGH = [
   '/payroll-v6',
   '/accounting-v52',
   '/procurement-v23',
-  '/performance-v22',
+  '/performance',
   '/fundraising-kyc',
   '/broker-instruction',
 ] as const

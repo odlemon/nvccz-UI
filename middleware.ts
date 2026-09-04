@@ -108,17 +108,39 @@ const routePermissions: Record<string, { module: string; subModule?: string }> =
   '/accounting-v52/integrations': { module: 'accounting-v52', subModule: 'ac52-integrations' },
   '/accounting-v52/settings': { module: 'accounting-v52', subModule: 'ac52-settings' },
 
-  // Performance Management routes
-  '/performance': { module: 'performance-management', subModule: 'performance-dashboard' },
-  '/performance/departments': { module: 'performance-management', subModule: 'departments-management' },
-  '/performance/kpis': { module: 'performance-management', subModule: 'kpi-management' },
-  '/performance/goals': { module: 'performance-management', subModule: 'goals-management' },
-  '/performance/tasks': { module: 'performance-management', subModule: 'taskManagement' },
-  '/performance/user-scorecards': { module: 'performance-management', subModule: 'userScorecard' },
-  '/performance/department-scorecards': { module: 'performance-management', subModule: 'departmentScorecard' },
-  '/performance/ceo-scorecards': { module: 'performance-management', subModule: 'performance-dashboard' },
-  '/performance/board-scorecards': { module: 'performance-management', subModule: 'performance-dashboard' },
-  '/performance/org-bsc': { module: 'performance-management', subModule: 'performance-dashboard' },
+  // Performance Management (Matanho V22 — canonical /performance)
+  '/performance': { module: 'performance-v22', subModule: 'pm22-dashboard' },
+  '/performance/strategy': { module: 'performance-v22', subModule: 'pm22-strategy' },
+  '/performance/scorecards': { module: 'performance-v22', subModule: 'pm22-scorecards' },
+  '/performance/objectives': { module: 'performance-v22', subModule: 'pm22-objectives' },
+  '/performance/tasks': { module: 'performance-v22', subModule: 'pm22-tasks' },
+  '/performance/reviews': { module: 'performance-v22', subModule: 'pm22-reviews' },
+  '/performance/corrective': { module: 'performance-v22', subModule: 'pm22-corrective' },
+  '/performance/reports': { module: 'performance-v22', subModule: 'pm22-reports' },
+  '/performance/vault': { module: 'performance-v22', subModule: 'pm22-vault' },
+  '/performance/alerts': { module: 'performance-v22', subModule: 'pm22-alerts' },
+  '/performance/access': { module: 'performance-v22', subModule: 'pm22-access' },
+  '/performance/departments': { module: 'performance-v22', subModule: 'pm22-dashboard' },
+  '/performance/integrations': { module: 'performance-v22', subModule: 'pm22-dashboard' },
+  '/performance/kpi-analytics': { module: 'performance-v22', subModule: 'pm22-objectives' },
+  '/performance/kpi-management': { module: 'performance-v22', subModule: 'pm22-objectives' },
+  '/performance/timesheets': { module: 'performance-v22', subModule: 'pm22-tasks' },
+  '/performance/settings': { module: 'performance-v22', subModule: 'pm22-access' },
+  '/performance/performance-reports': { module: 'performance-v22', subModule: 'pm22-reports' },
+  '/performance/ad-hoc-reports': { module: 'performance-v22', subModule: 'pm22-reports' },
+  '/performance/scheduled-reports': { module: 'performance-v22', subModule: 'pm22-reports' },
+  '/performance/report-history': { module: 'performance-v22', subModule: 'pm22-reports' },
+  '/performance/themes': { module: 'performance-v22', subModule: 'pm22-strategy' },
+  '/performance/risks': { module: 'performance-v22', subModule: 'pm22-strategy' },
+  '/performance/contracts': { module: 'performance-v22', subModule: 'pm22-dashboard' },
+  '/performance/bsc-pillars': { module: 'performance-v22', subModule: 'pm22-scorecards' },
+
+  // Legacy Arcus performance app
+  '/performance-legacy': { module: 'performance-management', subModule: 'performance-dashboard' },
+  '/performance-legacy/departments': { module: 'performance-management', subModule: 'departments-management' },
+  '/performance-legacy/kpis': { module: 'performance-management', subModule: 'kpi-management' },
+  '/performance-legacy/goals': { module: 'performance-management', subModule: 'goals-management' },
+  '/performance-legacy/tasks': { module: 'performance-management', subModule: 'taskManagement' },
 
   // Payroll routes
   '/payroll': { module: 'payroll', subModule: 'payroll-dashboard' },
@@ -311,12 +333,11 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL(`/investee-portal-v8${suffix}`, request.url))
   }
 
-  // Legacy /performance → current Performance Management (V22)
-  if (
-    pathname === "/performance" ||
-    (pathname.startsWith("/performance/") && !pathname.startsWith("/performance-v22"))
-  ) {
-    return NextResponse.redirect(new URL("/performance-v22", request.url))
+
+  // Legacy /performance-v22 → canonical /performance (Matanho UI)
+  if (pathname === "/performance-v22" || pathname.startsWith("/performance-v22/")) {
+    const suffix = pathname.replace(/^\/performance-v22/, "") || ""
+    return NextResponse.redirect(new URL(`/performance${suffix}`, request.url))
   }
 
   // Legacy /home-v3 → /home

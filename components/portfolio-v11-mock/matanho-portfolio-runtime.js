@@ -545,6 +545,19 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     target.splice(0, target.length, ...incoming);
   }
 
+  /** Hardcoded v25 fixtures for Reports Vault / E-Signatures when live API is empty or weak. */
+  const reportVaultFixtureSeed = cloneForIntegration(reportVaultItems);
+  const signatureEnvelopeFixtureSeed = cloneForIntegration(signatureEnvelopes);
+
+  function restoreHardcodedVaultIfEmpty() {
+    if (!reportVaultItems.length && reportVaultFixtureSeed.length) {
+      replaceCollection(reportVaultItems, cloneForIntegration(reportVaultFixtureSeed));
+    }
+    if (!signatureEnvelopes.length && signatureEnvelopeFixtureSeed.length) {
+      replaceCollection(signatureEnvelopes, cloneForIntegration(signatureEnvelopeFixtureSeed));
+    }
+  }
+
   function hydrateFromBackend(payload = {}) {
     const source = payload.data || payload;
     replaceCollection(funds, source.funds);
@@ -560,9 +573,15 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     replaceCollection(statementImports, source.statementImports);
     replaceCollection(reconciliationBatches, source.reconciliationBatches);
     replaceCollection(reconciliationExceptions, source.reconciliationExceptions);
-    replaceCollection(reportVaultItems, source.reportVaultItems);
-    replaceCollection(signatureEnvelopes, source.signatureEnvelopes);
+    // Keep live reads when present; do not wipe vault/esign with empty live payloads.
+    if (Array.isArray(source.reportVaultItems) && source.reportVaultItems.length) {
+      replaceCollection(reportVaultItems, source.reportVaultItems);
+    }
+    if (Array.isArray(source.signatureEnvelopes) && source.signatureEnvelopes.length) {
+      replaceCollection(signatureEnvelopes, source.signatureEnvelopes);
+    }
     replaceCollection(mailerLists, source.mailerLists);
+    restoreHardcodedVaultIfEmpty();
     if (payload.state && typeof payload.state === 'object') Object.assign(state, payload.state);
     render();
     window.dispatchEvent(new CustomEvent('matanho:data-hydrated', { detail: publicSnapshot() }));
@@ -1246,9 +1265,9 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       </section>
       <section class="card table-card"><div class="table-toolbar"><div class="table-title-row"><h3>Funds Overview</h3><span class="table-badge">${funds.length} funds</span></div><div class="table-tools"><div class="table-search">${icon('search')}<input type="text" placeholder="Search funds..." data-input-action="table-search" value="${escapeHTML(state.tableSearch)}"></div>${button('Filter','fund-filters','compact','filter')}${button('Export','export-funds','compact','download')}</div></div><div class="table-wrap"><table><thead><tr><th>Fund Name</th><th>Vintage</th><th>Strategy</th><th>Currency</th><th class="text-right">Commitment</th><th>Called</th><th class="text-right">NAV</th><th class="text-right">Distributed</th><th class="text-right">Gross IRR</th><th class="text-right">Net IRR</th><th class="text-right">TVPI</th><th class="text-right">DPI</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div></section>
       <section class="grid cols-3 section-gap">
-        ${card('Upcoming Reporting Deadlines',`<div class="info-list">${reports.slice(0,4).map(report=>`<div class="list-row"><span class="calendar-day" style="width:38px;height:38px;aspect-ratio:auto;background:var(--surface-soft)">${report.due.split(' ')[0]}<small style="font-size:10px">JUL</small></span><span class="list-row-main"><strong>${escapeHTML(report.fund)}</strong><small>${escapeHTML(report.type)}</small></span><span class="warning-text small">${escapeHTML(report.status)}</span></div>`).join('')}</div>`,{tools:'<button class="card-link" data-action="navigate" data-page="reporting">View all</button>'})}
-        ${card('Recent Capital Activity',`<div class="info-list">${capitalCalls.slice(0,4).map((call,index)=>`<div class="list-row"><span class="activity-icon" style="color:${index%2?'var(--emerald)':'var(--blue)'};background:${index%2?'var(--emerald-soft)':'var(--blue-soft)'}">${icon(index%2?'trend-up':'wallet')}</span><span class="list-row-main"><strong>${index%2?'Distribution':'Capital Call'}</strong><small>${escapeHTML(call.fund)}</small></span><strong class="${index%2?'positive':'negative'} small">${formatMoney(index%2?call.collected:call.amount)}</strong></div>`).join('')}</div>`,{tools:'<button class="card-link" data-action="navigate" data-page="capital-calls">View all</button>'})}
-        ${card('Top Performing Funds',`<div class="info-list">${[...funds].sort((a,b)=>b.grossIrr-a.grossIrr).slice(0,4).map((fund,index)=>`<div class="list-row"><span class="risk-score good">${index+1}</span><span class="list-row-main"><strong>${escapeHTML(fund.name)}</strong><small>${pct(fund.grossIrr)} Gross IRR</small></span><strong class="positive">${fund.tvpi.toFixed(2)}x</strong></div>`).join('')}</div>`,{tools:'<button class="card-link" data-action="chart-drilldown" data-chart-label="Fund Ranking" data-chart-value="Performance ranking by Gross IRR">View all</button>'})}
+        ${card('Upcoming Reporting Deadlines',`<div class="info-list">${(reports.length?reports:[{fund:'—',type:'No schedules loaded',due:'—',status:'—'}]).slice(0,4).map(report=>{const dueParts=String(report.due||'').split(/\s+/);const day=dueParts[0]||'—';const month=(dueParts[1]||'').slice(0,3).toUpperCase()||'—';return `<div class="list-row"><span class="calendar-day" style="width:38px;height:38px;aspect-ratio:auto;background:var(--surface-soft)">${escapeHTML(day)}<small style="font-size:10px">${escapeHTML(month)}</small></span><span class="list-row-main"><strong>${escapeHTML(report.fund)}</strong><small>${escapeHTML(report.type)}</small></span><span class="warning-text small">${escapeHTML(report.status)}</span></div>`;}).join('')}</div>`,{tools:'<button class="card-link" data-action="navigate" data-page="reporting">View all</button>'})}
+        ${card('Recent Capital Activity',`<div class="info-list">${(capitalCalls.length?capitalCalls:[]).slice(0,4).map((call,index)=>`<div class="list-row"><span class="activity-icon" style="color:${index%2?'var(--emerald)':'var(--blue)'};background:${index%2?'var(--emerald-soft)':'var(--blue-soft)'}">${icon(index%2?'trend-up':'wallet')}</span><span class="list-row-main"><strong>${index%2?'Distribution':'Capital Call'}</strong><small>${escapeHTML(call.fund)}</small></span><strong class="${index%2?'positive':'negative'} small">${formatMoney(index%2?call.collected:call.amount)}</strong></div>`).join('')||'<div class="muted small" style="padding:8px 0">No capital activity yet</div>'}</div>`,{tools:'<button class="card-link" data-action="navigate" data-page="capital-calls">View all</button>'})}
+        ${card('Top Performing Funds',`<div class="info-list">${[...funds].sort((a,b)=>b.grossIrr-a.grossIrr).slice(0,4).map((fund,index)=>`<div class="list-row"><span class="risk-score good">${index+1}</span><span class="list-row-main"><strong>${escapeHTML(fund.name)}</strong><small>${pct(fund.grossIrr)} Gross IRR</small></span><strong class="positive">${Number(fund.tvpi||0).toFixed(2)}x</strong></div>`).join('')||'<div class="muted small" style="padding:8px 0">No funds loaded</div>'}</div>`,{tools:'<button class="card-link" data-action="chart-drilldown" data-chart-label="Fund Ranking" data-chart-value="Performance ranking by Gross IRR">View all</button>'})}
       </section>`;
   }
 
@@ -1275,10 +1294,10 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       </section>
       <section class="card"><div class="table-toolbar"><div class="table-title-row"><h3>Capital Call Notices</h3><span class="table-badge">${capitalCalls.length} notices</span></div><div class="table-tools"><div class="table-search">${icon('search')}<input type="text" placeholder="Search notices..." data-input-action="table-search"></div>${selectControl('Status',['All Statuses','Issued','Partially Collected','Closed','Draft'],'All Statuses','capital-call-status')}${button('New Capital Call','new-capital-call','primary compact','plus')}</div></div><div class="table-wrap"><table><thead><tr><th>Notice ID</th><th>Fund</th><th>Call Date</th><th>Due Date</th><th>Purpose</th><th class="text-right">Total Amount</th><th>LP Count</th><th>Collection Progress</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></section>
       <section class="grid cols-4 section-gap">
-        ${card('Call Allocation by LP',`<div class="info-list">${lps.map(lp=>`<div><div class="info-row"><span>${escapeHTML(lp.name)}</span><strong>${formatMoney(lp.commitment*.05)}</strong></div>${progressBar(lp.called/lp.commitment*100)}</div>`).join('')}</div>`,{footer:'<button class="card-link" data-action="navigate" data-page="lps">View full allocation</button>'})}
+        ${card('Call Allocation by LP',`<div class="info-list">${(lps.length?lps:[]).slice(0,5).map(lp=>`<div><div class="info-row"><span>${escapeHTML(lp.name)}</span><strong>${formatMoney(lp.commitment*.05)}</strong></div>${progressBar(lp.commitment?lp.called/lp.commitment*100:0)}</div>`).join('')||'<div class="muted small" style="padding:8px 0">No LP allocations loaded</div>'}</div>`,{footer:'<button class="card-link" data-action="navigate" data-page="lps">View full allocation</button>'})}
         ${card('Collection Progress',donutChart(collectionSegments,formatMoney(outstanding),'Outstanding',112),{footer:'<button class="card-link" data-action="chart-drilldown" data-chart-label="Collection Progress" data-chart-value="Capital call collection by status">View detailed analysis</button>'})}
         ${card('Cash Requirement Timeline',barChart({labels:['Jul','Aug','Sep','Oct','Nov','Dec'],series:[{name:'Scheduled Calls',color:'var(--blue)',values:[42.5,76,38.5,55,26,18.5]}],height:205,format:v=>`${Math.round(v)}M`}),{footer:'<button class="card-link" data-action="chart-drilldown" data-chart-label="Cash Forecast" data-chart-value="Six month capital requirement forecast">View cash forecast</button>'})}
-        ${card('Recent Payment Confirmations',`<div class="info-list">${lps.map((lp,index)=>`<div class="list-row"><span class="activity-icon" style="color:var(--emerald);background:var(--emerald-soft)">${icon('check-circle')}</span><span class="list-row-main"><strong>${escapeHTML(lp.name)}</strong><small>${escapeHTML(funds[index%funds.length].name)}</small></span><strong class="small">${formatMoney([5,7.5,6.3,4,3][index]*1000000)}</strong></div>`).join('')}</div>`,{footer:'<button class="card-link" data-action="chart-drilldown" data-chart-label="Payments" data-chart-value="Recent confirmed capital call payments">View all payments</button>'})}
+        ${card('Recent Payment Confirmations',`<div class="info-list">${(lps.length?lps:[]).slice(0,5).map((lp,index)=>`<div class="list-row"><span class="activity-icon" style="color:var(--emerald);background:var(--emerald-soft)">${icon('check-circle')}</span><span class="list-row-main"><strong>${escapeHTML(lp.name)}</strong><small>${escapeHTML((funds[index%Math.max(funds.length,1)]||{name:'Fund'}).name)}</small></span><strong class="small">${formatMoney(([5,7.5,6.3,4,3][index]||3)*1000000)}</strong></div>`).join('')||'<div class="muted small" style="padding:8px 0">No payment confirmations yet</div>'}</div>`,{footer:'<button class="card-link" data-action="chart-drilldown" data-chart-label="Payments" data-chart-value="Recent confirmed capital call payments">View all payments</button>'})}
       </section>`;
   }
 
@@ -4844,12 +4863,14 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
 
 
   function __pv11ClearFixtures() {
-    const cols = [funds, companies, deals, capitalCalls, lps, reports, documents, cashAccounts, cashJournals, cashReservations, statementImports, reconciliationBatches, reconciliationExceptions, reportVaultItems, signatureEnvelopes, mailerLists];
+    // Reports Vault + E-Signatures keep hardcoded v25 fixtures unless live data arrives.
+    const cols = [funds, companies, deals, capitalCalls, lps, reports, documents, cashAccounts, cashJournals, cashReservations, statementImports, reconciliationBatches, reconciliationExceptions, mailerLists];
     cols.forEach((c) => { if (Array.isArray(c)) c.splice(0, c.length); });
   }
   function __pv11BeginLiveLoad() {
     try { rootEl.classList.add('is-hydrating'); } catch (_) {}
     __pv11ClearFixtures();
+    restoreHardcodedVaultIfEmpty();
     if (typeof render === 'function') render();
   }
   function __pv11FailLiveLoad(message) {
