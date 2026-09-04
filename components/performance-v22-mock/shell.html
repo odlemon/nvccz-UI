@@ -4,7 +4,35 @@
     <nav id="nav" class="nav-scroll"></nav>
     <div class="sidebar-foot"><button class="collapse-btn" data-action="toggle-sidebar" aria-label="Expand or collapse menu"><svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg><span class="collapse-label" aria-hidden="true"></span></button></div>
   </aside>
-  <!-- inner topbar removed; outer SharedTopbar used -->
+  <header class="topbar">
+    <button class="icon-button mobile-menu" data-action="mobile-nav" aria-label="Open navigation"><span data-icon="menu"></span></button>
+    <button class="search-trigger" data-action="search"><span data-icon="search"></span><span>Search goals, people, reviews, KPIs and documents...</span><kbd>Ctrl K</kbd></button>
+    <div class="spacer"></div>
+    <button class="icon-button apps" data-action="apps" aria-label="Matanho applications"><span data-icon="grid"></span></button>
+    <button class="icon-button" data-action="notifications" aria-label="Notifications"><span data-icon="bell"></span><span class="notification-count">4</span></button>
+    <button class="user-button" data-action="user-menu" aria-haspopup="true" aria-expanded="false" aria-controls="profileMenu">
+      <span class="avatar">TM</span><span class="user-copy"><strong>Tariro Moyo</strong><span id="userRoleCopy">HR/M&amp;E Manager</span></span>
+    </button>
+    <div id="profileMenu" class="profile-menu" aria-label="Profile and role switcher">
+      <div class="profile-menu-head">
+        <div class="profile-menu-avatar avatar">TM</div>
+        <div class="profile-menu-copy"><strong>Tariro Moyo</strong><span>Identity &amp; access context</span></div>
+      </div>
+      <label class="profile-menu-field">
+        <span>Role switch</span>
+        <select id="roleSelect" class="top-select role profile-role-select" aria-label="Demo role">
+          <option selected>HR/M&amp;E Manager</option><option>Executive</option><option>Department Manager</option><option>Employee</option><option>SysAdmin</option>
+        </select>
+      </label>
+      <div class="profile-menu-note">Switch the preview role from the user profile area.</div>
+      <div class="profile-menu-divider" role="separator"></div>
+      <button type="button" class="profile-menu-signout" data-action="client-design-sign-out">Sign out of Arcus</button>
+    </div>
+    <div class="header-hidden-controls" aria-hidden="true">
+      <select id="entitySelect" class="top-select entity" tabindex="-1"><option>Matanho Capital</option><option>Matanho Holdings</option><option>Matanho Advisory</option></select>
+      <select id="yearSelect" class="top-select year" tabindex="-1"><option>FY 2026</option><option>FY 2025</option></select>
+    </div>
+  </header>
   <main id="workspace" class="workspace" tabindex="-1"></main>
 </div>
 <div id="scrim" class="scrim" data-action="close-overlays"></div>

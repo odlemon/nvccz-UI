@@ -421,7 +421,7 @@ function handle(action,el){
   'apps':()=>openApps(el),'module-switcher':()=>openApps(el),
   'notifications':openNotifications,
   'search':search,
-  'go-access':()=>{closeOverlays();__setPm22Page('access');state.role='SysAdmin';$('#roleSelect').value=state.role;$('#userRoleCopy').textContent=state.role;render()},
+  'go-access':()=>{closeOverlays();__setPm22Page('access');state.role='SysAdmin';const __rs=$('#roleSelect');if(__rs)__rs.value=state.role;const __rc=$('#userRoleCopy');if(__rc)__rc.textContent=state.role;render()},
   'nav':()=>{closeOverlays();__setPm22Page(id)||'dashboard';render()},
   'objective-tab':()=>{state.objectiveTab=id;render()},
   'scorecard-tab':()=>{state.scorecardTab=id||'org';render()},
@@ -447,7 +447,7 @@ function handle(action,el){
   'toast-close':()=>{closeOverlays();toast('Saved','The change was recorded and added to the audit trail.')},
   'toast-generic':()=>{if(window.MatanhoV13?.handleLegacyAction){window.MatanhoV13.handleLegacyAction(el?.textContent?.trim()||'',el);return}},
   'app-switch':()=>toast('Matanho application switcher',`${id} would open within the unified Matanho platform.`),
-  'user-menu':()=>openUserMenu(el),
+  'user-menu':()=>toggleProfileMenu(),
   'client-design-sign-out':()=>{closeOverlays();clientDesignSignOut()},
   'new-doc':newDoc
  };
@@ -509,6 +509,7 @@ window.openDocument = openDocument;
 
   const rolePerson = {
     'HR/M&E Manager':'Natasha Chari',
+    'CEO':'Rumbidzai Chaza',
     'Executive':'Rumbidzai Chaza',
     'Department Manager':'Yvonne Sibanda',
     'Employee':'Tariro Moyo',
@@ -2028,7 +2029,6 @@ document.addEventListener('click',e=>{if(e.target.closest('[data-v10-room]')){e.
 document.addEventListener('input',e=>{if(e.target.matches('#v10CloseRange,#v10ReviewRange,#v10ProcessRange,#v10CapacityRange'))updateRoom()}, __pm22Sig);document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.querySelector('.v10-room-backdrop'))closeRoom()}, __pm22Sig);
 window.MatanhoSignatureV10=Object.freeze({decisionRoom:room,closeDecisionRoom:closeRoom,refresh:enrich10});
 })();
-const __pm22ApprovedDashboard=dashboard;
 
 ;
 
@@ -3641,6 +3641,7 @@ document.addEventListener('click',e=>{const reset=e.target.closest('[data-v240-r
 document.addEventListener('keydown',e=>{if(e.key!=='Enter'&&e.key!==' ')return;const row=e.target.closest('[data-v240-dept]');if(!row)return;e.preventDefault();VIEW.department=row.dataset.v240Dept;if(state.page==='dashboard'&&typeof render==='function')render()},true);
 window.MatanhoDashboardV240=Object.freeze({version:'24.1.0',minimumTextSize:'11px',design:'theme-aligned-executive-people-performance-command-centre',state:()=>({...VIEW}),refresh:()=>{if(state.page==='dashboard'&&typeof render==='function')render()}});
 })();
+const __pm22ApprovedDashboard=dashboard;
 
 ;
 window.MatanhoDashboardV242=Object.freeze({version:'24.2.0',minimumTextSize:'11px',design:'theme-aligned-compartment-fit',spacing:'balanced'});
@@ -3850,6 +3851,11 @@ window.MatanhoDashboardV242=Object.freeze({version:'24.2.0',minimumTextSize:'11p
     const output = __pm22RenderWithApprovedDashboard.apply(this, arguments);
     if (state.page === 'dashboard') {
       requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => {
+        const page = rootEl.querySelector('#workspace .page');
+        if (page?.classList?.contains('v240-dashboard')) {
+          rootEl.querySelectorAll('.sig-depthbar,.sig-card-tool,.v10-hero,.v10-system-meta').forEach((node) => node.remove());
+          return;
+        }
         window.MatanhoSignatureV9?.refresh?.();
         window.MatanhoSignatureV10?.refresh?.();
         rootEl.querySelectorAll('.sig-depthbar,.sig-card-tool').forEach((node) => node.remove());

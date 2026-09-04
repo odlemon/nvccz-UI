@@ -88,16 +88,106 @@ html.dark [data-arcus-shell] .performance-v22-root,
   }
 }
 
-/* The React shell already renders the shared app bar. Remove the hidden
-   source topbar's grid row so the module begins immediately beneath it. */
+/* Shared app bar above. Keep a compact right-aligned Matanho profile chrome
+   (original v24.5 Role switch lives in the profile menu on the right — never a
+   full-width Role switch strip under SharedTopbar). */
 [data-arcus-shell] .performance-v22-root .app {
-  grid-template-rows: minmax(0, 1fr) !important;
+  grid-template-rows: 52px minmax(0, 1fr) !important;
+}
+
+[data-arcus-shell] .performance-v22-root .topbar {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 8px !important;
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+  height: 52px !important;
+  min-height: 52px !important;
+  max-height: 52px !important;
+  padding: 0 14px 0 16px !important;
+  margin: 0 !important;
+  overflow: visible !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--line, #dfe4ed) !important;
+  background: #fff !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+  z-index: 40 !important;
+}
+
+/* SharedTopbar already provides search / apps / notifications. */
+[data-arcus-shell] .performance-v22-root .topbar .mobile-menu,
+[data-arcus-shell] .performance-v22-root .topbar .search-trigger,
+[data-arcus-shell] .performance-v22-root .topbar .spacer,
+[data-arcus-shell] .performance-v22-root .topbar .icon-button.apps,
+[data-arcus-shell] .performance-v22-root .topbar .icon-button[data-action="notifications"],
+[data-arcus-shell] .performance-v22-root .topbar .icon-button[data-action="apps"] {
+  display: none !important;
+}
+
+[data-arcus-shell] .performance-v22-root .topbar .user-button {
+  display: flex !important;
+  pointer-events: auto !important;
+}
+
+[data-arcus-shell] .performance-v22-root .topbar .profile-menu {
+  right: 14px !important;
+  z-index: 90 !important;
+}
+
+[data-arcus-shell] .performance-v22-root .topbar .profile-role-select,
+[data-arcus-shell] .performance-v22-root .topbar .top-select.role {
+  display: block !important;
+  width: 100%;
+  min-width: 100% !important;
+  height: 36px;
+  border: 1px solid var(--line, #dfe4ed);
+  border-radius: 11px;
+  background: #fff;
+  padding: 0 10px;
+  font-size: 11px;
+}
+
+[data-arcus-shell] .performance-v22-root .profile-menu-divider {
+  height: 1px;
+  margin: 10px 0 8px;
+  background: var(--line, #dfe4ed);
+}
+
+[data-arcus-shell] .performance-v22-root .profile-menu-signout {
+  width: 100%;
+  height: 34px;
+  border: 1px solid var(--line, #dfe4ed);
+  border-radius: 9px;
+  background: #fff;
+  font-size: 11px;
+  color: var(--ink, #111827);
+  text-align: left;
+  padding: 0 10px;
+}
+
+[data-arcus-shell] .performance-v22-root .profile-menu-signout:hover {
+  background: var(--brand-soft, #f4f0ff);
+  color: var(--brand, #5420c0);
 }
 
 [data-arcus-shell] .performance-v22-root .workspace {
-  grid-row: 1 !important;
+  grid-row: 2 !important;
   height: 100% !important;
   max-height: 100% !important;
+}
+
+@media (max-width: 780px) {
+  [data-arcus-shell] .performance-v22-root .topbar {
+    padding: 0 10px !important;
+  }
+  [data-arcus-shell] .performance-v22-root .topbar .user-copy {
+    display: none !important;
+  }
+  [data-arcus-shell] .performance-v22-root .topbar .top-select.role {
+    display: block !important;
+  }
 }
 
 /* Preserve the reference's white navigation rail despite the shared shell's

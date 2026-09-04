@@ -47,8 +47,9 @@ let shell = bodyMatch[1]
   .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, "")
   .trim()
 
-// strip inner topbar (lines 396-422 in v24.5 source)
-shell = shell.replace(/<header class="topbar">[\s\S]*?<\/header>/, "<!-- inner topbar removed; outer SharedTopbar used -->")
+// Keep the v24.5 topbar profile menu (Role switch on the right). Under
+// SharedTopbar, CSS hides search/apps/bell duplicates and leaves the right-side
+// user-button + profileMenu visible — never a left-aligned Role switch strip.
 shell = shell.replace(/\n{3,}/g, "\n\n")
 shell = shell.replace(/\u2318/g, "Cmd")
 
@@ -261,11 +262,11 @@ code = code.replace(
   "function removeGenericIntelligenceLaunchClutter(){",
   "function removeGenericIntelligenceLaunchClutter(){\n  window.MatanhoSignatureV9?.refresh?.();\n  window.MatanhoSignatureV10?.refresh?.();"
 )
-// V10 is the approved command-centre composition used by this comparison
-// route. Preserve its V8 dashboard renderer while allowing all subsequent
-// source revisions to contribute their richer non-dashboard workspaces.
+// V24.1 People Performance Command Centre is the approved dashboard for this
+// comparison route. Capture it after the V240 patch so later extract glue does
+// not roll the command centre back to the V8/V10 enterprise stub.
 code = code.replace(
-  /(window\.MatanhoSignatureV10=Object\.freeze\(\{decisionRoom:room,closeDecisionRoom:closeRoom\}\);\s*\}\)\(\);)/,
+  /(window\.MatanhoDashboardV240=Object\.freeze\(\{[\s\S]*?\}\);)/,
   "$1\nconst __pm22ApprovedDashboard=dashboard;"
 )
 // Publish the two visual decorator passes so the final Next renderer can run
@@ -321,14 +322,18 @@ ${code}
   if (typeof __pm22ApprovedDashboard === 'function') {
     dashboard = __pm22ApprovedDashboard;
   }
-  // Later cleanup intentionally removes the generic intelligence rail. Run
-  // the approved V9/V10 decorators once more after that cleanup so the V10
-  // executive banner remains, then discard only its temporary insertion rail.
+  // Keep V9/V10 decorators for non-dashboard pages. The V240 command centre is
+  // already the complete dashboard canvas — do not overlay the older signature.
   const __pm22RenderWithApprovedDashboard = render;
   render = function () {
     const output = __pm22RenderWithApprovedDashboard.apply(this, arguments);
     if (state.page === 'dashboard') {
       requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => {
+        const page = rootEl.querySelector('#workspace .page');
+        if (page?.classList?.contains('v240-dashboard')) {
+          rootEl.querySelectorAll('.sig-depthbar,.sig-card-tool,.v10-hero,.v10-system-meta').forEach((node) => node.remove());
+          return;
+        }
         window.MatanhoSignatureV9?.refresh?.();
         window.MatanhoSignatureV10?.refresh?.();
         rootEl.querySelectorAll('.sig-depthbar,.sig-card-tool').forEach((node) => node.remove());
@@ -405,31 +410,17 @@ function injectSignal(src) {
 
 let rt = injectSignal(runtime)
 
-// Next.js Arcus session bridge
-if (!rt.includes("function openUserMenu")) {
-  rt = rt.replace(
-    /function search\(\)/,
-    `function openUserMenu(anchor){
-  const sessionUser=getClientDesignSessionUser();
-  const person=sessionUser?.name||(typeof rolePerson!=='undefined'&&rolePerson[state.role])||'Tariro Moyo';
-  const r=(anchor&&anchor.getBoundingClientRect)?anchor.getBoundingClientRect():{bottom:56,right:innerWidth-20};
-  const p=document.createElement('div');p.className='popover';p.style.top=(r.bottom+8)+'px';p.style.right=Math.max(16,innerWidth-r.right)+'px';p.style.position='fixed';p.style.zIndex='120';
-  p.innerHTML=buildArcusProfilePopoverHtml(sessionUser||{name:person,email:sessionUser?.email||'',role:sessionUser?.role||state.role,initials:sessionUser?.initials||person.split(/\\s+/).map(x=>x[0]).slice(0,2).join('').toUpperCase()},icon('users'));
-  $('#popoverLayer').innerHTML='';$('#popoverLayer').appendChild(p);
-}
-function search()`
-  )
-}
-
-// v24.5 uses toggleProfileMenu() instead of toast('User profile',...); replace both variants
+// Keep v24.5 profile-menu Role switch (toggleProfileMenu). Also allow Arcus sign-out.
 rt = rt.replace(
   `'user-menu':()=>toast('User profile','Identity, delegated authority and access scope are centrally managed.'),`,
-  `'user-menu':()=>openUserMenu(el),\n  'client-design-sign-out':()=>{closeOverlays();clientDesignSignOut()},`
+  `'user-menu':()=>toggleProfileMenu(),\n  'client-design-sign-out':()=>{closeOverlays();clientDesignSignOut()},`
 )
-rt = rt.replace(
-  `'user-menu':()=>toggleProfileMenu(),`,
-  `'user-menu':()=>openUserMenu(el),\n  'client-design-sign-out':()=>{closeOverlays();clientDesignSignOut()},`
-)
+if (!rt.includes("'client-design-sign-out'")) {
+  rt = rt.replace(
+    `'user-menu':()=>toggleProfileMenu(),`,
+    `'user-menu':()=>toggleProfileMenu(),\n  'client-design-sign-out':()=>{closeOverlays();clientDesignSignOut()},`
+  )
+}
 
 rt = rt.replace(
   /function openApps\(anchor\)\{const r=anchor\.getBoundingClientRect\(\)/,

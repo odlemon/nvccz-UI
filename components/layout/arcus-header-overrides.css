@@ -322,8 +322,9 @@
  * Adjust grid/block layouts so the content fills the space.
  * ======================================================================== */
 
-/* Hide the HTML topbar in all mock-app roots when the shell wrapper is present */
-[data-arcus-shell] .performance-v22-root .topbar,
+/* Hide the HTML topbar in mock-app roots when SharedTopbar is present.
+   Performance keeps a compact right-side profile chrome (v24.5 Role switch in
+   the profile menu) — see performance-v22-overrides.css. */
 [data-arcus-shell] .home-v3-root .topbar,
 [data-arcus-shell] .home-v3-root header.topbar,
 [data-arcus-shell] .portfolio-v11-root .topbar,
@@ -351,11 +352,13 @@
   grid-template-rows: minmax(0, 1fr) !important;
 }
 
-[data-arcus-shell] .performance-v22-root .app,
 [data-arcus-shell] .home-v3-root #app.app,
 [data-arcus-shell] .home-v3-root .app {
   grid-template-rows: minmax(0, 1fr) !important;
 }
+
+/* Performance keeps a 52px right-profile chrome row under SharedTopbar
+   (see performance-v22-overrides.css). Do not collapse it to a single row. */
 
 /* Block layouts: make workspace fill 100% of the mock container */
 [data-arcus-shell] .performance-v22-root .workspace,
