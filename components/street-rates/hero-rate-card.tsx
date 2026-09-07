@@ -21,19 +21,19 @@ export function HeroRateCard() {
   const spreadUp = (comparison?.spreadPct ?? 0) >= 0
 
   return (
-    <div className="relative overflow-hidden rounded-3xl border-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
+    <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-slate-100 text-slate-900">
       {/* Ambient glow accents */}
-      <div className="pointer-events-none absolute -top-24 -right-16 w-80 h-80 bg-amber-500/20 rounded-full blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-24 -left-16 w-72 h-72 bg-blue-500/10 rounded-full blur-3xl" />
+      <div className="pointer-events-none absolute -top-24 -right-16 w-80 h-80 bg-amber-400/25 rounded-full blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-24 -left-16 w-72 h-72 bg-blue-400/15 rounded-full blur-3xl" />
 
       <div className="relative p-6 md:p-10">
         {/* Top row */}
         <div className="flex items-start justify-between flex-wrap gap-3">
           <div>
-            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-600">
               {pair.replace("/", " / ")}
             </span>
-            <p className="text-[11px] text-slate-500 mt-1">As of {asOfDate}</p>
+            <p className="text-[11px] text-slate-600 mt-1">As of {asOfDate}</p>
           </div>
           <LiveStatusDot status={staleToStatus(meta.stale, !!widgetError)} />
         </div>
@@ -44,10 +44,10 @@ export function HeroRateCard() {
             {fmtRate(streetValue, decimals)}
           </div>
           <div className="mt-2 flex items-center gap-2 flex-wrap">
-            <span className="text-xs font-semibold uppercase tracking-widest text-amber-400">
+            <span className="text-xs font-semibold uppercase tracking-widest text-amber-600">
               {primary.label}
             </span>
-            <span className="text-xs text-slate-500">{primary.format}</span>
+            <span className="text-xs text-slate-600">{primary.format}</span>
           </div>
         </div>
 
@@ -57,13 +57,13 @@ export function HeroRateCard() {
             <div
               className={cn(
                 "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold",
-                spreadUp ? "bg-emerald-500/15 text-emerald-400" : "bg-red-500/15 text-red-400"
+                spreadUp ? "bg-emerald-500/10 text-emerald-700" : "bg-red-500/10 text-red-700"
               )}
             >
               {spreadUp ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
               {fmtPct(comparison.spreadPct)}
             </div>
-            <span className="text-xs text-slate-500">Compared to Official</span>
+            <span className="text-xs text-slate-600">Compared to Official</span>
           </div>
         )}
 
@@ -71,22 +71,22 @@ export function HeroRateCard() {
         {comparison && (
           <div className="mt-8 grid grid-cols-2 gap-4 max-w-xs">
             <div>
-              <p className="text-[10px] uppercase tracking-widest text-slate-500">Official Rate</p>
+              <p className="text-[10px] uppercase tracking-widest text-slate-600">Official Rate</p>
               <p className="text-xl font-semibold tabular-nums mt-0.5">{fmtRate(officialValue, decimals)}</p>
             </div>
             <div>
-              <p className="text-[10px] uppercase tracking-widest text-slate-500">Spread</p>
+              <p className="text-[10px] uppercase tracking-widest text-slate-600">Spread</p>
               <p className="text-xl font-semibold tabular-nums mt-0.5">{fmtRate(spreadAbs, decimals)}</p>
             </div>
           </div>
         )}
 
         {/* Bottom metadata */}
-        <div className="mt-8 pt-4 border-t border-white/10 flex items-center justify-between flex-wrap gap-2">
-          <span className="text-xs text-slate-500">
+        <div className="mt-8 pt-4 border-t border-slate-200 flex items-center justify-between flex-wrap gap-2">
+          <span className="text-xs text-slate-600">
             Updated {formatDistanceToNow(new Date(meta.fetchedAt), { addSuffix: true })}
           </span>
-          {widgetLoading && <span className="text-[10px] text-slate-600">Refreshing…</span>}
+          {widgetLoading && <span className="text-[10px] text-slate-500">Refreshing…</span>}
         </div>
       </div>
     </div>

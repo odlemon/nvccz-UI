@@ -93,13 +93,25 @@ function SharedTopbarInner({ currentModule, moduleActions, hideThemeToggle = fal
   const currency = useAppSelector((state) => state.ui.currency)
   const { user, token, isAuthenticated, userDetails } = useAppSelector((state) => state.auth)
 
-  // Sync theme on mount — read saved preference and apply to all roots
+  // Sync theme on mount — read saved preference and apply to all roots.
+  //
+  // hideThemeToggle marks a module as light-only (Street Rates, Fundraising,
+  // Fundraising KYC, FP&A all hardcode light backgrounds and ship no dark
+  // variants). The theme preference is global, so a dark choice made in a
+  // module that supports it used to follow the user into these, darkening the
+  // topbar above a page that stayed light. Force light there instead of
+  // applying a half-theme.
   useEffect(() => {
+    if (hideThemeToggle) {
+      setIsDark(false)
+      propagateDarkClass(false)
+      return
+    }
     const saved = localStorage.getItem("arcus-theme")
     const shouldBeDark = saved === "dark" || (!saved && window.matchMedia("(prefers-color-scheme: dark)").matches)
     setIsDark(shouldBeDark)
     propagateDarkClass(shouldBeDark)
-  }, [])
+  }, [hideThemeToggle])
 
   const toggleTheme = useCallback(() => {
     const next = !isDark

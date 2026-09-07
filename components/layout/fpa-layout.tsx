@@ -28,7 +28,11 @@ export function FpaLayout({ children }: FpaLayoutProps) {
 
   return (
     <div className="min-h-screen bg-[#f1f5f9]" data-module="forecasting">
-      <SharedTopbar onModuleSelect={handleModuleSelect} currentModule={currentModule} />
+      {/* Light-only module: the layout hardcodes bg-[#f1f5f9] and the FP&A pages
+          carry no dark variants, so offering the toggle only produced a dark
+          topbar above a light page. Street Rates, Fundraising and Fundraising
+          KYC already hide it for the same reason. */}
+      <SharedTopbar onModuleSelect={handleModuleSelect} currentModule={currentModule} hideThemeToggle />
       <div className="flex">
         <FpaSidebar />
         <main className="flex-1 overflow-auto min-h-[calc(100vh-5rem)] bg-[#f8fafc]">{children}</main>
