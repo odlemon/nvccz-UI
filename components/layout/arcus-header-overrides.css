@@ -657,7 +657,15 @@ html.dark [data-arcus-shared-topbar] button,
 .procurement-v23-root.dark h1,
 .procurement-v23-root.dark h2,
 .procurement-v23-root.dark h3,
-.procurement-v23-root.dark h4 {
+.procurement-v23-root.dark h4,
+.portfolio-v11-root[data-theme="dark"] h1,
+.portfolio-v11-root[data-theme="dark"] h2,
+.portfolio-v11-root[data-theme="dark"] h3,
+.portfolio-v11-root[data-theme="dark"] h4,
+.portfolio-v11-root.dark h1,
+.portfolio-v11-root.dark h2,
+.portfolio-v11-root.dark h3,
+.portfolio-v11-root.dark h4 {
   color: #eef2f8 !important;
 }
 
@@ -691,7 +699,11 @@ html.dark [data-arcus-shared-topbar] button,
 .procurement-v23-root[data-theme="dark"] strong,
 .procurement-v23-root[data-theme="dark"] b,
 .procurement-v23-root.dark strong,
-.procurement-v23-root.dark b {
+.procurement-v23-root.dark b,
+.portfolio-v11-root[data-theme="dark"] strong,
+.portfolio-v11-root[data-theme="dark"] b,
+.portfolio-v11-root.dark strong,
+.portfolio-v11-root.dark b {
   color: #eef2f8 !important;
 }
 
@@ -1213,4 +1225,41 @@ html.dark [data-arcus-shared-topbar] button,
 [data-module="forecasting"] .bg-white,
 [data-module="fundraising"] .bg-white {
   background-color: #ffffff !important;
+}
+
+/* ── Dark-mode text restoration (Portfolio + Procurement) ─────────────────
+   The rules above force near-black text on these module roots because they
+   were written when both modules only ever rendered on a light surface.
+   Procurement's theme toggle now propagates an app-wide `dark` class, so
+   those same rules produced black text on a near-black background — the
+   Fund Detail page rendered its title and every metric value at roughly
+   1:1 contrast.
+
+   This block is last in the file so it wins over the earlier `!important`
+   declarations at equal specificity. Only text colour is restored; layout,
+   backgrounds and intentionally coloured elements (status pills, links,
+   primary buttons) are left alone. */
+.portfolio-v11-root[data-theme="dark"],
+.portfolio-v11-root.dark,
+.procurement-v23-root[data-theme="dark"],
+.procurement-v23-root.dark {
+  color: #eef2f8 !important;
+}
+.portfolio-v11-root[data-theme="dark"] th,
+.portfolio-v11-root.dark th,
+.procurement-v23-root[data-theme="dark"] th,
+.procurement-v23-root.dark th {
+  color: #c2cbdb !important;
+}
+.portfolio-v11-root[data-theme="dark"] .card,
+.portfolio-v11-root.dark .card,
+.procurement-v23-root[data-theme="dark"] .card,
+.procurement-v23-root.dark .card {
+  color: #eef2f8 !important;
+}
+.portfolio-v11-root[data-theme="dark"] .btn:not(.primary):not(.secondary),
+.portfolio-v11-root.dark .btn:not(.primary):not(.secondary),
+.procurement-v23-root[data-theme="dark"] .btn:not(.primary):not(.secondary),
+.procurement-v23-root.dark .btn:not(.primary):not(.secondary) {
+  color: #dde4f0 !important;
 }
