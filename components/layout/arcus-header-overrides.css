@@ -646,6 +646,21 @@ html.dark [data-arcus-shared-topbar] button,
   color: #000000 !important;
 }
 
+/* Procurement supports dark mode. The shared "#000000 !important" heading rule
+   above assumes a light surface, so in dark mode headings rendered black on a
+   near-black background (measured ~1:1 contrast — effectively invisible).
+   Restore light headings when this module is dark. */
+.procurement-v23-root[data-theme="dark"] h1,
+.procurement-v23-root[data-theme="dark"] h2,
+.procurement-v23-root[data-theme="dark"] h3,
+.procurement-v23-root[data-theme="dark"] h4,
+.procurement-v23-root.dark h1,
+.procurement-v23-root.dark h2,
+.procurement-v23-root.dark h3,
+.procurement-v23-root.dark h4 {
+  color: #eef2f8 !important;
+}
+
 /* Strong / bold text true black */
 .performance-v22-root strong,
 .performance-v22-root b,
@@ -670,6 +685,14 @@ html.dark [data-arcus-shared-topbar] button,
 [data-module="fundraising-kyc"] strong,
 [data-module="fundraising-kyc"] b {
   color: #000000 !important;
+}
+
+/* Same dark-mode exception as the headings above, for bold text. */
+.procurement-v23-root[data-theme="dark"] strong,
+.procurement-v23-root[data-theme="dark"] b,
+.procurement-v23-root.dark strong,
+.procurement-v23-root.dark b {
+  color: #eef2f8 !important;
 }
 
 /* ── ALL MODULES: Button text true black ───────────────────────────────── */
