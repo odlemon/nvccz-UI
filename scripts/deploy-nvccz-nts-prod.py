@@ -36,8 +36,16 @@ EXCLUDE_DIRS = {
     "dist",
     "coverage",
     ".next",
+    # Per-portal build output (run-portal-dev.mjs / portal builds). Roughly 1 GB
+    # combined; packing these made the upload take longer than the build.
+    ".next-staff",
+    ".next-lp",
+    ".next-investee",
+    ".next-apply",
     ".cursor",
     ".claude",
+    ".agents",
+    ".kilo",
     ".vscode",
     ".yarn",
     "tmp-smoke-io-reports",
