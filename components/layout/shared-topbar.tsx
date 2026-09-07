@@ -137,13 +137,15 @@ function SharedTopbarInner({ currentModule, moduleActions, hideThemeToggle = fal
     <TooltipProvider>
       <>
       <header data-arcus-shared-topbar className="h-20 border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="flex items-center justify-between h-full px-6">
+        <div className="flex items-center justify-between h-full px-3 sm:px-6">
           {/* Left Section - spacer */}
           <div className="flex items-center gap-4">
           </div>
 
-          {/* Center Section - Search */}
-          <div className="flex-1 min-w-0 max-w-md mx-8">
+          {/* Center Section - Search. Tight margins on small screens: at 375px the
+              wide mx-8 pushed this into the right-hand controls and the search
+              field visibly overlapped the organisation selector. */}
+          <div className="flex-1 min-w-0 max-w-md mx-2 sm:mx-8">
             <div className="relative">
               <CiSearch size={30} className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -190,7 +192,14 @@ function SharedTopbarInner({ currentModule, moduleActions, hideThemeToggle = fal
             {/* Company Selector */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-9 gap-1 px-2 text-xs font-medium">
+                {/* Hidden below sm: there is no room for it beside the search
+                    field on a phone, and it is informational rather than a
+                    control users need on mobile. */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="hidden sm:flex h-9 gap-1 px-2 text-xs font-medium"
+                >
                   {ORG_NAME}
                   <CiCircleChevDown size={14} className="opacity-50" />
                 </Button>
