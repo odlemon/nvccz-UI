@@ -19,10 +19,11 @@ import {
   adaptAc52Investments,
   adaptAc52Approvals,
   adaptAc52FxExposure,
+  adaptAc52RecurringSchedules,
 } from './adapters'
 import type { Ac52HydratePayload } from './types'
 
-export type Ac52DataScope = 'coa' | 'journals' | 'cash' | 'reconciliation' | 'payables' | 'receivables' | 'expenses' | 'inventory' | 'assets' | 'investments' | 'statements' | 'approvals' | 'fx'
+export type Ac52DataScope = 'coa' | 'journals' | 'cash' | 'reconciliation' | 'payables' | 'receivables' | 'expenses' | 'inventory' | 'assets' | 'investments' | 'statements' | 'approvals' | 'fx' | 'recurring'
 
 export type Ac52ScopePlan = {
   primary: Ac52DataScope[]
@@ -62,6 +63,8 @@ export function scopesForAc52Page(page: string): Ac52ScopePlan {
       return { primary: ['approvals'] }
     case 'fx':
       return { primary: ['fx'] }
+    case 'recurring':
+      return { primary: ['recurring'] }
     default:
       return { primary: [] }
   }
@@ -220,6 +223,11 @@ export async function loadAc52Scopes(scopes: Ac52DataScope[]): Promise<Ac52Hydra
   if (wanted.includes('fx')) {
     const res = await settle(accountingApi.getUnrealizedFxGainsReport(), 'unrealizedFx', errors)
     if (res?.data) data.fx = adaptAc52FxExposure(res.data)
+  }
+
+  if (wanted.includes('recurring')) {
+    const res = await settle(accountingApi.getRecurringJournalTemplates(), 'recurringJournalTemplates', errors)
+    if (Array.isArray(res?.data)) data.recurring = adaptAc52RecurringSchedules(res!.data!)
   }
 
   if (wanted.includes('statements')) {

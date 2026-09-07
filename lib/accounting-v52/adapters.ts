@@ -1,7 +1,7 @@
 import type { ChartOfAccount } from '@/lib/api/chart-of-accounts-api'
-import type { PurchaseInvoice, Vendor, Invoice, Customer, Expense, InventoryItem, Asset } from '@/lib/api/accounting-api'
+import type { PurchaseInvoice, Vendor, Invoice, Customer, Expense, InventoryItem, Asset, RecurringJournalTemplate } from '@/lib/api/accounting-api'
 import type { DashboardInstrument } from '@/lib/api/short-term-investments-api'
-import type { Ac52Account, Ac52Journal, Ac52Bank, Ac52ReconciliationLine, Ac52ApBill, Ac52ApVendor, Ac52ArInvoice, Ac52ArCustomer, Ac52Claim, Ac52InventoryItem, Ac52FixedAsset, Ac52Investment, Ac52Approval } from './types'
+import type { Ac52Account, Ac52Journal, Ac52Bank, Ac52ReconciliationLine, Ac52ApBill, Ac52ApVendor, Ac52ArInvoice, Ac52ArCustomer, Ac52Claim, Ac52InventoryItem, Ac52FixedAsset, Ac52Investment, Ac52Approval, Ac52RecurringSchedule } from './types'
 
 /** Raw shape of GET /cashbook/banks rows. */
 type RawCashbookBank = {
@@ -223,6 +223,64 @@ export function adaptAc52FxExposure(report: { lines?: any[]; totals?: { netUnrea
   const exposure = lines.reduce((s, l) => s + Math.abs(l[5]), 0)
   const gain = Number(report.totals?.netUnrealized) || 0
   return { exposure, gain, lines }
+}
+
+function nextMonthlyRunDate(dayOfMonth: number): string {
+  const now = new Date()
+  const clampedDay = Math.min(Math.max(dayOfMonth, 1), 28)
+  let year = now.getUTCFullYear()
+  let month = now.getUTCMonth()
+  if (now.getUTCDate() > clampedDay) {
+    month += 1
+    if (month > 11) {
+      month = 0
+      year += 1
+    }
+  }
+  return `${year}-${String(month + 1).padStart(2, '0')}-${String(clampedDay).padStart(2, '0')}`
+}
+
+/**
+ * Adapt live recurring journal templates into the v27 Recurring Schedules page's ST27.schedules
+ * array. These are recurring JOURNAL templates specifically (debit/credit lines against chart-of-
+ * account codes), not the mock's broader "supplier bill / invoice / expense" schedule types — the
+ * real backend only supports the journal case, so `type` is honestly 'Journal' throughout rather
+ * than claiming a bill/invoice automation this system doesn't have. `counterparty`/`project`/`entity`/
+ * `approval` have no equivalent on a generic journal template and carry neutral defaults; `owner`
+ * uses the template's real creator.
+ */
+export function adaptAc52RecurringSchedules(rows: RecurringJournalTemplate[]): Ac52RecurringSchedule[] {
+  return rows.map((r) => {
+    const amount = (r.linesJson || []).reduce((s, l) => s + (Number(l.debitAmount) || 0), 0)
+    const debitLine = (r.linesJson || []).find((l) => (Number(l.debitAmount) || 0) > 0)
+    const creditLine = (r.linesJson || []).find((l) => (Number(l.creditAmount) || 0) > 0)
+    return {
+      id: r.id,
+      type: 'Journal',
+      counterparty: 'Not applicable',
+      description: r.name,
+      frequency: 'Monthly',
+      cadence: `Monthly · day ${r.dayOfMonth}`,
+      nextRun: nextMonthlyRunDate(r.dayOfMonth),
+      currency: r.currency?.code || 'USD',
+      amount,
+      debit: debitLine?.chartOfAccountId || '—',
+      credit: creditLine?.chartOfAccountId || '—',
+      project: 'Corporate',
+      entity: 'Matanho Capital Partners',
+      approval: 'Auto-post on run (no approval gate configured)',
+      status: r.isActive ? 'Active' : 'Paused',
+      amountMode: 'Fixed amount',
+      owner: r.createdBy ? `${r.createdBy.firstName} ${r.createdBy.lastName}`.trim() || r.createdBy.email : 'System',
+      // A real date isn't available here (the list endpoint returns a run count, not the run rows) —
+      // left blank rather than guessing, since this field is date-formatted wherever it's displayed.
+      lastRun: '',
+      lastResult: r._count?.runs ? 'Successful' : '—',
+      exception: '',
+      version: 1,
+      autoPost: true,
+    }
+  })
 }
 
 /** Adapt live cashbook bank rows into the shape S.banks expects. */

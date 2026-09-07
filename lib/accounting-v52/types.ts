@@ -153,6 +153,32 @@ export type Ac52Claim = {
   status: string
 }
 
+/** Shape the runtime's v27-layer ST27.schedules array expects (matanho-accounting-runtime.js recurringPage27 / baseSchedules27). */
+export type Ac52RecurringSchedule = {
+  id: string
+  type: string
+  counterparty: string
+  description: string
+  frequency: string
+  cadence: string
+  nextRun: string
+  currency: string
+  amount: number
+  debit: string
+  credit: string
+  project: string
+  entity: string
+  approval: string
+  status: string
+  amountMode: string
+  owner: string
+  lastRun: string
+  lastResult: string
+  exception: string
+  version: number
+  autoPost: boolean
+}
+
 /** Shape the runtime's v8-scoped S.approvals array expects (matanho-accounting-runtime.js approvalsPage8). */
 export type Ac52Approval = {
   id: string
@@ -229,5 +255,6 @@ export type Ac52HydratePayload = {
     reportRows?: import('./financial-statements').Ac52ReportRows
     approvals?: Ac52Approval[]
     fx?: import('./adapters').Ac52FxSummary
+    recurring?: Ac52RecurringSchedule[]
   }
 }
