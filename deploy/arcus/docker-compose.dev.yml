@@ -11,16 +11,22 @@ services:
     restart: unless-stopped
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --default-authentication-plugin=mysql_native_password
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      # Dev-specific credentials with a fallback to the shared values.
+      # compose/.env is read by the dev, demo AND prod compose files, so a bare
+      # ${MYSQL_PASSWORD} meant all three environments shared one database
+      # password — rotating dev silently broke demo (2026-09-07). The
+      # ARCUS_DEV_* names let dev hold its own credentials; the ":-" fallback
+      # keeps this file working on any host where they are not set yet.
+      MYSQL_ROOT_PASSWORD: ${ARCUS_DEV_MYSQL_ROOT_PASSWORD:-${MYSQL_ROOT_PASSWORD}}
       MYSQL_DATABASE: arcus_dev
       MYSQL_USER: arcus_dev
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_PASSWORD: ${ARCUS_DEV_MYSQL_PASSWORD:-${MYSQL_PASSWORD}}
     volumes:
       - arcus_dev_mysql:/var/lib/mysql
     ports:
       - "127.0.0.1:3307:3306"
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${ARCUS_DEV_MYSQL_ROOT_PASSWORD:-${MYSQL_ROOT_PASSWORD}}"]
       interval: 5s
       timeout: 5s
       retries: 40
@@ -46,7 +52,7 @@ services:
       PORT: "3009"
       DB_HOST: mysql
       DB_PORT: "3306"
-      DATABASE_URL: mysql://arcus_dev:${MYSQL_PASSWORD}@mysql:3306/arcus_dev
+      DATABASE_URL: mysql://arcus_dev:${ARCUS_DEV_MYSQL_PASSWORD:-${MYSQL_PASSWORD}}@mysql:3306/arcus_dev
       RUN_SEED: "1"
       REMOTE_UPLOAD_SERVICE_URL: http://upload:3050/upload
       REMOTE_MEDIA_INTERNAL_BASE: http://upload:3050/uploads
