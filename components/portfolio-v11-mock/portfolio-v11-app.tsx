@@ -676,7 +676,6 @@ export function PortfolioV11App() {
     <div
       ref={rootRef}
         className={`portfolio-v11-root h-full${loadStatus === "loading" ? " is-host-loading" : ""}`}
-      data-theme="light"
         data-live={loadStatus === "ready" ? "true" : "false"}
         data-load={loadStatus}
     />

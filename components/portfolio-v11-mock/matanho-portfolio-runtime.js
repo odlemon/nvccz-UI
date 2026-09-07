@@ -5,7 +5,13 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   window.__PORTFOLIO_V11_NAV__ = options.onNavigate || (() => {});
 
   rootEl.innerHTML = options.shellHtml || '';
-  rootEl.dataset.theme = 'light';
+  // Honour the app-wide dark class. Hardcoding 'light' here left this module
+  // with a dark background (inherited from html.dark) but black text from its
+  // own light theme — unreadable — once any other module toggled dark mode.
+  rootEl.dataset.theme =
+    typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
+      ? 'dark'
+      : 'light';
   rootEl.classList.add('portfolio-v11-root');
 
   const __pv11Abort = new AbortController();
@@ -439,7 +445,12 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     // Expanded by default; a saved preference still wins.
     sidebarCollapsed: storage.get('matanho-portfolio-sidebar','expanded') !== 'expanded',
     mobileNavOpen: false,
-    theme: storage.get('matanho-portfolio-theme','light'),
+    theme: storage.get(
+      'matanho-portfolio-theme',
+      typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
+        ? 'dark'
+        : 'light',
+    ),
     liveData: false,
     hydrating: false,
     pageLoading: false,
