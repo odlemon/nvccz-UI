@@ -344,9 +344,9 @@ function integrationsPage(){const connectors=[['Core banking · CBZ','Bank state
 function settingsPage(){return `${pageHead('Configuration','Accounting Settings','Maintain entities, fiscal periods, currencies, approval policies, document retention and effective-dated accounting rules.',btn('Configuration history','settings-history')+btn('Save changes','save-settings','primary'))}
 <div class="grid two"><div class="stack">${card('Entity and fiscal settings','Core accounting structure',`<div class="form-grid two-col"><div class="field"><label>Legal entity</label><select class="select"><option>Matanho Capital Partners (Private) Limited</option></select></div><div class="field"><label>Functional currency</label><select class="select"><option>USD</option><option>ZiG</option></select></div><div class="field"><label>Fiscal year start</label><select class="select"><option>1 January</option></select></div><div class="field"><label>Current open period</label><select class="select"><option>July 2026</option></select></div><div class="field"><label>Posting tolerance</label><input class="input" value="0.01"></div><div class="field"><label>Default valuation</label><select class="select"><option>Weighted average cost</option></select></div></div>`)}${card('Multi-currency and rates','Functional, transaction and presentation currencies',`<div class="form-grid two-col"><div class="field"><label>Presentation currency</label><select class="select"><option>USD</option></select></div><div class="field"><label>Rate source</label><select class="select"><option>Treasury approved rates</option></select></div><div class="field"><label>Revaluation frequency</label><select class="select"><option>Month end</option><option>Daily</option></select></div><div class="field"><label>Missing-rate policy</label><select class="select"><option>Block posting</option></select></div></div><div class="note" style="margin-top:10px">All rates are effective-dated and require source evidence plus maker-checker approval.</div>`)}${card('Document and retention policy','Vault classification and lifecycle',`<div class="form-grid two-col"><div class="field"><label>Default retention</label><select class="select"><option>7 years</option><option>10 years</option></select></div><div class="field"><label>External sharing</label><select class="select"><option>Disabled by default</option></select></div><div class="field"><label>Watermark exports</label><select class="select"><option>Enabled</option></select></div><div class="field"><label>Version deletion</label><select class="select"><option>Not permitted</option></select></div></div>`)}</div><div class="stack sticky">${card('Posting policy','Validation and maker-checker',statusRows([['Manual journals','Maker + checker required','Enforced'],['Automatic journals','Control owner approval','Enforced'],['Backdated posting','Controller permission','Restricted'],['Closed periods','Finance Director unlock','Restricted'],['Large transactions','Threshold-based approval','Enforced']]))}${card('Approval thresholds','Configurable by action and entity',`<div class="mini-sheet"><div class="head"><strong>Action</strong><strong>Maker limit</strong><strong>Checker</strong><strong>Final approver</strong></div><div><span>Journal</span><span>${fmt(10000)}</span><span>Controller</span><span>Director > ${fmt(25000)}</span></div><div><span>Payment run</span><span>Any</span><span>Controller</span><span>Director + signatory</span></div><div><span>Tax pack</span><span>Tax Manager</span><span>Controller</span><span>Director</span></div><div><span>COA change</span><span>Accountant</span><span>Controller</span><span>System owner</span></div></div>`)}${card('Environment health','Operational resilience and service status',`${progressRow('Ledger service',100,'Operational')}${progressRow('Document rendering',100,'Operational')}${progressRow('Bank connectivity',96,'One sandbox connector','amber')}${progressRow('Identity service',100,'Operational')}${progressRow('Audit evidence ledger',100,'Operational')}`,btn('Open platform health','platform-health','soft small'))}</div></div>`}
 const pages={overview:overviewPage,ledger:ledgerPage,journals:journalsPage,cash:cashPage,reconciliation:reconciliationPage,payables:payablesPage,receivables:receivablesPage,inventory:inventoryPage,assets:assetsPage,investments:investmentsPage,expenses:expensesPage,coa:coaPage,fx:fxPage,consolidation:consolidationPage,reports:reportsPage,compliance:compliancePage,close:closePage,vault:vaultPage,approvals:approvalsPage,audit:auditPage,access:accessPage,integrations:integrationsPage,settings:settingsPage};
-function renderNav(){$('#nav').innerHTML=navGroups.map(([g,items])=>{const allowed=items.filter(([id])=>permittedPage(id));if(!allowed.length)return'';return `<div class="nav-group">${g}</div>${allowed.map(([id,label,ico,count])=>`<button class="nav-item ${state.page===id?'active':''}" data-page="${id}" title="${label}"><span class="nav-icon">${icon(ico)}</span><span class="nav-label">${label}</span>${count?`<span class="nav-count">${count}</span>`:''}</button>`).join('')}`}).join('')}
+function renderNav(){const navEl=$('#nav');if(!navEl)return;navEl.innerHTML=navGroups.map(([g,items])=>{const allowed=items.filter(([id])=>permittedPage(id));if(!allowed.length)return'';return `<div class="nav-group">${g}</div>${allowed.map(([id,label,ico,count])=>`<button class="nav-item ${state.page===id?'active':''}" data-page="${id}" title="${label}"><span class="nav-icon">${icon(ico)}</span><span class="nav-label">${label}</span>${count?`<span class="nav-count">${count}</span>`:''}</button>`).join('')}`}).join('')}
 function applyTheme(){rootEl.dataset.theme=state.theme;const themeBtn=$('#themeBtn');if(themeBtn)themeBtn.innerHTML=icon(state.theme==='dark'?'sun':'moon');$$('[data-action="apps-launcher"]').forEach(btn=>{btn.innerHTML=icon('apps')})}
-function render(){if(!permittedPage(state.page)){const first=navGroups.flatMap(x=>x[1]).find(x=>permittedPage(x[0]));state.page=first?first[0]:'overview'}renderNav();$('#main').innerHTML=(pages[state.page]||overviewPage)();$('#profileRole').textContent=state.role;$('#roleSelect').value=state.role;$('#entitySelect').value=state.entity;$('#periodSelect').value=state.period;applyTheme();$('#menuBtn').innerHTML=icon('menu');$('#bellBtn').innerHTML=icon('bell');$('#searchIcon').innerHTML=icon('search');$('#drawerClose').innerHTML=icon('x');$('#modalClose').innerHTML=icon('x');$('#commandIcon').innerHTML=icon('search');if(typeof window.__ACCOUNTING_V52_NAV__==='function')window.__ACCOUNTING_V52_NAV__(state.page)}
+function render(){if(!document.contains(rootEl))return;if(!permittedPage(state.page)){const first=navGroups.flatMap(x=>x[1]).find(x=>permittedPage(x[0]));state.page=first?first[0]:'overview'}renderNav();const mainEl=$('#main');if(!mainEl)return;mainEl.innerHTML=(pages[state.page]||overviewPage)();const setText8=(sel,v)=>{const el=$(sel);if(el)el.textContent=v};const setVal8=(sel,v)=>{const el=$(sel);if(el)el.value=v};const setHTML8=(sel,v)=>{const el=$(sel);if(el)el.innerHTML=v};setText8('#profileRole',state.role);setVal8('#roleSelect',state.role);setVal8('#entitySelect',state.entity);setVal8('#periodSelect',state.period);applyTheme();setHTML8('#menuBtn',icon('menu'));setHTML8('#bellBtn',icon('bell'));setHTML8('#searchIcon',icon('search'));setHTML8('#drawerClose',icon('x'));setHTML8('#modalClose',icon('x'));setHTML8('#commandIcon',icon('search'));if(typeof window.__ACCOUNTING_V52_NAV__==='function')window.__ACCOUNTING_V52_NAV__(state.page)}
 function goPage(id){if(!permittedPage(id))return deny(pagePermission[id]);state.page=id;if(typeof window.__ACCOUNTING_V52_NAV__==='function')window.__ACCOUNTING_V52_NAV__(id);closeDrawer();closeModal();closeCommand();$('#app').classList.remove('mobile-nav');render()}
 function ledgerDetail(id){const t=ledgerTxns.find(x=>x.id===id);if(!t)return;openDrawer(`${t.id} · ${t.status}`,`${t.account} · ${t.date}`,`<div class="grid three">${kpi('Debit',t.debit?fmt(t.debit,t.currency):'-','posted value','ledger')}${kpi('Credit',t.credit?fmt(t.credit,t.currency):'-','posted value','ledger')}${kpi('Currency',t.currency,'transaction currency','fx')}</div><div class="stack" style="margin-top:13px">${card('Transaction context','Source, dimensions and ownership',statusRows([['Description',t.desc,'Recorded'],['Source module',t.source,'Linked'],['Entity',t.entity,'Recorded'],['Department',t.dept,'Recorded'],['Maker',t.maker,'Recorded'],['Checker',t.checker,t.checker==='Blocked'?'Blocked':'Recorded']]))}${card('Posting evidence','Linked documents and source records',`<div class="pill-list"><span class="pill">Source record · ${t.source}</span><span class="pill">Posting certificate.pdf</span><span class="pill">Control validation.json</span></div><div class="note" style="margin-top:10px">This transaction is linked to its source record, approval trail and immutable posting event.</div>`)}${card('Audit history','Chronological record',`<div class="timeline"><div class="timeline-item"><div class="timeline-dot">1</div><div><strong>Record created</strong><span>${t.maker} · ${t.date}</span></div></div><div class="timeline-item"><div class="timeline-dot">2</div><div><strong>Control validation completed</strong><span>Dimensions, account rules and period validated</span></div></div><div class="timeline-item"><div class="timeline-dot">3</div><div><strong>${t.status==='Posted'?'Posted to ledger':'Current status: '+t.status}</strong><span>${t.checker}</span></div></div></div>`)}</div>`,btn('Open source record','source-record','soft')+btn('Export evidence','download-evidence','primary'))}
 function openRecordDrawer(title,subtitle,rows,actions=''){openDrawer(title,subtitle,statusRows(rows),actions)}
@@ -1653,7 +1653,7 @@ document.addEventListener('change',e=>{
 }, __ac52Sig);
 document.addEventListener('input',e=>{if(e.target.id==='v5CoaSearch'){v5State.coaSearch=e.target.value;clearTimeout(window.__v5Coa);window.__v5Coa=setTimeout(render,180)}}, __ac52Sig);
 
-state.page='overview';document.querySelector('#app')?.classList.add('collapsed');safeStore?.set?.('matanho-accounting-sidebar','collapsed');render();
+state.page=(typeof initialPage==='string'&&initialPage&&pages[initialPage])?initialPage:'overview';document.querySelector('#app')?.classList.add('collapsed');safeStore?.set?.('matanho-accounting-sidebar','collapsed');render();
 setTimeout(()=>{let last=0;try{last=Number(localStorage.getItem('matanho-v5-rate-check')||0)}catch{}if(Date.now()-last>6*60*60*1000){try{localStorage.setItem('matanho-v5-rate-check',String(Date.now()))}catch{}refreshOfficialRateV5()}},1200);
 window.MatanhoAccountingV5=Object.freeze({version:V5_VERSION,navigate:goPage,refreshRate:refreshOfficialRateV5,openReport:id=>{v5State.report=id||'pnl';document.querySelector('[data-action="v5-preview-report"]')?.click()},getBanks:()=>structuredClone(v5Banks)});
 })();
@@ -2375,7 +2375,9 @@ function createReversal8(id){const original=S.journals.find(x=>x.id===id);if(!or
 function postImportedBatch8(){const samples=[{kind:'receipt',bankId:S.ui.cashBank,currency:'USD',rate:1,counterparty:'Growth Fund I',account:'4120',vatRate:.15,date:'2026-08-01',reference:'RCPT-IMP-001',amount:18400,project:'Growth Fund I',description:'Imported fund administration fee'},{kind:'payment',bankId:S.ui.cashBank,currency:'USD',rate:1,counterparty:'Cloud Africa',account:'5140',vatRate:.15,date:'2026-08-01',reference:'PAY-IMP-002',amount:2400,project:'Corporate',description:'Imported data subscription'}];return samples.map(createCash8)}
 function reviewImpactJournal8(lines,currency='USD'){const v=validateJournal8(lines,'Cashbook');return `${journalPreview8(lines,currency)}<div class="v8-callout ${v.valid?'':'bad'}" style="margin-top:10px"><strong>${v.valid?'Balanced journal':'Validation exception'}</strong>${v.valid?`Debit and credit both equal ${money8(v.debit)}.`:esc8(v.errors.join(' '))}</div>`}
 
-function executePending8(){const pending=S.ui.pending||{},key=pending.key,p=pending.payload||{};S.ui.pending=null;save8();try{
+const AC52_LIVE_ACTION_KEYS=new Set(['coa-save']);
+function ac52DispatchBeforeCommit(key,payload){return window.dispatchEvent(new CustomEvent('matanho:before-action',{detail:{action:key,payload,dataset:{},state:{}},cancelable:true}))}
+function executePending8(){const pending=S.ui.pending||{},key=pending.key,p=pending.payload||{};S.ui.pending=null;save8();if(AC52_LIVE_ACTION_KEYS.has(key)){const proceed=ac52DispatchBeforeCommit(key,p);if(!proceed){closeModal();return}}try{
  switch(key){
   case 'cash-post':{const r=atomic8(()=>createCash8(p));success8('Cashbook entry posted',`${r.rec.id} created and balanced journal ${r.j.id} posted.`,'cash');break}
   case 'post-import':{const rows=atomic8(()=>postImportedBatch8());success8('Batch posted',`${rows.length} valid rows posted. Review rows remain quarantined.`,'cash');break}
@@ -2522,7 +2524,7 @@ function clickV8(e){const el=e.target.closest('[data-action]');if(!el)return;con
  case 'v8-run-due-recurring':confirm8('Process all due recurring schedules','All active schedules due through 31 Aug 2026','Each schedule will create a separately validated business record and journal, with duplicate-run protection.','run-due-recurring',{});break;
  case 'v8-add-account':accountModal8();break;
  case 'v8-edit-account':accountModal8(id);break;
- case 'v8-review-account':{const cls=value8('v8CoaEditClass'),p={original:id,code:value8('v8CoaCode'),name:value8('v8CoaName'),type:value8('v8CoaEditType'),natural:value8('v8CoaEditNatural'),posting:cls==='posting',control:cls==='control',active:value8('v8CoaEditStatus')==='Active'};confirm8('Apply Chart of Accounts change',`${p.code} · ${p.name}`,'The account master and reporting mapping will be versioned. Existing posted journal lines remain immutable.','coa-save',p);break}
+ case 'v8-review-account':{const cls=value8('v8CoaEditClass'),p={original:id,code:value8('v8CoaCode'),name:value8('v8CoaName'),type:value8('v8CoaEditType'),natural:value8('v8CoaEditNatural'),posting:cls==='posting',control:cls==='control',active:value8('v8CoaEditStatus')==='Active',financialStatement:value8('v8CoaEditReport')};confirm8('Apply Chart of Accounts change',`${p.code} · ${p.name}`,'The account master and reporting mapping will be versioned. Existing posted journal lines remain immutable.','coa-save',p);break}
  case 'v8-coa-history':openGenericInsight8('Chart of Accounts change history','Versioned structure, mapping and status events',panel8('Change audit','Impact-assessed account governance',table8(['Timestamp','User','Event','Account','Details','Status'],S.audit.filter(x=>/CHART_ACCOUNT/.test(x.action)).map(x=>`<tr><td>${new Date(x.time).toLocaleString()}</td><td>${x.user}</td><td>${x.action}</td><td>${x.record}</td><td>${x.detail}</td><td>${badge8(x.status)}</td></tr>`).join('')||'<tr><td colspan="6">No changes in this session.</td></tr>','850px')));break;
  case 'v8-import-coa':importCoaModal8();break;
  case 'v8-approval-detail':openApproval8(id);break;
@@ -2665,6 +2667,7 @@ const baseRender8=render;
 render=function(){baseRender8();setTimeout(enhance8,180)};
 normaliseState8();S.ui.sidebarExpanded=true;save8();render();setTimeout(enhance8,280);
 window.MatanhoAccountingV8=Object.freeze({version:VERSION,navigate:p=>rerender8(p),getState:()=>structuredClone(S),postJournal:postJournal8,validateJournal:validateJournal8,runInvestmentAccruals:runAccrualBatch8,previewReport:previewReport8});
+rootEl.__ac52Hydrate=function(source){if(!document.contains(rootEl))return;if(!source)return;if(Array.isArray(source.accounts))S.accounts.splice(0,S.accounts.length,...source.accounts);if(Array.isArray(source.journals))S.journals.splice(0,S.journals.length,...source.journals);save8();render()};
 })();
 
 
@@ -4975,6 +4978,13 @@ document.title='Matanho Accounting Operating System · Enterprise Finance v52';
     if (typeof afterRenderV5 === 'function') afterRenderV5()
   })
 
+  function ac52HydrateFromBackend(payload) {
+    const source = (payload && payload.data) || payload || {};
+    if (typeof rootEl.__ac52Hydrate === 'function') {
+      rootEl.__ac52Hydrate(source);
+    }
+  }
+
   api = {
     setPage(page) {
       if (typeof permittedPage === 'function' && !permittedPage(page)) return;
@@ -4990,6 +5000,34 @@ document.title='Matanho Accounting Operating System · Enterprise Finance v52';
       delete window.__ACCOUNTING_V52_NAV__;
       rootEl.innerHTML = '';
     },
+    hydrate(payload) {
+      ac52HydrateFromBackend(payload);
+    },
+    beginLiveLoad() {
+      try { rootEl.classList.add('is-hydrating'); } catch (_) {}
+    },
+    endLiveLoad() {
+      try { rootEl.classList.remove('is-hydrating'); } catch (_) {}
+    },
+    failLiveLoad(message) {
+      try { rootEl.classList.remove('is-hydrating'); rootEl.classList.add('is-host-error'); } catch (_) {}
+      if (typeof notify8 === 'function') notify8('Live data failed', message || 'Could not load accounting data.', 'bad');
+    },
+    commitSuccess(title, message, pageId) {
+      if (typeof success8 === 'function') success8(title, message, pageId);
+    },
+    commitError(err) {
+      if (typeof actionError8 === 'function') actionError8(err);
+      else console.error(err);
+    },
   };
+  window.MatanhoAccountingV52 = Object.assign(window.MatanhoAccountingV52 || {}, {
+    hydrate: api.hydrate,
+    beginLiveLoad: api.beginLiveLoad,
+    endLiveLoad: api.endLiveLoad,
+    failLiveLoad: api.failLiveLoad,
+    commitSuccess: api.commitSuccess,
+    commitError: api.commitError,
+  });
   return api;
 }

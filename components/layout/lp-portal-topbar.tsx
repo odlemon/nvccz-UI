@@ -7,6 +7,7 @@ import { Bell, Building2, CalendarDays, FileText, Menu, Search, X } from "lucide
 import { CiLogout, CiSettings, CiUser } from "react-icons/ci"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { ORG_NAME, ORG_LOGO_PATH } from "@/lib/branding"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -235,8 +236,8 @@ export function LpPortalTopbar() {
           aria-label="Matanho home"
         >
           <img
-            src="/new_logo.png"
-            alt="Matanho"
+            src={ORG_LOGO_PATH}
+            alt={ORG_NAME}
             className="h-10 w-auto object-contain"
             height={40}
             width={140}

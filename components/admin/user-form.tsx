@@ -69,7 +69,7 @@ export function UserForm({ isOpen, onClose, onSubmit, editingUser, loading }: Us
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-hidden overflow-y-auto rounded-2xl">
+      <DialogContent className="sm:max-w-2xl md:max-w-4xl max-h-[90vh] overflow-hidden overflow-y-auto rounded-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <User className="w-5 h-5" />

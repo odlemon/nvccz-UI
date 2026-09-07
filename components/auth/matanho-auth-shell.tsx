@@ -4,6 +4,7 @@ import type { ReactNode } from "react"
 import { motion } from "framer-motion"
 import Image from "next/image"
 import { cn } from "@/lib/utils"
+import { ORG_NAME, ORG_LOGO_PATH, IS_CUSTOM_BRAND } from "@/lib/branding"
 
 /** Matanho brand teal sampled from the login crop */
 export const MATANHO_TEAL = "#14C4CE"
@@ -47,9 +48,23 @@ export function MatanhoAuthShell({
             transition={{ duration: 0.55 }}
             className="pt-16 xl:pt-24"
           >
-            <h1 className="text-[44px] xl:text-[52px] font-semibold tracking-tight text-white leading-none">
-              matanho
-            </h1>
+            {IS_CUSTOM_BRAND ? (
+              <div className="inline-block rounded-xl bg-white px-4 py-3">
+                <Image
+                  src={ORG_LOGO_PATH}
+                  alt={ORG_NAME}
+                  width={220}
+                  height={72}
+                  unoptimized
+                  className="h-10 xl:h-12 w-auto object-contain"
+                  priority
+                />
+              </div>
+            ) : (
+              <h1 className="text-[44px] xl:text-[52px] font-semibold tracking-tight text-white leading-none">
+                matanho
+              </h1>
+            )}
             <div
               className="mt-2.5 h-[3px] w-9 rounded-full"
               style={{ backgroundColor: MATANHO_TEAL }}
@@ -86,15 +101,29 @@ export function MatanhoAuthShell({
           >
             {/* Mobile: official logo asset */}
             <div className="lg:hidden mb-6 flex flex-col items-center text-center">
-              <Image
-                src="/new_logo.png"
-                alt="Matanho — Investment Management ERP"
-                width={200}
-                height={64}
-                unoptimized
-                className="h-11 w-auto object-contain mb-3 brightness-0 invert"
-                priority
-              />
+              {IS_CUSTOM_BRAND ? (
+                <div className="rounded-lg bg-white px-3 py-2 mb-3">
+                  <Image
+                    src={ORG_LOGO_PATH}
+                    alt={ORG_NAME}
+                    width={200}
+                    height={64}
+                    unoptimized
+                    className="h-9 w-auto object-contain"
+                    priority
+                  />
+                </div>
+              ) : (
+                <Image
+                  src={ORG_LOGO_PATH}
+                  alt="Matanho — Investment Management ERP"
+                  width={200}
+                  height={64}
+                  unoptimized
+                  className="h-11 w-auto object-contain mb-3 brightness-0 invert"
+                  priority
+                />
+              )}
               <p className="text-white/85 text-sm max-w-xs">
                 The infrastructure behind every investment.
               </p>
