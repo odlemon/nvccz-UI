@@ -2215,7 +2215,7 @@ function normaliseState8(){
    {id:'CB-0041',date:'2026-07-28',type:'Transfer',bankId:'BANK-CBZ-USD',counterparty:'Stanbic USD Reserve',project:'Corporate',currency:'USD',amount:125000,baseAmount:125000,reference:'TRANSFER',description:'Transfer to reserve account',journal:'JE-2026-0111',status:'Posted'}
   ];
  }
- if(!S.approvals.some(x=>x.record==='JE-2026-0115')){
+ if(!S.ac52RealApprovalsLoaded&&!S.approvals.some(x=>x.record==='JE-2026-0115')){
   const lines=[line8('5140',9200,0,'Legal due diligence · Project Atlas','Growth Fund I'),line8('1101',0,9200,'Cash payment pending approval','Growth Fund I')];
   S.journals.unshift({id:'JE-2026-0115',date:'2026-08-01',reference:'DD-ATLAS-081',description:'Project Atlas legal due diligence',source:'Manual',sourceId:'DD-ATLAS-081',currency:'USD',rate:1,status:'Submitted',maker:'Farai Mapfumo',checker:null,createdAt:'2026-08-01T07:50:00Z',postedAt:null,cashFlow:'Operating',evidence:['Due diligence engagement.pdf'],immutable:false,lines,total:9200});
   S.approvals.unshift({id:'APR-0009',type:'Journal',record:'JE-2026-0115',title:'Project Atlas legal due diligence',amount:9200,currency:'USD',maker:'Farai Mapfumo',requiredRole:'Finance Director or CEO',status:'Pending',createdAt:'2026-08-01T07:50:00Z'});
@@ -2676,7 +2676,7 @@ rootEl.__ac52Hydrate=function(source){if(!document.contains(rootEl))return;if(!s
  if(Array.isArray(source.arInvoices))S.invoices.splice(0,S.invoices.length,...source.arInvoices.map(x=>({id:x.id,customerId:x.id,date:x.date,due:x.due,currency:'USD',net:x.gross,vat:0,total:x.gross,outstanding:x.open,project:x.project,status:x.status,journal:x.journal})));
  // Approval Centre reads S.approvals — real PENDING journals awaiting posting, the one
  // maker-checker queue genuinely backed by live data (see adaptAc52Approvals).
- if(Array.isArray(source.approvals))S.approvals.splice(0,S.approvals.length,...source.approvals);
+ if(Array.isArray(source.approvals)){S.approvals.splice(0,S.approvals.length,...source.approvals);S.ac52RealApprovalsLoaded=true}
  save8();render()};
 })();
 
