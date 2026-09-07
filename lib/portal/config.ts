@@ -68,7 +68,11 @@ export const STAFF_PUBLIC_PASS_THROUGH = [
   '/home',
   '/portfolio',
   '/payroll-v6',
-  '/accounting-v52',
+  // The V52 accounting port now serves /accounting (renamed from
+  // /accounting-v52). Note this list is matched with startsWith, so this entry
+  // also covers /accounting-legacy — the frozen legacy module, which previously
+  // required login. Narrow this if legacy must stay authenticated.
+  '/accounting',
   '/procurement-v23',
   '/performance',
   '/fundraising-kyc',
