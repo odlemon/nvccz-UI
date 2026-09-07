@@ -42,6 +42,8 @@ declare global {
       closeOverlays?: () => void
       setActionBusy?: (busy: boolean, message?: string, actionName?: string) => void
       setDealTab?: (tab: string) => void
+      setFundPerformanceSnapshots?: (fundId: string, snapshots: unknown[]) => void
+      setFundDocuments?: (fundId: string, documents: unknown[]) => void
     }
   }
 }

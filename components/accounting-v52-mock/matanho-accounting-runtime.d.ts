@@ -9,5 +9,11 @@ declare module "@/components/accounting-v52-mock/matanho-accounting-runtime" {
   ): {
     setPage: (page: string) => void
     destroy: () => void
+    hydrate?: (payload: unknown) => void
+    beginLiveLoad?: () => void
+    endLiveLoad?: () => void
+    failLiveLoad?: (message?: string) => void
+    commitSuccess?: (title: string, message?: string, pageId?: string) => void
+    commitError?: (err: unknown) => void
   }
 }
