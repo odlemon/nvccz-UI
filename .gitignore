@@ -34,3 +34,14 @@ next-env.d.ts
 
 # claude code worktrees
 .claude/worktrees/
+# Local-only secrets (never commit) - added 2026-09-07 after credential rotation
+.secrets/
+
+# Credential-bearing files that must never be committed (added 2026-09-07).
+# The scratch ops helpers under scripts/_*.py accumulated hard-coded server and
+# database passwords over time; 29 of them still hold live values. _ssh_creds.py
+# is the deliberate exception: it holds no secret, it reads one from
+# .secrets/ssh.env or $ARCUS_SSH_PASSWORD.
+design-refs/credentials-and-database-access.md
+scripts/_*.py
+!scripts/_ssh_creds.py

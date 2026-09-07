@@ -17,10 +17,11 @@ import sys
 from pathlib import Path
 
 import paramiko
+from _ssh_creds import SSH_PASSWORD  # rotated 2026-09-07; value lives in .secrets/ssh.env
 
 HOST = "31.220.82.129"
 USER = "root"
-PASSWORD = "Debgjnk4@!z"
+PASSWORD = SSH_PASSWORD
 API = Path(r"C:\Users\lysp\Downloads\nvccz")
 SEED = API / "scripts" / "seed-portfolio-v11-full-demo.ts"
 ASSERT = API / "scripts" / "lib" / "assert-dev-database.ts"
