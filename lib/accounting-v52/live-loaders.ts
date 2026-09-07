@@ -2,6 +2,7 @@ import { chartOfAccountsApi } from '@/lib/api/chart-of-accounts-api'
 import { accountingApi } from '@/lib/api/accounting-api'
 import { cashbookApi } from '@/lib/api/cashbook-api'
 import { usersApi } from '@/lib/api/users-api'
+import { getSTIDashboard } from '@/lib/api/short-term-investments-api'
 import {
   adaptAc52Accounts,
   adaptAc52Journals,
@@ -12,10 +13,13 @@ import {
   adaptAc52ArInvoices,
   adaptAc52ArCustomers,
   adaptAc52Claims,
+  adaptAc52InventoryItems,
+  adaptAc52FixedAssets,
+  adaptAc52Investments,
 } from './adapters'
 import type { Ac52HydratePayload } from './types'
 
-export type Ac52DataScope = 'coa' | 'journals' | 'cash' | 'reconciliation' | 'payables' | 'receivables' | 'expenses'
+export type Ac52DataScope = 'coa' | 'journals' | 'cash' | 'reconciliation' | 'payables' | 'receivables' | 'expenses' | 'inventory' | 'assets' | 'investments'
 
 export type Ac52ScopePlan = {
   primary: Ac52DataScope[]
@@ -43,6 +47,12 @@ export function scopesForAc52Page(page: string): Ac52ScopePlan {
       return { primary: ['receivables'] }
     case 'expenses':
       return { primary: ['expenses'] }
+    case 'inventory':
+      return { primary: ['inventory'] }
+    case 'assets':
+      return { primary: ['assets'] }
+    case 'investments':
+      return { primary: ['investments'] }
     default:
       return { primary: [] }
   }
@@ -180,6 +190,21 @@ export async function loadAc52Scopes(scopes: Ac52DataScope[]): Promise<Ac52Hydra
       }
       data.claims = adaptAc52Claims(expRes!.data as any, userNames)
     }
+  }
+
+  if (wanted.includes('inventory')) {
+    const res = await settle(accountingApi.getInventoryItems({ limit: 200 }), 'inventoryItems', errors)
+    if (Array.isArray(res?.data?.items)) data.inventoryItems = adaptAc52InventoryItems(res!.data!.items)
+  }
+
+  if (wanted.includes('assets')) {
+    const res = await settle(accountingApi.getAssets({ limit: 200 }), 'assets', errors)
+    if (Array.isArray(res?.data?.assets)) data.fixedAssets = adaptAc52FixedAssets(res!.data!.assets as any)
+  }
+
+  if (wanted.includes('investments')) {
+    const res = await settle(getSTIDashboard({}), 'stiDashboard', errors)
+    if (Array.isArray(res?.data?.instruments)) data.investments = adaptAc52Investments(res!.data!.instruments)
   }
 
   return { data, meta: { errors } }

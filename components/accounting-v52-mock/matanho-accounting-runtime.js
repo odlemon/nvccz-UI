@@ -4416,6 +4416,7 @@ installNav();installPages();const baseRender28=render;render=function(){baseRend
 rootEl.__ac52HydrateReconBanks=function(banks,lines){if(!document.contains(rootEl))return;if(Array.isArray(banks)&&banks.length){reconBanks.splice(0,reconBanks.length,...banks);if(!banks.some(b=>b.id===V28.reconBank))V28.reconBank=banks[0].id}if(Array.isArray(lines))reconLines.splice(0,reconLines.length,...lines);if(typeof render==='function')render()};
 rootEl.__ac52HydrateApAr=function(bills,vendors,invoices,customers){if(!document.contains(rootEl))return;if(Array.isArray(bills)){apBills.splice(0,apBills.length,...bills);try{const g=navGroups.find(g=>g[1].some(x=>x[0]==='payables'));const item=g&&g[1].find(x=>x[0]==='payables');if(item){const openCount=apBills.filter(x=>x.open>0).length;item[3]=openCount?String(openCount):''}}catch(_){}}if(Array.isArray(vendors))apVendors.splice(0,apVendors.length,...vendors);if(Array.isArray(invoices)){arInvoices.splice(0,arInvoices.length,...invoices);try{const g=navGroups.find(g=>g[1].some(x=>x[0]==='receivables'));const item=g&&g[1].find(x=>x[0]==='receivables');if(item){const openCount=arInvoices.filter(x=>x.open>0).length;item[3]=openCount?String(openCount):''}}catch(_){}}if(Array.isArray(customers))arCustomers.splice(0,arCustomers.length,...customers);if(typeof render==='function')render()};
 rootEl.__ac52HydrateClaims=function(items){if(!document.contains(rootEl))return;if(Array.isArray(items)){claims.splice(0,claims.length,...items);try{const g=navGroups.find(g=>g[1].some(x=>x[0]==='expenses'));const item=g&&g[1].find(x=>x[0]==='expenses');if(item){const reviewCount=claims.filter(x=>x.status==='Review').length;item[3]=reviewCount?String(reviewCount):''}}catch(_){}}if(typeof render==='function')render()};
+rootEl.__ac52HydrateRegisters=function(inv,fixedAssets,stiInvestments){if(!document.contains(rootEl))return;if(Array.isArray(inv))inventory.splice(0,inventory.length,...inv);if(Array.isArray(fixedAssets))assets.splice(0,assets.length,...fixedAssets);if(Array.isArray(stiInvestments))investments.splice(0,investments.length,...stiInvestments);if(typeof render==='function')render()};
 })();
 
 
@@ -5000,6 +5001,12 @@ document.title='Matanho Accounting Operating System · Enterprise Finance v52';
     // Expenses & Claims' visible page (v34 layer) reads its own claims array, separate from S.
     if (Array.isArray(source.claims) && typeof rootEl.__ac52HydrateClaims === 'function') {
       rootEl.__ac52HydrateClaims(source.claims);
+    }
+    // Inventory/Fixed Assets (v51 layer) and Short-Term Investments (v17 layer) each read their
+    // own module-level arrays, separate from S — same situation as the hooks above.
+    if ((Array.isArray(source.inventoryItems) || Array.isArray(source.fixedAssets) || Array.isArray(source.investments))
+        && typeof rootEl.__ac52HydrateRegisters === 'function') {
+      rootEl.__ac52HydrateRegisters(source.inventoryItems, source.fixedAssets, source.investments);
     }
   }
 

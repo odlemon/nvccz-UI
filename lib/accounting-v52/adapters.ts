@@ -1,6 +1,7 @@
 import type { ChartOfAccount } from '@/lib/api/chart-of-accounts-api'
-import type { PurchaseInvoice, Vendor, Invoice, Customer, Expense } from '@/lib/api/accounting-api'
-import type { Ac52Account, Ac52Journal, Ac52Bank, Ac52ReconciliationLine, Ac52ApBill, Ac52ApVendor, Ac52ArInvoice, Ac52ArCustomer, Ac52Claim } from './types'
+import type { PurchaseInvoice, Vendor, Invoice, Customer, Expense, InventoryItem, Asset } from '@/lib/api/accounting-api'
+import type { DashboardInstrument } from '@/lib/api/short-term-investments-api'
+import type { Ac52Account, Ac52Journal, Ac52Bank, Ac52ReconciliationLine, Ac52ApBill, Ac52ApVendor, Ac52ArInvoice, Ac52ArCustomer, Ac52Claim, Ac52InventoryItem, Ac52FixedAsset, Ac52Investment } from './types'
 
 /** Raw shape of GET /cashbook/banks rows. */
 type RawCashbookBank = {
@@ -306,5 +307,85 @@ export function adaptAc52Claims(rows: Expense[], userNames: Map<string, string>)
     receipts: r.receiptNumber ? 1 : 0,
     policy: r.receiptNumber ? 'Compliant' : 'Missing receipt',
     status: claimStatusLabel(r.status),
+  }))
+}
+
+/** Adapt live inventory items into the v51 Inventory Accounting page's `inventory` array. No warehouse/category/physical-count system exists in the backend, so those carry honest neutral defaults rather than an invented location or variance. */
+export function adaptAc52InventoryItems(rows: InventoryItem[]): Ac52InventoryItem[] {
+  return rows.map((r) => {
+    const qty = Number(r.quantityOnHand) || 0
+    const unitCost = Number(r.costOfPurchase) || 0
+    return {
+      sku: r.skuNumber || r.id,
+      item: r.itemName,
+      category: 'General',
+      warehouse: 'Main warehouse',
+      qty,
+      unitCost,
+      value: qty * unitCost,
+      countVar: 0,
+      obsolete: 'No',
+      status: r.isActive ? 'Controlled' : 'Review',
+    }
+  })
+}
+
+const DEPRECIATION_METHOD_LABEL: Record<string, string> = {
+  STRAIGHT_LINE: 'Straight line',
+  REDUCING_BALANCE: 'Reducing balance',
+  UNITS_OF_PRODUCTION: 'Units of production',
+}
+
+const ASSET_STATUS_LABEL: Record<string, string> = {
+  IN_USE: 'Active',
+  DISPOSED: 'Disposed',
+  UNDER_MAINTENANCE: 'Under maintenance',
+}
+
+/** Adapt live fixed assets into the v51 Fixed Assets page's `assets` array. `accum` (accumulated depreciation) is derived from real cost minus real book value rather than re-fetched, since the backend doesn't expose it as its own field. `custodian` has no backend field and defaults honestly to 'Unassigned'. */
+export function adaptAc52FixedAssets(rows: Asset[]): Ac52FixedAsset[] {
+  return rows.map((r) => {
+    const cost = Number(r.cost) || 0
+    const nbv = Number(r.currentBookValue) || 0
+    return {
+      id: r.id,
+      desc: r.assetName,
+      category: r.assetAccount?.accountName || 'Equipment',
+      location: r.location || 'Unassigned',
+      custodian: 'Unassigned',
+      cost,
+      accum: Math.max(0, cost - nbv),
+      nbv,
+      life: `${r.usefulLifeYears} years`,
+      method: DEPRECIATION_METHOD_LABEL[r.depreciationMethod] || r.depreciationMethod,
+      status: ASSET_STATUS_LABEL[r.status] || r.status || 'Active',
+    }
+  })
+}
+
+const STI_STATUS_LABEL: Record<string, string> = { ACTIVE: 'Active', SETTLED: 'Settled', VOIDED: 'Voided' }
+
+/**
+ * Adapt the live STI dashboard's instrument summaries into the v17 Short-Term Investments page's
+ * `investments` array. Uses the dashboard endpoint (not the raw instrument list) because it returns
+ * server-computed accruedInterest/carryingValue — recomputing day-count/compounding client-side
+ * would risk getting the accrual math wrong. `type` and `limit` (concentration-limit check) have no
+ * equivalent on this response shape, so they carry an honest '—' rather than a fabricated classification
+ * or a false compliance claim.
+ */
+export function adaptAc52Investments(rows: DashboardInstrument[]): Ac52Investment[] {
+  const now = Date.now()
+  return rows.map((r) => ({
+    id: r.instrumentId,
+    issuer: r.broker,
+    type: '—',
+    currency: r.currencyCode,
+    principal: Number(r.principal) || 0,
+    rate: Number(r.apyAsOf) || 0,
+    maturity: (r.maturityDate || '').slice(0, 10),
+    days: Math.max(0, Math.ceil((new Date(r.maturityDate).getTime() - now) / 86400000)),
+    carrying: Number(r.carryingValue) || 0,
+    limit: '—',
+    status: STI_STATUS_LABEL[r.status] || r.status,
   }))
 }

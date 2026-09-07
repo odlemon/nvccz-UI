@@ -153,6 +153,50 @@ export type Ac52Claim = {
   status: string
 }
 
+/** Shape the runtime's v51-layer `inventory` array expects (matanho-accounting-runtime.js invPage). */
+export type Ac52InventoryItem = {
+  sku: string
+  item: string
+  category: string
+  warehouse: string
+  qty: number
+  unitCost: number
+  value: number
+  countVar: number
+  obsolete: string
+  status: string
+}
+
+/** Shape the runtime's v51-layer `assets` array expects (matanho-accounting-runtime.js assetPage). */
+export type Ac52FixedAsset = {
+  id: string
+  desc: string
+  category: string
+  location: string
+  custodian: string
+  cost: number
+  accum: number
+  nbv: number
+  life: string
+  method: string
+  status: string
+}
+
+/** Shape the runtime's v17-layer `investments` array expects (matanho-accounting-runtime.js investments17). */
+export type Ac52Investment = {
+  id: string
+  issuer: string
+  type: string
+  currency: string
+  principal: number
+  rate: number
+  maturity: string
+  days: number
+  carrying: number
+  limit: string
+  status: string
+}
+
 export type Ac52HydratePayload = {
   data?: {
     accounts?: Ac52Account[]
@@ -166,5 +210,8 @@ export type Ac52HydratePayload = {
     arInvoices?: Ac52ArInvoice[]
     arCustomers?: Ac52ArCustomer[]
     claims?: Ac52Claim[]
+    inventoryItems?: Ac52InventoryItem[]
+    fixedAssets?: Ac52FixedAsset[]
+    investments?: Ac52Investment[]
   }
 }
