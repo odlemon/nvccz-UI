@@ -719,21 +719,35 @@ html.dark [data-arcus-shared-topbar] button,
   color: #94a3b8 !important;
 }
 
-/* Payroll / Accounting / Procurement sidebar */
+/* Payroll / Accounting sidebar — these render a white sidebar, so dark text is correct */
 .payroll-v6-root .sidebar,
-.accounting-v52-root .sidebar,
-.procurement-v23-root .sidebar {
+.accounting-v52-root .sidebar {
   color: #000000 !important;
 }
 .payroll-v6-root .sidebar .nav-item,
-.accounting-v52-root .sidebar .nav-item,
-.procurement-v23-root .sidebar .nav-item {
+.accounting-v52-root .sidebar .nav-item {
   color: #111111 !important;
 }
 .payroll-v6-root .sidebar .nav-item:hover,
-.accounting-v52-root .sidebar .nav-item:hover,
-.procurement-v23-root .sidebar .nav-item:hover {
+.accounting-v52-root .sidebar .nav-item:hover {
   color: #000000 !important;
+}
+
+/* Procurement sidebar renders a dark navy background (like Performance's), so it
+   needs light text — the shared Payroll/Accounting #111111 rule above assumed a
+   white sidebar and made Procurement's nav labels unreadable. */
+.procurement-v23-root .sidebar {
+  color: #cfd6e4 !important;
+}
+.procurement-v23-root .sidebar .nav-item {
+  color: #aeb9ca !important;
+}
+.procurement-v23-root .sidebar .nav-item:hover,
+.procurement-v23-root .sidebar .nav-item.active {
+  color: #ffffff !important;
+}
+.procurement-v23-root .sidebar .nav-group {
+  color: #7f8ba1 !important;
 }
 
 /* ── 4. Consistent header area ─────────────────────────────────────────── */

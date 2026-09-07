@@ -14,8 +14,9 @@ export function startProcurementV23Runtime(rootEl, runtimeOptions = {}) {
   );
 
   rootEl.innerHTML = runtimeOptions.shellHtml || '';
-  rootEl.dataset.theme = rootEl.dataset.theme || 'light';
+  rootEl.dataset.theme = rootEl.dataset.theme || (document.documentElement.classList.contains('dark') ? 'dark' : 'light');
   rootEl.classList.add('procurement-v23-root');
+  rootEl.classList.toggle('dark', rootEl.dataset.theme === 'dark');
 
   const __pr23Abort = new AbortController();
   const __pr23Sig = { signal: __pr23Abort.signal };
@@ -382,6 +383,7 @@ document.addEventListener('click',e=>{
  if(!a)return;const action=a.dataset.action,id=a.dataset.id;
  switch(action){
   case 'toggle-sidebar':state.expanded=!state.expanded;render();break;
+  case 'toggle-theme':{const next=rootEl.dataset.theme==='dark'?'light':'dark';rootEl.dataset.theme=next;rootEl.classList.toggle('dark',next==='dark');document.documentElement.classList.toggle('dark',next==='dark');try{localStorage.setItem('arcus-theme',next)}catch(err){}break}
   case 'mobile-menu':$('#app').classList.toggle('mobile-open');break;
   case 'close-overlay':closeOverlay();break;
   case 'search':openModal('Search Matanho procurement','Search across the current entity and your access scope.',`<div class="field"><label>Search</label><input id="globalSearch" autofocus placeholder="Plan, PR, tender, vendor, PO, invoice or document UID"></div><div class="list" style="margin-top:12px"><div class="list-row" data-page="tenders"><div class="list-main"><strong>TN-2026-014</strong><span>Group Enterprise Network & Cybersecurity Services</span></div></div><div class="list-row" data-page="vendors"><div class="list-main"><strong>TechNova Solutions</strong><span>Prequalified technology vendor</span></div></div><div class="list-row" data-page="documents"><div class="list-main"><strong>DOC-00184</strong><span>FY 2026 Consolidated Procurement Plan</span></div></div></div>`,btn('Search','perform-search','primary'));break;

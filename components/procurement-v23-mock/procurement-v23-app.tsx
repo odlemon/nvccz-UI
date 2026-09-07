@@ -52,7 +52,6 @@ export function ProcurementV23App() {
     <div
       ref={rootRef}
       className="procurement-v23-root h-full"
-      data-theme="light"
     />
   )
 }
