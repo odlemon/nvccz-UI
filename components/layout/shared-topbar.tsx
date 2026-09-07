@@ -142,7 +142,7 @@ function SharedTopbarInner({ currentModule, moduleActions, hideThemeToggle = fal
           </div>
 
           {/* Center Section - Search */}
-          <div className="flex-1 max-w-md mx-8">
+          <div className="flex-1 min-w-0 max-w-md mx-8">
             <div className="relative">
               <CiSearch size={30} className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
               <Input

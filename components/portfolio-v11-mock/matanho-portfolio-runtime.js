@@ -25,7 +25,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     const number = (abs / divisor).toLocaleString(undefined, { maximumFractionDigits: suffix ? 1 : 0 });
     return `${value < 0 ? '-' : ''}${symbols[currency] || `${currency} `}${number}${suffix}`;
   };
-  const pct = value => `${Number(value).toFixed(1)}%`;
+  const pct = value => { const n = Number(value); return `${Number.isFinite(n) ? n.toFixed(1) : '0.0'}%`; };
   const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
   const escapeHTML = value => String(value ?? '').replace(/[&<>'"]/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[char]));
   const initials = name => name.split(/\s+/).map(part => part[0]).join('').slice(0,2).toUpperCase();
@@ -148,32 +148,33 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
 
   const icon = (name, className = '') => `<svg class="${className}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${iconPaths[name] || iconPaths.file}</svg>`;
 
+  /** Items with `count: true` show live total-record badges (not “needs attention”). */
   const navGroups = [
     { label: 'INVESTMENTS', items: [
       { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
-      { id: 'deals', label: 'Deal Flow', icon: 'briefcase', badge: '198' },
-      { id: 'funds', label: 'Funds', icon: 'layers' },
-      { id: 'capital-calls', label: 'Capital Calls', icon: 'wallet', badge: '8' },
-      { id: 'companies', label: 'Portfolio Companies', icon: 'building', badge: '42' }
+      { id: 'deals', label: 'Deal Flow', icon: 'briefcase', count: true },
+      { id: 'funds', label: 'Funds', icon: 'layers', count: true },
+      { id: 'capital-calls', label: 'Capital Calls', icon: 'wallet', count: true },
+      { id: 'companies', label: 'Portfolio Companies', icon: 'building', count: true }
     ]},
     { label: 'FUND OPERATIONS', items: [
-      { id: 'cash-accounts', label: 'Client / Fund Accounts', icon: 'bank', badge: '12' },
+      { id: 'cash-accounts', label: 'Client / Fund Accounts', icon: 'bank', count: true },
       { id: 'cash-overview', label: 'Cash Overview', icon: 'dollar' },
       { id: 'cash-ledger', label: 'Cash Ledger', icon: 'list' },
-      { id: 'cash-reservations', label: 'Reservations', icon: 'lock', badge: '4' },
-      { id: 'statement-imports', label: 'Statement Imports', icon: 'upload', badge: '2' },
-      { id: 'reconciliations', label: 'Reconciliations', icon: 'refresh', badge: '7' },
-      { id: 'exceptions', label: 'Exceptions', icon: 'alert', badge: '5' },
+      { id: 'cash-reservations', label: 'Reservations', icon: 'lock', count: true },
+      { id: 'statement-imports', label: 'Statement Imports', icon: 'upload', count: true },
+      { id: 'reconciliations', label: 'Reconciliations', icon: 'refresh', count: true },
+      { id: 'exceptions', label: 'Exceptions', icon: 'alert', count: true },
       { id: 'period-close', label: 'Period Close & GL', icon: 'check-circle' }
     ]},
     { label: 'REPORTING & RECORDS', items: [
-      { id: 'reporting', label: 'Reporting Schedules', icon: 'calendar', badge: '5' },
+      { id: 'reporting', label: 'Reporting Schedules', icon: 'calendar', count: true },
       { id: 'fund-performance', label: 'Fund Performance', icon: 'file-chart' },
-      { id: 'lps', label: 'LP Management', icon: 'users' },
-      { id: 'documents-vault', label: 'Documents Vault', icon: 'folder', badge: '36' },
-      { id: 'reports-vault', label: 'Reports Vault', icon: 'file-chart', badge: '14' },
-      { id: 'e-signatures', label: 'E-Signatures', icon: 'edit', badge: '3' },
-      { id: 'mailer-lists', label: 'Mailer Lists', icon: 'mail', badge: '6' }
+      { id: 'lps', label: 'LP Management', icon: 'users', count: true },
+      { id: 'documents-vault', label: 'Documents Vault', icon: 'folder', count: true },
+      { id: 'reports-vault', label: 'Reports Vault', icon: 'file-chart', count: true },
+      { id: 'e-signatures', label: 'E-Signatures', icon: 'edit', count: true },
+      { id: 'mailer-lists', label: 'Mailer Lists', icon: 'mail', count: true }
     ]},
     { label: 'WORKSPACE', items: [
       { id: 'settings', label: 'Settings & Integrations', icon: 'settings' }
@@ -283,7 +284,8 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   function documentIdForName(name) {
     const normalise = value => String(value || '').replace(/\.(pdf|docx|xlsx|xls|csv|zip)$/i,'').trim().toLowerCase();
     const target = normalise(name);
-    return (documents.find(doc => normalise(doc.name) === target) || documents[0]).id;
+    const hit = documents.find(doc => normalise(doc.name) === target) || documents[0];
+    return hit ? hit.id : '';
   }
 
   documents.forEach((doc,index) => Object.assign(doc, {
@@ -437,10 +439,16 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     sidebarCollapsed: storage.get('matanho-portfolio-sidebar','collapsed') !== 'expanded',
     mobileNavOpen: false,
     theme: storage.get('matanho-portfolio-theme','light'),
+    liveData: false,
+    hydrating: false,
+    pageLoading: false,
+    liveLoadError: null,
     activeFund: 'All Funds',
     asOfDate: '31 Jul 2026',
     selectedDealId: 'DL-013',
     dealTab: 'overview',
+    dealDetail: null,
+    dealDetailLoading: false,
     dealView: 'list',
     selectedCompanyId: 'CO-001',
     selectedFundId: 'FUND-001',
@@ -450,6 +458,8 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     lpTab: 'overview',
     selectedCapitalCallId: 'CC-2026-0038',
     tableSearch: '',
+    fundPerformanceSnapshots: {},
+    fundDocuments: {},
     searchQuery: '',
     drawer: null,
     modal: null,
@@ -545,16 +555,14 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     target.splice(0, target.length, ...incoming);
   }
 
-  /** Hardcoded v25 fixtures for Reports Vault / E-Signatures when live API is empty or weak. */
+  /** Hardcoded v25 fixture for Reports Vault when live API is empty or weak.
+   *  (Signature envelopes are intentionally NOT restored here — an empty
+   *  e-signatures table must show a genuine empty state, not fake rows.) */
   const reportVaultFixtureSeed = cloneForIntegration(reportVaultItems);
-  const signatureEnvelopeFixtureSeed = cloneForIntegration(signatureEnvelopes);
 
   function restoreHardcodedVaultIfEmpty() {
     if (!reportVaultItems.length && reportVaultFixtureSeed.length) {
       replaceCollection(reportVaultItems, cloneForIntegration(reportVaultFixtureSeed));
-    }
-    if (!signatureEnvelopes.length && signatureEnvelopeFixtureSeed.length) {
-      replaceCollection(signatureEnvelopes, cloneForIntegration(signatureEnvelopeFixtureSeed));
     }
   }
 
@@ -577,12 +585,17 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     if (Array.isArray(source.reportVaultItems) && source.reportVaultItems.length) {
       replaceCollection(reportVaultItems, source.reportVaultItems);
     }
-    if (Array.isArray(source.signatureEnvelopes) && source.signatureEnvelopes.length) {
+    if (Array.isArray(source.signatureEnvelopes)) {
       replaceCollection(signatureEnvelopes, source.signatureEnvelopes);
     }
     replaceCollection(mailerLists, source.mailerLists);
     restoreHardcodedVaultIfEmpty();
-    if (payload.state && typeof payload.state === 'object') Object.assign(state, payload.state);
+    if (payload.state && typeof payload.state === 'object') {
+      // Preserve an in-flight deal detail payload unless the host explicitly replaces it.
+      const nextState = { ...payload.state };
+      if (!('dealDetail' in nextState)) delete nextState.dealDetail;
+      Object.assign(state, nextState);
+    }
     render();
     window.dispatchEvent(new CustomEvent('matanho:data-hydrated', { detail: publicSnapshot() }));
   }
@@ -819,9 +832,157 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     return `<span class="mini-avatar photo-avatar"><img src="${profilePhoto(name)}" alt="${safe}" loading="lazy"></span>`;
   }
 
+  /** Total-record badge for sidebar items. Returns null when this page has no count. */
+  function liveNavBadge(pageId) {
+    const totals = {
+      deals: () => deals.length,
+      funds: () => funds.length,
+      'capital-calls': () => capitalCalls.length,
+      companies: () => companies.length,
+      'cash-accounts': () => cashAccounts.length,
+      'cash-reservations': () => cashReservations.length,
+      'statement-imports': () => statementImports.length,
+      reconciliations: () => reconciliationBatches.length,
+      exceptions: () => reconciliationExceptions.length,
+      reporting: () => reports.length,
+      lps: () => lps.length,
+      'documents-vault': () => documents.length,
+      'reports-vault': () => reportVaultItems.length,
+      'e-signatures': () => signatureEnvelopes.length,
+      'mailer-lists': () => mailerLists.length,
+    };
+    if (!(pageId in totals)) return null;
+    if ((state.hydrating || rootEl.classList.contains('is-hydrating')) && !state.liveData) return '…';
+    if (!state.liveData) return null;
+    return String(totals[pageId]());
+  }
+
+  function findNavItem(pageId) {
+    for (const group of navGroups) {
+      const found = group.items.find((item) => item.id === pageId);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  function buildNavHtml(activePage) {
+    return navGroups.map((group) => `<div class="nav-group"><div class="nav-group-label">${group.label}</div>${group.items.map((item) => {
+      const badge = item.count ? liveNavBadge(item.id) : null;
+      return `<button type="button" class="nav-item ${activePage === item.id ? 'active' : ''}" data-action="navigate" data-page="${item.id}" title="${escapeHTML(item.label)}">${icon(item.icon)}<span class="nav-label">${escapeHTML(item.label)}</span>${badge != null && badge !== '' ? `<span class="nav-badge">${escapeHTML(String(badge))}</span>` : ''}</button>`;
+    }).join('')}</div>`).join('');
+  }
+
+  /** Build nav once; afterward only patch active state + badge text in place (no sidebar remount). */
   function renderNav() {
+    if (!primaryNav) return;
     const activePage = state.page === 'analytics-detail' ? (state.drilldown?.sourcePage || 'dashboard') : state.page;
-    primaryNav.innerHTML = navGroups.map(group => `<div class="nav-group"><div class="nav-group-label">${group.label}</div>${group.items.map(item => `<button class="nav-item ${activePage === item.id ? 'active' : ''}" data-action="navigate" data-page="${item.id}" title="${escapeHTML(item.label)}">${icon(item.icon)}<span class="nav-label">${escapeHTML(item.label)}</span>${item.badge ? `<span class="nav-badge">${item.badge}</span>` : ''}</button>`).join('')}</div>`).join('');
+    const detailToList = {
+      'deal-detail': 'deals',
+      'fund-detail': 'funds',
+      'company-detail': 'companies',
+      'lp-detail': 'lps',
+      'capital-call-detail': 'capital-calls',
+      'reconciliation-workspace': 'reconciliations',
+      'report-builder': 'reports-vault',
+    };
+    const highlight = detailToList[activePage] || activePage;
+
+    if (!primaryNav.dataset.navBuilt) {
+      primaryNav.innerHTML = buildNavHtml(highlight);
+      primaryNav.dataset.navBuilt = '1';
+      return;
+    }
+
+    $$('.nav-item', primaryNav).forEach((btn) => {
+      const id = btn.getAttribute('data-page');
+      btn.classList.toggle('active', highlight === id);
+      const item = findNavItem(id);
+      if (!item || !item.count) {
+        const orphan = btn.querySelector('.nav-badge');
+        if (orphan) orphan.remove();
+        return;
+      }
+      const badge = liveNavBadge(id);
+      let badgeEl = btn.querySelector('.nav-badge');
+      if (badge != null && badge !== '') {
+        if (!badgeEl) {
+          badgeEl = document.createElement('span');
+          badgeEl.className = 'nav-badge';
+          btn.appendChild(badgeEl);
+        }
+        if (badgeEl.textContent !== String(badge)) badgeEl.textContent = String(badge);
+      } else if (badgeEl) {
+        badgeEl.remove();
+      }
+    });
+  }
+
+  function skeletonBlock(height = 120, className = '') {
+    return `<div class="pv11-skeleton ${className}" style="min-height:${height}px" aria-hidden="true"></div>`;
+  }
+
+  function pageTitleFor(page = state.page) {
+    const titles = {
+      dashboard: 'Portfolio Dashboard',
+      deals: 'Deal Flow',
+      'deal-detail': 'Deal detail',
+      funds: 'Funds',
+      'fund-detail': 'Fund detail',
+      'capital-calls': 'Capital Calls',
+      'capital-call-detail': 'Capital call',
+      companies: 'Portfolio Companies',
+      'company-detail': 'Company detail',
+      reporting: 'Reporting Schedules',
+      'fund-performance': 'Fund Performance Reporting',
+      lps: 'LP Management',
+      'lp-detail': 'LP detail',
+      'cash-accounts': 'Client / Fund Accounts',
+      'cash-overview': 'Cash Overview',
+      'cash-ledger': 'Cash Ledger',
+      'cash-reservations': 'Cash Reservations',
+      'statement-imports': 'External Statement Imports',
+      reconciliations: 'Reconciliation Dashboard',
+      'reconciliation-workspace': 'Reconciliation Workspace',
+      exceptions: 'Reconciliation Exceptions',
+      'period-close': 'Period Close & General-Ledger Control',
+      'documents-vault': 'Documents Vault',
+      'reports-vault': 'Reports Vault',
+      'e-signatures': 'E-Signatures',
+      'mailer-lists': 'Mailer Lists',
+      'report-builder': 'Report Builder',
+      'applicant-portal': 'Applicant Portal',
+      settings: 'Settings & Access Control',
+      'analytics-detail': 'Analytics',
+    };
+    return titles[page] || 'Portfolio';
+  }
+
+  function renderPageSkeleton() {
+    const title = pageTitleFor(state.page);
+    if (state.liveLoadError && !state.hydrating && !state.pageLoading) {
+      return `${pageHeader(title, 'Live portfolio data could not be loaded.', '', 'Error')}
+        <div class="empty-state"><h3>Could not load live data</h3><p class="muted">${escapeHTML(state.liveLoadError)}</p><div class="section-gap">${button('Retry', 'retry-live-load', 'primary', 'refresh')}</div></div>`;
+    }
+    if (state.page === 'deal-detail' || state.dealDetailLoading) {
+      return `${pageHeader(title, 'Loading application…', `${button('Back to Deal Flow', 'back-to-deals', '', 'arrow-left')}`, 'Committee Review')}
+        <section class="deal-detail-skeleton" aria-busy="true" aria-label="Loading deal">
+          <section class="metric-grid section-gap">${Array.from({ length: 4 }, () => `<article class="metric-card">${skeletonBlock(64)}</article>`).join('')}</section>
+          <section class="grid cols-2 section-gap">${skeletonBlock(210, 'pv11-skeleton-card')}${skeletonBlock(210, 'pv11-skeleton-card')}</section>
+          <section class="grid cols-3 section-gap">${skeletonBlock(140, 'pv11-skeleton-card')}${skeletonBlock(140, 'pv11-skeleton-card')}${skeletonBlock(140, 'pv11-skeleton-card')}</section>
+        </section>`;
+    }
+    return `${pageHeader(title, 'Loading live data…')}
+      <section class="metric-grid section-gap">${Array.from({ length: 4 }, () => `<article class="metric-card">${skeletonBlock(72)}</article>`).join('')}</section>
+      <section class="chart-grid section-gap">${skeletonBlock(240, 'pv11-skeleton-card')}${skeletonBlock(240, 'pv11-skeleton-card')}</section>
+      <section class="card table-card pv11-skeleton-card">${skeletonBlock(280)}</section>`;
+  }
+
+  function shouldShowPageSkeleton() {
+    if (state.liveLoadError && !state.hydrating && !state.pageLoading) return true;
+    if (state.pageLoading) return true;
+    if (liveOnly && (state.hydrating || rootEl.classList.contains('is-hydrating')) && !state.liveData) return true;
+    if (state.dealDetailLoading && state.page === 'deal-detail') return true;
+    return false;
   }
 
   function globalPageActions({ includeFund = true, includeDate = true, extra = '' } = {}) {
@@ -960,7 +1121,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     return `${pageHeader('Client / Fund Accounts','Authorised fund, vehicle and investor-linked cash accounts with lifecycle, provider mapping and reconciliation health.',`${button('Export accounts','export-cash-accounts','','download')}${button('Create account','create-cash-account','primary','plus')}`,'Cash & Reconciliation')}
       ${cashContextBar()}
       <section class="metric-grid section-gap">
-        ${metricCard({label:'Active Accounts',value:String(cashAccounts.filter(a=>a.status==='ACTIVE').length),iconName:'bank',accent:'brand',foot:'Across 5 funds and 6 vehicles',action:'cash-accounts-active'})}
+        ${metricCard({label:'Active Accounts',value:String(cashAccounts.filter(a=>a.status==='ACTIVE').length),iconName:'bank',accent:'brand',foot:`${new Set(cashAccounts.map(a=>a.fund)).size} funds · ${new Set(cashAccounts.map(a=>a.vehicle)).size} vehicles`,action:'cash-accounts-active'})}
         ${metricCard({label:'Settled USD Cash',value:formatMoney(totalSettled),iconName:'dollar',accent:'emerald',foot:'Ledger-derived · not statement balance',action:'cash-settled-explain'})}
         ${metricCard({label:'Reserved Cash',value:formatMoney(sum(cashAccounts.filter(a=>a.currency==='USD'),a=>a.reserved)),iconName:'lock',accent:'amber',foot:'4 active or approved reservations',action:'navigate-cash-reservations'})}
         ${metricCard({label:'Reconciliation Health',value:pct(cashAccounts.length?sum(cashAccounts,a=>a.reconHealth)/cashAccounts.length:0),iconName:'refresh',accent:'blue',foot:'Weighted account health',action:'navigate-reconciliations'})}
@@ -973,7 +1134,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   function renderCashOverview() {
     const accounts=cashAccounts.filter(a=>state.cashCurrency==='All'||a.currency===state.cashCurrency);
     const settled=sum(accounts,a=>a.settled), reserved=sum(accounts,a=>a.reserved), held=sum(accounts,a=>a.held), expectedIn=sum(accounts,a=>a.expectedIn), expectedOut=sum(accounts,a=>a.expectedOut), deployable=sum(accounts,a=>a.deployable), distributable=sum(accounts,a=>a.distributable);
-    const waterfall=[{label:'Settled',value:settled},{label:'Reusable proceeds',value:8500000},{label:'Reservations',value:-reserved},{label:'Holds',value:-held},{label:'Pending outflows',value:-expectedOut},{label:'Deployable',value:deployable}];
+    const waterfall=[{label:'Settled',value:settled},{label:'Reservations',value:-reserved},{label:'Holds',value:-held},{label:'Pending outflows',value:-expectedOut},{label:'Deployable',value:deployable}];
     const rows=accounts.map(a=>`<tr class="clickable" data-action="open-cash-account" data-id="${a.id}"><td class="table-primary">${escapeHTML(a.fund)}<small>${escapeHTML(a.vehicle)} · ${escapeHTML(a.masked)}</small></td><td>${escapeHTML(a.currency)}</td><td>${formatMoney(a.posted,a.currency)}</td><td>${formatMoney(a.settled,a.currency)}</td><td>${formatMoney(a.reserved,a.currency)}</td><td>${formatMoney(a.held,a.currency)}</td><td class="positive">${formatMoney(a.deployable,a.currency)}</td><td>${formatMoney(a.distributable,a.currency)}</td><td>${button('Explain','explain-cash-position','compact','info',`data-id="${a.id}"`)}</td></tr>`).join('');
     return `${pageHeader('Cash Overview','Posted, settled, reserved, held, expected, deployable, distributable and projected cash by authorised ownership scope.',`${selectControl('Currency',['USD','ZWG','All'],state.cashCurrency,'cash-currency')}${button('Export cash view','export-cash-overview','','download')}`,'Cash & Reconciliation')}${cashContextBar()}
       <section class="metric-grid section-gap">
@@ -986,39 +1147,47 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       </section>
       <section class="cash-overview-grid section-gap">
         ${card('Cash-State Waterfall',barChart({labels:waterfall.map(x=>x.label),series:[{name:'Cash state',color:'var(--brand)',values:waterfall.map(x=>x.value/1e6)}],height:310,yLabel:'USD (millions)',format:v=>`${Number(v).toFixed(1)}M`,action:'cash-waterfall-drill'}),{subtitle:'Every component is clickable and traceable to ledger, reservations, holds and policy.',classes:'cash-chart-card'})}
-        ${card('Projected Cash Timeline',lineChart({labels:['31 Jul','07 Aug','14 Aug','21 Aug','31 Aug','15 Sep'],series:[{name:'Projected settled',color:'var(--blue)',values:[settled,settled+expectedIn*.4,settled+expectedIn*.55-expectedOut*.4,settled+expectedIn*.8-expectedOut*.7,settled+expectedIn-expectedOut,settled+expectedIn*1.2-expectedOut*1.1].map(v=>v/1e6)},{name:'Deployable',color:'var(--emerald)',values:[deployable,deployable+2.1e6,deployable-3.4e6,deployable+4.2e6,deployable+5.5e6,deployable+7.1e6].map(v=>v/1e6)}],height:310,yLabel:'USD (millions)',format:v=>`${Number(v).toFixed(1)}M`,action:'cash-projection-drill'}),{subtitle:`Expected inflows ${formatMoney(expectedIn)} · expected outflows ${formatMoney(expectedOut)}`,classes:'cash-chart-card'})}
+        ${card('Cash Position Today vs Period End',barChart({labels:['Settled today','Projected at period end'],series:[{name:'Settled',color:'var(--blue)',values:[settled/1e6,(settled+expectedIn-expectedOut)/1e6]},{name:'Deployable',color:'var(--emerald)',values:[deployable/1e6,(deployable+expectedIn-expectedOut)/1e6]}],height:310,yLabel:'USD (millions)',format:v=>`${Number(v).toFixed(1)}M`,action:'cash-projection-drill'}),{subtitle:`Straight-line from today's position, expected inflows ${formatMoney(expectedIn)} and expected outflows ${formatMoney(expectedOut)} — not a fabricated daily curve`,classes:'cash-chart-card'})}
       </section>
       <section class="card table-card section-gap"><div class="table-toolbar"><div class="table-title-row"><h3>Cash Position by Account</h3><span class="table-badge">As of ${escapeHTML(state.asOfDate)}</span></div><div class="table-tools">${button('Reservations','navigate-cash-reservations','','lock')}${button('Ledger','navigate-cash-ledger','','list')}</div></div><div class="table-wrap"><table><thead><tr><th>Fund / Account</th><th>Currency</th><th>Posted</th><th>Settled</th><th>Reserved</th><th>Held</th><th>Deployable</th><th>Distributable</th><th>Trace</th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
   }
 
   function renderCashLedger() {
+    const exportedCount=cashJournals.filter(j=>j.accounting==='Exported').length;
     const rows=cashJournals.map(j=>`<tr class="clickable" data-action="open-journal" data-id="${j.id}"><td class="table-primary">${escapeHTML(j.id)}<small>${escapeHTML(j.source)}</small></td><td>${escapeHTML(j.event)}</td><td>${escapeHTML(j.fund)}<small>${escapeHTML(j.account)}</small></td><td>${escapeHTML(j.valueDate)}</td><td>${formatMoney(j.debit)}</td><td>${formatMoney(j.credit)}</td><td class="${j.signed>=0?'positive':'negative'}">${formatMoney(j.signed)}</td><td>${statusPill(j.status)}</td><td>${formatMoney(j.reconciled)}</td><td>${statusPill(j.accounting)}</td></tr>`).join('');
     return `${pageHeader('Cash Ledger','Immutable double-entry journals, source events, cash lines, accounting status and reconciliation evidence.',`${button('Export approved journals','export-ledger','','download')}${button('Create manual journal','create-manual-journal','primary','plus')}`,'Cash & Reconciliation')}${cashContextBar()}
-      <section class="summary-strip section-gap"><div class="summary-item"><span>Posted journals</span><strong>${cashJournals.filter(j=>j.status==='POSTED').length}</strong><small>Current visible population</small></div><div class="summary-item"><span>Total debits</span><strong>${formatMoney(sum(cashJournals,j=>j.debit))}</strong><small>Exactly equals credits</small></div><div class="summary-item"><span>Total credits</span><strong>${formatMoney(sum(cashJournals,j=>j.credit))}</strong><small>Balanced by currency</small></div><div class="summary-item"><span>Reconciled amount</span><strong>${formatMoney(sum(cashJournals,j=>j.reconciled))}</strong><small>External proof linked</small></div><div class="summary-item"><span>Pending approvals</span><strong>${cashJournals.filter(j=>j.status!=='POSTED').length}</strong><small>Maker-checker required</small></div><div class="summary-item"><span>GL export status</span><strong>4 / 5</strong><small>One pending export</small></div></section>
+      <section class="summary-strip section-gap"><div class="summary-item"><span>Posted journals</span><strong>${cashJournals.filter(j=>j.status==='POSTED').length}</strong><small>Current visible population</small></div><div class="summary-item"><span>Total debits</span><strong>${formatMoney(sum(cashJournals,j=>j.debit))}</strong><small>Exactly equals credits</small></div><div class="summary-item"><span>Total credits</span><strong>${formatMoney(sum(cashJournals,j=>j.credit))}</strong><small>Balanced by currency</small></div><div class="summary-item"><span>Reconciled amount</span><strong>${formatMoney(sum(cashJournals,j=>j.reconciled))}</strong><small>External proof linked</small></div><div class="summary-item"><span>Pending approvals</span><strong>${cashJournals.filter(j=>j.status!=='POSTED').length}</strong><small>Maker-checker required</small></div><div class="summary-item"><span>GL export status</span><strong>${exportedCount} / ${cashJournals.length}</strong><small>${cashJournals.length-exportedCount} pending export</small></div></section>
       <section class="card table-card section-gap"><div class="table-toolbar"><div class="table-title-row"><h3>Journal Register</h3><span class="table-badge">Posted history cannot be edited or deleted</span></div><div class="table-tools">${button('Filters','ledger-filters','','filter')}${button('Trace source','trace-ledger-source','','link')}</div></div><div class="table-wrap"><table><thead><tr><th>Journal / Source</th><th>Economic Event</th><th>Fund / Account</th><th>Value Date</th><th>Debit</th><th>Credit</th><th>Cash Effect</th><th>Status</th><th>Reconciled</th><th>Accounting</th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
   }
 
   function renderCashReservations() {
+    const expiringSoon=cashReservations.filter(r=>{ const d=new Date(r.expiry); if(Number.isNaN(d.getTime()))return false; const days=(d.getTime()-Date.now())/86400000; return days>=0&&days<=14&&/ACTIVE|PARTIALLY/.test(r.status); }).length;
     const rows=cashReservations.map(r=>`<tr class="clickable" data-action="open-reservation" data-id="${r.id}"><td class="table-primary">${escapeHTML(r.id)}<small>${escapeHTML(r.source)}</small></td><td>${escapeHTML(r.fund)}<small>${escapeHTML(r.vehicle)} · ${escapeHTML(r.account)}</small></td><td>${escapeHTML(r.beneficiary)}</td><td>${escapeHTML(r.purpose.replaceAll('_',' '))}</td><td>${formatMoney(r.amount)}</td><td>${formatMoney(r.remaining)}</td><td>${escapeHTML(r.required)}</td><td>${escapeHTML(r.expiry)}</td><td>${statusPill(r.status)}</td><td>${escapeHTML(r.owner)}</td></tr>`).join('');
     return `${pageHeader('Cash Reservations','Controlled commitments of eligible settled cash that reduce availability without changing the posted ledger.',`${button('Export reservations','export-reservations','','download')}${button('Request reservation','create-reservation','primary','lock')}`,'Cash & Reconciliation')}${cashContextBar()}
       <section class="reservation-lifecycle section-gap">${['REQUESTED','APPROVED','ACTIVE','PARTIALLY CONSUMED','CONSUMED / RELEASED'].map((s,i)=>`<div class="lifecycle-stage ${i===2?'active':''}"><span>${i+1}</span><strong>${s}</strong><small>${i<2?'Approval workflow':i===2?'Reduces available cash':i===3?'Residual remains visible':'Terminal with audit'}</small></div>`).join('')}</section>
-      <section class="metric-grid section-gap">${metricCard({label:'Active Reserved',value:formatMoney(sum(cashReservations.filter(r=>/ACTIVE|PARTIALLY/.test(r.status)),r=>r.remaining)),iconName:'lock',accent:'amber',foot:'Included in available-cash deductions',action:'reservation-active'})}${metricCard({label:'Requested',value:formatMoney(sum(cashReservations.filter(r=>r.status==='REQUESTED'),r=>r.amount)),iconName:'clock',accent:'blue',foot:'Awaiting independent checker',action:'reservation-requested'})}${metricCard({label:'Partially Consumed',value:formatMoney(sum(cashReservations.filter(r=>r.status==='PARTIALLY_CONSUMED'),r=>r.remaining)),iconName:'pie-chart',accent:'purple',foot:'Remaining amount is explainable',action:'reservation-partial'})}${metricCard({label:'Expiring in 14 Days',value:'3',iconName:'alert',accent:'red',foot:'Escalated under configured policy',trend:'negative',action:'reservation-expiring'})}</section>
+      <section class="metric-grid section-gap">${metricCard({label:'Active Reserved',value:formatMoney(sum(cashReservations.filter(r=>/ACTIVE|PARTIALLY/.test(r.status)),r=>r.remaining)),iconName:'lock',accent:'amber',foot:'Included in available-cash deductions',action:'reservation-active'})}${metricCard({label:'Requested',value:formatMoney(sum(cashReservations.filter(r=>r.status==='REQUESTED'),r=>r.amount)),iconName:'clock',accent:'blue',foot:'Awaiting independent checker',action:'reservation-requested'})}${metricCard({label:'Partially Consumed',value:formatMoney(sum(cashReservations.filter(r=>r.status==='PARTIALLY_CONSUMED'),r=>r.remaining)),iconName:'pie-chart',accent:'purple',foot:'Remaining amount is explainable',action:'reservation-partial'})}${metricCard({label:'Expiring in 14 Days',value:String(expiringSoon),iconName:'alert',accent:'red',foot:expiringSoon?'Escalated under configured policy':'None expiring soon',trend:expiringSoon?'negative':undefined,action:'reservation-expiring'})}</section>
       <section class="card table-card section-gap"><div class="table-toolbar"><div class="table-title-row"><h3>Reservation Register</h3><span class="table-badge">${cashReservations.length} records</span></div><div class="table-tools">${button('Lifecycle policy','reservation-policy','','info')}</div></div><div class="table-wrap"><table><thead><tr><th>Reservation / Source</th><th>Fund / Account</th><th>Beneficiary</th><th>Purpose</th><th>Original</th><th>Remaining</th><th>Required</th><th>Expiry</th><th>Status</th><th>Owner</th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
   }
 
   function renderStatementImports() {
     const rows=statementImports.map(i=>`<tr class="clickable" data-action="review-statement-import" data-id="${i.id}"><td class="table-primary">${escapeHTML(i.id)}<small>${escapeHTML(i.filename)}</small></td><td>${escapeHTML(i.provider)}<small>${escapeHTML(i.account)}</small></td><td>${escapeHTML(i.period)}</td><td>${i.lines.toLocaleString()}</td><td>${formatMoney(i.opening)}</td><td class="${i.movements>=0?'positive':'negative'}">${formatMoney(i.movements)}</td><td>${formatMoney(i.closing)}</td><td>${statusPill(i.duplicate,i.duplicate==='Clear'?'success':'warning')}</td><td>${i.errors?statusPill(`${i.errors} errors`,'danger'):statusPill(`${i.warnings} warnings`,i.warnings?'warning':'success')}</td><td>${statusPill(i.status)}</td></tr>`).join('');
     return `${pageHeader('External Statement Imports','Immutable source files, account mapping, raw-to-canonical preview, control totals, duplicate checks and maker-checker commit.',`${button('Download error template','download-import-template','','download')}${button('Upload statement','upload-statement','primary','upload')}`,'Cash & Reconciliation')}${cashContextBar()}
-      <section class="metric-grid section-gap">${metricCard({label:'Lines Received',value:statementImports.reduce((t,i)=>t+i.lines,0).toLocaleString(),iconName:'list',accent:'brand',foot:'Across 4 provider batches',action:'import-lines'})}${metricCard({label:'Committed Batches',value:String(statementImports.filter(i=>i.status==='COMMITTED').length),iconName:'check-circle',accent:'emerald',foot:'Immutable external evidence',action:'import-committed'})}${metricCard({label:'Pending Approval',value:String(statementImports.filter(i=>i.status==='PENDING_APPROVAL').length),iconName:'user-check',accent:'blue',foot:'Reviewed staging version frozen',action:'import-pending'})}${metricCard({label:'Blocking Errors',value:String(sum(statementImports,i=>i.errors)),iconName:'alert',accent:'red',foot:'Must be resolved before commit',trend:'negative',action:'import-errors'})}</section>
+      <section class="metric-grid section-gap">${metricCard({label:'Lines Received',value:statementImports.reduce((t,i)=>t+i.lines,0).toLocaleString(),iconName:'list',accent:'brand',foot:`Across ${statementImports.length} provider batch${statementImports.length===1?'':'es'}`,action:'import-lines'})}${metricCard({label:'Committed Batches',value:String(statementImports.filter(i=>i.status==='COMMITTED').length),iconName:'check-circle',accent:'emerald',foot:'Immutable external evidence',action:'import-committed'})}${metricCard({label:'Pending Approval',value:String(statementImports.filter(i=>i.status==='PENDING_APPROVAL').length),iconName:'user-check',accent:'blue',foot:'Reviewed staging version frozen',action:'import-pending'})}${metricCard({label:'Blocking Errors',value:String(sum(statementImports,i=>i.errors)),iconName:'alert',accent:'red',foot:'Must be resolved before commit',trend:'negative',action:'import-errors'})}</section>
       <section class="card table-card section-gap"><div class="table-toolbar"><div class="table-title-row"><h3>Import Batches</h3><span class="table-badge">Validate → review → approve → commit</span></div><div class="table-tools">${button('Provider layouts','provider-layouts','','settings')}</div></div><div class="table-wrap"><table><thead><tr><th>Batch / File</th><th>Provider / Account</th><th>Period</th><th>Lines</th><th>Opening</th><th>Movements</th><th>Closing</th><th>Duplicate</th><th>Validation</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
   }
 
   function renderReconciliations() {
+    const missingStatements=reconciliationExceptions.filter(e=>e.code==='MISSING_STATEMENT').length;
+    const pendingApprovals=reconciliationBatches.filter(r=>r.status==='PENDING_APPROVAL').length;
+    const ageingBuckets=[{label:'0–2 days',max:2},{label:'3–5 days',max:5},{label:'6–10 days',max:10},{label:'Over 10 days',max:Infinity}];
+    const ageingCounts=ageingBuckets.map((bucket,i)=>{ const min=i===0?0:ageingBuckets[i-1].max+1; return reconciliationExceptions.filter(e=>e.age>=min&&e.age<=bucket.max).length; });
+    const ageingColors=['var(--emerald)','var(--amber)','var(--orange)','var(--red)'];
+    const ageingSegments=ageingBuckets.map((bucket,i)=>({label:bucket.label,value:ageingCounts[i],color:ageingColors[i]}));
     const rows=reconciliationBatches.map(r=>`<tr class="clickable" data-action="open-reconciliation" data-id="${r.id}"><td class="table-primary">${escapeHTML(r.id)}<small>${escapeHTML(r.account)}</small></td><td>${escapeHTML(r.fund)}</td><td>${escapeHTML(r.period)}</td><td>${escapeHTML(r.currency)}</td><td>${formatMoney(r.internal,r.currency)}</td><td>${formatMoney(r.external,r.currency)}</td><td class="${Math.abs(r.variance)<=100?'positive':'negative'}">${formatMoney(r.variance,r.currency)}</td><td><div class="inline-progress">${progressBar(r.matched)}<span>${r.matched.toFixed(1)}%</span></div></td><td>${r.breaks}</td><td>${statusPill(r.status)}</td><td>${escapeHTML(r.owner)}</td></tr>`).join('');
-    const matched=sum(reconciliationBatches,r=>r.matched)/reconciliationBatches.length;
+    const matched=reconciliationBatches.length?sum(reconciliationBatches,r=>r.matched)/reconciliationBatches.length:0;
     return `${pageHeader('Reconciliation Dashboard','Transaction, event, balance, omnibus and subledger-to-GL reconciliation by account, currency and period.',`${button('Export evidence pack','export-reconciliation-pack','','download')}${button('Start batch','start-reconciliation','primary','refresh')}`,'Cash & Reconciliation')}${cashContextBar()}
-      <section class="metric-grid section-gap">${metricCard({label:'Average Matched',value:pct(matched),iconName:'refresh',accent:'emerald',foot:'Transaction population',action:'recon-matched'})}${metricCard({label:'Open Breaks',value:String(sum(reconciliationBatches,r=>r.breaks)),iconName:'alert',accent:'red',foot:'Each has owner, SLA and evidence',trend:'negative',action:'navigate-exceptions'})}${metricCard({label:'Ready to Close',value:String(reconciliationBatches.filter(r=>r.status==='READY_TO_CLOSE').length),iconName:'check-circle',accent:'blue',foot:'All close controls passed',action:'navigate-period-close'})}${metricCard({label:'Total Variance',value:formatMoney(sum(reconciliationBatches.filter(r=>r.currency==='USD'),r=>r.variance)),iconName:'bar-chart',accent:'amber',foot:'Adjusted external less internal',action:'recon-variance'})}${metricCard({label:'Missing Statements',value:'1',iconName:'file',accent:'purple',foot:'FBC Custody · critical blocker',action:'navigate-exceptions'})}${metricCard({label:'Pending Approvals',value:'4',iconName:'user-check',accent:'cyan',foot:'Independent checker or CFO',action:'recon-approvals'})}</section>
-      <section class="reconciliation-dashboard-grid section-gap">${card('Reconciliation Health by Account',barChart({labels:reconciliationBatches.map(r=>r.account.split(' · ')[0]),series:[{name:'Matched %',color:'var(--brand)',values:reconciliationBatches.map(r=>r.matched)}],height:300,yLabel:'Percent',format:v=>`${v}%`,action:'recon-health-drill'}),{subtitle:'Click an account to open the reconciliation workspace.'})}${card('Break Ageing',donutChart([{label:'0–2 days',value:5,color:'var(--emerald)'},{label:'3–5 days',value:6,color:'var(--amber)'},{label:'6–10 days',value:2,color:'var(--orange)'},{label:'Over 10 days',value:1,color:'var(--red)'}],'14','Open items',155),{subtitle:'Ageing is measured on the configured business calendar.'})}</section>
+      <section class="metric-grid section-gap">${metricCard({label:'Average Matched',value:pct(matched),iconName:'refresh',accent:'emerald',foot:'Transaction population',action:'recon-matched'})}${metricCard({label:'Open Breaks',value:String(sum(reconciliationBatches,r=>r.breaks)),iconName:'alert',accent:'red',foot:'Each has owner, SLA and evidence',trend:'negative',action:'navigate-exceptions'})}${metricCard({label:'Ready to Close',value:String(reconciliationBatches.filter(r=>r.status==='READY_TO_CLOSE').length),iconName:'check-circle',accent:'blue',foot:'All close controls passed',action:'navigate-period-close'})}${metricCard({label:'Total Variance',value:formatMoney(sum(reconciliationBatches.filter(r=>r.currency==='USD'),r=>r.variance)),iconName:'bar-chart',accent:'amber',foot:'Adjusted external less internal',action:'recon-variance'})}${metricCard({label:'Missing Statements',value:String(missingStatements),iconName:'file',accent:'purple',foot:missingStatements?'Critical blocker':'None missing',action:'navigate-exceptions'})}${metricCard({label:'Pending Approvals',value:String(pendingApprovals),iconName:'user-check',accent:'cyan',foot:'Independent checker or CFO',action:'recon-approvals'})}</section>
+      <section class="reconciliation-dashboard-grid section-gap">${card('Reconciliation Health by Account',barChart({labels:reconciliationBatches.map(r=>r.account.split(' · ')[0]),series:[{name:'Matched %',color:'var(--brand)',values:reconciliationBatches.map(r=>r.matched)}],height:300,yLabel:'Percent',format:v=>`${v}%`,action:'recon-health-drill'}),{subtitle:'Click an account to open the reconciliation workspace.'})}${card('Exception Ageing',reconciliationExceptions.length?donutChart(ageingSegments,String(reconciliationExceptions.length),'Open exceptions',155):`<div class="empty-state compact">${icon('pie-chart')}<strong>No open exceptions</strong></div>`,{subtitle:'Ageing is measured on the configured business calendar.'})}</section>
       <section class="card table-card section-gap"><div class="table-toolbar"><div class="table-title-row"><h3>Account / Period Batches</h3><span class="table-badge">Balanced does not always mean fully reconciled</span></div><div class="table-tools">${button('Filters','reconciliation-filters','','filter')}</div></div><div class="table-wrap"><table><thead><tr><th>Batch / Account</th><th>Fund</th><th>Period</th><th>Currency</th><th>Internal Closing</th><th>External Closing</th><th>Variance</th><th>Matched</th><th>Breaks</th><th>Status</th><th>Owner</th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
   }
 
@@ -1069,7 +1238,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   }
 
   function renderESignatures() {
-    const rows=signatureEnvelopes.map(e=>`<tr class="clickable" data-action="open-envelope" data-id="${e.id}"><td class="table-primary">${escapeHTML(e.id)}<small>${escapeHTML(e.subject)}</small></td><td><button class="text-link" data-action="open-signature-studio" data-id="${e.documentId}">${escapeHTML(e.document)}</button></td><td>${e.recipients.map(r=>`<span class="signer-chip">${initials(r[0])} ${escapeHTML(r[0])}</span>`).join('')}</td><td><div class="inline-progress">${progressBar(e.progress)}<span>${e.progress}%</span></div></td><td>${statusPill(e.status)}</td><td>${escapeHTML(e.sent)}</td><td>${escapeHTML(e.expires)}</td><td><div class="row-actions">${button('Open','open-envelope','compact','eye',`data-id="${e.id}"`)}${button('Activity','activity-menu','ghost compact','clock',`data-context="envelope" data-id="${e.id}"`)}</div></td></tr>`).join('');
+    const rows=signatureEnvelopes.map(e=>`<tr class="clickable" data-action="open-envelope" data-id="${e.id}"><td class="table-primary">${escapeHTML(e.id)}<small>${escapeHTML(e.subject)}</small></td><td><button class="text-link" data-action="open-signature-studio" data-id="${e.documentId}">${escapeHTML(e.document)}</button></td><td>${(Array.isArray(e.recipients)?e.recipients:[]).map(r=>`<span class="signer-chip">${initials(r[0])} ${escapeHTML(r[0])}</span>`).join('')}</td><td><div class="inline-progress">${progressBar(e.progress)}<span>${e.progress}%</span></div></td><td>${statusPill(e.status)}</td><td>${escapeHTML(e.sent)}</td><td>${escapeHTML(e.expires)}</td><td><div class="row-actions">${button('Open','open-envelope','compact','eye',`data-id="${e.id}"`)}${button('Activity','activity-menu','ghost compact','clock',`data-context="envelope" data-id="${e.id}"`)}</div></td></tr>`).join('');
     return `${pageHeader('E-Signatures','DocuSign-style preparation, signing order, secure delivery, audit evidence and completion certificates for termsheets and documents.',`${button('Signature templates','signature-templates','','layers')}${button('New envelope','new-signature-envelope','primary','edit')}`,'Reporting & Records')}
       <section class="signature-summary section-gap"><div class="signature-summary-card"><span class="signature-orb">${icon('send')}</span><div><strong>${signatureEnvelopes.filter(e=>e.status!=='Completed').length}</strong><small>Active envelopes</small></div></div><div class="signature-summary-card"><span class="signature-orb success">${icon('check')}</span><div><strong>${signatureEnvelopes.filter(e=>e.status==='Completed').length}</strong><small>Completed this month</small></div></div><div class="signature-summary-card"><span class="signature-orb warning">${icon('clock')}</span><div><strong>2</strong><small>Awaiting recipients</small></div></div><div class="signature-summary-card"><span class="signature-orb danger">${icon('alert')}</span><div><strong>1</strong><small>Action required</small></div></div></section>
       <section class="card table-card section-gap"><div class="table-toolbar"><div class="table-title-row"><h3>Signature Envelopes</h3><span class="table-badge">Electronic evidence and signing order</span></div><div class="table-tools">${button('Filters','signature-filters','','filter')}</div></div><div class="table-wrap"><table><thead><tr><th>Envelope / Subject</th><th>Document</th><th>Recipients</th><th>Progress</th><th>Status</th><th>Sent</th><th>Expires</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
@@ -1077,7 +1246,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
 
   function renderMailerLists() {
     const totalMembers=sum(mailerLists,list=>list.members);
-    const rows=mailerLists.map(list=>`<tr class="clickable" data-action="open-mailer-list" data-id="${list.id}"><td class="table-primary"><span class="document-name-cell"><span class="document-row-icon">${icon('mail')}</span><span>${escapeHTML(list.name)}<small>${escapeHTML(list.description)}</small></span></span></td><td>${escapeHTML(list.source)}</td><td>${list.members}</td><td>${list.active}</td><td>${list.pending}</td><td>${list.bounced}</td><td>${escapeHTML(list.channels.join(' · '))}</td><td>${escapeHTML(list.owner)}</td><td>${statusPill(list.status)}</td><td><div class="row-actions">${button('Open','open-mailer-list','compact','eye',`data-id="${list.id}"`)}${button('Activity','activity-menu','ghost compact','clock',`data-context="mailer-list" data-id="${list.id}"`)}</div></td></tr>`).join('');
+    const rows=mailerLists.map(list=>`<tr class="clickable" data-action="open-mailer-list" data-id="${list.id}"><td class="table-primary"><span class="document-name-cell"><span class="document-row-icon">${icon('mail')}</span><span>${escapeHTML(list.name)}<small>${escapeHTML(list.description||list.source||'')}</small></span></span></td><td>${escapeHTML(list.source)}</td><td>${list.members}</td><td>${list.active}</td><td>${list.pending}</td><td>${list.bounced}</td><td>${escapeHTML((list.channels||['Email']).join(' · '))}</td><td>${escapeHTML(list.owner||'—')}</td><td>${statusPill(list.status)}</td><td><div class="row-actions">${button('Open','open-mailer-list','compact','eye',`data-id="${list.id}"`)}${button('Activity','activity-menu','ghost compact','clock',`data-context="mailer-list" data-id="${list.id}"`)}</div></td></tr>`).join('');
     const cards=mailerLists.slice(0,3).map(list=>`<article class="mailer-card" data-action="open-mailer-list" data-id="${list.id}"><div class="mailer-card-head"><span class="mailer-icon">${icon('mail')}</span><div><strong>${escapeHTML(list.name)}</strong><small>${escapeHTML(list.source)}</small></div>${statusPill(list.status)}</div><div class="mailer-card-metrics"><span><small>Members</small><strong>${list.members}</strong></span><span><small>Active</small><strong>${list.active}</strong></span><span><small>Campaigns</small><strong>${list.campaigns}</strong></span></div><div class="tag-row">${list.tags.map(tag=>`<span class="table-badge">${escapeHTML(tag)}</span>`).join('')}</div></article>`).join('');
     return `${pageHeader('Mailer Lists','Create governed audiences for LP reporting, capital calls, portfolio communications, events and regulatory distribution.',`${button('New campaign','mailer-new-campaign','','send')}${button('Create mailer list','create-mailer-list','primary','plus')}`,'Reporting & Records')}
       ${workspaceFilterBar([{label:'Audience type',action:'mailer-type-filter',selected:'All audiences',options:['All audiences','LPs','Governance','Portfolio companies','Regulatory']},{label:'Status',action:'mailer-status-filter',selected:'All Statuses',options:['All Statuses','Active','Review','Draft']},{label:'Channel',action:'mailer-channel-filter',selected:'All channels',options:['All channels','Secure email','LP portal','Email','Event portal']},{type:'button',label:'Export lists',action:'export-mailer-lists',icon:'download'}])}
@@ -1098,7 +1267,9 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     renderStaticIcons();
 
     let html = '';
-    switch (state.page) {
+    if (shouldShowPageSkeleton()) {
+      html = renderPageSkeleton();
+    } else switch (state.page) {
       case 'dashboard': html = renderDashboard(); break;
       case 'deals': html = renderDealFlow(); break;
       case 'funds': html = renderFunds(); break;
@@ -1132,7 +1303,9 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       default: html = renderDashboard();
     }
     if (!workspace) return;
-    workspace.innerHTML = `<div class="page page-enter">${html}</div><div id="chartTooltip" class="chart-tooltip"></div>`;
+    // page-enter only on real page changes — re-animating on every hydrate blinks the workspace
+    const enterClass = preserveScroll ? '' : ' page-enter';
+    workspace.innerHTML = `<div class="page${enterClass}">${html}</div><div id="chartTooltip" class="chart-tooltip"></div>`;
     renderStaticIcons(workspace);
     workspace.scrollTop = preserveScroll ? previousScrollTop : 0;
     lastRenderedPage = state.page;
@@ -1156,52 +1329,73 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     const activeCompanies = companies.length;
     const unrealized = sum(companies,c => c.fairValue);
 
-    const performance = barChart({
-      labels:['2022','2023','2024','2025','2026 YTD'],
+    const hasPerfData = funds.some(f=>f.grossIrr || f.netIrr || f.tvpi || f.dpi);
+    const portfolioGrossIrr = committed ? sum(funds,f=>f.grossIrr*f.commitment)/committed : 0;
+    const portfolioNetIrr = committed ? sum(funds,f=>f.netIrr*f.commitment)/committed : 0;
+    const portfolioTvpi = committed ? sum(funds,f=>f.tvpi*f.commitment)/committed : 0;
+    const portfolioDpi = committed ? sum(funds,f=>f.dpi*f.commitment)/committed : 0;
+
+    // Aggregate real recorded fund-performance snapshots across all funds (no fabricated history).
+    const snapshotsByDate = {};
+    Object.values(state.fundPerformanceSnapshots || {}).forEach(list => {
+      (list || []).forEach(snap => {
+        const key = String(snap.asOfDate).slice(0,10);
+        if (!snapshotsByDate[key]) snapshotsByDate[key] = { nav:0, calledCapital:0, distributedCapital:0 };
+        snapshotsByDate[key].nav += Number(snap.nav)||0;
+        snapshotsByDate[key].calledCapital += Number(snap.calledCapital)||0;
+        snapshotsByDate[key].distributedCapital += Number(snap.distributedCapital)||0;
+      });
+    });
+    const snapDates = Object.keys(snapshotsByDate).sort();
+    const snapLabels = snapDates.map(d=>new Date(d).toLocaleDateString('en-GB',{day:'2-digit',month:'short'}));
+    const performance = snapDates.length ? barChart({
+      labels:snapLabels,
       series:[
-        { name:'Capital invested', color:'var(--emerald)', values:[20,78,66,22,8] },
-        { name:'Distributions', color:'var(--blue)', values:[5,-30,28,41,29] },
-        { name:'Other expenses', color:'var(--amber)', values:[-2,5,4,-8,2] },
-        { name:'Net cash flow', color:'var(--navy)', values:[8,34,82,63,31] }
+        { name:'Called capital', color:'var(--emerald)', values:snapDates.map(d=>Number((snapshotsByDate[d].calledCapital/1e6).toFixed(2))) },
+        { name:'Distributed', color:'var(--blue)', values:snapDates.map(d=>Number((snapshotsByDate[d].distributedCapital/1e6).toFixed(2))) },
+        { name:'NAV', color:'var(--navy)', values:snapDates.map(d=>Number((snapshotsByDate[d].nav/1e6).toFixed(2))) }
       ],
       yLabel:'USD (Millions)',
       format:v => `${v}M`
-    });
-    const jCurve = lineChart({
-      labels:['Year 0','Year 1','Year 2','Year 3','Year 4','Year 5','Year 6+'],
-      series:[{ name:'Net Cash Flow (USD)', color:'var(--blue)', values:[0,-52,-75,-45,-5,29,51] }],
+    }) : null;
+    const jCurve = snapDates.length ? lineChart({
+      labels:snapLabels,
+      series:[{ name:'NAV (USD)', color:'var(--blue)', values:snapDates.map(d=>Number((snapshotsByDate[d].nav/1e6).toFixed(2))) }],
       yLabel:'USD (Millions)', format:v=>`${v}M`
-    });
-    const sectorSegments = [
-      {label:'Software',value:34.2,color:'#2475f5',display:'34.2%'},
-      {label:'Healthcare',value:23.1,color:'#0ba780',display:'23.1%'},
-      {label:'Consumer',value:19.8,color:'#f5a623',display:'19.8%'},
-      {label:'FinTech',value:12.7,color:'#60a5fa',display:'12.7%'},
-      {label:'Industrials',value:6.5,color:'#11a5b7',display:'6.5%'},
-      {label:'Other',value:3.7,color:'#adb5c3',display:'3.7%'}
-    ];
+    }) : null;
+
+    const sectorTotals = {};
+    companies.forEach(c=>{ sectorTotals[c.sector||'Other']=(sectorTotals[c.sector||'Other']||0)+(c.fairValue||0); });
+    const sectorTotal = sum(companies,c=>c.fairValue||0);
+    const allocColors=['#2475f5','#0ba780','#f5a623','#60a5fa','#f0641c','#aab3c2'];
+    const sectorSegments = sectorTotal ? Object.entries(sectorTotals).map(([label,value],index)=>({label,value,color:allocColors[index%allocColors.length],display:pct(value/sectorTotal*100)})) : [];
 
     const portfolioRows = companies.map(company => `<tr class="clickable" data-action="open-company" data-id="${company.id}"><td><div class="company-cell">${companyLogo(company)}<span class="table-primary">${escapeHTML(company.name)}</span></div></td><td>${escapeHTML(company.sector)}</td><td class="text-right">${formatMoney(company.invested)}</td><td class="text-right">${formatMoney(Math.max(0,company.fairValue-company.invested))}</td><td class="text-right">${formatMoney(company.fairValue)}</td><td class="text-right">${(company.fairValue/company.invested).toFixed(2)}x</td><td class="text-right positive">${pct(company.revenueGrowth)}</td><td>${healthScore(company.health)}</td><td>${statusPill(company.health >= 70 ? 'Active' : 'Watchlist')}</td></tr>`).join('');
+
+    const distinctFundsWithCompanies = new Set(companies.map(c=>c.fund)).size;
+    const openCalls = capitalCalls.filter(c=>c.status!=='Closed');
+
+    const recentCalls = capitalCalls.slice().sort((a,b)=>new Date(b.callDate)-new Date(a.callDate)).slice(0,4);
+    const recentActivity = recentCalls.length ? `<ul class="activity-list">${recentCalls.map(call=>`<li class="activity-item clickable" data-action="open-capital-call" data-id="${call.id}"><span class="status-dot" style="background:${call.status==='Closed'?'var(--emerald)':call.status==='Draft'?'var(--amber)':'var(--blue)'}"></span><span class="activity-copy"><strong>${escapeHTML(call.fund)}</strong><small>Capital call · ${escapeHTML(call.status)} · ${escapeHTML(call.callDate)}</small></span><span class="activity-amount">${formatMoney(call.amount)}</span></li>`).join('')}</ul>` : `<div class="empty-state compact">${icon('clock')}<strong>No recent capital-call activity yet</strong></div>`;
 
     return `${pageHeader('Portfolio Dashboard','Cross-fund performance, allocation and portfolio-company health.',globalPageActions({ extra: button('Add Deal','add-deal','primary','plus') }))}
       ${workspaceFilterBar([{label:'Fund',action:'dashboard-fund-filter',selected:'All Funds',options:['All Funds',...funds.map(f=>f.name)]},{label:'As of',action:'dashboard-period-filter',selected:'31 Jul 2026',options:['31 Jul 2026','30 Jun 2026','31 Mar 2026','31 Dec 2025']},{label:'Currency',action:'dashboard-currency-filter',selected:'USD',options:['USD','ZWG','Reporting currency']},{label:'Geography',action:'dashboard-geography-filter',selected:'All geographies',options:['All geographies','Southern Africa','East Africa','West Africa']},{type:'button',label:'Reset',action:'reset-dashboard-filters',icon:'refresh'}])}
       <section class="metric-grid section-gap">
-        ${metricCard({label:'Total Invested',value:formatMoney(totalInvested),iconName:'dollar',accent:'emerald',foot:'12.4% vs 31 Dec 2025',action:'metric-invested'})}
-        ${metricCard({label:'Available for Drawdown',value:formatMoney(committed-sum(funds,f=>f.called)),iconName:'wallet',accent:'blue',foot:'39.2% of commitments',action:'metric-drawdown'})}
-        ${metricCard({label:'Fund Gross IRR',value:'18.7%',iconName:'trend-up',accent:'purple',foot:'1.6pp vs prior period',action:'metric-irr'})}
-        ${metricCard({label:'LP Net IRR',value:'14.9%',iconName:'users',accent:'cyan',foot:'1.3pp vs prior period',action:'metric-net-irr'})}
-        ${metricCard({label:'TVPI',value:'2.18x',iconName:'bar-chart',accent:'amber',foot:'DPI 0.62x',action:'metric-tvpi'})}
+        ${metricCard({label:'Total Invested',value:formatMoney(totalInvested),iconName:'dollar',accent:'emerald',foot:`Across ${companies.length} portfolio companies`,action:'metric-invested'})}
+        ${metricCard({label:'Available for Drawdown',value:formatMoney(committed-sum(funds,f=>f.called)),iconName:'wallet',accent:'blue',foot:committed?`${pct((committed-sum(funds,f=>f.called))/committed*100)} of commitments`:'No commitments recorded',action:'metric-drawdown'})}
+        ${metricCard({label:'Fund Gross IRR',value:hasPerfData?pct(portfolioGrossIrr):'—',iconName:'trend-up',accent:'purple',foot:'Weighted by commitment',action:'metric-irr'})}
+        ${metricCard({label:'LP Net IRR',value:hasPerfData?pct(portfolioNetIrr):'—',iconName:'users',accent:'cyan',foot:'Weighted by commitment',action:'metric-net-irr'})}
+        ${metricCard({label:'TVPI',value:hasPerfData?`${portfolioTvpi.toFixed(2)}x`:'—',iconName:'bar-chart',accent:'amber',foot:hasPerfData?`DPI ${portfolioDpi.toFixed(2)}x`:'No recorded performance yet',action:'metric-tvpi'})}
         ${metricCard({label:'Unrealized Value',value:formatMoney(unrealized),iconName:'pie-chart',accent:'brand',foot:`${activeCompanies} active companies`,action:'metric-unrealized'})}
       </section>
       <section class="chart-grid">
-        ${card('Performance Overview',performance,{subtitle:'By activity type (USD)',tools:selectControl('Performance fund',['All Funds','Growth Funds','Venture Funds'],'All Funds','dashboard-chart-fund'),classes:'chart-card'})}
-        ${card('J-Curve',jCurve,{subtitle:'Net cash flow since inception',tools:selectControl('J-curve fund',['All Funds','Fund II','Venture I'],'All Funds','dashboard-chart-fund'),classes:'chart-card'})}
+        ${card('Performance Overview',performance || `<div class="empty-state compact">${icon('bar-chart')}<strong>No recorded snapshots yet</strong><p class="muted small">Builds from real fund-performance snapshots recorded on fund create/update, going forward.</p></div>`,{subtitle:performance?`USD millions · ${snapDates.length} recorded snapshot date${snapDates.length===1?'':'s'} (real, not backfilled history)`:'By activity type (USD)',classes:'chart-card'})}
+        ${card('J-Curve',jCurve || `<div class="empty-state compact">${icon('trend-up')}<strong>No recorded snapshots yet</strong></div>`,{subtitle:'NAV over recorded snapshots · USD millions',classes:'chart-card'})}
       </section>
       <section class="dashboard-lower">
-        ${card('Sector Allocation',donutChart(sectorSegments,formatMoney(committed),'Committed',112),{footer:'<button class="card-link" data-action="chart-drilldown" data-chart-label="Sector Allocation" data-chart-value="Committed capital by sector">View full allocation</button>'})}
-        ${card('Portfolio Value Trend',lineChart({labels:['Q1 2026','Q2 2026','Q3 2026','Q4 2026','Q1 2027'],series:[{name:'Value growth',color:'var(--brand)',values:[-10,45,92,132,148]}],height:190,format:v=>`${v}%`}),{footer:'<button class="card-link" data-action="chart-drilldown" data-chart-label="Portfolio Value Trend" data-chart-value="Quarterly portfolio mark movements">View detailed analytics</button>'})}
-        ${card('Quick Overview',`<ul class="activity-list"><li class="activity-item"><span class="activity-icon" style="color:var(--blue);background:var(--blue-soft)">${icon('building')}</span><span class="activity-copy"><strong>Active Investments</strong><small>Across 5 funds</small></span><span class="activity-amount">18</span></li><li class="activity-item"><span class="activity-icon" style="color:var(--emerald);background:var(--emerald-soft)">${icon('check-circle')}</span><span class="activity-copy"><strong>Realised Investments</strong><small>Since inception</small></span><span class="activity-amount">7</span></li><li class="activity-item"><span class="activity-icon" style="color:var(--orange);background:var(--orange-soft)">${icon('briefcase')}</span><span class="activity-copy"><strong>Total Companies</strong><small>Active and realised</small></span><span class="activity-amount">25</span></li><li class="activity-item"><span class="activity-icon" style="color:var(--purple);background:var(--purple-soft)">${icon('trend-up')}</span><span class="activity-copy"><strong>Unrealized Value</strong><small>Current fair value</small></span><span class="activity-amount">${formatMoney(unrealized)}</span></li></ul>`) }
-        ${card('Recent Activity',`<ul class="activity-list"><li class="activity-item"><span class="status-dot online"></span><span class="activity-copy"><strong>Nova Analytics</strong><small>Term sheet signed · 2 days ago</small></span></li><li class="activity-item"><span class="status-dot" style="background:var(--amber)"></span><span class="activity-copy"><strong>GreenOrbit Energy</strong><small>Capital call · 4 days ago</small></span></li><li class="activity-item"><span class="status-dot" style="background:var(--red)"></span><span class="activity-copy"><strong>Mukuru Logistics</strong><small>Board meeting · 5 days ago</small></span></li><li class="activity-item"><span class="status-dot" style="background:var(--blue)"></span><span class="activity-copy"><strong>Nyasha Foods</strong><small>Quarterly report · 1 week ago</small></span></li></ul>`,{tools:'<button class="card-link" data-action="open-activity">View all</button>'})}
+        ${card('Sector Allocation',sectorSegments.length?donutChart(sectorSegments,formatMoney(sectorTotal),'Fair value',112):`<div class="empty-state compact">${icon('pie-chart')}<strong>No holdings recorded yet</strong></div>`,{footer:'<button class="card-link" data-action="chart-drilldown" data-chart-label="Sector Allocation" data-chart-value="Fair value by sector">View full allocation</button>'})}
+        ${card('Quick Overview',`<ul class="activity-list"><li class="activity-item"><span class="activity-icon" style="color:var(--blue);background:var(--blue-soft)">${icon('building')}</span><span class="activity-copy"><strong>Active Investments</strong><small>Across ${distinctFundsWithCompanies} fund${distinctFundsWithCompanies===1?'':'s'}</small></span><span class="activity-amount">${companies.length}</span></li><li class="activity-item"><span class="activity-icon" style="color:var(--orange);background:var(--orange-soft)">${icon('briefcase')}</span><span class="activity-copy"><strong>Total Funds</strong><small>Across the portfolio</small></span><span class="activity-amount">${funds.length}</span></li><li class="activity-item"><span class="activity-icon" style="color:var(--amber);background:var(--amber-soft)">${icon('wallet')}</span><span class="activity-copy"><strong>Open Capital Calls</strong><small>Not yet closed</small></span><span class="activity-amount">${openCalls.length}</span></li><li class="activity-item"><span class="activity-icon" style="color:var(--purple);background:var(--purple-soft)">${icon('trend-up')}</span><span class="activity-copy"><strong>Unrealized Value</strong><small>Current fair value</small></span><span class="activity-amount">${formatMoney(unrealized)}</span></li></ul>`) }
+        ${card('Recent Activity',recentActivity,{tools:'<button class="card-link" data-action="open-activity">View all</button>'})}
       </section>
       <section class="card table-card">
         <div class="table-toolbar"><div class="table-title-row"><h3>Portfolio Summary</h3><span class="table-badge">${companies.length} companies</span></div><div class="table-tools"><div class="table-search">${icon('search')}<input type="text" placeholder="Filter portfolio..." data-input-action="table-search" value="${escapeHTML(state.tableSearch)}"></div>${button('Export summary','export-companies','compact','download')}</div></div>
@@ -1223,7 +1417,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       {label:'Lost',value:String(lostDeals.length),iconName:'x',accent:'red',foot:formatMoney(sum(lostDeals,d=>d.amount)),trend:'negative',action:'metric-lost'}
     ];
     const kanban=`<div class="kanban-shell"><div class="kanban">${dealStages.map(stage=>{const stageDeals=deals.filter(deal=>deal.stage===stage);const value=sum(stageDeals,d=>d.amount);return `<section class="kanban-column" data-stage="${stage}" style="--kanban-tint:${stageColors[stage]}18"><div class="kanban-head"><div class="kanban-title" style="color:${stageColors[stage]}">${escapeHTML(stage)}<span class="kanban-count">${stageDeals.length}</span></div><span class="kanban-value">${formatMoney(value)}</span></div>${stageDeals.map(deal=>`<article class="deal-card" draggable="true" data-deal-id="${deal.id}" data-action="open-deal"><div class="deal-card-head"><div><h4>${escapeHTML(deal.name)}</h4><p>${escapeHTML(deal.sector)}</p></div>${statusPill(deal.round,'neutral')}</div><div class="deal-meta"><span>Round <strong>${escapeHTML(deal.round)}</strong></span><span>Ask <strong>${formatMoney(deal.amount)}</strong></span><span>Age <strong>${deal.age} days</strong></span><span>Score <strong>${deal.score}/100</strong></span></div><div class="deal-card-foot"><span class="owner-mini">${avatar(deal.owner,deal.id.charCodeAt(deal.id.length-1))}${escapeHTML(deal.owner.split(' ')[0])}</span><span class="priority ${deal.priority.toLowerCase()}">${escapeHTML(deal.priority)}</span></div></article>`).join('')}${stageDeals.length<4&&!['Portfolio','Rejected'].includes(stage)?`<button class="button ghost compact" style="width:100%;margin-top:7px" data-action="add-deal" data-stage="${stage}">${icon('plus')} Add deal</button>`:''}</section>`}).join('')}</div></div>`;
-    const listView=`<section class="card table-card deal-list-view"><div class="table-toolbar"><div class="table-title-row"><h3>Deal Register</h3><span class="table-badge">${deals.length} opportunities</span></div><div class="table-tools"><label class="table-search">${icon('search')}<input placeholder="Search deals"></label>${button('Columns','deal-list-columns','','grid')}${button('Export','export-deals','','download')}</div></div><div class="table-wrap"><table><thead><tr><th>Deal</th><th>Stage</th><th>Sector</th><th>Round</th><th class="text-right">Ask</th><th>Owner</th><th>Age</th><th>Score</th><th>Priority</th><th>Next action</th><th></th></tr></thead><tbody>${deals.map((deal,index)=>`<tr class="clickable" data-action="open-deal" data-deal-id="${deal.id}"><td class="table-primary">${escapeHTML(deal.name)}<small>${escapeHTML(deal.id)}</small></td><td>${statusPill(deal.stage,deal.stage==='Rejected'?'danger':deal.stage==='Portfolio'?'success':'info')}</td><td>${escapeHTML(deal.sector)}</td><td>${escapeHTML(deal.round)}</td><td class="text-right">${formatMoney(deal.amount)}</td><td><span class="owner-mini">${avatar(deal.owner,index)}${escapeHTML(deal.owner)}</span></td><td>${deal.age} days</td><td><div class="inline-progress">${progressBar(deal.score)}<span>${deal.score}</span></div></td><td><span class="priority ${deal.priority.toLowerCase()}">${escapeHTML(deal.priority)}</span></td><td>${['Review application','Complete screening','Prepare IC memo','Resolve DD findings','Finalise terms'][index%5]}</td><td>${button('Open','open-deal','compact','eye',`data-deal-id="${deal.id}"`)}</td></tr>`).join('')}</tbody></table></div></section>`;
+    const listView=`<section class="card table-card deal-list-view"><div class="table-toolbar"><div class="table-title-row"><h3>Deal Register</h3><span class="table-badge">${deals.length} opportunities</span></div><div class="table-tools"><label class="table-search">${icon('search')}<input placeholder="Search deals"></label>${button('Columns','deal-list-columns','','grid')}${button('Export','export-deals','','download')}</div></div><div class="table-wrap"><table><thead><tr><th>Deal</th><th>Stage</th><th>Sector</th><th>Round</th><th class="text-right">Ask</th><th>Owner</th><th>Age</th><th>Score</th><th>Priority</th><th>Next action</th><th></th></tr></thead><tbody>${deals.map((deal,index)=>`<tr class="clickable" data-action="open-deal" data-deal-id="${deal.id}"><td class="table-primary">${escapeHTML(deal.name)}${(deal.sector || deal.round) ? `<small>${escapeHTML([deal.sector, deal.round].filter(Boolean).join(' · '))}</small>` : ''}</td><td>${statusPill(deal.stage,deal.stage==='Rejected'?'danger':deal.stage==='Portfolio'?'success':'info')}</td><td>${escapeHTML(deal.sector)}</td><td>${escapeHTML(deal.round)}</td><td class="text-right">${formatMoney(deal.amount)}</td><td><span class="owner-mini">${avatar(deal.owner,index)}${escapeHTML(deal.owner)}</span></td><td>${deal.age} days</td><td><div class="inline-progress">${progressBar(deal.score)}<span>${deal.score}</span></div></td><td><span class="priority ${deal.priority.toLowerCase()}">${escapeHTML(deal.priority)}</span></td><td>${['Review application','Complete screening','Prepare IC memo','Resolve DD findings','Finalise terms'][index%5]}</td><td>${button('Open','open-deal','compact','eye',`data-deal-id="${deal.id}"`)}</td></tr>`).join('')}</tbody></table></div></section>`;
     const calendarDays=Array.from({length:35},(_,i)=>{const day=i-1;const display=day<=0?day+30:day>31?day-31:day;const muted=day<=0||day>31;const dayDeals=deals.filter((_,idx)=>((idx*3+4)%28)+1===display&&!muted);return `<button class="deal-calendar-day ${muted?'muted':''} ${dayDeals.length?'has-deals':''}" data-action="deal-calendar-day" data-day="${display}"><span>${display}</span>${dayDeals.slice(0,2).map(deal=>`<em style="--stage-color:${stageColors[deal.stage]}">${escapeHTML(deal.name)}</em>`).join('')}${dayDeals.length>2?`<small>+${dayDeals.length-2} more</small>`:''}</button>`}).join('');
     const calendarView=`<section class="card deal-calendar-card"><div class="card-head"><div><h3>Deal activity calendar</h3><p>Reviews, IC meetings, diligence deadlines and closing milestones.</p></div>${button('Add milestone','add-deal-milestone','primary compact','plus')}</div><div class="card-body"><div class="deal-calendar-week">${['MON','TUE','WED','THU','FRI','SAT','SUN'].map(day=>`<span>${day}</span>`).join('')}</div><div class="deal-calendar-grid">${calendarDays}</div></div></section>`;
     const view=state.dealView==='board'?kanban:state.dealView==='calendar'?calendarView:listView;
@@ -1234,40 +1428,53 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   }
 
   function renderFunds() {
-    const totalCommitment = sum(funds,f=>f.commitment);
-    const called = sum(funds,f=>f.called);
-    const distributed = sum(funds,f=>f.distributed);
+    const vintageFilter = state.fundVintageFilter || 'All vintages';
+    const strategyFilter = state.fundStrategyFilter || 'All strategies';
+    const statusFilter = state.fundStatusFilter || 'All statuses';
+    const currencyFilter = state.fundCurrencyFilter || 'All currencies';
+    const searchTerm = String(state.tableSearch||'').trim().toLowerCase();
+    const filteredFunds = funds.filter(f =>
+      (vintageFilter==='All vintages' || String(f.vintage)===vintageFilter) &&
+      (strategyFilter==='All strategies' || f.strategy===strategyFilter) &&
+      (statusFilter==='All statuses' || f.status===statusFilter) &&
+      (currencyFilter==='All currencies' || f.currency===currencyFilter) &&
+      (!searchTerm || f.name.toLowerCase().includes(searchTerm) || f.strategy.toLowerCase().includes(searchTerm))
+    );
+    const totalCommitment = sum(filteredFunds,f=>f.commitment);
+    const called = sum(filteredFunds,f=>f.called);
+    const distributed = sum(filteredFunds,f=>f.distributed);
     const dryPowder = totalCommitment - called;
     const strategies = {};
-    funds.forEach(f=>strategies[f.strategy]=(strategies[f.strategy]||0)+f.commitment);
+    filteredFunds.forEach(f=>strategies[f.strategy]=(strategies[f.strategy]||0)+f.commitment);
     const strategySegments = Object.entries(strategies).map(([label,value],index)=>({label,value,color:['#2475f5','#0ba780','#60a5fa','#f5a623','#0f98b6'][index],display:`${pct(value/totalCommitment*100)} · ${formatMoney(value)}`}));
-    const geographies = [
-      {label:'Southern Africa',value:52.7,color:'#2475f5',display:'52.7%'},
-      {label:'East Africa',value:19.8,color:'#0ba780',display:'19.8%'},
-      {label:'West Africa',value:14.2,color:'#60a5fa',display:'14.2%'},
-      {label:'Pan-African / Other',value:13.3,color:'#f5a623',display:'13.3%'}
-    ];
-    const rows = funds.map(fund=>`<tr class="clickable" data-action="open-fund" data-id="${fund.id}"><td><div class="company-cell"><span class="company-logo" style="background:linear-gradient(145deg,#6094dc,#0a8f76)">${escapeHTML(fund.id.slice(-1))}</span><span class="table-primary">${escapeHTML(fund.name)}</span></div></td><td>${fund.vintage}</td><td>${escapeHTML(fund.strategy)}</td><td>${fund.currency}</td><td class="text-right">${formatMoney(fund.commitment,fund.currency)}</td><td><div class="inline-progress">${progressBar(fund.called/fund.commitment*100)}<span>${pct(fund.called/fund.commitment*100)}</span></div></td><td class="text-right">${formatMoney(fund.nav,fund.currency)}</td><td class="text-right">${formatMoney(fund.distributed,fund.currency)}</td><td class="text-right positive">${pct(fund.grossIrr)}</td><td class="text-right positive">${pct(fund.netIrr)}</td><td class="text-right">${fund.tvpi.toFixed(2)}x</td><td class="text-right">${fund.dpi.toFixed(2)}x</td><td>${statusPill(fund.status)}</td></tr>`).join('');
+    // Weighted by commitment across real fund data (no fabricated portfolio-level constant).
+    const portfolioGrossIrr = totalCommitment ? sum(filteredFunds,f=>f.grossIrr*f.commitment)/totalCommitment : 0;
+    const portfolioTvpi = totalCommitment ? sum(filteredFunds,f=>f.tvpi*f.commitment)/totalCommitment : 0;
+    const geoTotals = {};
+    filteredFunds.forEach(f=>{ const g=f.geography&&f.geography!=='—'?f.geography:'Unspecified'; geoTotals[g]=(geoTotals[g]||0)+f.commitment; });
+    const geoColors=['#2475f5','#0ba780','#60a5fa','#f5a623','#0f98b6','#d9475c'];
+    const geographies = Object.entries(geoTotals).map(([label,value],index)=>({label,value,color:geoColors[index%geoColors.length],display:`${pct(value/totalCommitment*100)} · ${formatMoney(value)}`}));
+    const rows = filteredFunds.map(fund=>`<tr class="clickable" data-action="open-fund" data-id="${fund.id}"><td><div class="company-cell"><span class="company-logo" style="background:linear-gradient(145deg,#6094dc,#0a8f76)">${escapeHTML(fund.id.slice(-1))}</span><span class="table-primary">${escapeHTML(fund.name)}</span></div></td><td>${fund.vintage}</td><td>${escapeHTML(fund.strategy)}</td><td>${fund.currency}</td><td class="text-right">${formatMoney(fund.commitment,fund.currency)}</td><td><div class="inline-progress">${progressBar(fund.called/fund.commitment*100)}<span>${pct(fund.called/fund.commitment*100)}</span></div></td><td class="text-right">${formatMoney(fund.nav,fund.currency)}</td><td class="text-right">${formatMoney(fund.distributed,fund.currency)}</td><td class="text-right positive">${pct(fund.grossIrr)}</td><td class="text-right positive">${pct(fund.netIrr)}</td><td class="text-right">${fund.tvpi.toFixed(2)}x</td><td class="text-right">${fund.dpi.toFixed(2)}x</td><td>${statusPill(fund.status)}</td></tr>`).join('');
     return `${pageHeader('Funds','Monitor fund-level performance, capital activity and structure across the portfolio.',globalPageActions({extra:button('Create fund','create-fund','primary','plus')}))}
-      ${workspaceFilterBar([{label:'Vintage',action:'fund-vintage-filter',selected:'All vintages',options:['All vintages',...Array.from(new Set(funds.map(f=>String(f.vintage))))]},{label:'Strategy',action:'fund-strategy-filter',selected:'All strategies',options:['All strategies',...Array.from(new Set(funds.map(f=>f.strategy)))]},{label:'Status',action:'fund-status-filter',selected:'All statuses',options:['All statuses','Investing','Realising','Closed']},{label:'Currency',action:'fund-currency-filter',selected:'All currencies',options:['All currencies','USD','ZWG']}])}
+      ${workspaceFilterBar([{label:'Vintage',action:'fund-vintage-filter',selected:vintageFilter,options:['All vintages',...Array.from(new Set(funds.map(f=>String(f.vintage))))]},{label:'Strategy',action:'fund-strategy-filter',selected:strategyFilter,options:['All strategies',...Array.from(new Set(funds.map(f=>f.strategy)))]},{label:'Status',action:'fund-status-filter',selected:statusFilter,options:['All statuses','Investing','Realising','Closed']},{label:'Currency',action:'fund-currency-filter',selected:currencyFilter,options:['All currencies','USD','ZWG']}])}
       <section class="metric-grid section-gap">
-        ${metricCard({label:'Total Commitments',value:formatMoney(totalCommitment),iconName:'dollar',accent:'emerald',foot:'12.4% vs prior period',action:'metric-funds'})}
+        ${metricCard({label:'Total Commitments',value:formatMoney(totalCommitment),iconName:'dollar',accent:'emerald',foot:'No prior-period data',action:'metric-funds'})}
         ${metricCard({label:'Called Capital',value:formatMoney(called),iconName:'wallet',accent:'blue',foot:`${pct(called/totalCommitment*100)} of commitments`,action:'metric-called'})}
         ${metricCard({label:'Distributed Capital',value:formatMoney(distributed),iconName:'trend-up',accent:'purple',foot:`${pct(distributed/totalCommitment*100)} of commitments`,action:'metric-distributed'})}
         ${metricCard({label:'Remaining Dry Powder',value:formatMoney(dryPowder),iconName:'bar-chart',accent:'amber',foot:`${pct(dryPowder/totalCommitment*100)} of commitments`,action:'metric-dry-powder'})}
-        ${metricCard({label:'Gross IRR (Portfolio)',value:'18.7%',iconName:'trend-up',accent:'cyan',foot:'1.6pp vs prior period',action:'metric-irr'})}
-        ${metricCard({label:'TVPI (Portfolio)',value:'2.18x',iconName:'pie-chart',accent:'brand',foot:'0.14x vs prior period',action:'metric-tvpi'})}
+        ${metricCard({label:'Gross IRR (Portfolio)',value:pct(portfolioGrossIrr),iconName:'trend-up',accent:'cyan',foot:'Weighted by commitment',action:'metric-irr'})}
+        ${metricCard({label:'TVPI (Portfolio)',value:`${portfolioTvpi.toFixed(2)}x`,iconName:'pie-chart',accent:'brand',foot:'Weighted by commitment',action:'metric-tvpi'})}
       </section>
       <section class="grid cols-3">
         ${card('Fund Mix by Strategy',donutChart(strategySegments,formatMoney(totalCommitment),'Total Commitments',120),{footer:'<button class="card-link" data-action="chart-drilldown" data-chart-label="Fund Mix" data-chart-value="Commitments by strategy">View full breakdown</button>'})}
-        ${card('Vintage Year Performance',barChart({labels:funds.map(f=>String(f.vintage)),series:[{name:'Gross IRR',color:'var(--blue)',values:funds.map(f=>f.grossIrr)}],height:215,format:v=>`${Math.round(v)}%`}),{subtitle:'Gross IRR by vintage',footer:'<button class="card-link" data-action="chart-drilldown" data-chart-label="Vintage Analysis" data-chart-value="Gross IRR by vintage year">View vintage analysis</button>'})}
+        ${card('Vintage Year Performance',barChart({labels:filteredFunds.map(f=>String(f.vintage)),series:[{name:'Gross IRR',color:'var(--blue)',values:filteredFunds.map(f=>f.grossIrr)}],height:215,format:v=>`${Math.round(v)}%`}),{subtitle:'Gross IRR by vintage',footer:'<button class="card-link" data-action="chart-drilldown" data-chart-label="Vintage Analysis" data-chart-value="Gross IRR by vintage year">View vintage analysis</button>'})}
         ${card('Geographic Allocation',donutChart(geographies,formatMoney(totalCommitment),'Committed',120),{footer:'<button class="card-link" data-action="chart-drilldown" data-chart-label="Geographic Allocation" data-chart-value="Commitment by operating geography">View full allocation</button>'})}
       </section>
-      <section class="card table-card"><div class="table-toolbar"><div class="table-title-row"><h3>Funds Overview</h3><span class="table-badge">${funds.length} funds</span></div><div class="table-tools"><div class="table-search">${icon('search')}<input type="text" placeholder="Search funds..." data-input-action="table-search" value="${escapeHTML(state.tableSearch)}"></div>${button('Filter','fund-filters','compact','filter')}${button('Export','export-funds','compact','download')}</div></div><div class="table-wrap"><table><thead><tr><th>Fund Name</th><th>Vintage</th><th>Strategy</th><th>Currency</th><th class="text-right">Commitment</th><th>Called</th><th class="text-right">NAV</th><th class="text-right">Distributed</th><th class="text-right">Gross IRR</th><th class="text-right">Net IRR</th><th class="text-right">TVPI</th><th class="text-right">DPI</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div></section>
+      <section class="card table-card"><div class="table-toolbar"><div class="table-title-row"><h3>Funds Overview</h3><span class="table-badge">${filteredFunds.length} funds</span></div><div class="table-tools"><div class="table-search">${icon('search')}<input type="text" placeholder="Search funds..." data-input-action="table-search" value="${escapeHTML(state.tableSearch)}"></div>${button('Filter','fund-filters','compact','filter')}${button('Export','export-funds','compact','download')}</div></div><div class="table-wrap"><table><thead><tr><th>Fund Name</th><th>Vintage</th><th>Strategy</th><th>Currency</th><th class="text-right">Commitment</th><th>Called</th><th class="text-right">NAV</th><th class="text-right">Distributed</th><th class="text-right">Gross IRR</th><th class="text-right">Net IRR</th><th class="text-right">TVPI</th><th class="text-right">DPI</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div></section>
       <section class="grid cols-3 section-gap">
         ${card('Upcoming Reporting Deadlines',`<div class="info-list">${(reports.length?reports:[{fund:'—',type:'No schedules loaded',due:'—',status:'—'}]).slice(0,4).map(report=>{const dueParts=String(report.due||'').split(/\s+/);const day=dueParts[0]||'—';const month=(dueParts[1]||'').slice(0,3).toUpperCase()||'—';return `<div class="list-row"><span class="calendar-day" style="width:38px;height:38px;aspect-ratio:auto;background:var(--surface-soft)">${escapeHTML(day)}<small style="font-size:10px">${escapeHTML(month)}</small></span><span class="list-row-main"><strong>${escapeHTML(report.fund)}</strong><small>${escapeHTML(report.type)}</small></span><span class="warning-text small">${escapeHTML(report.status)}</span></div>`;}).join('')}</div>`,{tools:'<button class="card-link" data-action="navigate" data-page="reporting">View all</button>'})}
-        ${card('Recent Capital Activity',`<div class="info-list">${(capitalCalls.length?capitalCalls:[]).slice(0,4).map((call,index)=>`<div class="list-row"><span class="activity-icon" style="color:${index%2?'var(--emerald)':'var(--blue)'};background:${index%2?'var(--emerald-soft)':'var(--blue-soft)'}">${icon(index%2?'trend-up':'wallet')}</span><span class="list-row-main"><strong>${index%2?'Distribution':'Capital Call'}</strong><small>${escapeHTML(call.fund)}</small></span><strong class="${index%2?'positive':'negative'} small">${formatMoney(index%2?call.collected:call.amount)}</strong></div>`).join('')||'<div class="muted small" style="padding:8px 0">No capital activity yet</div>'}</div>`,{tools:'<button class="card-link" data-action="navigate" data-page="capital-calls">View all</button>'})}
-        ${card('Top Performing Funds',`<div class="info-list">${[...funds].sort((a,b)=>b.grossIrr-a.grossIrr).slice(0,4).map((fund,index)=>`<div class="list-row"><span class="risk-score good">${index+1}</span><span class="list-row-main"><strong>${escapeHTML(fund.name)}</strong><small>${pct(fund.grossIrr)} Gross IRR</small></span><strong class="positive">${Number(fund.tvpi||0).toFixed(2)}x</strong></div>`).join('')||'<div class="muted small" style="padding:8px 0">No funds loaded</div>'}</div>`,{tools:'<button class="card-link" data-action="chart-drilldown" data-chart-label="Fund Ranking" data-chart-value="Performance ranking by Gross IRR">View all</button>'})}
+        ${card('Recent Capital Activity',`<div class="info-list">${capitalCalls.slice(0,4).map(call=>`<div class="list-row"><span class="activity-icon" style="color:var(--blue);background:var(--blue-soft)">${icon('wallet')}</span><span class="list-row-main"><strong>Capital Call</strong><small>${escapeHTML(call.fund)}</small></span><strong class="negative small">${formatMoney(call.amount)}</strong></div>`).join('')||'<div class="muted small" style="padding:8px 0">No capital activity yet</div>'}</div>`,{tools:'<button class="card-link" data-action="navigate" data-page="capital-calls">View all</button>'})}
+        ${card('Top Performing Funds',`<div class="info-list">${[...filteredFunds].sort((a,b)=>b.grossIrr-a.grossIrr).slice(0,4).map((fund,index)=>`<div class="list-row"><span class="risk-score good">${index+1}</span><span class="list-row-main"><strong>${escapeHTML(fund.name)}</strong><small>${pct(fund.grossIrr)} Gross IRR</small></span><strong class="positive">${Number(fund.tvpi||0).toFixed(2)}x</strong></div>`).join('')||'<div class="muted small" style="padding:8px 0">No funds loaded</div>'}</div>`,{tools:'<button class="card-link" data-action="chart-drilldown" data-chart-label="Fund Ranking" data-chart-value="Performance ranking by Gross IRR">View all</button>'})}
       </section>`;
   }
 
@@ -1275,37 +1482,41 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     const outstanding = sum(capitalCalls,c=>Math.max(0,c.amount-c.collected));
     const collected = sum(capitalCalls,c=>c.collected);
     const upcoming = capitalCalls.filter(c=>!['Closed'].includes(c.status)).length;
-    const overdue = capitalCalls.filter(c=>c.status==='Partially Collected').length;
-    const rows = capitalCalls.map(call=>`<tr class="clickable" data-action="open-capital-call" data-id="${call.id}"><td class="table-primary brand-text">${escapeHTML(call.id)}</td><td>${escapeHTML(call.fund)}</td><td>${call.callDate}</td><td>${call.dueDate}</td><td>${escapeHTML(call.purpose)}</td><td class="text-right">${formatMoney(call.amount)}</td><td class="text-center">${call.lpCount}</td><td><div class="inline-progress">${progressBar(call.collected/call.amount*100,call.collected===call.amount?'var(--emerald)':'')}<span>${formatMoney(call.collected)} / ${formatMoney(call.amount)}</span></div></td><td>${statusPill(call.status)}</td><td><button class="button ghost compact icon-only" data-action="activity-menu" data-context="capital-call" data-id="${call.id}" aria-label="Capital call activity">${icon('clock')}</button></td></tr>`).join('');
+    const today = new Date();
+    const overdueCalls = capitalCalls.filter(c=>c.status!=='Closed' && c.collected<c.amount && new Date(c.dueDate)<today);
+    const draftCalls = capitalCalls.filter(c=>c.status==='Draft');
+    const overdueAmount = sum(overdueCalls,c=>Math.max(0,c.amount-c.collected));
+    const draftAmount = sum(draftCalls,c=>c.amount);
+    const rows = capitalCalls.map(call=>`<tr class="clickable" data-action="open-capital-call" data-id="${call.id}"><td class="table-primary brand-text">${escapeHTML(call.id)}</td><td>${escapeHTML(call.fund)}</td><td>${call.callDate}</td><td>${call.dueDate}</td><td>${escapeHTML(call.purpose)}</td><td class="text-right">${formatMoney(call.amount)}</td><td class="text-center">${call.lpCount}</td><td><div class="inline-progress">${progressBar(call.amount?call.collected/call.amount*100:0,call.collected===call.amount?'var(--emerald)':'')}<span>${formatMoney(call.collected)} / ${formatMoney(call.amount)}</span></div></td><td>${statusPill(call.status)}</td><td><button class="button ghost compact icon-only" data-action="activity-menu" data-context="capital-call" data-id="${call.id}" aria-label="Capital call activity">${icon('clock')}</button></td></tr>`).join('');
     const collectionSegments = [
       {label:'Collected',value:collected,color:'#07936d',display:formatMoney(collected)},
-      {label:'Outstanding',value:outstanding,color:'#f59e0b',display:formatMoney(outstanding)},
-      {label:'Overdue',value:12600000,color:'#d9475c',display:formatMoney(12600000)},
-      {label:'Draft',value:11000000,color:'#aab3c2',display:formatMoney(11000000)}
+      {label:'Outstanding',value:outstanding-overdueAmount,color:'#f59e0b',display:formatMoney(Math.max(0,outstanding-overdueAmount))},
+      {label:'Overdue',value:overdueAmount,color:'#d9475c',display:formatMoney(overdueAmount)},
+      {label:'Draft',value:draftAmount,color:'#aab3c2',display:formatMoney(draftAmount)}
     ];
+    const recentPayments = capitalCalls.filter(c=>c.collected>0).slice(0,5);
     return `${pageHeader('Capital Calls','Plan, issue and track capital calls and drawdowns across funds.',globalPageActions({extra:button('New Capital Call','new-capital-call','primary','plus')}))}
       <section class="metric-grid">
         ${metricCard({label:'Upcoming Calls',value:String(upcoming),iconName:'calendar',accent:'blue',foot:formatMoney(sum(capitalCalls.filter(c=>c.status!=='Closed'),c=>c.amount)),action:'metric-upcoming-calls'})}
         ${metricCard({label:'Outstanding Amount',value:formatMoney(outstanding),iconName:'dollar',accent:'emerald',foot:'Across active notices',action:'metric-outstanding'})}
-        ${metricCard({label:'Collected This Quarter',value:formatMoney(collected),iconName:'check',accent:'emerald',foot:'18.7% vs Q2 2026',action:'metric-collected'})}
-        ${metricCard({label:'Overdue LPs',value:String(overdue*7),iconName:'alert',accent:'amber',foot:formatMoney(12600000),trend:'negative',action:'metric-overdue-lps'})}
-        ${metricCard({label:'Notice Period Compliance',value:'96.3%',iconName:'shield',accent:'blue',foot:'3.4pp vs last month',action:'metric-compliance'})}
-        ${metricCard({label:'Average Collection Time',value:'18.4 days',iconName:'clock',accent:'purple',foot:'2.1 days faster',action:'metric-collection-time'})}
+        ${metricCard({label:'Collected',value:formatMoney(collected),iconName:'check',accent:'emerald',foot:`${pct(outstanding+collected?collected/(outstanding+collected)*100:0)} of issued calls`,action:'metric-collected'})}
+        ${metricCard({label:'Overdue Calls',value:String(overdueCalls.length),iconName:'alert',accent:'amber',foot:formatMoney(overdueAmount),trend:overdueCalls.length?'negative':undefined,action:'metric-overdue-lps'})}
       </section>
-      <section class="card"><div class="table-toolbar"><div class="table-title-row"><h3>Capital Call Notices</h3><span class="table-badge">${capitalCalls.length} notices</span></div><div class="table-tools"><div class="table-search">${icon('search')}<input type="text" placeholder="Search notices..." data-input-action="table-search"></div>${selectControl('Status',['All Statuses','Issued','Partially Collected','Closed','Draft'],'All Statuses','capital-call-status')}${button('New Capital Call','new-capital-call','primary compact','plus')}</div></div><div class="table-wrap"><table><thead><tr><th>Notice ID</th><th>Fund</th><th>Call Date</th><th>Due Date</th><th>Purpose</th><th class="text-right">Total Amount</th><th>LP Count</th><th>Collection Progress</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></section>
-      <section class="grid cols-4 section-gap">
-        ${card('Call Allocation by LP',`<div class="info-list">${(lps.length?lps:[]).slice(0,5).map(lp=>`<div><div class="info-row"><span>${escapeHTML(lp.name)}</span><strong>${formatMoney(lp.commitment*.05)}</strong></div>${progressBar(lp.commitment?lp.called/lp.commitment*100:0)}</div>`).join('')||'<div class="muted small" style="padding:8px 0">No LP allocations loaded</div>'}</div>`,{footer:'<button class="card-link" data-action="navigate" data-page="lps">View full allocation</button>'})}
-        ${card('Collection Progress',donutChart(collectionSegments,formatMoney(outstanding),'Outstanding',112),{footer:'<button class="card-link" data-action="chart-drilldown" data-chart-label="Collection Progress" data-chart-value="Capital call collection by status">View detailed analysis</button>'})}
-        ${card('Cash Requirement Timeline',barChart({labels:['Jul','Aug','Sep','Oct','Nov','Dec'],series:[{name:'Scheduled Calls',color:'var(--blue)',values:[42.5,76,38.5,55,26,18.5]}],height:205,format:v=>`${Math.round(v)}M`}),{footer:'<button class="card-link" data-action="chart-drilldown" data-chart-label="Cash Forecast" data-chart-value="Six month capital requirement forecast">View cash forecast</button>'})}
-        ${card('Recent Payment Confirmations',`<div class="info-list">${(lps.length?lps:[]).slice(0,5).map((lp,index)=>`<div class="list-row"><span class="activity-icon" style="color:var(--emerald);background:var(--emerald-soft)">${icon('check-circle')}</span><span class="list-row-main"><strong>${escapeHTML(lp.name)}</strong><small>${escapeHTML((funds[index%Math.max(funds.length,1)]||{name:'Fund'}).name)}</small></span><strong class="small">${formatMoney(([5,7.5,6.3,4,3][index]||3)*1000000)}</strong></div>`).join('')||'<div class="muted small" style="padding:8px 0">No payment confirmations yet</div>'}</div>`,{footer:'<button class="card-link" data-action="chart-drilldown" data-chart-label="Payments" data-chart-value="Recent confirmed capital call payments">View all payments</button>'})}
+      <section class="card"><div class="table-toolbar"><div class="table-title-row"><h3>Capital Call Notices</h3><span class="table-badge">${capitalCalls.length} notices</span></div><div class="table-tools"><div class="table-search">${icon('search')}<input type="text" placeholder="Search notices..." data-input-action="table-search"></div>${selectControl('Status',['All Statuses','Issued','Partially Collected','Closed','Draft'],'All Statuses','capital-call-status')}${button('New Capital Call','new-capital-call','primary compact','plus')}</div></div><div class="table-wrap"><table><thead><tr><th>Notice ID</th><th>Fund</th><th>Call Date</th><th>Due Date</th><th>Purpose</th><th class="text-right">Total Amount</th><th>LP Count</th><th>Collection Progress</th><th>Status</th><th></th></tr></thead><tbody>${rows||`<tr><td colspan="10"><div class="empty-state compact">${icon('send')}<strong>No capital calls issued yet</strong></div></td></tr>`}</tbody></table></div></section>
+      <section class="grid cols-3 section-gap">
+        ${card('Call Allocation by LP',`<div class="info-list">${(lps.length?lps:[]).slice(0,5).map(lp=>`<div><div class="info-row"><span>${escapeHTML(lp.name)}</span><strong>${formatMoney(lp.called)}</strong></div>${progressBar(lp.commitment?lp.called/lp.commitment*100:0)}</div>`).join('')||'<div class="muted small" style="padding:8px 0">No LP allocations loaded</div>'}</div>`,{subtitle:'Cumulative called capital per LP, across all funds',footer:'<button class="card-link" data-action="navigate" data-page="lps">View full allocation</button>'})}
+        ${card('Collection Progress',(outstanding+collected)?donutChart(collectionSegments,formatMoney(outstanding+collected),'Total issued',112):`<div class="empty-state compact">${icon('pie-chart')}<strong>No capital calls issued yet</strong></div>`,{footer:'<button class="card-link" data-action="chart-drilldown" data-chart-label="Collection Progress" data-chart-value="Capital call collection by status">View detailed analysis</button>'})}
+        ${card('Recent Payment Confirmations',`<div class="info-list">${recentPayments.map(call=>`<button type="button" class="list-row" data-action="open-capital-call" data-id="${call.id}"><span class="activity-icon" style="color:var(--emerald);background:var(--emerald-soft)">${icon('check-circle')}</span><span class="list-row-main"><strong>${escapeHTML(call.fund)}</strong><small>${escapeHTML(call.id)}</small></span><strong class="small">${formatMoney(call.collected)}</strong></button>`).join('')||'<div class="muted small" style="padding:8px 0">No payment confirmations yet</div>'}</div>`,{footer:'<button class="card-link" data-action="chart-drilldown" data-chart-label="Payments" data-chart-value="Recent confirmed capital call payments">View all payments</button>'})}
       </section>`;
   }
 
   function renderCompanies() {
     const totalFairValue = sum(companies,c=>c.fairValue);
-    const avgGrowth = sum(companies,c=>c.revenueGrowth)/companies.length;
-    const avgMargin = sum(companies,c=>c.margin)/companies.length;
+    const avgGrowth = companies.length ? sum(companies,c=>c.revenueGrowth)/companies.length : 0;
+    const avgMargin = companies.length ? sum(companies,c=>c.margin)/companies.length : 0;
     const atRisk = companies.filter(c=>c.health<70).length;
+    const lowRunway = companies.filter(c=>c.runway<12).length;
+    const sectorCount = new Set(companies.map(c=>c.sector)).size;
     const rows = companies.filter(company=>!state.tableSearch || company.name.toLowerCase().includes(state.tableSearch.toLowerCase()) || company.sector.toLowerCase().includes(state.tableSearch.toLowerCase())).map(company=>`<tr class="clickable" data-action="open-company" data-id="${company.id}"><td><div class="company-cell">${companyLogo(company)}<span class="table-primary">${escapeHTML(company.name)}</span></div></td><td>${escapeHTML(company.sector)}</td><td>${escapeHTML(company.stage)}</td><td>${company.entry}</td><td class="text-right">${formatMoney(company.invested)}</td><td class="text-right">${formatMoney(company.fairValue)}</td><td class="text-right">${pct(company.ownership)}</td><td class="text-right positive">${pct(company.revenueGrowth)}</td><td>${company.runway} months</td><td>${healthScore(company.health)}</td><td>${company.boardDate}</td><td>${company.lastReport}</td><td><button class="button ghost compact icon-only" data-action="activity-menu" data-context="company" data-id="${company.id}" aria-label="Company activity">${icon('clock')}</button></td></tr>`).join('');
     const healthSegments = [
       {label:'Excellent (80-100)',value:companies.filter(c=>c.health>=80).length,color:'#07936d',display:String(companies.filter(c=>c.health>=80).length)},
@@ -1318,38 +1529,45 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     const sectorSegments = Object.entries(sectorValues).map(([label,value],index)=>({label,value,color:['#2475f5','#0ba780','#60a5fa','#f5a623','#0f98b6','#d9475c'][index],display:formatMoney(value)}));
     return `${pageHeader('Portfolio Companies','Portfolio health, fair value, growth and value-creation oversight.',globalPageActions({extra:`${button('Filters','company-filters','','filter')}${button('Add company','add-company','primary','plus')}`}))}
       <section class="metric-grid">
-        ${metricCard({label:'Active Portfolio Companies',value:String(companies.length),iconName:'building',accent:'emerald',foot:'+4 vs 31 Dec 2025',action:'metric-companies'})}
-        ${metricCard({label:'Total Fair Value',value:formatMoney(totalFairValue),iconName:'dollar',accent:'purple',foot:'12.4% vs prior period',action:'metric-fair-value',spark:[120,132,126,141,136,151,155]})}
-        ${metricCard({label:'Average Revenue Growth',value:pct(avgGrowth),iconName:'trend-up',accent:'blue',foot:'5.3pp vs prior period',action:'metric-revenue-growth',spark:[18,21,26,23,27,29,31]})}
-        ${metricCard({label:'Average Gross Margin',value:pct(avgMargin),iconName:'pie-chart',accent:'amber',foot:'2.1pp vs prior period',action:'metric-ebitda',spark:[54,57,61,59,64,65,67]})}
-        ${metricCard({label:'Follow-on Pipeline',value:formatMoney(462500000),iconName:'filter',accent:'cyan',foot:'16 opportunities',action:'metric-follow-on'})}
-        ${metricCard({label:'At-Risk Companies',value:String(atRisk),iconName:'shield',accent:'red',foot:`${pct(atRisk/companies.length*100)} of portfolio`,trend:'negative',action:'metric-at-risk'})}
+        ${metricCard({label:'Active Portfolio Companies',value:String(companies.length),iconName:'building',accent:'emerald',foot:`${sectorCount} sector${sectorCount===1?'':'s'} represented`,action:'metric-companies'})}
+        ${metricCard({label:'Total Fair Value',value:formatMoney(totalFairValue),iconName:'dollar',accent:'purple',foot:formatMoney(sum(companies,c=>c.invested))+' invested',action:'metric-fair-value'})}
+        ${metricCard({label:'Average Revenue Growth',value:pct(avgGrowth),iconName:'trend-up',accent:'blue',foot:'Across active companies',action:'metric-revenue-growth'})}
+        ${metricCard({label:'Average Gross Margin',value:pct(avgMargin),iconName:'pie-chart',accent:'amber',foot:'Across active companies',action:'metric-ebitda'})}
+        ${metricCard({label:'Low Runway (<12mo)',value:String(lowRunway),iconName:'filter',accent:'cyan',foot:`${pct(companies.length?lowRunway/companies.length*100:0)} of portfolio`,action:'metric-low-runway'})}
+        ${metricCard({label:'At-Risk Companies',value:String(atRisk),iconName:'shield',accent:'red',foot:`${pct(companies.length?atRisk/companies.length*100:0)} of portfolio`,trend:'negative',action:'metric-at-risk'})}
       </section>
       <section class="card"><div class="table-toolbar"><div class="table-title-row"><h3>Portfolio Companies</h3><span class="table-badge">${companies.length}</span></div><div class="table-tools"><div class="table-search">${icon('search')}<input type="text" placeholder="Search companies..." data-input-action="table-search" value="${escapeHTML(state.tableSearch)}"></div>${button('Export','export-companies','compact','download')}</div></div><div class="table-wrap"><table><thead><tr><th>Company</th><th>Sector</th><th>Stage</th><th>Entry Date</th><th class="text-right">Invested Amount</th><th class="text-right">Fair Value</th><th class="text-right">Ownership</th><th class="text-right">Revenue Growth</th><th>Runway</th><th>Health Score</th><th>Next Board Date</th><th>Last Reporting Update</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></section>
-      <section class="grid cols-5 section-gap">
-        ${card('Portfolio Health Distribution',donutChart(healthSegments,String(companies.length),'Companies',104),{footer:'<span class="muted small">Weighted score</span><strong>${Math.round(sum(companies,c=>c.health)/companies.length)}</strong>'})}
+      <section class="grid cols-4 section-gap">
+        ${card('Portfolio Health Distribution',donutChart(healthSegments,String(companies.length),'Companies',104),{footer:`<span class="muted small">Average score</span><strong>${companies.length?Math.round(sum(companies,c=>c.health)/companies.length):0}</strong>`})}
         ${card('Value by Sector',donutChart(sectorSegments,formatMoney(totalFairValue),'Fair Value',104),{footer:'<button class="card-link" data-action="chart-drilldown" data-chart-label="Sector Value" data-chart-value="Fair value by sector">View sector breakdown</button>'})}
-        ${card('Key Milestones Tracker',`<div class="info-list">${companies.slice(0,5).map((company,index)=>`<div class="list-row">${companyLogo(company)}<span class="list-row-main"><strong>${escapeHTML(company.name)}</strong><small>${['$100M ARR','Series C Raise','US Market Launch','Break-even EBITDA','ISO 27001'][index]}</small></span>${statusPill(index===3?'Behind':index===1?'At Risk':'On Track')}</div>`).join('')}</div>`,{footer:'<button class="card-link" data-action="open-milestones">View all milestones</button>'})}
-        ${card('Value Creation Initiatives',`<div class="info-list">${[['Go-to-market expansion',68],['Product & Technology',57],['Operational Excellence',63],['Talent & Organisation',50]].map(item=>`<div><div class="info-row"><span>${item[0]}</span><strong>${item[1]}%</strong></div>${progressBar(item[1])}</div>`).join('')}</div>`,{footer:'<button class="card-link" data-action="open-value-creation">View all initiatives</button>'})}
-        ${card('Alerts & Actions',`<div class="info-list">${[['3 companies','Missing Q2 Reports','Overdue'],['2 companies','Board materials overdue','Overdue'],['1 company','Runway < 9 months','High'],['4 companies','Health score declined','Medium'],['2 companies','Regulatory filing due','Medium']].map(item=>`<div class="list-row"><span class="activity-icon" style="color:var(--red);background:var(--red-soft)">${icon('alert')}</span><span class="list-row-main"><strong>${item[0]}</strong><small>${item[1]}</small></span>${statusPill(item[2])}</div>`).join('')}</div>`,{footer:'<button class="card-link" data-action="open-alerts">View all alerts</button>'})}
+        ${card('Alerts & Actions',(lowRunway||atRisk)?`<div class="info-list">${[lowRunway?[`${lowRunway} compan${lowRunway===1?'y':'ies'}`,'Runway under 12 months','High']:null,atRisk?[`${atRisk} compan${atRisk===1?'y':'ies'}`,'Health score below 70','Medium']:null].filter(Boolean).map(item=>`<div class="list-row"><span class="activity-icon" style="color:var(--red);background:var(--red-soft)">${icon('alert')}</span><span class="list-row-main"><strong>${item[0]}</strong><small>${item[1]}</small></span>${statusPill(item[2])}</div>`).join('')}</div>`:`<div class="empty-state compact">${icon('check-circle')}<strong>No portfolio alerts right now</strong></div>`,{footer:'<button class="card-link" data-action="open-alerts">View all alerts</button>'})}
       </section>`;
   }
 
   function renderReporting() {
-    const complete=reports.filter(r=>r.status==='Complete').length+46;
-    const overdue=reports.filter(r=>r.status==='Overdue').length+4;
+    const complete=reports.filter(r=>r.status==='Complete').length;
+    const overdue=reports.filter(r=>r.status==='Overdue').length;
+    const boardPacks=reports.filter(r=>r.type==='Board Pack').length;
+    const investorLetters=reports.filter(r=>/investor|lp report/i.test(r.type||'')).length;
     const [year,month]=state.reportingMonth.split('-').map(Number);
     const monthName=new Intl.DateTimeFormat('en',{month:'long',year:'numeric'}).format(new Date(year,month-1,1));
     const firstDay=(new Date(year,month-1,1).getDay()+6)%7;
     const daysInMonth=new Date(year,month,0).getDate();
     const prevDays=new Date(year,month-1,0).getDate();
-    const cells=Array.from({length:42},(_,i)=>{const dayNumber=i-firstDay+1;let dateObj,display,muted=false;if(dayNumber<1){display=prevDays+dayNumber;dateObj=new Date(year,month-2,display);muted=true;}else if(dayNumber>daysInMonth){display=dayNumber-daysInMonth;dateObj=new Date(year,month,display);muted=true;}else{display=dayNumber;dateObj=new Date(year,month-1,display);}const iso=`${dateObj.getFullYear()}-${String(dateObj.getMonth()+1).padStart(2,'0')}-${String(dateObj.getDate()).padStart(2,'0')}`;const events=reportingCalendarEvents.filter(event=>event.date===iso);return `<button class="calendar-day ${muted?'muted':''} ${iso===state.selectedCalendarDate?'active':''} ${events.length?'has-events':''}" data-action="calendar-day" data-date="${iso}"><span>${display}</span>${events.slice(0,2).map(event=>`<i class="calendar-event-dot ${event.type.toLowerCase().replaceAll(' ','-')}"></i>`).join('')}</button>`}).join('');
-    const selectedEvents=reportingCalendarEvents.filter(event=>event.date===state.selectedCalendarDate);
+    // Real calendar events derived from each report's actual due date (no fixture event list).
+    const reportEvents = reports.map(report=>{
+      const d = new Date(report.due);
+      if (Number.isNaN(d.getTime())) return null;
+      return { id:report.id, date:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`, type:report.type, title:report.type, owner:report.owner, channel:report.channel, status:report.status };
+    }).filter(Boolean);
+    const dueThisMonth = reports.filter(r=>{ const d=new Date(r.due); return !Number.isNaN(d.getTime()) && d.getMonth()===new Date().getMonth() && d.getFullYear()===new Date().getFullYear(); }).length;
+    const cells=Array.from({length:42},(_,i)=>{const dayNumber=i-firstDay+1;let dateObj,display,muted=false;if(dayNumber<1){display=prevDays+dayNumber;dateObj=new Date(year,month-2,display);muted=true;}else if(dayNumber>daysInMonth){display=dayNumber-daysInMonth;dateObj=new Date(year,month,display);muted=true;}else{display=dayNumber;dateObj=new Date(year,month-1,display);}const iso=`${dateObj.getFullYear()}-${String(dateObj.getMonth()+1).padStart(2,'0')}-${String(dateObj.getDate()).padStart(2,'0')}`;const events=reportEvents.filter(event=>event.date===iso);return `<button class="calendar-day ${muted?'muted':''} ${iso===state.selectedCalendarDate?'active':''} ${events.length?'has-events':''}" data-action="calendar-day" data-date="${iso}"><span>${display}</span>${events.slice(0,2).map(event=>`<i class="calendar-event-dot ${event.type.toLowerCase().replaceAll(' ','-')}"></i>`).join('')}</button>`}).join('');
+    const selectedEvents=reportEvents.filter(event=>event.date===state.selectedCalendarDate);
     const rows=reports.map(report=>`<tr class="clickable" data-action="preview-scheduled-report" data-id="${report.id}"><td><div class="company-cell"><span class="activity-icon" style="color:var(--blue);background:var(--blue-soft)">${icon('file')}</span><span class="table-primary">${escapeHTML(report.type)}</span></div></td><td>${escapeHTML(report.fund)}</td><td>${escapeHTML(report.entity)}</td><td><span class="owner-mini">${avatar(report.owner,report.id.charCodeAt(report.id.length-1))}${escapeHTML(report.owner)}</span></td><td>${escapeHTML(report.frequency)}</td><td>${report.due}</td><td>${statusPill(report.status)}</td><td><div class="inline-progress">${progressBar(report.progress)}<span>${report.progress}%</span></div></td><td>${escapeHTML(report.channel)}</td><td>${button('Preview','preview-scheduled-report','compact','eye',`data-id="${report.id}"`)}</td></tr>`).join('');
     return `${pageHeader('Reporting Schedules','Coordinate internal and external reporting obligations across PE and VC funds.',globalPageActions({extra:button('Filters','report-filters','','filter')}))}
-      <section class="metric-grid">${metricCard({label:'Reports Due This Month',value:'28',iconName:'calendar',accent:'blue',foot:'16% vs Jun 2026',action:'metric-reports-due'})}${metricCard({label:'Completed Reports',value:String(complete),iconName:'check-circle',accent:'emerald',foot:'22% vs Jun 2026',action:'metric-reports-complete'})}${metricCard({label:'Overdue Reports',value:String(overdue),iconName:'alert',accent:'red',foot:'+2 vs Jun 2026',trend:'negative',action:'metric-reports-overdue'})}${metricCard({label:'Upcoming Board Packs',value:'12',iconName:'clipboard',accent:'purple',foot:'8% vs Jun 2026',action:'metric-board-packs'})}${metricCard({label:'Investor Letters Scheduled',value:'8',iconName:'mail',accent:'amber',foot:'14% vs Jun 2026',action:'metric-investor-letters'})}${metricCard({label:'Avg. Turnaround Time',value:'4.2 days',iconName:'clock',accent:'cyan',foot:'0.6 days faster',action:'metric-report-turnaround'})}</section>
+      <section class="metric-grid">${metricCard({label:'Reports Due This Month',value:String(dueThisMonth),iconName:'calendar',accent:'blue',foot:'Across all funds',action:'metric-reports-due'})}${metricCard({label:'Completed Reports',value:String(complete),iconName:'check-circle',accent:'emerald',foot:`${reports.length} total scheduled`,action:'metric-reports-complete'})}${metricCard({label:'Overdue Reports',value:String(overdue),iconName:'alert',accent:'red',foot:overdue?'Needs attention':'None overdue',trend:overdue?'negative':undefined,action:'metric-reports-overdue'})}${metricCard({label:'Board Packs',value:String(boardPacks),iconName:'clipboard',accent:'purple',foot:'Scheduled',action:'metric-board-packs'})}${metricCard({label:'Investor / LP Reports',value:String(investorLetters),iconName:'mail',accent:'amber',foot:'Scheduled',action:'metric-investor-letters'})}</section>
       <section class="calendar-layout interactive-reporting-calendar"><section class="card"><div class="calendar"><div class="calendar-head"><div><strong>${monthName}</strong><small>Click a date to view reporting activity</small></div><div class="calendar-controls">${button('','calendar-prev','ghost compact icon-only','chevron-left','aria-label="Previous month"')}${button('Today','calendar-today','compact')}${button('','calendar-next','ghost compact icon-only','chevron-right','aria-label="Next month"')}</div></div><div class="calendar-grid">${['MON','TUE','WED','THU','FRI','SAT','SUN'].map(d=>`<div class="calendar-day-label">${d}</div>`).join('')}${cells}</div><div class="calendar-agenda"><div class="calendar-agenda-head"><div><strong>${new Intl.DateTimeFormat('en',{weekday:'long',day:'numeric',month:'long'}).format(new Date(state.selectedCalendarDate+'T12:00:00'))}</strong><small>${selectedEvents.length} scheduled item${selectedEvents.length===1?'':'s'}</small></div>${button('Add schedule','new-report-schedule','compact','plus')}</div>${selectedEvents.length?selectedEvents.map(event=>`<button class="calendar-agenda-item" data-action="open-calendar-event" data-id="${event.id}"><span>${icon(event.type.includes('Board')?'clipboard':event.type.includes('Valuation')?'trend-up':'file')}</span><span><strong>${escapeHTML(event.title)}</strong><small>${escapeHTML(event.owner)} · ${escapeHTML(event.channel)}</small></span>${statusPill(event.status)}${icon('chevron-right')}</button>`).join(''):'<div class="empty-state compact"><div><div class="empty-state-icon">'+icon('calendar')+'</div><h3>No reporting events</h3><p>Select another date or create a schedule.</p></div></div>'}</div></div></section>
-        <section class="card table-card"><div class="table-toolbar"><div class="table-title-row"><h3>Upcoming Due Dates</h3><span class="table-badge">${reports.length}</span></div><div class="table-tools">${button('New schedule','new-report-schedule','compact','plus')}</div></div><div class="table-wrap"><table><thead><tr><th>Report Type</th><th>Fund</th><th>Entity</th><th>Owner</th><th>Frequency</th><th>Due Date</th><th>Status</th><th>Draft Progress</th><th>Delivery Channel</th><th>Preview</th></tr></thead><tbody>${rows}</tbody></table></div></section></section>`;
+        <section class="card table-card"><div class="table-toolbar"><div class="table-title-row"><h3>Upcoming Due Dates</h3><span class="table-badge">${reports.length}</span></div><div class="table-tools">${button('New schedule','new-report-schedule','compact','plus')}</div></div><div class="table-wrap"><table><thead><tr><th>Report Type</th><th>Fund</th><th>Entity</th><th>Owner</th><th>Frequency</th><th>Due Date</th><th>Status</th><th>Draft Progress</th><th>Delivery Channel</th><th>Preview</th></tr></thead><tbody>${reports.length?rows:`<tr><td colspan="10"><div class="empty-state compact">${icon('file-chart')}<strong>No reporting schedule yet</strong></div></td></tr>`}</tbody></table></div></section></section>`;
   }
 
   function renderFundPerformance() {
@@ -1357,35 +1575,51 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     if (!selectedFund) {
       return `${pageHeader('Fund Performance Reporting','Track performance, cash flows, attribution and benchmarks across reporting periods.','')}<div class="empty-state"><h3>No funds loaded</h3><p>Live fund data is still loading or has not been seeded yet.</p></div>`;
     }
+    const fundCompaniesAll = companies.filter(c=>c.fund===selectedFund.name);
+    const snapshots = (state.fundPerformanceSnapshots && state.fundPerformanceSnapshots[selectedFund.id]) || [];
+    const irrSnapshots = snapshots.filter(s=>s.grossIrr!=null);
+    const latestGrossIrr = irrSnapshots.length ? Number(irrSnapshots[irrSnapshots.length-1].grossIrr)*100 : null;
     const metrics = [
-      {label:'Gross IRR',value:pct(selectedFund.grossIrr||0),iconName:'trend-up',accent:'emerald',foot:'1.6pp vs Q1 2026',action:'metric-gross-irr'},
-      {label:'Net IRR',value:pct(selectedFund.netIrr||0),iconName:'users',accent:'cyan',foot:'1.3pp vs Q1 2026',action:'metric-net-irr'},
-      {label:'TVPI',value:`${Number(selectedFund.tvpi||0).toFixed(2)}x`,iconName:'bar-chart',accent:'amber',foot:'0.14x vs Q1 2026',action:'metric-tvpi'},
-      {label:'DPI',value:`${Number(selectedFund.dpi||0).toFixed(2)}x`,iconName:'dollar',accent:'purple',foot:'0.08x vs Q1 2026',action:'metric-dpi'},
-      {label:'RVPI',value:`${Math.max(0,Number(selectedFund.tvpi||0)-Number(selectedFund.dpi||0)).toFixed(2)}x`,iconName:'trend-up',accent:'blue',foot:'0.06x vs Q1 2026',action:'metric-rvpi'},
-      {label:'NAV',value:formatMoney(selectedFund.nav||0),iconName:'dollar',accent:'emerald',foot:'+8.7M vs Q1 2026',action:'metric-nav'}
+      {label:'Gross IRR',value:latestGrossIrr!=null?pct(latestGrossIrr):'—',iconName:'trend-up',accent:'emerald',foot:latestGrossIrr!=null?'Since inception':'Not enough cash-flow history yet',action:'metric-gross-irr'},
+      {label:'Net IRR',value:pct(selectedFund.netIrr||0),iconName:'users',accent:'cyan',foot:'After fees and carry',action:'metric-net-irr'},
+      {label:'TVPI',value:`${Number(selectedFund.tvpi||0).toFixed(2)}x`,iconName:'bar-chart',accent:'amber',foot:'Total value multiple',action:'metric-tvpi'},
+      {label:'DPI',value:`${Number(selectedFund.dpi||0).toFixed(2)}x`,iconName:'dollar',accent:'purple',foot:'Distributed multiple',action:'metric-dpi'},
+      {label:'RVPI',value:`${Math.max(0,Number(selectedFund.tvpi||0)-Number(selectedFund.dpi||0)).toFixed(2)}x`,iconName:'trend-up',accent:'blue',foot:'Residual value multiple',action:'metric-rvpi'},
+      {label:'NAV',value:formatMoney(selectedFund.nav||0),iconName:'dollar',accent:'emerald',foot:'Current fund NAV',action:'metric-nav'}
     ];
-    const performanceChart = lineChart({labels:['Q2 2024','Q3 2024','Q4 2024','Q1 2025','Q2 2025','Q3 2025','Q4 2025','Q1 2026','Q2 2026'],series:[{name:'Net IRR',color:'var(--emerald)',values:[1,6,7,9,10,12,13.8,14.2,14.9]},{name:'Gross IRR',color:'var(--blue)',values:[3,9,10,12,14,16,17.1,18,18.7]}],height:220,format:v=>`${Math.round(v)}%`});
-    const pmeChart = lineChart({labels:['Q2 2024','Q3 2024','Q4 2024','Q1 2025','Q2 2025','Q3 2025','Q4 2025','Q1 2026','Q2 2026'],series:[{name:'Matanho Fund II (Net IRR)',color:'var(--blue)',values:[0,4,7,9.5,12,14,16,17.5,18.7]},{name:'Private Markets PME',color:'var(--emerald)',values:[0,2,4,5.5,7,8.5,10,11.2,12.5]}],height:220,format:v=>`${Math.round(v)}%`});
-    const attributionRows = companies.slice(0,5).map(c=>`<tr><td class="table-primary">${escapeHTML(c.name)}</td><td class="text-right">${pct(c.revenueGrowth/6)}</td><td class="text-right">${pct(c.fairValue/sum(companies,x=>x.fairValue)*100)}</td><td class="text-right positive">↑ ${pct(c.health/100)}</td></tr>`).join('');
-    return `${pageHeader('Fund Performance Reporting','Track performance, cash flows, attribution and benchmarks across reporting periods.',`${selectControl('Fund',funds.map(f=>f.name),selectedFund.name,'fund-filter')}${selectControl('Period',['Q2 2026 (Apr - Jun 2026)','Q1 2026 (Jan - Mar 2026)','Q4 2025 (Oct - Dec 2025)'],'Q2 2026 (Apr - Jun 2026)','performance-period')}${statusPill('Review in progress','info')}${button('Generate Report','generate-report','primary','file-chart')}${button('Export','export-performance','','download')}${button('Submit for approval','submit-performance','','send')}`)}
+    const snapLabels = irrSnapshots.map(s=>new Date(s.asOfDate).toLocaleDateString('en-GB',{day:'2-digit',month:'short'}));
+    const performanceChart = irrSnapshots.length ? lineChart({labels:snapLabels,series:[{name:'Gross IRR',color:'var(--blue)',values:irrSnapshots.map(s=>Number(s.grossIrr)*100)}],height:220,format:v=>`${Number(v).toFixed(1)}%`}) : null;
+    const CA_BENCHMARK = { irr: 3.9, tvpi: 1.25, dpi: 0.0, asOf: 'H1 2025', source: 'Cambridge Associates LLC US Private Equity Index' };
+    const benchRows = [
+      ['Gross IRR', latestGrossIrr, CA_BENCHMARK.irr, latestGrossIrr!=null?pct(latestGrossIrr):'—', `${CA_BENCHMARK.irr.toFixed(1)}%`],
+      ['TVPI', selectedFund.tvpi||null, CA_BENCHMARK.tvpi, selectedFund.tvpi?`${selectedFund.tvpi.toFixed(2)}x`:'—', `${CA_BENCHMARK.tvpi.toFixed(2)}x`],
+      ['DPI', selectedFund.dpi||null, CA_BENCHMARK.dpi, selectedFund.dpi?`${selectedFund.dpi.toFixed(2)}x`:'0.00x', `${CA_BENCHMARK.dpi.toFixed(2)}x`],
+    ];
+    const benchmarkTable = `<div class="table-wrap"><table><thead><tr><th>Metric</th><th class="text-right">Fund</th><th class="text-right">Benchmark</th><th class="text-right">Alpha</th><th>Status</th></tr></thead><tbody>${benchRows.map(([label,fundVal,benchVal,fundDisp,benchDisp])=>{
+      const hasFund = fundVal!=null;
+      const alpha = hasFund ? fundVal-benchVal : null;
+      const outperforming = alpha!=null && alpha>=0;
+      const alphaDisp = alpha==null?'—':`${alpha>=0?'+':''}${label==='Gross IRR'?alpha.toFixed(1)+'pp':alpha.toFixed(2)+'x'}`;
+      return `<tr><td class="table-primary">${label}</td><td class="text-right">${fundDisp}</td><td class="text-right">${benchDisp}</td><td class="text-right ${alpha==null?'':outperforming?'positive':'negative'}">${alphaDisp}</td><td>${hasFund?statusPill(outperforming?'Outperforming':'Underperforming',outperforming?'success':'warning'):statusPill('Not enough data yet','neutral')}</td></tr>`;
+    }).join('')}</tbody></table></div><p class="muted small" style="margin-top:10px">Benchmark: ${CA_BENCHMARK.source}, ${CA_BENCHMARK.asOf} (TVPI/DPI use CA's published early-lifecycle 2019–2021 vintage range as the nearest comparable cohort — no freely published vintage-matched figure exists for a fund this young).</p>`;
+    const totalFV = sum(fundCompaniesAll,c=>c.fairValue);
+    const attributionRows = fundCompaniesAll.map(c=>`<tr><td class="table-primary">${escapeHTML(c.name)}</td><td class="text-right">${formatMoney(c.fairValue)}</td><td class="text-right">${pct(totalFV?c.fairValue/totalFV*100:0)}</td></tr>`).join('');
+    const fundReports = reports.filter(r=>r.fund===selectedFund.name || r.entity===selectedFund.name);
+    return `${pageHeader('Fund Performance Reporting','Track performance, cash flows, attribution and benchmarks across reporting periods.',`${selectControl('Fund',funds.map(f=>f.name),selectedFund.name,'fund-filter')}${button('Generate Report','generate-report','primary','file-chart')}${button('Export','export-performance','','download')}`)}
       <section class="metric-grid">${metrics.map(metricCard).join('')}</section>
-      <div class="tabs"><button class="tab active">Overview</button><button class="tab" data-action="performance-tab">Performance</button><button class="tab" data-action="performance-tab">Cash Flows</button><button class="tab" data-action="performance-tab">Portfolio</button><button class="tab" data-action="performance-tab">Attribution</button><button class="tab" data-action="performance-tab">Benchmarks</button></div>
       <section class="split-layout section-gap">
         <div>
           <section class="grid cols-2">
-            ${card('Net and Gross Performance Trend',performanceChart,{subtitle:'Quarterly IRR progression'})}
-            ${card('PME Benchmark Comparison',pmeChart,{subtitle:'Public-market equivalent comparison'})}
+            ${card('Gross IRR Over Recorded Snapshots',performanceChart||`<div class="empty-state compact">${icon('trend-up')}<strong>Gross IRR not yet computable</strong><p class="muted small">Needs real capital-call cash flows dated far enough from today for a stable annualised rate.</p></div>`,{subtitle:'From real capital-call cash flows vs current NAV'})}
+            ${card('Benchmark Comparison',benchmarkTable,{subtitle:'vs Cambridge Associates US Private Equity Index'})}
           </section>
-          <section class="grid cols-2 section-gap">
-            ${card('Cash Flow Bridge',waterfallChart([{label:'Opening NAV',value:151200000,total:true},{label:'Contributions',value:25600000},{label:'Distributions',value:-19800000},{label:'Fees',value:-6100000},{label:'Value Change',value:17500000},{label:'Closing NAV',value:168400000,total:true}]),{subtitle:'USD'})}
-            ${card('Attribution by Company',`<div class="table-wrap"><table class="criteria-table"><thead><tr><th>Company</th><th class="text-right">Contribution to IRR</th><th class="text-right">% of Net IRR</th><th class="text-right">Change</th></tr></thead><tbody>${attributionRows}<tr><td class="table-primary">Total</td><td class="text-right table-primary">14.9%</td><td class="text-right table-primary">100.0%</td><td class="text-right positive">↑ 2.0%</td></tr></tbody></table></div>`,{subtitle:'Q2 2026'})}
+          <section class="grid cols-1 section-gap">
+            ${card('Fair Value by Holding',fundCompaniesAll.length?`<div class="table-wrap"><table class="criteria-table"><thead><tr><th>Company</th><th class="text-right">Fair Value</th><th class="text-right">% of Fund FV</th></tr></thead><tbody>${attributionRows}</tbody></table></div>`:`<div class="empty-state compact">${icon('building')}<strong>No holdings recorded for this fund yet</strong></div>`,{subtitle:'Current fair-value contribution'})}
           </section>
-          <section class="card table-card"><div class="table-toolbar"><div class="table-title-row"><h3>Reporting Periods</h3></div><div class="table-tools">${button('Open report builder','open-report-builder','compact','edit')}</div></div><div class="table-wrap"><table><thead><tr><th>Period</th><th>Version</th><th>Prepared by</th><th>Prepared on</th><th>Reviewed by</th><th>Reviewed on</th><th>Status</th><th>Published on</th><th></th></tr></thead><tbody>${[['Q2 2026 (Apr - Jun 2026)','v1.0','Tendai Makoni','10 Jul 2026','Chipo Muzenhamo','13 Jul 2026','Review in progress','-'],['Q1 2026 (Jan - Mar 2026)','v2.1','Tendai Makoni','15 Apr 2026','Chipo Muzenhamo','17 Apr 2026','Approved','20 Apr 2026'],['Q4 2025 (Oct - Dec 2025)','v2.0','Tendai Makoni','16 Jan 2026','Chipo Muzenhamo','19 Jan 2026','Approved','22 Jan 2026'],['Q3 2025 (Jul - Sep 2025)','v2.0','Tendai Makoni','17 Oct 2025','Chipo Muzenhamo','20 Oct 2025','Approved','23 Oct 2025']].map(row=>`<tr class="clickable" data-action="open-report-builder">${row.map((cell,i)=>`<td class="${i===0?'table-primary':''}">${i===6?statusPill(cell):escapeHTML(cell)}</td>`).join('')}<td><button class="button ghost compact icon-only" data-action="activity-menu" data-context="report" data-id="${escapeHTML(row[0])}" aria-label="Report activity">${icon('clock')}</button></td></tr>`).join('')}</tbody></table></div></section>
+          <section class="card table-card"><div class="table-toolbar"><div class="table-title-row"><h3>Reporting Periods</h3><span class="table-badge">${fundReports.length}</span></div><div class="table-tools">${button('Open report builder','open-report-builder','compact','edit')}</div></div><div class="table-wrap"><table><thead><tr><th>Report Type</th><th>Owner</th><th>Due</th><th>Status</th><th>Progress</th></tr></thead><tbody>${fundReports.length?fundReports.map(r=>`<tr class="clickable" data-action="open-report-builder"><td class="table-primary">${escapeHTML(r.type)}</td><td>${escapeHTML(r.owner)}</td><td>${r.due}</td><td>${statusPill(r.status)}</td><td><div class="inline-progress">${progressBar(r.progress)}<span>${r.progress}%</span></div></td></tr>`).join(''):`<tr><td colspan="5"><div class="empty-state compact">${icon('file-chart')}<strong>No reporting schedule for this fund yet</strong></div></td></tr>`}</tbody></table></div></section>
         </div>
         <div class="side-stack" style="display:flex">
-          ${card('Validation Summary',`<div style="margin-bottom:11px">${statusPill('All validations passed','success')}</div><div class="info-list">${[['Cash flows reconciled','Net cash flow variance: $0.00'],['NAV balanced','NAV per books matches investment data'],['Valuations up to date','All portfolio valuations current'],['Expense allocation','Allocated in accordance with LPA'],['Capital accounts','LP capital accounts in balance']].map(item=>`<div class="reason-item">${icon('check-circle')}<div><strong>${item[0]}</strong><small>${item[1]}</small></div></div>`).join('')}</div>`,{footer:'<button class="card-link" data-action="open-validations">View validation details</button>'})}
-          ${card('Reporting Controls',`<div class="info-list"><div class="info-row"><span>Data lock date</span><strong>30 Jun 2026</strong></div><div class="info-row"><span>FX source</span><strong>Reserve Bank / Refinitiv</strong></div><div class="info-row"><span>Valuation policy</span><strong>IPEV 2025</strong></div><div class="info-row"><span>Benchmark</span><strong>Private Markets PME</strong></div><div class="info-row"><span>Last validated</span><strong>13 Jul 2026 · 10:24</strong></div></div>`,{footer:'<button class="card-link" data-action="performance-settings">Configure controls</button>'})}
+          ${card('Fund Snapshot Log',snapshots.length?`<div class="info-list">${snapshots.slice().reverse().map(s=>`<div class="info-row"><span>${new Date(s.asOfDate).toLocaleDateString()}</span><strong>NAV ${formatMoney(Number(s.nav))}</strong></div>`).join('')}</div>`:`<div class="empty-state compact">${icon('clock')}<strong>No recorded snapshots yet</strong></div>`,{footer:'<span class="muted small">Snapshots record automatically on fund create/update</span>'})}
         </div>
       </section>`;
   }
@@ -1398,36 +1632,103 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     const geography = {};
     lps.forEach(lp=>geography[lp.geography]=(geography[lp.geography]||0)+lp.commitment);
     const geosegments = Object.entries(geography).map(([label,value],i)=>({label,value,color:['#2475f5','#0ba780','#60a5fa','#f5a623'][i],display:`${pct(value/totalCommitments*100)} · ${formatMoney(value)}`}));
-    return `${pageHeader('LP Management','Manage investors, commitments, communications, KYC and account history.',`${selectControl('LP filter',['All LPs','Pension Funds','Family Offices','Insurance','Funds of Funds'],'All LPs','lp-filter')}${selectControl('Date',['31 Jul 2026','30 Jun 2026'],'31 Jul 2026','date-filter')}${button('Export','export-lps','','download')}${button('Add LP','add-lp','primary','plus')}`)}
+    const verifiedKyc = lps.filter(lp=>lp.kyc==='Verified').length;
+    const activePortal = lps.filter(lp=>lp.portal==='Active').length;
+    return `${pageHeader('LP Management','Manage investors, commitments, communications, KYC and account history.',`${selectControl('LP filter',['All LPs','Pension Funds','Family Offices','Insurance','Funds of Funds'],'All LPs','lp-filter')}${button('Export','export-lps','','download')}${button('Add LP','add-lp','primary','plus')}`)}
       <section class="metric-grid">
-        ${metricCard({label:'Active LPs',value:'42',iconName:'users',accent:'emerald',foot:'5.0% vs 31 Dec 2025',action:'metric-active-lps'})}
-        ${metricCard({label:'Total Commitments',value:formatMoney(totalCommitments),iconName:'wallet',accent:'blue',foot:'8.7% vs 31 Dec 2025',action:'metric-lp-commitments'})}
-        ${metricCard({label:'Unfunded Commitments',value:formatMoney(unfunded),iconName:'pie-chart',accent:'amber',foot:'6.3% vs 31 Dec 2025',action:'metric-unfunded'})}
-        ${metricCard({label:'Distributions This Quarter',value:formatMoney(distributed),iconName:'dollar',accent:'purple',foot:'12.5% vs Q1 2026',action:'metric-lp-distributions'})}
-        ${metricCard({label:'Investor Satisfaction',value:'4.6 / 5.0',iconName:'sparkles',accent:'emerald',foot:'+0.2 vs prior period',action:'metric-satisfaction'})}
-        ${metricCard({label:'Documents Pending',value:'18',iconName:'file',accent:'amber',foot:'3 fewer than prior period',trend:'negative',action:'metric-lp-docs'})}
+        ${metricCard({label:'Active LPs',value:String(lps.length),iconName:'users',accent:'emerald',foot:'Investor records on file',action:'metric-active-lps'})}
+        ${metricCard({label:'Total Commitments',value:formatMoney(totalCommitments),iconName:'wallet',accent:'blue',foot:`Across ${lps.length} LP${lps.length===1?'':'s'}`,action:'metric-lp-commitments'})}
+        ${metricCard({label:'Unfunded Commitments',value:formatMoney(unfunded),iconName:'pie-chart',accent:'amber',foot:totalCommitments?`${pct(unfunded/totalCommitments*100)} of commitments`:'No commitments recorded',action:'metric-unfunded'})}
+        ${metricCard({label:'Distributed',value:formatMoney(distributed),iconName:'dollar',accent:'purple',foot:'Cumulative to date',action:'metric-lp-distributions'})}
+        ${metricCard({label:'Verified KYC',value:`${verifiedKyc}/${lps.length}`,iconName:'shield',accent:'emerald',foot:'Investor records current',action:'metric-kyc'})}
       </section>
-      <section class="card"><div class="table-toolbar"><div class="table-title-row"><h3>LP Directory</h3><span class="table-badge">42 LPs</span></div><div class="table-tools"><div class="table-search">${icon('search')}<input type="text" placeholder="Search LPs..." data-input-action="table-search"></div>${button('Filters','lp-filters','compact','filter')}</div></div><div class="table-wrap"><table><thead><tr><th>LP Name</th><th>Type</th><th>Geography</th><th class="text-right">Committed Amount</th><th>Called</th><th class="text-right">Distributed</th><th class="text-right">Net IRR</th><th>Contact Owner</th><th>Last Interaction</th><th>KYC Status</th><th>Portal Status</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></section>
-      <section class="grid cols-4 section-gap">
-        ${card('Commitment Concentration',donutChart(geosegments,formatMoney(totalCommitments),'Total Commitments',112),{footer:'<button class="card-link" data-action="chart-drilldown" data-chart-label="Commitment Concentration" data-chart-value="LP commitments by geography">View full breakdown</button>'})}
-        ${card('Contact Activity',`<div class="timeline">${[['3 Jul 2026','Email with Zambezi Pension Fund','Quarterly update & NAV report shared'],['2 Jul 2026','Call with Savannah Insurance','Discussed re-up and diversification'],['1 Jul 2026','Meeting with Baobab Growth Partners','Onboarding documentation review']].map(item=>`<div class="timeline-item"><strong>${item[1]}</strong><small>${item[0]} · ${item[2]}</small></div>`).join('')}</div>`,{tools:'<button class="card-link" data-action="open-contacts">View all</button>'})}
-        ${card('Outstanding Documents',`<div class="info-list">${[['Side Letter Acknowledgement','Horizon Family Office','Overdue'],['LPA Amendment','Savannah Insurance','2 days'],['KYC Annual Review','Baobab Growth Partners','5 days']].map(item=>`<div class="list-row"><span class="activity-icon" style="color:var(--red);background:var(--red-soft)">${icon('file')}</span><span class="list-row-main"><strong>${item[0]}</strong><small>${item[1]}</small></span>${statusPill(item[2])}</div>`).join('')}</div>`,{tools:'<button class="card-link" data-action="open-lp-documents">View all</button>'})}
-        ${card('Onboarding & Communications',`<div><div class="info-row"><strong>Onboarding Progress</strong><strong>60%</strong></div>${progressBar(60)}</div><div class="info-list" style="margin-top:13px"><div class="list-row"><span class="activity-icon" style="color:var(--blue);background:var(--blue-soft)">${icon('mail')}</span><span class="list-row-main"><strong>Q2 2026 Investor Update</strong><small>Sent to 42 LPs · 7 Jul 2026</small></span></div><div class="list-row"><span class="activity-icon" style="color:var(--purple);background:var(--purple-soft)">${icon('file')}</span><span class="list-row-main"><strong>Capital Call Notice - Fund II</strong><small>Sent to 38 LPs · 1 Jul 2026</small></span></div></div>`,{footer:'<button class="card-link" data-action="new-communication">Send communication</button>'})}
+      <section class="card"><div class="table-toolbar"><div class="table-title-row"><h3>LP Directory</h3><span class="table-badge">${lps.length} LPs</span></div><div class="table-tools"><div class="table-search">${icon('search')}<input type="text" placeholder="Search LPs..." data-input-action="table-search"></div>${button('Filters','lp-filters','compact','filter')}</div></div><div class="table-wrap"><table><thead><tr><th>LP Name</th><th>Type</th><th>Geography</th><th class="text-right">Committed Amount</th><th>Called</th><th class="text-right">Distributed</th><th class="text-right">Net IRR</th><th>Contact Owner</th><th>Last Interaction</th><th>KYC Status</th><th>Portal Status</th><th></th></tr></thead><tbody>${lps.length?rows:`<tr><td colspan="12"><div class="empty-state compact">${icon('users')}<strong>No LP records yet</strong></div></td></tr>`}</tbody></table></div></section>
+      <section class="grid cols-2 section-gap">
+        ${card('Commitment Concentration',geosegments.length?donutChart(geosegments,formatMoney(totalCommitments),'Total Commitments',112):`<div class="empty-state compact">${icon('pie-chart')}<strong>No LP records yet</strong></div>`,{footer:'<button class="card-link" data-action="chart-drilldown" data-chart-label="Commitment Concentration" data-chart-value="LP commitments by geography">View full breakdown</button>'})}
+        ${card('KYC & Portal Status',lps.length?`<div><div class="info-row"><strong>KYC Verified</strong><strong>${pct(verifiedKyc/lps.length*100)}</strong></div>${progressBar(verifiedKyc/lps.length*100)}</div><div style="margin-top:13px"><div class="info-row"><strong>Portal Active</strong><strong>${pct(activePortal/lps.length*100)}</strong></div>${progressBar(activePortal/lps.length*100)}</div>`:`<div class="empty-state compact">${icon('shield')}<strong>No LP records yet</strong></div>`,{footer:'<button class="card-link" data-action="new-communication">Send communication</button>'})}
       </section>`;
+  }
+
+  /**
+   * state.dealDetail (when loaded) is the WRAPPER shape returned by
+   * loadDealDetail(): { application, hero, dueDiligence, termSheet,
+   * boardReview, investmentImplementation, disbursements, documents, ... } —
+   * not the flat application record. `app` below is the raw application;
+   * `hero` is loadDealDetail's own normalised display fields (ownership,
+   * preMoney, screeningOutcome, address, ...) and is preferred where it
+   * exists since it already applies the right application-vs-term-sheet
+   * precedence.
+   */
+  function boardDecisionLabel(boardReview) {
+    if (!boardReview || boardReview.status !== 'COMPLETED') return null;
+    if (boardReview.investmentApproved) return 'Approved';
+    if (boardReview.investmentRejected) return 'Rejected';
+    if (boardReview.conditionalApproval) return 'Approved with conditions';
+    return 'Decision recorded';
+  }
+
+  const __PV11_TERMINAL_REJECT_STAGES = new Set([
+    'REJECTED', 'REJECTED_SCREENING', 'AUTO_REJECTED', 'BELOW_THRESHOLD', 'BOARD_REJECTED', 'DECLINED', 'WITHDRAWN',
+  ]);
+  function dealProgress(deal) {
+    const detail = state.dealDetail || {};
+    const app = detail.application || {};
+    const hero = detail.hero || {};
+    const realOutcome = hero.screeningOutcome || app.screeningOutcome || (deal.stage === 'Rejected' ? 'REJECTED' : null);
+    const hasDD = Boolean(deal.hasDueDiligence);
+    const ddComplete = detail.dueDiligence?.status === 'COMPLETED';
+    const hasTS = Boolean(deal.hasTermSheet);
+    const hasBoard = Boolean(deal.hasBoardReview);
+    const hasImpl = Boolean(detail.investmentImplementation);
+    const disbursedAny = Number(detail.disbursements?.totalDisbursedAmount || 0) > 0;
+    const proposedOwnership = hero.ownership ?? app.applicationFormData?.proposedOwnership;
+    const preMoneyValuation = hero.preMoney ?? app.applicationFormData?.preMoneyValuation;
+    // The application's overall currentStage (not just the AI screening outcome) can land on a
+    // terminal rejection at any point — after DD (REJECTED) or after board review (BOARD_REJECTED)
+    // — not only at initial screening. Surface that regardless of which step it happened at, so the
+    // header/stepper don't keep showing a dead deal as "In progress".
+    const overallStage = String(app.currentStage || '').toUpperCase();
+    const isTerminalRejected = __PV11_TERMINAL_REJECT_STAGES.has(overallStage);
+    return { app, hero, detail, realOutcome, hasDD, ddComplete, hasTS, hasBoard, hasImpl, disbursedAny, proposedOwnership, preMoneyValuation, overallStage, isTerminalRejected };
   }
 
   function renderDealDetail() {
     const deal = deals.find(d=>d.id===state.selectedDealId) || deals.find(d=>d.featured) || deals[0];
+    if (!deal) {
+      const loading = Boolean(state.dealDetailLoading) || Boolean(state.liveData);
+      return `${pageHeader('Deal detail', loading ? 'Loading application…' : 'Deal not found in the current register.', `${button('Back to Deal Flow','back-to-deals','','arrow-left')}`,'Committee Review')}
+        <div class="empty-state"><div><div class="empty-state-icon">${icon(loading ? 'clock' : 'alert')}</div><h3>${loading ? 'Loading deal' : 'Deal not found'}</h3><p class="muted">${loading ? 'Fetching application and documents.' : 'Return to Deal Flow and open the opportunity again.'}</p></div></div>`;
+    }
     const tabs = [
       ['overview','Overview'],['application','Application'],['screening','AI Screening'],['diligence','Due Diligence'],['term','Term Sheet'],['ic','Board & IC Decision'],['disbursement','Disbursement'],['documents','Documents']
     ];
-    const currentStep = {overview:5,application:1,screening:2,diligence:3,term:4,ic:5,disbursement:6,documents:5}[state.dealTab] || 5;
-    const stepLabels = [['Application Submitted','Complete'],['AI Screening','Shortlisted · 86/100'],['Due Diligence','Complete · 6/6'],['Term Sheet','Conditional · 15/17'],['Board & IC Decision','In review'],['Disbursement','Locked']];
-    const actions = `${selectControl('Fund',funds.map(f=>f.name),deal.fund,'deal-fund')}${button('Back to Deal Flow','back-to-deals','','arrow-left')}${button('Activity','activity-menu','','clock',`data-context="deal" data-id="${deal.id}"`)}`;
-    return `${pageHeader(`${deal.name} - ${deal.round}`,'Investment application and execution workspace.',actions,'Committee Review')}
-      <section class="detail-hero"><div class="detail-hero-top"><div class="entity-title"><span class="entity-logo" style="background:linear-gradient(145deg,#23314d,#5e93dd)">${escapeHTML(initials(deal.name))}</span><div><h1>${escapeHTML(deal.name)}</h1><p>${escapeHTML(deal.sector)} · ${escapeHTML(deal.round)} · ${escapeHTML(deal.fund)}</p></div></div>${statusPill(state.dealTab==='disbursement'?'Approved - Closing':'Committee Review',state.dealTab==='disbursement'?'success':'info')}</div><div class="hero-meta"><div class="hero-meta-item"><span>Requested Investment (USD)</span><strong>${formatMoney(deal.amount)}</strong></div><div class="hero-meta-item"><span>Proposed Ownership</span><strong>17.5%</strong></div><div class="hero-meta-item"><span>Pre-Money Valuation</span><strong>$85.0M</strong></div><div class="hero-meta-item"><span>Lead Investor</span><strong>${escapeHTML(deal.fund)}</strong></div><div class="hero-meta-item"><span>AI Screening Score</span><strong>${deal.score}/100</strong></div></div></section>
-      <div class="tabs">${tabs.map(tab=>`<button class="tab ${state.dealTab===tab[0]?'active':''}" data-action="deal-tab" data-tab="${tab[0]}">${tab[1]}</button>`).join('')}</div>
-      <div class="stepper">${stepLabels.map((step,index)=>`<div class="step ${index+1<currentStep?'complete':index+1===currentStep?'current':''}"><span class="step-index">${index+1<currentStep?icon('check'):index+1}</span><span class="step-copy"><strong>${step[0]}</strong><small>${step[1]}</small></span></div>`).join('')}</div>
+    const { app, hero, detail, realOutcome, hasDD, ddComplete, hasTS, hasBoard, hasImpl, disbursedAny, proposedOwnership, preMoneyValuation, overallStage, isTerminalRejected } = dealProgress(deal);
+    // Stage-gate tab access: a tab for a stage the deal hasn't reached yet is shown disabled
+    // (greyed out, non-clickable) rather than hidden, so the pipeline stays visible end-to-end.
+    const tabGateReason = typeof __pv11IsLive === 'function' && __pv11IsLive() ? {
+      term: !ddComplete ? 'Complete due diligence to unlock the term sheet.' : '',
+      ic: !hasTS ? 'A term sheet must exist before board review can begin.' : '',
+      disbursement: !hasBoard ? 'Board approval is required before disbursement.' : '',
+    } : {};
+    const currentStep = disbursedAny ? 6 : hasImpl ? 6 : hasBoard ? 5 : hasTS ? 4 : hasDD ? 3 : realOutcome ? 2 : 1;
+    // Which step the rejection actually happened at, so only that step (and later, unreached ones)
+    // get marked rejected/locked instead of the whole stepper misleadingly reading "in progress".
+    const rejectedAtStep = !isTerminalRejected ? 0 : hasBoard ? 5 : hasDD ? 3 : 2;
+    const stepLabels = [
+      ['Application Submitted','Complete'],
+      ['AI Screening', realOutcome ? `${realOutcome.replace(/_/g,' ')} · ${deal.score}/100` : 'Pending'],
+      ['Due Diligence', rejectedAtStep === 3 ? 'Rejected' : hasDD ? (ddComplete ? 'Complete' : 'In progress') : 'Not started'],
+      ['Term Sheet', hasTS ? (detail.termSheet?.isSigned ? 'Signed' : 'Drafted') : 'Not started'],
+      ['Board & IC Decision', rejectedAtStep === 5 ? 'Rejected' : hasBoard ? (boardDecisionLabel(detail.boardReview) || 'In review') : 'Not started'],
+      ['Disbursement', hasImpl ? (disbursedAny ? 'Disbursed' : 'Ready') : 'Locked'],
+    ];
+    const actions = `${selectControl('Fund',funds.map(f=>f.name),deal.fund,'deal-fund')}${button('Back to Deal Flow','back-to-deals','','arrow-left')}${button('Launch investee portal','open-investee-portal','','external-link',`data-deal-id="${escapeHTML(deal.id)}"`)}${button('Activity','activity-menu','','clock',`data-context="deal" data-id="${deal.id}"`)}`;
+    const heroStatus = isTerminalRejected ? 'Rejected' : disbursedAny ? 'Disbursed' : hasImpl ? 'Approved - Closing' : hasBoard ? 'Board & IC Review' : hasTS ? 'Term Sheet' : hasDD ? 'Due Diligence' : realOutcome ? realOutcome.replace(/_/g,' ') : 'Screening Pending';
+    const heroStatusTone = isTerminalRejected ? 'danger' : disbursedAny || hasImpl ? 'success' : (realOutcome === 'REJECTED_SCREENING' || realOutcome === 'AUTO_REJECTED') ? 'danger' : 'info';
+    return `${pageHeader(`${deal.name} - ${deal.round}`,'Investment application and execution workspace.',actions,heroStatus)}
+      <section class="detail-hero"><div class="detail-hero-top"><div class="entity-title"><span class="entity-logo" style="background:linear-gradient(145deg,#23314d,#5e93dd)">${escapeHTML(initials(deal.name))}</span><div><h1>${escapeHTML(deal.name)}</h1><p>${escapeHTML(deal.sector)} · ${escapeHTML(deal.round)} · ${escapeHTML(deal.fund)}</p></div></div>${statusPill(heroStatus,heroStatusTone)}</div><div class="hero-meta"><div class="hero-meta-item"><span>Requested Investment (USD)</span><strong>${formatMoney(deal.amount)}</strong></div><div class="hero-meta-item"><span>Proposed Ownership</span><strong>${proposedOwnership ? escapeHTML(String(proposedOwnership)) + '%' : '—'}</strong></div><div class="hero-meta-item"><span>Pre-Money Valuation</span><strong>${preMoneyValuation ? formatMoney(Number(preMoneyValuation)) : '—'}</strong></div><div class="hero-meta-item"><span>Lead Investor</span><strong>${escapeHTML(deal.fund)}</strong></div><div class="hero-meta-item"><span>AI Screening Score</span><strong>${deal.score}/100</strong></div></div></section>
+      <div class="tabs">${tabs.map(tab=>{const reason=tabGateReason[tab[0]];return `<button class="tab ${state.dealTab===tab[0]?'active':''}${reason?' tab-disabled':''}" data-action="${reason?'tab-locked-notice':'deal-tab'}" data-tab="${tab[0]}"${reason?` aria-disabled="true" title="${escapeHTML(reason)}"`:''}>${tab[1]}${reason?icon('lock'):''}</button>`;}).join('')}</div>
+      <div class="stepper">${stepLabels.map((step,index)=>`<div class="step ${rejectedAtStep && index+1===rejectedAtStep?'rejected':index+1<currentStep?'complete':index+1===currentStep?'current':''}"><span class="step-index">${rejectedAtStep && index+1===rejectedAtStep?icon('x'):index+1<currentStep?icon('check'):index+1}</span><span class="step-copy"><strong>${step[0]}</strong><small>${step[1]}</small></span></div>`).join('')}</div>
       ${renderDealTab(deal)}`;
   }
 
@@ -1439,44 +1740,62 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       case 'term': return renderDealTermSheet(deal);
       case 'ic': return renderDealIC(deal);
       case 'disbursement': return renderDealDisbursement(deal);
-      case 'documents': return renderDealDocuments(deal);
+      case 'documents': return renderDealDocuments(deal, state.dealDetail || null);
       default: return renderDealOverview(deal);
     }
   }
 
   function renderDealOverview(deal) {
+    const { app, hero, detail, realOutcome, hasDD, ddComplete, hasTS, hasBoard, hasImpl, disbursedAny, proposedOwnership } = dealProgress(deal);
     const company = companies[0];
     const workstreams = ['Market Research','Financial Assessment','Competitive Analysis','Management Team Evaluation','Legal Compliance','Risk Assessment'];
+    const overviewDocs = (state.liveData && state.dealDetail && Array.isArray(state.dealDetail.documents))
+      ? state.dealDetail.documents
+      : (documents || []);
     return `<section class="split-layout"><div>
       <section class="grid cols-3">
-        ${card('Company Overview',`<div class="info-list"><div class="info-row"><span>Legal name</span><strong>Nova Analytics (Pvt) Ltd</strong></div><div class="info-row"><span>Sector</span><strong>${escapeHTML(deal.sector)}</strong></div><div class="info-row"><span>Location</span><strong>Harare, Zimbabwe</strong></div><div class="info-row"><span>Founded</span><strong>2021</strong></div><div class="info-row"><span>Employees</span><strong>62</strong></div><div class="info-row"><span>Primary Contact</span><strong>Tariro Kasere, CEO</strong></div></div>`) }
-        ${card('Application Snapshot',`<div class="grid cols-3"><div><span class="muted small">Requested Investment</span><div class="metric-value" style="font-size:17px">${formatMoney(deal.amount)}</div></div><div><span class="muted small">Funding Round</span><div class="metric-value" style="font-size:17px">${escapeHTML(deal.round)}</div></div><div><span class="muted small">Ownership</span><div class="metric-value" style="font-size:17px">17.5%</div></div></div><div class="grid cols-3 section-gap"><div><span class="muted small">FY2025E Revenue</span><strong style="display:block;margin-top:4px">$13.2M</strong></div><div><span class="muted small">ARR</span><strong style="display:block;margin-top:4px">$14.5M</strong></div><div><span class="muted small">Gross Margin</span><strong style="display:block;margin-top:4px">73%</strong></div></div>`) }
-        ${card('AI Screening',`<div class="score-panel"><div><div class="score-big"><strong>${deal.score}</strong><span>/100</span></div><div class="score-confidence">94% confidence</div></div>${statusPill('SHORTLISTED','success')}</div><div class="grid cols-3 section-gap"><div class="text-center"><strong class="positive" style="font-size:18px">8</strong><div class="muted small">Passed</div></div><div class="text-center"><strong class="warning-text" style="font-size:18px">2</strong><div class="muted small">Review</div></div><div class="text-center"><strong class="negative" style="font-size:18px">0</strong><div class="muted small">Failed</div></div></div><button class="button ghost compact" style="width:100%;margin-top:12px" data-action="deal-tab" data-tab="screening">Open screening</button>`) }
+        ${card('Company Overview',`<div class="info-list"><div class="info-row"><span>Legal name</span><strong>${escapeHTML(deal.name)}</strong></div><div class="info-row"><span>Sector</span><strong>${escapeHTML(deal.sector)}</strong></div><div class="info-row"><span>Location</span><strong>${hero.address ? escapeHTML(hero.address) : '—'}</strong></div><div class="info-row"><span>Founded</span><strong>${app.foundingDate ? new Date(app.foundingDate).getUTCFullYear() : '—'}</strong></div><div class="info-row"><span>Employees</span><strong>—</strong></div><div class="info-row"><span>Primary Contact</span><strong>${app.applicantName ? escapeHTML(app.applicantName) : escapeHTML(deal.owner)}</strong></div></div>`) }
+        ${card('Application Snapshot',`<div class="grid cols-3"><div><span class="muted small">Requested Investment</span><div class="metric-value" style="font-size:17px">${formatMoney(deal.amount)}</div></div><div><span class="muted small">Funding Round</span><div class="metric-value" style="font-size:17px">${escapeHTML(deal.round)}</div></div><div><span class="muted small">Ownership</span><div class="metric-value" style="font-size:17px">${proposedOwnership ? escapeHTML(String(proposedOwnership)) + '%' : '—'}</div></div></div><div class="grid cols-3 section-gap"><div><span class="muted small">Historical Revenue</span><strong style="display:block;margin-top:4px">${app.applicationFormData?.historicalRevenue ? formatMoney(Number(app.applicationFormData.historicalRevenue)) : '—'}</strong></div><div><span class="muted small">Projected Revenue</span><strong style="display:block;margin-top:4px">${app.applicationFormData?.projectedRevenue ? formatMoney(Number(app.applicationFormData.projectedRevenue)) : '—'}</strong></div><div><span class="muted small">Monthly Burn Rate</span><strong style="display:block;margin-top:4px">${app.applicationFormData?.burnRate ? formatMoney(Number(app.applicationFormData.burnRate)) : '—'}</strong></div></div>`) }
+        ${card('AI Screening',`<div class="score-panel"><div><div class="score-big"><strong>${deal.score}</strong><span>/100</span></div></div>${realOutcome ? statusPill(realOutcome.replace(/_/g,' '), realOutcome==='SCREENING'?'success':(realOutcome==='REJECTED_SCREENING'||realOutcome==='AUTO_REJECTED')?'danger':'info') : statusPill('Pending','neutral')}</div><button class="button ghost compact" style="width:100%;margin-top:12px" data-action="deal-tab" data-tab="screening">Open screening</button>`) }
       </section>
       <section class="grid cols-2 section-gap">
-        ${card('Attached Documents',`<div class="info-list">${documents.slice(0,8).map(doc=>`<button type="button" class="list-row v17-document-list-row" data-action="preview-document" data-id="${doc.id}"><span class="activity-icon" style="color:${doc.type==='XLSX'?'var(--emerald)':'var(--red)'};background:${doc.type==='XLSX'?'var(--emerald-soft)':'var(--red-soft)'}">${icon('file')}</span><span class="list-row-main"><strong>${escapeHTML(doc.name)}</strong><small>${escapeHTML(doc.version)} · ${escapeHTML(doc.status)}</small></span><span class="button ghost compact icon-only" aria-hidden="true">${icon('eye')}</span></button>`).join('')}</div>`,{tools:button('Data room','deal-tab','compact','folder','data-tab="documents"')})}
-        ${card('Due Diligence Workstreams',`<div class="table-wrap"><table class="criteria-table"><thead><tr><th>Workstream</th><th>Analyst</th><th>Due Date</th><th>Progress</th><th>Status</th></tr></thead><tbody>${workstreams.map((name,index)=>`<tr><td class="table-primary">${name}</td><td><span class="owner-mini">${avatar(['Nyasha Moyo','Tendai Moyo','Rudo Ndlovu','Chipo Dube','Farai Chikore','Tinashe Sibanda'][index],index)}${['Nyasha Moyo','Tendai Moyo','Rudo Ndlovu','Chipo Dube','Farai Chikore','Tinashe Sibanda'][index]}</span></td><td>${10+index} Jul 2026</td><td><div class="inline-progress">${progressBar(100,'var(--emerald)')}<span>100%</span></div></td><td>${statusPill('Complete')}</td></tr>`).join('')}</tbody></table></div>`,{tools:button('Assign tasks','assign-dd-task','compact','plus')})}
+        ${card('Attached Documents',`<div class="info-list">${(overviewDocs||[]).filter(Boolean).slice(0,8).map(doc=>`<button type="button" class="list-row v17-document-list-row" data-action="preview-document" data-id="${escapeHTML(String(doc.id||''))}"><span class="activity-icon" style="color:${doc.type==='XLSX'?'var(--emerald)':'var(--red)'};background:${doc.type==='XLSX'?'var(--emerald-soft)':'var(--red-soft)'}">${icon('file')}</span><span class="list-row-main"><strong>${escapeHTML(doc.name||doc.fileName||'Document')}</strong><small>${escapeHTML(doc.version||'v1.0')} · ${escapeHTML(doc.status||'Available')}</small></span><span class="button ghost compact icon-only" aria-hidden="true">${icon('eye')}</span></button>`).join('') || '<p class="muted small">No documents attached yet.</p>'}</div>`,{tools:button('Data room','deal-tab','compact','folder','data-tab="documents"')})}
+        ${card('Due Diligence',hasDD ? `<div class="info-list"><div class="info-row"><span>Status</span><strong>${statusPill(ddComplete?'Complete':'In progress')}</strong></div><div class="info-row"><span>Recommendation</span><strong>${detail.dueDiligence?.recommendation ? escapeHTML(String(detail.dueDiligence.recommendation)) : '—'}</strong></div></div>` : `<div class="empty-state compact">${icon('search')}<strong>Due diligence not started</strong><p class="muted small">Start due diligence from the Diligence tab.</p></div>`,{tools:button(hasDD?'Open diligence':'Start due diligence',hasDD?'deal-tab':'start-due-diligence','compact',hasDD?'search':'plus',hasDD?'data-tab="diligence"':`data-deal-id="${escapeHTML(deal.id)}" data-application-id="${escapeHTML(deal.id)}"`)})}
       </section>
     </div><div class="side-stack" style="display:flex">
-      ${card('Board & Investment Committee',`<div class="info-list"><div class="info-row"><span>Date & time</span><strong>15 Jul 2026 · 10:00 SAST</strong></div><div class="info-row"><span>Voting members</span><strong>7</strong></div><div class="info-row"><span>Recommendation</span><strong class="positive">Approve with conditions</strong></div></div><div class="grid cols-2 section-gap">${button('Approve','vote-approve','success compact','check')}${button('Approve with conditions','vote-conditions','compact','shield')}${button('Defer','vote-defer','compact','clock')}${button('Reject','vote-reject','danger compact','x')}</div>`) }
-      ${card('Term Sheet Status',`<div class="grid cols-3"><div class="text-center"><strong style="font-size:17px">17</strong><div class="muted small">Sections</div></div><div class="text-center"><strong class="positive" style="font-size:17px">15</strong><div class="muted small">Agreed</div></div><div class="text-center"><strong class="warning-text" style="font-size:17px">2</strong><div class="muted small">Open</div></div></div><div class="reason-list section-gap"><div class="reason-item warning">${icon('alert')}<div><strong>Liquidation preference</strong><small>Economic rights</small></div></div><div class="reason-item warning">${icon('alert')}<div><strong>Board observer rights</strong><small>Governance</small></div></div></div>`,{footer:'<button class="card-link" data-action="deal-tab" data-tab="term">Open term sheet</button>'})}
-      ${card('Disbursement Readiness',`<div class="info-row"><span>Readiness</span><strong>72%</strong></div>${progressBar(72,'var(--emerald)')}<div class="reason-list section-gap"><div class="reason-item">${icon('check-circle')}<div><strong>KYC verified</strong></div></div><div class="reason-item">${icon('check-circle')}<div><strong>Bank details verified</strong></div></div><div class="reason-item warning">${icon('alert')}<div><strong>Legal conditions</strong><small>3 of 4 complete</small></div></div><div class="reason-item warning">${icon('clock')}<div><strong>Board resolution</strong><small>Pending</small></div></div></div>`,{footer:'<button class="card-link" data-action="deal-tab" data-tab="disbursement">View readiness</button>'})}
-      ${card('Audit Trail',`<div class="timeline">${[['10 Jul 2026, 09:08','Nyasha Moyo updated Pitch Deck.pdf'],['9 Jul 2026, 17:45','Nyasha Moyo completed Market Research'],['9 Jul 2026, 14:32','Rudo Ndlovu completed Financial Assessment'],['8 Jul 2026, 14:32','Farai Chikore requested legal documents'],['1 Jul 2026, 10:15','Application submitted by Nova Analytics']].map(item=>`<div class="timeline-item"><strong>${item[1]}</strong><small>${item[0]}</small></div>`).join('')}</div>`,{tools:'<button class="card-link" data-action="open-audit">View all</button>'})}
+      ${card('Board & Investment Committee',hasBoard ? (()=>{ const boardComplete = detail.boardReview?.status==='COMPLETED'; return `<div class="info-list"><div class="info-row"><span>Status</span><strong>${boardComplete?statusPill('Completed','success'):statusPill('In progress','warning')}</strong></div><div class="info-row"><span>Recommendation</span><strong>${boardDecisionLabel(detail.boardReview) ? escapeHTML(boardDecisionLabel(detail.boardReview)) : 'Pending vote'}</strong></div></div>${boardComplete ? `<p class="muted small section-gap">Voting is complete.</p><button class="button ghost compact" style="width:100%;margin-top:8px" data-action="deal-tab" data-tab="ic">Open board & IC decision</button>` : `<div class="grid cols-2 section-gap">${button('Approve','vote-approve','success compact','check',`data-deal-id="${escapeHTML(deal.id)}"`)}${button('Approve with conditions','vote-conditions','compact','shield',`data-deal-id="${escapeHTML(deal.id)}"`)}${button('Defer','vote-defer','compact','clock',`data-deal-id="${escapeHTML(deal.id)}"`)}${button('Reject','vote-reject','danger compact','x',`data-deal-id="${escapeHTML(deal.id)}"`)}</div>`}`; })() : `<div class="empty-state compact">${icon('users')}<strong>Board review not started</strong><p class="muted small">A term sheet must exist before board review can begin.</p></div>`) }
+      ${card('Term Sheet Status',hasTS ? `<div class="info-list"><div class="info-row"><span>Status</span><strong>${detail.termSheet?.isSigned ? statusPill('Signed','success') : statusPill(detail.termSheet?.status||'Drafted')}</strong></div><div class="info-row"><span>Investment amount</span><strong>${detail.termSheet?.investmentAmount ? formatMoney(Number(detail.termSheet.investmentAmount)) : '—'}</strong></div></div>` : `<div class="empty-state compact">${icon('file')}<strong>No term sheet yet</strong><p class="muted small">Created once due diligence completes.</p></div>`,{footer:'<button class="card-link" data-action="deal-tab" data-tab="term">Open term sheet</button>'})}
+      ${card('Disbursement Readiness',hasImpl ? `<div class="info-row"><span>Status</span><strong>${disbursedAny?'Disbursed':'Ready for disbursement'}</strong></div>` : `<div class="empty-state compact">${icon('dollar')}<strong>Not ready</strong><p class="muted small">Implementation starts after board approval.</p></div>`,{footer:'<button class="card-link" data-action="deal-tab" data-tab="disbursement">View readiness</button>'})}
     </div></section>`;
   }
 
   function renderDealApplication(deal) {
+    const { app } = dealProgress(deal);
+    const fd = app.applicationFormData || {};
     const sections = ['Company Information','Ownership & Governance','Business & Market','Financial Information','Funding Request','Impact & ESG','Declarations & Consent'];
+    const sectionIcons = ['building','users','trend-up','file-chart','dollar','sparkles','shield'];
+    const reqDocs = Array.isArray(app.documents) ? app.documents.filter(d=>d.isRequired) : [];
+    const completeness = reqDocs.length ? Math.round(100 * reqDocs.filter(d=>d.isSubmitted).length / reqDocs.length) : (app.id ? 100 : 0);
+    const val = v => (v===undefined || v===null || v==='') ? '—' : escapeHTML(String(v));
+    const activeSection = Math.min(Math.max(Number(state.applicationSection||0),0), sections.length-1);
+    const proposedOwnership = fd.proposedOwnership ?? fd.ownershipPercent;
+    const sectionBodies = [
+      `<div class="form-grid"><div class="form-field"><label>Legal name</label><input value="${val(app.businessName)}" readonly></div><div class="form-field"><label>Industry</label><input value="${val(app.industry)}" readonly></div><div class="form-field"><label>Business stage</label><input value="${val(app.businessStage)}" readonly></div><div class="form-field"><label>Founded</label><input value="${app.foundingDate ? escapeHTML(new Date(app.foundingDate).getUTCFullYear()) : '—'}" readonly></div><div class="form-field full"><label>Address</label><input value="${val(app.applicantAddress)}" readonly></div><div class="form-field full"><label>Business description</label><textarea readonly>${val(app.businessDescription)}</textarea></div></div>`,
+      `<div class="form-grid"><div class="form-field"><label>Proposed ownership</label><input value="${proposedOwnership ? val(proposedOwnership)+'%' : '—'}" readonly></div><div class="form-field"><label>Target close date</label><input value="${fd.targetCloseDate ? escapeHTML(new Date(fd.targetCloseDate).toLocaleDateString()) : '—'}" readonly></div><div class="form-field full"><label>Board composition</label><textarea readonly>${val(fd.boardComposition)}</textarea></div><div class="form-field full"><label>Key shareholders</label><textarea readonly>${val(fd.keyShareholders)}</textarea></div><div class="form-field full"><label>Governance notes</label><textarea readonly>${val(fd.governanceNotes)}</textarea></div></div>`,
+      `<div class="form-grid"><div class="form-field full"><label>Business description</label><textarea readonly>${val(app.businessDescription)}</textarea></div><div class="form-field"><label>Industry</label><input value="${val(app.industry)}" readonly></div></div><p class="muted small section-gap">Detailed market research is on file in the market-research document — see the Documents tab.</p>`,
+      `<div class="grid cols-3"><div><span class="muted small">Historical revenue</span><strong style="display:block;margin-top:4px">${fd.historicalRevenue ? formatMoney(Number(fd.historicalRevenue)) : '—'}</strong></div><div><span class="muted small">Projected revenue</span><strong style="display:block;margin-top:4px">${fd.projectedRevenue ? formatMoney(Number(fd.projectedRevenue)) : '—'}</strong></div><div><span class="muted small">Monthly burn rate</span><strong style="display:block;margin-top:4px">${fd.burnRate ? formatMoney(Number(fd.burnRate)) : '—'}</strong></div></div><p class="muted small section-gap">Projected cash flows are on file in the Documents tab.</p>`,
+      `<div class="grid cols-4"><div><span class="muted small">Funding Round</span><strong style="display:block;margin-top:4px">${escapeHTML(deal.round||'—')}</strong></div><div><span class="muted small">Requested Investment</span><strong style="display:block;margin-top:4px">${formatMoney(deal.amount)}</strong></div><div><span class="muted small">Proposed Ownership</span><strong style="display:block;margin-top:4px">${proposedOwnership ? val(proposedOwnership)+'%' : '—'}</strong></div><div><span class="muted small">Pre-Money Valuation</span><strong style="display:block;margin-top:4px">${fd.preMoneyValuation ? formatMoney(Number(fd.preMoneyValuation)) : '—'}</strong></div></div>`,
+      `<div class="empty-state compact">${icon('sparkles')}<strong>No impact & ESG data on file</strong><p class="muted small">This application form did not capture impact/ESG fields.</p></div>`,
+      `<div class="reason-list"><div class="reason-item">${icon('check-circle')}<div><strong>Declarations confirmed at submission</strong><small class="muted">${app.submittedAt ? escapeHTML(new Date(app.submittedAt).toLocaleString()) : '—'}</small></div></div></div>`
+    ];
     return `<section class="split-layout"><div>
-      <section class="summary-strip"><div class="summary-item"><span>Submitted online</span><strong>1 Jul 2026 · 10:15</strong></div><div class="summary-item"><span>Application ID</span><strong>APP-2026-0048</strong></div><div class="summary-item"><span>Completeness</span><strong class="positive">100%</strong></div><div class="summary-item"><span>Applicant</span><strong>Tariro Kasere, CEO</strong></div><div class="summary-item"><span>Last amended</span><strong>30 Jun 2026</strong></div><div class="summary-item"><span>Status</span><strong>${statusPill('Submitted')}</strong></div></section>
-      <section class="grid" style="grid-template-columns:230px minmax(0,1fr)"><div class="term-sections" style="display:block">${sections.map((section,index)=>`<button class="term-section ${index===0?'active':''}" data-action="application-section"><span>${icon(index===0?'building':index===1?'users':index===2?'trend-up':index===3?'file-chart':index===4?'dollar':index===5?'sparkles':'shield')} ${escapeHTML(section)}</span>${icon('check-circle')}</button>`).join('')}</div>
-        <div>${card('Company Information',`<div class="form-grid"><div class="form-field"><label>Legal name</label><input value="Nova Analytics (Pvt) Ltd" readonly></div><div class="form-field"><label>Website</label><input value="nova-analytics.co.zw" readonly></div><div class="form-field"><label>Registration No.</label><input value="1234567" readonly></div><div class="form-field"><label>Sector</label><input value="Enterprise Software / AI Analytics" readonly></div><div class="form-field"><label>Country</label><input value="Zimbabwe" readonly></div><div class="form-field"><label>Employees</label><input value="62" readonly></div><div class="form-field full"><label>Business description</label><textarea readonly>Nova Analytics provides an AI-powered analytics platform that helps enterprises transform complex data into actionable insights. The platform enables predictive forecasting, operational optimisation and intelligent decision-making.</textarea></div><div class="form-field full"><label>Problem & solution</label><textarea readonly>Enterprises in emerging markets lack affordable, easy-to-use analytics tools, resulting in poor data utilisation and slow decision-making. Nova Analytics delivers an intuitive, scalable platform built for these operating environments.</textarea></div></div>`) }
-        ${card('Funding Request Summary',`<div class="grid cols-4"><div><span class="muted small">Funding Round</span><strong style="display:block;margin-top:4px">${escapeHTML(deal.round)}</strong></div><div><span class="muted small">Requested Investment</span><strong style="display:block;margin-top:4px">${formatMoney(deal.amount)}</strong></div><div><span class="muted small">Proposed Ownership</span><strong style="display:block;margin-top:4px">17.5%</strong></div><div><span class="muted small">Pre-Money Valuation</span><strong style="display:block;margin-top:4px">$85.0M</strong></div></div><div class="section-gap"><div class="chart-legend"><span class="legend-item" style="color:var(--blue)"><i class="legend-dot"></i>40% Product</span><span class="legend-item" style="color:var(--emerald)"><i class="legend-dot"></i>35% Regional Expansion</span><span class="legend-item" style="color:var(--orange)"><i class="legend-dot"></i>25% Sales</span></div><div class="progress" style="height:10px;margin-top:8px"><span style="width:40%;background:var(--blue)"></span></div></div>`,{classes:'section-gap'})}</div>
+      <section class="summary-strip"><div class="summary-item"><span>Submitted online</span><strong>${app.submittedAt ? escapeHTML(new Date(app.submittedAt).toLocaleString()) : '—'}</strong></div><div class="summary-item"><span>Application ID</span><strong>${app.dealReference ? escapeHTML(app.dealReference) : escapeHTML(deal.id)}</strong></div><div class="summary-item"><span>Completeness</span><strong class="positive">${completeness}%</strong></div><div class="summary-item"><span>Applicant</span><strong>${app.applicantName ? escapeHTML(app.applicantName) : escapeHTML(deal.owner)}</strong></div><div class="summary-item"><span>Last amended</span><strong>${app.updatedAt ? escapeHTML(new Date(app.updatedAt).toLocaleDateString()) : '—'}</strong></div><div class="summary-item"><span>Status</span><strong>${statusPill(app.submittedAt ? 'Submitted' : 'Draft')}</strong></div></section>
+      <section class="grid" style="grid-template-columns:230px minmax(0,1fr)"><div class="term-sections" style="display:block">${sections.map((section,index)=>`<button class="term-section ${index===activeSection?'active':''}" data-action="application-section" data-section="${index}"><span>${icon(sectionIcons[index])} ${escapeHTML(section)}</span>${icon('check-circle')}</button>`).join('')}</div>
+        <div>${card(sections[activeSection],sectionBodies[activeSection])}</div>
       </section>
     </div><div class="side-stack" style="display:flex">
-      ${card('Application Overview',`<div class="info-list"><div><div class="info-row"><span>Section progress</span><strong>7 / 7 complete</strong></div>${progressBar(100,'var(--emerald)')}</div><div><div class="info-row"><span>Required documents</span><strong>8 / 8 received</strong></div>${progressBar(100,'var(--emerald)')}</div><div><div class="info-row"><span>Completeness</span><strong>100%</strong></div>${progressBar(100,'var(--emerald)')}</div></div>`) }
-      ${card('Declarations',`<div class="reason-list"><div class="reason-item">${icon('check-circle')}<div><strong>All information is true and accurate</strong></div></div><div class="reason-item">${icon('check-circle')}<div><strong>Consent to data processing and sharing</strong></div></div><div class="reason-item">${icon('check-circle')}<div><strong>Authorised representative confirmed</strong></div></div></div>`) }
-      ${card('Applicant Activity',`<div class="timeline">${sections.slice().reverse().map((section,index)=>`<div class="timeline-item"><strong>${escapeHTML(section)} completed</strong><small>30 Jun 2026 · ${9+index}:45</small></div>`).join('')}</div>`) }
+      ${card('Application Overview',`<div class="info-list"><div><div class="info-row"><span>Required documents</span><strong>${reqDocs.filter(d=>d.isSubmitted).length} / ${reqDocs.length} received</strong></div>${progressBar(reqDocs.length?Math.round(100*reqDocs.filter(d=>d.isSubmitted).length/reqDocs.length):0,'var(--emerald)')}</div><div><div class="info-row"><span>Completeness</span><strong>${completeness}%</strong></div>${progressBar(completeness,'var(--emerald)')}</div></div>`) }
+      ${card('Declarations',`<div class="reason-list"><div class="reason-item">${icon('check-circle')}<div><strong>Declarations confirmed at submission</strong></div></div></div>`) }
       <div class="grid">${button('Request clarification','request-clarification','','mail')}${button('Download application','download-application','primary','download')}</div>
     </div></section>`;
   }
@@ -1498,7 +1817,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
         <div>${card(deal.name,`<div style="display:flex;justify-content:space-between;gap:12px"><div class="score-panel"><div><div class="score-big"><strong>${deal.score}</strong><span>/100</span></div><div class="score-confidence">94% confidence</div></div></div>${statusPill('SHORTLISTED','success')}</div><div class="section-gap"><strong class="small">AI summary</strong><p class="muted" style="font-size:10px;line-height:1.6">${escapeHTML(deal.name)} demonstrates strong strategic alignment and product-market fit with a scalable analytics platform for enterprise clients across Africa. Financials are solid with strong revenue growth and healthy unit economics.</p></div><div class="table-wrap"><table class="criteria-table"><thead><tr><th>Criteria</th><th>Weight</th><th>Score</th><th>Evidence (AI summary)</th><th>Status</th></tr></thead><tbody>${criteria.map(row=>`<tr><td class="table-primary">${row[0]}</td><td>${row[1]}%</td><td class="positive table-primary">${row[2]}</td><td>${row[3]}</td><td>${statusPill(row[4],row[4]==='Adequate'?'warning':'success')}</td></tr>`).join('')}</tbody></table></div>`,{tools:button('Re-run screening','rerun-screening','compact','refresh')})}
         <section class="grid cols-2 section-gap">${card('Reasons for shortlist',`<div class="reason-list"><div class="reason-item">${icon('check-circle')}<div><strong>AI platform with defensible IP and a strong data flywheel</strong><small>Evidence: 68% YoY revenue growth; 90%+ gross retention.</small></div></div><div class="reason-item">${icon('check-circle')}<div><strong>Large addressable market with accelerating adoption</strong><small>TAM $1.2B; 22% CAGR to 2030.</small></div></div><div class="reason-item">${icon('check-circle')}<div><strong>Experienced founding team with proven execution</strong><small>150+ enterprise clients; ARR $13.2M.</small></div></div></div>`) }${card('Review flags',`<div class="reason-list"><div class="reason-item warning">${icon('alert')}<div><strong>Customer concentration</strong><small>Top 3 customers represent 46% of revenue.</small></div></div><div class="reason-item warning">${icon('alert')}<div><strong>FY2025 EBITDA loss</strong><small>EBITDA -$2.1M; path to profitability in FY2026.</small></div></div></div>`) }</section></div>
       </div><div class="side-stack" style="display:flex">
-        ${card('Decision',`<div class="grid">${button('Confirm shortlist','confirm-shortlist','success','check')}${button('Move to human review','human-review','warning','users')}${button('Does not meet criteria','screen-reject','danger','x')}</div>`) }
+        ${card('Decision',`<div class="grid">${button('Confirm shortlist','confirm-shortlist','success','check',`data-deal-id="${escapeHTML(deal.id)}" data-application-id="${escapeHTML(deal.id)}"`)}${button('Move to human review','human-review','warning','users',`data-deal-id="${escapeHTML(deal.id)}" data-application-id="${escapeHTML(deal.id)}"`)}${button('Does not meet criteria','screen-reject','danger','x',`data-deal-id="${escapeHTML(deal.id)}" data-application-id="${escapeHTML(deal.id)}"`)}</div>`) }
         ${card('Screening Rules',`<div class="info-list"><div class="info-row"><span>Shortlist</span><strong class="positive">Score ≥ 75</strong></div><div class="info-row"><span>Human review</span><strong class="warning-text">60 - 74</strong></div><div class="info-row"><span>Does not meet criteria</span><strong class="negative">&lt; 60</strong></div></div>`) }
         ${card('Evidence Sources',`<div class="info-row"><span>Reviewed</span><strong>12 / 12 · 100%</strong></div>${progressBar(100,'var(--emerald)')}<p class="muted small">Scores are generated from application data, submitted evidence and weighted criteria. Manager discretion applies.</p>`) }
         ${card('Audit Trail',`<div class="timeline"><div class="timeline-item"><strong>Screening completed</strong><small>1 Jul 2026 · 10:18</small></div><div class="timeline-item"><strong>Model version Matanho Screen v3.2</strong><small>1 Jul 2026 · 10:18</small></div><div class="timeline-item"><strong>Evidence sources updated</strong><small>1 Jul 2026 · 10:10</small></div></div>`,{footer:'<span class="muted small">AI recommendation requires manager confirmation.</span>'})}
@@ -1541,7 +1860,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       ${workspaceFilterBar([{label:'Version',action:'term-version-filter',selected:'v4 Current',options:['v4 Current','v3 Company redline','v2 Internal draft']},{label:'Clause status',action:'term-status-filter',selected:'All clauses',options:['All clauses','Open only','Agreed only']},{label:'Owner',action:'term-owner-filter',selected:'All owners',options:['All owners','Farai Chikore','Tendai Moyo','Nyasha Moyo']},{type:'button',label:'Activity',action:'activity-menu',icon:'clock',attrs:'data-context="term-sheet" data-id="DL-013"'}])}
       <section class="term-layout"><div class="term-sections">${termSheetSections.map((section,index)=>{const sectionStatuses=section.clauses.map((clause,cIndex)=>decisions[`${index}:${cIndex}`]||clause.status);const complete=sectionStatuses.filter(status=>status==='Agreed').length;return `<button class="term-section ${state.termSection===index?'active':''}" data-action="term-section" data-section="${index}"><span>${icon(section.icon)} ${escapeHTML(section.name)}</span><span class="${complete<section.clauses.length?'warning-text':'positive'}">${complete} / ${section.clauses.length}</span></button>`}).join('')}</div>
       <div><div class="page-actions term-toolbar">${button('Preview PDF','preview-document','','eye','data-id="DOC-009"')}${button('Generate PDF','generate-term-pdf','','file')}${button(envelope?.status==='Completed'?'View signed term sheet':'Sign term sheet','sign-term-sheet','primary','edit')}${button('Signature Studio','share-term','','send')}${button('Compare versions','open-version-history','','layers')}${button('New version','new-term-version','','plus')}</div>
-        <section class="term-signing-status"><div><span class="term-signing-icon">${icon('edit')}</span><div><strong>Electronic signing workflow</strong><small>${envelope?.recipients.map(recipient=>`${recipient[0]} · ${recipient[2]}`).join('  •  ')||'Envelope not prepared'}</small></div></div><div><div class="inline-progress">${progressBar(envelope?.progress||0)}<span>${envelope?.progress||0}%</span></div>${statusPill(envelope?.status||'Draft')}</div></section>
+        <section class="term-signing-status"><div><span class="term-signing-icon">${icon('edit')}</span><div><strong>Electronic signing workflow</strong><small>${(Array.isArray(envelope?.recipients)?envelope.recipients:[]).map(recipient=>`${recipient[0]} · ${recipient[2]}`).join('  •  ')||'Envelope not prepared'}</small></div></div><div><div class="inline-progress">${progressBar(envelope?.progress||0)}<span>${envelope?.progress||0}%</span></div>${statusPill(envelope?.status||'Draft')}</div></section>
         <div class="term-section-heading"><div><span class="overlay-eyebrow">Clause workspace</span><h3>${escapeHTML(selectedSection.name)}</h3><p>${clauses.filter(c=>c.status==='Agreed').length} agreed · ${clauses.filter(c=>c.status!=='Agreed').length} requiring attention · source-linked redlines</p></div><div class="term-section-health">${statusPill(clauses.every(c=>c.status==='Agreed')?'Complete':'Negotiating',clauses.every(c=>c.status==='Agreed')?'success':'warning')}</div></div>
         <div class="term-clause-grid">${clauses.map((clause,index)=>`<article class="clause-card interactive-clause ${clause.status==='Open'?'open-clause':''}" data-action="open-term-clause" data-section="${state.termSection}" data-clause="${index}"><div class="clause-head"><div><strong>${escapeHTML(clause.title)}</strong><div class="muted small">${escapeHTML(clause.reference)} · ${escapeHTML(clause.source)}</div></div>${statusPill(clause.status,clause.status==='Open'?'warning':'success')}</div><div class="clause-summary"><div><span>Current value</span><strong>${escapeHTML(clause.value)}</strong></div><div><span>Owner</span><strong>${escapeHTML(clause.owner)}</strong></div><div><span>Updated</span><strong>${escapeHTML(clause.updated)}</strong></div></div><div class="clause-preview"><div><small>Matanho position</small><p>${escapeHTML(clause.matanho)}</p></div><div><small>Company position</small><p>${escapeHTML(clause.company)}</p></div></div><div class="clause-actions">${button('Open clause','open-term-clause','compact','eye',`data-section="${state.termSection}" data-clause="${index}"`)}${clause.status==='Open'?`${button('Accept counter','accept-counter','compact','check',`data-section="${state.termSection}" data-clause="${index}"`)}${button('Retain position','retain-position','compact','gavel',`data-section="${state.termSection}" data-clause="${index}"`)}`:button('Activity','activity-menu','ghost compact','clock',`data-context="term-clause" data-id="${state.termSection}:${index}"`)}</div></article>`).join('')}</div>
       </div><div class="side-stack" style="display:flex">${card('Signing Parties',`<div class="signature-party-list">${(envelope?.recipients||[]).map((recipient,index)=>`<div>${personAvatar(recipient[0])}<span><strong>${escapeHTML(recipient[0])}</strong><small>${escapeHTML(recipient[1])}</small></span>${statusPill(recipient[2],recipient[2]==='Signed'?'success':'warning')}</div>`).join('')}</div>`,{footer:`<button class="card-link" data-action="sign-term-sheet">Open signing page</button>`})}${card('Approval Routing',`<div class="approval-route"><div class="done"><span>1</span><div><strong>Legal review</strong><small>Farai Chikore · complete</small></div></div><div class="done"><span>2</span><div><strong>Investment Director</strong><small>Tariro Kasere · complete</small></div></div><div class="current"><span>3</span><div><strong>Company signature</strong><small>${envelope?.progress||0}% complete</small></div></div><div><span>4</span><div><strong>Completion certificate</strong><small>Generated after all parties sign</small></div></div></div>`)}${card('Source Data',`<div class="info-list"><div class="info-row"><span>Investment memo</span><strong>IM-NOVA-v7</strong></div><div class="info-row"><span>Valuation model</span><strong>VAL-NOVA-Q2-2026</strong></div><div class="info-row"><span>Cap table</span><strong>CAP-NOVA-v8</strong></div><div class="info-row"><span>Legal redline</span><strong>TS-NOVA-v4</strong></div><div class="info-row"><span>Last sync</span><strong>13 Jul · 16:20 CAT</strong></div></div>`,{footer:'<button class="card-link" data-action="preview-document" data-id="DOC-009">Preview current term sheet</button>'})}</div></section>`;
@@ -1586,21 +1905,77 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       </div></section>`;
   }
 
-  function renderDealDocuments() {
-    const folders = [...['Application','Corporate & Legal','Financial','Commercial','Due Diligence','Term Sheet','Committee Pack','Closing & Disbursement'], ...(state.customFolders || [])];
-    const filtered = documents.filter(doc=>doc.folder===state.selectedFolder);
-    const selected = documents.find(doc=>doc.id===state.selectedDocumentId) || filtered[0] || documents[0];
-    return `<section class="document-layout"><div class="folder-list">${folders.map(folder=>`<button class="folder-button ${state.selectedFolder===folder?'active':''}" data-action="select-folder" data-folder="${escapeHTML(folder)}">${icon('folder')}<span>${escapeHTML(folder)}</span><strong>${documents.filter(doc=>doc.folder===folder).length}</strong></button>`).join('')}</div>
-      <div><div class="page-actions" style="justify-content:space-between;margin-bottom:10px"><div class="table-search">${icon('search')}<input style="width:280px" placeholder="Search in ${escapeHTML(state.selectedFolder)}..."></div><div class="page-actions"><label class="button primary" style="cursor:pointer">${icon('upload')} Upload files<input type="file" multiple hidden data-file-action="upload-document"></label>${button('Create folder','create-folder','','folder')}${button('Request document','request-document','','file')}</div></div>
-        <section class="card"><div class="table-wrap"><table><thead><tr><th><input type="checkbox"></th><th>Name</th><th>Type</th><th>Version</th><th>Owner</th><th>Uploaded</th><th>Review Status</th><th>Access</th><th>Actions</th></tr></thead><tbody>${filtered.map(doc=>`<tr class="clickable" data-action="select-document" data-id="${doc.id}"><td><input type="checkbox"></td><td class="table-primary brand-text"><button type="button" class="v17-document-name" data-action="preview-document" data-id="${doc.id}"><span class="document-row-icon">${icon(doc.type==='XLSX'?'file-chart':'file')}</span><span>${escapeHTML(doc.name)}</span></button></td><td>${doc.type}</td><td>${statusPill(doc.version,'info')}</td><td>${escapeHTML(doc.owner)}</td><td>${doc.uploaded}</td><td>${statusPill(doc.status)}</td><td>${escapeHTML(doc.access)}</td><td><div class="page-actions" style="justify-content:flex-start">${button('','preview-document','ghost compact icon-only','eye',`data-id="${doc.id}"`)}${button('','download-document','ghost compact icon-only','download',`data-id="${doc.id}"`)}</div></td></tr>`).join('')}</tbody></table></div></section>
-        <section class="document-preview section-gap"><div class="document-preview-head"><span class="file-icon">${icon('file')}</span><div style="flex:1"><strong>${escapeHTML(selected.name)}</strong><div class="muted small">${escapeHTML(selected.folder)} · ${escapeHTML(selected.version)} · ${escapeHTML(selected.status)}</div></div>${statusPill(selected.status)}</div><div class="grid cols-2 section-gap"><div class="info-list"><div class="info-row"><span>Type</span><strong>${escapeHTML(selected.type)} Document</strong></div><div class="info-row"><span>Version</span><strong>${escapeHTML(selected.version)}</strong></div><div class="info-row"><span>Uploaded by</span><strong>${escapeHTML(selected.owner)}</strong></div><div class="info-row"><span>Uploaded on</span><strong>${escapeHTML(selected.uploaded)}</strong></div><div class="info-row"><span>Access</span><strong>${escapeHTML(selected.access)}</strong></div></div><div><div class="tabs"><button class="tab active">Version history</button><button class="tab">Reviewers</button><button class="tab">Comments (2)</button><button class="tab">E-signatures</button></div><div class="timeline section-gap"><div class="timeline-item"><strong>${selected.version} · Current</strong><small>${selected.uploaded} · Updated registered office address</small></div><div class="timeline-item"><strong>v2.0</strong><small>7 Jul 2026 · Reissued certificate</small></div><div class="timeline-item"><strong>v1.0</strong><small>30 Jun 2026 · Initial upload</small></div></div></div></div></section>
-      </div><div class="side-stack" style="display:flex">
-        ${card('Data Room Access',`<div class="info-list"><div class="info-row"><span>Internal Team</span><strong>6 users</strong></div><div class="info-row"><span>Nova Analytics</span><strong>5 users</strong></div><div class="info-row"><span>External Counsel</span><strong>3 users</strong></div></div><div class="grid cols-2 section-gap">${button('Change permissions','change-permissions','compact','shield')}${button('Revoke access','revoke-access','danger compact','lock')}</div>`) }
-        ${card('Permissions Summary',`<div class="info-list"><div class="info-row"><span>View only</span><strong>10 users</strong></div><div class="info-row"><span>Edit</span><strong>2 users</strong></div><div class="info-row"><span>Download</span><strong>10 users</strong></div><div class="info-row"><span>Upload</span><strong>3 users</strong></div><div class="info-row"><span>Full control</span><strong>2 users</strong></div></div>`,{footer:'<button class="card-link" data-action="permissions-matrix">View permission matrix</button>'})}
-        ${card('Document Requests',`<div class="info-list"><div class="list-row"><span class="activity-icon" style="color:var(--amber);background:var(--amber-soft)">${icon('file')}</span><span class="list-row-main"><strong>Audited Financial Statements FY2025</strong><small>Due 15 Jul 2026</small></span></div><div class="list-row"><span class="activity-icon" style="color:var(--amber);background:var(--amber-soft)">${icon('file')}</span><span class="list-row-main"><strong>Beneficial Ownership Declaration</strong><small>Due 16 Jul 2026</small></span></div><div class="list-row"><span class="activity-icon" style="color:var(--amber);background:var(--amber-soft)">${icon('file')}</span><span class="list-row-main"><strong>Board Resolutions</strong><small>Due 17 Jul 2026</small></span></div></div>`,{tools:statusPill('3 outstanding','warning')})}
-        ${card('Storage & Security',`<div class="reason-list"><div class="reason-item">${icon('check-circle')}<div><strong>Encryption</strong><small>Enabled</small></div></div><div class="reason-item">${icon('check-circle')}<div><strong>Watermarking</strong><small>Enabled</small></div></div><div class="reason-item">${icon('check-circle')}<div><strong>Audit logging</strong><small>Enabled</small></div></div><div class="reason-item">${icon('check-circle')}<div><strong>ISO 27001 aligned</strong><small>Certified</small></div></div></div>`) }
-      </div></section>`;
+  function renderDealDocuments(deal, detail) {
+    const live = Boolean(state.liveData) || Boolean(detail) || Boolean(state.dealDetail);
+    const detailPayload = detail || state.dealDetail || {};
+    const rawLive = Array.isArray(detailPayload.documents)
+      ? detailPayload.documents
+      : (Array.isArray(detailPayload.application && detailPayload.application.documents)
+          ? detailPayload.application.documents
+          : []);
+    const liveDocs = rawLive.filter(Boolean).map((doc, i) => {
+      const name = String(doc.name || doc.fileName || doc.title || ('Document ' + (i + 1)));
+      const uploadedRaw = doc.uploadedAt || doc.createdAt || null;
+      let uploaded = '-';
+      if (uploadedRaw) {
+        try {
+          uploaded = new Date(uploadedRaw).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+        } catch (_) {
+          uploaded = String(uploadedRaw);
+        }
+      } else if (doc.uploaded) {
+        uploaded = String(doc.uploaded);
+      }
+      const ext = String(name.split('.').pop() || '').toUpperCase();
+      return {
+        id: String(doc.id || ('LIVE-DOC-' + i)),
+        name,
+        type: String(doc.documentType || doc.type || (ext.length && ext.length <= 5 ? ext : 'FILE')),
+        version: String(doc.version || doc.versionLabel || 'v1.0'),
+        owner: String(doc.uploadedByName || doc.uploadedBy || doc.owner || (detailPayload.application && detailPayload.application.applicantName) || (deal && deal.name) || '-'),
+        uploaded,
+        status: String(doc.status || (doc.isSubmitted ? 'Submitted' : doc.isRequired ? 'Required' : 'Available')),
+        access: String(doc.access || 'Internal'),
+        folder: String(doc.folder || doc.documentType || doc.category || 'Application'),
+        fileUrl: String(doc.fileUrl || doc.url || doc.downloadUrl || ''),
+      };
+    });
+    const sourceDocs = live ? liveDocs : (Array.isArray(documents) ? documents.filter(Boolean) : []);
+    const mockFolders = ['Application','Corporate & Legal','Financial','Commercial','Due Diligence','Term Sheet','Committee Pack','Closing & Disbursement'];
+    const folders = live
+      ? [...new Set([...sourceDocs.map((d) => d.folder).filter(Boolean), ...(state.customFolders || []), 'Application'])]
+      : [...mockFolders, ...(state.customFolders || [])];
+    const activeFolder = (() => {
+      if (folders.includes(state.selectedFolder) && sourceDocs.some((d) => d.folder === state.selectedFolder)) return state.selectedFolder;
+      const firstWithDocs = folders.find((f) => sourceDocs.some((d) => d.folder === f));
+      return firstWithDocs || folders[0] || 'Application';
+    })();
+    const filtered = sourceDocs.filter((doc) => doc.folder === activeFolder);
+    const tableRows = filtered.length ? filtered : sourceDocs;
+    const selected = sourceDocs.find((doc) => doc.id === state.selectedDocumentId) || tableRows[0] || sourceDocs[0] || null;
+    const emptyBody = '<div class="empty-state"><div><div class="empty-state-icon">' + icon('file') + '</div><h3>No documents</h3><p class="muted">' + (live ? 'No application documents are on file for this deal yet.' : 'No documents in this folder.') + '</p></div></div>';
+    const folderLabel = String(activeFolder || '').replace(/_/g, ' ');
+    const tableBody = tableRows.length
+      ? tableRows.map((doc) => {
+          const idAttr = escapeHTML(String(doc.id || ''));
+          const name = escapeHTML(String(doc.name || 'Document'));
+          return '<tr class="clickable" data-action="select-document" data-id="' + idAttr + '"><td><input type="checkbox"></td><td class="table-primary brand-text"><button type="button" class="v17-document-name" data-action="preview-document" data-id="' + idAttr + '"><span class="document-row-icon">' + icon(doc.type === 'XLSX' ? 'file-chart' : 'file') + '</span><span>' + name + '</span></button></td><td>' + escapeHTML(String(doc.type || 'FILE')) + '</td><td>' + statusPill(String(doc.version || 'v1.0'), 'info') + '</td><td>' + escapeHTML(String(doc.owner || '-')) + '</td><td>' + escapeHTML(String(doc.uploaded || '-')) + '</td><td>' + statusPill(String(doc.status || 'Available')) + '</td><td>' + escapeHTML(String(doc.access || 'Internal')) + '</td><td><div class="page-actions" style="justify-content:flex-start">' + button('', 'preview-document', 'ghost compact icon-only', 'eye', 'data-id="' + idAttr + '"') + button('', 'download-document', 'ghost compact icon-only', 'download', 'data-id="' + idAttr + '"') + '</div></td></tr>';
+        }).join('')
+      : '<tr><td colspan="9">' + emptyBody + '</td></tr>';
+    const preview = selected
+      ? '<section class="document-preview section-gap"><div class="document-preview-head"><span class="file-icon">' + icon('file') + '</span><div style="flex:1"><strong>' + escapeHTML(String(selected.name || 'Document')) + '</strong><div class="muted small">' + escapeHTML(String(selected.folder || '').replace(/_/g, ' ')) + ' · ' + escapeHTML(String(selected.version || '-')) + ' · ' + escapeHTML(String(selected.status || '-')) + '</div></div>' + statusPill(String(selected.status || 'Available')) + '</div><div class="grid cols-2 section-gap"><div class="info-list"><div class="info-row"><span>Type</span><strong>' + escapeHTML(String(selected.type || 'FILE')) + ' Document</strong></div><div class="info-row"><span>Version</span><strong>' + escapeHTML(String(selected.version || '-')) + '</strong></div><div class="info-row"><span>Uploaded by</span><strong>' + escapeHTML(String(selected.owner || '-')) + '</strong></div><div class="info-row"><span>Uploaded on</span><strong>' + escapeHTML(String(selected.uploaded || '-')) + '</strong></div><div class="info-row"><span>Access</span><strong>' + escapeHTML(String(selected.access || 'Internal')) + '</strong></div></div><div><div class="tabs"><button class="tab active">Version history</button><button class="tab">Reviewers</button></div><div class="timeline section-gap"><div class="timeline-item"><strong>' + escapeHTML(String(selected.version || 'v1.0')) + ' · Current</strong><small>' + escapeHTML(String(selected.uploaded || '-')) + '</small></div></div></div></div></section>'
+      : '';
+    return '<section class="document-layout"><div class="folder-list">' + folders.map((folder) => '<button class="folder-button ' + (activeFolder === folder ? 'active' : '') + '" data-action="select-folder" data-folder="' + escapeHTML(folder) + '">' + icon('folder') + '<span>' + escapeHTML(String(folder).replace(/_/g, ' ')) + '</span><strong>' + sourceDocs.filter((doc) => doc.folder === folder).length + '</strong></button>').join('') + '</div>' +
+      '<div><div class="page-actions" style="justify-content:space-between;margin-bottom:10px"><div class="table-search">' + icon('search') + '<input style="width:280px" placeholder="Search in ' + escapeHTML(folderLabel) + '..."></div><div class="page-actions"><label class="button primary" style="cursor:pointer">' + icon('upload') + ' Upload files<input type="file" multiple hidden data-file-action="upload-document"></label>' + button('Create folder', 'create-folder', '', 'folder') + button('Request document', 'request-document', '', 'file') + '</div></div>' +
+      '<section class="card"><div class="table-wrap"><table><thead><tr><th><input type="checkbox"></th><th>Name</th><th>Type</th><th>Version</th><th>Owner</th><th>Uploaded</th><th>Review Status</th><th>Access</th><th>Actions</th></tr></thead><tbody>' + tableBody + '</tbody></table></div></section>' +
+      preview +
+      '</div><div class="side-stack" style="display:flex">' +
+      card('Data Room Access', live ? '<p class="muted small">Access roster follows application permissions.</p>' : '<div class="info-list"><div class="info-row"><span>Internal Team</span><strong>6 users</strong></div><div class="info-row"><span>External Counsel</span><strong>3 users</strong></div></div>') +
+      card('Document Requests', live ? '<p class="muted small">Required application documents appear in the register when uploaded.</p>' : '<div class="info-list"><div class="list-row"><span class="list-row-main"><strong>Outstanding requests</strong><small>See diligence checklist</small></span></div></div>') +
+      card('Storage & Security', '<div class="reason-list"><div class="reason-item">' + icon('check-circle') + '<div><strong>Encryption</strong><small>Enabled</small></div></div><div class="reason-item">' + icon('check-circle') + '<div><strong>Audit logging</strong><small>Enabled</small></div></div></div>') +
+      '</div></section>';
   }
+
 
   function fundProfileMetrics(fund) {
     const unfunded = Math.max(0, fund.commitment - fund.called);
@@ -1615,28 +1990,31 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   }
 
   function renderFundOverviewTab(fund, fundCompanies, allocation) {
-    const holdings = fundCompanies.length ? fundCompanies : companies.slice(0,4);
+    const holdings = fundCompanies;
+    const fundCalls = capitalCalls.filter(c=>c.fund===fund.name);
+    const snapshots = (state.fundPerformanceSnapshots && state.fundPerformanceSnapshots[fund.id]) || [];
+    const snapLabels = snapshots.map(s=>new Date(s.asOfDate).toLocaleDateString('en-GB',{day:'2-digit',month:'short'}));
     return `<section class="profile-tab-panel fund-profile-panel section-gap">
       <div class="profile-tab-summary"><div><strong>Fund overview workspace</strong><span>Portfolio value, cash-flow position, concentration, obligations and governing terms.</span></div>${button('Update fund snapshot','edit-fund','primary','edit')}</div>
       <section class="fund-primary-grid section-gap">
-        ${card('NAV and Cumulative Cash Flows',barChart({labels:['2021','2022','2023','2024','2025','2026 YTD'],series:[{name:'Cumulative Distributions',color:'var(--emerald)',values:[12,38,52,71,86,97]},{name:'Cumulative Called',color:'var(--navy)',values:[20,58,82,112,143,168]}],height:270,format:v=>`${Math.round(v)}M`}),{subtitle:'USD millions · select a bar for period detail'})}
-        ${card('J-Curve',lineChart({labels:['Year 0','Year 1','Year 2','Year 3','Year 4','Year 5+'],series:[{name:'Net Cash Flow',color:'var(--blue)',values:[0,-72,-68,-18,25,43]}],height:270,format:v=>`${Math.round(v)}M`}),{subtitle:'Since inception · click a point for the underlying cash flows'})}
-        ${card('Allocation by Sector (NAV %)',donutChart(allocation,formatMoney(fund.nav),'NAV',145),{subtitle:'Current fair-value concentration'})}
+        ${card('NAV and Cumulative Cash Flows',snapshots.length?barChart({labels:snapLabels,series:[{name:'NAV',color:'var(--emerald)',values:snapshots.map(s=>Number(s.nav)/1e6)},{name:'Called Capital',color:'var(--navy)',values:snapshots.map(s=>Number(s.calledCapital)/1e6)}],height:270,format:v=>`${Math.round(v)}M`}):`<div class="empty-state compact">${icon('bar-chart')}<strong>No recorded snapshots yet</strong><p class="muted small">Snapshots are recorded automatically as the fund is updated — the series will build from here forward.</p></div>`,{subtitle:snapshots.length?`USD millions · ${snapshots.length} recorded snapshot${snapshots.length===1?'':'s'} (real, not backfilled history)`:'USD millions · select a bar for period detail'})}
+        ${card('J-Curve',snapshots.length?lineChart({labels:snapLabels,series:[{name:'NAV',color:'var(--blue)',values:snapshots.map(s=>Number(s.nav)/1e6)}],height:270,format:v=>`${Math.round(v)}M`}):`<div class="empty-state compact">${icon('trend-up')}<strong>No recorded snapshots yet</strong><p class="muted small">Builds from real recorded snapshots going forward.</p></div>`,{subtitle:'NAV over recorded snapshots · USD millions'})}
+        ${card('Allocation by Sector (NAV %)',allocation.length?donutChart(allocation,formatMoney(fund.nav),'NAV',145):`<div class="empty-state compact">${icon('pie-chart')}<strong>No holdings recorded yet</strong></div>`,{subtitle:'Current fair-value concentration'})}
       </section>
       <section class="fund-secondary-grid section-gap">
-        ${card('Top Holdings by NAV',`<div class="info-list">${holdings.slice(0,5).map(company=>`<button type="button" class="list-row" data-action="open-company" data-id="${company.id}">${companyLogo(company)}<span class="list-row-main"><strong>${escapeHTML(company.name)}</strong><small>${escapeHTML(company.sector)} · ${pct(company.ownership)} ownership</small></span><strong>${formatMoney(company.fairValue)}<br><span class="muted">${pct(company.fairValue/fund.nav*100)}</span></strong></button>`).join('')}</div>`,{footer:'<button type="button" class="card-link" data-action="fund-profile-tab" data-tab="investments">View all investments</button>'})}
-        ${card('Recent Capital Activity',`<div class="info-list">${capitalCalls.slice(0,5).map((call,index)=>`<button type="button" class="list-row" data-action="open-capital-call" data-id="${call.id}"><span class="activity-icon" style="color:${index%2?'var(--emerald)':'var(--blue)'};background:${index%2?'var(--emerald-soft)':'var(--blue-soft)'}">${icon(index%2?'trend-up':'wallet')}</span><span class="list-row-main"><strong>${index%2?'Distribution / follow-on':'Capital Call'}</strong><small>${escapeHTML(call.fund)}</small></span><strong class="${index%2?'positive':'negative'}">${formatMoney(index%2?call.collected:call.amount)}</strong></button>`).join('')}</div>`,{footer:'<button type="button" class="card-link" data-action="fund-profile-tab" data-tab="capital">Open capital activity</button>'})}
-        ${card('Upcoming Obligations',`<div class="info-list">${[['Capital Call','$18.0M','28 Jul 2026','warning'],['Management Fee Q3 2026','$375,000','15 Aug 2026','warning'],['Carried Interest Provision','$2.6M','30 Sep 2026','warning'],['Capital Call','$20.0M','29 Oct 2026','success'],['Management Fee Q4 2026','$375,000','15 Nov 2026','success']].map(item=>`<div class="list-row"><span class="status-dot" style="background:${item[3]==='success'?'var(--emerald)':'var(--orange)'}"></span><span class="list-row-main"><strong>${item[0]}</strong><small>${item[2]}</small></span><strong>${item[1]}</strong></div>`).join('')}</div>`,{footer:'<button type="button" class="card-link" data-action="fund-profile-tab" data-tab="reporting">View reporting and obligations</button>'})}
+        ${card('Top Holdings by NAV',holdings.length?`<div class="info-list">${holdings.slice(0,5).map(company=>`<button type="button" class="list-row" data-action="open-company" data-id="${company.id}">${companyLogo(company)}<span class="list-row-main"><strong>${escapeHTML(company.name)}</strong><small>${escapeHTML(company.sector)} · ${pct(company.ownership)} ownership</small></span><strong>${formatMoney(company.fairValue)}<br><span class="muted">${pct(fund.nav?company.fairValue/fund.nav*100:0)}</span></strong></button>`).join('')}</div>`:`<div class="empty-state compact">${icon('building')}<strong>No holdings recorded for this fund yet</strong></div>`,{footer:'<button type="button" class="card-link" data-action="fund-profile-tab" data-tab="investments">View all investments</button>'})}
+        ${card('Recent Capital Activity',fundCalls.length?`<div class="info-list">${fundCalls.slice(0,5).map(call=>`<button type="button" class="list-row" data-action="open-capital-call" data-id="${call.id}"><span class="activity-icon" style="color:var(--blue);background:var(--blue-soft)">${icon('wallet')}</span><span class="list-row-main"><strong>Capital Call</strong><small>${escapeHTML(call.fund)}</small></span><strong class="negative">${formatMoney(call.amount)}</strong></button>`).join('')}</div>`:`<div class="empty-state compact">${icon('wallet')}<strong>No capital activity for this fund yet</strong></div>`,{footer:'<button type="button" class="card-link" data-action="fund-profile-tab" data-tab="capital">Open capital activity</button>'})}
+        ${card('Upcoming Obligations',`<div class="empty-state compact">${icon('calendar')}<strong>No forward obligations schedule available</strong><p class="muted small">A forward-looking fee/call schedule API is not yet exposed.</p></div>`,{footer:'<button type="button" class="card-link" data-action="fund-profile-tab" data-tab="reporting">View reporting and obligations</button>'})}
         ${card('Fund Terms',`<div class="info-list"><div class="info-row"><span>Fund Entity</span><strong>${escapeHTML(fund.name)}, L.P.</strong></div><div class="info-row"><span>Vintage Year</span><strong>${fund.vintage}</strong></div><div class="info-row"><span>Fund Size</span><strong>${formatMoney(fund.commitment)}</strong></div><div class="info-row"><span>Strategy</span><strong>${escapeHTML(fund.strategy)}</strong></div><div class="info-row"><span>Primary Geography</span><strong>${escapeHTML(fund.geography)}</strong></div><div class="info-row"><span>Management Fee</span><strong>${escapeHTML(fund.managementFee)}</strong></div><div class="info-row"><span>Carried Interest</span><strong>${escapeHTML(fund.carry)}</strong></div><div class="info-row"><span>Status</span><strong>${statusPill(fund.status)}</strong></div></div>`,{footer:'<button type="button" class="card-link" data-action="fund-profile-tab" data-tab="documents">View fund documents</button>'})}
       </section>
     </section>`;
   }
 
   function renderFundInvestmentsTab(fund, fundCompanies, allocation) {
-    const holdings = fundCompanies.length ? fundCompanies : companies;
+    const holdings = fundCompanies;
     const invested = sum(holdings, item=>item.invested);
     const value = sum(holdings, item=>item.fairValue);
-    const rows = holdings.map(company=>`<tr class="clickable" data-action="open-company" data-id="${company.id}"><td><span class="company-cell">${companyLogo(company)}<span><strong>${escapeHTML(company.name)}</strong><small>${escapeHTML(company.city)}</small></span></span></td><td>${escapeHTML(company.sector)}</td><td>${escapeHTML(company.stage)}</td><td>${company.entry}</td><td class="text-right">${formatMoney(company.invested)}</td><td class="text-right">${formatMoney(company.fairValue)}</td><td class="text-right">${(company.fairValue/company.invested).toFixed(2)}x</td><td class="text-right">${pct(company.ownership)}</td><td class="text-right ${company.revenueGrowth>=20?'positive':''}">${pct(company.revenueGrowth)}</td><td>${healthScore(company.health)}</td><td>${statusPill(company.runway<12?'Watch':'On track')}</td></tr>`).join('');
+    const rows = holdings.map(company=>`<tr class="clickable" data-action="open-company" data-id="${company.id}"><td><span class="company-cell">${companyLogo(company)}<span><strong>${escapeHTML(company.name)}</strong><small>${escapeHTML(company.city)}</small></span></span></td><td>${escapeHTML(company.sector)}</td><td>${escapeHTML(company.stage)}</td><td>${company.entry}</td><td class="text-right">${formatMoney(company.invested)}</td><td class="text-right">${formatMoney(company.fairValue)}</td><td class="text-right">${(company.fairValue/company.invested).toFixed(2)}x</td><td class="text-right">${pct(company.ownership)}</td><td class="text-right ${company.revenueGrowth>=20?'positive':''}">${pct(company.revenueGrowth)}</td><td>${healthScore(company.health)}</td><td>${statusPill(company.runway<12?'Watch':'On track')}</td></tr>`).join('') || `<tr><td colspan="11"><div class="empty-state compact">${icon('building')}<strong>No holdings recorded for this fund yet</strong></div></td></tr>`;
     return `<section class="profile-tab-panel fund-profile-panel section-gap">
       <div class="profile-tab-summary"><div><strong>Investment portfolio workspace</strong><span>Holdings, valuations, ownership, operating performance, concentration and follow-on reserves.</span></div>${button('Add investment','add-company','primary','plus')}</div>
       <section class="grid cols-4 section-gap">
@@ -1646,34 +2024,28 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
         ${metricCard({label:'Follow-on Reserve',value:formatMoney(Math.max(0,fund.commitment-fund.called)*.58),iconName:'clock',accent:'amber',foot:'Estimated available reserve',action:'fund-reserve'})}
       </section>
       <section class="fund-two-column section-gap">
-        ${card('Portfolio Value by Company',barChart({labels:holdings.slice(0,7).map(c=>c.name),series:[{name:'Invested',color:'var(--muted)',values:holdings.slice(0,7).map(c=>c.invested/1e6)},{name:'Fair Value',color:'var(--brand)',values:holdings.slice(0,7).map(c=>c.fairValue/1e6)}],height:320,yLabel:'USD millions',format:v=>`${Math.round(v)}M`}),{subtitle:'Select a bar to drill into valuation movements'})}
-        ${card('Sector Allocation',donutChart(allocation,formatMoney(value),'Fair value',155),{subtitle:'NAV exposure by sector'})}
+        ${card('Portfolio Value by Company',holdings.length?barChart({labels:holdings.slice(0,7).map(c=>c.name),series:[{name:'Invested',color:'var(--muted)',values:holdings.slice(0,7).map(c=>c.invested/1e6)},{name:'Fair Value',color:'var(--brand)',values:holdings.slice(0,7).map(c=>c.fairValue/1e6)}],height:320,yLabel:'USD millions',format:v=>`${Math.round(v)}M`}):`<div class="empty-state compact">${icon('bar-chart')}<strong>No holdings recorded yet</strong></div>`,{subtitle:'Select a bar to drill into valuation movements'})}
+        ${card('Sector Allocation',allocation.length?donutChart(allocation,formatMoney(value),'Fair value',155):`<div class="empty-state compact">${icon('pie-chart')}<strong>No holdings recorded yet</strong></div>`,{subtitle:'NAV exposure by sector'})}
       </section>
       <section class="card table-card section-gap"><div class="table-toolbar"><div class="table-title-row"><h3>Investment Register</h3><span class="table-badge">${holdings.length} holdings</span></div><div class="table-tools">${button('Filters','company-filters','compact','filter')}${button('Export','export-companies','compact','download')}</div></div><div class="table-wrap"><table><thead><tr><th>Company</th><th>Sector</th><th>Stage</th><th>Entry</th><th class="text-right">Invested</th><th class="text-right">Fair Value</th><th class="text-right">MOIC</th><th class="text-right">Ownership</th><th class="text-right">Revenue Growth</th><th>Health</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div></section>
     </section>`;
   }
 
   function renderFundCapitalTab(fund) {
-    const calls = capitalCalls.filter(call=>call.fund===fund.name);
-    const visibleCalls = calls.length ? calls : capitalCalls.slice(0,5);
+    const visibleCalls = capitalCalls.filter(call=>call.fund===fund.name);
     const totalCalled = sum(visibleCalls, call=>call.amount);
     const totalCollected = sum(visibleCalls, call=>call.collected);
-    const cashFlowRows = [['01 Jul 2026','Capital call','CC-2026-0038',42500000,'Pending'],['18 Jun 2026','Distribution','Portfolio realisation',-12400000,'Settled'],['15 Jun 2026','Management fee','Q2 2026 fee',375000,'Settled'],['28 May 2026','Capital call','CC-2026-0033',22500000,'Partially collected'],['17 May 2026','Follow-on investment','Nova Analytics',-8000000,'Settled'],['30 Apr 2026','Fund expense','Audit and administration',-168000,'Settled']];
     return `<section class="profile-tab-panel fund-profile-panel section-gap">
       <div class="profile-tab-summary"><div><strong>Capital activity workspace</strong><span>Capital calls, collections, distributions, fees, investment funding and cash reconciliation.</span></div>${button('New capital activity','new-capital-call','primary','plus')}</div>
       <section class="grid cols-4 section-gap">
         ${metricCard({label:'Issued Calls',value:formatMoney(totalCalled),iconName:'send',accent:'blue',foot:`${visibleCalls.length} call notices`,action:'fund-calls-issued'})}
-        ${metricCard({label:'Collected',value:formatMoney(totalCollected),iconName:'check-circle',accent:'emerald',foot:`${pct(totalCollected/Math.max(1,totalCalled)*100)} collection rate`,action:'fund-calls-collected'})}
-        ${metricCard({label:'Distributions YTD',value:'$24.8M',iconName:'trend-up',accent:'purple',foot:'Across 3 distributions',action:'fund-distributions'})}
-        ${metricCard({label:'Next Cash Need',value:'$18.0M',iconName:'clock',accent:'amber',foot:'Due 28 Jul 2026',action:'fund-cash-need'})}
+        ${metricCard({label:'Collected',value:formatMoney(totalCollected),iconName:'check-circle',accent:'emerald',foot:`${pct(totalCalled?totalCollected/totalCalled*100:0)} collection rate`,action:'fund-calls-collected'})}
+        ${metricCard({label:'Distributed',value:formatMoney(fund.distributed),iconName:'trend-up',accent:'purple',foot:'Since inception',action:'fund-distributions'})}
+        ${metricCard({label:'Unfunded Commitment',value:formatMoney(Math.max(0,fund.commitment-fund.called)),iconName:'clock',accent:'amber',foot:'Available for future calls',action:'fund-cash-need'})}
       </section>
       <section class="fund-two-column section-gap">
-        ${card('Quarterly Cash Movement',barChart({labels:['Q1 2025','Q2 2025','Q3 2025','Q4 2025','Q1 2026','Q2 2026'],series:[{name:'Calls',color:'var(--blue)',values:[18,25,14,32,21,42.5]},{name:'Distributions',color:'var(--emerald)',values:[4,7,9,12,11,24.8]}],height:310,yLabel:'USD millions',format:v=>`${Number(v).toFixed(0)}M`}),{subtitle:'Calls versus distributions'})}
-        ${card('Collection Status',donutChart([{label:'Collected',value:totalCollected,color:'#07936d',display:formatMoney(totalCollected)},{label:'Outstanding',value:Math.max(0,totalCalled-totalCollected),color:'#f29a1f',display:formatMoney(Math.max(0,totalCalled-totalCollected))}],pct(totalCollected/Math.max(1,totalCalled)*100),'Collected',150),{subtitle:'Current issued notices'})}
-      </section>
-      <section class="fund-two-column section-gap">
-        ${card('Capital Call Register',`<div class="table-wrap"><table><thead><tr><th>Reference</th><th>Call Date</th><th>Due Date</th><th>Purpose</th><th class="text-right">Amount</th><th class="text-right">Collected</th><th>Status</th></tr></thead><tbody>${visibleCalls.map(call=>`<tr class="clickable" data-action="open-capital-call" data-id="${call.id}"><td class="table-primary brand-text">${call.id}</td><td>${call.callDate}</td><td>${call.dueDate}</td><td>${escapeHTML(call.purpose)}</td><td class="text-right">${formatMoney(call.amount)}</td><td class="text-right">${formatMoney(call.collected)}</td><td>${statusPill(call.status)}</td></tr>`).join('')}</tbody></table></div>`,{tools:button('Export','export-capital','compact','download')})}
-        ${card('Cash Ledger',`<div class="table-wrap"><table><thead><tr><th>Date</th><th>Type</th><th>Reference</th><th class="text-right">Amount</th><th>Status</th></tr></thead><tbody>${cashFlowRows.map(row=>`<tr><td>${row[0]}</td><td class="table-primary">${row[1]}</td><td>${row[2]}</td><td class="text-right ${row[3]<0?'negative':'positive'}">${formatMoney(Math.abs(row[3]))}${row[3]<0?' out':''}</td><td>${statusPill(row[4])}</td></tr>`).join('')}</tbody></table></div>`,{tools:button('Reconcile','reconcile-capital','compact','check-circle')})}
+        ${card('Collection Status',visibleCalls.length?donutChart([{label:'Collected',value:totalCollected,color:'#07936d',display:formatMoney(totalCollected)},{label:'Outstanding',value:Math.max(0,totalCalled-totalCollected),color:'#f29a1f',display:formatMoney(Math.max(0,totalCalled-totalCollected))}],pct(totalCalled?totalCollected/totalCalled*100:0),'Collected',150):`<div class="empty-state compact">${icon('pie-chart')}<strong>No capital calls issued yet</strong></div>`,{subtitle:'Current issued notices'})}
+        ${card('Capital Call Register',visibleCalls.length?`<div class="table-wrap"><table><thead><tr><th>Reference</th><th>Call Date</th><th>Due Date</th><th>Purpose</th><th class="text-right">Amount</th><th class="text-right">Collected</th><th>Status</th></tr></thead><tbody>${visibleCalls.map(call=>`<tr class="clickable" data-action="open-capital-call" data-id="${call.id}"><td class="table-primary brand-text">${call.id}</td><td>${call.callDate}</td><td>${call.dueDate}</td><td>${escapeHTML(call.purpose)}</td><td class="text-right">${formatMoney(call.amount)}</td><td class="text-right">${formatMoney(call.collected)}</td><td>${statusPill(call.status)}</td></tr>`).join('')}</tbody></table></div>`:`<div class="empty-state compact">${icon('send')}<strong>No capital calls issued for this fund yet</strong></div>`,{tools:button('Export','export-capital','compact','download')})}
       </section>
     </section>`;
   }
@@ -1692,91 +2064,92 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
         ${metricCard({label:'Verified KYC',value:`${lps.filter(lp=>lp.kyc==='Verified').length}/${lps.length}`,iconName:'shield',accent:'emerald',foot:'Investor records current',action:'fund-lp-kyc'})}
       </section>
       <section class="fund-three-column section-gap">
-        ${card('Commitment by Investor Type',donutChart([{label:'Pension Funds',value:250,color:'#2475f5',display:'$250M'},{label:'Insurance',value:200,color:'#07936d',display:'$200M'},{label:'Endowments',value:175,color:'#60a5fa',display:'$175M'},{label:'Family Offices',value:150,color:'#f29a1f',display:'$150M'},{label:'Funds of Funds',value:125,color:'#0f98b6',display:'$125M'}],formatMoney(fund.commitment),'Commitment',150),{subtitle:'Investor mix'})}
-        ${card('Geographic Mix',barChart({labels:['Africa','North America','Europe','Middle East','Asia'],series:[{name:'Commitment',color:'var(--brand)',values:[375,325,200,80,55]}],height:280,yLabel:'USD millions',format:v=>`${Math.round(v)}M`}),{subtitle:'LP domicile exposure'})}
-        ${card('Investor Servicing',`<div class="info-list"><div class="info-row"><span>Notices acknowledged</span><strong>92%</strong></div><div class="info-row"><span>Portal adoption</span><strong>96%</strong></div><div class="info-row"><span>KYC current</span><strong>80%</strong></div><div class="info-row"><span>Open document requests</span><strong class="warning-text">4</strong></div><div class="info-row"><span>Interactions this quarter</span><strong>18</strong></div><div class="info-row"><span>Average response time</span><strong>1.8 days</strong></div></div>`,{footer:'<button type="button" class="card-link" data-action="new-communication">Send investor update</button>'})}
+        ${card('Commitment by Investor Type',lps.length?donutChart(Object.entries(lps.reduce((acc,lp)=>{acc[lp.type]=(acc[lp.type]||0)+lp.commitment*fundShare;return acc;},{})).map(([label,value],i)=>({label,value,color:['#2475f5','#07936d','#60a5fa','#f29a1f','#0f98b6'][i%5],display:formatMoney(value)})),formatMoney(fund.commitment),'Commitment',150):`<div class="empty-state compact">${icon('pie-chart')}<strong>No LP records yet</strong></div>`,{subtitle:'Investor mix'})}
+        ${card('Geographic Mix',lps.length?barChart({labels:Object.keys(lps.reduce((acc,lp)=>{acc[lp.geography]=true;return acc;},{})),series:[{name:'Commitment',color:'var(--brand)',values:Object.values(lps.reduce((acc,lp)=>{acc[lp.geography]=(acc[lp.geography]||0)+lp.commitment*fundShare/1e6;return acc;},{}))}],height:280,yLabel:'USD millions',format:v=>`${Math.round(v)}M`}):`<div class="empty-state compact">${icon('bar-chart')}<strong>No LP records yet</strong></div>`,{subtitle:'LP domicile exposure'})}
+        ${card('Investor Servicing',`<div class="empty-state compact">${icon('shield')}<strong>Investor servicing metrics not available</strong><p class="muted small">A live investor-servicing API is not yet exposed.</p></div>`,{footer:'<button type="button" class="card-link" data-action="new-communication">Send investor update</button>'})}
       </section>
       <section class="card table-card section-gap"><div class="table-toolbar"><div class="table-title-row"><h3>Fund LP Register</h3><span class="table-badge">${lps.length} LPs</span></div><div class="table-tools">${button('Send communication','new-communication','compact','mail')}${button('Export','export-lps','compact','download')}</div></div><div class="table-wrap"><table><thead><tr><th>LP</th><th>Geography</th><th class="text-right">Commitment</th><th class="text-right">Called</th><th class="text-right">Unfunded</th><th class="text-right">Distributed</th><th>KYC</th><th>Portal</th><th>Owner</th></tr></thead><tbody>${rows}</tbody></table></div></section>
     </section>`;
   }
 
   function renderFundPerformanceTab(fund, fundCompanies) {
-    const holdings = fundCompanies.length ? fundCompanies : companies.slice(0,5);
-    const periods=['Q3 2024','Q4 2024','Q1 2025','Q2 2025','Q3 2025','Q4 2025','Q1 2026','Q2 2026'];
-    const net=[8.1,8.8,9.5,10.2,10.7,11.2,11.7,fund.netIrr];
-    const gross=net.map((v,i)=>Number((v+2.7+i*.08).toFixed(1)));
+    const holdings = fundCompanies;
+    const snapshots = (state.fundPerformanceSnapshots && state.fundPerformanceSnapshots[fund.id]) || [];
+    const irrSnapshots = snapshots.filter(s=>s.grossIrr!=null);
+    const latestIrr = irrSnapshots.length ? Number(irrSnapshots[irrSnapshots.length-1].grossIrr)*100 : null;
     return `<section class="profile-tab-panel fund-profile-panel section-gap">
       <div class="profile-tab-summary"><div><strong>Fund performance workspace</strong><span>Returns, value bridges, attribution, benchmark comparison and company-level contribution.</span></div>${button('Generate performance report','generate-report','primary','file-chart')}</div>
       <section class="grid cols-4 section-gap">
-        ${metricCard({label:'Gross IRR',value:pct(fund.grossIrr),iconName:'trend-up',accent:'emerald',foot:'Since inception',action:'fund-gross-irr'})}
+        ${metricCard({label:'Gross IRR',value:latestIrr!=null?pct(latestIrr):'—',iconName:'trend-up',accent:'emerald',foot:latestIrr!=null?'Since inception (called capital vs NAV)':'Not enough cash-flow history yet',action:'fund-gross-irr'})}
         ${metricCard({label:'Net IRR',value:pct(fund.netIrr),iconName:'trend-up',accent:'blue',foot:'After fees and carry',action:'fund-net-irr'})}
         ${metricCard({label:'TVPI',value:`${fund.tvpi.toFixed(2)}x`,iconName:'pie-chart',accent:'purple',foot:'Total value multiple',action:'fund-tvpi'})}
         ${metricCard({label:'DPI',value:`${fund.dpi.toFixed(2)}x`,iconName:'wallet',accent:'amber',foot:'Distributed multiple',action:'fund-dpi'})}
       </section>
       <section class="fund-two-column section-gap">
-        ${card('Gross and Net IRR Trend',lineChart({labels:periods,series:[{name:'Gross IRR',color:'var(--emerald)',values:gross},{name:'Net IRR',color:'var(--blue)',values:net}],height:320,yLabel:'Percent',format:v=>`${Number(v).toFixed(1)}%`}),{subtitle:'Quarter-end performance · select a point to inspect the reporting period'})}
-        ${card('Value Bridge',waterfallChart([{label:'Opening NAV',value:131,total:true},{label:'Investment',value:22},{label:'Value creation',value:31},{label:'FX',value:-4},{label:'Realisation',value:-18},{label:'Closing NAV',value:162,total:true}]),{subtitle:'Q2 2026 movement · USD millions'})}
+        ${card('Gross IRR Over Recorded Snapshots',irrSnapshots.length?lineChart({labels:irrSnapshots.map(s=>new Date(s.asOfDate).toLocaleDateString('en-GB',{day:'2-digit',month:'short'})),series:[{name:'Gross IRR',color:'var(--emerald)',values:irrSnapshots.map(s=>Number(s.grossIrr)*100)}],height:270,format:v=>`${Number(v).toFixed(1)}%`}):`<div class="empty-state compact">${icon('trend-up')}<strong>Gross IRR not yet computable</strong><p class="muted small">Needs at least one real capital call collection dated far enough from today for a stable annualised rate — real cash flows are used, no fabricated history.</p></div>`,{subtitle:'From real capital-call cash flows vs current NAV · select a point to inspect the reporting period'})}
+        ${card('Value Bridge',`<div class="empty-state compact">${icon('bar-chart')}<strong>NAV movement bridge not available</strong><p class="muted small">Requires period-over-period NAV components not yet exposed by the API.</p></div>`,{subtitle:'NAV movement · USD millions'})}
       </section>
       <section class="fund-two-column section-gap">
-        ${card('Company Contribution to NAV',barChart({labels:holdings.map(c=>c.name),series:[{name:'Fair value',color:'var(--brand)',values:holdings.map(c=>c.fairValue/1e6)}],height:300,yLabel:'USD millions',format:v=>`${Math.round(v)}M`}),{subtitle:'Current fair value by holding'})}
-        ${card('Benchmark Comparison',`<div class="table-wrap"><table><thead><tr><th>Benchmark</th><th class="text-right">Fund</th><th class="text-right">Benchmark</th><th class="text-right">Alpha</th><th>Status</th></tr></thead><tbody>${[['Net IRR',fund.netIrr,9.8,fund.netIrr-9.8],['Gross IRR',fund.grossIrr,12.4,fund.grossIrr-12.4],['TVPI',fund.tvpi,1.48,fund.tvpi-1.48],['DPI',fund.dpi,.52,fund.dpi-.52]].map((row,i)=>`<tr><td class="table-primary">${row[0]}</td><td class="text-right">${i<2?pct(row[1]):`${row[1].toFixed(2)}x`}</td><td class="text-right">${i<2?pct(row[2]):`${row[2].toFixed(2)}x`}</td><td class="text-right positive">+${i<2?pct(row[3]):`${row[3].toFixed(2)}x`}</td><td>${statusPill('Outperforming','success')}</td></tr>`).join('')}</tbody></table></div>`,{subtitle:'Cambridge-style private markets composite'})}
+        ${card('Company Contribution to NAV',holdings.length?barChart({labels:holdings.map(c=>c.name),series:[{name:'Fair value',color:'var(--brand)',values:holdings.map(c=>c.fairValue/1e6)}],height:300,yLabel:'USD millions',format:v=>`${Math.round(v)}M`}):`<div class="empty-state compact">${icon('bar-chart')}<strong>No holdings recorded yet</strong></div>`,{subtitle:'Current fair value by holding'})}
+        ${card('Benchmark Comparison',(()=>{
+          // Real, sourced public benchmark (no internal PME/peer database exists to compare against
+          // instead). Cambridge Associates LLC US Private Equity Index — the closest publicly
+          // published figure is the H1 2025 index return; TVPI/DPI use CA's own published
+          // early-lifecycle (2019-2021 vintage) range as the nearest comparable cohort to a fund
+          // this young, since no vintage-matched figure is freely published.
+          const CA_BENCHMARK = { irr: 3.9, tvpi: 1.25, dpi: 0.0, asOf: 'H1 2025', source: 'Cambridge Associates LLC US Private Equity Index' };
+          const rows = [
+            ['Gross IRR', latestIrr, CA_BENCHMARK.irr, latestIrr!=null?pct(latestIrr):'—', `${CA_BENCHMARK.irr.toFixed(1)}%`],
+            ['TVPI', fund.tvpi||null, CA_BENCHMARK.tvpi, fund.tvpi?`${fund.tvpi.toFixed(2)}x`:'—', `${CA_BENCHMARK.tvpi.toFixed(2)}x`],
+            ['DPI', fund.dpi||null, CA_BENCHMARK.dpi, fund.dpi?`${fund.dpi.toFixed(2)}x`:'0.00x', `${CA_BENCHMARK.dpi.toFixed(2)}x`],
+          ];
+          return `<div class="table-wrap"><table><thead><tr><th>Metric</th><th class="text-right">Fund</th><th class="text-right">Benchmark</th><th class="text-right">Alpha</th><th>Status</th></tr></thead><tbody>${rows.map(([label,fundVal,benchVal,fundDisp,benchDisp])=>{
+            const hasFund = fundVal!=null;
+            const alpha = hasFund ? fundVal-benchVal : null;
+            const outperforming = alpha!=null && alpha>=0;
+            const alphaDisp = alpha==null?'—':`${alpha>=0?'+':''}${label==='Gross IRR'?alpha.toFixed(1)+'pp':alpha.toFixed(2)+'x'}`;
+            return `<tr><td class="table-primary">${label}</td><td class="text-right">${fundDisp}</td><td class="text-right">${benchDisp}</td><td class="text-right ${alpha==null?'':outperforming?'positive':'negative'}">${alphaDisp}</td><td>${hasFund?statusPill(outperforming?'Outperforming':'Underperforming',outperforming?'success':'warning'):statusPill('Not enough data yet','neutral')}</td></tr>`;
+          }).join('')}</tbody></table></div><p class="muted small" style="margin-top:10px">Benchmark: ${CA_BENCHMARK.source}, ${CA_BENCHMARK.asOf} (TVPI/DPI use CA's published early-lifecycle 2019–2021 vintage range as the nearest comparable cohort — no freely published vintage-matched figure exists for a fund this young).</p>`;
+        })(),{subtitle:'vs Cambridge Associates US Private Equity Index'})}
       </section>
     </section>`;
   }
 
   function renderFundDocumentsTab(fund) {
-    const fundDocs = [
-      ['Limited Partnership Agreement.pdf','Legal','v4.2','Verified','12 Jun 2026'],
-      ['Private Placement Memorandum.pdf','Fundraising','v3.1','Verified','04 Apr 2026'],
-      ['Side Letter Register.xlsx','Legal','v8.0','In review','15 Jul 2026'],
-      ['Q2 2026 Valuation Pack.pdf','Valuation','v1.0','Verified','10 Jul 2026'],
-      ['Capital Account Statements Q2.zip','Investor Reporting','v1.0','Verified','14 Jul 2026'],
-      ['ESG & Impact Report 2025.pdf','ESG','v2.0','Verified','28 Jun 2026'],
-      ['Audit Findings and Responses.docx','Audit','v1.4','Needs update','11 Jul 2026']
-    ];
+    const docs = (state.fundDocuments && state.fundDocuments[fund.id]) || [];
+    const formatSize = bytes => { if(!bytes) return '—'; const mb = bytes/1e6; return mb>=1 ? `${mb.toFixed(1)} MB` : `${Math.round(bytes/1024)} KB`; };
     return `<section class="profile-tab-panel fund-profile-panel section-gap">
-      <div class="profile-tab-summary"><div><strong>Fund document workspace</strong><span>Governing agreements, side letters, valuation evidence, audit records and investor reporting packs.</span></div><div class="page-actions">${button('Create folder','create-folder','','folder')}<label class="button primary compact">${icon('upload')} Upload<input type="file" hidden data-file-action="upload-document"></label></div></div>
-      <section class="fund-document-summary section-gap">
-        ${card('Document Library',`<div class="document-stat"><span class="document-stat-icon">${icon('folder')}</span><div><strong>286 files</strong><small>Across 14 controlled folders</small></div></div>`,{footer:'<span class="muted small">8.6 GB used · encrypted at rest</span>'})}
-        ${card('Review Queue',`<div class="document-stat"><span class="document-stat-icon warning">${icon('clock')}</span><div><strong>7 pending</strong><small>3 require legal review</small></div></div>`,{footer:'<button type="button" class="card-link" data-action="generic-action">Open review queue</button>'})}
-        ${card('Access',`<div class="document-stat"><span class="document-stat-icon success">${icon('shield')}</span><div><strong>42 authorised</strong><small>12 internal · 30 LP users</small></div></div>`,{footer:'<button type="button" class="card-link" data-action="change-permissions">Manage permissions</button>'})}
-      </section>
-      <section class="fund-two-column section-gap fund-document-layout">
-        ${card('Folders',`<div class="fund-folder-grid">${[['Legal',38],['Fundraising',26],['Valuation',44],['Investor Reporting',62],['Audit',31],['Tax',24],['ESG',37],['Capital Activity',24]].map(item=>`<button type="button" class="fund-folder" data-action="generic-action"><span class="document-row-icon folder">${icon('folder')}</span><span><strong>${item[0]}</strong><small>${item[1]} documents</small></span>${icon('chevron-right')}</button>`).join('')}</div>`) }
-        ${card('Recent Documents',`<div class="table-wrap"><table><thead><tr><th>Document</th><th>Folder</th><th>Version</th><th>Updated</th><th>Status</th><th></th></tr></thead><tbody>${fundDocs.map((doc,index)=>`<tr><td class="table-primary"><button type="button" class="v17-document-name" data-action="preview-document" data-id="${documentIdForName(doc[0])}"><span class="document-row-icon">${icon(doc[0].endsWith('.xlsx')?'file-chart':'file')}</span><span>${escapeHTML(doc[0])}</span></button></td><td>${doc[1]}</td><td>${doc[2]}</td><td>${doc[4]}</td><td>${statusPill(doc[3])}</td><td><div class="document-row-actions"><button type="button" class="button ghost compact icon-only" data-action="preview-document" data-id="${documentIdForName(doc[0])}">${icon('eye')}</button><button type="button" class="button ghost compact icon-only" data-action="download-document" data-id="${documentIdForName(doc[0])}">${icon('download')}</button></div></td></tr>`).join('')}</tbody></table></div>`,{tools:button('Export index','export-drilldown','compact','download')})}
-      </section>
+      <div class="profile-tab-summary"><div><strong>Fund document workspace</strong><span>Governing agreements, side letters, valuation evidence, audit records and investor reporting packs.</span></div><div class="page-actions"><label class="button primary compact">${icon('upload')} Upload<input type="file" hidden data-file-action="upload-fund-document"></label></div></div>
+      <section class="card table-card section-gap"><div class="table-toolbar"><div class="table-title-row"><h3>Documents</h3><span class="table-badge">${docs.length} on file</span></div></div>${docs.length?`<div class="table-wrap"><table><thead><tr><th>Document</th><th>Category</th><th>Uploaded by</th><th>Size</th><th>Uploaded</th><th></th></tr></thead><tbody>${docs.map(doc=>`<tr><td class="table-primary"><button type="button" class="v17-document-name" data-action="preview-document" data-id="${escapeHTML(doc.fileUrl)}"><span class="document-row-icon">${icon('file')}</span><span>${escapeHTML(doc.name)}</span></button></td><td>${escapeHTML(doc.category||'General')}</td><td>${doc.uploadedBy?escapeHTML(doc.uploadedBy.firstName+' '+doc.uploadedBy.lastName):'—'}</td><td>${formatSize(doc.fileSizeBytes)}</td><td>${new Date(doc.createdAt).toLocaleDateString()}</td><td><div class="document-row-actions"><button type="button" class="button ghost compact icon-only" data-action="preview-document" data-id="${escapeHTML(doc.fileUrl)}">${icon('eye')}</button><button type="button" class="button ghost compact icon-only" data-action="download-document" data-id="${escapeHTML(doc.fileUrl)}">${icon('download')}</button></div></td></tr>`).join('')}</tbody></table></div>`:`<div class="empty-state">${icon('folder')}<strong>No documents on file for this fund yet</strong><p class="muted small">Upload the fund's governing agreements, valuation packs or investor reports above.</p></div>`}</section>
     </section>`;
   }
 
   function renderFundReportingTab(fund) {
-    const fundReports = reports.filter(report=>report.fund===fund.name || report.entity===fund.name).concat(reports.slice(0,3)).slice(0,6);
+    const fundReports = reports.filter(report=>report.fund===fund.name || report.entity===fund.name);
+    const dueCount = fundReports.filter(r=>/due|not started|scheduled/i.test(r.status||'')).length;
+    const inProgressCount = fundReports.filter(r=>/progress|review/i.test(r.status||'')).length;
+    const completedCount = fundReports.filter(r=>/complete|delivered|sent/i.test(r.status||'')).length;
+    const overdueCount = fundReports.filter(r=>/overdue/i.test(r.status||'')).length;
     return `<section class="profile-tab-panel fund-profile-panel section-gap">
       <div class="profile-tab-summary"><div><strong>Fund reporting workspace</strong><span>Reporting calendar, LP deliverables, regulatory submissions, approval workflow and distribution controls.</span></div>${button('Create report','generate-report','primary','file-chart')}</div>
       <section class="grid cols-4 section-gap">
-        ${metricCard({label:'Due This Quarter',value:'12',iconName:'calendar',accent:'blue',foot:'5 investor · 4 regulatory · 3 internal',action:'fund-report-due'})}
-        ${metricCard({label:'In Progress',value:'5',iconName:'clock',accent:'amber',foot:'Across finance and investment teams',action:'fund-report-progress'})}
-        ${metricCard({label:'Completed',value:'18',iconName:'check-circle',accent:'emerald',foot:'Current reporting year',action:'fund-report-complete'})}
-        ${metricCard({label:'Overdue',value:'1',iconName:'alert',accent:'red',foot:'Quarterly investor report',action:'fund-report-overdue'})}
+        ${metricCard({label:'Due',value:String(dueCount),iconName:'calendar',accent:'blue',foot:'From reporting schedule',action:'fund-report-due'})}
+        ${metricCard({label:'In Progress',value:String(inProgressCount),iconName:'clock',accent:'amber',foot:'From reporting schedule',action:'fund-report-progress'})}
+        ${metricCard({label:'Completed',value:String(completedCount),iconName:'check-circle',accent:'emerald',foot:'From reporting schedule',action:'fund-report-complete'})}
+        ${metricCard({label:'Overdue',value:String(overdueCount),iconName:'alert',accent:'red',foot:'From reporting schedule',action:'fund-report-overdue'})}
       </section>
-      <section class="fund-two-column section-gap">
-        ${card('Reporting Completion Trend',lineChart({labels:['Q1 2025','Q2 2025','Q3 2025','Q4 2025','Q1 2026','Q2 2026'],series:[{name:'On-time completion',color:'var(--emerald)',values:[82,86,91,93,94,96]},{name:'Target',color:'var(--brand)',values:[90,90,92,92,95,95]}],height:300,yLabel:'Percent',format:v=>`${Math.round(v)}%`}),{subtitle:'Completion within agreed deadline'})}
-        ${card('Next 60 Days',`<div class="timeline">${[['15 Aug 2026','Q2 Investor Report','Investment team','In progress'],['20 Aug 2026','Capital Account Statements','Fund administration','In review'],['31 Aug 2026','Regulatory Return','Compliance','Not started'],['15 Sep 2026','Portfolio ESG Data Pack','ESG lead','Not started'],['30 Sep 2026','Quarter-end Valuation Pack','Finance','Scheduled']].map(item=>`<button type="button" class="timeline-item" data-action="generic-action"><strong>${item[1]}</strong><small>${item[0]} · ${item[2]}</small><span>${statusPill(item[3])}</span></button>`).join('')}</div>`,{subtitle:'Critical deliverables and owners'})}
-      </section>
-      <section class="card table-card section-gap"><div class="table-toolbar"><div class="table-title-row"><h3>Reporting Register</h3><span class="table-badge">${fundReports.length} visible</span></div><div class="table-tools">${button('Filters','report-filters','compact','filter')}${button('Export','export-reports','compact','download')}</div></div><div class="table-wrap"><table><thead><tr><th>Report</th><th>Entity</th><th>Owner</th><th>Frequency</th><th>Due</th><th>Progress</th><th>Status</th><th>Delivery</th><th></th></tr></thead><tbody>${fundReports.map(report=>`<tr><td class="table-primary">${escapeHTML(report.type)}</td><td>${escapeHTML(report.entity)}</td><td>${escapeHTML(report.owner)}</td><td>${escapeHTML(report.frequency)}</td><td>${report.due}</td><td><span class="inline-progress"><span class="progress"><span style="width:${report.progress}%"></span></span><strong>${report.progress}%</strong></span></td><td>${statusPill(report.status)}</td><td>${escapeHTML(report.channel)}</td><td><button type="button" class="button ghost compact icon-only" data-action="open-report-builder">${icon('chevron-right')}</button></td></tr>`).join('')}</tbody></table></div></section>
+      <section class="card table-card section-gap"><div class="table-toolbar"><div class="table-title-row"><h3>Reporting Register</h3><span class="table-badge">${fundReports.length} visible</span></div><div class="table-tools">${button('Filters','report-filters','compact','filter')}${button('Export','export-reports','compact','download')}</div></div><div class="table-wrap"><table><thead><tr><th>Report</th><th>Entity</th><th>Owner</th><th>Frequency</th><th>Due</th><th>Progress</th><th>Status</th><th>Delivery</th><th></th></tr></thead><tbody>${fundReports.length?fundReports.map(report=>`<tr><td class="table-primary">${escapeHTML(report.type)}</td><td>${escapeHTML(report.entity)}</td><td>${escapeHTML(report.owner)}</td><td>${escapeHTML(report.frequency)}</td><td>${report.due}</td><td><span class="inline-progress"><span class="progress"><span style="width:${report.progress}%"></span></span><strong>${report.progress}%</strong></span></td><td>${statusPill(report.status)}</td><td>${escapeHTML(report.channel)}</td><td><button type="button" class="button ghost compact icon-only" data-action="open-report-builder">${icon('chevron-right')}</button></td></tr>`).join(''):`<tr><td colspan="9"><div class="empty-state compact">${icon('file-chart')}<strong>No reporting schedule for this fund yet</strong></div></td></tr>`}</tbody></table></div></section>
     </section>`;
   }
 
   function renderFundDetail() {
     const fund = funds.find(f=>f.id===state.selectedFundId) || funds[0];
     const fundCompanies = companies.filter(c=>c.fund===fund.name);
-    const allocation = [
-      {label:'Financial Services',value:27.3,color:'#2475f5',display:'27.3%'},
-      {label:'Technology',value:22.8,color:'#0ba780',display:'22.8%'},
-      {label:'Consumer',value:18.6,color:'#f5a623',display:'18.6%'},
-      {label:'Industrial',value:14.7,color:'#60a5fa',display:'14.7%'},
-      {label:'Healthcare',value:8.2,color:'#f0641c',display:'8.2%'},
-      {label:'Other',value:8.4,color:'#aab3c2',display:'8.4%'}
-    ];
+    const sectorTotals = {};
+    fundCompanies.forEach(c=>{ sectorTotals[c.sector||'Other']=(sectorTotals[c.sector||'Other']||0)+(c.fairValue||0); });
+    const sectorTotal = sum(fundCompanies,c=>c.fairValue||0);
+    const allocColors=['#2475f5','#0ba780','#f5a623','#60a5fa','#f0641c','#aab3c2'];
+    const allocation = sectorTotal ? Object.entries(sectorTotals).map(([label,value],index)=>({label,value,color:allocColors[index%allocColors.length],display:`${pct(value/sectorTotal*100)}`})) : [];
     const tabs=[['overview','Overview'],['investments','Investments'],['capital','Capital Activity'],['lps','LPs'],['performance','Performance'],['documents','Documents'],['reporting','Reporting']];
     const content = state.fundTab==='investments' ? renderFundInvestmentsTab(fund,fundCompanies,allocation)
       : state.fundTab==='capital' ? renderFundCapitalTab(fund)
@@ -2116,7 +2489,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   function renderCapitalCallDetail() {
     const call = capitalCalls.find(item=>item.id===state.selectedCapitalCallId) || capitalCalls[0];
     const lpAllocation = lps.map(lp=>({lp,amount:call.amount*(lp.commitment/sum(lps,x=>x.commitment))}));
-    return `${pageHeader(`Capital Call ${call.id}`,`${call.fund} · Draft · Call date ${call.callDate} · Due ${call.dueDate} · ${call.lpCount} LPs`,`${button('Preview notice','preview-capital-call','','eye')}${button('Submit for approval','submit-capital-call-approval','primary','send')}${button('Activity','activity-menu','','clock',`data-context="capital-call" data-id="${call.id}"`)}`,'Capital Call Notice')}
+    return `${pageHeader(`Capital Call ${call.id}`,`${call.fund} · Draft · Call date ${call.callDate} · Due ${call.dueDate} · ${call.lpCount} LPs`,`${button('Preview notice','preview-capital-call','','eye')}${button('Send notices','send-capital-call-notices','','send',`data-id="${escapeHTML(call.id)}"`)}${button('Submit for approval','submit-capital-call-approval','primary','send')}${button('Activity','activity-menu','','clock',`data-context="capital-call" data-id="${call.id}"`)}`,'Capital Call Notice')}
       <div class="stepper">${[['Draft','Complete'],['Allocation','Complete'],['Legal review','Complete'],['Finance review','In progress'],['Authorisation','Pending'],['Issuance','Locked']].map((s,i)=>`<div class="step ${i<3?'complete':i===3?'current':''}"><span class="step-index">${i<3?icon('check'):i+1}</span><span class="step-copy"><strong>${s[0]}</strong><small>${s[1]}</small></span></div>`).join('')}</div>
       <section class="grid" style="grid-template-columns:240px minmax(0,1fr) 300px;gap:12px"><div class="side-stack" style="display:flex">
         ${card('Call Purpose Allocation',`<div class="info-list"><div class="info-row"><span>Follow-on Investments</span><strong>$30.0M · 70.6%</strong></div><div class="info-row"><span>Management Fees</span><strong>$7.5M · 17.6%</strong></div><div class="info-row"><span>Fund Expenses</span><strong>$5.0M · 11.8%</strong></div><div class="info-row"><span>Total</span><strong>${formatMoney(call.amount)} · 100%</strong></div></div><div class="reason-item warning section-gap">${icon('info')}<div><small>Cash is required by ${call.dueDate} to ensure investments are funded on time.</small></div></div>`) }
@@ -2250,7 +2623,10 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   }
 
   function openCompany(id) { state.selectedCompanyId = id; state.companyTab = 'overview'; navigate('company-detail'); }
-  function openFund(id) { state.selectedFundId = id; state.fundTab = 'overview'; navigate('fund-detail'); }
+  function openFund(id) {
+    state.selectedFundId = id; state.fundTab = 'overview'; navigate('fund-detail');
+    if (state.liveData && id) window.dispatchEvent(new CustomEvent('matanho:load-fund-detail', { detail: { fundId: id } }));
+  }
   function openLP(id) { state.selectedLPId = id; state.lpTab = 'overview'; navigate('lp-detail'); }
   function openCapitalCall(id) { state.selectedCapitalCallId = id; navigate('capital-call-detail'); }
 
@@ -2376,7 +2752,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   function showMailerListDrawer(id) {
     const list=mailerLists.find(item=>item.id===id)||mailerLists[0]; state.selectedMailerListId=list.id;
     const members=[['Tendai Moyo','tendai@example.com','LP primary contact','Verified','Secure email + portal'],['Chipo Ndlovu','chipo@example.com','Finance contact','Verified','Secure email'],['Rudo Sibanda','rudo@example.com','Authorised signatory','Pending review','LP portal'],['Nyasha Dube','nyasha@example.com','Reporting contact','Verified','Secure email']];
-    showDrawer(list.name,`${list.id} · ${list.members} members · ${list.status}`,`<section class="drawer-section mailer-hero"><div><span>${icon('mail')}</span><div><strong>${list.members} recipients</strong><small>${escapeHTML(list.description)}</small></div></div>${statusPill(list.status)}</section><section class="drawer-section"><h3>Audience rules</h3><div class="info-list"><div class="info-row"><span>Source</span><strong>${escapeHTML(list.source)}</strong></div><div class="info-row"><span>Funds</span><strong>${escapeHTML(list.funds.join(', '))}</strong></div><div class="info-row"><span>Channels</span><strong>${escapeHTML(list.channels.join(', '))}</strong></div><div class="info-row"><span>Consent / authority</span><strong>${escapeHTML(list.consent)}</strong></div><div class="info-row"><span>Owner</span><strong>${escapeHTML(list.owner)}</strong></div><div class="info-row"><span>Last refreshed</span><strong>${escapeHTML(list.updated)}</strong></div></div></section><section class="drawer-section"><h3>Recipient health</h3>${donutChart([{label:'Active',value:list.active,color:'var(--emerald)',display:String(list.active)},{label:'Pending',value:list.pending,color:'var(--amber)',display:String(list.pending)},{label:'Bounced',value:list.bounced,color:'var(--red)',display:String(list.bounced)}],String(list.members),'Recipients',145)}</section><section class="drawer-section"><h3>Sample recipients</h3><div class="table-wrap"><table class="criteria-table"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Delivery</th></tr></thead><tbody>${members.map(row=>`<tr>${row.map((value,index)=>`<td>${index===3?statusPill(value,value==='Verified'?'success':'warning'):escapeHTML(value)}</td>`).join('')}</tr>`).join('')}</tbody></table></div></section><section class="drawer-section"><h3>Recent campaigns</h3><div class="case-timeline"><div><span></span><strong>Q2 2026 Investor Report</strong><small>31 Jul 2026 · 97.4% delivered</small><p>38 recipients · secure email and LP portal.</p></div><div><span></span><strong>Annual Meeting Save the Date</strong><small>12 Jul 2026 · 94.7% opened</small><p>Audience snapshot retained with campaign evidence.</p></div></div></section>`,`${button('Export audience','export-mailer-list','','download',`data-id="${list.id}"`)}${button('Edit rules','edit-mailer-list','','settings',`data-id="${list.id}"`)}${button('Create campaign','mailer-new-campaign','primary','send',`data-id="${list.id}"`)}`,{variant:'record',icon:'mail',eyebrow:'Mailer list'});
+    showDrawer(list.name,`${list.id} · ${list.members} members · ${list.status}`,`<section class="drawer-section mailer-hero"><div><span>${icon('mail')}</span><div><strong>${list.members} recipients</strong><small>${escapeHTML(list.description||list.source||'')}</small></div></div>${statusPill(list.status)}</section><section class="drawer-section"><h3>Audience rules</h3><div class="info-list"><div class="info-row"><span>Source</span><strong>${escapeHTML(list.source)}</strong></div><div class="info-row"><span>Funds</span><strong>${escapeHTML((list.funds||[]).join(', '))}</strong></div><div class="info-row"><span>Channels</span><strong>${escapeHTML((list.channels||['Email']).join(', '))}</strong></div><div class="info-row"><span>Consent / authority</span><strong>${escapeHTML(list.consent)}</strong></div><div class="info-row"><span>Owner</span><strong>${escapeHTML(list.owner||'—')}</strong></div><div class="info-row"><span>Last refreshed</span><strong>${escapeHTML(list.updated)}</strong></div></div></section><section class="drawer-section"><h3>Recipient health</h3>${donutChart([{label:'Active',value:list.active,color:'var(--emerald)',display:String(list.active)},{label:'Pending',value:list.pending,color:'var(--amber)',display:String(list.pending)},{label:'Bounced',value:list.bounced,color:'var(--red)',display:String(list.bounced)}],String(list.members),'Recipients',145)}</section><section class="drawer-section"><h3>Sample recipients</h3><div class="table-wrap"><table class="criteria-table"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Delivery</th></tr></thead><tbody>${members.map(row=>`<tr>${row.map((value,index)=>`<td>${index===3?statusPill(value,value==='Verified'?'success':'warning'):escapeHTML(value)}</td>`).join('')}</tr>`).join('')}</tbody></table></div></section><section class="drawer-section"><h3>Recent campaigns</h3><div class="case-timeline"><div><span></span><strong>Q2 2026 Investor Report</strong><small>31 Jul 2026 · 97.4% delivered</small><p>38 recipients · secure email and LP portal.</p></div><div><span></span><strong>Annual Meeting Save the Date</strong><small>12 Jul 2026 · 94.7% opened</small><p>Audience snapshot retained with campaign evidence.</p></div></div></section>`,`${button('Export audience','export-mailer-list','','download',`data-id="${list.id}"`)}${button('Edit rules','edit-mailer-list','','settings',`data-id="${list.id}"`)}${button('Create campaign','mailer-new-campaign','primary','send',`data-id="${list.id}"`)}`,{variant:'record',icon:'mail',eyebrow:'Mailer list'});
   }
 
   function showCreateMailerListModal() {
@@ -2392,7 +2768,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
 
   function showMailerCampaignModal(id=state.selectedMailerListId) {
     const list=mailerLists.find(item=>item.id===id)||mailerLists[0];
-    showModal('Create Mailer Campaign',`${list.name} · ${list.active} active recipients`,`<form id="mailerCampaignForm"><div class="compose-layout"><aside><strong>Audience summary</strong><div class="info-list"><div class="info-row"><span>List</span><strong>${escapeHTML(list.name)}</strong></div><div class="info-row"><span>Active recipients</span><strong>${list.active}</strong></div><div class="info-row"><span>Channels</span><strong>${escapeHTML(list.channels.join(', '))}</strong></div><div class="info-row"><span>Consent</span><strong>${escapeHTML(list.consent)}</strong></div></div></aside><main><div class="form-field"><label>Campaign type</label><select><option>Investor report distribution</option><option>Capital call notice</option><option>Portfolio update</option><option>Meeting invitation</option></select></div><div class="form-field"><label class="required">Subject</label><input required value="Matanho Portfolio Update · Q2 2026"></div><div class="form-field"><label>Message</label><textarea style="min-height:180px">Dear Investor,\n\nThe latest approved report pack is available in your secure portal. Please use the link below to access the published version.</textarea></div><div class="form-field"><label>Attach report</label><select><option>MGF II Quarterly Report · Q2 2026 · Published</option><option>Portfolio Valuation Report · Q2 2026</option></select></div></main></div></form>`,`${button('Cancel','close-modal')}${button('Save draft','save-mailer-campaign','','save')}${button('Schedule campaign','schedule-mailer-campaign','primary','send')}`,{variant:'compose',size:'lg',rail:['Audience','Message','Attachments','Delivery'],eyebrow:'Controlled communication'});
+    showModal('Create Mailer Campaign',`${list.name} · ${list.active} active recipients`,`<form id="mailerCampaignForm"><div class="compose-layout"><aside><strong>Audience summary</strong><div class="info-list"><div class="info-row"><span>List</span><strong>${escapeHTML(list.name)}</strong></div><div class="info-row"><span>Active recipients</span><strong>${list.active}</strong></div><div class="info-row"><span>Channels</span><strong>${escapeHTML((list.channels||['Email']).join(', '))}</strong></div><div class="info-row"><span>Consent</span><strong>${escapeHTML(list.consent)}</strong></div></div></aside><main><div class="form-field"><label>Campaign type</label><select><option>Investor report distribution</option><option>Capital call notice</option><option>Portfolio update</option><option>Meeting invitation</option></select></div><div class="form-field"><label class="required">Subject</label><input required value="Matanho Portfolio Update · Q2 2026"></div><div class="form-field"><label>Message</label><textarea style="min-height:180px">Dear Investor,\n\nThe latest approved report pack is available in your secure portal. Please use the link below to access the published version.</textarea></div><div class="form-field"><label>Attach report</label><select><option>MGF II Quarterly Report · Q2 2026 · Published</option><option>Portfolio Valuation Report · Q2 2026</option></select></div></main></div></form>`,`${button('Cancel','close-modal')}${button('Save draft','save-mailer-campaign','','save')}${button('Schedule campaign','schedule-mailer-campaign','primary','send')}`,{variant:'compose',size:'lg',rail:['Audience','Message','Attachments','Delivery'],eyebrow:'Controlled communication'});
   }
 
   function showScheduledReportPreview(id) {
@@ -2413,6 +2789,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     commandPalette.innerHTML = '';
     scrim.classList.remove('visible');
     state.drawer = state.modal = state.popover = null;
+    state.modalWizard = null;
   }
 
   function toast(title, message, type = 'success') {
@@ -2468,7 +2845,12 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   }
 
   function downloadDocumentFormat(id, format='pdf') {
-    const doc=documents.find(item=>item.id===id)||documents[0]; const base=doc.name.replace(/\.[^.]+$/,'').replace(/[^a-z0-9-_ ]/gi,'').trim().replaceAll(' ','_');
+    if (/^https?:\/\//i.test(String(id||''))) { window.open(normalizeMediaUrl(String(id)),'_blank','noopener'); return; }
+    const liveDoc = findLiveDocumentRaw(id);
+    if (liveDoc && liveDoc.fileUrl) { window.open(normalizeMediaUrl(liveDoc.fileUrl),'_blank','noopener'); return; }
+    const doc=documents.find(item=>item.id===id)||documents[0];
+    if (!doc) { toast('No document available','This deal has no documents on file yet.','warning'); return; }
+    const base=doc.name.replace(/\.[^.]+$/,'').replace(/[^a-z0-9-_ ]/gi,'').trim().replaceAll(' ','_');
     const rows=documentRows(doc);
     if(format==='pdf') downloadBlob(`${base}.pdf`,createSimplePdf(doc.name,rows.map(r=>r.join(': '))));
     else if(format==='csv') exportCSV(`${base}.csv`,rows);
@@ -2483,33 +2865,298 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   }
 
   function showAddDealModal(defaultStage = 'Sourcing') {
-    showModal('Add investment opportunity','Create a frontend-only pipeline record.',`<form id="addDealForm"><div class="form-grid"><div class="form-field"><label class="required">Company name</label><input name="name" required placeholder="e.g. AfriCloud"></div><div class="form-field"><label class="required">Sector</label><select name="sector"><option>Enterprise Software</option><option>FinTech</option><option>Climate Tech</option><option>HealthTech</option><option>Consumer</option><option>Mobility & Logistics</option></select></div><div class="form-field"><label class="required">Funding round</label><select name="round"><option>Seed</option><option>Series A</option><option>Series B</option><option>Growth</option><option>Buyout</option></select></div><div class="form-field"><label class="required">Requested amount (USD)</label><input name="amount" type="number" min="100000" value="10000000" required></div><div class="form-field"><label class="required">Stage</label><select name="stage">${dealStages.map(stage=>`<option ${stage===defaultStage?'selected':''}>${stage}</option>`).join('')}</select></div><div class="form-field"><label>Owner</label><select name="owner"><option>Nyasha Moyo</option><option>Sarah Chen</option><option>Michael Park</option><option>Priya Nair</option><option>Alex Johnson</option></select></div><div class="form-field"><label>Priority</label><select name="priority"><option>Medium</option><option>High</option><option>Low</option></select></div><div class="form-field"><label>Target fund</label><select name="fund">${funds.map(f=>`<option>${escapeHTML(f.name)}</option>`).join('')}</select></div><div class="form-field full"><label>Investment note</label><textarea name="note" placeholder="Add sourcing context, thesis fit and next action..."></textarea></div></div></form>`,`${button('Cancel','close-modal')}${button('Add to pipeline','submit-add-deal','primary','plus')}`);
+    state.modalWizard = {
+      kind: 'add-deal',
+      step: 0,
+      maxReached: 0,
+      draft: { stage: defaultStage || 'Sourcing' },
+      defaultStage: defaultStage || 'Sourcing',
+    };
+    renderAddDealWizard();
+  }
+
+  function modalWizardFormId(kind) {
+    if (kind === 'create-term-sheet') return 'createTermSheetForm';
+    if (kind === 'create-fund') return 'createFundForm';
+    if (kind === 'new-capital-call') return 'capitalCallForm';
+    if (kind === 'add-lp') return 'lpForm';
+    if (kind === 'add-company') return 'companyForm';
+    return 'addDealForm';
+  }
+
+  function captureModalWizardDraft() {
+    if (!state.modalWizard) return;
+    const formId = modalWizardFormId(state.modalWizard.kind);
+    const form = document.getElementById(formId);
+    if (!form) return;
+    const data = Object.fromEntries(new FormData(form));
+    if (state.modalWizard.kind === 'create-term-sheet') delete data.document;
+    state.modalWizard.draft = { ...state.modalWizard.draft, ...data };
+  }
+
+  function captureAddDealDraft() {
+    captureModalWizardDraft();
+  }
+
+  function renderModalWizard() {
+    if (!state.modalWizard) return;
+    if (state.modalWizard.kind === 'create-term-sheet') return;
+    if (state.modalWizard.kind === 'create-fund') return renderCreateFundWizard();
+    if (state.modalWizard.kind === 'new-capital-call') return renderCapitalCallWizard();
+    if (state.modalWizard.kind === 'add-lp') return renderLPWizard();
+    if (state.modalWizard.kind === 'add-company') return renderCompanyWizard();
+    renderAddDealWizard();
+  }
+
+  function modalWizardMaxStep() {
+    return 2;
+  }
+
+  function addDealEmptyOption(label) {
+    return '<option value="">' + escapeHTML(label) + '</option>';
+  }
+
+  function addDealSelectOptions(values, selected, placeholder) {
+    return addDealEmptyOption(placeholder) + values.map((v) => {
+      const val = typeof v === 'string' ? v : String(v.value || '');
+      const label = typeof v === 'string' ? v : String(v.label || v.value || '');
+      const sel = String(selected || '') === val ? ' selected' : '';
+      return '<option value="' + escapeHTML(val) + '"' + sel + '>' + escapeHTML(label) + '</option>';
+    }).join('');
+  }
+
+  function renderAddDealWizard() {
+    const wiz = state.modalWizard || { step: 0, draft: {}, maxReached: 0 };
+    const step = Number(wiz.step || 0);
+    wiz.maxReached = Math.max(Number(wiz.maxReached || 0), step);
+    const d = wiz.draft || {};
+    const fundOptions = funds.length
+      ? addDealEmptyOption('Select fund') + funds.map((f) => {
+          const id = String(f.id || f.name || '');
+          const sel = String(d.fundId || '') === id ? ' selected' : '';
+          return '<option value="' + escapeHTML(id) + '"' + sel + '>' + escapeHTML(f.name || id) + '</option>';
+        }).join('')
+      : '<option value="">No funds available</option>';
+    const industryOptions = ['Enterprise Software', 'FinTech', 'Climate Tech', 'HealthTech', 'Consumer', 'Mobility & Logistics', 'AgTech', 'Other'];
+    const stageOptions = ['Seed', 'Series A', 'Series B', 'Growth', 'Buyout'];
+    const roundOptions = ['Seed', 'Series A', 'Series B', 'Growth Equity'];
+    const steps = ['Details', 'Ownership', 'Review'];
+    let body = '';
+    if (step === 0) {
+      body = '<form id="addDealForm"><div class="form-grid">' +
+        '<div class="form-field"><label class="required">Target fund</label><select name="fundId" required>' + fundOptions + '</select></div>' +
+        '<div class="form-field"><label class="required">Applicant full name</label><input type="text" name="applicantName" required placeholder="Primary contact" value="' + escapeHTML(d.applicantName || '') + '"></div>' +
+        '<div class="form-field"><label class="required">Applicant email</label><input type="email" name="applicantEmail" required placeholder="you@company.com" value="' + escapeHTML(d.applicantEmail || '') + '"></div>' +
+        '<div class="form-field"><label class="required">Applicant phone</label><input type="text" name="applicantPhone" required placeholder="+263 …" value="' + escapeHTML(d.applicantPhone || '') + '"></div>' +
+        '<div class="form-field"><label class="required">Applicant address</label><input type="text" name="applicantAddress" required placeholder="City, country" value="' + escapeHTML(d.applicantAddress || '') + '"></div>' +
+        '<div class="form-field"><label class="required">Business name</label><input type="text" name="name" required placeholder="e.g. AfriCloud" value="' + escapeHTML(d.name || '') + '"></div>' +
+        '<div class="form-field"><label class="required">Industry</label><select name="sector" required>' + addDealSelectOptions(industryOptions, d.sector, 'Select industry') + '</select></div>' +
+        '<div class="form-field"><label class="required">Business stage</label><select name="round" required>' + addDealSelectOptions(stageOptions, d.round, 'Select stage') + '</select></div>' +
+        '<div class="form-field"><label class="required">Founding date</label><input type="date" name="foundingDate" required value="' + escapeHTML(d.foundingDate || '') + '"></div>' +
+        '<div class="form-field full"><label class="required">Business description</label><textarea name="note" required placeholder="What does the company do?">' + escapeHTML(d.note || '') + '</textarea></div>' +
+        '<div class="form-field"><label class="required">Funding round</label><select name="fundingRound" required>' + addDealSelectOptions(roundOptions, d.fundingRound, 'Select round') + '</select></div>' +
+        '<div class="form-field"><label class="required">Requested investment (USD)</label><input type="number" name="amount" min="0" required placeholder="e.g. 5000000" value="' + escapeHTML(d.amount != null && d.amount !== '' ? String(d.amount) : '') + '"></div>' +
+      '</div></form>';
+    } else if (step === 1) {
+      body = '<form id="addDealForm"><div class="form-grid">' +
+        '<div class="form-field"><label>Founder ownership (%)</label><input type="number" name="ownershipPercent" min="0" max="100" step="0.1" placeholder="e.g. 60" value="' + escapeHTML(String(d.ownershipPercent || '')) + '"></div>' +
+        '<div class="form-field"><label>Board composition</label><input type="text" name="boardComposition" placeholder="e.g. 5 directors" value="' + escapeHTML(d.boardComposition || '') + '"></div>' +
+        '<div class="form-field full"><label>Key shareholders</label><textarea name="keyShareholders" placeholder="Names and ownership splits">' + escapeHTML(d.keyShareholders || '') + '</textarea></div>' +
+        '<div class="form-field full"><label>Governance notes</label><textarea name="governanceNotes" placeholder="Board / control notes">' + escapeHTML(d.governanceNotes || '') + '</textarea></div>' +
+        '<div class="form-field"><label>Proposed ownership (%)</label><input type="number" name="proposedOwnership" min="0" max="100" step="0.1" placeholder="e.g. 15.5" value="' + escapeHTML(String(d.proposedOwnership || '')) + '"></div>' +
+        '<div class="form-field"><label>Pre-money valuation (USD)</label><input type="number" name="preMoneyValuation" min="0" placeholder="e.g. 85000000" value="' + escapeHTML(String(d.preMoneyValuation || '')) + '"></div>' +
+        '<div class="form-field"><label>Target close date</label><input type="date" name="targetCloseDate" value="' + escapeHTML(d.targetCloseDate || '') + '"></div>' +
+        '<div class="form-field"><label>Country</label><input type="text" name="country" placeholder="Zimbabwe" value="' + escapeHTML(d.country || '') + '"></div>' +
+      '</div></form>';
+    } else {
+      const fundName = (funds.find((f) => String(f.id) === String(d.fundId) || String(f.name) === String(d.fundId)) || {}).name || d.fundId || '-';
+      const reviewRows = [
+        ['Company', d.name || '-'],
+        ['Industry', d.sector || '-'],
+        ['Business stage', d.round || '-'],
+        ['Funding round', d.fundingRound || '-'],
+        ['Ask', d.amount ? formatMoney(Number(d.amount)) : '-'],
+        ['Applicant', ((d.applicantName || '-') + ' · ' + (d.applicantEmail || '-'))],
+        ['Fund', fundName],
+        ['Proposed ownership', d.proposedOwnership ? (d.proposedOwnership + '%') : '-'],
+        ['Pre-money', d.preMoneyValuation ? formatMoney(Number(d.preMoneyValuation)) : '-'],
+      ].map((row) => '<div class="info-row"><span>' + escapeHTML(row[0]) + '</span><strong>' + escapeHTML(String(row[1])) + '</strong></div>').join('');
+      body = '<form id="addDealForm"><div class="form-grid">' +
+        '<div class="form-field full">' + card('Review summary', '<div class="info-list">' + reviewRows + '</div>') + '</div>' +
+        '<div class="form-field"><label class="required">Business plan</label><input name="fileBusinessPlan" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg" required></div>' +
+        '<div class="form-field"><label class="required">Proof of concept</label><input name="filePoc" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg" required></div>' +
+        '<div class="form-field"><label class="required">Market research</label><input name="fileMarket" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg" required></div>' +
+        '<div class="form-field"><label class="required">Projected cash flows</label><input name="fileCashFlows" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg" required></div>' +
+      '</div></form>';
+    }
+    const footer = step === 0
+      ? button('Cancel', 'close-modal') + button('Next', 'wizard-next', 'primary', 'arrow-right')
+      : step === 1
+        ? button('Back', 'wizard-back') + button('Next', 'wizard-next', 'primary', 'arrow-right')
+        : button('Back', 'wizard-back') + button('Create application', 'submit-add-deal', 'primary', 'plus');
+    const subtitle = step === 2
+      ? 'Upload required documents and confirm. Creates a live application via POST /applications.'
+      : 'Creates a live screening application on the selected fund.';
+    showModal('Add investment opportunity', subtitle, body, footer, {
+      variant: 'wizard',
+      size: 'lg',
+      eyebrow: 'Deal intake',
+      rail: steps,
+      railStep: step,
+      railMax: wiz.maxReached,
+    });
   }
 
   function submitAddDeal() {
     const form = $('#addDealForm');
-    if (!form?.reportValidity()) return;
-    const data = Object.fromEntries(new FormData(form));
-    const deal = { id:`DL-${String(deals.length+1).padStart(3,'0')}`, name:data.name, sector:data.sector, round:data.round, amount:Number(data.amount), owner:data.owner, age:0, priority:data.priority, stage:data.stage, score:0, fund:data.fund };
+    if (!form || !form.reportValidity()) return;
+    captureAddDealDraft();
+    const data = { ...(state.modalWizard && state.modalWizard.draft ? state.modalWizard.draft : {}), ...Object.fromEntries(new FormData(form)) };
+    if (state.liveData) {
+      const bp = form.querySelector('[name="fileBusinessPlan"]') && form.querySelector('[name="fileBusinessPlan"]').files && form.querySelector('[name="fileBusinessPlan"]').files[0];
+      const poc = form.querySelector('[name="filePoc"]') && form.querySelector('[name="filePoc"]').files && form.querySelector('[name="filePoc"]').files[0];
+      const market = form.querySelector('[name="fileMarket"]') && form.querySelector('[name="fileMarket"]').files && form.querySelector('[name="fileMarket"]').files[0];
+      const cash = form.querySelector('[name="fileCashFlows"]') && form.querySelector('[name="fileCashFlows"]').files && form.querySelector('[name="fileCashFlows"]').files[0];
+      if (!bp || !poc || !market || !cash) {
+        toast('Documents required', 'Upload all four required application documents.', 'warning');
+        return;
+      }
+      const address = [data.applicantAddress, data.country].filter(Boolean).join(', ');
+      emitIntegrationEvent('matanho:before-action', {
+        action: 'api-create-application',
+        dataset: {
+          applicantName: String(data.applicantName || ''),
+          applicantEmail: String(data.applicantEmail || ''),
+          applicantPhone: String(data.applicantPhone || ''),
+          applicantAddress: String(address || data.applicantAddress || ''),
+          businessName: String(data.name || ''),
+          businessDescription: String(data.note || data.name || ''),
+          industry: String(data.sector || ''),
+          businessStage: String(data.round || data.fundingRound || 'Seed'),
+          foundingDate: String(data.foundingDate || new Date().toISOString().slice(0, 10)),
+          requestedAmount: String(data.amount || ''),
+          fundId: String(data.fundId || ''),
+          proposedOwnership: String(data.proposedOwnership || ''),
+          preMoneyValuation: String(data.preMoneyValuation || ''),
+          country: String(data.country || ''),
+          // Staff Add Deal always persists INTERNAL (no UI selector).
+          source: 'INTERNAL',
+          fundingRound: String(data.fundingRound || ''),
+          ownershipPercent: String(data.ownershipPercent || ''),
+          boardComposition: String(data.boardComposition || ''),
+          keyShareholders: String(data.keyShareholders || ''),
+          governanceNotes: String(data.governanceNotes || ''),
+          targetCloseDate: String(data.targetCloseDate || ''),
+        },
+        files: { businessPlan: bp, proofOfConcept: poc, marketResearch: market, projectedCashFlows: cash },
+        state: typeof publicSnapshot === 'function' ? publicSnapshot().state : state,
+      }, true);
+      return;
+    }
+    const deal = {
+      id: 'DL-' + String(deals.length + 1).padStart(3, '0'),
+      name: data.name,
+      sector: data.sector,
+      round: data.round || data.fundingRound,
+      amount: Number(data.amount),
+      owner: data.owner || 'Unassigned',
+      age: 0,
+      priority: data.priority || 'Medium',
+      stage: data.stage || 'Sourcing',
+      score: 0,
+      fund: data.fundId || data.fund,
+      source: 'INTERNAL',
+    };
     deals.push(deal);
+    state.modalWizard = null;
     closeOverlays();
-    toast('Deal added', `${deal.name} was added to ${deal.stage}.`);
+    toast('Deal added', deal.name + ' was added to ' + deal.stage + '.');
     state.page = 'deals';
     render();
   }
 
+
   function showCapitalCallModal() {
-    showModal('New Capital Call','Create a draft capital call notice.',`<form id="capitalCallForm"><div class="form-grid"><div class="form-field full"><label class="required">Fund</label><select name="fund">${funds.map(f=>`<option>${escapeHTML(f.name)}</option>`).join('')}</select></div><div class="form-field"><label class="required">Call date</label><input name="callDate" type="date" value="2026-08-01"></div><div class="form-field"><label class="required">Due date</label><input name="dueDate" type="date" value="2026-08-31"></div><div class="form-field"><label class="required">Total amount (USD)</label><input name="amount" type="number" value="25000000"></div><div class="form-field"><label class="required">Purpose</label><select name="purpose"><option>New investments</option><option>Follow-on investments</option><option>Management fees</option><option>Fund expenses</option><option>Co-investments</option></select></div><div class="form-field full"><label>Notes</label><textarea name="notes">Capital required to fund the approved investment programme and related fund expenses.</textarea></div></div></form>`,`${button('Cancel','close-modal')}${button('Create draft','submit-capital-call','primary','plus')}`);
+    state.modalWizard = { kind: 'new-capital-call', step: 0, maxReached: 0, draft: {} };
+    renderCapitalCallWizard();
+  }
+
+  function renderCapitalCallWizard() {
+    const wiz = state.modalWizard || { step: 0, draft: {}, maxReached: 0 };
+    const step = Number(wiz.step || 0);
+    wiz.maxReached = Math.max(Number(wiz.maxReached || 0), step);
+    const d = wiz.draft || {};
+    const steps = ['Details', 'Ownership', 'Review'];
+    const fundOptions = funds.length
+      ? addDealEmptyOption('Select fund') + funds.map((f) => {
+          const id = String(f.id || f.name || '');
+          const sel = String(d.fund || '') === id ? ' selected' : '';
+          return '<option value="' + escapeHTML(id) + '"' + sel + '>' + escapeHTML(f.name || id) + '</option>';
+        }).join('')
+      : '<option value="">No funds available</option>';
+    let body = '';
+    if (step === 0) {
+      body = '<form id="capitalCallForm"><div class="form-grid">' +
+        '<div class="form-field full"><label class="required">Fund</label><select name="fund" required>' + fundOptions + '</select></div>' +
+        '<div class="form-field"><label class="required">Call / transaction date</label><input name="callDate" type="date" required value="' + escapeHTML(d.callDate || '') + '"></div>' +
+        '<div class="form-field"><label class="required">Payment due date</label><input name="dueDate" type="date" required value="' + escapeHTML(d.dueDate || '') + '"></div>' +
+        '<div class="form-field"><label class="required">Total amount (USD)</label><input name="amount" type="number" min="0" required placeholder="e.g. 25000000" value="' + escapeHTML(d.amount != null && d.amount !== '' ? String(d.amount) : '') + '"></div>' +
+        '<div class="form-field"><label class="required">Purpose</label><select name="purpose" required>' + addDealSelectOptions(['New investments','Follow-on investments','Management fees','Fund expenses','Co-investments'], d.purpose, 'Select purpose') + '</select></div>' +
+        '<div class="form-field full"><label>Bank instructions / notes</label><textarea name="notes" placeholder="Remit per LPA collection account.">' + escapeHTML(d.notes || '') + '</textarea></div>' +
+      '</div></form>';
+    } else if (step === 1) {
+      body = '<form id="capitalCallForm"><div class="form-grid">' +
+        '<div class="form-field"><label>Expected LP count</label><input name="lpCount" type="number" min="0" placeholder="Optional" value="' + escapeHTML(String(d.lpCount || '')) + '"></div>' +
+        '<div class="form-field"><label>Call percent override</label><input name="callPercent" type="number" min="0" step="0.1" placeholder="Auto from amount / commitment" value="' + escapeHTML(String(d.callPercent || '')) + '"></div>' +
+        '<div class="form-field full"><label>Allocation notes</label><textarea name="allocationNotes" placeholder="Pro-rata, side letters, exclusions…">' + escapeHTML(d.allocationNotes || '') + '</textarea></div>' +
+      '</div></form>';
+    } else {
+      const fundName = (funds.find((f) => String(f.id) === String(d.fund) || String(f.name) === String(d.fund)) || {}).name || d.fund || '-';
+      const rows = [['Fund', fundName],['Call date', d.callDate || '-'],['Due date', d.dueDate || '-'],['Amount', d.amount ? formatMoney(Number(d.amount)) : '-'],['Purpose', d.purpose || '-']].map((r) => '<div class="info-row"><span>' + escapeHTML(r[0]) + '</span><strong>' + escapeHTML(String(r[1])) + '</strong></div>').join('');
+      body = '<form id="capitalCallForm"><div class="form-field full">' + card('Review summary', '<div class="info-list">' + rows + '</div>') + '</div><p class="muted small">Creates a live capital call via the funds capital-call API.</p></form>';
+    }
+    const footer = step === 0
+      ? button('Cancel', 'close-modal') + button('Next', 'wizard-next', 'primary', 'arrow-right')
+      : step === 1
+        ? button('Back', 'wizard-back') + button('Next', 'wizard-next', 'primary', 'arrow-right')
+        : button('Back', 'wizard-back') + button('Create capital call', 'submit-capital-call', 'primary', 'plus');
+    showModal('New Capital Call', step === 2 ? 'Confirm and create via API.' : 'Plan a capital call notice against a live fund.', body, footer, {
+      variant: 'wizard', size: 'lg', eyebrow: 'Capital call', rail: steps, railStep: step, railMax: wiz.maxReached,
+    });
   }
 
   function submitCapitalCall() {
     const form = $('#capitalCallForm');
     if (!form?.reportValidity()) return;
-    const data = Object.fromEntries(new FormData(form));
+    captureModalWizardDraft();
+    const data = { ...(state.modalWizard && state.modalWizard.draft ? state.modalWizard.draft : {}), ...Object.fromEntries(new FormData(form)) };
+    const fundKey = String(data.fund || data.fundId || '');
+    const fund = funds.find((f) => f.id === fundKey || f.name === fundKey) || funds[0];
+    if (state.liveData && fund?.id) {
+      const commitment = Number(fund.commitment || fund.totalAmount || data.amount || 0) || 1;
+      const amount = Number(data.amount || 0);
+      const callPercent = data.callPercent
+        ? Number(data.callPercent)
+        : (amount && commitment ? Math.max(0.1, Math.round((amount / commitment) * 1000) / 10) : 10);
+      emitIntegrationEvent('matanho:before-action', {
+        action: 'api-create-capital-call',
+        dataset: {
+          fundId: String(fund.id),
+          callPercent: String(callPercent),
+          paymentDueDate: String(data.dueDate || ''),
+          transactionDate: String(data.callDate || ''),
+          bankInstructions: String(data.notes || data.allocationNotes || 'Remit per LPA collection account.'),
+        },
+        state: typeof publicSnapshot === 'function' ? publicSnapshot().state : state,
+      }, true);
+      state.modalWizard = null;
+      return;
+    }
     const id = `CC-2026-${String(39 + capitalCalls.length).padStart(4,'0')}`;
-    const call = { id, fund:data.fund, callDate:new Date(data.callDate).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}), dueDate:new Date(data.dueDate).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}), purpose:data.purpose, amount:Number(data.amount), lpCount:38, collected:0, status:'Draft', approval:'Draft' };
+    const call = { id, fund:data.fund, callDate:data.callDate ? new Date(data.callDate).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : '-', dueDate:data.dueDate ? new Date(data.dueDate).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : '-', purpose:data.purpose, amount:Number(data.amount), lpCount:Number(data.lpCount||0), collected:0, status:'Draft', approval:'Draft' };
     capitalCalls.unshift(call);
     state.selectedCapitalCallId = id;
+    state.modalWizard = null;
     closeOverlays();
     toast('Capital call created', `${id} is ready for allocation and validation.`);
     state.page = 'capital-call-detail';
@@ -2517,37 +3164,165 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   }
 
   function showCompanyModal() {
-    showModal('Add portfolio company','Add an existing investment to the monitoring workspace.',`<form id="companyForm"><div class="form-grid"><div class="form-field"><label class="required">Company name</label><input name="name" required></div><div class="form-field"><label class="required">Sector</label><input name="sector" required value="Enterprise Software"></div><div class="form-field"><label class="required">Fund</label><select name="fund">${funds.map(f=>`<option>${escapeHTML(f.name)}</option>`).join('')}</select></div><div class="form-field"><label>Stage</label><select name="stage"><option>Growth</option><option>Series B</option><option>Series A</option><option>Buyout</option></select></div><div class="form-field"><label class="required">Invested amount</label><input name="invested" type="number" value="15000000"></div><div class="form-field"><label>Fair value</label><input name="fairValue" type="number" value="15000000"></div><div class="form-field"><label>Ownership %</label><input name="ownership" type="number" value="15"></div><div class="form-field"><label>Location</label><input name="city" value="Harare, Zimbabwe"></div></div></form>`,`${button('Cancel','close-modal')}${button('Add company','submit-company','primary','plus')}`);
+    state.modalWizard = { kind: 'add-company', step: 0, maxReached: 0, draft: {} };
+    renderCompanyWizard();
+  }
+
+  function renderCompanyWizard() {
+    const wiz = state.modalWizard || { step: 0, draft: {}, maxReached: 0 };
+    const step = Number(wiz.step || 0);
+    wiz.maxReached = Math.max(Number(wiz.maxReached || 0), step);
+    const d = wiz.draft || {};
+    const steps = ['Details', 'Ownership', 'Review'];
+    const fundOptions = funds.length
+      ? addDealEmptyOption('Select fund') + funds.map((f) => {
+          const id = String(f.id || f.name || '');
+          const sel = String(d.fund || '') === id ? ' selected' : '';
+          return '<option value="' + escapeHTML(id) + '"' + sel + '>' + escapeHTML(f.name || id) + '</option>';
+        }).join('')
+      : '<option value="">No funds available</option>';
+    let body = '';
+    if (step === 0) {
+      body = '<form id="companyForm"><div class="form-grid">' +
+        '<div class="form-field"><label class="required">Company name</label><input type="text" name="name" required placeholder="Legal / trading name" value="' + escapeHTML(d.name || '') + '"></div>' +
+        '<div class="form-field"><label class="required">Sector</label><input type="text" name="sector" required placeholder="e.g. Enterprise Software" value="' + escapeHTML(d.sector || '') + '"></div>' +
+        '<div class="form-field"><label class="required">Fund</label><select name="fund" required>' + fundOptions + '</select></div>' +
+        '<div class="form-field"><label>Stage</label><select name="stage">' + addDealSelectOptions(['Growth','Series B','Series A','Buyout','Seed'], d.stage, 'Select stage') + '</select></div>' +
+        '<div class="form-field"><label>Location</label><input type="text" name="city" placeholder="City, country" value="' + escapeHTML(d.city || '') + '"></div>' +
+        '<div class="form-field"><label>Registration number</label><input type="text" name="registrationNumber" placeholder="Optional" value="' + escapeHTML(d.registrationNumber || '') + '"></div>' +
+      '</div></form>';
+    } else if (step === 1) {
+      body = '<form id="companyForm"><div class="form-grid">' +
+        '<div class="form-field"><label class="required">Invested amount (USD)</label><input name="invested" type="number" min="0" required placeholder="e.g. 15000000" value="' + escapeHTML(d.invested != null && d.invested !== '' ? String(d.invested) : '') + '"></div>' +
+        '<div class="form-field"><label>Fair value (USD)</label><input name="fairValue" type="number" min="0" placeholder="Optional" value="' + escapeHTML(d.fairValue != null && d.fairValue !== '' ? String(d.fairValue) : '') + '"></div>' +
+        '<div class="form-field"><label>Ownership %</label><input name="ownership" type="number" min="0" max="100" step="0.1" placeholder="e.g. 15" value="' + escapeHTML(String(d.ownership || '')) + '"></div>' +
+      '</div></form>';
+    } else {
+      const fundName = (funds.find((f) => String(f.id) === String(d.fund) || String(f.name) === String(d.fund)) || {}).name || d.fund || '-';
+      const rows = [['Company', d.name || '-'],['Sector', d.sector || '-'],['Fund', fundName],['Invested', d.invested ? formatMoney(Number(d.invested)) : '-'],['Ownership', d.ownership ? (d.ownership + '%') : '-']].map((r) => '<div class="info-row"><span>' + escapeHTML(r[0]) + '</span><strong>' + escapeHTML(String(r[1])) + '</strong></div>').join('');
+      body = '<form id="companyForm"><div class="form-field full">' + card('Review summary', '<div class="info-list">' + rows + '</div>') + '</div><p class="muted small">Creates via portfolio companies admin API when live.</p></form>';
+    }
+    const footer = step === 0
+      ? button('Cancel', 'close-modal') + button('Next', 'wizard-next', 'primary', 'arrow-right')
+      : step === 1
+        ? button('Back', 'wizard-back') + button('Next', 'wizard-next', 'primary', 'arrow-right')
+        : button('Back', 'wizard-back') + button('Add company', 'submit-company', 'primary', 'plus');
+    showModal('Add portfolio company', step === 2 ? 'Confirm and create via API.' : 'Add an investment to the monitoring workspace.', body, footer, {
+      variant: 'wizard', size: 'lg', eyebrow: 'Portfolio company', rail: steps, railStep: step, railMax: wiz.maxReached,
+    });
   }
 
   function submitCompany() {
     const form = $('#companyForm');
     if (!form?.reportValidity()) return;
-    const data = Object.fromEntries(new FormData(form));
+    captureModalWizardDraft();
+    const data = { ...(state.modalWizard && state.modalWizard.draft ? state.modalWizard.draft : {}), ...Object.fromEntries(new FormData(form)) };
+    if (state.liveData) {
+      emitIntegrationEvent('matanho:before-action', {
+        action: 'api-create-company',
+        dataset: {
+          name: String(data.name || ''),
+          sector: String(data.sector || ''),
+          industry: String(data.sector || ''),
+          fundId: String(data.fund || ''),
+          registrationNumber: String(data.registrationNumber || ''),
+          invested: String(data.invested || ''),
+          fairValue: String(data.fairValue || ''),
+          ownership: String(data.ownership || ''),
+        },
+        state: typeof publicSnapshot === 'function' ? publicSnapshot().state : state,
+      }, true);
+      state.modalWizard = null;
+      return;
+    }
     const colors = ['#1d4ed8','#0d9488','#ea580c','#0284c7','#0284c7'];
-    const company = { id:`CO-${String(companies.length+1).padStart(3,'0')}`, name:data.name, sector:data.sector, stage:data.stage, entry:'31 Jul 2026', invested:Number(data.invested), fairValue:Number(data.fairValue), ownership:Number(data.ownership), revenueGrowth:0, runway:18, health:75, boardDate:'TBC', lastReport:'Not submitted', fund:data.fund, city:data.city, revenue:[0,0,0,0,0], ebitda:[0,0,0,0,0], arr:0, margin:0, nrr:0, clients:0, esg:[0,0,0], color:colors[companies.length%colors.length] };
+    const company = { id:`CO-${String(companies.length+1).padStart(3,'0')}`, name:data.name, sector:data.sector, stage:data.stage, entry:'31 Jul 2026', invested:Number(data.invested||0), fairValue:Number(data.fairValue||data.invested||0), ownership:Number(data.ownership||0), revenueGrowth:0, runway:18, health:75, boardDate:'TBC', lastReport:'Not submitted', fund:data.fund, city:data.city, revenue:[0,0,0,0,0], ebitda:[0,0,0,0,0], arr:0, margin:0, nrr:0, clients:0, esg:[0,0,0], color:colors[companies.length%colors.length] };
     companies.push(company);
+    state.modalWizard = null;
     closeOverlays();
     toast('Company added', `${company.name} is now in portfolio monitoring.`);
     state.page = 'companies'; render();
   }
 
   function showLPModal() {
-    showModal('Add Limited Partner','Create an investor directory record and begin onboarding.',`<form id="lpForm"><div class="form-grid"><div class="form-field"><label class="required">LP name</label><input name="name" required></div><div class="form-field"><label>Investor type</label><select name="type"><option>Pension Fund</option><option>Family Office</option><option>Insurance</option><option>Fund of Funds</option><option>Development Finance Institution</option></select></div><div class="form-field"><label>Geography</label><input name="geography" value="Africa"></div><div class="form-field"><label>Commitment (USD)</label><input name="commitment" type="number" value="50000000"></div><div class="form-field"><label>Relationship owner</label><select name="owner"><option>Maya Moyo</option><option>Daniel Lunga</option><option>Aisha Chirwa</option><option>James Mbewe</option></select></div><div class="form-field"><label>Primary contact email</label><input name="email" type="email"></div></div></form>`,`${button('Cancel','close-modal')}${button('Start onboarding','submit-lp','primary','users')}`);
+    state.modalWizard = { kind: 'add-lp', step: 0, maxReached: 0, draft: {} };
+    renderLPWizard();
+  }
+
+  function renderLPWizard() {
+    const wiz = state.modalWizard || { step: 0, draft: {}, maxReached: 0 };
+    const step = Number(wiz.step || 0);
+    wiz.maxReached = Math.max(Number(wiz.maxReached || 0), step);
+    const d = wiz.draft || {};
+    const steps = ['Details', 'Ownership', 'Review'];
+    const fundOptions = funds.length
+      ? addDealEmptyOption('Select fund (optional)') + funds.map((f) => {
+          const id = String(f.id || f.name || '');
+          const sel = String(d.fundId || '') === id ? ' selected' : '';
+          return '<option value="' + escapeHTML(id) + '"' + sel + '>' + escapeHTML(f.name || id) + '</option>';
+        }).join('')
+      : '<option value="">No funds available</option>';
+    let body = '';
+    if (step === 0) {
+      body = '<form id="lpForm"><div class="form-grid">' +
+        '<div class="form-field"><label class="required">LP name</label><input type="text" name="name" required placeholder="Legal entity name" value="' + escapeHTML(d.name || '') + '"></div>' +
+        '<div class="form-field"><label>Investor type</label><select name="type">' + addDealSelectOptions(['Pension Fund','Family Office','Insurance','Fund of Funds','Development Finance Institution'], d.type, 'Select type') + '</select></div>' +
+        '<div class="form-field"><label>Geography / country</label><input type="text" name="geography" placeholder="e.g. Zimbabwe" value="' + escapeHTML(d.geography || '') + '"></div>' +
+        '<div class="form-field"><label class="required">Primary contact email</label><input name="email" type="email" required placeholder="investor@example.com" value="' + escapeHTML(d.email || '') + '"></div>' +
+        '<div class="form-field"><label>Relationship owner</label><input type="text" name="owner" placeholder="Internal owner" value="' + escapeHTML(d.owner || '') + '"></div>' +
+        '<div class="form-field"><label>Fund</label><select name="fundId">' + fundOptions + '</select></div>' +
+      '</div></form>';
+    } else if (step === 1) {
+      body = '<form id="lpForm"><div class="form-grid">' +
+        '<div class="form-field"><label>Commitment (USD)</label><input name="commitment" type="number" min="0" placeholder="e.g. 50000000" value="' + escapeHTML(d.commitment != null && d.commitment !== '' ? String(d.commitment) : '') + '"></div>' +
+        '<div class="form-field"><label>KYC status</label><select name="kyc">' + addDealSelectOptions(['Not Started','In Progress','Verified'], d.kyc, 'Select KYC status') + '</select></div>' +
+        '<div class="form-field full"><label>Onboarding notes</label><textarea name="notes" placeholder="Side letters, contact preferences…">' + escapeHTML(d.notes || '') + '</textarea></div>' +
+      '</div></form>';
+    } else {
+      const fundName = (funds.find((f) => String(f.id) === String(d.fundId) || String(f.name) === String(d.fundId)) || {}).name || d.fundId || '-';
+      const rows = [['LP', d.name || '-'],['Type', d.type || '-'],['Email', d.email || '-'],['Geography', d.geography || '-'],['Commitment', d.commitment ? formatMoney(Number(d.commitment)) : '-'],['Fund', fundName]].map((r) => '<div class="info-row"><span>' + escapeHTML(r[0]) + '</span><strong>' + escapeHTML(String(r[1])) + '</strong></div>').join('');
+      body = '<form id="lpForm"><div class="form-field full">' + card('Review summary', '<div class="info-list">' + rows + '</div>') + '</div><p class="muted small">Creates a live LP / client record via API.</p></form>';
+    }
+    const footer = step === 0
+      ? button('Cancel', 'close-modal') + button('Next', 'wizard-next', 'primary', 'arrow-right')
+      : step === 1
+        ? button('Back', 'wizard-back') + button('Next', 'wizard-next', 'primary', 'arrow-right')
+        : button('Back', 'wizard-back') + button('Start onboarding', 'submit-lp', 'primary', 'users');
+    showModal('Add Limited Partner', step === 2 ? 'Confirm and create via API.' : 'Create an investor directory record and begin onboarding.', body, footer, {
+      variant: 'wizard', size: 'lg', eyebrow: 'LP onboarding', rail: steps, railStep: step, railMax: wiz.maxReached,
+    });
   }
 
   function submitLP() {
     const form = $('#lpForm');
     if (!form?.reportValidity()) return;
-    const data = Object.fromEntries(new FormData(form));
-    const commitment = Number(data.commitment);
-    const lp = { id:`LP-${String(lps.length+1).padStart(3,'0')}`, name:data.name, type:data.type, geography:data.geography, commitment, called:0, distributed:0, netIrr:0, owner:data.owner, lastInteraction:'Not contacted', kyc:'Not Started', portal:'Invited', unfunded:commitment, tvpi:0, dpi:0, color:'#2563eb' };
+    captureModalWizardDraft();
+    const data = { ...(state.modalWizard && state.modalWizard.draft ? state.modalWizard.draft : {}), ...Object.fromEntries(new FormData(form)) };
+    if (state.liveData) {
+      emitIntegrationEvent('matanho:before-action', {
+        action: 'api-add-lp',
+        dataset: {
+          name: String(data.name || ''),
+          email: String(data.email || ''),
+          type: String(data.type || 'entity'),
+          country: String(data.geography || data.country || 'ZW'),
+          amount: String(data.commitment || ''),
+          fundId: String(data.fundId || funds[0]?.id || ''),
+        },
+        state: typeof publicSnapshot === 'function' ? publicSnapshot().state : state,
+      }, true);
+      state.modalWizard = null;
+      return;
+    }
+    const commitment = Number(data.commitment || 0);
+    const lp = { id:`LP-${String(lps.length+1).padStart(3,'0')}`, name:data.name, type:data.type, geography:data.geography, commitment, called:0, distributed:0, netIrr:0, owner:data.owner, lastInteraction:'Not contacted', kyc:data.kyc||'Not Started', portal:'Invited', unfunded:commitment, tvpi:0, dpi:0, color:'#2563eb' };
     lps.push(lp);
+    state.modalWizard = null;
     closeOverlays(); toast('LP onboarding started', `${lp.name} was added to the directory.`); state.page='lps'; render();
   }
 
   function showCommunicationModal() {
-    showModal('Send investor communication','Draft and schedule a secure LP communication.',`<form id="communicationForm"><div class="form-grid"><div class="form-field full"><label>Recipients</label><select><option>All active LPs (42)</option><option>Fund II LPs (12)</option><option>Selected LPs</option></select></div><div class="form-field full"><label>Subject</label><input value="Q2 2026 Portfolio Update"></div><div class="form-field full"><label>Message</label><textarea style="min-height:180px">Dear Limited Partner,\n\nPlease find attached the Q2 2026 portfolio update, including fund performance, portfolio-company developments and upcoming capital activity.\n\nKind regards,\nMatanho Investor Relations</textarea></div><div class="form-field"><label class="checkbox-row"><input type="checkbox" checked> Secure email</label></div><div class="form-field"><label class="checkbox-row"><input type="checkbox" checked> LP portal</label></div></div></form>`,`${button('Save draft','save-communication','','save')}${button('Send now','send-communication','primary','send')}`);
+    showModal('Send investor communication','Draft and schedule a secure LP communication.',`<form id="communicationForm"><div class="form-grid"><div class="form-field full"><label>Recipients</label><select name="recipients"><option value="">Select audience</option><option>All active LPs</option><option>Fund LPs</option><option>Selected LPs</option></select></div><div class="form-field full"><label>Subject</label><input name="subject" type="text" placeholder="e.g. Q2 portfolio update"></div><div class="form-field full"><label>Message</label><textarea name="message" style="min-height:180px" placeholder="Write the investor message…"></textarea></div><div class="form-field"><label class="checkbox-row"><input type="checkbox" name="secureEmail" checked> Secure email</label></div><div class="form-field"><label class="checkbox-row"><input type="checkbox" name="lpPortal" checked> LP portal</label></div></div></form>`,`${button('Save draft','save-communication','','save')}${button('Send now','send-communication','primary','send')}`);
   }
 
   function revealActiveProfileTab() {
@@ -2576,8 +3351,8 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     const doc=documents.find(d=>d.id===documentId)||documents.find(d=>/Term Sheet/.test(d.name))||documents[0];
     const envelope=signatureEnvelopes.find(e=>e.id===envelopeId)||signatureEnvelopes.find(e=>e.documentId===doc.id)||signatureEnvelopes[0];
     state.selectedDocumentId=doc.id; state.selectedEnvelopeId=envelope.id;
-    const recipients=envelope.recipients.map((r,i)=>`<button class="signature-recipient ${r[2]==='Signed'?'signed':r[2]==='Declined'?'declined':''}" data-action="select-signature-recipient" data-index="${i}">${personAvatar(r[0])}<span><strong>${escapeHTML(r[0])}</strong><small>${escapeHTML(r[1])}</small></span>${statusPill(r[2])}</button>`).join('');
-    showModal('Signature Studio',`${doc.name} · ${envelope.id}`,`<div class="signature-studio"><aside class="signature-toolbox"><strong>Fields</strong><button class="signature-tool" data-action="add-signature-field">${icon('edit')} Signature</button><button class="signature-tool" data-action="add-initial-field">${icon('user-check')} Initials</button><button class="signature-tool" data-action="add-date-field">${icon('calendar')} Date signed</button><button class="signature-tool" data-action="add-text-field">${icon('file')} Text field</button><div class="signature-divider"></div><strong>Recipients</strong>${recipients}</aside><main class="signature-document"><div class="signature-document-toolbar"><span>Page 1 of ${doc.pages||8}</span><span>${icon('lock')} Encrypted · audit logged</span><button data-action="signature-zoom">100%</button></div><article class="signature-page"><div class="document-letterhead"><div class="pdf-brand">MATANHO</div><small>Investment Management ERP</small></div><p class="document-classification">TERM SHEET · SERIES B INVESTMENT · ${escapeHTML(doc.version)}</p><h1>Nova Analytics (Pvt) Ltd</h1><p class="document-lead">Non-binding summary of principal investment terms</p><div class="term-summary"><div><span>Investment</span><strong>USD 18,000,000</strong></div><div><span>Pre-money valuation</span><strong>USD 85,000,000</strong></div><div><span>Proposed ownership</span><strong>17.5%</strong></div></div><h2>Governance and investor protections</h2><p>The investor shall have the right to appoint one director and one non-voting observer, subject to the definitive agreements and agreed reserved matters.</p><h2>Electronic signatures</h2>${envelope.recipients.map((recipient,index)=>recipient[2]==='Signed'?`<div class="signature-field signed"><span>${escapeHTML(recipient[0])}</span><small>${escapeHTML(recipient[1])} · Signed with OTP authentication</small></div>`:`<button class="signature-field pending" data-action="sign-term-sheet" data-signer="${index}"><span>Click to sign for ${escapeHTML(recipient[0])}</span><small>${escapeHTML(recipient[1])}</small></button>`).join('')}</article></main><aside class="signature-inspector"><div class="signature-inspector-tabs"><button class="active">Prepare</button><button>Message</button><button>Review</button></div><div class="signature-inspector-body"><h3>Envelope settings</h3><div class="info-list"><div class="info-row"><span>Signing order</span><strong>Enabled</strong></div><div class="info-row"><span>Authentication</span><strong>Email + OTP</strong></div><div class="info-row"><span>Expiry</span><strong>${escapeHTML(envelope.expires)}</strong></div><div class="info-row"><span>Reminders</span><strong>Every 2 days</strong></div></div><h3 class="section-gap">Message</h3><div class="form-field"><label>Email subject</label><input value="Please sign: ${escapeHTML(envelope.subject)}"></div><div class="form-field section-gap"><label>Private message</label><textarea>Please review and electronically sign the attached investment document.</textarea></div><div class="reason-item section-gap">${icon('shield')}<div><strong>Electronic signature evidence</strong><small>Recipient, timestamp, consent, authentication and completion certificate are recorded.</small></div></div></div></aside></div>`,`${button('Save draft','save-signature-draft')}${button('Download certificate','download-signature-certificate','','download')}${button(envelope.status==='Completed'?'View completion':'Send envelope','send-signature-envelope','primary','send')}`,{variant:'signature',size:'fullscreen',eyebrow:'Secure e-signature'});
+    const recipients=(Array.isArray(envelope.recipients)?envelope.recipients:[]).map((r,i)=>`<button class="signature-recipient ${r[2]==='Signed'?'signed':r[2]==='Declined'?'declined':''}" data-action="select-signature-recipient" data-index="${i}">${personAvatar(r[0])}<span><strong>${escapeHTML(r[0])}</strong><small>${escapeHTML(r[1])}</small></span>${statusPill(r[2])}</button>`).join('');
+    showModal('Signature Studio',`${doc.name} · ${envelope.id}`,`<div class="signature-studio"><aside class="signature-toolbox"><strong>Fields</strong><button class="signature-tool" data-action="add-signature-field">${icon('edit')} Signature</button><button class="signature-tool" data-action="add-initial-field">${icon('user-check')} Initials</button><button class="signature-tool" data-action="add-date-field">${icon('calendar')} Date signed</button><button class="signature-tool" data-action="add-text-field">${icon('file')} Text field</button><div class="signature-divider"></div><strong>Recipients</strong>${recipients}</aside><main class="signature-document"><div class="signature-document-toolbar"><span>Page 1 of ${doc.pages||8}</span><span>${icon('lock')} Encrypted · audit logged</span><button data-action="signature-zoom">100%</button></div><article class="signature-page"><div class="document-letterhead"><div class="pdf-brand">MATANHO</div><small>Investment Management ERP</small></div><p class="document-classification">TERM SHEET · SERIES B INVESTMENT · ${escapeHTML(doc.version)}</p><h1>Nova Analytics (Pvt) Ltd</h1><p class="document-lead">Non-binding summary of principal investment terms</p><div class="term-summary"><div><span>Investment</span><strong>USD 18,000,000</strong></div><div><span>Pre-money valuation</span><strong>USD 85,000,000</strong></div><div><span>Proposed ownership</span><strong>17.5%</strong></div></div><h2>Governance and investor protections</h2><p>The investor shall have the right to appoint one director and one non-voting observer, subject to the definitive agreements and agreed reserved matters.</p><h2>Electronic signatures</h2>${(Array.isArray(envelope.recipients)?envelope.recipients:[]).map((recipient,index)=>recipient[2]==='Signed'?`<div class="signature-field signed"><span>${escapeHTML(recipient[0])}</span><small>${escapeHTML(recipient[1])} · Signed with OTP authentication</small></div>`:`<button class="signature-field pending" data-action="sign-term-sheet" data-signer="${index}"><span>Click to sign for ${escapeHTML(recipient[0])}</span><small>${escapeHTML(recipient[1])}</small></button>`).join('')}</article></main><aside class="signature-inspector"><div class="signature-inspector-tabs"><button class="active">Prepare</button><button>Message</button><button>Review</button></div><div class="signature-inspector-body"><h3>Envelope settings</h3><div class="info-list"><div class="info-row"><span>Signing order</span><strong>Enabled</strong></div><div class="info-row"><span>Authentication</span><strong>Email + OTP</strong></div><div class="info-row"><span>Expiry</span><strong>${escapeHTML(envelope.expires)}</strong></div><div class="info-row"><span>Reminders</span><strong>Every 2 days</strong></div></div><h3 class="section-gap">Message</h3><div class="form-field"><label>Email subject</label><input value="Please sign: ${escapeHTML(envelope.subject)}"></div><div class="form-field section-gap"><label>Private message</label><textarea>Please review and electronically sign the attached investment document.</textarea></div><div class="reason-item section-gap">${icon('shield')}<div><strong>Electronic signature evidence</strong><small>Recipient, timestamp, consent, authentication and completion certificate are recorded.</small></div></div></div></aside></div>`,`${button('Save draft','save-signature-draft')}${button('Download certificate','download-signature-certificate','','download')}${button(envelope.status==='Completed'?'View completion':'Send envelope','send-signature-envelope','primary','send')}`,{variant:'signature',size:'fullscreen',eyebrow:'Secure e-signature'});
   }
 
   function showAccountDetail(id) {
@@ -2719,7 +3494,9 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       case 'deal-view': state.dealView=trigger.dataset.view||'list'; render(); break;
       case 'deal-calendar-day': showRecordMetadata('deal-calendar',`Day ${trigger.dataset.day}`); break;
       case 'deal-tab': state.dealTab = trigger.dataset.tab || trigger.dataset.dataTab || 'overview'; render(); break;
+      case 'tab-locked-notice': toast('Not available yet', trigger.title || 'This stage has not been reached yet.', 'warning'); break;
       case 'term-section': state.termSection=Number(trigger.dataset.section||0); render(); break;
+      case 'application-section': state.applicationSection=Number(trigger.dataset.section||0); render(); break;
       case 'sign-term-sheet': showTermSigningConfirmation(); break;
       case 'confirm-term-signature': { const form=$('#termSignatureForm'); if(!form?.reportValidity()) break; if(!$('#termSignConsent')?.checked){toast('Consent required','Confirm that the signatory reviewed the current term sheet.','warning');break;} const envelope=signatureEnvelopes.find(item=>item.documentId==='DOC-009'); const index=Number(new FormData(form).get('signerIndex')); if(envelope&&envelope.recipients[index]) envelope.recipients[index][2]='Signed'; if(envelope){envelope.progress=Math.round(envelope.recipients.filter(r=>r[2]==='Signed').length/envelope.recipients.length*100);envelope.status=envelope.progress===100?'Completed':'Waiting for others';} const doc=documents.find(item=>item.id==='DOC-009'); if(doc) doc.signatureStatus=envelope?.status==='Completed'?'Completed':'Partially signed'; closeOverlays();toast('Term sheet signed','Electronic consent, signature evidence and the controlled document hash were recorded.');render();break;}
       case 'open-term-clause': showTermClauseDrawer(trigger.dataset.section,trigger.dataset.clause); break;
@@ -2754,7 +3531,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       case 'save-communication': closeOverlays(); toast('Draft saved','The communication remains in Draft status.'); break;
       case 'close-overlays': closeOverlays(); state.mobileNavOpen=false; sidebar.classList.remove('mobile-open'); break;
       case 'close-drawer': drawer.classList.remove('open'); drawer.innerHTML=''; scrim.classList.remove('visible'); state.drawer=null; break;
-      case 'close-modal': modalLayer.classList.remove('visible'); modalLayer.innerHTML=''; scrim.classList.remove('visible'); state.modal=null; break;
+      case 'close-modal': modalLayer.classList.remove('visible'); modalLayer.innerHTML=''; scrim.classList.remove('visible'); state.modal=null; state.modalWizard=null; break;
       case 'close-toast': $(`#${trigger.dataset.id}`)?.remove(); break;
       case 'toggle-theme': state.theme = state.theme === 'light' ? 'dark' : 'light'; storage.set('matanho-portfolio-theme',state.theme); render(); toast('Theme changed',`${state.theme[0].toUpperCase()+state.theme.slice(1)} mode is now active.`); break;
       case 'open-search': openCommandPalette(); break;
@@ -2810,11 +3587,19 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
         else genericDetailDrawer('Payment Instruction','$12.0M first tranche · dual authorisation required');
         break;
       }
-      case 'select-folder': state.selectedFolder = trigger.dataset.folder; state.selectedDocumentId = documents.find(d=>d.folder===state.selectedFolder)?.id || documents[0].id; render(); break;
+      case 'select-folder': {
+        state.selectedFolder = trigger.dataset.folder;
+        const folderDocs = documents.filter((d) => d && d.folder === state.selectedFolder);
+        state.selectedDocumentId = folderDocs[0]?.id || documents[0]?.id || '';
+        render();
+        break;
+      }
       case 'select-document': state.selectedDocumentId = trigger.dataset.id; render(); break;
       case 'preview-document': showDocumentPreview(trigger.dataset.id); break;
       case 'download-document': downloadDocumentFormat(trigger.dataset.id||state.selectedDocumentId,'pdf'); break;
       case 'document-download-menu': showDownloadMenu(trigger,trigger.dataset.id,'document'); break;
+      case 'open-external-url': if(trigger.dataset.url) window.open(normalizeMediaUrl(trigger.dataset.url),'_blank','noopener'); break;
+      case 'download-live-document': if(trigger.dataset.url) window.open(normalizeMediaUrl(trigger.dataset.url),'_blank','noopener'); break;
       case 'report-download-menu': showDownloadMenu(trigger,trigger.dataset.id,'report'); break;
       case 'download-format': { const doc=documents.find(d=>d.id===trigger.dataset.id); if(doc) downloadDocumentFormat(doc.id,trigger.dataset.format); else { const report=reportVaultItems.find(r=>r.id===trigger.dataset.id)||reportVaultItems[0]; const rows=[['Report',report.name],['Fund',report.fund],['Period',report.period],['Version',report.version],['Status',report.status],['Owner',report.owner],['Generated',report.generated],['Pages',report.pages],['Recipients',report.recipients]]; if(trigger.dataset.format==='pdf') downloadBlob(report.name.replaceAll(' ','_')+'.pdf',createSimplePdf(report.name,rows.map(r=>r.join(': ')))); else if(trigger.dataset.format==='csv') exportCSV(report.name.replaceAll(' ','_')+'.csv',rows); else downloadBlob(report.name.replaceAll(' ','_')+'.xls',new Blob([`<table>${rows.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('')}</table>`],{type:'application/vnd.ms-excel'})); } closeOverlays(); break; }
       case 'create-folder': showCreateFolderModal(); break;
@@ -2826,7 +3611,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       case 'request-report-review': toast('Review requested','Rudo Moyo and the Investment Committee were notified.'); break;
       case 'refresh-report-data': toast('Data refreshed','Linked figures were refreshed from the prototype data model.'); break;
       case 'generate-report': navigate('report-builder'); break;
-      case 'save-settings': toast('Settings saved','Workspace preferences were saved in browser memory.'); break;
+      case 'save-settings': toast('Not saved','Workspace, security, notification and data settings are preview-only in this build and are not persisted. Role permission changes above reset on reload.','warning'); break;
       case 'configure-integration': genericDetailDrawer('Integration Configuration','Frontend prototype connector settings'); break;
       case 'ic-vote': break;
       case 'final-vote': showDecisionConfirmation(trigger.dataset.vote==='Reject'?'reject':trigger.dataset.vote==='Defer'?'defer':'approve',`${trigger.dataset.vote} investment decision`,`Nova Analytics · Series B · Investment Committee`,{'Decision':trigger.dataset.vote,'Investment':'USD 18.0M','Proposed ownership':'17.5%','Resolution':'RES-IC-2026-014','Open conditions':'3'},'Confirm vote'); state.pendingDecision.vote=trigger.dataset.vote; break;
@@ -2835,7 +3620,28 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       case 'human-review': toast('Human review requested','The application was assigned to the screening manager.','warning'); break;
       case 'screen-reject': showDecisionConfirmation('reject','Reject screening application','Nova Analytics · AI screening and human review',{'Application':'DL-013','Screening score':'86 / 100','Requested investment':'USD 18.0M','Current stage':'AI Screening'},'Confirm rejection'); break;
       case 'request-clarification': showClarificationModal(); break;
-      case 'download-application': toast('Application downloaded','The application pack was prepared as a sample PDF.'); break;
+      case 'download-application': {
+        const dp = state.dealDetail || {};
+        const app = dp.application || {};
+        if (!app.id) { toast('No application data','Open a deal with a live application record first.','warning'); break; }
+        const lines = [
+          `Business name: ${app.businessName||'—'}`,
+          `Applicant: ${app.applicantName||'—'} (${app.applicantEmail||'—'})`,
+          `Industry: ${app.industry||'—'}`,
+          `Business stage: ${app.businessStage||'—'}`,
+          `Requested amount: ${app.requestedAmount?formatMoney(Number(app.requestedAmount)):'—'}`,
+          `Current stage: ${app.currentStage||'—'}`,
+          `Deal reference: ${app.dealReference||'—'}`,
+          `Submitted: ${app.submittedAt?new Date(app.submittedAt).toLocaleString():'—'}`,
+          '',
+          'Business description:',
+          String(app.businessDescription||'—'),
+        ];
+        const base=(app.businessName||'application').replace(/[^a-z0-9-_ ]/gi,'').trim().replaceAll(' ','_')||'application';
+        downloadBlob(`${base}_application.pdf`, createSimplePdf(`${app.businessName||'Application'} — Application Summary`, lines));
+        toast('Application downloaded',`${base}_application.pdf was generated from the live application record.`);
+        break;
+      }
       case 'accept-counter': { const s=Number(trigger.dataset.section??state.termSection), c=Number(trigger.dataset.clause??state.termClause); const clause=termSheetSections[s]?.clauses[c]||termSheetSections[3].clauses[3]; showDecisionConfirmation('approve','Accept company counterproposal',`${clause.title} · ${clause.reference}`,{'Clause':clause.title,'Matanho position':clause.matanho,'Company counter':clause.company,'Source':clause.source},'Accept counter'); state.pendingDecision.term={section:s,clause:c,decision:'Agreed'}; break; }
       case 'retain-position': { const s=Number(trigger.dataset.section??state.termSection), c=Number(trigger.dataset.clause??state.termClause); const clause=termSheetSections[s]?.clauses[c]||termSheetSections[3].clauses[3]; showDecisionConfirmation('defer','Retain Matanho negotiating position',`${clause.title} · ${clause.reference}`,{'Clause':clause.title,'Current position':clause.matanho,'Company counter':clause.company,'Next action':'Return redline to company'},'Retain position'); state.pendingDecision.term={section:s,clause:c,decision:'Open'}; break; }
       case 'add-term-comment': showSimpleCommentModal('Add term sheet comment'); break;
@@ -2957,19 +3763,94 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   }
 
   function showCreateFundModal() {
-    showModal('Create fund','Set up a new private-markets fund workspace.', `<form id="createFundForm"><div class="form-grid"><div class="form-field full"><label class="required">Fund name</label><input name="name" required placeholder="Matanho Africa Growth Fund III"></div><div class="form-field"><label>Strategy</label><select name="strategy"><option>Growth Equity</option><option>Early Stage</option><option>Buyout</option><option>Climate Infrastructure</option><option>SME Growth</option></select></div><div class="form-field"><label>Vintage</label><input name="vintage" type="number" value="2026"></div><div class="form-field"><label>Currency</label><select name="currency"><option>USD</option><option>ZAR</option><option>ZWG</option><option>EUR</option></select></div><div class="form-field"><label>Target commitment</label><input name="commitment" type="number" value="200000000"></div><div class="form-field"><label>Primary geography</label><input name="geography" value="Pan-African"></div><div class="form-field"><label>Management fee</label><input name="managementFee" value="2.0%"></div><div class="form-field full"><label>Carry terms</label><input name="carry" value="20% above 8% hurdle"></div></div></form>`, `${button('Cancel','close-modal')}${button('Create fund','submit-create-fund','primary','plus')}`);
+    state.modalWizard = { kind: 'create-fund', step: 0, maxReached: 0, draft: {} };
+    renderCreateFundWizard();
+  }
+
+  function renderCreateFundWizard() {
+    const wiz = state.modalWizard || { step: 0, draft: {}, maxReached: 0 };
+    const step = Number(wiz.step || 0);
+    wiz.maxReached = Math.max(Number(wiz.maxReached || 0), step);
+    const d = wiz.draft || {};
+    const steps = ['Details', 'Ownership', 'Review'];
+    const strategyOptions = ['Growth Equity', 'Early Stage', 'Buyout', 'Climate Infrastructure', 'SME Growth', 'Private Equity'];
+    const currencyOptions = ['USD', 'ZAR', 'ZWG', 'EUR'];
+    let body = '';
+    if (step === 0) {
+      body = '<form id="createFundForm"><div class="form-grid">' +
+        '<div class="form-field full"><label class="required">Fund name</label><input type="text" name="name" required placeholder="e.g. Matanho Africa Growth Fund III" value="' + escapeHTML(d.name || '') + '"></div>' +
+        '<div class="form-field"><label class="required">Strategy</label><select name="strategy" required>' + addDealSelectOptions(strategyOptions, d.strategy, 'Select strategy') + '</select></div>' +
+        '<div class="form-field"><label>Vintage</label><input name="vintage" type="number" min="1990" max="2100" placeholder="e.g. 2026" value="' + escapeHTML(d.vintage != null && d.vintage !== '' ? String(d.vintage) : '') + '"></div>' +
+        '<div class="form-field"><label>Currency</label><select name="currency">' + addDealSelectOptions(currencyOptions, d.currency, 'Select currency') + '</select></div>' +
+        '<div class="form-field"><label class="required">Target commitment</label><input name="commitment" type="number" min="0" required placeholder="e.g. 200000000" value="' + escapeHTML(d.commitment != null && d.commitment !== '' ? String(d.commitment) : '') + '"></div>' +
+        '<div class="form-field"><label>Primary geography</label><input type="text" name="geography" placeholder="e.g. Pan-African" value="' + escapeHTML(d.geography || '') + '"></div>' +
+        '<div class="form-field full"><label>Description</label><textarea name="description" placeholder="Fund thesis and mandate summary">' + escapeHTML(d.description || '') + '</textarea></div>' +
+      '</div></form>';
+    } else if (step === 1) {
+      body = '<form id="createFundForm"><div class="form-grid">' +
+        '<div class="form-field"><label>Management fee</label><input type="text" name="managementFee" placeholder="e.g. 2.0%" value="' + escapeHTML(d.managementFee || '') + '"></div>' +
+        '<div class="form-field"><label>Carry terms</label><input type="text" name="carry" placeholder="e.g. 20% above 8% hurdle" value="' + escapeHTML(d.carry || '') + '"></div>' +
+        '<div class="form-field"><label>Minimum investment</label><input name="minInvestment" type="number" min="0" placeholder="e.g. 100000" value="' + escapeHTML(d.minInvestment != null && d.minInvestment !== '' ? String(d.minInvestment) : '') + '"></div>' +
+        '<div class="form-field"><label>Maximum investment</label><input name="maxInvestment" type="number" min="0" placeholder="e.g. 5000000" value="' + escapeHTML(d.maxInvestment != null && d.maxInvestment !== '' ? String(d.maxInvestment) : '') + '"></div>' +
+        '<div class="form-field full"><label>Focus industries</label><input type="text" name="focusIndustries" placeholder="Comma-separated, e.g. FinTech, Climate" value="' + escapeHTML(d.focusIndustries || '') + '"></div>' +
+      '</div></form>';
+    } else {
+      const rows = [
+        ['Fund name', d.name || '-'],
+        ['Strategy', d.strategy || '-'],
+        ['Vintage', d.vintage || '-'],
+        ['Currency', d.currency || '-'],
+        ['Target commitment', d.commitment ? formatMoney(Number(d.commitment)) : '-'],
+        ['Geography', d.geography || '-'],
+        ['Management fee', d.managementFee || '-'],
+        ['Carry', d.carry || '-'],
+        ['Min / max ticket', ((d.minInvestment || '-') + ' / ' + (d.maxInvestment || '-'))],
+      ].map((r) => '<div class="info-row"><span>' + escapeHTML(r[0]) + '</span><strong>' + escapeHTML(String(r[1])) + '</strong></div>').join('');
+      body = '<form id="createFundForm"><div class="form-field full">' + card('Review summary', '<div class="info-list">' + rows + '</div>') + '</div><p class="muted small">Creates a live fund via POST /funds.</p></form>';
+    }
+    const footer = step === 0
+      ? button('Cancel', 'close-modal') + button('Next', 'wizard-next', 'primary', 'arrow-right')
+      : step === 1
+        ? button('Back', 'wizard-back') + button('Next', 'wizard-next', 'primary', 'arrow-right')
+        : button('Back', 'wizard-back') + button('Create fund', 'submit-create-fund', 'primary', 'plus');
+    showModal('Create fund', step === 2 ? 'Confirm and create via POST /funds.' : 'Set up a new private-markets fund workspace.', body, footer, {
+      variant: 'wizard', size: 'lg', eyebrow: 'Fund setup', rail: steps, railStep: step, railMax: wiz.maxReached,
+    });
   }
 
   function submitCreateFund() {
     const form = $('#createFundForm');
     if (!form?.reportValidity()) return;
-    const data = Object.fromEntries(new FormData(form));
-    const fund = { id:`FUND-${String(funds.length+1).padStart(3,'0')}`, name:data.name, vintage:Number(data.vintage), strategy:data.strategy, currency:data.currency, commitment:Number(data.commitment), called:0, nav:0, distributed:0, grossIrr:0, netIrr:0, tvpi:0, dpi:0, status:'Fundraising', geography:data.geography, managementFee:data.managementFee, carry:data.carry };
-    funds.push(fund); state.selectedFundId=fund.id; closeOverlays(); toast('Fund created',`${fund.name} is ready for setup.`); state.page='fund-detail'; render();
+    captureModalWizardDraft();
+    const data = { ...(state.modalWizard && state.modalWizard.draft ? state.modalWizard.draft : {}), ...Object.fromEntries(new FormData(form)) };
+    if (state.liveData) {
+      emitIntegrationEvent('matanho:before-action', {
+        action: 'api-create-fund',
+        dataset: {
+          name: String(data.name || ''),
+          description: String(data.description || [data.strategy, data.geography, data.carry].filter(Boolean).join(' · ') || 'Created from Portfolio'),
+          totalAmount: String(data.commitment || data.totalAmount || ''),
+          minInvestment: String(data.minInvestment || ''),
+          maxInvestment: String(data.maxInvestment || ''),
+          focusIndustries: String(data.focusIndustries || data.strategy || 'Private Equity'),
+          strategy: String(data.strategy || ''),
+          vintage: String(data.vintage || ''),
+          currency: String(data.currency || ''),
+          geography: String(data.geography || ''),
+          managementFee: String(data.managementFee || ''),
+          carry: String(data.carry || ''),
+        },
+        state: typeof publicSnapshot === 'function' ? publicSnapshot().state : state,
+      }, true);
+      state.modalWizard = null;
+      return;
+    }
+    const fund = { id:`FUND-${String(funds.length+1).padStart(3,'0')}`, name:data.name, vintage:Number(data.vintage||new Date().getFullYear()), strategy:data.strategy||'Private Equity', currency:data.currency||'USD', commitment:Number(data.commitment||0), called:0, nav:0, distributed:0, grossIrr:0, netIrr:0, tvpi:0, dpi:0, status:'Fundraising', geography:data.geography||'', managementFee:data.managementFee||'', carry:data.carry||'' };
+    funds.push(fund); state.selectedFundId=fund.id; state.modalWizard=null; closeOverlays(); toast('Fund created',`${fund.name} is ready for setup.`); state.page='fund-detail'; render();
   }
 
   function showReportScheduleModal() {
-    showModal('Schedule reporting obligation','Add a recurring or one-time portfolio reporting requirement.', `<form id="reportScheduleForm"><div class="form-grid"><div class="form-field"><label class="required">Report type</label><select name="type"><option>Quarterly Fund Report</option><option>Portfolio Company Report</option><option>LP Report</option><option>Board Pack</option><option>Valuation Memo</option><option>Compliance Submission</option></select></div><div class="form-field"><label>Fund</label><select name="fund">${funds.map(f=>`<option>${escapeHTML(f.name)}</option>`).join('')}</select></div><div class="form-field"><label>Entity</label><input name="entity" value="Matanho Growth Fund II"></div><div class="form-field"><label>Owner</label><select name="owner"><option>Sarah Mitchell</option><option>James Davidson</option><option>Anita Kapoor</option><option>Laura Chen</option></select></div><div class="form-field"><label>Frequency</label><select name="frequency"><option>Quarterly</option><option>Monthly</option><option>Annual</option><option>One-time</option></select></div><div class="form-field"><label>Due date</label><input name="due" type="date" value="2026-08-31"></div><div class="form-field full"><label>Delivery channel</label><select name="channel"><option>LP Portal + Secure Email</option><option>Secure Portal</option><option>Regulatory Portal</option><option>Internal Only</option></select></div></div></form>`, `${button('Cancel','close-modal')}${button('Schedule report','submit-report-schedule','primary','calendar')}`);
+    showModal('Schedule reporting obligation','Add a recurring or one-time portfolio reporting requirement.', `<form id="reportScheduleForm"><div class="form-grid"><div class="form-field"><label class="required">Report type</label><select name="type"><option value="">Select type</option><option>Quarterly Fund Report</option><option>Portfolio Company Report</option><option>LP Report</option><option>Board Pack</option><option>Valuation Memo</option><option>Compliance Submission</option></select></div><div class="form-field"><label>Fund</label><select name="fund"><option value="">Select fund</option>${funds.map(f=>`<option value="${escapeHTML(f.name)}">${escapeHTML(f.name)}</option>`).join('')}</select></div><div class="form-field"><label>Entity</label><input name="entity" type="text" placeholder="Reporting entity"></div><div class="form-field"><label>Owner</label><input name="owner" type="text" placeholder="Report owner"></div><div class="form-field"><label>Frequency</label><select name="frequency"><option value="">Select frequency</option><option>Quarterly</option><option>Monthly</option><option>Annual</option><option>One-time</option></select></div><div class="form-field"><label>Due date</label><input name="due" type="date"></div><div class="form-field full"><label>Delivery channel</label><select name="channel"><option value="">Select channel</option><option>LP Portal + Secure Email</option><option>Secure Portal</option><option>Regulatory Portal</option><option>Internal Only</option></select></div></div></form>`, `${button('Cancel','close-modal')}${button('Schedule report','submit-report-schedule','primary','calendar')}`);
   }
 
   function submitReportSchedule() {
@@ -2985,7 +3866,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   }
 
   function showDDTaskModal() {
-    showModal('Assign due diligence task','Create a task in the selected diligence workstream.', `<form id="ddTaskForm"><div class="form-grid"><div class="form-field full"><label class="required">Task</label><input name="title" required placeholder="e.g. Verify regulatory licences"></div><div class="form-field"><label>Workstream</label><select name="workstream"><option>Financial Assessment</option><option>Market Research</option><option>Legal Compliance</option><option>Risk Assessment</option><option>Management Team Evaluation</option></select></div><div class="form-field"><label>Analyst</label><select name="analyst"><option>Tendai Moyo</option><option>Nyasha Moyo</option><option>Rudo Ndlovu</option><option>Chipo Dube</option><option>Farai Chikore</option></select></div><div class="form-field"><label>Due date</label><input name="due" type="date" value="2026-08-07"></div><div class="form-field"><label>Priority</label><select name="priority"><option>Medium</option><option>High</option><option>Low</option></select></div><div class="form-field full"><label>Evidence required</label><textarea name="evidence" placeholder="Describe the evidence needed to close this task..."></textarea></div></div></form>`, `${button('Cancel','close-modal')}${button('Assign task','submit-dd-task','primary','clipboard')}`);
+    showModal('Assign due diligence task','Create a task in the selected diligence workstream.', `<form id="ddTaskForm"><div class="form-grid"><div class="form-field full"><label class="required">Task</label><input name="title" required placeholder="e.g. Verify regulatory licences"></div><div class="form-field"><label>Workstream</label><select name="workstream"><option value="">Select workstream</option><option>Financial Assessment</option><option>Market Research</option><option>Legal Compliance</option><option>Risk Assessment</option><option>Management Team Evaluation</option></select></div><div class="form-field"><label>Analyst</label><input name="analyst" type="text" placeholder="Assignee"></div><div class="form-field"><label>Due date</label><input name="due" type="date"></div><div class="form-field"><label>Priority</label><select name="priority"><option value="">Select priority</option><option>Medium</option><option>High</option><option>Low</option></select></div><div class="form-field full"><label>Evidence required</label><textarea name="evidence" placeholder="Describe the evidence needed to close this task..."></textarea></div></div></form>`, `${button('Cancel','close-modal')}${button('Assign task','submit-dd-task','primary','clipboard')}`);
   }
 
   function submitDDTask() {
@@ -3005,8 +3886,51 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     showModal('Release first tranche','Confirm the controlled release of USD 12.0M.', `<div class="reason-item ${ready?'':'warning'}">${icon(ready?'check-circle':'alert')}<div><strong>${ready?'All conditions are complete':'Payment remains locked'}</strong><small>${ready?'Dual authorisation will still be required.':'Complete all closing conditions before release.'}</small></div></div><div class="info-list section-gap"><div class="info-row"><span>Beneficiary</span><strong>Nova Analytics (Pvt) Ltd</strong></div><div class="info-row"><span>Bank</span><strong>CBZ Bank Limited</strong></div><div class="info-row"><span>Amount</span><strong>USD 12,000,000</strong></div><div class="info-row"><span>Purpose</span><strong>Product and regional expansion</strong></div><div class="info-row"><span>Authorisation</span><strong>Two signatories required</strong></div></div>`, `${button('Cancel','close-modal')}${button('Create release request','confirm-release-tranche',ready?'primary':'','send',ready?'':'disabled')}`);
   }
 
+  function normalizeMediaUrl(url) {
+    if (!url) return url;
+    try {
+      const u = new URL(String(url));
+      const isLocalApp = typeof window !== 'undefined' && /^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname);
+      const localApiOrigin = 'http://127.0.0.1:3009';
+      if (isLocalApp && /\/api\/public-media\//.test(u.pathname) && u.origin !== localApiOrigin) {
+        return localApiOrigin + u.pathname + u.search;
+      }
+      return String(url);
+    } catch (_) { return url; }
+  }
+
+  function findLiveDocumentRaw(id) {
+    const dp = state.dealDetail || {};
+    const raw = Array.isArray(dp.documents) ? dp.documents : (Array.isArray(dp.application && dp.application.documents) ? dp.application.documents : []);
+    return raw.find(d => d && String(d.id) === String(id)) || null;
+  }
+
+  function showLiveFilePreview(rawUrl, name, meta) {
+    meta = meta || {};
+    const url = normalizeMediaUrl(rawUrl);
+    const safeName = String(name || url.split('/').pop().split('?')[0] || 'Document');
+    const isImage = /\.(png|jpe?g|gif|webp)(\?|$)/i.test(url);
+    showModal('Document Preview', meta.subtitle || 'Live document', `<div class="document-viewer"><header class="document-viewer-toolbar"><div class="document-preview-head"><span class="file-icon">${icon('file')}</span><div><strong>${escapeHTML(safeName)}</strong>${meta.uploaded?`<small>uploaded ${escapeHTML(meta.uploaded)}</small>`:''}</div></div><div class="viewer-controls">${button('Open in new tab','open-external-url','ghost compact','eye',`data-url="${escapeHTML(url)}"`)}${button('Download','download-live-document','ghost compact','download',`data-url="${escapeHTML(url)}" data-name="${escapeHTML(safeName)}"`)}</div></header><div class="document-viewer-main"><main>${isImage?`<div style="padding:24px;text-align:center;background:#f4f6f9;border-radius:8px"><img src="${escapeHTML(url)}" style="max-width:100%;max-height:75vh;border-radius:8px" alt="${escapeHTML(safeName)}"></div>`:`<iframe src="${escapeHTML(url)}" style="width:100%;height:75vh;border:0;border-radius:8px;background:#fff" title="${escapeHTML(safeName)}"></iframe>`}</main>${meta.aside?`<aside class="document-inspector"><div class="info-list">${meta.aside}</div></aside>`:''}</div></div>`,
+      `${button('Open in new tab','open-external-url','','eye',`data-url="${escapeHTML(url)}"`)}${button('Download','download-live-document','primary','download',`data-url="${escapeHTML(url)}" data-name="${escapeHTML(safeName)}"`)}${button('Close','close-modal','')}`,
+      {variant:'document',size:'fullscreen',eyebrow:'Live document'});
+  }
+
   function showDocumentPreview(id) {
-    const doc=documents.find(d=>d.id===id)||documents[0]; state.selectedDocumentId=doc.id;
+    if (/^https?:\/\//i.test(String(id||''))) {
+      showLiveFilePreview(String(id), null, {subtitle:'Application document'});
+      return;
+    }
+    const liveDoc = findLiveDocumentRaw(id);
+    if (liveDoc && liveDoc.fileUrl) {
+      const name = liveDoc.fileName || liveDoc.name || 'Document';
+      const uploaded = liveDoc.uploadedAt ? new Date(liveDoc.uploadedAt).toLocaleString() : '';
+      const aside = `<div class="info-row"><span>Type</span><strong>${escapeHTML(String(liveDoc.documentType||'FILE'))}</strong></div><div class="info-row"><span>Uploaded by</span><strong>${escapeHTML(String(liveDoc.uploadedBy||liveDoc.owner||'—'))}</strong></div><div class="info-row"><span>Status</span><strong>${escapeHTML(String(liveDoc.status||(liveDoc.isSubmitted?'Submitted':'—')))}</strong></div>`;
+      showLiveFilePreview(liveDoc.fileUrl, name, {subtitle:`${liveDoc.documentType||''} · ${liveDoc.version||'v1.0'} · ${liveDoc.status||''}`, uploaded, aside});
+      return;
+    }
+    const doc=documents.find(d=>d.id===id)||documents[0];
+    if (!doc) { toast('No document available','This deal has no documents on file yet.','warning'); return; }
+    state.selectedDocumentId=doc.id;
     showModal('Document Preview',`${doc.folder} · ${doc.version} · ${doc.status}`,`<div class="document-viewer"><header class="document-viewer-toolbar"><div class="document-preview-head"><span class="file-icon">${icon(doc.type==='XLSX'?'bar-chart':'file')}</span><div><strong>${escapeHTML(doc.name)}</strong><small>${escapeHTML(doc.type)} · ${escapeHTML(doc.size)} · uploaded ${escapeHTML(doc.uploaded)}</small></div></div><div class="viewer-controls">${button('Edit ledger','edit-document-ledger','ghost compact','list',`data-id="${doc.id}"`)}${button('100%','document-zoom','ghost compact')}${button('Download','document-download-menu','ghost compact','download',`data-id="${doc.id}"`)}</div></header><div class="document-viewer-main"><main>${documentPreviewBody(doc)}</main><aside class="document-inspector"><div class="inspector-tabs"><button class="active">Details</button><button>Versions</button><button>Activity</button></div><div class="info-list"><div class="info-row"><span>Owner</span><strong>${escapeHTML(doc.owner)}</strong></div><div class="info-row"><span>Access</span><strong>${escapeHTML(doc.access)}</strong></div><div class="info-row"><span>Classification</span><strong>${escapeHTML(doc.classification)}</strong></div><div class="info-row"><span>Retention</span><strong>${escapeHTML(doc.retention)}</strong></div><div class="info-row"><span>Signature</span><strong>${statusPill(doc.signatureStatus)}</strong></div><div class="info-row"><span>Source reference</span><strong>${doc.id}-SRC-${doc.version.replace('.','')}</strong></div><div class="info-row"><span>Checksum</span><strong>71dc…b98f</strong></div></div><div class="reason-item section-gap">${icon('shield')}<div><strong>Editable controlled preview</strong><small>Content edits remain local until saved as a new version. Preview, export, signature and permission activity is logged.</small></div></div>${doc.signatureStatus!=='Not required'?`<div class="section-gap">${button(doc.id==='DOC-009'?'Sign term sheet':'Open Signature Studio',doc.id==='DOC-009'?'sign-term-sheet':'open-signature-studio','primary','edit',`data-id="${doc.id}"`)}</div>`:''}</aside></div></div>`,`${button('Edit ledger','edit-document-ledger','','list',`data-id="${doc.id}"`)}${button('Download PDF','download-format','','file',`data-id="${doc.id}" data-format="pdf"`)}${button('Excel','download-format','','bar-chart',`data-id="${doc.id}" data-format="xls"`)}${button('CSV','download-format','','list',`data-id="${doc.id}" data-format="csv"`)}${button('Close','close-modal','primary')}`,{variant:'document',size:'fullscreen',eyebrow:'Secure document vault'});
   }
 
@@ -3023,11 +3947,11 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   }
 
   function showRequestDocumentModal() {
-    showModal('Request document','Send a secure document request to the applicant.', `<form id="requestDocumentForm"><div class="form-grid"><div class="form-field full"><label class="required">Document requested</label><input name="document" required placeholder="e.g. Audited Financial Statements FY2025"></div><div class="form-field"><label>Request owner</label><select name="owner"><option>Nyasha Moyo</option><option>Tendai Moyo</option><option>Farai Chikore</option></select></div><div class="form-field"><label>Due date</label><input name="due" type="date" value="2026-08-07"></div><div class="form-field full"><label>Instructions</label><textarea name="instructions">Please upload the latest signed version through the secure application portal.</textarea></div></div></form>`, `${button('Cancel','close-modal')}${button('Send request','submit-document-request','primary','send')}`);
+    showModal('Request document','Send a secure document request to the applicant.', `<form id="requestDocumentForm"><div class="form-grid"><div class="form-field full"><label class="required">Document requested</label><input name="document" required placeholder="e.g. Audited Financial Statements FY2025"></div><div class="form-field"><label>Request owner</label><input name="owner" type="text" placeholder="Owner name"></div><div class="form-field"><label>Due date</label><input name="due" type="date"></div><div class="form-field full"><label>Instructions</label><textarea name="instructions" placeholder="Upload guidance for the applicant…"></textarea></div></div></form>`, `${button('Cancel','close-modal')}${button('Send request','submit-document-request','primary','send')}`);
   }
 
   function showClarificationModal() {
-    showModal('Request clarification','Ask the applicant to clarify information in the submitted application.', `<form id="clarificationForm"><div class="form-field"><label>Application section</label><select><option>Financial Information</option><option>Business & Market</option><option>Ownership & Governance</option><option>Funding Request</option><option>Impact & ESG</option></select></div><div class="form-field section-gap"><label class="required">Question</label><textarea required style="min-height:150px">Please provide additional detail supporting the customer-concentration assumptions and upload the latest top-ten customer schedule.</textarea></div><label class="checkbox-row section-gap"><input type="checkbox" checked> Notify applicant by secure email</label></form>`, `${button('Cancel','close-modal')}${button('Send clarification','submit-clarification','primary','send')}`);
+    showModal('Request clarification','Ask the applicant to clarify information in the submitted application.', `<form id="clarificationForm"><div class="form-field"><label>Application section</label><select name="section"><option value="">Select section</option><option>Financial Information</option><option>Business & Market</option><option>Ownership & Governance</option><option>Funding Request</option><option>Impact & ESG</option></select></div><div class="form-field section-gap"><label class="required">Question</label><textarea name="question" required style="min-height:150px" placeholder="Write the clarification request…"></textarea></div><label class="checkbox-row section-gap"><input type="checkbox" name="notify" checked> Notify applicant by secure email</label></form>`, `${button('Cancel','close-modal')}${button('Send clarification','submit-clarification','primary','send')}`);
   }
 
   function showSimpleCommentModal(title) {
@@ -3036,13 +3960,23 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
 
   function showFundEditModal() {
     const fund=funds.find(f=>f.id===state.selectedFundId)||funds[0];
-    showModal('Edit fund',fund.name, `<form id="fundEditForm"><div class="form-grid"><div class="form-field full"><label>Fund name</label><input name="name" value="${escapeHTML(fund.name)}"></div><div class="form-field"><label>Status</label><select name="status"><option ${fund.status==='Investing'?'selected':''}>Investing</option><option ${fund.status==='Fundraising'?'selected':''}>Fundraising</option><option ${fund.status==='Realising'?'selected':''}>Realising</option><option>Closed</option></select></div><div class="form-field"><label>Strategy</label><input name="strategy" value="${escapeHTML(fund.strategy)}"></div><div class="form-field"><label>Primary geography</label><input name="geography" value="${escapeHTML(fund.geography)}"></div><div class="form-field"><label>Management fee</label><input name="managementFee" value="${escapeHTML(fund.managementFee)}"></div><div class="form-field full"><label>Carry terms</label><input name="carry" value="${escapeHTML(fund.carry)}"></div></div></form>`, `${button('Cancel','close-modal')}${button('Save changes','submit-fund-edit','primary','save')}`);
+    showModal('Edit fund',fund.name, `<form id="fundEditForm"><input type="hidden" name="fundId" value="${escapeHTML(fund.id)}"><div class="form-grid"><div class="form-field full"><label>Fund name</label><input name="name" value="${escapeHTML(fund.name)}"></div><div class="form-field"><label>Status</label><select name="status"><option ${fund.status==='Investing'?'selected':''}>Investing</option><option ${fund.status==='Fundraising'?'selected':''}>Fundraising</option><option ${fund.status==='Realising'?'selected':''}>Realising</option><option>Closed</option></select></div><div class="form-field"><label>Strategy</label><input name="strategy" value="${escapeHTML(fund.strategy)}" readonly title="Strategy is set from focus industries at fund creation"></div><div class="form-field"><label>Primary geography</label><input name="geography" value="${escapeHTML(fund.geography==='—'?'':fund.geography)}"></div><div class="form-field"><label>Management fee</label><input name="managementFee" value="${escapeHTML(fund.managementFee==='—'?'':fund.managementFee)}" placeholder="e.g. 2.0%"></div><div class="form-field full"><label>Carry terms</label><input name="carry" value="${escapeHTML(fund.carry==='—'?'':fund.carry)}" placeholder="e.g. 20% above 8% hurdle"></div></div></form>`, `${button('Cancel','close-modal')}${button('Save changes','submit-fund-edit','primary','save')}`);
   }
 
   function submitFundEdit() {
     const form=$('#fundEditForm'); if(!form?.reportValidity()) return;
     const fund=funds.find(f=>f.id===state.selectedFundId)||funds[0];
-    const data=Object.fromEntries(new FormData(form)); Object.assign(fund,data);
+    const data=Object.fromEntries(new FormData(form));
+    if (state.liveData) {
+      emitIntegrationEvent('matanho:before-action', {
+        action: 'api-update-fund',
+        dataset: { fundId: fund.id, name: String(data.name||''), status: String(data.status||''), geography: String(data.geography||''), managementFee: String(data.managementFee||''), carry: String(data.carry||'') },
+        state: typeof publicSnapshot === 'function' ? publicSnapshot().state : state,
+      }, true);
+      closeOverlays();
+      return;
+    }
+    Object.assign(fund,data);
     closeOverlays(); toast('Fund updated',`${fund.name} was updated.`); render();
   }
 
@@ -3057,7 +3991,11 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       case 'reconciliation-period': state.reconciliationPeriod=target.value; render(); break;
       case 'report-vault-fund': state.reportFilterFund=target.value; render(); break;
       case 'report-vault-status': state.reportFilterStatus=target.value; render(); break;
-      case 'term-version-filter': case 'term-status-filter': case 'term-owner-filter': case 'reconciliation-status-filter': case 'reconciliation-amount-filter': case 'expanded-recon-date': case 'expanded-recon-status': case 'expanded-recon-tolerance': case 'report-vault-type': case 'report-vault-period': case 'mailer-type-filter': case 'mailer-status-filter': case 'mailer-channel-filter': case 'dashboard-fund-filter': case 'dashboard-period-filter': case 'dashboard-currency-filter': case 'dashboard-geography-filter': case 'deal-fund-filter': case 'deal-stage-filter': case 'deal-owner-filter': case 'deal-age-filter': case 'fund-vintage-filter': case 'fund-strategy-filter': case 'fund-status-filter': case 'fund-currency-filter': toast('Filter updated',target.value); softFocus(target.closest('.workspace-filter-bar')||target); break;
+      case 'fund-vintage-filter': state.fundVintageFilter=target.value; render(); break;
+      case 'fund-strategy-filter': state.fundStrategyFilter=target.value; render(); break;
+      case 'fund-status-filter': state.fundStatusFilter=target.value; render(); break;
+      case 'fund-currency-filter': state.fundCurrencyFilter=target.value; render(); break;
+      case 'term-version-filter': case 'term-status-filter': case 'term-owner-filter': case 'reconciliation-status-filter': case 'reconciliation-amount-filter': case 'expanded-recon-date': case 'expanded-recon-status': case 'expanded-recon-tolerance': case 'report-vault-type': case 'report-vault-period': case 'mailer-type-filter': case 'mailer-status-filter': case 'mailer-channel-filter': case 'dashboard-fund-filter': case 'dashboard-period-filter': case 'dashboard-currency-filter': case 'dashboard-geography-filter': case 'deal-fund-filter': case 'deal-stage-filter': case 'deal-owner-filter': case 'deal-age-filter': toast('Filter updated',target.value); softFocus(target.closest('.workspace-filter-bar')||target); break;
       case 'ic-vote': state.dealVote[target.dataset.member]=target.value; toast('Vote updated',`${target.dataset.member}: ${target.value}`); render(); break;
       default: toast('Selection updated',target.value || 'Value changed');
     }
@@ -3094,6 +4032,11 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     if(target.dataset.changeAction) handleChangeAction(target.dataset.changeAction,target);
     if(target.dataset.fileAction==='upload-document') uploadDocuments(target.files);
     if(target.dataset.fileAction==='upload-bank-statement') uploadBankStatement(target.files);
+    if(target.dataset.fileAction==='upload-fund-document'&&target.files?.[0]){
+      const fund=funds.find(f=>f.id===state.selectedFundId)||funds[0];
+      if (state.liveData && fund) window.dispatchEvent(new CustomEvent('matanho:upload-fund-document', { detail: { fundId: fund.id, file: target.files[0], category: target.dataset.category||'General' } }));
+      target.value='';
+    }
   }, __pv11Sig);
 
   document.addEventListener('input', event => {
@@ -3347,14 +4290,25 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   const v8ShowModal=showModal;
   showModal=function(title,subtitle,body,footer='',options={}){
     const variant=options.variant||overlayVariant(title,'modal'); const size=options.size||(/document|signature|reconciliation|import/.test(variant)?'xl':/wizard|approval|operations/.test(variant)?'lg':'md'); const railItems=options.rail||({wizard:['Details','Ownership','Review'],approval:['Impact','Evidence','Approval'],operations:['Context','Controls','Action'],compose:['Message','Recipients','Delivery'],inspector:['Properties','Permissions','Audit']}[variant]||[]);
+    const railStep = Number(options.railStep != null ? options.railStep : 0);
+    const railMax = Number(options.railMax != null ? options.railMax : railStep);
+    const wizardMode = Boolean(state.modalWizard) && (options.variant === 'wizard' || /investment opportunity|term sheet/i.test(String(title||'')));
     state.modal={title,variant};
-    modalLayer.innerHTML=`<section class="modal modal-${variant} modal-${size}" role="dialog" aria-modal="true" aria-label="${escapeHTML(title)}">${railItems.length?`<aside class="modal-rail"><span class="modal-rail-icon">${icon(options.icon||({wizard:'plus',approval:'shield',operations:'refresh',compose:'send',inspector:'settings'}[variant]||'file'))}</span><strong>${escapeHTML(options.eyebrow||variant.replaceAll('-',' '))}</strong>${railItems.map((item,index)=>`<button class="modal-rail-step ${index===0?'active':''}" data-action="modal-rail-step" data-step="${index}"><b>${index+1}</b>${escapeHTML(item)}</button>`).join('')}</aside>`:''}<div class="modal-main"><div class="modal-head"><div><span class="overlay-eyebrow">${escapeHTML(options.eyebrow||variant.replaceAll('-',' '))}</span><h2>${escapeHTML(title)}</h2>${subtitle?`<p>${escapeHTML(subtitle)}</p>`:''}</div><div class="modal-window-controls"><button class="icon-button" data-action="modal-toggle-size" aria-label="Toggle popup size" title="Toggle popup size">${icon('maximize')}</button><button class="icon-button" data-action="close-modal" aria-label="Close popup">${icon('x')}</button></div></div><div class="modal-body">${body}</div>${footer?`<div class="modal-foot">${footer}</div>`:''}</div></section>`;
+    modalLayer.innerHTML='<section class="modal modal-' + variant + ' modal-' + size + '" role="dialog" aria-modal="true" aria-label="' + escapeHTML(title) + '">' + (railItems.length ? ('<aside class="modal-rail"><span class="modal-rail-icon">' + icon(options.icon||({wizard:'plus',approval:'shield',operations:'refresh',compose:'send',inspector:'settings'}[variant]||'file')) + '</span><strong>' + escapeHTML(options.eyebrow||variant.replaceAll('-',' ')) + '</strong>' + railItems.map((item,index) => {
+      const active = index === railStep ? 'active' : '';
+      const done = index < railStep ? 'done' : '';
+      const clickable = wizardMode ? index <= railMax : true;
+      const action = wizardMode ? 'wizard-step' : 'modal-rail-step';
+      return clickable
+        ? '<button type="button" class="modal-rail-step ' + active + ' ' + done + '" data-action="' + action + '" data-step="' + index + '"><b>' + (index + 1) + '</b>' + escapeHTML(item) + '</button>'
+        : '<span class="modal-rail-step ' + active + ' ' + done + '"><b>' + (index + 1) + '</b>' + escapeHTML(item) + '</span>';
+    }).join('') + '</aside>') : '') + '<div class="modal-main"><div class="modal-head"><div><span class="overlay-eyebrow">' + escapeHTML(options.eyebrow||variant.replaceAll('-',' ')) + '</span><h2>' + escapeHTML(title) + '</h2>' + (subtitle ? ('<p>' + escapeHTML(subtitle) + '</p>') : '') + '</div><div class="modal-window-controls"><button class="icon-button" data-action="modal-toggle-size" aria-label="Toggle popup size" title="Toggle popup size">' + icon('maximize') + '</button><button class="icon-button" data-action="close-modal" aria-label="Close popup">' + icon('x') + '</button></div></div><div class="modal-body">' + body + '</div>' + (footer ? ('<div class="modal-foot">' + footer + '</div>') : '') + '</div></section>';
     modalLayer.classList.add('visible'); scrim.classList.add('visible'); renderStaticIcons(modalLayer); requestAnimationFrame(()=>$('input,select,textarea,button',modalLayer)?.focus());
   };
 
   showMailerListDrawer=function(id){
     const list=mailerLists.find(item=>item.id===id)||mailerLists[0]; state.selectedMailerListId=list.id; const people=v9GetMailerPeople(list.id);
-    showDrawer(list.name,`${list.id} · ${list.members} members · ${list.status}`,`<section class="drawer-section mailer-hero"><div><span>${icon('mail')}</span><div><strong>${list.members} recipients</strong><small>${escapeHTML(list.description)}</small></div></div>${statusPill(list.status)}</section><section class="drawer-section"><div class="section-heading-with-action"><h3>Audience rules</h3>${button('Manage people','manage-mailer-people','compact','users',`data-id="${list.id}"`)}</div><div class="info-list"><div class="info-row"><span>Source</span><strong>${escapeHTML(list.source)}</strong></div><div class="info-row"><span>Funds</span><strong>${escapeHTML(list.funds.join(', '))}</strong></div><div class="info-row"><span>Channels</span><strong>${escapeHTML(list.channels.join(', '))}</strong></div><div class="info-row"><span>Consent / authority</span><strong>${escapeHTML(list.consent)}</strong></div><div class="info-row"><span>Owner</span><strong>${escapeHTML(list.owner)}</strong></div><div class="info-row"><span>Last refreshed</span><strong>${escapeHTML(list.updated)}</strong></div></div></section><section class="drawer-section"><h3>Recipient health</h3>${donutChart([{label:'Active',value:list.active,color:'var(--emerald)',display:String(list.active)},{label:'Pending',value:list.pending,color:'var(--amber)',display:String(list.pending)},{label:'Bounced',value:list.bounced,color:'var(--red)',display:String(list.bounced)}],String(list.members),'Recipients',145)}</section><section class="drawer-section"><div class="section-heading-with-action"><h3>Managed people</h3><span class="table-badge">${people.length} shown</span></div><div class="recipient-mini-list">${people.slice(0,5).map(person=>`<button data-action="mailer-member-detail" data-list-id="${list.id}" data-person-id="${person.id}">${avatar(person.name,1)}<span><strong>${escapeHTML(person.name)}</strong><small>${escapeHTML(person.role)} · ${escapeHTML(person.email)}</small></span>${statusPill(person.status,person.status==='Verified'?'success':'warning')}</button>`).join('')}</div>${button('Open full people register','manage-mailer-people','primary compact','users',`data-id="${list.id}"`)}</section><section class="drawer-section"><h3>Recent campaigns</h3><div class="case-timeline"><div><span></span><strong>Q2 2026 Investor Report</strong><small>31 Jul 2026 · 97.4% delivered</small><p>Audience snapshot retained with campaign evidence.</p></div><div><span></span><strong>Annual Meeting Save the Date</strong><small>12 Jul 2026 · 94.7% opened</small><p>Approved communication authority applied.</p></div></div></section>`,`${button('Export audience','export-mailer-list','','download',`data-id="${list.id}"`)}${button('Manage people','manage-mailer-people','','users',`data-id="${list.id}"`)}${button('Create campaign','mailer-new-campaign','primary','send',`data-id="${list.id}"`)}`,{variant:'record',icon:'mail',eyebrow:'Mailer list'});
+    showDrawer(list.name,`${list.id} · ${list.members} members · ${list.status}`,`<section class="drawer-section mailer-hero"><div><span>${icon('mail')}</span><div><strong>${list.members} recipients</strong><small>${escapeHTML(list.description||list.source||'')}</small></div></div>${statusPill(list.status)}</section><section class="drawer-section"><div class="section-heading-with-action"><h3>Audience rules</h3>${button('Manage people','manage-mailer-people','compact','users',`data-id="${list.id}"`)}</div><div class="info-list"><div class="info-row"><span>Source</span><strong>${escapeHTML(list.source)}</strong></div><div class="info-row"><span>Funds</span><strong>${escapeHTML((list.funds||[]).join(', '))}</strong></div><div class="info-row"><span>Channels</span><strong>${escapeHTML((list.channels||['Email']).join(', '))}</strong></div><div class="info-row"><span>Consent / authority</span><strong>${escapeHTML(list.consent)}</strong></div><div class="info-row"><span>Owner</span><strong>${escapeHTML(list.owner||'—')}</strong></div><div class="info-row"><span>Last refreshed</span><strong>${escapeHTML(list.updated)}</strong></div></div></section><section class="drawer-section"><h3>Recipient health</h3>${donutChart([{label:'Active',value:list.active,color:'var(--emerald)',display:String(list.active)},{label:'Pending',value:list.pending,color:'var(--amber)',display:String(list.pending)},{label:'Bounced',value:list.bounced,color:'var(--red)',display:String(list.bounced)}],String(list.members),'Recipients',145)}</section><section class="drawer-section"><div class="section-heading-with-action"><h3>Managed people</h3><span class="table-badge">${people.length} shown</span></div><div class="recipient-mini-list">${people.slice(0,5).map(person=>`<button data-action="mailer-member-detail" data-list-id="${list.id}" data-person-id="${person.id}">${avatar(person.name,1)}<span><strong>${escapeHTML(person.name)}</strong><small>${escapeHTML(person.role)} · ${escapeHTML(person.email)}</small></span>${statusPill(person.status,person.status==='Verified'?'success':'warning')}</button>`).join('')}</div>${button('Open full people register','manage-mailer-people','primary compact','users',`data-id="${list.id}"`)}</section><section class="drawer-section"><h3>Recent campaigns</h3><div class="case-timeline"><div><span></span><strong>Q2 2026 Investor Report</strong><small>31 Jul 2026 · 97.4% delivered</small><p>Audience snapshot retained with campaign evidence.</p></div><div><span></span><strong>Annual Meeting Save the Date</strong><small>12 Jul 2026 · 94.7% opened</small><p>Approved communication authority applied.</p></div></div></section>`,`${button('Export audience','export-mailer-list','','download',`data-id="${list.id}"`)}${button('Manage people','manage-mailer-people','','users',`data-id="${list.id}"`)}${button('Create campaign','mailer-new-campaign','primary','send',`data-id="${list.id}"`)}`,{variant:'record',icon:'mail',eyebrow:'Mailer list'});
   };
 
   const v8ShowReportPreview=showReportPreview;
@@ -3415,7 +4369,52 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   handleAction=function(action,trigger,event){
     switch(action){
       case 'modal-toggle-size': { const modal=$('.modal',modalLayer); if(modal){modal.classList.toggle('modal-user-expanded'); const buttonNode=trigger; buttonNode.innerHTML=icon(modal.classList.contains('modal-user-expanded')?'x':'maximize');} return; }
-      case 'modal-rail-step': { $$('.modal-rail-step',modalLayer).forEach(node=>node.classList.toggle('active',node===trigger)); const sections=$$('.modal-body > section,.modal-body > form > section',modalLayer); const target=sections[Number(trigger.dataset.step)]; target?.scrollIntoView({behavior:'smooth',block:'start'}); return; }
+      case 'wizard-step': {
+        const step = Number(trigger.dataset.step || 0);
+        if (state.modalWizard) {
+          captureModalWizardDraft();
+          if (step > (state.modalWizard.maxReached || 0)) return;
+          state.modalWizard.step = step;
+          renderModalWizard();
+        }
+        return;
+      }
+      case 'wizard-next': {
+        if (state.modalWizard) {
+          const formId = modalWizardFormId(state.modalWizard.kind);
+          const form = document.getElementById(formId);
+          if (form && !form.reportValidity()) return;
+          captureModalWizardDraft();
+          state.modalWizard.step = Math.min(modalWizardMaxStep(), (state.modalWizard.step || 0) + 1);
+          state.modalWizard.maxReached = Math.max(state.modalWizard.maxReached || 0, state.modalWizard.step);
+          renderModalWizard();
+        }
+        return;
+      }
+      case 'wizard-back': {
+        if (state.modalWizard) {
+          captureModalWizardDraft();
+          state.modalWizard.step = Math.max(0, (state.modalWizard.step || 0) - 1);
+          renderModalWizard();
+        }
+        return;
+      }
+      case 'modal-rail-step': {
+        if (state.modalWizard) {
+          const step = Number(trigger.dataset.step || 0);
+          captureModalWizardDraft();
+          if (step <= (state.modalWizard.maxReached || 0)) {
+            state.modalWizard.step = step;
+            renderModalWizard();
+          }
+          return;
+        }
+        $('.modal-rail-step',modalLayer).forEach(node=>node.classList.toggle('active',node===trigger));
+        const sections=$('.modal-body > section,.modal-body > form > section',modalLayer);
+        const target=sections[Number(trigger.dataset.step)];
+        target?.scrollIntoView({behavior:'smooth',block:'start'});
+        return;
+      }
       case 'edit-letterhead': v9SaveCurrentReportSection(); v9ShowLetterheadEditor(); return;
       case 'save-letterhead': v9SaveLetterhead(); return;
       case 'reset-letterhead': Object.assign(v9Letterhead,{organisation:'Matanho Capital',product:'Investment Management ERP',address:'4th Floor, Matanho House · Harare, Zimbabwe',email:'investor-relations@matanho.com',phone:'+263 77 245 8890',website:'www.matanho.com',footer:'Private and confidential · Prepared for authorised recipients only',accent:'#2563eb',logoScale:'medium',alignment:'left',showLogo:true,showAddress:true,showFooter:true,logoDataUrl:''}); v9ShowLetterheadEditor(); return;
@@ -3571,32 +4570,43 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
 
   function v10RenderFundReportingContent(fund,view) {
     const fundCompanies = companies.filter(company=>company.fund===fund.name);
-    const visibleCompanies = fundCompanies.length ? fundCompanies : companies.slice(0,5);
-    const totalFV = sum(visibleCompanies,company=>company.fairValue) || 1;
+    const totalFV = sum(fundCompanies,company=>company.fairValue);
+    const fundCalls = capitalCalls.filter(c=>c.fund===fund.name);
+    const snapshots = (state.fundPerformanceSnapshots && state.fundPerformanceSnapshots[fund.id]) || [];
+    const irrSnapshots = snapshots.filter(s=>s.grossIrr!=null);
+    const latestGrossIrr = irrSnapshots.length ? Number(irrSnapshots[irrSnapshots.length-1].grossIrr)*100 : null;
     if (view === 'Cash Flows') {
-      const rows = [
-        ['04 Apr 2026','Capital call receipt','LP collection account','Contribution',25000000,'Reconciled'],
-        ['29 Apr 2026','Follow-on investment','Nova Analytics','Investment',-12000000,'Posted'],
-        ['18 May 2026','Fund expense','Legal and advisory','Expense',-6100000,'Approved'],
-        ['16 Jun 2026','Realisation proceeds','GreenOrbit Energy','Distribution',37000000,'Distributed'],
-        ['30 Jun 2026','Management fee','Matanho Capital','Fee',-1500000,'Approved']
-      ];
-      return `<section class="grid cols-2">${card('Contributions and Distributions',barChart({labels:['Q2 2025','Q3 2025','Q4 2025','Q1 2026','Q2 2026'],series:[{name:'Contributions',color:'var(--blue)',values:[62,79,88,94,105]},{name:'Distributions',color:'var(--emerald)',values:[18,52,24,68,37]}],height:310,yLabel:'USD millions',format:value=>`${Math.round(value)}M`}),{subtitle:'Quarterly investor cash flows'})}${card('Net Cash-Flow and NAV Bridge',waterfallChart([{label:'Opening NAV',value:151200000,total:true},{label:'Contributions',value:25600000},{label:'Distributions',value:-19800000},{label:'Fees & expenses',value:-6100000},{label:'Value movement',value:17500000},{label:'Closing NAV',value:168400000,total:true}]),{subtitle:'Click any bridge component for source detail'})}</section><section class="card table-card section-gap"><div class="table-toolbar"><div><h3>Fund Cash-Flow Ledger</h3><p>Prefilled from approved source events, with type and reconciliation status.</p></div><div class="table-tools">${button('Filters','report-filters','compact','filter')}${button('Export cash flows','export-performance','compact','download')}</div></div><div class="table-wrap"><table><thead><tr><th>Date</th><th>Event</th><th>Entity / counterparty</th><th>Classification</th><th class="text-right">Amount</th><th>Status</th><th></th></tr></thead><tbody>${rows.map(row=>`<tr class="clickable" data-action="activity-open-metadata" data-context="cash-flow" data-id="${escapeHTML(row[1])}"><td>${row[0]}</td><td class="table-primary">${row[1]}</td><td>${row[2]}</td><td>${row[3]}</td><td class="text-right ${row[4]<0?'negative':'positive'}">${formatMoney(row[4])}</td><td>${statusPill(row[5])}</td><td>${icon('chevron-right')}</td></tr>`).join('')}</tbody></table></div></section>`;
+      return `<section class="card table-card"><div class="table-toolbar"><div><h3>Fund Capital Calls</h3><p>Real capital-call notices and collection status for this fund.</p></div><div class="table-tools">${button('Filters','report-filters','compact','filter')}${button('Export cash flows','export-performance','compact','download')}</div></div>${fundCalls.length?`<div class="table-wrap"><table><thead><tr><th>Reference</th><th>Call Date</th><th>Due Date</th><th>Purpose</th><th class="text-right">Amount</th><th class="text-right">Collected</th><th>Status</th></tr></thead><tbody>${fundCalls.map(call=>`<tr class="clickable" data-action="open-capital-call" data-id="${call.id}"><td class="table-primary brand-text">${call.id}</td><td>${call.callDate}</td><td>${call.dueDate}</td><td>${escapeHTML(call.purpose)}</td><td class="text-right">${formatMoney(call.amount)}</td><td class="text-right">${formatMoney(call.collected)}</td><td>${statusPill(call.status)}</td></tr>`).join('')}</tbody></table></div>`:`<div class="empty-state compact">${icon('send')}<strong>No capital calls issued for this fund yet</strong></div>`}</section>`;
     }
     if (view === 'Portfolio') {
       const sectorMap = {};
-      visibleCompanies.forEach(company=>sectorMap[company.sector]=(sectorMap[company.sector]||0)+company.fairValue);
-      const sectorSegments = Object.entries(sectorMap).map(([label,value],index)=>({label,value,color:['#2475f5','#0ba780','#60a5fa','#f29a1f','#dc3f72','#0c879f'][index%6],display:pct(value/totalFV*100)}));
-      return `<section class="grid cols-2">${card('Fair Value by Sector',donutChart(sectorSegments,formatMoney(totalFV),'Portfolio fair value',158),{subtitle:'Current approved valuation'})}${card('Portfolio Operating Trend',lineChart({labels:['Q2 2025','Q3 2025','Q4 2025','Q1 2026','Q2 2026'],series:[{name:'Revenue growth',color:'var(--blue)',values:[18,21,24,26,29]},{name:'EBITDA growth',color:'var(--emerald)',values:[11,14,16,19,23]}],height:310,yLabel:'Percent',format:value=>`${Math.round(value)}%`}),{subtitle:'Weighted portfolio indicators'})}</section><section class="card table-card section-gap"><div class="table-toolbar"><div><h3>Investment-Level Performance</h3><p>Cost, fair value, MOIC, operating momentum and monitoring status.</p></div>${button('Portfolio filters','company-filters','compact','filter')}</div><div class="table-wrap"><table><thead><tr><th>Company</th><th>Sector</th><th class="text-right">Invested</th><th class="text-right">Fair value</th><th class="text-right">MOIC</th><th class="text-right">Ownership</th><th class="text-right">Revenue growth</th><th>Health</th></tr></thead><tbody>${visibleCompanies.map(company=>`<tr class="clickable" data-action="open-company" data-id="${company.id}"><td class="table-primary">${escapeHTML(company.name)}</td><td>${escapeHTML(company.sector)}</td><td class="text-right">${formatMoney(company.invested)}</td><td class="text-right">${formatMoney(company.fairValue)}</td><td class="text-right">${(company.fairValue/company.invested).toFixed(2)}x</td><td class="text-right">${pct(company.ownership)}</td><td class="text-right positive">${pct(company.revenueGrowth)}</td><td>${statusPill(company.health>=75?'On track':company.health>=65?'Watch':'Attention')}</td></tr>`).join('')}</tbody></table></div></section>`;
+      fundCompanies.forEach(company=>sectorMap[company.sector]=(sectorMap[company.sector]||0)+company.fairValue);
+      const sectorSegments = totalFV ? Object.entries(sectorMap).map(([label,value],index)=>({label,value,color:['#2475f5','#0ba780','#60a5fa','#f29a1f','#dc3f72','#0c879f'][index%6],display:pct(value/totalFV*100)})) : [];
+      return `<section class="grid cols-2">${card('Fair Value by Sector',sectorSegments.length?donutChart(sectorSegments,formatMoney(totalFV),'Portfolio fair value',158):`<div class="empty-state compact">${icon('pie-chart')}<strong>No holdings recorded for this fund yet</strong></div>`,{subtitle:'Current approved valuation'})}${card('Weighted Revenue Growth',fundCompanies.length?`<div class="empty-state compact" style="padding:24px 0"><strong style="font-size:28px">${pct(sum(fundCompanies,c=>c.revenueGrowth*c.fairValue)/Math.max(1,totalFV))}</strong><p class="muted small">Weighted by fair value across ${fundCompanies.length} holding${fundCompanies.length===1?'':'s'}</p></div>`:`<div class="empty-state compact">${icon('trend-up')}<strong>No holdings recorded for this fund yet</strong></div>`,{subtitle:'Real revenue-growth field, weighted by holding'})}</section><section class="card table-card section-gap"><div class="table-toolbar"><div><h3>Investment-Level Performance</h3><p>Cost, fair value, MOIC, operating momentum and monitoring status.</p></div>${button('Portfolio filters','company-filters','compact','filter')}</div><div class="table-wrap"><table><thead><tr><th>Company</th><th>Sector</th><th class="text-right">Invested</th><th class="text-right">Fair value</th><th class="text-right">MOIC</th><th class="text-right">Ownership</th><th class="text-right">Revenue growth</th><th>Health</th></tr></thead><tbody>${fundCompanies.length?fundCompanies.map(company=>`<tr class="clickable" data-action="open-company" data-id="${company.id}"><td class="table-primary">${escapeHTML(company.name)}</td><td>${escapeHTML(company.sector)}</td><td class="text-right">${formatMoney(company.invested)}</td><td class="text-right">${formatMoney(company.fairValue)}</td><td class="text-right">${(company.fairValue/company.invested).toFixed(2)}x</td><td class="text-right">${pct(company.ownership)}</td><td class="text-right positive">${pct(company.revenueGrowth)}</td><td>${statusPill(company.health>=75?'On track':company.health>=65?'Watch':'Attention')}</td></tr>`).join(''):`<tr><td colspan="8"><div class="empty-state compact">${icon('building')}<strong>No holdings recorded for this fund yet</strong></div></td></tr>`}</tbody></table></div></section>`;
     }
     if (view === 'Attribution') {
-      const attributionRows = visibleCompanies.map((company,index)=>{const contribution=[4.3,3.1,2.4,1.9,1.2,.8][index]||.6;return `<tr class="clickable" data-action="chart-drilldown" data-chart-label="${escapeHTML(company.name)} attribution" data-chart-value="${contribution.toFixed(1)} percentage points"><td class="table-primary">${escapeHTML(company.name)}</td><td class="text-right">${contribution.toFixed(1)}pp</td><td class="text-right">${pct(contribution/fund.netIrr*100)}</td><td>${index<2?'Operating performance':index===2?'Multiple expansion':'Revenue and margin'}</td><td class="text-right positive">+${pct(company.revenueGrowth/10)}</td></tr>`}).join('');
-      return `<section class="grid cols-2">${card('Net IRR Attribution',waterfallChart([{label:'Opening return',value:10.2,total:true},{label:'Revenue growth',value:3.8},{label:'Margin expansion',value:2.1},{label:'Multiple movement',value:1.6},{label:'Leverage / cash',value:1.0},{label:'FX & fees',value:-.9},{label:'Net IRR',value:17.8,total:true}]),{subtitle:'Percentage-point contribution'})}${card('Value-Creation Drivers',barChart({labels:['Revenue growth','Margin expansion','Pricing','Working capital','Strategic initiatives','FX / macro'],series:[{name:'Contribution',color:'var(--brand)',values:[38,24,15,11,9,-3]}],height:310,yLabel:'Percent of value creation',format:value=>`${Math.round(value)}%`}),{subtitle:'Current period attribution'})}</section><section class="card table-card section-gap"><div class="table-toolbar"><div><h3>Company Attribution Schedule</h3><p>Contribution to fund return and the underlying value-creation driver.</p></div>${button('Methodology','performance-settings','compact','settings')}</div><div class="table-wrap"><table><thead><tr><th>Company</th><th class="text-right">Contribution to net IRR</th><th class="text-right">Share of net IRR</th><th>Primary driver</th><th class="text-right">Quarter movement</th></tr></thead><tbody>${attributionRows}<tr class="table-primary"><td>Total</td><td class="text-right">${pct(fund.netIrr)}</td><td class="text-right">100.0%</td><td>Fund total</td><td class="text-right positive">+1.3pp</td></tr></tbody></table></div></section>`;
+      const rows = fundCompanies.map(c=>`<tr><td class="table-primary">${escapeHTML(c.name)}</td><td class="text-right">${formatMoney(c.fairValue)}</td><td class="text-right">${pct(totalFV?c.fairValue/totalFV*100:0)}</td></tr>`).join('');
+      return `<section class="card table-card"><div class="table-toolbar"><div><h3>Fair-Value Contribution by Company</h3><p>IRR-level attribution (operating vs multiple vs FX contribution) requires per-company cash-flow allocation data not yet tracked by the platform — shown here is real fair-value contribution instead.</p></div></div>${fundCompanies.length?`<div class="table-wrap"><table class="criteria-table"><thead><tr><th>Company</th><th class="text-right">Fair Value</th><th class="text-right">% of Fund FV</th></tr></thead><tbody>${rows}</tbody></table></div>`:`<div class="empty-state compact">${icon('building')}<strong>No holdings recorded for this fund yet</strong></div>`}</section>`;
     }
     if (view === 'Benchmarks') {
-      return `<section class="grid cols-2">${card('PME and Peer Comparison',lineChart({labels:['Q2 2024','Q3 2024','Q4 2024','Q1 2025','Q2 2025','Q3 2025','Q4 2025','Q1 2026','Q2 2026'],series:[{name:`${fund.name} net IRR`,color:'var(--blue)',values:[0,4,7,9.5,12,14,16,17.5,fund.netIrr]},{name:state.fundReportingBenchmark,color:'var(--emerald)',values:[0,2,4,5.5,7,8.5,10,11.2,12.5]},{name:'Peer median',color:'var(--amber)',values:[0,2.8,4.9,6.8,8.2,9.7,11.3,12.1,13.4]}],height:310,yLabel:'Percent',format:value=>`${Math.round(value)}%`}),{subtitle:`${state.fundReportingBasis} basis · ${state.fundReportingBenchmark}`})}${card('Quartile Position',barChart({labels:['Net IRR','TVPI','DPI','Revenue growth','Loss ratio'],series:[{name:'Fund percentile',color:'var(--brand)',values:[78,74,69,82,66]}],height:310,yLabel:'Percentile',format:value=>`${Math.round(value)}th`}),{subtitle:'Illustrative peer cohort percentile'})}</section><section class="grid cols-2 section-gap">${card('Benchmark Summary',`<div class="table-wrap"><table><thead><tr><th>Measure</th><th class="text-right">Fund</th><th class="text-right">Peer median</th><th class="text-right">Top quartile</th><th>Position</th></tr></thead><tbody><tr><td>Net IRR</td><td class="text-right">${pct(fund.netIrr)}</td><td class="text-right">13.4%</td><td class="text-right">17.2%</td><td>${statusPill('Top quartile','success')}</td></tr><tr><td>TVPI</td><td class="text-right">${fund.tvpi.toFixed(2)}x</td><td class="text-right">1.67x</td><td class="text-right">2.02x</td><td>${statusPill('Top quartile','success')}</td></tr><tr><td>DPI</td><td class="text-right">${fund.dpi.toFixed(2)}x</td><td class="text-right">0.41x</td><td class="text-right">0.58x</td><td>${statusPill('Top quartile','success')}</td></tr></tbody></table></div>`,{subtitle:'Selected peer cohort'})}${card('Methodology & Controls',`<div class="info-list"><div class="info-row"><span>Benchmark</span><strong>${escapeHTML(state.fundReportingBenchmark)}</strong></div><div class="info-row"><span>Return basis</span><strong>${escapeHTML(state.fundReportingBasis)}</strong></div><div class="info-row"><span>Currency</span><strong>${escapeHTML(state.fundReportingCurrency)}</strong></div><div class="info-row"><span>Cash-flow convention</span><strong>Daily dated cash flows</strong></div><div class="info-row"><span>Peer cohort</span><strong>2020-2023 Africa growth / buyout</strong></div><div class="info-row"><span>Last validated</span><strong>31 Jul 2026 · 17:10 CAT</strong></div></div>`,{footer:'<button class="card-link" data-action="performance-settings">Configure methodology</button>'})}</section>`;
+      const CA_BENCHMARK = { irr: 3.9, tvpi: 1.25, dpi: 0.0, asOf: 'H1 2025', source: 'Cambridge Associates LLC US Private Equity Index' };
+      const rows = [
+        ['Gross IRR', latestGrossIrr, CA_BENCHMARK.irr, latestGrossIrr!=null?pct(latestGrossIrr):'—', `${CA_BENCHMARK.irr.toFixed(1)}%`],
+        ['TVPI', fund.tvpi||null, CA_BENCHMARK.tvpi, fund.tvpi?`${fund.tvpi.toFixed(2)}x`:'—', `${CA_BENCHMARK.tvpi.toFixed(2)}x`],
+        ['DPI', fund.dpi||null, CA_BENCHMARK.dpi, fund.dpi?`${fund.dpi.toFixed(2)}x`:'0.00x', `${CA_BENCHMARK.dpi.toFixed(2)}x`],
+      ];
+      const table = `<div class="table-wrap"><table><thead><tr><th>Metric</th><th class="text-right">Fund</th><th class="text-right">Benchmark</th><th class="text-right">Alpha</th><th>Status</th></tr></thead><tbody>${rows.map(([label,fundVal,benchVal,fundDisp,benchDisp])=>{
+        const hasFund = fundVal!=null;
+        const alpha = hasFund ? fundVal-benchVal : null;
+        const outperforming = alpha!=null && alpha>=0;
+        const alphaDisp = alpha==null?'—':`${alpha>=0?'+':''}${label==='Gross IRR'?alpha.toFixed(1)+'pp':alpha.toFixed(2)+'x'}`;
+        return `<tr><td class="table-primary">${label}</td><td class="text-right">${fundDisp}</td><td class="text-right">${benchDisp}</td><td class="text-right ${alpha==null?'':outperforming?'positive':'negative'}">${alphaDisp}</td><td>${hasFund?statusPill(outperforming?'Outperforming':'Underperforming',outperforming?'success':'warning'):statusPill('Not enough data yet','neutral')}</td></tr>`;
+      }).join('')}</tbody></table></div><p class="muted small" style="margin-top:10px">Benchmark: ${CA_BENCHMARK.source}, ${CA_BENCHMARK.asOf}. No internal peer/PME database exists to compare against instead.</p>`;
+      return `<section class="grid cols-1">${card('Benchmark Comparison',table,{subtitle:'vs Cambridge Associates US Private Equity Index'})}</section>`;
     }
-    return `<section class="grid cols-2">${card('Gross and Net Performance Trend',lineChart({labels:['Q2 2024','Q3 2024','Q4 2024','Q1 2025','Q2 2025','Q3 2025','Q4 2025','Q1 2026','Q2 2026'],series:[{name:'Net IRR',color:'var(--emerald)',values:[1,6,7,9,10,12,13.8,14.2,fund.netIrr]},{name:'Gross IRR',color:'var(--blue)',values:[3,9,10,12,14,16,17.1,18,fund.grossIrr]}],height:310,yLabel:'Percent',format:value=>`${Math.round(value)}%`}),{subtitle:'Quarterly progression'})}${card('Investment Multiple Progression',lineChart({labels:['Q2 2024','Q3 2024','Q4 2024','Q1 2025','Q2 2025','Q3 2025','Q4 2025','Q1 2026','Q2 2026'],series:[{name:'TVPI',color:'var(--brand)',values:[1.02,1.11,1.22,1.36,1.48,1.63,1.82,2.01,fund.tvpi]},{name:'DPI',color:'var(--amber)',values:[0,.03,.08,.14,.21,.28,.38,.47,fund.dpi]}],height:310,yLabel:'Multiple',format:value=>`${Number(value).toFixed(2)}x`}),{subtitle:'Since inception'})}</section><section class="grid cols-2 section-gap">${card('NAV and Paid-In Capital',barChart({labels:['Q2 2025','Q3 2025','Q4 2025','Q1 2026','Q2 2026'],series:[{name:'NAV',color:'var(--blue)',values:[112,126,139,151,168]},{name:'Paid-in capital',color:'var(--emerald)',values:[156,171,187,196,211]}],height:310,yLabel:'USD millions',format:value=>`${Math.round(value)}M`}),{subtitle:'Quarter-end balances'})}${card('Performance Schedule',`<div class="table-wrap"><table><thead><tr><th>Metric</th><th class="text-right">Current</th><th class="text-right">Prior quarter</th><th class="text-right">Since inception</th><th>Validation</th></tr></thead><tbody><tr><td>Gross IRR</td><td class="text-right">${pct(fund.grossIrr)}</td><td class="text-right">${pct(fund.grossIrr-1.6)}</td><td class="text-right">${pct(fund.grossIrr)}</td><td>${statusPill('Passed','success')}</td></tr><tr><td>Net IRR</td><td class="text-right">${pct(fund.netIrr)}</td><td class="text-right">${pct(fund.netIrr-1.3)}</td><td class="text-right">${pct(fund.netIrr)}</td><td>${statusPill('Passed','success')}</td></tr><tr><td>TVPI</td><td class="text-right">${fund.tvpi.toFixed(2)}x</td><td class="text-right">${Math.max(0,fund.tvpi-.14).toFixed(2)}x</td><td class="text-right">${fund.tvpi.toFixed(2)}x</td><td>${statusPill('Passed','success')}</td></tr><tr><td>DPI</td><td class="text-right">${fund.dpi.toFixed(2)}x</td><td class="text-right">${Math.max(0,fund.dpi-.08).toFixed(2)}x</td><td class="text-right">${fund.dpi.toFixed(2)}x</td><td>${statusPill('Passed','success')}</td></tr></tbody></table></div>`,{subtitle:'Current reporting period'})}</section>`;
+    const snapLabels = irrSnapshots.map(s=>new Date(s.asOfDate).toLocaleDateString('en-GB',{day:'2-digit',month:'short'}));
+    return `<section class="grid cols-2">${card('Gross IRR Over Recorded Snapshots',irrSnapshots.length?lineChart({labels:snapLabels,series:[{name:'Gross IRR',color:'var(--emerald)',values:irrSnapshots.map(s=>Number(s.grossIrr)*100)}],height:270,format:v=>`${Number(v).toFixed(1)}%`}):`<div class="empty-state compact">${icon('trend-up')}<strong>Gross IRR not yet computable</strong><p class="muted small">Needs real capital-call cash flows dated far enough from today for a stable annualised rate.</p></div>`,{subtitle:'From real capital-call cash flows vs current NAV'})}${card('NAV Over Recorded Snapshots',snapshots.length?barChart({labels:snapshots.map(s=>new Date(s.asOfDate).toLocaleDateString('en-GB',{day:'2-digit',month:'short'})),series:[{name:'NAV',color:'var(--blue)',values:snapshots.map(s=>Number(s.nav)/1e6)}],height:270,format:v=>`${Math.round(v)}M`}):`<div class="empty-state compact">${icon('bar-chart')}<strong>No recorded snapshots yet</strong></div>`,{subtitle:'USD millions · real recorded snapshots, not backfilled'})}</section>
+      <section class="card table-card section-gap"><div class="table-toolbar"><div class="table-title-row"><h3>Fund Snapshot Log</h3></div></div><div class="table-wrap"><table><thead><tr><th>As of</th><th class="text-right">Called Capital</th><th class="text-right">Distributed</th><th class="text-right">NAV</th><th class="text-right">Gross IRR</th><th class="text-right">TVPI</th></tr></thead><tbody>${snapshots.length?snapshots.slice().reverse().map(s=>`<tr><td class="table-primary">${new Date(s.asOfDate).toLocaleDateString()}</td><td class="text-right">${formatMoney(Number(s.calledCapital))}</td><td class="text-right">${formatMoney(Number(s.distributedCapital))}</td><td class="text-right">${formatMoney(Number(s.nav))}</td><td class="text-right">${s.grossIrr!=null?pct(Number(s.grossIrr)*100):'—'}</td><td class="text-right">${s.tvpi!=null?Number(s.tvpi).toFixed(2)+'x':'—'}</td></tr>`).join(''):`<tr><td colspan="6"><div class="empty-state compact">${icon('clock')}<strong>No recorded snapshots yet</strong><p class="muted small">Snapshots record automatically on fund create/update.</p></div></td></tr>`}</tbody></table></div></section>`;
   }
 
   renderFundPerformance = function() {
@@ -3605,12 +4615,23 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       return `${pageHeader('Fund Reporting','Interactive performance, cash-flow, portfolio, attribution and benchmark reporting.',`${button('Refresh','reset-fund-reporting-filters','','refresh')}`,'Fund Reporting')}<div class="empty-state"><div class="empty-state-icon">${icon('file-chart')}</div><h3>No funds loaded</h3><p>Live fund data is still loading or has not been seeded yet.</p></div>`;
     }
     const views = ['Performance','Cash Flows','Portfolio','Attribution','Benchmarks'];
+    const fundCallsForFund = capitalCalls.filter(c=>c.fund===selectedFund.name);
+    const fundCompaniesForFund = companies.filter(c=>c.fund===selectedFund.name);
+    const totalFVForFund = sum(fundCompaniesForFund,c=>c.fairValue);
+    const totalCalledForFund = sum(fundCallsForFund,c=>c.amount);
+    const totalCollectedForFund = sum(fundCallsForFund,c=>c.collected);
+    const snapshotsForFund = (state.fundPerformanceSnapshots && state.fundPerformanceSnapshots[selectedFund.id]) || [];
+    const irrSnapshotsForFund = snapshotsForFund.filter(s=>s.grossIrr!=null);
+    const latestGrossIrrForFund = irrSnapshotsForFund.length ? Number(irrSnapshotsForFund[irrSnapshotsForFund.length-1].grossIrr)*100 : null;
+    const onTrackCount = fundCompaniesForFund.filter(c=>c.health>=75).length;
+    const watchCount = fundCompaniesForFund.filter(c=>c.health<65).length;
+    const avgRevGrowthForFund = fundCompaniesForFund.length ? sum(fundCompaniesForFund,c=>c.revenueGrowth)/fundCompaniesForFund.length : 0;
     const metricSets = {
-      Performance:[['Gross IRR',pct(selectedFund.grossIrr||0),'trend-up','emerald','+1.6pp vs prior quarter'],['Net IRR',pct(selectedFund.netIrr||0),'users','cyan','+1.3pp vs prior quarter'],['TVPI',`${Number(selectedFund.tvpi||0).toFixed(2)}x`,'bar-chart','amber','+0.14x vs prior quarter'],['DPI',`${Number(selectedFund.dpi||0).toFixed(2)}x`,'dollar','purple','+0.08x vs prior quarter'],['RVPI',`${Math.max(0,Number(selectedFund.tvpi||0)-Number(selectedFund.dpi||0)).toFixed(2)}x`,'trend-up','blue','Residual value multiple'],['NAV',formatMoney(selectedFund.nav||0),'dollar','emerald','Approved period close']],
-      'Cash Flows':[['Contributions','USD 25.6M','trend-down','blue','Current quarter'],['Distributions','USD 19.8M','trend-up','emerald','Current quarter'],['Net cash flow','USD 5.8M','refresh','cyan','Before fees and expenses'],['Fees & expenses','USD 6.1M','file','amber','Current quarter'],['Unfunded',formatMoney(Math.max(0,(selectedFund.commitment||0)-(selectedFund.called||0))),'wallet','purple','Remaining commitment'],['Available cash','USD 94.8M','bank','emerald','Reconciled cash position']],
-      Portfolio:[['Portfolio companies',String(Math.max(0,companies.filter(c=>c.fund===selectedFund.name).length)),'building','blue','Active investments'],['Fair value',formatMoney(selectedFund.nav||0),'dollar','emerald','Approved valuation'],['Weighted revenue growth','28.9%','trend-up','cyan','Current quarter'],['Weighted EBITDA growth','22.7%','bar-chart','purple','Current quarter'],['On-track companies','82%','check-circle','emerald','Weighted by fair value'],['Watch items','3','alert','amber','Require intervention']],
-      Attribution:[['Operating performance','+5.9pp','trend-up','emerald','Net IRR contribution'],['Multiple movement','+1.6pp','bar-chart','blue','Net IRR contribution'],['Leverage / cash','+1.0pp','wallet','purple','Net IRR contribution'],['FX & macro','-0.9pp','refresh','red','Net IRR drag'],['Top contributor','Nova Analytics','building','cyan','4.3pp contribution'],['Attribution coverage','100%','check-circle','emerald','All investments mapped']],
-      Benchmarks:[['Fund net IRR',pct(selectedFund.netIrr||0),'trend-up','emerald','Selected basis'],['Peer median','13.4%','users','blue','Illustrative cohort'],['Top quartile','17.2%','sparkles','purple','Illustrative cohort'],['Excess return',`+${(Number(selectedFund.netIrr||0)-12.5).toFixed(1)}pp`,'bar-chart','cyan','Versus PME'],['TVPI percentile','74th','trend-up','amber','Peer cohort'],['Benchmark coverage','100%','check-circle','emerald','Cash flows mapped']]
+      Performance:[['Gross IRR',latestGrossIrrForFund!=null?pct(latestGrossIrrForFund):'—','trend-up','emerald',latestGrossIrrForFund!=null?'Since inception':'Not enough cash-flow history yet'],['Net IRR',pct(selectedFund.netIrr||0),'users','cyan','After fees and carry'],['TVPI',`${Number(selectedFund.tvpi||0).toFixed(2)}x`,'bar-chart','amber','Total value multiple'],['DPI',`${Number(selectedFund.dpi||0).toFixed(2)}x`,'dollar','purple','Distributed multiple'],['RVPI',`${Math.max(0,Number(selectedFund.tvpi||0)-Number(selectedFund.dpi||0)).toFixed(2)}x`,'trend-up','blue','Residual value multiple'],['NAV',formatMoney(selectedFund.nav||0),'dollar','emerald','Current fund NAV']],
+      'Cash Flows':[['Called',formatMoney(totalCalledForFund),'trend-down','blue',`${fundCallsForFund.length} call${fundCallsForFund.length===1?'':'s'} issued`],['Collected',formatMoney(totalCollectedForFund),'trend-up','emerald',totalCalledForFund?`${pct(totalCollectedForFund/totalCalledForFund*100)} of called`:'No calls issued yet'],['Outstanding',formatMoney(Math.max(0,totalCalledForFund-totalCollectedForFund)),'refresh','cyan','Called but not yet collected'],['Unfunded',formatMoney(Math.max(0,(selectedFund.commitment||0)-(selectedFund.called||0))),'wallet','purple','Remaining commitment']],
+      Portfolio:[['Portfolio companies',String(fundCompaniesForFund.length),'building','blue','Active investments'],['Fair value',formatMoney(totalFVForFund),'dollar','emerald','Current fair value'],['Weighted revenue growth',pct(avgRevGrowthForFund),'trend-up','cyan','Across holdings'],['On-track companies',String(onTrackCount),'check-circle','emerald',`Health ≥ 75`],['Watch items',String(watchCount),'alert','amber','Health < 65']],
+      Attribution:[['Holdings mapped',String(fundCompaniesForFund.length),'building','cyan',fundCompaniesForFund.length?'All holdings have fair-value data':'No holdings recorded yet'],['Total fair value',formatMoney(totalFVForFund),'dollar','emerald','Current valuation']],
+      Benchmarks:[['Fund Gross IRR',latestGrossIrrForFund!=null?pct(latestGrossIrrForFund):'—','trend-up','emerald','Since inception'],['Fund TVPI',`${Number(selectedFund.tvpi||0).toFixed(2)}x`,'bar-chart','blue','Total value multiple'],['Benchmark (CA US PE)','3.9%','users','purple','H1 2025, Cambridge Associates']]
     };
     const metrics = metricSets[state.fundReportingView] || metricSets.Performance;
     const filters = workspaceFilterBar([
@@ -3619,7 +4640,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       {label:'Benchmark',action:'fund-reporting-benchmark',selected:state.fundReportingBenchmark,options:['Private Markets PME','MSCI Emerging Markets','S&P 500 PME','Peer cohort median']},
       {type:'button',label:'Reset',action:'reset-fund-reporting-filters',icon:'refresh'}
     ]);
-    return `${pageHeader('Fund Reporting','Interactive performance, cash-flow, portfolio, attribution and benchmark reporting.',`${selectControl('Fund',funds.map(f=>f.name),selectedFund.name,'fund-filter')}${selectControl('Period',['Q2 2026 (Apr - Jun 2026)','Q1 2026 (Jan - Mar 2026)','Q4 2025 (Oct - Dec 2025)'],'Q2 2026 (Apr - Jun 2026)','performance-period')}${button('Generate industry report','open-report-template-library','primary','file-chart')}${button('Export','export-performance','','download')}${button('Submit for approval','submit-performance','','send')}`,'Fund Reporting')}${filters}<section class="metric-grid">${metrics.map(item=>metricCard({label:item[0],value:item[1],iconName:item[2],accent:item[3],foot:item[4],action:`fund-reporting-metric-${item[0].toLowerCase().replace(/[^a-z0-9]+/g,'-')}`})).join('')}</section><nav class="tabs fund-reporting-tabs" aria-label="Fund reporting views">${views.map(view=>`<button class="tab ${state.fundReportingView===view?'active':''}" data-action="fund-reporting-tab" data-tab="${escapeHTML(view)}">${escapeHTML(view)}<span>${view==='Performance'?'Returns':view==='Cash Flows'?'Ledger':view==='Portfolio'?'Investments':view==='Attribution'?'Drivers':'Comparators'}</span></button>`).join('')}</nav><section class="fund-reporting-view section-gap"><header class="fund-reporting-view-head"><div><small>${escapeHTML(selectedFund.name)} · Q2 2026</small><h2>${escapeHTML(state.fundReportingView)}</h2><p>${state.fundReportingView==='Performance'?'Fund-level return metrics and progression.':state.fundReportingView==='Cash Flows'?'Contribution, distribution, fee and investment cash-flow detail.':state.fundReportingView==='Portfolio'?'Investment-level operating and valuation performance.':state.fundReportingView==='Attribution'?'Company and value-creation contribution to fund return.':'PME, peer cohort and methodology comparison.'}</p></div><div>${statusPill('Data validated','success')}${button('Open report builder','open-report-builder','compact','edit')}</div></header>${v10RenderFundReportingContent(selectedFund,state.fundReportingView)}</section>`;
+    return `${pageHeader('Fund Reporting','Interactive performance, cash-flow, portfolio, attribution and benchmark reporting.',`${selectControl('Fund',funds.map(f=>f.name),selectedFund.name,'fund-filter')}${button('Export','export-performance','','download')}`,'Fund Reporting')}${filters}<section class="metric-grid">${metrics.map(item=>metricCard({label:item[0],value:item[1],iconName:item[2],accent:item[3],foot:item[4],action:`fund-reporting-metric-${item[0].toLowerCase().replace(/[^a-z0-9]+/g,'-')}`})).join('')}</section><nav class="tabs fund-reporting-tabs" aria-label="Fund reporting views">${views.map(view=>`<button class="tab ${state.fundReportingView===view?'active':''}" data-action="fund-reporting-tab" data-tab="${escapeHTML(view)}">${escapeHTML(view)}<span>${view==='Performance'?'Returns':view==='Cash Flows'?'Ledger':view==='Portfolio'?'Investments':view==='Attribution'?'Drivers':'Comparators'}</span></button>`).join('')}</nav><section class="fund-reporting-view section-gap"><header class="fund-reporting-view-head"><div><small>${escapeHTML(selectedFund.name)}</small><h2>${escapeHTML(state.fundReportingView)}</h2><p>${state.fundReportingView==='Performance'?'Fund-level return metrics and progression.':state.fundReportingView==='Cash Flows'?'Real capital-call notices and collection status.':state.fundReportingView==='Portfolio'?'Investment-level operating and valuation performance.':state.fundReportingView==='Attribution'?'Fair-value contribution by holding.':'Benchmark comparison against a real, sourced index.'}</p></div><div>${button('Open report builder','open-report-builder','compact','edit')}</div></header>${v10RenderFundReportingContent(selectedFund,state.fundReportingView)}</section>`;
   };
 
   const v10BaseReportInspector = v9RenderReportInspector;
@@ -3803,9 +4824,59 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
 
   const v11BaseRenderNav = renderNav;
   renderNav = function() {
-    const activePage=v11PageResource(state.page);
-    const visibleGroups=navGroups.map(group=>({ ...group, items:group.items.filter(item=>v11CanRead(item.id)) })).filter(group=>group.items.length);
-    primaryNav.innerHTML=visibleGroups.map(group=>`<div class="nav-group"><div class="nav-group-label">${group.label}</div>${group.items.map(item=>`<button class="nav-item ${activePage===item.id?'active':''}" data-action="navigate" data-page="${item.id}" title="${escapeHTML(item.label)}">${icon(item.icon)}<span class="nav-label">${escapeHTML(item.label)}</span>${item.badge?`<span class="nav-badge">${item.badge}</span>`:''}</button>`).join('')}</div>`).join('');
+    if (!primaryNav) return;
+    const activePage = v11PageResource(state.page);
+    const detailToList = {
+      'deal-detail': 'deals',
+      'fund-detail': 'funds',
+      'company-detail': 'companies',
+      'lp-detail': 'lps',
+      'capital-call-detail': 'capital-calls',
+      'reconciliation-workspace': 'reconciliations',
+      'report-builder': 'reports-vault',
+    };
+    const highlight = detailToList[activePage] || activePage;
+    const visibleGroups = navGroups
+      .map((group) => ({ ...group, items: group.items.filter((item) => v11CanRead(item.id)) }))
+      .filter((group) => group.items.length);
+
+    const visibleIds = new Set(visibleGroups.flatMap((g) => g.items.map((i) => i.id)));
+    const builtSignature = visibleGroups.map((g) => g.items.map((i) => i.id).join(',')).join('|');
+
+    if (!primaryNav.dataset.navBuilt || primaryNav.dataset.navSignature !== builtSignature) {
+      primaryNav.innerHTML = visibleGroups.map((group) => `<div class="nav-group"><div class="nav-group-label">${group.label}</div>${group.items.map((item) => {
+        const badge = item.count ? liveNavBadge(item.id) : null;
+        return `<button type="button" class="nav-item ${highlight === item.id ? 'active' : ''}" data-action="navigate" data-page="${item.id}" title="${escapeHTML(item.label)}">${icon(item.icon)}<span class="nav-label">${escapeHTML(item.label)}</span>${badge != null && badge !== '' ? `<span class="nav-badge">${escapeHTML(String(badge))}</span>` : ''}</button>`;
+      }).join('')}</div>`).join('');
+      primaryNav.dataset.navBuilt = '1';
+      primaryNav.dataset.navSignature = builtSignature;
+      return;
+    }
+
+    // In-place active + badge updates only — do not remount sidebar chrome.
+    $$('.nav-item', primaryNav).forEach((btn) => {
+      const id = btn.getAttribute('data-page');
+      if (!visibleIds.has(id)) return;
+      btn.classList.toggle('active', highlight === id);
+      const item = findNavItem(id);
+      if (!item || !item.count) {
+        const orphan = btn.querySelector('.nav-badge');
+        if (orphan) orphan.remove();
+        return;
+      }
+      const badge = liveNavBadge(id);
+      let badgeEl = btn.querySelector('.nav-badge');
+      if (badge != null && badge !== '') {
+        if (!badgeEl) {
+          badgeEl = document.createElement('span');
+          badgeEl.className = 'nav-badge';
+          btn.appendChild(badgeEl);
+        }
+        if (badgeEl.textContent !== String(badge)) badgeEl.textContent = String(badge);
+      } else if (badgeEl) {
+        badgeEl.remove();
+      }
+    });
   };
 
   const v11SettingsTabs = [
@@ -3864,14 +4935,14 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   };
 
   function v11EnvelopeRows() {
-    return signatureEnvelopes.map(e=>`<tr class="clickable" data-action="open-envelope" data-id="${e.id}"><td class="table-primary">${escapeHTML(e.id)}<small>${escapeHTML(e.subject)}</small></td><td><button class="text-link" data-action="open-signature-studio" data-id="${e.documentId}">${escapeHTML(e.document)}</button></td><td><div class="v11-signer-stack">${e.recipients.map(r=>`<span class="signer-chip" title="${escapeHTML(r[0])} · ${escapeHTML(r[2])}">${initials(r[0])}</span>`).join('')}</div></td><td><div class="inline-progress">${progressBar(e.progress)}<span>${e.progress}%</span></div></td><td>${statusPill(e.status)}</td><td>${escapeHTML(e.sent)}</td><td>${escapeHTML(e.expires)}</td><td><div class="row-actions">${button('Open','open-envelope','compact','eye',`data-id="${e.id}"`)}${button('Activity','activity-menu','ghost compact','clock',`data-context="envelope" data-id="${e.id}"`)}</div></td></tr>`).join('');
+    return signatureEnvelopes.map(e=>`<tr class="clickable" data-action="open-envelope" data-id="${e.id}"><td class="table-primary">${escapeHTML(e.id)}<small>${escapeHTML(e.subject)}</small></td><td><button class="text-link" data-action="open-signature-studio" data-id="${e.documentId}">${escapeHTML(e.document)}</button></td><td><div class="v11-signer-stack">${(Array.isArray(e.recipients)?e.recipients:[]).map(r=>`<span class="signer-chip" title="${escapeHTML(r[0])} · ${escapeHTML(r[2])}">${initials(r[0])}</span>`).join('')}</div></td><td><div class="inline-progress">${progressBar(e.progress)}<span>${e.progress}%</span></div></td><td>${statusPill(e.status)}</td><td>${escapeHTML(e.sent)}</td><td>${escapeHTML(e.expires)}</td><td><div class="row-actions">${button('Open','open-envelope','compact','eye',`data-id="${e.id}"`)}${button('Activity','activity-menu','ghost compact','clock',`data-context="envelope" data-id="${e.id}"`)}</div></td></tr>`).join('');
   }
 
   function v11RenderSignatureContent() {
     if (state.signatureView==='Overview') return `<section class="grid cols-2"><div class="card">${lineChart({labels:['Apr','May','Jun','Jul','Aug'],series:[{name:'Sent',color:'var(--blue)',values:[8,12,18,21,17]},{name:'Completed',color:'var(--emerald)',values:[6,10,15,19,13]}],height:300,yLabel:'Envelopes',format:value=>String(Math.round(value))})}</div><div class="card"><div class="card-head"><div><h3>Completion health</h3><p>Current signer and envelope status.</p></div>${button('Open audit','signature-view-tab','compact','activity','data-tab="Audit Trail"')}</div>${donutChart([{label:'Completed',value:19,color:'var(--emerald)',display:'19'},{label:'Awaiting',value:6,color:'var(--amber)',display:'6'},{label:'Declined',value:1,color:'var(--red)',display:'1'}],'73%','Completion',150)}</div></section><section class="card table-card section-gap"><div class="table-toolbar"><div><h3>Action required</h3><p>Envelopes that are expiring, declined or waiting beyond policy.</p></div>${button('Send reminders','send-signature-reminders','primary compact','send')}</div><div class="table-wrap"><table><thead><tr><th>Envelope</th><th>Issue</th><th>Owner</th><th>Age</th><th>Action</th></tr></thead><tbody><tr data-action="open-envelope" data-id="ENV-0098"><td class="table-primary">ENV-0098</td><td>One recipient still pending</td><td>Farai Chikore</td><td>3 days</td><td>${button('Open','open-envelope','compact','eye','data-id="ENV-0098"')}</td></tr><tr><td class="table-primary">ENV-0095</td><td>Expires in 24 hours</td><td>Anita Kapoor</td><td>6 days</td><td>${button('Remind','send-signature-reminder','compact','send','data-id="ENV-0095"')}</td></tr></tbody></table></div></section>`;
     if (state.signatureView==='Templates') return `<section class="v11-signature-template-grid">${[['Term Sheet','Investment terms, parties and controlled version','gavel'],['Subscription Agreement','Investor subscription and declarations','file'],['Board Resolution','Board authority and execution blocks','users'],['NDA','Mutual confidentiality and permitted disclosure','lock']].map((item,index)=>`<article class="card v11-signature-template"><span>${icon(item[2])}</span><div><small>TEMPLATE ${String(index+1).padStart(2,'0')}</small><h3>${item[0]}</h3><p>${item[1]}</p></div><div class="v11-template-facts"><span>Fields <strong>${[7,12,5,6][index]}</strong></span><span>Used <strong>${[18,9,12,24][index]}</strong></span></div><footer>${button('Preview','preview-signature-template','compact','eye',`data-template="${item[0]}"`)}${button('Use template','use-signature-template','primary compact','plus',`data-template="${item[0]}"`)}</footer></article>`).join('')}</section>`;
     if (state.signatureView==='Signers') {
-      const signers=signatureEnvelopes.flatMap(envelope=>envelope.recipients.map(recipient=>({name:recipient[0],role:recipient[1],status:recipient[2],envelope:envelope.id,document:envelope.document}))).slice(0,12);
+      const signers=signatureEnvelopes.flatMap(envelope=>(Array.isArray(envelope.recipients)?envelope.recipients:[]).map(recipient=>({name:recipient[0],role:recipient[1],status:recipient[2],envelope:envelope.id,document:envelope.document}))).slice(0,12);
       return `<section class="card table-card"><div class="table-toolbar"><div><h3>Signer register</h3><p>Identity, role, status and associated controlled document.</p></div>${button('Export signers','export-signers','compact','download')}</div><div class="table-wrap"><table><thead><tr><th>Signer</th><th>Role</th><th>Envelope</th><th>Document</th><th>Status</th><th>Authentication</th><th></th></tr></thead><tbody>${signers.map(s=>`<tr data-action="open-envelope" data-id="${s.envelope}"><td class="table-primary"><span class="v11-person-cell">${personAvatar(s.name)}<span>${escapeHTML(s.name)}<small>Verified recipient</small></span></span></td><td>${escapeHTML(s.role)}</td><td>${escapeHTML(s.envelope)}</td><td>${escapeHTML(s.document)}</td><td>${statusPill(s.status)}</td><td>Email + OTP</td><td>${icon('chevron-right')}</td></tr>`).join('')}</tbody></table></div></section>`;
     }
     if (state.signatureView==='Audit Trail') return `<section class="card table-card"><div class="table-toolbar"><div><h3>Signature audit trail</h3><p>Append-only envelope, recipient and evidence events.</p></div>${button('Export audit','export-signature-audit','compact','download')}</div><div class="table-wrap"><table><thead><tr><th>Timestamp</th><th>Envelope</th><th>Event</th><th>Actor / recipient</th><th>Authentication</th><th>Evidence</th></tr></thead><tbody><tr><td>01 Aug 2026 · 03:51 CAT</td><td>ENV-0098</td><td>Document viewed</td><td>Rudo Ndlovu</td><td>Email + OTP</td><td>evt_09f…a81</td></tr><tr><td>01 Aug 2026 · 03:42 CAT</td><td>ENV-0098</td><td>Signature applied</td><td>Farai Chikore</td><td>Passkey</td><td>sig_82c…ae1</td></tr><tr><td>31 Jul 2026 · 17:08 CAT</td><td>ENV-0097</td><td>Completion certificate issued</td><td>System</td><td>Document hash verified</td><td>cert_91b…442</td></tr></tbody></table></div></section>`;
@@ -3887,7 +4958,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     if (state.signatureInspectorTab==='Message') return `<div class="signature-inspector-body"><h3>Delivery message</h3><div class="form-field"><label>Email subject</label><input id="v11SignatureSubject" value="Please sign: ${escapeHTML(envelope.subject)}"></div><div class="form-field section-gap"><label>Private message</label><textarea id="v11SignatureMessage">Please review and electronically sign the attached investment document. Contact the legal team if any information is incorrect.</textarea></div><div class="form-grid section-gap"><div class="form-field"><label>Reminder cadence</label><select><option>Every 2 days</option><option>Daily</option><option>Every 3 days</option></select></div><div class="form-field"><label>Expiry</label><input type="date" value="2026-08-15"></div></div><div class="v11-setting-list section-gap">${v11SettingToggle('Respect signing order','Notify each recipient only after the previous signer completes.',true)}${v11SettingToggle('Send completion copy','Send the final signed document and certificate to every party.',true)}</div></div>`;
     if (state.signatureInspectorTab==='Review') return `<div class="signature-inspector-body"><h3>Readiness review</h3><div class="reason-list"><div class="reason-item">${icon('check-circle')}<div><strong>Controlled document version</strong><small>Document hash and version are locked for this envelope.</small></div></div><div class="reason-item">${icon('check-circle')}<div><strong>${envelope.recipients.length} recipients verified</strong><small>Email, role and signing order are complete.</small></div></div><div class="reason-item ${state.signatureFields.length<3?'warning':''}">${icon(state.signatureFields.length<3?'alert':'check-circle')}<div><strong>${state.signatureFields.length} fields placed</strong><small>${state.signatureFields.length<3?'Add all required signature and date fields.':'Every required recipient has an assigned field.'}</small></div></div></div><h3 class="section-gap">Security</h3><div class="info-list"><div class="info-row"><span>Authentication</span><strong>Email + OTP</strong></div><div class="info-row"><span>Signing order</span><strong>Enabled</strong></div><div class="info-row"><span>Audit evidence</span><strong>Timestamp, consent, IP and document hash</strong></div><div class="info-row"><span>Certificate</span><strong>Issued after all signatures</strong></div></div></div>`;
     const field=state.signatureFields.find(item=>item.id===state.selectedSignatureField) || state.signatureFields[0];
-    return `<div class="signature-inspector-body"><h3>Selected field</h3>${field?`<div class="v11-selected-field"><span>${icon(field.type==='Signature'?'edit':field.type==='Initials'?'user-check':field.type==='Date signed'?'calendar':'file')}</span><div><strong>${escapeHTML(field.type)}</strong><small>${escapeHTML(field.id)} · Page ${field.page}</small></div>${statusPill(field.status,'info')}</div><div class="form-grid section-gap"><div class="form-field full"><label>Assigned recipient</label><select data-change-action="signature-field-recipient" data-field="${field.id}">${envelope.recipients.map((recipient,index)=>`<option value="${index}" ${field.recipient===index?'selected':''}>${escapeHTML(recipient[0])}</option>`).join('')}</select></div><div class="form-field"><label>Required</label><select><option>Required</option><option>Optional</option></select></div><div class="form-field"><label>Page</label><input type="number" value="${field.page}" min="1"></div></div>${button('Remove field','remove-signature-field','danger compact','x',`data-id="${field.id}"`)}`:'<div class="empty-state"><strong>No field selected</strong><p>Add a signature, initials, date or text field.</p></div>'}<h3 class="section-gap">Envelope settings</h3><div class="info-list"><div class="info-row"><span>Signing order</span><strong>Enabled</strong></div><div class="info-row"><span>Authentication</span><strong>Email + OTP</strong></div><div class="info-row"><span>Expiry</span><strong>${escapeHTML(envelope.expires)}</strong></div><div class="info-row"><span>Reminders</span><strong>Every 2 days</strong></div></div></div>`;
+    return `<div class="signature-inspector-body"><h3>Selected field</h3>${field?`<div class="v11-selected-field"><span>${icon(field.type==='Signature'?'edit':field.type==='Initials'?'user-check':field.type==='Date signed'?'calendar':'file')}</span><div><strong>${escapeHTML(field.type)}</strong><small>${escapeHTML(field.id)} · Page ${field.page}</small></div>${statusPill(field.status,'info')}</div><div class="form-grid section-gap"><div class="form-field full"><label>Assigned recipient</label><select data-change-action="signature-field-recipient" data-field="${field.id}">${(Array.isArray(envelope.recipients)?envelope.recipients:[]).map((recipient,index)=>`<option value="${index}" ${field.recipient===index?'selected':''}>${escapeHTML(recipient[0])}</option>`).join('')}</select></div><div class="form-field"><label>Required</label><select><option>Required</option><option>Optional</option></select></div><div class="form-field"><label>Page</label><input type="number" value="${field.page}" min="1"></div></div>${button('Remove field','remove-signature-field','danger compact','x',`data-id="${field.id}"`)}`:'<div class="empty-state"><strong>No field selected</strong><p>Add a signature, initials, date or text field.</p></div>'}<h3 class="section-gap">Envelope settings</h3><div class="info-list"><div class="info-row"><span>Signing order</span><strong>Enabled</strong></div><div class="info-row"><span>Authentication</span><strong>Email + OTP</strong></div><div class="info-row"><span>Expiry</span><strong>${escapeHTML(envelope.expires)}</strong></div><div class="info-row"><span>Reminders</span><strong>Every 2 days</strong></div></div></div>`;
   }
 
   const v11BaseShowSignatureStudio=showSignatureStudio;
@@ -3896,9 +4967,9 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     const envelope=signatureEnvelopes.find(item=>item.id===envelopeId)||signatureEnvelopes.find(item=>item.documentId===doc.id)||signatureEnvelopes[0];
     state.selectedEnvelopeId=envelope.id;
     state.signatureSelectedRecipient=Math.min(state.signatureSelectedRecipient,envelope.recipients.length-1);
-    const recipients=envelope.recipients.map((recipient,index)=>`<button class="signature-recipient ${recipient[2]==='Signed'?'signed':recipient[2]==='Declined'?'declined':''} ${state.signatureSelectedRecipient===index?'selected':''}" data-action="select-signature-recipient" data-index="${index}">${personAvatar(recipient[0])}<span><strong>${escapeHTML(recipient[0])}</strong><small>${escapeHTML(recipient[1])}</small></span>${statusPill(recipient[2],recipient[2]==='Signed'?'success':recipient[2]==='Declined'?'danger':'warning')}</button>`).join('');
+    const recipients=(Array.isArray(envelope.recipients)?envelope.recipients:[]).map((recipient,index)=>`<button class="signature-recipient ${recipient[2]==='Signed'?'signed':recipient[2]==='Declined'?'declined':''} ${state.signatureSelectedRecipient===index?'selected':''}" data-action="select-signature-recipient" data-index="${index}">${personAvatar(recipient[0])}<span><strong>${escapeHTML(recipient[0])}</strong><small>${escapeHTML(recipient[1])}</small></span>${statusPill(recipient[2],recipient[2]==='Signed'?'success':recipient[2]==='Declined'?'danger':'warning')}</button>`).join('');
     const fields=state.signatureFields.map(field=>{const recipient=envelope.recipients[field.recipient]||envelope.recipients[0];return `<button class="v11-document-field ${state.selectedSignatureField===field.id?'selected':''}" data-action="select-signature-field" data-id="${field.id}"><span>${icon(field.type==='Signature'?'edit':field.type==='Initials'?'user-check':field.type==='Date signed'?'calendar':'file')}</span><strong>${escapeHTML(field.type)}</strong><small>${escapeHTML(recipient?.[0]||'Unassigned')} · ${escapeHTML(field.status)}</small></button>`}).join('');
-    showModal('Signature Studio',`${doc.name} · ${envelope.id}`,`<div class="signature-studio v11-signature-studio"><aside class="signature-toolbox"><div class="v11-signature-tool-scroll"><div><strong>Fields</strong><button class="signature-tool" data-action="add-signature-field" data-type="Signature">${icon('edit')} Signature</button><button class="signature-tool" data-action="add-signature-field" data-type="Initials">${icon('user-check')} Initials</button><button class="signature-tool" data-action="add-signature-field" data-type="Date signed">${icon('calendar')} Date signed</button><button class="signature-tool" data-action="add-signature-field" data-type="Text field">${icon('file')} Text field</button></div><div><div class="section-heading-with-action"><strong>Recipients</strong>${button('Add','add-signature-recipient','ghost compact','plus')}</div>${recipients}</div></div></aside><main class="signature-document"><div class="signature-document-toolbar"><span>Page 1 of ${doc.pages||8}</span><span>${icon('lock')} Encrypted · audit logged</span><button data-action="signature-zoom">100%</button></div><article class="signature-page"><div class="document-letterhead"><div class="pdf-brand">MATANHO</div><small>Investment Management ERP</small></div><p class="document-classification">TERM SHEET · SERIES B INVESTMENT · ${escapeHTML(doc.version)}</p><h1>Nova Analytics (Pvt) Ltd</h1><p class="document-lead">Non-binding summary of principal investment terms</p><div class="term-summary"><div><span>Investment</span><strong>USD 18,000,000</strong></div><div><span>Pre-money valuation</span><strong>USD 85,000,000</strong></div><div><span>Proposed ownership</span><strong>17.5%</strong></div></div><h2>Governance and investor protections</h2><p>The investor shall have the right to appoint one director and one non-voting observer, subject to the definitive agreements and agreed reserved matters.</p><h2>Electronic signature fields</h2><div class="v11-document-fields">${fields}</div><h2>Signing parties</h2>${envelope.recipients.map((recipient,index)=>recipient[2]==='Signed'?`<div class="signature-field signed"><span>${escapeHTML(recipient[0])}</span><small>${escapeHTML(recipient[1])} · Signed with OTP authentication</small></div>`:`<button class="signature-field pending" data-action="sign-term-sheet" data-signer="${index}"><span>Click to sign for ${escapeHTML(recipient[0])}</span><small>${escapeHTML(recipient[1])}</small></button>`).join('')}</article></main><aside class="signature-inspector"><div class="signature-inspector-tabs">${['Prepare','Message','Review'].map(tab=>`<button class="${state.signatureInspectorTab===tab?'active':''}" data-action="signature-inspector-tab" data-tab="${tab}">${tab}</button>`).join('')}</div>${v11SignatureInspector(envelope)}</aside></div>`,`${button('Save draft','save-signature-draft')}${button('Download certificate','download-signature-certificate','','download')}${button(envelope.status==='Completed'?'View completion':'Send envelope','send-signature-envelope','primary','send')}`,{variant:'signature',size:'fullscreen',eyebrow:'Secure responsive e-signature'});
+    showModal('Signature Studio',`${doc.name} · ${envelope.id}`,`<div class="signature-studio v11-signature-studio"><aside class="signature-toolbox"><div class="v11-signature-tool-scroll"><div><strong>Fields</strong><button class="signature-tool" data-action="add-signature-field" data-type="Signature">${icon('edit')} Signature</button><button class="signature-tool" data-action="add-signature-field" data-type="Initials">${icon('user-check')} Initials</button><button class="signature-tool" data-action="add-signature-field" data-type="Date signed">${icon('calendar')} Date signed</button><button class="signature-tool" data-action="add-signature-field" data-type="Text field">${icon('file')} Text field</button></div><div><div class="section-heading-with-action"><strong>Recipients</strong>${button('Add','add-signature-recipient','ghost compact','plus')}</div>${recipients}</div></div></aside><main class="signature-document"><div class="signature-document-toolbar"><span>Page 1 of ${doc.pages||8}</span><span>${icon('lock')} Encrypted · audit logged</span><button data-action="signature-zoom">100%</button></div><article class="signature-page"><div class="document-letterhead"><div class="pdf-brand">MATANHO</div><small>Investment Management ERP</small></div><p class="document-classification">TERM SHEET · SERIES B INVESTMENT · ${escapeHTML(doc.version)}</p><h1>Nova Analytics (Pvt) Ltd</h1><p class="document-lead">Non-binding summary of principal investment terms</p><div class="term-summary"><div><span>Investment</span><strong>USD 18,000,000</strong></div><div><span>Pre-money valuation</span><strong>USD 85,000,000</strong></div><div><span>Proposed ownership</span><strong>17.5%</strong></div></div><h2>Governance and investor protections</h2><p>The investor shall have the right to appoint one director and one non-voting observer, subject to the definitive agreements and agreed reserved matters.</p><h2>Electronic signature fields</h2><div class="v11-document-fields">${fields}</div><h2>Signing parties</h2>${(Array.isArray(envelope.recipients)?envelope.recipients:[]).map((recipient,index)=>recipient[2]==='Signed'?`<div class="signature-field signed"><span>${escapeHTML(recipient[0])}</span><small>${escapeHTML(recipient[1])} · Signed with OTP authentication</small></div>`:`<button class="signature-field pending" data-action="sign-term-sheet" data-signer="${index}"><span>Click to sign for ${escapeHTML(recipient[0])}</span><small>${escapeHTML(recipient[1])}</small></button>`).join('')}</article></main><aside class="signature-inspector"><div class="signature-inspector-tabs">${['Prepare','Message','Review'].map(tab=>`<button class="${state.signatureInspectorTab===tab?'active':''}" data-action="signature-inspector-tab" data-tab="${tab}">${tab}</button>`).join('')}</div>${v11SignatureInspector(envelope)}</aside></div>`,`${button('Save draft','save-signature-draft')}${button('Download certificate','download-signature-certificate','','download')}${button(envelope.status==='Completed'?'View completion':'Send envelope','send-signature-envelope','primary','send')}`,{variant:'signature',size:'fullscreen',eyebrow:'Secure responsive e-signature'});
   };
 
   function v11UpdateUserChrome() {
@@ -4330,9 +5401,9 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     const envelope=signatureEnvelopes.find(e=>e.id===envelopeId)||signatureEnvelopes.find(e=>e.documentId===doc.id)||signatureEnvelopes[0];
     state.selectedDocumentId=doc.id; state.selectedEnvelopeId=envelope.id;
     state.signatureSelectedRecipient = Math.min(state.signatureSelectedRecipient || 0, Math.max(0,envelope.recipients.length-1));
-    const recipients=envelope.recipients.map((r,i)=>`<button class="signature-recipient ${i===state.signatureSelectedRecipient?'selected':''} ${r[2]==='Signed'?'signed':r[2]==='Declined'?'declined':''}" data-action="select-signature-recipient" data-index="${i}">${personAvatar(r[0])}<span><strong>${escapeHTML(r[0])}</strong><small>${escapeHTML(r[1])}</small></span>${statusPill(r[2])}</button>`).join('');
+    const recipients=(Array.isArray(envelope.recipients)?envelope.recipients:[]).map((r,i)=>`<button class="signature-recipient ${i===state.signatureSelectedRecipient?'selected':''} ${r[2]==='Signed'?'signed':r[2]==='Declined'?'declined':''}" data-action="select-signature-recipient" data-index="${i}">${personAvatar(r[0])}<span><strong>${escapeHTML(r[0])}</strong><small>${escapeHTML(r[1])}</small></span>${statusPill(r[2])}</button>`).join('');
     const fields=(state.signatureFields||[]).map(field=>`<button class="v11-document-field ${state.selectedSignatureField===field.id?'selected':''}" data-action="select-signature-field" data-id="${field.id}"><span>${icon(field.type==='Signature'?'edit':field.type==='Initials'?'user-check':field.type==='Date signed'?'calendar':'file')}</span><strong>${escapeHTML(field.type)}</strong><small>${escapeHTML(envelope.recipients[field.recipient]?.[0]||'Unassigned')} · Page ${field.page}</small></button>`).join('');
-    const signingParties=envelope.recipients.map((recipient,index)=>recipient[2]==='Signed'?`<div class="signature-field signed"><div class="v15-signed-mark">${v15RenderSignatureMark(envelope.id,index,recipient[0])}<span><strong>${escapeHTML(recipient[0])}</strong><small>${escapeHTML(recipient[1])} · Signed · Email + OTP</small></span></div></div>`:`<button class="signature-field pending" data-action="sign-term-sheet" data-signer="${index}" data-id="${doc.id}"><span>Sign as ${escapeHTML(recipient[0])}</span><small>${escapeHTML(recipient[1])} · Draw, type or upload</small></button>`).join('');
+    const signingParties=(Array.isArray(envelope.recipients)?envelope.recipients:[]).map((recipient,index)=>recipient[2]==='Signed'?`<div class="signature-field signed"><div class="v15-signed-mark">${v15RenderSignatureMark(envelope.id,index,recipient[0])}<span><strong>${escapeHTML(recipient[0])}</strong><small>${escapeHTML(recipient[1])} · Signed · Email + OTP</small></span></div></div>`:`<button class="signature-field pending" data-action="sign-term-sheet" data-signer="${index}" data-id="${doc.id}"><span>Sign as ${escapeHTML(recipient[0])}</span><small>${escapeHTML(recipient[1])} · Draw, type or upload</small></button>`).join('');
     showModal('Signature Studio',`${doc.name} · ${envelope.id}`,`<div class="signature-studio v11-signature-studio"><aside class="signature-toolbox"><div class="v11-signature-tool-scroll"><div><strong>Fields</strong><button class="signature-tool" data-action="add-signature-field" data-type="Signature">${icon('edit')} Signature</button><button class="signature-tool" data-action="add-signature-field" data-type="Initials">${icon('user-check')} Initials</button><button class="signature-tool" data-action="add-signature-field" data-type="Date signed">${icon('calendar')} Date signed</button><button class="signature-tool" data-action="add-signature-field" data-type="Text field">${icon('file')} Text field</button></div><div><div class="section-heading-with-action"><strong>Recipients</strong>${button('Add','add-signature-recipient','ghost compact','plus')}</div>${recipients}</div></div></aside><main class="signature-document"><div class="signature-document-toolbar"><span>Page 1 of ${doc.pages||8}</span><span>${icon('lock')} Encrypted · audit logged</span><button data-action="signature-zoom">100%</button></div><article class="signature-page"><div class="document-letterhead"><div class="pdf-brand">MATANHO</div><small>Investment Management ERP</small></div><p class="document-classification">TERM SHEET · SERIES B INVESTMENT · ${escapeHTML(doc.version)}</p><h1>Nova Analytics (Pvt) Ltd</h1><p class="document-lead">Non-binding summary of principal investment terms</p><div class="term-summary"><div><span>Investment</span><strong>USD 18,000,000</strong></div><div><span>Pre-money valuation</span><strong>USD 85,000,000</strong></div><div><span>Proposed ownership</span><strong>17.5%</strong></div></div><h2>Governance and investor protections</h2><p>The investor shall have the right to appoint one director and one non-voting observer, subject to the definitive agreements and agreed reserved matters.</p><h2>Electronic signature fields</h2><div class="v11-document-fields">${fields}</div><h2>Signing parties</h2>${signingParties}</article></main><aside class="signature-inspector"><div class="signature-inspector-tabs">${['Prepare','Message','Review'].map(tab=>`<button class="${state.signatureInspectorTab===tab?'active':''}" data-action="signature-inspector-tab" data-tab="${tab}">${tab}</button>`).join('')}</div>${v11SignatureInspector(envelope)}</aside></div>`,`${button('Save draft','save-signature-draft')}${button('Download certificate','download-signature-certificate','','download')}${button(envelope.status==='Completed'?'View completion':'Send envelope','send-signature-envelope','primary','send')}`,{variant:'signature',size:'fullscreen',eyebrow:'Responsive e-signature workspace'});
   };
 
@@ -4429,13 +5500,14 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
 
   function v21SignaturePaper(doc,envelope,currentIndex) {
     const current=envelope.recipients[currentIndex] || envelope.recipients[0];
+    const docTypeLabel=(envelope.documentType||'').replace(/_/g,' ').replace(/\w/g,c=>c.toUpperCase());
     const rows=[
-      ['Investment amount','USD 18,000,000'],
-      ['Instrument','Preferred equity'],
-      ['Pre-money valuation','USD 85,000,000'],
-      ['Proposed ownership','17.5%'],
-      ['Board rights','1 director + 1 observer'],
-      ['Target close','31 Aug 2026']
+      ['Document type', docTypeLabel || 'Agreement'],
+      ...(envelope.fundName ? [['Fund', envelope.fundName]] : []),
+      ...(envelope.dealName ? [['Deal', envelope.dealName]] : []),
+      ['Status', envelope.status || 'Draft'],
+      ['Prepared', envelope.sent || '—'],
+      ['Expires', envelope.expires || '—']
     ];
     const blocks=envelope.recipients.slice(0,2).map((recipient,index)=>{
       const evidence=v21SignatureEvidence(envelope,index);
@@ -4446,8 +5518,10 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   }
 
   function v21ShowESign(documentId='DOC-009',envelopeId=null,signerIndex=null) {
-    const doc=documents.find(item=>item.id===documentId) || documents.find(item=>/Term Sheet|Agreement/.test(item.name)) || documents[0];
-    const envelope=signatureEnvelopes.find(item=>item.id===envelopeId) || signatureEnvelopes.find(item=>item.documentId===doc.id) || signatureEnvelopes[0];
+    const envelope=signatureEnvelopes.find(item=>item.id===envelopeId) || signatureEnvelopes.find(item=>item.documentId===documentId) || signatureEnvelopes[0];
+    if (!envelope) { toast('No envelope', 'Create a signature envelope first.', 'warning'); return; }
+    const doc=documents.find(item=>item.id===documentId) || documents.find(item=>item.id===envelope.documentId)
+      || { id: envelope.documentId || envelope.id, name: envelope.document || envelope.subject || 'Document', version: 'v1.0', pages: 1 };
     const pending=envelope.recipients.findIndex(item=>item[2]!=='Signed');
     const requested=(signerIndex===null||signerIndex===undefined||signerIndex==='')?NaN:Number(signerIndex);
     const index=Number.isFinite(requested) && requested>=0 ? requested : (pending>=0?pending:0);
@@ -4462,7 +5536,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     state.v15HasDrawnSignature=false;
     state.v15UploadedSignature='';
 
-    const otherSigners=envelope.recipients.map((r,i)=>`<div class="v21-other-signer">${personAvatar(r[0])}<span><strong>${escapeHTML(r[0])}</strong><small>${escapeHTML(r[1])}</small></span>${statusPill(r[2],r[2]==='Signed'?'success':r[2]==='Declined'?'danger':'warning')}</div>`).join('');
+    const otherSigners=(Array.isArray(envelope.recipients)?envelope.recipients:[]).map((r,i)=>`<div class="v21-other-signer">${personAvatar(r[0])}<span><strong>${escapeHTML(r[0])}</strong><small>${escapeHTML(r[1])}</small></span>${statusPill(r[2],r[2]==='Signed'?'success':r[2]==='Declined'?'danger':'warning')}</div>`).join('');
     const step2=completed?'done':'active';
     const step3=completed?'active':'';
     const signingControls=alreadySigned || completed ? `<div class="v21-complete-card"><strong>${completed?'Document completed':'Your signature is recorded'}</strong><p>${completed?'All required signers have completed the document. The completion certificate is available for download.':'The envelope remains open while other signers complete their steps.'}</p></div>${completed?`<button class="v21-sign-primary" data-action="download-signature-certificate">${icon('download')} Download completion certificate</button>`:`<button class="v21-sign-secondary" data-action="close-modal">Finish later</button>`}` : `<div class="v21-sign-methods"><button type="button" class="v15-sign-tab active" data-action="v15-signature-mode" data-mode="draw">Draw</button><button type="button" class="v15-sign-tab" data-action="v15-signature-mode" data-mode="type">Type</button><button type="button" class="v15-sign-tab" data-action="v15-signature-mode" data-mode="upload">Upload</button></div><div class="v15-sign-panel active" data-mode="draw"><p>Draw inside the box using a mouse, finger or stylus.</p><div class="v15-signature-pad-wrap"><canvas id="v15SignatureCanvas"></canvas><span class="v15-sign-pad-caption">SIGN ABOVE THIS LINE</span></div><div class="v15-sign-pad-actions"><small id="v15SignatureDrawStatus">Draw your signature</small>${button('Clear','v15-clear-signature','ghost compact','refresh')}</div></div><div class="v15-sign-panel" data-mode="type"><div class="form-field"><label class="required">Full legal name</label><input id="v15TypedSignatureName" value="${escapeHTML(signer[0])}" autocomplete="name"></div><div class="v15-typed-signature"><strong id="v15TypedSignaturePreview">${escapeHTML(signer[0])}</strong></div></div><div class="v15-sign-panel" data-mode="upload"><label class="v15-signature-upload" for="v15SignatureUpload">${icon('upload')}<span><strong>Upload signature image</strong><small>PNG or JPG</small></span><input id="v15SignatureUpload" type="file" accept="image/png,image/jpeg" hidden></label><img id="v15SignatureUploadPreview" class="v15-upload-preview" alt="Uploaded signature preview"></div><label class="v21-consent"><input id="v15SignatureConsent" type="checkbox"><span>I have reviewed this controlled document and consent to apply my electronic signature.</span></label><button class="v21-sign-primary" data-action="v21-apply-signature" data-signer="${index}" data-document="${doc.id}">${icon('edit')} Sign and continue</button><button class="v21-sign-secondary" data-action="close-modal">Save and finish later</button>`;
@@ -4562,7 +5636,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     const filtered=v22FilteredDocuments();
     const filterCount=(state.v22VaultClassification!=='All classifications'?1:0)+(state.v22VaultStatus!=='All statuses'?1:0);
     return `${pageHeader('Documents Vault','Secure, classified and auditable investment-document repository with native previews, versions, access controls and e-signature.',`${button('Request document','request-document','','send')}${button('Upload files','vault-upload','primary','upload')}`,'Reporting & Records')}
-      <section class="vault-stats section-gap"><div>${icon('folder')}<span><strong>${folders.length}</strong><small>Controlled folders</small></span></div><div>${icon('file')}<span><strong>${documents.length}</strong><small>Active documents</small></span></div><div>${icon('edit')}<span><strong>${documents.filter(d=>d.signatureStatus!=='Not required').length}</strong><small>Signature-enabled</small></span></div><div>${icon('shield')}<span><strong>100%</strong><small>Encrypted & audit logged</small></span></div><div>${icon('clock')}<span><strong>2</strong><small>Retention reviews due</small></span></div></section>
+      <section class="vault-stats section-gap"><div>${icon('folder')}<span><strong>${folders.length}</strong><small>Controlled folders</small></span></div><div>${icon('file')}<span><strong>${documents.length}</strong><small>Active documents</small></span></div><div>${icon('edit')}<span><strong>${documents.filter(d=>d.signatureStatus&&d.signatureStatus!=='Not required').length}</strong><small>Signature-enabled</small></span></div><div>${icon('clock')}<span><strong>${documents.filter(d=>d.status==='Needs update'||d.status==='In review').length}</strong><small>Needs review or update</small></span></div></section>
       <section class="vault-layout section-gap"><aside class="vault-folder-panel"><div class="vault-panel-head"><strong>Folders</strong>${button('','create-folder','ghost compact icon-only','plus')}</div><button class="vault-folder ${state.v22VaultFolder==='all'?'active':''}" data-action="vault-filter-folder" data-folder="all">${icon('layers')}<span>All documents<small>${documents.length} records</small></span><b>${documents.length}</b></button>${folders.map(folder=>`<button class="vault-folder ${state.v22VaultFolder===folder?'active':''}" data-action="vault-filter-folder" data-folder="${escapeHTML(folder)}">${icon('folder')}<span>${escapeHTML(folder)}<small>${documents.filter(d=>d.folder===folder).length} records</small></span><b>${documents.filter(d=>d.folder===folder).length}</b></button>`).join('')}</aside><section class="card table-card vault-records"><div class="table-toolbar"><div class="table-title-row"><h3>Document Register</h3><span class="table-badge">${filtered.length} visible · click a row to preview</span></div><div class="table-tools"><label class="table-search">${icon('search')}<input data-input-action="v22-document-search" value="${escapeHTML(state.v22VaultSearch)}" placeholder="Search documents"></label>${button(`Filters${filterCount?` · ${filterCount}`:''}`,'document-vault-filters','','filter')}${button(state.v22VaultView==='list'?'Cards':'List','toggle-vault-view','','grid')}</div></div>${vaultDocumentTable(filtered)}</section></section>`;
   };
 
@@ -4646,7 +5720,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     const cards=filtered.length?filtered.map(report=>`<article class="report-vault-card v22-report-card" data-action="preview-vault-report" data-id="${report.id}" tabindex="0"><div class="report-cover professional"><span>${icon(report.type.includes('Valuation')?'trend-up':report.type.includes('IC')?'users':report.type.includes('Operations')?'bank':'file-chart')}</span><div><small>${escapeHTML(report.type)}</small><strong>${escapeHTML(report.period)}</strong></div><em>${escapeHTML(report.classification)}</em></div><div class="report-vault-body"><div class="report-vault-title"><div><h3>${escapeHTML(report.name)}</h3><p>${escapeHTML(report.fund)} · ${escapeHTML(report.version)}</p></div>${statusPill(report.status)}</div><div class="report-meta-grid"><span><small>Generated</small><strong>${escapeHTML(report.generated)}</strong></span><span><small>Pages</small><strong>${report.pages}</strong></span><span><small>Recipients</small><strong>${report.recipients}</strong></span><span><small>Owner</small><strong>${escapeHTML(report.owner)}</strong></span></div><div class="report-vault-actions">${button('Preview','preview-vault-report','','eye',`data-id="${report.id}"`)}${button('Edit ledger','edit-report-ledger','','list',`data-id="${report.id}"`)}${button('Download','report-download-menu','primary','download',`data-id="${report.id}"`)}</div></div></article>`).join(''):`<div class="v22-empty-state v22-report-empty">${icon('file-chart')}<strong>No report packs match these filters</strong><p>Adjust the fund, type, status, period or search text.</p>${button('Clear filters','v22-clear-report-filters','','refresh')}</div>`;
     return `${pageHeader('Reports Vault','Institutional fund, portfolio, IC, valuation, cash-control and investor report packs with professional templates and editable publication ledgers.',`${button('Generate report','generate-report','','plus')}${button('Build report pack','open-report-builder','primary','file-chart')}`,'Reporting & Records')}
       ${workspaceFilterBar([{label:'Fund',action:'report-vault-fund',selected:state.reportFilterFund,options:['All Funds',...funds.map(f=>f.name)]},{label:'Report type',action:'report-vault-type',selected:state.v22ReportType,options:types},{label:'Status',action:'report-vault-status',selected:state.reportFilterStatus,options:['All Statuses',...new Set(reportVaultItems.map(r=>r.status))]},{label:'Period',action:'report-vault-period',selected:state.v22ReportPeriod,options:periods}])}
-      <section class="metric-grid section-gap">${metricCard({label:'Published Reports',value:String(reportVaultItems.filter(r=>r.status==='Published').length),iconName:'check-circle',accent:'emerald',foot:'Distribution evidence retained',action:'reports-published'})}${metricCard({label:'In Review',value:String(reportVaultItems.filter(r=>r.status==='In Review').length),iconName:'user-check',accent:'blue',foot:'Approval and commentary workflow',action:'reports-review'})}${metricCard({label:'Total Pages',value:sum(reportVaultItems,r=>r.pages).toLocaleString(),iconName:'file',accent:'brand',foot:'Across active report versions',action:'reports-pages'})}${metricCard({label:'Scheduled Distributions',value:'8',iconName:'send',accent:'purple',foot:'LP portal and secure email',action:'reports-distributions'})}</section><section class="card v22-report-tools section-gap"><label class="table-search">${icon('search')}<input data-input-action="v22-report-search" value="${escapeHTML(state.v22ReportSearch)}" placeholder="Search reports, owners or periods"></label><span class="table-badge">${filtered.length} of ${reportVaultItems.length} packs</span></section><section class="report-vault-grid section-gap">${cards}</section>`;
+      <section class="metric-grid section-gap">${metricCard({label:'Published Reports',value:String(reportVaultItems.filter(r=>r.status==='Published').length),iconName:'check-circle',accent:'emerald',foot:'Distribution evidence retained',action:'reports-published'})}${metricCard({label:'In Review',value:String(reportVaultItems.filter(r=>r.status==='In Review').length),iconName:'user-check',accent:'blue',foot:'Approval and commentary workflow',action:'reports-review'})}${metricCard({label:'Total Pages',value:sum(reportVaultItems,r=>r.pages).toLocaleString(),iconName:'file',accent:'brand',foot:'Across active report versions',action:'reports-pages'})}${metricCard({label:'Recipients Reached',value:sum(reportVaultItems.filter(r=>r.status==='Published'),r=>r.recipients).toLocaleString(),iconName:'send',accent:'purple',foot:'Across published reports',action:'reports-distributions'})}</section><section class="card v22-report-tools section-gap"><label class="table-search">${icon('search')}<input data-input-action="v22-report-search" value="${escapeHTML(state.v22ReportSearch)}" placeholder="Search reports, owners or periods"></label><span class="table-badge">${filtered.length} of ${reportVaultItems.length} packs</span></section><section class="report-vault-grid section-gap">${cards}</section>`;
   };
 
   function v22FilteredEnvelopes(){
@@ -4660,7 +5734,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
 
   renderESignatures=function(){
     const filtered=v22FilteredEnvelopes();
-    const rows=filtered.length?filtered.map(e=>`<tr class="clickable" data-action="open-envelope" data-id="${e.id}" tabindex="0"><td class="table-primary">${escapeHTML(e.id)}<small>${escapeHTML(e.subject)}</small></td><td><button class="text-link" data-action="open-signature-studio" data-id="${e.documentId}" data-envelope="${e.id}">${escapeHTML(e.document)}</button></td><td><div class="v22-signer-summary"><span class="v22-signer-stack">${e.recipients.slice(0,4).map(r=>personAvatar(r[0])).join('')}</span><span><strong>${e.recipients.length} signer${e.recipients.length===1?'':'s'}</strong><small>${escapeHTML(e.recipients.map(r=>r[0]).join(', '))}</small></span></div></td><td><div class="inline-progress">${progressBar(e.progress)}<span>${e.progress}%</span></div></td><td>${statusPill(e.status)}</td><td>${escapeHTML(e.sent)}</td><td>${escapeHTML(e.expires)}</td><td><div class="row-actions">${button('Open','open-envelope','compact','eye',`data-id="${e.id}"`)}${button('Activity','activity-menu','ghost compact','clock',`data-context="envelope" data-id="${e.id}"`)}</div></td></tr>`).join(''):`<tr><td colspan="8"><div class="v22-empty-state compact">${icon('edit')}<strong>No envelopes match these filters</strong><p>Try another signer, document or status.</p></div></td></tr>`;
+    const rows=filtered.length?filtered.map(e=>`<tr class="clickable" data-action="open-envelope" data-id="${e.id}" tabindex="0"><td class="table-primary">${escapeHTML(e.id)}<small>${escapeHTML(e.subject)}</small></td><td><button class="text-link" data-action="open-signature-studio" data-id="${e.documentId}" data-envelope="${e.id}">${escapeHTML(e.document)}</button></td><td><div class="v22-signer-summary"><span class="v22-signer-stack">${e.recipients.slice(0,4).map(r=>personAvatar(r[0])).join('')}</span><span><strong>${e.recipients.length} signer${e.recipients.length===1?'':'s'}</strong><small>${escapeHTML((Array.isArray(e.recipients)?e.recipients:[]).map(r=>r[0]).join(', '))}</small></span></div></td><td><div class="inline-progress">${progressBar(e.progress)}<span>${e.progress}%</span></div></td><td>${statusPill(e.status)}</td><td>${escapeHTML(e.sent)}</td><td>${escapeHTML(e.expires)}</td><td><div class="row-actions">${button('Open','open-envelope','compact','eye',`data-id="${e.id}"`)}${button('Activity','activity-menu','ghost compact','clock',`data-context="envelope" data-id="${e.id}"`)}</div></td></tr>`).join(''):`<tr><td colspan="8"><div class="v22-empty-state compact">${icon('edit')}<strong>No envelopes match these filters</strong><p>Try another signer, document or status.</p></div></td></tr>`;
     return `${pageHeader('E-Signatures','Simple, controlled electronic execution with signing order, consent evidence and completion certificates.',`${button('Signature templates','signature-templates','','layers')}${button('New envelope','new-signature-envelope','primary','edit')}`,'Reporting & Records')}
       <section class="signature-summary section-gap"><div class="signature-summary-card"><span class="signature-orb">${icon('send')}</span><div><strong>${signatureEnvelopes.filter(e=>e.status!=='Completed').length}</strong><small>Active envelopes</small></div></div><div class="signature-summary-card"><span class="signature-orb success">${icon('check')}</span><div><strong>${signatureEnvelopes.filter(e=>e.status==='Completed').length}</strong><small>Completed this month</small></div></div><div class="signature-summary-card"><span class="signature-orb warning">${icon('clock')}</span><div><strong>${signatureEnvelopes.filter(e=>e.status==='Waiting for others'||e.status==='In progress').length}</strong><small>Awaiting recipients</small></div></div><div class="signature-summary-card"><span class="signature-orb danger">${icon('alert')}</span><div><strong>${signatureEnvelopes.filter(e=>e.status==='Action required').length}</strong><small>Action required</small></div></div></section>
       <section class="card table-card section-gap"><div class="table-toolbar"><div class="table-title-row"><h3>Signature Envelopes</h3><span class="table-badge">${filtered.length} visible · signer photos shown</span></div><div class="table-tools"><label class="table-search">${icon('search')}<input data-input-action="v22-signature-search" value="${escapeHTML(state.v22SignatureSearch)}" placeholder="Search envelope, document or signer"></label>${button(state.v22SignatureStatus==='All statuses'?'Status':state.v22SignatureStatus,'signature-filters','','filter')}</div></div><div class="table-wrap"><table><thead><tr><th>Envelope / Subject</th><th>Document</th><th>Recipients</th><th>Progress</th><th>Status</th><th>Sent</th><th>Expires</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
@@ -4848,6 +5922,21 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   uploadDocuments=function(fileList){
     const files=Array.from(fileList||[]); if(!files.length)return;
     const folder=state.v22VaultFolder&&state.v22VaultFolder!=='all'?state.v22VaultFolder:(state.selectedFolder&&state.selectedFolder!=='All Documents'?state.selectedFolder:'General');
+    const fundId = String(funds[0]?.id || state.selectedFundId || '');
+    if (fundId && typeof __pv11EmitApi === 'function') {
+      files.forEach((file) => {
+        __pv11EmitApi('api-upload-document', {
+          fundId,
+          folder,
+          documentType: folder || 'GENERAL',
+          title: file.name,
+          fileName: file.name,
+          fileRef: file.name,
+        }, { document: file });
+      });
+      toast('Uploading…', `${files.length} file${files.length===1?'':'s'} sent to the document API.`);
+      return;
+    }
     files.forEach(file=>{
       const ext=(file.name.split('.').pop()||'FILE').toUpperCase();
       documents.push({id:`DOC-${String(documents.length+1).padStart(3,'0')}`,name:file.name,type:ext,version:'v1.0',owner:v11RoleMember().name,uploaded:'13 Aug 2026',status:'In review',access:'Internal',folder,classification:'Internal confidential',signatureStatus:/PDF|DOC|DOCX/.test(ext)?'Not required':'Not required',retention:'Fund life + 10 years',size:file.size>1048576?`${(file.size/1048576).toFixed(1)} MB`:`${Math.max(1,Math.round(file.size/1024))} KB`,pages:/PDF|DOC|DOCX/.test(ext)?6:1});
@@ -4868,14 +5957,27 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     cols.forEach((c) => { if (Array.isArray(c)) c.splice(0, c.length); });
   }
   function __pv11BeginLiveLoad() {
+    state.hydrating = true;
+    state.liveLoadError = null;
     try { rootEl.classList.add('is-hydrating'); } catch (_) {}
     __pv11ClearFixtures();
     restoreHardcodedVaultIfEmpty();
     if (typeof render === 'function') render();
   }
   function __pv11FailLiveLoad(message) {
+    state.hydrating = false;
+    state.pageLoading = false;
+    state.liveLoadError = message || 'Could not load portfolio data.';
     try { rootEl.classList.remove('is-hydrating'); rootEl.classList.add('is-host-error'); } catch (_) {}
     if (typeof toast === 'function') toast('Live data failed', message || 'Could not load portfolio data.', 'error');
+    if (typeof render === 'function') render();
+  }
+  function __pv11SetPageLoading(loading) {
+    const next = Boolean(loading);
+    if (state.pageLoading === next) return;
+    state.pageLoading = next;
+    try { rootEl.classList.toggle('is-page-loading', next); } catch (_) {}
+    if (typeof render === 'function') render();
   }
   function __pv11SetActionBusy(busy, message, actionName) {
     try {
@@ -4891,23 +5993,756 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       } else if (banner) banner.remove();
     } catch (_) {}
   }
+
+  
+  
+  /* BEGIN_PORTFOLIO_LIVE_BRIDGE */
+function __pv11IsLive() {
+    return Boolean(state.liveData) || Boolean(liveOnly) || Boolean(state.dealDetail);
+  }
+  function __pv11ShouldWireDeal(dealId) {
+    if (state.dealDetail) return true;
+    if (!dealId) return false;
+    // Fixture ids look like DL-013; live application ids are UUIDs / cuid-like.
+    return !/^DL-\d+/i.test(String(dealId));
+  }
+  /**
+   * The Deal Flow board's `deals` array is populated from a filtered applications list (e.g.
+   * rejected/pending-shortlisting stages are excluded by default so they don't clutter the
+   * active pipeline). renderDealDetail()'s header falls back to an arbitrary unrelated deal
+   * (`deals.find(featured) || deals[0]`) when the real one isn't in that filtered list — showing
+   * the wrong company name/fund/score in the header while the tabs below correctly show the real
+   * deal's data. Upsert a real-data entry into `deals` whenever a deal is loaded directly (by URL,
+   * bookmark, etc.) so the header lookup always resolves to the correct deal instead of guessing.
+   */
+  const __PV11_STAGE_MAP = {
+    DRAFT: 'Sourcing', SUBMITTED: 'Screening', UNDER_REVIEW: 'Initial Review',
+    INITIAL_SCREENING: 'Screening', SCREENING_PENDING: 'Screening', SCREENING: 'Screening',
+    SHORTLISTED: 'Initial Review', IC_PENDING: 'Investment Committee',
+    INVESTMENT_COMMITTEE: 'Investment Committee', UNDER_BOARD_REVIEW: 'Investment Committee',
+    BOARD_APPROVED: 'Term Sheet', BOARD_CONDITIONAL: 'Term Sheet', BOARD_REJECTED: 'Rejected',
+    ACTIVE_DD: 'Due Diligence', DUE_DILIGENCE: 'Due Diligence', DUE_DILIGENCE_COMPLETED: 'Due Diligence',
+    TERM_SHEET: 'Term Sheet', TERM_SHEET_ISSUED: 'Term Sheet', TERM_SHEET_NEGOTIATION: 'Term Sheet',
+    TERM_SHEET_CREATED: 'Term Sheet', TERM_SHEET_APPROVED: 'Term Sheet', APPROVED: 'Term Sheet',
+    INVESTMENT_IMPLEMENTATION: 'Portfolio', DISBURSEMENT: 'Portfolio', DISBURSED: 'Portfolio',
+    FUNDED: 'Portfolio', PORTFOLIO: 'Portfolio', PORTFOLIO_MANAGEMENT: 'Portfolio',
+    PORTFOLIO_COMPANY_CREATED: 'Portfolio', ACTIVE: 'Portfolio', REJECTED: 'Rejected',
+    REJECTED_SCREENING: 'Rejected', AUTO_REJECTED: 'Rejected', BELOW_THRESHOLD: 'Rejected',
+    DECLINED: 'Rejected', WITHDRAWN: 'Rejected',
+  };
+  function __pv11SyncDealIntoList(dealDetail) {
+    const app = dealDetail?.application;
+    const hero = dealDetail?.hero;
+    const id = String(hero?.applicationId || app?.id || '');
+    if (!id) return;
+    const stageKey = String(app?.currentStage || '').toUpperCase();
+    const score = Number(hero?.score ?? hero?.aiScore ?? app?.screeningScore ?? app?.initialScreeningScore ?? 0) || 0;
+    const analyst = app?.assignedAnalyst;
+    const owner = (analyst ? `${analyst.firstName || ''} ${analyst.lastName || ''}`.trim() : '') || app?.applicantName || 'Unassigned';
+    const synthesized = {
+      id,
+      applicationId: id,
+      name: String(hero?.companyName || app?.businessName || app?.applicantName || 'Deal'),
+      sector: String(app?.industry || '-'),
+      round: String(app?.businessStage || '-'),
+      amount: Number(hero?.requestedAmount ?? app?.requestedAmount ?? 0) || 0,
+      owner,
+      age: 0,
+      priority: score >= 80 ? 'High' : score >= 60 ? 'Medium' : 'Low',
+      stage: __PV11_STAGE_MAP[stageKey] || 'Screening',
+      score: Math.min(100, Math.round(score)),
+      fund: String(hero?.fundName || app?.fund?.name || 'Unassigned fund'),
+      hasDueDiligence: Boolean(dealDetail?.dueDiligence),
+      hasTermSheet: Boolean(dealDetail?.termSheet),
+      hasBoardReview: Boolean(dealDetail?.boardReview),
+    };
+    const idx = deals.findIndex((d) => d.id === id);
+    if (idx >= 0) deals[idx] = Object.assign({}, deals[idx], synthesized);
+    else deals.push(synthesized);
+  }
+  function __pv11AsArray(v) {
+    if (Array.isArray(v)) return v;
+    if (v == null) return [];
+    if (typeof v === 'object') return Object.values(v);
+    return [];
+  }
+  function __pv11IsDDComplete(dd) {
+    return Boolean(dd && /complete/i.test(String(dd.status || '')));
+  }
+  function __pv11IsDDTaskComplete(task) {
+    const st = String(task?.stage || task?.status || '');
+    return /complete|done|closed/i.test(st);
+  }
+  function __pv11DdScore(dd) {
+    if (!dd) return 0;
+    let n = 0;
+    for (const k of ['marketResearchViable','financialViable','competitiveOpportunities','managementTeamQualified','legalCompliant','riskTolerable']) {
+      if (dd[k]) n++;
+    }
+    return n;
+  }
+  function __pv11CanCompleteDD(dd, tasks) {
+    if (!dd) return { ok: false, reason: 'Start due diligence first' };
+    if (__pv11IsDDComplete(dd)) return { ok: false, reason: 'Due diligence is already completed' };
+    const required = [
+      ['marketResearchViable', 'Market research'],
+      ['financialViable', 'Financial assessment'],
+      ['legalCompliant', 'Legal compliance'],
+      ['managementTeamQualified', 'Management assessment'],
+    ];
+    for (const [field, label] of required) {
+      if (!dd[field]) return { ok: false, reason: `${label} must be marked as met in the assessment` };
+    }
+    if (dd.overallScore == null) return { ok: false, reason: 'Save the assessment to calculate overall score' };
+    if (!dd.recommendation) return { ok: false, reason: 'Recommendation is required in the assessment' };
+    if (!dd.finalComments) return { ok: false, reason: 'Final comments are required in the assessment' };
+    for (const task of __pv11AsArray(tasks)) {
+      if (__pv11IsDDTaskComplete(task)) continue;
+      const activities = __pv11AsArray(task.activityLogs || task.activities);
+      if (!activities.length) {
+        return { ok: false, reason: `Workstream "${task.name || task.workstream || task.id || 'task'}" must be marked complete` };
+      }
+      if (activities.some((a) => a.status && String(a.status) !== 'approved')) {
+        return { ok: false, reason: `Workstream "${task.name || task.workstream || task.id || 'task'}" has unapproved activity` };
+      }
+    }
+    return { ok: true, reason: '' };
+  }
+  function __pv11DealId(trigger) {
+    return String(
+      trigger?.dataset?.dealId ||
+      trigger?.dataset?.applicationId ||
+      state.selectedDealId ||
+      state.dealDetail?.application?.id ||
+      state.dealDetail?.id ||
+      ''
+    );
+  }
+  function __pv11EmitApi(action, dataset, files) {
+    const detail = {
+      action,
+      dataset: { ...(dataset || {}) },
+      state: publicSnapshot().state,
+    };
+    if (files) detail.files = files;
+    emitIntegrationEvent('matanho:before-action', detail, true);
+  }
+
+  /* --- Real e-signature envelope creation (replaces the v11 local-only fake) --- */
+  const __pv11DocumentTypes = [
+    ['TERM_SHEET', 'Term Sheet'],
+    ['SHAREHOLDERS_AGREEMENT', 'Shareholders Agreement'],
+    ['NDA', 'Non-Disclosure Agreement'],
+    ['BOARD_RESOLUTION', 'Board / IC Resolution'],
+    ['LOAN_AGREEMENT', 'Loan / Facility Agreement'],
+  ];
+  function __pv11DefaultExpiry(days) {
+    const d = new Date();
+    d.setDate(d.getDate() + (days || 14));
+    return d.toISOString().slice(0, 10);
+  }
+  function __pv11ShowNewEnvelope(prefill) {
+    const pf = prefill || {};
+    const docOptions = __pv11DocumentTypes
+      .map(([value, label]) => `<option value="${value}"${pf.documentType === value ? ' selected' : ''}>${escapeHTML(label)}</option>`)
+      .join('');
+    const fundOptions = (Array.isArray(funds) ? funds : [])
+      .map((f) => `<option value="${escapeHTML(String(f.id))}"${pf.fundId === f.id ? ' selected' : ''}>${escapeHTML(f.name || f.id)}</option>`)
+      .join('');
+    const dealOptions = (Array.isArray(deals) ? deals : [])
+      .map((d) => `<option value="${escapeHTML(String(d.id))}"${pf.applicationId === d.id ? ' selected' : ''}>${escapeHTML(d.name || d.id)}</option>`)
+      .join('');
+    showModal(
+      'Create Signature Envelope',
+      'Route a controlled document to a real signer. Creates a live agreement record.',
+      `<form id="pv11EnvelopeForm">
+        <section class="modal-section">
+          <div class="modal-section-heading"><h3>Document</h3></div>
+          <div class="form-grid">
+            <div class="form-field full"><label class="required">Document type</label><select name="documentType" required><option value="">Select document type</option>${docOptions}</select></div>
+            <div class="form-field full"><label class="required">Envelope subject</label><input name="subject" required placeholder="e.g. Please sign: Nova Analytics Term Sheet" value="${escapeHTML(pf.subject || '')}"></div>
+            <div class="form-field"><label>Fund</label><select name="fundId"><option value="">No fund</option>${fundOptions}</select></div>
+            <div class="form-field"><label>Deal</label><select name="applicationId"><option value="">No deal</option>${dealOptions}</select></div>
+          </div>
+        </section>
+        <section class="modal-section">
+          <div class="modal-section-heading"><h3>Recipient</h3></div>
+          <div class="form-grid">
+            <div class="form-field"><label class="required">Full name</label><input name="recipientName" required placeholder="Signatory full name"></div>
+            <div class="form-field"><label class="required">Email</label><input type="email" name="recipientEmail" required placeholder="name@company.com"></div>
+            <div class="form-field"><label>Signing role</label><input name="recipientRole" placeholder="e.g. Company signatory"></div>
+            <div class="form-field"><label>Expires</label><input type="date" name="expires" value="${__pv11DefaultExpiry(14)}"></div>
+          </div>
+          <div class="reason-item section-gap">${icon('shield')}<div><strong>Additional signers</strong><small>Add further recipients from the envelope's Activity panel after it is created.</small></div></div>
+        </section>
+      </form>`,
+      `${button('Cancel', 'close-modal')}${button('Create envelope', 'submit-new-envelope', 'primary', 'edit')}`,
+      { variant: 'wizard', size: 'lg', rail: ['Document', 'Recipient', 'Review'], eyebrow: 'Electronic signature workflow' },
+    );
+  }
+  function __pv11SubmitNewEnvelope() {
+    const form = $('#pv11EnvelopeForm');
+    if (!form?.reportValidity()) return;
+    const data = Object.fromEntries(new FormData(form));
+    __pv11EmitApi('api-create-envelope', {
+      documentType: String(data.documentType || ''),
+      subject: String(data.subject || ''),
+      fundId: String(data.fundId || ''),
+      applicationId: String(data.applicationId || ''),
+      recipientName: String(data.recipientName || ''),
+      recipientEmail: String(data.recipientEmail || ''),
+      recipientRole: String(data.recipientRole || ''),
+      expires: String(data.expires || ''),
+    });
+    closeOverlays();
+  }
+  function __pv11ShowSignatureTemplates() {
+    showModal(
+      'Signature Templates',
+      'Start a new envelope from a standard document type.',
+      `<div class="info-list" id="pv11TemplateList"><div class="empty-state compact"><div class="empty-state-icon">${icon('layers')}</div><p class="muted">Loading templates…</p></div></div>`,
+      `${button('Close', 'close-modal')}`,
+      { variant: 'record', size: 'md', eyebrow: 'Reusable document templates' },
+    );
+    window.dispatchEvent(new CustomEvent('matanho:load-signature-templates'));
+  }
+  function __pv11RenderSignatureTemplates(templates) {
+    const list = $('#pv11TemplateList');
+    if (!list) return;
+    const items = Array.isArray(templates) ? templates : [];
+    list.innerHTML = items.length
+      ? items.map((t) => `<button type="button" class="list-row" style="width:100%;text-align:left;cursor:pointer;border:1px solid var(--line);border-radius:10px;margin-bottom:8px" data-action="use-signature-template" data-id="${escapeHTML(t.id)}" data-document-type="${escapeHTML(t.documentType)}" data-name="${escapeHTML(t.name)}"><span class="activity-icon" style="color:var(--brand);background:var(--brand-soft)">${icon('layers')}</span><span class="list-row-main"><strong>${escapeHTML(t.name)}</strong><small>${escapeHTML(t.description || t.documentType)}</small></span></button>`).join('')
+      : `<div class="empty-state compact">${icon('layers')}<strong>No templates configured</strong><p class="muted">Ask an administrator to add a signature template.</p></div>`;
+  }
+  function __pv11UseSignatureTemplate(trigger) {
+    const documentType = trigger?.dataset?.documentType || '';
+    const name = trigger?.dataset?.name || '';
+    closeOverlays();
+    __pv11ShowNewEnvelope({ documentType, subject: name ? `Please sign: ${name}` : '' });
+  }
+  function __pv11ShowDdAssessmentModal() {
+    const dd = state.dealDetail?.dueDiligence;
+    if (!dd?.id) {
+      toast('Start due diligence first', 'Initiate due diligence before filling the assessment.', 'warning');
+      return;
+    }
+    const section = (title, name, commentsName, viable, comments) =>
+      `<section class="drawer-section"><h3>${escapeHTML(title)}</h3><label class="checkbox-row"><input type="checkbox" name="${name}" value="1"${viable ? ' checked' : ''}> Criteria met</label><div class="form-field section-gap"><label>Comments</label><textarea name="${commentsName}">${escapeHTML(String(comments || ''))}</textarea></div></section>`;
+    showModal(
+      'Due diligence assessment',
+      'Complete the investment checklist and recommendation before closing due diligence.',
+      `<form id="ddAssessmentForm">${section('Market research','marketResearchViable','marketResearchComments',dd.marketResearchViable,dd.marketResearchComments)}${section('Financial viability','financialViable','financialComments',dd.financialViable,dd.financialComments)}${section('Competitive opportunities','competitiveOpportunities','competitiveComments',dd.competitiveOpportunities,dd.competitiveComments)}${section('Management team','managementTeamQualified','managementComments',dd.managementTeamQualified,dd.managementComments)}${section('Legal compliance','legalCompliant','legalComments',dd.legalCompliant,dd.legalComments)}${section('Risk assessment','riskTolerable','riskComments',dd.riskTolerable,dd.riskComments)}<section class="drawer-section"><h3>Final recommendation</h3><div class="form-grid"><div class="form-field"><label class="required">Recommendation</label><select name="recommendation" required><option value="APPROVE"${String(dd.recommendation||'')==='APPROVE'?' selected':''}>Approve</option><option value="CONDITIONAL"${String(dd.recommendation||'')==='CONDITIONAL'?' selected':''}>Conditional</option><option value="REJECT"${String(dd.recommendation||'')==='REJECT'?' selected':''}>Reject</option></select></div><div class="form-field full"><label class="required">Final comments</label><textarea name="finalComments" required>${escapeHTML(String(dd.finalComments||''))}</textarea></div></div></section></form>`,
+      `${button('Cancel','close-modal')}${button('Save assessment','submit-dd-assessment','primary','save')}`
+    );
+  }
+  function __pv11ShowCreateTermSheetModal(dealId) {
+    const ask = deals.find((d) => String(d.id) === String(dealId))?.amount || '';
+    showModal(
+      'Create term sheet',
+      'Issue investment terms for this deal.',
+      `<form id="createTermSheetForm"><div class="form-grid"><div class="form-field full"><label>Title</label><input name="title" value="Term Sheet"></div><div class="form-field"><label class="required">Investment amount</label><input name="investmentAmount" type="number" required value="${escapeHTML(String(ask || ''))}"></div><div class="form-field"><label class="required">Equity %</label><input name="equityPercentage" type="number" required step="0.01" value="17.5"></div><div class="form-field"><label class="required">Valuation</label><input name="valuation" type="number" required value="85000000"></div><div class="form-field full"><label>Key terms</label><textarea name="keyTerms"></textarea></div><div class="form-field full"><label>Conditions</label><textarea name="conditions"></textarea></div><div class="form-field full"><label>Timeline</label><textarea name="timeline"></textarea></div><div class="form-field full"><label class="required">Term sheet PDF</label><input name="document" type="file" accept=".pdf,application/pdf" required></div></div></form>`,
+      `${button('Cancel','close-modal')}${button('Create term sheet','submit-create-term-sheet','primary','plus',`data-deal-id="${escapeHTML(String(dealId||''))}"`)}`
+    );
+  }
+  function __pv11ShowBoardReviewModal(dealId) {
+    showModal(
+      'Start board review',
+      'Upload the investment memorandum to open IC voting.',
+      `<form id="startBoardReviewForm"><div class="form-field"><label class="required">Investment memorandum</label><input name="document" type="file" required accept=".pdf,.doc,.docx"></div></form>`,
+      `${button('Cancel','close-modal')}${button('Start review','submit-start-board-review','primary','users',`data-deal-id="${escapeHTML(String(dealId||''))}"`)}`
+    );
+  }
+  function __pv11LiveLifecycleBar(deal) {
+    if (!__pv11IsLive()) return '';
+    const dealId = String(deal?.id || state.selectedDealId || '');
+    const dd = state.dealDetail?.dueDiligence;
+    const ddTasks = dd ? __pv11AsArray(dd.tasks || dd.workstreams || dd.activities) : [];
+    const gate = dd ? __pv11CanCompleteDD(dd, ddTasks) : { ok: false, reason: 'Start due diligence first' };
+    const ddDone = __pv11IsDDComplete(dd);
+    const hasTs = Boolean(state.dealDetail?.termSheet || state.dealDetail?.termSheets?.length);
+    const hasBoard = Boolean(state.dealDetail?.boardReview);
+    const hasImpl = Boolean(state.dealDetail?.implementation || state.dealDetail?.investmentImplementation);
+    const attrs = `data-deal-id="${escapeHTML(dealId)}" data-application-id="${escapeHTML(dealId)}"`;
+    const parts = [
+      button('Reload deal','reload-deal-detail','compact','refresh', attrs),
+      button('Investee portal','open-investee-portal','compact','external-link', attrs),
+    ];
+    if (!dd) parts.unshift(button('Start due diligence','start-due-diligence','primary compact','plus', attrs));
+    else if (!ddDone) {
+      parts.unshift(button('Complete DD','complete-due-diligence','compact','check', `${attrs}${gate.ok ? '' : ` disabled title="${escapeHTML(gate.reason)}"`}`));
+      parts.unshift(button('Fill assessment','open-dd-assessment','compact','edit', attrs));
+    }
+    if (ddDone && !hasTs) parts.unshift(button('Create term sheet','create-term-sheet','primary compact','plus', attrs));
+    if (hasTs && !hasBoard) parts.unshift(button('Start board review','start-board-review','primary compact','users', attrs));
+    if (hasBoard && !hasImpl) parts.unshift(button('Start implementation','start-implementation','primary compact','plus', `${attrs} data-fund-id="${escapeHTML(String(funds[0]?.id||''))}" data-portfolio-company-id="${escapeHTML(String(state.dealDetail?.hero?.portfolioCompanyId||''))}" data-amount="${escapeHTML(String(state.dealDetail?.hero?.requestedAmount||''))}"`));
+    return `<section class="section-gap card" style="padding:12px 16px"><div class="section-heading-with-action"><div><strong>Live deal actions</strong><p class="muted small" style="margin:0">API-backed controls for this application.</p></div><div class="row-actions">${parts.join('')}</div></div></section>`;
+  }
+
+  // Wrap deal tab renderers to surface live CTAs.
+  if (typeof renderDealScreening === 'function') {
+    const __baseRenderDealScreening = renderDealScreening;
+    renderDealScreening = function(deal) {
+      const d = deal || deals.find((x) => x.id === state.selectedDealId) || deals[0];
+      if (!(__pv11IsLive() && state.dealDetail)) return __baseRenderDealScreening(d);
+      const app = state.dealDetail.application || {};
+      const hero = state.dealDetail.hero || {};
+      const outcome = String(hero.screeningOutcome || app.screeningOutcome || '');
+      const isRejected = /REJECT|BELOW_THRESHOLD/.test(outcome);
+      const isPending = !outcome || outcome === 'SCREENING_PENDING';
+      const statusLabel = isPending ? 'Pending' : outcome.replace(/_/g, ' ');
+      const statusTone = isRejected ? 'danger' : isPending ? 'neutral' : 'success';
+      const narrative = hero.screeningSummary ? String(hero.screeningSummary) : '';
+      const meetCount = deals.filter((x) => x.score >= 50 && x.stage !== 'Rejected').length;
+      const rejectCount = deals.filter((x) => x.stage === 'Rejected').length;
+      return `<section class="summary-strip"><div class="summary-item"><span>Total applications (loaded)</span><strong>${deals.length}</strong></div><div class="summary-item"><span>Meet criteria (score ≥ 50)</span><strong class="positive">${meetCount}</strong></div><div class="summary-item"><span>Rejected</span><strong class="negative">${rejectCount}</strong></div><div class="summary-item"><span>Threshold</span><strong>Score ≥ 50 → Active DD</strong></div></section>
+      <section class="split-layout"><div>
+        ${card(escapeHTML(d.name),`<div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start"><div class="score-panel"><div class="score-big"><strong>${d.score}</strong><span>/100</span></div></div>${statusPill(statusLabel,statusTone)}</div><div class="section-gap"><strong class="small">AI screening narrative</strong><p class="muted" style="font-size:10px;line-height:1.6">${narrative ? escapeHTML(narrative) : 'No AI narrative was recorded for this application (a narrative is only stored when the AI recommends rejection).'}</p></div>`,{tools:button('Re-run screening','rerun-screening','compact','refresh',`data-deal-id="${escapeHTML(d.id)}" data-application-id="${escapeHTML(d.id)}"`)})}
+      </div><div class="side-stack" style="display:flex">
+        ${card('Decision',`<div class="grid">${button('Confirm shortlist','confirm-shortlist','success','check',`data-deal-id="${escapeHTML(d.id)}" data-application-id="${escapeHTML(d.id)}"`)}${button('Move to human review','human-review','warning','users',`data-deal-id="${escapeHTML(d.id)}" data-application-id="${escapeHTML(d.id)}"`)}${button('Does not meet criteria','screen-reject','danger','x',`data-deal-id="${escapeHTML(d.id)}" data-application-id="${escapeHTML(d.id)}"`)}</div>`) }
+        ${card('Screening Rules',`<div class="info-list"><div class="info-row"><span>Passes to Due Diligence</span><strong class="positive">Score ≥ 50</strong></div><div class="info-row"><span>Auto-rejected</span><strong class="negative">Score &lt; 50</strong></div></div><p class="muted small">Applied automatically by the AI scoring service on submission; the actions on the left let an analyst confirm, override to human review, or reject.</p>`) }
+      </div></section>`;
+    };
+  }
+  if (typeof renderDealDiligence === 'function') {
+    const __baseRenderDealDiligence = renderDealDiligence;
+    renderDealDiligence = function(deal) {
+      const d = deal || deals.find((x) => x.id === state.selectedDealId) || deals[0];
+      if (__pv11IsLive() && state.dealDetail) {
+        const dd = state.dealDetail.dueDiligence;
+        if (!dd) {
+          return `${__pv11LiveLifecycleBar(d)}<section class="section-gap">${card('Due diligence', `<div class="empty-state compact"><p class="muted">No due diligence record yet.</p><div class="section-gap">${button('Start due diligence','start-due-diligence','primary','plus',`data-deal-id="${escapeHTML(String(d?.id||''))}" data-application-id="${escapeHTML(String(d?.id||''))}"`)}</div></div>`)}</section>`;
+        }
+        const tasks = __pv11AsArray(dd.tasks);
+        const tasksDone = tasks.filter(__pv11IsDDTaskComplete).length;
+        const ddScore = __pv11DdScore(dd);
+        const isComplete = __pv11IsDDComplete(dd);
+        const criteria = [
+          ['marketResearchViable', 'Market research', dd.marketResearchComments],
+          ['financialViable', 'Financial viability', dd.financialComments],
+          ['competitiveOpportunities', 'Competitive opportunities', dd.competitiveComments],
+          ['managementTeamQualified', 'Management team', dd.managementComments],
+          ['legalCompliant', 'Legal compliance', dd.legalComments],
+          ['riskTolerable', 'Risk tolerable', dd.riskComments],
+        ];
+        return `${__pv11LiveLifecycleBar(d)}<section class="metric-grid">
+        ${metricCard({label:'Overall Progress',value:isComplete?'100%':`${Math.round((ddScore/6)*100)}%`,iconName:'pie-chart',accent:'blue',foot:statusPill(dd.status||'IN_PROGRESS', isComplete?'success':'warning')})}
+        ${metricCard({label:'Criteria met',value:`${ddScore} / 6`,iconName:'briefcase',accent:'purple',foot:isComplete?'Complete':'In progress'})}
+        ${metricCard({label:'Tasks',value:`${tasksDone} / ${tasks.length}`,iconName:'clipboard',accent:'emerald',foot:tasksDone===tasks.length&&tasks.length?'Complete':'Open'})}
+        ${metricCard({label:'Overall score',value:dd.overallScore!=null?String(dd.overallScore):'—',iconName:'shield',accent:'emerald',foot:dd.recommendation||'Not scored'})}
+        </section>
+        <section class="split-layout"><div>
+          ${card('Due diligence criteria',`<div class="table-wrap"><table class="criteria-table"><thead><tr><th>Criterion</th><th>Status</th><th>Comments</th></tr></thead><tbody>${criteria.map(([key,label,comment])=>`<tr><td class="table-primary">${escapeHTML(label)}</td><td>${statusPill(dd[key]?'Met':'Pending', dd[key]?'success':'warning')}</td><td>${comment?escapeHTML(String(comment)):'—'}</td></tr>`).join('')}</tbody></table></div>`)}
+          <section class="section-gap">${card('Workstream tasks',tasks.length?`<div class="table-wrap"><table class="criteria-table"><thead><tr><th>Task</th><th>Owner</th><th>Due</th><th>Status</th></tr></thead><tbody>${tasks.map(t=>`<tr><td class="table-primary">${escapeHTML(String(t.title||t.name||''))}</td><td>${escapeHTML(String((t.team&&t.team[0]&&(t.team[0].firstName+' '+t.team[0].lastName))||'Unassigned'))}</td><td>${t.date?new Date(t.date).toLocaleDateString():'—'}</td><td>${statusPill(t.status||t.stage||'todo', __pv11IsDDTaskComplete(t)?'success':'warning')}</td></tr>`).join('')}</tbody></table></div>`:`<div class="empty-state compact"><p class="muted">No workstream tasks yet.</p></div>`)}</section>
+        </div><div class="side-stack" style="display:flex">
+          ${card('Recommendation',`<div class="info-list"><div class="info-row"><span>Recommendation</span><strong>${dd.recommendation?escapeHTML(String(dd.recommendation)):'—'}</strong></div><div class="info-row"><span>Final comments</span><strong>${dd.finalComments?escapeHTML(String(dd.finalComments)):'—'}</strong></div></div>`)}
+        </div></section>`;
+      }
+      return `${__pv11LiveLifecycleBar(d)}${__baseRenderDealDiligence(d)}`;
+    };
+  }
+  if (typeof renderDealTermSheet === 'function') {
+    const __baseRenderDealTermSheet = renderDealTermSheet;
+    renderDealTermSheet = function(deal) {
+      const d = deal || deals.find((x) => x.id === state.selectedDealId) || deals[0];
+      if (__pv11IsLive() && state.dealDetail) {
+        const ts = state.dealDetail.termSheet;
+        if (!ts) {
+          return `${__pv11LiveLifecycleBar(d)}<section class="section-gap">${card('Term sheet', `<div class="empty-state compact"><p class="muted">No term sheet yet. Created once due diligence completes.</p></div>`)}</section>`;
+        }
+        const dealId = escapeHTML(String(d?.id||''));
+        const statusTone = ts.isSigned ? 'success' : ts.status === 'FINAL' ? 'warning' : 'neutral';
+        return `${__pv11LiveLifecycleBar(d)}<section class="summary-strip"><div class="summary-item"><span>Version</span><strong>${escapeHTML(ts.version||'v1')}</strong></div><div class="summary-item"><span>Investment amount</span><strong>${ts.investmentAmount?formatMoney(Number(ts.investmentAmount)):'—'}</strong></div><div class="summary-item"><span>Equity</span><strong>${ts.equityPercentage?ts.equityPercentage+'%':'—'}</strong></div><div class="summary-item"><span>Valuation</span><strong>${ts.valuation?formatMoney(Number(ts.valuation)):'—'}</strong></div><div class="summary-item"><span>Last updated</span><strong>${ts.updatedAt?new Date(ts.updatedAt).toLocaleString():'—'}</strong></div><div class="summary-item"><span>Status</span><strong>${statusPill(ts.isSigned?'Signed':ts.status||'Draft',statusTone)}</strong></div></section>
+        <section class="section-gap grid" style="grid-template-columns:minmax(0,1fr) 320px;gap:12px"><div>
+          ${card(escapeHTML(ts.title||'Term Sheet'),`<div class="info-list"><div class="info-row"><span>Key terms</span><strong>${ts.keyTerms?escapeHTML(ts.keyTerms):'—'}</strong></div><div class="info-row"><span>Conditions</span><strong>${ts.conditions?escapeHTML(ts.conditions):'—'}</strong></div><div class="info-row"><span>Timeline</span><strong>${ts.timeline?escapeHTML(ts.timeline):'—'}</strong></div></div>`,{tools:ts.documentUrl?button('View document','preview-document','compact','eye',`data-id="${escapeHTML(ts.documentUrl)}"`):''})}
+        </div><div class="side-stack" style="display:flex">
+          ${card('Signatures',`<div class="signature-party-list"><div>${personAvatar('Applicant')}<span><strong>Applicant${ts.applicantSignature?.signedBy?` · ${escapeHTML(String(ts.applicantSignature.signedBy.firstName||''))} ${escapeHTML(String(ts.applicantSignature.signedBy.lastName||''))}`:''}</strong><small>${ts.applicantSignature?.signedAt?new Date(ts.applicantSignature.signedAt).toLocaleString():'Not signed'}</small></span>${statusPill(ts.applicantSignature?.signatureUrl?'Signed':'Pending',ts.applicantSignature?.signatureUrl?'success':'warning')}</div>${ts.applicantSignature?.signatureUrl?`<div class="signature-image-preview" style="padding:10px 14px 4px"><img src="${escapeHTML(normalizeMediaUrl(ts.applicantSignature.signatureUrl))}" alt="Applicant signature" style="max-height:60px;max-width:100%;background:#fff;border:1px solid var(--border,#e2e8f0);border-radius:6px;padding:6px"></div>`:''}<div>${personAvatar('Matanho Capital')}<span><strong>Investor (Matanho)${ts.investorSignature?.signedBy?` · ${escapeHTML(String(ts.investorSignature.signedBy.firstName||''))} ${escapeHTML(String(ts.investorSignature.signedBy.lastName||''))}`:''}</strong><small>${ts.investorSignature?.signedAt?new Date(ts.investorSignature.signedAt).toLocaleString():'Not signed'}</small></span>${statusPill(ts.investorSignature?.signatureUrl?'Signed':'Pending',ts.investorSignature?.signatureUrl?'success':'warning')}</div>${ts.investorSignature?.signatureUrl?`<div class="signature-image-preview" style="padding:10px 14px 4px"><img src="${escapeHTML(normalizeMediaUrl(ts.investorSignature.signatureUrl))}" alt="Investor signature" style="max-height:60px;max-width:100%;background:#fff;border:1px solid var(--border,#e2e8f0);border-radius:6px;padding:6px"></div>`:''}</div>`,{tools:[
+            ts.status!=='FINAL' && !ts.isSigned ? button('Finalize term sheet','finalize-term-sheet','compact','check',`data-deal-id="${dealId}" data-application-id="${dealId}"`) : '',
+            !ts.investorSignature?.signatureUrl ? button('Sign as investor','investor-sign-term-sheet','primary compact','edit',`data-deal-id="${dealId}" data-application-id="${dealId}"`) : '',
+          ].join('')})}
+          ${card('Applicant signing',`<p class="muted small">The applicant signs from their own Investee Portal (Terms page). This deal advances once both parties have signed.</p>`)}
+        </div></section>`;
+      }
+      return `${__pv11LiveLifecycleBar(d)}${__baseRenderDealTermSheet(d)}`;
+    };
+  }
+  if (typeof renderDealIC === 'function') {
+    const __baseRenderDealIC = renderDealIC;
+    renderDealIC = function(deal) {
+      const d = deal || deals.find((x) => x.id === state.selectedDealId) || deals[0];
+      if (__pv11IsLive() && state.dealDetail) {
+        const br = state.dealDetail.boardReview;
+        if (!br) {
+          return `${__pv11LiveLifecycleBar(d)}<section class="section-gap">${card('Board & Investment Committee', `<div class="empty-state compact"><p class="muted">Board review has not started. A term sheet must exist first.</p></div>`)}</section>`;
+        }
+        const votes = state.dealDetail.boardVotes || {};
+        const dealId = escapeHTML(String(d?.id||''));
+        const castVotes = Array.isArray(votes.votes) ? votes.votes : [];
+        const complete = Boolean(votes.isVotingComplete);
+        return `${__pv11LiveLifecycleBar(d)}<section class="summary-strip"><div class="summary-item"><span>Status</span><strong>${statusPill(br.status==='COMPLETED'?'Completed':'In progress',br.status==='COMPLETED'?'success':'warning')}</strong></div><div class="summary-item"><span>Approve power</span><strong class="positive">${votes.approvePower ?? 0}</strong></div><div class="summary-item"><span>Reject power</span><strong class="warning-text">${votes.rejectPower ?? 0}</strong></div><div class="summary-item"><span>Majority decision</span><strong>${votes.majorityDecision||'PENDING'}</strong></div><div class="summary-item"><span>Votes cast</span><strong>${castVotes.length}</strong></div><div class="summary-item"><span>IM document</span><strong>${br.imDocumentUrl?`<a href="${escapeHTML(normalizeMediaUrl(br.imDocumentUrl))}" target="_blank" rel="noopener">View</a>`:'—'}</strong></div></section>
+        <section class="section-gap grid" style="grid-template-columns:minmax(0,1fr) 320px;gap:12px"><div>
+          ${card('Votes cast',castVotes.length?`<div class="table-wrap"><table class="criteria-table"><thead><tr><th>Reviewer</th><th>Vote</th><th>Comment</th></tr></thead><tbody>${castVotes.map(v=>`<tr><td>${escapeHTML(v.userName||'')}</td><td>${statusPill(v.vote,v.vote==='APPROVE'?'success':'danger')}</td><td>${escapeHTML(v.comment||'')}</td></tr>`).join('')}</tbody></table></div>`:`<div class="empty-state compact"><p class="muted">No votes cast yet.</p></div>`)}
+        </div><div class="side-stack" style="display:flex">
+          ${card('Cast your vote',complete?`<p class="muted small">Voting is complete. Majority decision: <strong>${votes.majorityDecision||'—'}</strong></p>`:`<div class="grid">${button('Approve','final-vote','success compact','check',`data-deal-id="${dealId}" data-application-id="${dealId}" data-vote="APPROVE"`)}${button('Reject','final-vote','danger compact','x',`data-deal-id="${dealId}" data-application-id="${dealId}" data-vote="REJECT"`)}</div>`)}
+          ${!complete && br.status!=='COMPLETED' ? card('Close review',`<p class="muted small">Once enough votes are in, complete the board review to lock the decision.</p>`,{tools:button('Complete review','complete-board-review','compact','check',`data-deal-id="${dealId}" data-application-id="${dealId}"`)}) : ''}
+        </div></section>`;
+      }
+      return `${__pv11LiveLifecycleBar(d)}${__baseRenderDealIC(d)}`;
+    };
+  }
+  if (typeof renderDealDisbursement === 'function') {
+    const __baseRenderDealDisbursement = renderDealDisbursement;
+    renderDealDisbursement = function(deal) {
+      const d = deal || deals.find((x) => x.id === state.selectedDealId) || deals[0];
+      const bar = __pv11LiveLifecycleBar(d);
+      if (__pv11IsLive() && state.dealDetail) {
+        const impl = state.dealDetail.implementation || state.dealDetail.investmentImplementation;
+        const dealId = String(d?.id || '');
+        if (!impl) {
+          return `${bar}<section class="section-gap">${card('Disbursement', `<div class="empty-state"><div><div class="empty-state-icon">${icon('dollar')}</div><h3>No disbursement / implementation</h3><p class="muted">Initiate investment implementation after board approval.</p><div class="section-gap">${button('Initiate implementation','start-implementation','primary','plus',`data-deal-id="${escapeHTML(dealId)}" data-application-id="${escapeHTML(dealId)}" data-fund-id="${escapeHTML(String(funds[0]?.id||''))}" data-portfolio-company-id="${escapeHTML(String(state.dealDetail?.hero?.portfolioCompanyId||''))}" data-amount="${escapeHTML(String(state.dealDetail?.hero?.requestedAmount||''))}"`)}</div></div></div>`)}</section>`;
+        }
+        const summary = state.dealDetail.disbursementSummary || {};
+        const disb = Array.isArray(summary.disbursements) ? summary.disbursements : [];
+        const blocked = summary.complianceCleared === false;
+        const releaseAmount = Number(summary.remainingCommittedAmount || impl.totalCommittedAmount || 0) || 0;
+        const banks = Array.isArray(state.dealDetail.disbursementBanks) ? state.dealDetail.disbursementBanks : [];
+        return `${bar}<section class="summary-strip"><div class="summary-item"><span>Status</span><strong>${statusPill(impl.status||'INITIATED', impl.status==='COMPLETED'?'success':'info')}</strong></div><div class="summary-item"><span>Committed</span><strong>${formatMoney(Number(summary.totalCommittedAmount||impl.totalCommittedAmount||0))}</strong></div><div class="summary-item"><span>Disbursed</span><strong class="positive">${formatMoney(Number(summary.totalDisbursedAmount||0))}</strong></div><div class="summary-item"><span>Remaining</span><strong>${formatMoney(Number(summary.remainingCommittedAmount||0))}</strong></div><div class="summary-item"><span>Compliance</span><strong>${statusPill(summary.complianceCleared?'Cleared':'Blocked', summary.complianceCleared?'success':'danger')}</strong></div><div class="summary-item"><span>KYC</span><strong>${statusPill(summary.kycVerified?'Verified':'Pending', summary.kycVerified?'success':'warning')}</strong></div></section>
+        ${blocked ? `<section class="section-gap">${card('Disbursement blocked', `<p class="muted">${escapeHTML(summary.disbursementBlockedReason||'Statutory compliance not yet cleared.')}</p>`)}</section>` : ''}
+        <section class="section-gap grid" style="grid-template-columns:minmax(0,1fr) 320px;gap:12px"><div>
+          ${card('Disbursements',disb.length?`<div class="table-wrap"><table class="criteria-table"><thead><tr><th>Amount</th><th>Type</th><th>Date</th><th>Status</th><th>Reference</th><th></th></tr></thead><tbody>${disb.map(row=>`<tr><td class="table-primary">${formatMoney(Number(row.amount||0))}</td><td>${escapeHTML(row.disbursementType||'')}</td><td>${row.disbursementDate?new Date(row.disbursementDate).toLocaleDateString():'—'}</td><td>${statusPill(row.status||'PENDING', row.status==='DISBURSED'?'success':row.status==='APPROVED'?'info':'warning')}</td><td>${escapeHTML(row.transactionReference||'—')}</td><td>${row.status==='PENDING' && banks[0]?button('Approve','approve-disbursement','compact','check',`data-deal-id="${dealId}" data-application-id="${dealId}" data-disbursement-id="${escapeHTML(String(row.id||''))}" data-bank-id="${escapeHTML(String(banks[0].id||''))}"`):''}</td></tr>`).join('')}</tbody></table></div>`:`<div class="empty-state compact"><p class="muted">No tranches released yet.</p></div>`)}
+        </div><div class="side-stack" style="display:flex">
+          ${card('Release a tranche',blocked?`<p class="muted small">Clear statutory compliance before releasing funds.</p>`:`<div class="info-list"><div class="info-row"><span>Amount</span><strong>${formatMoney(releaseAmount)}</strong></div><div class="info-row"><span>Type</span><strong>Equity</strong></div></div><p class="muted small">Releases the full remaining committed amount as a single tranche.</p>`,{tools:blocked?'':button('Release tranche','confirm-release-tranche','primary compact','unlock',`data-deal-id="${escapeHTML(dealId)}" data-application-id="${escapeHTML(dealId)}" data-implementation-id="${escapeHTML(String(impl.id||''))}" data-amount="${releaseAmount}" data-disbursement-type="EQUITY"`)})}
+        </div></section>`;
+      }
+      return `${bar}${__baseRenderDealDisbursement(d)}`;
+    };
+  }
+  if (typeof renderDealDetail === 'function') {
+    const __baseRenderDealDetail = renderDealDetail;
+    renderDealDetail = function() {
+      const html = __baseRenderDealDetail();
+      if (!__pv11IsLive()) return html;
+      // Ensure investee / retry affordances exist even if extract omitted them.
+      return html;
+    };
+  }
+
+  // Intercept handleAction for lifecycle + id aliases that need form capture.
+  if (typeof handleAction === 'function') {
+    const __baseHandleAction = handleAction;
+    handleAction = function(action, trigger, event) {
+      const dealId = __pv11DealId(trigger);
+      switch (action) {
+        case 'retry-live-load':
+          state.liveLoadError = null;
+          window.dispatchEvent(new CustomEvent('pv11:retry-live-load'));
+          return;
+        case 'reload-deal-detail':
+          if (dealId) window.dispatchEvent(new CustomEvent('matanho:load-deal-detail', { detail: { applicationId: dealId } }));
+          return;
+        case 'open-investee-portal':
+        case 'open-applicant-portal': {
+          const external = window.__INVESTEE_PORTAL_URL__ ? String(window.__INVESTEE_PORTAL_URL__).replace(/\/$/, '') : '';
+          window.open(external ? `${external}/investee-portal-v8` : '/investee-portal-v8', '_blank', 'noopener,noreferrer');
+          return;
+        }
+        case 'start-due-diligence':
+          if (!dealId) { toast('Deal required', 'Open a deal first.', 'warning'); return; }
+          if (!__pv11ShouldWireDeal(dealId)) break;
+          __pv11EmitApi('api-initiate-due-diligence', { applicationId: dealId, dealId });
+          return;
+        case 'complete-due-diligence': {
+          if (!dealId) { toast('Deal required', 'Open a deal first.', 'warning'); return; }
+          if (!__pv11ShouldWireDeal(dealId)) break;
+          const dd = state.dealDetail?.dueDiligence;
+          const tasks = dd ? __pv11AsArray(dd.tasks || dd.workstreams || dd.activities) : [];
+          const gate = __pv11CanCompleteDD(dd, tasks);
+          if (!gate.ok) {
+            toast('Cannot complete due diligence', gate.reason, 'warning');
+            if (dd && (!dd.finalComments || !dd.recommendation || dd.overallScore == null)) __pv11ShowDdAssessmentModal();
+            return;
+          }
+          __pv11EmitApi('api-complete-due-diligence', { applicationId: dealId, dealId });
+          return;
+        }
+        case 'open-dd-assessment':
+          __pv11ShowDdAssessmentModal();
+          return;
+        case 'view-dd-assessment': {
+          const dd = state.dealDetail?.dueDiligence;
+          if (!dd) { toast('No assessment', 'Start due diligence first.', 'warning'); return; }
+          showDrawer('Investment assessment', `Score ${dd.overallScore != null ? dd.overallScore : __pv11DdScore(dd)+'/6'}`, `<div class="info-list"><div class="info-row"><span>Recommendation</span><strong>${escapeHTML(String(dd.recommendation||'—'))}</strong></div><div class="info-row"><span>Comments</span><strong>${escapeHTML(String(dd.finalComments||'—'))}</strong></div></div>`, button('Close','close-drawer'));
+          return;
+        }
+        case 'submit-dd-assessment': {
+          const form = document.getElementById('ddAssessmentForm');
+          if (!form?.reportValidity()) return;
+          const fd = new FormData(form);
+          const asBool = (name) => fd.get(name) === '1' || fd.get(name) === 'on' || fd.get(name) === 'true';
+          __pv11EmitApi('api-update-due-diligence', {
+            applicationId: dealId,
+            dealId,
+            marketResearchViable: String(asBool('marketResearchViable')),
+            marketResearchComments: String(fd.get('marketResearchComments') || ''),
+            financialViable: String(asBool('financialViable')),
+            financialComments: String(fd.get('financialComments') || ''),
+            competitiveOpportunities: String(asBool('competitiveOpportunities')),
+            competitiveComments: String(fd.get('competitiveComments') || ''),
+            managementTeamQualified: String(asBool('managementTeamQualified')),
+            managementComments: String(fd.get('managementComments') || ''),
+            legalCompliant: String(asBool('legalCompliant')),
+            legalComments: String(fd.get('legalComments') || ''),
+            riskTolerable: String(asBool('riskTolerable')),
+            riskComments: String(fd.get('riskComments') || ''),
+            recommendation: String(fd.get('recommendation') || 'APPROVE'),
+            finalComments: String(fd.get('finalComments') || ''),
+          });
+          return;
+        }
+        case 'create-term-sheet':
+          __pv11ShowCreateTermSheetModal(dealId);
+          return;
+        case 'submit-create-term-sheet': {
+          const form = document.getElementById('createTermSheetForm');
+          if (!form?.reportValidity()) return;
+          const file = form.querySelector('input[type="file"][name="document"]')?.files?.[0];
+          if (!file) { toast('Document required', 'Upload the term sheet PDF.', 'warning'); return; }
+          const d = Object.fromEntries(new FormData(form));
+          __pv11EmitApi('api-create-term-sheet', {
+            applicationId: dealId,
+            dealId,
+            title: String(d.title || ''),
+            investmentAmount: String(d.investmentAmount || ''),
+            equityPercentage: String(d.equityPercentage || ''),
+            valuation: String(d.valuation || ''),
+            keyTerms: String(d.keyTerms || ''),
+            conditions: String(d.conditions || ''),
+            timeline: String(d.timeline || ''),
+          }, { document: file });
+          return;
+        }
+        case 'start-board-review':
+          __pv11ShowBoardReviewModal(dealId);
+          return;
+        case 'submit-start-board-review': {
+          const form = document.getElementById('startBoardReviewForm');
+          if (!form?.reportValidity()) return;
+          const file = form.querySelector('input[type="file"][name="document"]')?.files?.[0];
+          if (!file) { toast('Document required', 'Upload the investment memorandum.', 'warning'); return; }
+          __pv11EmitApi('api-create-board-review', { applicationId: dealId, dealId }, { document: file });
+          return;
+        }
+        case 'start-implementation': {
+          if (!dealId) { toast('Deal required', 'Open a deal first.', 'warning'); return; }
+          const fundId = String(state.dealDetail?.application?.fundId || state.dealDetail?.hero?.fundId || state.dealDetail?.fundId || funds[0]?.id || '');
+          const portfolioCompanyId = String(state.dealDetail?.hero?.portfolioCompanyId || state.dealDetail?.portfolioCompanyId || state.dealDetail?.portfolioCompany?.id || '');
+          __pv11EmitApi('api-initiate-implementation', {
+            applicationId: dealId,
+            dealId,
+            fundId,
+            portfolioCompanyId,
+            amount: String(state.dealDetail?.application?.requestedAmount || deals.find((d)=>String(d.id)===dealId)?.amount || ''),
+          });
+          return;
+        }
+        case 'preview-deal-document':
+        case 'download-deal-document':
+        case 'open-deal-document-external': {
+          const url = trigger?.dataset?.url;
+          if (url) window.open(url, '_blank', 'noopener,noreferrer');
+          else toast('No document URL', 'This document has no downloadable link.', 'warning');
+          return;
+        }
+        case 'confirm-shortlist':
+          if (!dealId) { toast('Deal required', 'Open a deal first.', 'warning'); return; }
+          if (!__pv11ShouldWireDeal(dealId)) break;
+          __pv11EmitApi('api-trigger-shortlisting', { applicationId: dealId, dealId });
+          return;
+        case 'rerun-screening':
+        case 'human-review':
+          if (!dealId) { toast('Deal required', 'Open a deal first.', 'warning'); return; }
+          if (!__pv11ShouldWireDeal(dealId)) break;
+          __pv11EmitApi('api-analyst-screening', {
+            applicationId: dealId,
+            dealId,
+            score: String(trigger?.dataset?.score || deals.find((d)=>String(d.id)===dealId)?.score || 75),
+          });
+          return;
+        case 'screen-reject':
+          if (!dealId) { toast('Deal required', 'Open a deal first.', 'warning'); return; }
+          if (!__pv11ShouldWireDeal(dealId)) break;
+          __pv11EmitApi('api-analyst-screening', {
+            applicationId: dealId,
+            dealId,
+            score: String(trigger?.dataset?.score || 40),
+            reject: 'true',
+          });
+          return;
+        case 'vote-approve':
+        case 'vote-conditions':
+        case 'vote-reject':
+        case 'vote-defer': {
+          if (!__pv11ShouldWireDeal(dealId)) break;
+          const voteMap = {
+            'vote-approve': 'APPROVE',
+            'vote-conditions': 'APPROVE',
+            'vote-reject': 'REJECT',
+            'vote-defer': 'APPROVE',
+          };
+          __pv11EmitApi('api-cast-ic-vote', {
+            applicationId: dealId,
+            dealId,
+            vote: voteMap[action] || 'APPROVE',
+            comment: action.replace('vote-', ''),
+          });
+          return;
+        }
+        case 'final-vote': {
+          if (!__pv11ShouldWireDeal(dealId)) break;
+          const raw = String(trigger?.dataset?.vote || 'Approve');
+          __pv11EmitApi('api-cast-ic-vote', {
+            applicationId: dealId,
+            dealId,
+            vote: /reject/i.test(raw) ? 'REJECT' : 'APPROVE',
+            comment: raw,
+          });
+          return;
+        }
+        case 'send-capital-call-notices':
+        case 'send-notices': {
+          const call = capitalCalls.find((c) => c.id === (trigger?.dataset?.id || state.selectedCapitalCallId)) || capitalCalls[0];
+          if (!call) { toast('No capital call', 'Select a capital call first.', 'warning'); return; }
+          const fund = funds.find((f) => f.name === call.fund || f.id === call.fundId) || funds[0];
+          __pv11EmitApi('send-capital-call-notices', {
+            fundId: String(call.fundId || fund?.id || ''),
+            id: String(call.id),
+            capitalCallId: String(call.id),
+          });
+          return;
+        }
+        case 'export-deals': {
+          const rows = typeof filteredDeals === 'function' ? filteredDeals() : deals;
+          exportCSV('deal-register.csv', [
+            ['ID','Deal','Stage','Sector','Round','Ask','Owner','Age','Score','Priority','Fund'],
+            ...rows.map((d) => [d.id, d.name, d.stage, d.sector, d.round, d.amount, d.owner, d.age, d.score, d.priority, d.fund]),
+          ]);
+          return;
+        }
+        case 'wizard-back':
+        case 'wizard-next':
+        case 'wizard-step':
+        case 'toggle-deal-column':
+          // UI chrome — fall through to base if present, else no-op.
+          break;
+        case 'new-signature-envelope':
+          __pv11ShowNewEnvelope();
+          return;
+        case 'submit-new-envelope':
+          __pv11SubmitNewEnvelope();
+          return;
+        case 'signature-templates':
+          __pv11ShowSignatureTemplates();
+          return;
+        case 'use-signature-template':
+          __pv11UseSignatureTemplate(trigger);
+          return;
+        case 'export-settings': {
+          const snapshot = {
+            exportedAt: new Date().toISOString(),
+            currentRole: state.currentRole,
+            rolePermissions: Object.fromEntries(
+              Object.values(v11RoleDefinitions).map(r => [r.id, r.permissions || {}])
+            ),
+          };
+          downloadBlob('portfolio-role-permissions.json', new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' }));
+          return;
+        }
+        default:
+          break;
+      }
+      return __baseHandleAction(action, trigger, event);
+    };
+  }
+
+  // Live-aware capital call / LP / fund / company submits are implemented in the
+  // base submit* handlers (emit api-* when state.liveData). Do not wrap again here.
+
+  // Mark live after hydrate when host paints API data.
+  if (typeof hydrateFromBackend === 'function') {
+    const __baseHydrate = hydrateFromBackend;
+    hydrateFromBackend = function(payload) {
+      state.liveData = true;
+      state.hydrating = false;
+      state.pageLoading = false;
+      state.liveLoadError = null;
+      const result = __baseHydrate(payload);
+      try { rootEl.classList.remove('is-hydrating', 'is-host-error', 'is-page-loading'); } catch (_) {}
+      return result;
+    };
+  }
+
+  // Defensive recipients for e-signatures (T2.1).
+  if (typeof renderESignatures === 'function' || Array.isArray(signatureEnvelopes)) {
+    const harden = () => {
+      signatureEnvelopes.forEach((e) => {
+        if (!Array.isArray(e.recipients)) e.recipients = [];
+      });
+    };
+    harden();
+    const __baseRender = render;
+    render = function() {
+      try { harden(); } catch (_) {}
+      return __baseRender.apply(this, arguments);
+    };
+  }
+  /* END_PORTFOLIO_LIVE_BRIDGE */
+
   window.MatanhoPortfolioUI = Object.freeze({
     version: '25.0.0',
     hydrate: function(payload) {
-      try { rootEl.classList.remove('is-hydrating', 'is-host-error'); } catch (_) {}
+      state.hydrating = false;
+      state.pageLoading = false;
+      state.liveLoadError = null;
+      try { rootEl.classList.remove('is-hydrating', 'is-host-error', 'is-page-loading'); } catch (_) {}
       return hydrateFromBackend(payload);
     },
     beginLiveLoad: __pv11BeginLiveLoad,
     failLiveLoad: __pv11FailLiveLoad,
+    setPageLoading: __pv11SetPageLoading,
     setActionBusy: __pv11SetActionBusy,
     notify: function(title, body, tone) { if (typeof toast === 'function') toast(title, body || '', tone || 'info'); },
     closeOverlays: function() { if (typeof closeOverlays === 'function') closeOverlays(); },
     setDealTab: function(tab) { if (tab) { state.dealTab = tab; render(); } },
+    setFundPerformanceSnapshots: function(fundId, snapshots) {
+      if (!fundId) return;
+      state.fundPerformanceSnapshots = state.fundPerformanceSnapshots || {};
+      state.fundPerformanceSnapshots[fundId] = Array.isArray(snapshots) ? snapshots : [];
+      render();
+    },
+    setFundDocuments: function(fundId, documents) {
+      if (!fundId) return;
+      state.fundDocuments = state.fundDocuments || {};
+      state.fundDocuments[fundId] = Array.isArray(documents) ? documents : [];
+      render();
+    },
     setDealDetail: function(detail) {
       if (!detail || typeof detail !== 'object') return;
       if (detail.selectedDealId != null) state.selectedDealId = detail.selectedDealId;
-      if (detail.dealDetail != null) state.dealDetail = detail.dealDetail;
-      Object.assign(state, detail);
+      // loadDealDetail() returns the payload itself; older callers wrap as { dealDetail }.
+      if (detail.dealDetail != null && typeof detail.dealDetail === 'object') {
+        state.dealDetail = detail.dealDetail;
+      } else if (
+        detail.application != null ||
+        Array.isArray(detail.documents) ||
+        detail.hero != null ||
+        detail.dueDiligence != null ||
+        detail.termSheet != null ||
+        detail.boardReview != null
+      ) {
+        state.dealDetail = detail;
+      } else if (detail.dealDetail === null) {
+        state.dealDetail = null;
+      }
+      __pv11SyncDealIntoList(state.dealDetail);
       render();
     },
     setDealDetailLoading: function(loading) {
@@ -4920,6 +6755,9 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       if (Array.isArray(users)) state.investmentUsers = users;
       if (typeof showAssignDdTaskModal === 'function') showAssignDdTaskModal();
       else if (typeof toast === 'function') toast('Assign DD task', 'Open Due Diligence on the deal to assign tasks.');
+    },
+    openSignatureTemplatesModal: function(templates) {
+      if (typeof __pv11RenderSignatureTemplates === 'function') __pv11RenderSignatureTemplates(templates);
     },
     getSnapshot: publicSnapshot,
     render,

@@ -172,7 +172,8 @@ export function scopesForPage(page: string): PageScopePlan {
       return { primary: ['documents'], secondary: [] }
 
     case 'e-signatures':
-      return { primary: ['agreements'], secondary: [] }
+      // Secondary: New Envelope needs real fund/deal options to link an envelope to.
+      return { primary: ['agreements'], secondary: ['funds', 'applications'] }
 
     case 'mailer-lists':
       return { primary: ['mailer'], secondary: [] }
@@ -184,8 +185,8 @@ export function scopesForPage(page: string): PageScopePlan {
       return { primary: ['dashboard'], secondary: ['funds'] }
 
     case 'applicant-portal':
-      // Redirect/public apply — no portfolio hydrate required.
-      return { primary: [], secondary: [] }
+      // Avoid infinite skeleton: hydrate with dashboard so the host clears is-hydrating.
+      return { primary: ['dashboard'], secondary: [] }
 
     default:
       return { primary: ['dashboard'], secondary: ['companies', 'funds'] }

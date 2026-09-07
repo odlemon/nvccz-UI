@@ -225,6 +225,7 @@ export function FundingApplicationApp() {
         businessStage: draft.businessStage.trim() || draft.fundingRound.trim(),
         foundingDate: draft.foundingDate,
         requestedAmount: Number(draft.requestedAmount),
+        source: "APPLICANT_FORM",
         applicationFormData: {
           ownershipPercent: draft.ownershipPercent,
           boardComposition: draft.boardComposition,

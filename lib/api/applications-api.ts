@@ -62,6 +62,10 @@ export interface ApplicationCreateRequest {
   foundingDate: string
   requestedAmount: number
   fundId?: string
+  /** Staff Add Deal: INTERNAL; applicant form: APPLICANT_FORM (when BE supports). */
+  source?: string
+  /** Ownership/valuation/governance fields the Add Deal wizard collects (proposedOwnership, preMoneyValuation, ownershipPercent, boardComposition, keyShareholders, governanceNotes, targetCloseDate, ...). */
+  applicationFormData?: Record<string, unknown>
   files: File[]
   documentTypes: string[]
 }
@@ -283,6 +287,14 @@ class ApplicationsApiService {
       formData.append('fundId', applicationData.fundId)
     }
 
+    if (applicationData.source) {
+      formData.append('source', applicationData.source)
+    }
+
+    if (applicationData.applicationFormData) {
+      formData.append('applicationFormData', JSON.stringify(applicationData.applicationFormData))
+    }
+
     // Append files
     applicationData.files.forEach((file) => {
       formData.append('files', file)
@@ -338,6 +350,8 @@ class ApplicationsApiService {
     foundingDate: string
     requestedAmount: number
     fundId?: string
+    /** Public form: APPLICANT_FORM; staff Add Deal uses multipart create with INTERNAL. */
+    source?: string
     applicationFormData?: Record<string, unknown>
     documents: Array<{
       documentType: string

@@ -4,10 +4,12 @@ declare module "@/components/investee-portal-v8-mock/matanho-investee-portal-run
     options?: {
       shellHtml?: string
       initialPage?: string
+      liveOnly?: boolean
       onNavigate?: (page: string) => void
     }
   ): {
     setPage: (page: string) => void
     destroy: () => void
+    hydrate?: (payload: unknown) => void
   }
 }

@@ -37,13 +37,13 @@ Portfolio V11 FE (`/portfolio/*`) paints progressive scopes. Funds page side car
 
 ### 2. Fund performance fields on fund list (optional)
 
-**Why:** “Top Performing Funds” currently uses deterministic illustrative IRR/TVPI when API omits performance.
+**Why:** “Top Performing Funds” and IRR/DPI columns need real metrics. FE **no longer** uses demoSeed illustrative fallbacks (2026-09-05).
 
 **Endpoint:** `GET /funds` (or portfolio fund list)
 
-**Nice-to-have fields:** `grossIrr`, `netIrr`, `tvpi`, `dpi`, `distributed`
+**Required fields:** `grossIrr`, `netIrr`, `tvpi`, `dpi`, `distributed`
 
-**FE today:** `adaptFunds` in `lib/portfolio-v11/adapters.ts` falls back to stable demo metrics per fund id.
+**FE today:** `adaptFunds` — live fields only; absent → `0`. See also `design-refs/portfolio-staff-phase02-backend-asks.md` §1.
 
 ### 3. Report vault run metadata (optional)
 

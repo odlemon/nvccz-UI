@@ -258,6 +258,9 @@ export type Pv11SignatureEnvelope = {
   documentId: string
   document: string
   subject: string
+  documentType?: string
+  fundName?: string
+  dealName?: string
   recipients: Array<[string, string, string]>
   status: string
   sent: string
@@ -284,6 +287,11 @@ export type Pv11MailerList = {
   campaigns: number
   tags: string[]
   channels?: string[]
+  description?: string
+  owner?: string
+  funds?: string[]
+  consent?: string
+  updated?: string
 }
 
 export type Pv11DashboardMetrics = {

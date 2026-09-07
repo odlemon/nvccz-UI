@@ -11,20 +11,11 @@ import { investmentOpsApi } from '@/lib/api/investment-ops-api'
 import { portfolioCompaniesApi } from '@/lib/api/portfolio-companies-api'
 import { stockPickerCashApi } from '@/lib/api/stock-picker-cash-api'
 import { termSheetApi } from '@/lib/api/term-sheet-api'
+import { usersApi } from '@/lib/api/users-api'
+import { getAuthUser } from '@/lib/utils/cookies'
 import { asArray } from './adapters'
 import { loadPortfolioV11Scopes, type PortfolioDataScope } from './bootstrap'
 import { loadDealDetail } from './live-loaders'
-
-type MatanhoPortfolioUI = {
-  hydrate: (payload: unknown) => void
-  setDealDetail?: (detail: unknown) => void
-}
-
-declare global {
-  interface Window {
-    MatanhoPortfolioUI?: MatanhoPortfolioUI
-  }
-}
 
 const UI_STAGE_TO_BE: Record<string, string> = {
   Sourcing: 'SCREENING_PENDING',
@@ -93,6 +84,16 @@ export async function handlePortfolioV11Action(detail: {
           error: 'Applicant name, email, business name and requested amount are required',
         }
       }
+      const formDataFields: Record<string, unknown> = {}
+      if (ds.proposedOwnership) formDataFields.proposedOwnership = ds.proposedOwnership
+      if (ds.preMoneyValuation) formDataFields.preMoneyValuation = ds.preMoneyValuation
+      if (ds.ownershipPercent) formDataFields.ownershipPercent = ds.ownershipPercent
+      if (ds.boardComposition) formDataFields.boardComposition = ds.boardComposition
+      if (ds.keyShareholders) formDataFields.keyShareholders = ds.keyShareholders
+      if (ds.governanceNotes) formDataFields.governanceNotes = ds.governanceNotes
+      if (ds.targetCloseDate) formDataFields.targetCloseDate = ds.targetCloseDate
+      if (ds.fundingRound) formDataFields.fundingRound = ds.fundingRound
+
       await applicationsApi.create({
         applicantName: ds.applicantName,
         applicantEmail: ds.applicantEmail,
@@ -105,6 +106,9 @@ export async function handlePortfolioV11Action(detail: {
         foundingDate: ds.foundingDate || new Date().toISOString().slice(0, 10),
         requestedAmount: Number(ds.requestedAmount),
         fundId: firstFundId(ds) || undefined,
+        // Staff Add Deal / submit-add-deal always INTERNAL (no UI selector).
+        source: 'INTERNAL',
+        applicationFormData: Object.keys(formDataFields).length ? formDataFields : undefined,
         files,
         documentTypes: [
           'BUSINESS_PLAN',
@@ -209,24 +213,79 @@ export async function handlePortfolioV11Action(detail: {
       return { handled: true, message: 'Match reversed' }
     }
 
-    if (action === 'submit-create-fund' || action === 'create-fund-submit') {
+    if (action === 'submit-create-fund' || action === 'create-fund-submit' || action === 'api-create-fund') {
       const name = ds.name || `Fund ${new Date().toISOString().slice(0, 10)}`
+      const totalAmount = Number(ds.totalAmount || ds.commitment || 10000000)
+      const minInvestment = Number(ds.minInvestment || Math.min(100000, totalAmount))
+      const maxInvestment = Number(ds.maxInvestment || Math.max(minInvestment, Math.round(totalAmount * 0.25)))
+      // "Management fee" (e.g. "2.0%") and "Carry terms" (e.g. "20% above 8% hurdle") are collected
+      // as free text in the wizard; parse the leading percentages into decimals for the backend's
+      // managementFeeRate/carryRate/hurdleRate columns, which the create payload previously dropped.
+      const pctToDecimal = (text?: string): number | undefined => {
+        if (!text) return undefined
+        const match = String(text).match(/(\d+(?:\.\d+)?)\s*%/)
+        return match ? Number(match[1]) / 100 : undefined
+      }
+      const carryText = String(ds.carry || '')
+      const hurdleMatch = carryText.match(/(\d+(?:\.\d+)?)\s*%\s*hurdle/i)
       await fundsApi.create({
         name,
-        description: ds.description || 'Created from Portfolio V23',
-        totalAmount: Number(ds.totalAmount || 10000000),
-        minInvestment: Number(ds.minInvestment || 100000),
-        maxInvestment: Number(ds.maxInvestment || 5000000),
-        focusIndustries: (ds.focusIndustries || 'Private Equity').split(',').map((s) => s.trim()),
+        description: ds.description || 'Created from Portfolio',
+        totalAmount,
+        minInvestment,
+        maxInvestment,
+        focusIndustries: String(ds.focusIndustries || ds.strategy || 'Private Equity')
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean),
         applicationStart: new Date().toISOString(),
         applicationEnd: new Date(Date.now() + 365 * 86400000 * 5).toISOString(),
         status: 'OPEN',
+        managementFeeRate: pctToDecimal(ds.managementFee),
+        carryRate: pctToDecimal(carryText),
+        hurdleRate: hurdleMatch ? Number(hurdleMatch[1]) / 100 : undefined,
+        vintageYear: ds.vintage ? Number(ds.vintage) : undefined,
+        currencyCode: ds.currency || undefined,
+        geography: ds.geography || undefined,
       })
       await rehydrate(['funds', 'dashboard'])
       return { handled: true, message: `Fund created: ${name}` }
     }
 
-    if (action === 'submit-add-lp' || action === 'add-lp-submit') {
+    if (action === 'submit-fund-edit' || action === 'api-update-fund') {
+      const fundId = ds.fundId || ds.id
+      if (!fundId) return { handled: true, error: 'Fund is required' }
+      const pctToDecimal = (text?: string): number | undefined => {
+        if (!text) return undefined
+        const match = String(text).match(/(\d+(?:\.\d+)?)\s*%/)
+        return match ? Number(match[1]) / 100 : undefined
+      }
+      const carryText = String(ds.carry || '')
+      const hurdleMatch = carryText.match(/(\d+(?:\.\d+)?)\s*%\s*hurdle/i)
+      // The edit form's "Status" options (Investing/Fundraising/Realising/Closed) are UI labels, not
+      // the backend's real OPEN/CLOSED/PAUSED enum — only map the one unambiguous case (Closed) and
+      // leave status untouched otherwise, rather than overwriting real backend state with a guess.
+      const statusMap: Record<string, 'OPEN' | 'CLOSED' | 'PAUSED'> = { Closed: 'CLOSED' }
+      await fundsApi.update(fundId, {
+        name: ds.name || undefined,
+        description: ds.description || undefined,
+        status: ds.status ? statusMap[ds.status] : undefined,
+        managementFeeRate: pctToDecimal(ds.managementFee),
+        carryRate: pctToDecimal(carryText),
+        hurdleRate: hurdleMatch ? Number(hurdleMatch[1]) / 100 : undefined,
+        geography: ds.geography || undefined,
+      })
+      await rehydrate(['funds', 'dashboard'])
+      return { handled: true, message: `Fund updated: ${ds.name || fundId}` }
+    }
+
+    if (
+      action === 'submit-add-lp' ||
+      action === 'add-lp-submit' ||
+      action === 'submit-lp' ||
+      action === 'add-lp' ||
+      action === 'api-add-lp'
+    ) {
       await clientsApi.create({
         legal_name: ds.name || ds.legalName || 'New LP',
         email: ds.email || `lp.${Date.now()}@example.com`,
@@ -239,7 +298,11 @@ export async function handlePortfolioV11Action(detail: {
       return { handled: true, message: 'LP created' }
     }
 
-    if (action === 'submit-create-capital-call' || action === 'api-create-capital-call') {
+    if (
+      action === 'submit-create-capital-call' ||
+      action === 'api-create-capital-call' ||
+      action === 'submit-capital-call'
+    ) {
       const fundId = ds.fundId
       if (!fundId) return { handled: true, error: 'Fund is required' }
       await capitalCallsApi.initiate(fundId, {
@@ -393,19 +456,23 @@ export async function handlePortfolioV11Action(detail: {
     }
 
     if (action === 'api-create-envelope' || action === 'submit-new-envelope') {
+      const documentType = ds.documentType || ds.type
+      if (!documentType) return { handled: true, error: 'Document type is required' }
+      if (!ds.subject) return { handled: true, error: 'Envelope subject is required' }
       const agreement = await fundraisingApi.createAgreement({
-        title: ds.subject || ds.title || 'Portfolio agreement',
-        type: ds.type || 'TERM_SHEET',
+        title: ds.subject,
+        documentType,
         fundId: firstFundId(ds) || undefined,
         applicationId: ds.applicationId || undefined,
       })
       const agreementId = (agreement as any)?.id || (agreement as any)?.data?.id
-      if (agreementId && (ds.recipientEmail || ds.recipientName)) {
+      if (agreementId && ds.recipientEmail && ds.recipientName) {
         await fundraisingApi.addSignatory(agreementId, {
-          name: ds.recipientName || 'Signatory',
-          email: ds.recipientEmail || `signer.${Date.now()}@example.com`,
+          fullName: ds.recipientName,
+          email: ds.recipientEmail,
           role: ds.recipientRole || 'Signer',
-          order: 1,
+          sequenceOrder: 1,
+          expiresAt: ds.expires || undefined,
         })
         await fundraisingApi.sendAgreement(agreementId, {}).catch(() => null)
       }
@@ -416,12 +483,43 @@ export async function handlePortfolioV11Action(detail: {
     if (action === 'api-upload-document' || action === 'vault-upload-live') {
       const fundId = firstFundId(ds)
       if (!fundId) return { handled: true, error: 'Fund is required to create a document' }
+      const file: File | undefined =
+        detail.file instanceof File
+          ? detail.file
+          : !detail.files || Array.isArray(detail.files)
+            ? undefined
+            : detail.files.document
+      let fileId: string | undefined = ds.fileId
+      if (file && !fileId) {
+        const buf = await file.arrayBuffer()
+        const bytes = new Uint8Array(buf)
+        let binary = ''
+        for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
+        const contentBase64 = btoa(binary)
+        const uploaded = await investmentOpsApi.uploadBinaryFile({
+          fundId,
+          fileName: file.name || ds.fileName || 'upload.bin',
+          mimeType: file.type || 'application/octet-stream',
+          contentBase64,
+          byteSize: file.size || bytes.length,
+        })
+        fileId = uploaded?.data?.fileId
+        if (!fileId) {
+          return { handled: true, error: uploaded?.message || 'Document upload session failed' }
+        }
+      }
+      if (!fileId) {
+        return {
+          handled: true,
+          error:
+            'Choose a file to upload. Vault documents require an Investment Ops upload session (fileId).',
+        }
+      }
       await investmentOpsApi.createDocument({
         fundId,
         documentType: ds.documentType || ds.folder || 'GENERAL',
-        title: ds.title || ds.fileName || 'Uploaded document',
-        fileRef: ds.fileRef,
-        fileId: ds.fileId,
+        title: ds.title || ds.fileName || file?.name || 'Uploaded document',
+        fileId,
       })
       await rehydrate(['documents'])
       return { handled: true, message: 'Document registered' }
@@ -524,6 +622,15 @@ export async function handlePortfolioV11Action(detail: {
       if (!applicationId) return { handled: true, error: 'Deal id required' }
       const document = !detail.files || Array.isArray(detail.files) ? undefined : detail.files.document
       if (!document) return { handled: true, error: 'Investment memorandum file is required' }
+      // BE only accepts board-review create from UNDER_BOARD_REVIEW (not TERM_SHEET).
+      try {
+        await applicationsApi.changeStage(applicationId, {
+          newStage: 'UNDER_BOARD_REVIEW',
+          notes: 'Moved to board review to attach investment memorandum',
+        })
+      } catch {
+        // Already UNDER_BOARD_REVIEW or transition not allowed — create may still succeed.
+      }
       await boardReviewApi.create(applicationId, document)
       await hydrateDealDetail(applicationId)
       await rehydrate(['applications'])
@@ -590,10 +697,11 @@ export async function handlePortfolioV11Action(detail: {
       return { handled: true, message: 'Clarification request emailed to the applicant' }
     }
 
-    if (action === 'api-cast-ic-vote' || action === 'final-vote' || action === 'ic-vote-submit') {
+    if (action === 'api-cast-ic-vote' || action === 'final-vote' || action === 'ic-vote-submit' ||
+        action === 'vote-approve' || action === 'vote-conditions' || action === 'vote-reject' || action === 'vote-defer') {
       const applicationId = ds.applicationId || ds.dealId || ds.id
       if (!applicationId) return { handled: true, error: 'Deal id required' }
-      const raw = String(ds.vote || 'APPROVE').toUpperCase()
+      const raw = String(ds.vote || ds.comment || action || 'APPROVE').toUpperCase()
       const vote = raw.includes('REJECT') ? 'REJECT' : 'APPROVE'
       await boardReviewApi.castVote(applicationId, {
         vote,
@@ -603,16 +711,127 @@ export async function handlePortfolioV11Action(detail: {
       return { handled: true, message: `Vote recorded (${vote})` }
     }
 
+    if (action === 'api-trigger-shortlisting' || action === 'confirm-shortlist') {
+      const applicationId = ds.applicationId || ds.dealId || ds.id
+      if (!applicationId) return { handled: true, error: 'Deal id required' }
+      // "Confirm shortlist" is meaningful at two different stages, backed by two different
+      // endpoints: SCREENING_PENDING -> run the initial AI shortlisting pass; SCREENING (AI has
+      // already scored it) -> record the analyst's own confirming score. Using the wrong one for
+      // the app's current stage always 400s ("Only applications in SCREENING_PENDING can be
+      // processed"), so branch on the real current stage instead of assuming SCREENING_PENDING.
+      const current = await applicationsApi.getById(applicationId).catch(() => null)
+      const currentStage = String((current as any)?.data?.currentStage ?? (current as any)?.currentStage ?? '')
+      if (currentStage === 'SCREENING') {
+        const existingScore = Number(
+          (current as any)?.data?.initialScreeningScore ?? (current as any)?.initialScreeningScore ?? 75,
+        )
+        const assignedAnalystId =
+          (current as any)?.data?.assignedAnalystId ?? (current as any)?.assignedAnalystId ?? null
+        if (!assignedAnalystId) {
+          // Analyst screening requires a lead analyst on the record (must be a user in the
+          // Investments department with the investment-analyst role). Self-assign when the
+          // acting user qualifies; otherwise claim the first eligible analyst on record so the
+          // deal isn't permanently stuck with no one able to record a score.
+          const me = getAuthUser()
+          const meQualifies =
+            String(me?.department || '').toLowerCase() === 'investments' ||
+            String(me?.roleCode || '').toUpperCase() === 'INV_ANALYST'
+          if (me?.id && meQualifies) {
+            await applicationsApi.assignAnalyst(applicationId, me.id)
+          } else {
+            const usersRes = await usersApi.getAll().catch(() => null)
+            const users = asArray((usersRes as any)?.data ?? usersRes)
+            const eligible = users.find(
+              (u: any) =>
+                String(u?.department?.name || u?.department || '').toLowerCase() === 'investments',
+            )
+            if (eligible?.id) await applicationsApi.assignAnalyst(applicationId, eligible.id)
+          }
+        }
+        await applicationsApi.analystScreening(applicationId, Number(ds.score) || existingScore || 75)
+      } else {
+        await applicationsApi.triggerShortlisting(applicationId)
+      }
+      await rehydrate(['applications'])
+      if (window.MatanhoPortfolioUI?.getSnapshot?.()?.state?.selectedDealId === applicationId) {
+        await hydrateDealDetail(applicationId)
+      }
+      return { handled: true, message: 'Shortlist confirmed' }
+    }
+
+    if (
+      action === 'api-analyst-screening' ||
+      action === 'rerun-screening' ||
+      action === 'human-review' ||
+      action === 'screen-reject'
+    ) {
+      const applicationId = ds.applicationId || ds.dealId || ds.id
+      if (!applicationId) return { handled: true, error: 'Deal id required' }
+      const score = Number(ds.score || (action === 'screen-reject' ? 40 : 75))
+      await applicationsApi.analystScreening(applicationId, score)
+      await rehydrate(['applications'])
+      if (window.MatanhoPortfolioUI?.getSnapshot?.()?.state?.selectedDealId === applicationId) {
+        await hydrateDealDetail(applicationId)
+      }
+      const msg =
+        action === 'screen-reject'
+          ? 'Screening score recorded (reject path)'
+          : action === 'human-review'
+            ? 'Screening score recorded for human review'
+            : 'Analyst screening recorded'
+      return { handled: true, message: msg }
+    }
+
     if (action === 'api-update-term-sheet' || action === 'accept-counter' || action === 'retain-position') {
       const applicationId = ds.applicationId || ds.dealId || ds.id
       if (!applicationId) return { handled: true, error: 'Deal id required' }
       const decision = action === 'accept-counter' ? 'Accepted company counter' : 'Retained Matanho position'
+      const allowedStatus = ['DRAFT', 'FINAL', 'SIGNED'] as const
+      const nextStatus = allowedStatus.find((s) => s === ds.status)
       await termSheetApi.update(applicationId, {
         keyTerms: ds.keyTerms || `${decision} · clause ${ds.clause || ds.section || ''}`.trim(),
-        status: ds.status,
+        ...(nextStatus ? { status: nextStatus } : {}),
       })
       await hydrateDealDetail(applicationId)
       return { handled: true, message: 'Term sheet updated' }
+    }
+
+    if (action === 'api-complete-board-review' || action === 'complete-board-review') {
+      const applicationId = ds.applicationId || ds.dealId || ds.id
+      if (!applicationId) return { handled: true, error: 'Deal id required' }
+      await boardReviewApi.complete(applicationId)
+      await hydrateDealDetail(applicationId)
+      await rehydrate(['applications'])
+      return { handled: true, message: 'Board review completed' }
+    }
+
+    if (action === 'api-finalize-term-sheet' || action === 'finalize-term-sheet') {
+      const applicationId = ds.applicationId || ds.dealId || ds.id
+      if (!applicationId) return { handled: true, error: 'Deal id required' }
+      await termSheetApi.finalize(applicationId)
+      await hydrateDealDetail(applicationId)
+      return { handled: true, message: 'Term sheet finalized' }
+    }
+
+    if (action === 'api-investor-sign-term-sheet' || action === 'investor-sign-term-sheet') {
+      const applicationId = ds.applicationId || ds.dealId || ds.id
+      if (!applicationId) return { handled: true, error: 'Deal id required' }
+      const signerName = ds.signerName || 'Matanho Capital'
+      const canvas = document.createElement('canvas')
+      canvas.width = 320
+      canvas.height = 120
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return { handled: true, error: 'Could not generate signature' }
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+      ctx.fillStyle = '#111827'
+      ctx.font = 'italic 32px cursive'
+      ctx.fillText(signerName, 20, 70)
+      const signature = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'))
+      if (!signature) return { handled: true, error: 'Could not generate signature' }
+      await termSheetApi.investorSign(applicationId, signature)
+      await hydrateDealDetail(applicationId)
+      return { handled: true, message: 'Term sheet signed as investor' }
     }
 
     if (action === 'api-release-tranche' || action === 'confirm-release-tranche') {
@@ -635,6 +854,17 @@ export async function handlePortfolioV11Action(detail: {
       if (ds.applicationId) await hydrateDealDetail(ds.applicationId)
       else await rehydrate(['applications'])
       return { handled: true, message: 'Disbursement request created' }
+    }
+
+    if (action === 'api-approve-disbursement' || action === 'approve-disbursement') {
+      const disbursementId = ds.disbursementId
+      if (!disbursementId) return { handled: true, error: 'Disbursement id required' }
+      const bankId = ds.bankId
+      if (!bankId) return { handled: true, error: 'No eligible disbursement bank configured' }
+      await investmentImplementationApi.disbursementDecision(disbursementId, 'APPROVE', bankId)
+      if (ds.applicationId) await hydrateDealDetail(ds.applicationId)
+      else await rehydrate(['applications'])
+      return { handled: true, message: 'Disbursement approved' }
     }
 
     if (action === 'api-send-lp-communication' || action === 'send-communication') {
@@ -660,7 +890,10 @@ export async function handlePortfolioV11Action(detail: {
 
 export async function hydrateDealDetail(applicationId: string) {
   const detail = await loadDealDetail(applicationId)
-  window.MatanhoPortfolioUI?.setDealDetail?.(detail)
+  window.MatanhoPortfolioUI?.setDealDetail?.({
+    selectedDealId: applicationId,
+    dealDetail: detail,
+  })
   return detail
 }
 

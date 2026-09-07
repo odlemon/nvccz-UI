@@ -792,6 +792,8 @@ async function listAgreements(params?: {
   opportunityId?: string
   investorId?: string
   campaignId?: string
+  applicationId?: string
+  fundId?: string
 }) {
   const res = await apiClient.get<ApiResponse<any[] | FrPaginated<any>>>(
     `${FR}/agreements${qs(params)}`
@@ -804,6 +806,15 @@ async function listAgreements(params?: {
 async function createAgreement(body: Record<string, any>) {
   const res = await apiClient.post<ApiResponse<any>>(`${FR}/agreements`, body)
   return unwrapData(res)
+}
+
+async function listAgreementTemplates() {
+  const res = await apiClient.get<ApiResponse<any[] | FrPaginated<any>>>(
+    `${FR}/agreement-templates`
+  )
+  const data = unwrapData(res)
+  if (Array.isArray(data)) return data
+  return (data as FrPaginated<any>).items ?? []
 }
 
 async function getAgreement(agreementId: string) {
@@ -1268,6 +1279,7 @@ export const fundraisingApi = {
   // agreements
   listAgreements,
   createAgreement,
+  listAgreementTemplates,
   getAgreement,
   uploadAgreementVersion,
   addSignatory,

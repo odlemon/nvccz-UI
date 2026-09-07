@@ -397,7 +397,7 @@
 .portfolio-v11-root .button.compact{ min-height: 32px; padding: 6px 10px; border-radius: 9px; font-size: 11px; }
 .portfolio-v11-root .button.icon-only{ width: 38px; padding: 0; }
 .portfolio-v11-root .button:disabled{ opacity: .5; cursor: not-allowed; transform: none; filter: grayscale(.1); box-shadow: none; }
-.portfolio-v11-root .select, .portfolio-v11-root select, .portfolio-v11-root .input, .portfolio-v11-root input[type="text"], .portfolio-v11-root input[type="number"], .portfolio-v11-root input[type="date"], .portfolio-v11-root input[type="email"], .portfolio-v11-root textarea{
+.portfolio-v11-root .select, .portfolio-v11-root select, .portfolio-v11-root .input, .portfolio-v11-root input:not([type]), .portfolio-v11-root input[type="text"], .portfolio-v11-root input[type="search"], .portfolio-v11-root input[type="tel"], .portfolio-v11-root input[type="url"], .portfolio-v11-root input[type="number"], .portfolio-v11-root input[type="date"], .portfolio-v11-root input[type="email"], .portfolio-v11-root textarea{
   border: 1px solid var(--line);
   border-radius: 11px;
   background: var(--surface);
@@ -643,6 +643,9 @@
 .portfolio-v11-root .tab:hover{ color: var(--ink); }
 .portfolio-v11-root .tab.active{ color: var(--brand); }
 .portfolio-v11-root .tab.active::after{ content: ""; position: absolute; left: 12px; right: 12px; bottom: -1px; height: 2px; border-radius: 2px 2px 0 0; background: linear-gradient(90deg,var(--brand),var(--orange)); }
+.portfolio-v11-root .tab.tab-disabled{ color: var(--muted); opacity: .5; cursor: not-allowed; }
+.portfolio-v11-root .tab.tab-disabled:hover{ color: var(--muted); }
+.portfolio-v11-root .tab.tab-disabled svg{ width: 10px; height: 10px; margin-left: 4px; vertical-align: -1px; }
 .portfolio-v11-root .profile-tabs{ position: sticky; top: -1px; z-index: 8; background: color-mix(in srgb,var(--canvas) 92%,transparent); backdrop-filter: blur(16px); }
 .portfolio-v11-root .profile-tab-panel{ animation: profilePanelIn .2s ease both; min-height: 420px; }
 .portfolio-v11-root .profile-tab-summary{ display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 13px 0 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-soft); }
@@ -669,6 +672,8 @@
 .portfolio-v11-root .step-index{ width: 25px; height: 25px; flex: 0 0 25px; border-radius: 50%; display: grid; place-items: center; border: 2px solid var(--line-strong); color: var(--muted); background: var(--surface); font-size: 10px; font-weight: 850; }
 .portfolio-v11-root .step.complete .step-index{ color: #fff; border-color: var(--emerald); background: var(--emerald); }
 .portfolio-v11-root .step.current .step-index{ color: #fff; border-color: var(--blue); background: var(--blue); box-shadow: 0 0 0 4px rgba(36,117,245,.1); }
+.portfolio-v11-root .step.rejected .step-index{ color: #fff; border-color: var(--red); background: var(--red); }
+.portfolio-v11-root .step.rejected .step-copy strong{ color: var(--red); }
 .portfolio-v11-root .step-copy{ min-width: 0; display: flex; flex-direction: column; }
 .portfolio-v11-root .step-copy strong{ font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .portfolio-v11-root .step-copy small{ color: var(--muted); font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

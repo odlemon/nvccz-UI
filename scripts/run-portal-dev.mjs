@@ -15,9 +15,14 @@ if (!port) {
   process.exit(1)
 }
 
+const distDir = `.next-${portal}`
+
 const env = {
   ...process.env,
   NEXT_PUBLIC_PORTAL: portal,
+  // Per-portal distDir so concurrent `dev:staff` + `dev:investee` do not
+  // clobber each other's inlined NEXT_PUBLIC_PORTAL in shared `.next`.
+  NEXT_DIST_DIR: distDir,
 }
 
 if (portal === "staff") {
@@ -30,7 +35,7 @@ if (portal === "staff") {
   }
 }
 
-console.log(`Starting ${portal} portal on http://localhost:${port}`)
+console.log(`Starting ${portal} portal on http://localhost:${port} (distDir=${distDir})`)
 
 const child = spawn("npx", ["next", "dev", "-p", String(port)], {
   stdio: "inherit",

@@ -61,6 +61,8 @@ const STAGE_MAP: Record<string, string> = {
   TERM_SHEET: 'Term Sheet',
   TERM_SHEET_ISSUED: 'Term Sheet',
   TERM_SHEET_NEGOTIATION: 'Term Sheet',
+  TERM_SHEET_CREATED: 'Term Sheet',
+  TERM_SHEET_APPROVED: 'Term Sheet',
   APPROVED: 'Term Sheet',
   INVESTMENT_IMPLEMENTATION: 'Portfolio',
   DISBURSEMENT: 'Portfolio',
@@ -68,6 +70,7 @@ const STAGE_MAP: Record<string, string> = {
   FUNDED: 'Portfolio',
   PORTFOLIO: 'Portfolio',
   PORTFOLIO_MANAGEMENT: 'Portfolio',
+  PORTFOLIO_COMPANY_CREATED: 'Portfolio',
   ACTIVE: 'Portfolio',
   REJECTED: 'Rejected',
   REJECTED_SCREENING: 'Rejected',
@@ -85,20 +88,28 @@ export function adaptFunds(raw: any[]): Pv11Fund[] {
     const fee = num(f.managementFeeRate)
     const carry = num(f.carryRate)
     const hurdle = num(f.hurdleRate)
-    // Prefer live performance fields; otherwise deterministic illustrative metrics per fund
-    // so Funds page "Top Performing" / IRR columns are not empty zeros.
-    const demoSeed = [...String(f.id || f.name || i)].reduce((a, c) => a + c.charCodeAt(0), 0)
-    const grossIrr = num(
-      f.grossIrr ?? f.grossIRR ?? f.irr ?? f.performance?.grossIrr,
-      11 + (demoSeed % 140) / 10,
-    )
-    const netIrr = num(f.netIrr ?? f.netIRR ?? f.performance?.netIrr, Math.max(6, grossIrr - 2.4))
-    const tvpi = num(
-      f.tvpi ?? f.performance?.tvpi,
-      Number((1.15 + (demoSeed % 110) / 100).toFixed(2)),
-    )
-    const dpi = num(f.dpi ?? f.performance?.dpi, Number((0.18 + (demoSeed % 40) / 100).toFixed(2)))
-    const distributed = num(f.distributed ?? f.totalDistributed, commitment * dpi * 0.45)
+    // Prefer live performance fields only — do not invent IRR/DPI (T2.6 backend ask).
+    const hasPerf =
+      f.grossIrr != null ||
+      f.grossIRR != null ||
+      f.irr != null ||
+      f.netIrr != null ||
+      f.netIRR != null ||
+      f.tvpi != null ||
+      f.dpi != null ||
+      f.performance?.grossIrr != null ||
+      f.performance?.netIrr != null ||
+      f.performance?.tvpi != null ||
+      f.performance?.dpi != null
+    const grossIrr = hasPerf
+      ? num(f.grossIrr ?? f.grossIRR ?? f.irr ?? f.performance?.grossIrr, 0)
+      : 0
+    const netIrr = hasPerf
+      ? num(f.netIrr ?? f.netIRR ?? f.performance?.netIrr, Math.max(0, grossIrr - 2.4))
+      : 0
+    const tvpi = hasPerf ? num(f.tvpi ?? f.performance?.tvpi, 0) : 0
+    const dpi = hasPerf ? num(f.dpi ?? f.performance?.dpi, 0) : 0
+    const distributed = num(f.distributed ?? f.totalDistributed, dpi > 0 ? commitment * dpi * 0.45 : 0)
     return {
       id: String(f.id),
       name: String(f.name || 'Fund'),
@@ -109,7 +120,7 @@ export function adaptFunds(raw: any[]): Pv11Fund[] {
       currency: String(f.currencyCode || f.currency || 'USD'),
       commitment,
       called,
-      nav: remaining || commitment * Math.max(0.35, tvpi - dpi),
+      nav: remaining || (tvpi > 0 ? commitment * Math.max(0.35, tvpi - dpi) : remaining),
       distributed,
       grossIrr,
       netIrr,
@@ -587,6 +598,9 @@ export function adaptSignatureEnvelopes(raw: any[]): Pv11SignatureEnvelope[] {
       documentId: String(a.documentId || a.fileId || a.id || `DOC-${i + 1}`),
       document: String(a.documentName || a.fileName || a.templateName || `${title}.pdf`),
       subject: title,
+      documentType: String(a.documentType || '—'),
+      fundName: String(a.fund?.name || ''),
+      dealName: String(a.application?.businessName || ''),
       recipients,
       status,
       sent: fmtDate(a.sentAt || a.createdAt),
@@ -605,10 +619,20 @@ export function adaptSignatureEnvelopes(raw: any[]): Pv11SignatureEnvelope[] {
 export function adaptMailerLists(raw: any[]): Pv11MailerList[] {
   return (raw || []).map((l) => {
     const members = num(l.memberCount ?? l.recipients?.length ?? l.members)
+    const source = String(l.source || l.fundName || 'Fund reporting')
     return {
       id: String(l.id),
       name: String(l.name || 'Distribution list'),
-      source: String(l.source || l.fundName || 'Fund reporting'),
+      source,
+      description: String(l.description || l.subtitle || l.notes || source),
+      owner: String(l.ownerName || l.owner || l.createdByName || l.managedBy || '—'),
+      funds: Array.isArray(l.funds)
+        ? l.funds.map(String)
+        : l.fundName
+          ? [String(l.fundName)]
+          : [],
+      consent: String(l.consent || l.consentStatus || 'Verified'),
+      updated: fmtDate(l.updatedAt || l.lastRefreshedAt || l.createdAt) || '—',
       status: String(l.status || 'Active'),
       members,
       active: num(l.activeCount, members),

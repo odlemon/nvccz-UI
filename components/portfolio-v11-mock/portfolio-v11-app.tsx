@@ -18,6 +18,8 @@ import {
 } from "@/lib/portfolio-v11/bootstrap"
 import { handlePortfolioV11Action, hydrateDealDetail } from "@/lib/portfolio-v11/actions"
 import { applicationsApi } from "@/lib/api/applications-api"
+import { fundsApi } from "@/lib/api/funds-api"
+import { fundraisingApi } from "@/lib/api/fundraising-api"
 import { asArray } from "@/lib/portfolio-v11/adapters"
 import { getAuthToken } from "@/lib/utils/cookies"
 import {
@@ -34,27 +36,6 @@ type RuntimeApi = {
   beginLiveLoad?: () => void
   failLiveLoad?: (message?: string) => void
   hydrate?: (payload: unknown) => void
-}
-
-declare global {
-  interface Window {
-    __APPLY_PORTAL_URL__?: string
-    __INVESTEE_PORTAL_URL__?: string
-    MatanhoPortfolioUI?: {
-      hydrate: (payload: unknown) => void
-      beginLiveLoad?: () => void
-      failLiveLoad?: (message?: string) => void
-      getSnapshot?: () => { state?: { selectedDealId?: string; page?: string } }
-      setDealDetail?: (detail: unknown) => void
-      setDealDetailLoading?: (loading: boolean) => void
-      setInvestmentUsers?: (users: unknown[]) => void
-      openDdTaskModal?: (users?: unknown[]) => void
-      notify?: (title: string, body?: string, tone?: string) => void
-      closeOverlays?: () => void
-      setActionBusy?: (busy: boolean, message?: string, actionName?: string) => void
-      setDealTab?: (tab: string) => void
-    }
-  }
 }
 
 function applyHydrate(runtime: RuntimeApi, payload: unknown) {
@@ -124,6 +105,24 @@ export function PortfolioV11App() {
         pathnameRef.current = pathOnly
         window.history.pushState({ portfolioV11: page }, "", path)
         void ensurePageDataRef.current?.(page, { soft: true })
+        if (page === "deal-detail") {
+          let dealIdForDetail = ""
+          try {
+            dealIdForDetail =
+              new URLSearchParams(window.location.search).get("id") ||
+              window.MatanhoPortfolioUI?.getSnapshot?.()?.state?.selectedDealId ||
+              sessionStorage.getItem("pv11.selectedDealId") ||
+              ""
+          } catch {
+            dealIdForDetail = ""
+          }
+          if (dealIdForDetail) {
+            window.MatanhoPortfolioUI?.setDealDetailLoading?.(true)
+            void hydrateDealDetail(String(dealIdForDetail)).finally(() => {
+              window.MatanhoPortfolioUI?.setDealDetailLoading?.(false)
+            })
+          }
+        }
       },
     })
     apiRef.current = runtime
@@ -212,11 +211,22 @@ export function PortfolioV11App() {
         : plan.secondary.filter((s) => !loadedScopesRef.current.has(s))
 
       if (!primary.length && !secondary.length) {
+        window.MatanhoPortfolioUI?.setPageLoading?.(false)
         setLoadStatus("ready")
         return
       }
 
+      // Soft nav onto already-hydrated primary: drop any prior page skeleton.
+      if (soft && !primary.length) {
+        window.MatanhoPortfolioUI?.setPageLoading?.(false)
+      }
+
       const gen = ++hydrateGenRef.current
+
+      // Soft nav into unloaded scopes: page skeleton only — never beginLiveLoad (clears all collections).
+      if (soft && primary.length) {
+        window.MatanhoPortfolioUI?.setPageLoading?.(true)
+      }
 
       if (!soft) {
         paintedLiveRef.current = false
@@ -255,6 +265,10 @@ export function PortfolioV11App() {
           setLoadMessage(summarizePayload(page, primaryPayload))
         }
 
+        if (soft && primary.length) {
+          window.MatanhoPortfolioUI?.setPageLoading?.(false)
+        }
+
         if (!primary.length && !soft) {
           paintedLiveRef.current = true
           setLoadStatus("ready")
@@ -280,6 +294,7 @@ export function PortfolioV11App() {
         const msg = err?.message || "Failed to load portfolio data from API"
         setLoadStatus("error")
         setLoadMessage(msg)
+        window.MatanhoPortfolioUI?.setPageLoading?.(false)
         if (!soft) {
           runtime.failLiveLoad?.(msg)
         }
@@ -316,8 +331,61 @@ export function PortfolioV11App() {
         "unmatch",
         "reverse-match",
         "change-deal-stage",
+        // Phase 0/1 aliases (bridge usually emits api-* after form capture)
+        "submit-capital-call",
+        "submit-create-capital-call",
+        "submit-lp",
+        "add-lp",
+        "submit-add-lp",
+        "submit-create-fund",
+        "create-fund-submit",
+        "submit-company",
+        "submit-add-deal",
+        "api-create-application",
+        "api-create-fund",
+        "api-add-lp",
+        "api-create-company",
+        "api-create-capital-call",
+        "start-due-diligence",
+        "complete-due-diligence",
+        "submit-create-term-sheet",
+        "submit-start-board-review",
+        "start-implementation",
+        "submit-dd-assessment",
+        "confirm-shortlist",
+        "rerun-screening",
+        "screen-reject",
+        "human-review",
+        "vote-approve",
+        "vote-conditions",
+        "vote-reject",
+        "vote-defer",
+        "final-vote",
+        "finalize-term-sheet",
+        "investor-sign-term-sheet",
+        "complete-board-review",
+        "confirm-release-tranche",
+        "approve-disbursement",
       ])
       const actionName = String(detail.action || "")
+      // Form-backed submits need the runtime handleAction to gather FormData first.
+      // Those handlers re-emit api-* which this listener then services.
+      const formFirst = new Set([
+        "submit-capital-call",
+        "submit-lp",
+        "add-lp",
+        "submit-create-fund",
+        "submit-company",
+        "submit-add-deal",
+        "submit-create-term-sheet",
+        "submit-start-board-review",
+        "submit-dd-assessment",
+        "create-term-sheet",
+        "start-board-review",
+        "complete-due-diligence",
+        "open-dd-assessment",
+      ])
+      if (formFirst.has(actionName)) return
       if (!named.has(actionName) && !actionName.startsWith("api-")) return
       event.preventDefault()
       if (actionBusyRef.current) return
@@ -333,7 +401,11 @@ export function PortfolioV11App() {
                 ? "submit-add-lp"
                 : detail.action === "api-create-capital-call"
                   ? "submit-create-capital-call"
-                  : detail.action
+                  : detail.action === "submit-capital-call"
+                    ? "submit-create-capital-call"
+                    : detail.action === "submit-lp" || detail.action === "add-lp"
+                      ? "submit-add-lp"
+                      : detail.action
 
       const busyLabel =
         String(action).includes("create") ||
@@ -441,6 +513,46 @@ export function PortfolioV11App() {
         })
     }
 
+    const onFundDetail = (event: Event) => {
+      const fundId = (event as CustomEvent).detail?.fundId
+      if (!fundId) return
+      void fundsApi
+        .getPerformanceSnapshots(fundId)
+        .then((res) => {
+          window.MatanhoPortfolioUI?.setFundPerformanceSnapshots?.(fundId, res?.data || [])
+        })
+        .catch(() => {
+          window.MatanhoPortfolioUI?.setFundPerformanceSnapshots?.(fundId, [])
+        })
+      void fundsApi
+        .getDocuments(fundId)
+        .then((res) => {
+          window.MatanhoPortfolioUI?.setFundDocuments?.(fundId, res?.data || [])
+        })
+        .catch(() => {
+          window.MatanhoPortfolioUI?.setFundDocuments?.(fundId, [])
+        })
+    }
+
+    const onUploadFundDocument = (event: Event) => {
+      const detail = (event as CustomEvent).detail || {}
+      const { fundId, file, category } = detail
+      if (!fundId || !file) return
+      window.MatanhoPortfolioUI?.notify?.('Uploading…', file.name, 'info')
+      void fundsApi
+        .uploadDocument(fundId, file, category)
+        .then(() => {
+          window.MatanhoPortfolioUI?.notify?.('Document uploaded', file.name, 'success')
+          return fundsApi.getDocuments(fundId)
+        })
+        .then((res) => {
+          if (res) window.MatanhoPortfolioUI?.setFundDocuments?.(fundId, res.data || [])
+        })
+        .catch((err: any) => {
+          window.MatanhoPortfolioUI?.notify?.('Upload failed', err?.message || 'Could not upload document', 'error')
+        })
+    }
+
     const onPrepareDdTaskModal = () => {
       void applicationsApi
         .getInvestmentUsers()
@@ -465,12 +577,43 @@ export function PortfolioV11App() {
       void ensurePageData(page, { hard: true })
     }
 
+    const onLoadSignatureTemplates = () => {
+      void fundraisingApi
+        .listAgreementTemplates()
+        .then((templates) => {
+          window.MatanhoPortfolioUI?.openSignatureTemplatesModal?.(asArray(templates))
+        })
+        .catch((err: any) => {
+          window.MatanhoPortfolioUI?.notify?.(
+            "Could not load signature templates",
+            err?.message || "Template list failed to load.",
+            "error",
+          )
+          window.MatanhoPortfolioUI?.openSignatureTemplatesModal?.([])
+        })
+    }
+
     window.addEventListener("matanho:before-action", onBeforeAction)
     window.addEventListener("matanho:reload-request", onReload)
     window.addEventListener("matanho:load-deal-detail", onDealDetail)
+    window.addEventListener("matanho:load-fund-detail", onFundDetail)
+    window.addEventListener("matanho:upload-fund-document", onUploadFundDocument)
     window.addEventListener("matanho:prepare-dd-task-modal", onPrepareDdTaskModal)
+    window.addEventListener("matanho:load-signature-templates", onLoadSignatureTemplates)
     window.addEventListener("pv11:retry-live-load", onRetryLiveLoad)
     void ensurePageData(initialPage)
+    if (initialPage === "deal-detail") {
+      const dealId =
+        new URLSearchParams(window.location.search).get("id") ||
+        sessionStorage.getItem("pv11.selectedDealId") ||
+        ""
+      if (dealId) {
+        window.MatanhoPortfolioUI?.setDealDetailLoading?.(true)
+        void hydrateDealDetail(dealId).finally(() => {
+          window.MatanhoPortfolioUI?.setDealDetailLoading?.(false)
+        })
+      }
+    }
 
     return () => {
       hydrateGenRef.current += 1
@@ -478,7 +621,10 @@ export function PortfolioV11App() {
       window.removeEventListener("matanho:before-action", onBeforeAction)
       window.removeEventListener("matanho:reload-request", onReload)
       window.removeEventListener("matanho:load-deal-detail", onDealDetail)
+      window.removeEventListener("matanho:load-fund-detail", onFundDetail)
+      window.removeEventListener("matanho:upload-fund-document", onUploadFundDocument)
       window.removeEventListener("matanho:prepare-dd-task-modal", onPrepareDdTaskModal)
+      window.removeEventListener("matanho:load-signature-templates", onLoadSignatureTemplates)
       window.removeEventListener("pv11:retry-live-load", onRetryLiveLoad)
       apiRef.current?.destroy()
       apiRef.current = null

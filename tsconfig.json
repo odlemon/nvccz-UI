@@ -22,6 +22,15 @@
       "@/*": ["./*"]
     }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    ".next-staff/types/**/*.ts",
+    ".next-lp/types/**/*.ts",
+    ".next-investee/types/**/*.ts",
+    ".next-apply/types/**/*.ts"
+  ],
   "exclude": ["node_modules"]
 }
