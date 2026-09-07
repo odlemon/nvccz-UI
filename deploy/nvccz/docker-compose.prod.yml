@@ -120,7 +120,7 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=lms_lms-network
-      - traefik.http.routers.nvccz-prod-ui-staff.rule=Host(`${PUBLIC_STAFF_HOST}`)
+      - traefik.http.routers.nvccz-prod-ui-staff.rule=Host(`${PUBLIC_STAFF_HOST}`) || Host(`${PUBLIC_STAFF_HOST_ALT}`)
       - traefik.http.routers.nvccz-prod-ui-staff.entrypoints=websecure
       - traefik.http.routers.nvccz-prod-ui-staff.tls.certresolver=le
       - traefik.http.services.nvccz-prod-ui-staff.loadbalancer.server.port=3000
@@ -271,7 +271,11 @@ services:
       - default
       - edge
     ports:
-      - "3250:3000"
+      # 3250 is taken by the upload service (127.0.0.1:3250->3050), which made
+      # ui-events fail to start with "port is already allocated". Traefik routes
+      # this service by container port 3000 over the docker network, so the host
+      # binding only affects direct access.
+      - "3260:3000"
     environment:
       NODE_ENV: production
       PORT: "3000"

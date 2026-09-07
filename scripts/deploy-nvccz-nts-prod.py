@@ -23,6 +23,9 @@ UI_ROOT = Path(r"C:\Users\lysp\Downloads\nvccz-new")
 COMPOSE_DIR = UI_ROOT / "deploy" / "nvccz"
 # Public HTTPS hostnames (Traefik on NTS). Override via env when staff domain is purchased.
 PUBLIC_STAFF_HOST = os.environ.get("NVCCZ_PUBLIC_STAFF_HOST", "matanho.nvccz.com")
+PUBLIC_STAFF_HOST_ALT = os.environ.get(
+    "NVCCZ_PUBLIC_STAFF_HOST_ALT", "nvfnvvcz.my.matanho.com"
+)
 STAFF_URL = f"https://{PUBLIC_STAFF_HOST}"
 APPLY_URL = os.environ.get("NVCCZ_APPLY_URL", "https://nvccz.online")
 LP_URL = os.environ.get("NVCCZ_LP_URL", "https://lp.nvccz.online")
@@ -140,6 +143,10 @@ def env_blob(mysql_root: str, mysql_pass: str, jwt: str, admin_pw: str) -> str:
         "PUBLIC_INVESTEE_PORTAL_URL": investee_ui,
         "PUBLIC_APPLY_PORTAL_URL": apply_ui,
         "PUBLIC_STAFF_HOST": PUBLIC_STAFF_HOST,
+        # Mirror host (NVCCZ frontend on Matanho infrastructure). The staff
+        # Traefik router matches this in addition to PUBLIC_STAFF_HOST, so a
+        # redeploy does not drop the mirror URL that is handed out to users.
+        "PUBLIC_STAFF_HOST_ALT": PUBLIC_STAFF_HOST_ALT,
         "NEXT_PUBLIC_ORGANIZATION_NAME": "NVCCZ",
         # Client branding. docker-compose.prod.yml passes this to every ui-* build
         # as a build arg; without it the UI falls back to Matanho branding.
