@@ -18,10 +18,11 @@ import {
   adaptAc52FixedAssets,
   adaptAc52Investments,
   adaptAc52Approvals,
+  adaptAc52FxExposure,
 } from './adapters'
 import type { Ac52HydratePayload } from './types'
 
-export type Ac52DataScope = 'coa' | 'journals' | 'cash' | 'reconciliation' | 'payables' | 'receivables' | 'expenses' | 'inventory' | 'assets' | 'investments' | 'statements' | 'approvals'
+export type Ac52DataScope = 'coa' | 'journals' | 'cash' | 'reconciliation' | 'payables' | 'receivables' | 'expenses' | 'inventory' | 'assets' | 'investments' | 'statements' | 'approvals' | 'fx'
 
 export type Ac52ScopePlan = {
   primary: Ac52DataScope[]
@@ -59,6 +60,8 @@ export function scopesForAc52Page(page: string): Ac52ScopePlan {
       return { primary: ['statements'] }
     case 'approvals':
       return { primary: ['approvals'] }
+    case 'fx':
+      return { primary: ['fx'] }
     default:
       return { primary: [] }
   }
@@ -212,6 +215,11 @@ export async function loadAc52Scopes(scopes: Ac52DataScope[]): Promise<Ac52Hydra
   if (wanted.includes('investments')) {
     const res = await settle(getSTIDashboard({}), 'stiDashboard', errors)
     if (Array.isArray(res?.data?.instruments)) data.investments = adaptAc52Investments(res!.data!.instruments)
+  }
+
+  if (wanted.includes('fx')) {
+    const res = await settle(accountingApi.getUnrealizedFxGainsReport(), 'unrealizedFx', errors)
+    if (res?.data) data.fx = adaptAc52FxExposure(res.data)
   }
 
   if (wanted.includes('statements')) {

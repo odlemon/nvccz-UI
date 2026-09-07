@@ -180,6 +180,51 @@ export function adaptAc52Approvals(rows: RawJournalEntry[]): Ac52Approval[] {
     }))
 }
 
+/** [item, currency, FCY balance, book rate, close rate, base carrying, FX movement, status] — matches the runtime's fxPage23 exposure register table shape (matanho-accounting-runtime.js). */
+export type Ac52FxExposureRow = [string, string, number, number, number, number, number, string]
+
+export type Ac52FxSummary = {
+  exposure: number
+  gain: number
+  lines: Ac52FxExposureRow[]
+}
+
+function round4(n: number): number {
+  return Math.round((n + Number.EPSILON) * 10000) / 10000
+}
+
+/**
+ * Adapt GET /accounting/multi-currency/reports/unrealized-fx into the FX Revaluation page's exposure
+ * register. This is the only real FX-revaluation data the backend exposes — open AR invoices' ZiG
+ * functional-currency exposure — so bank/AP-side monetary exposure (which the mock's original
+ * hardcoded rows implied) isn't covered; there's no backend report for it. Book/close "rate" here is
+ * approximated as functional-value ÷ FCY-balance (the report gives functional-currency values, not a
+ * bare rate), which is the same concept the mock's rate columns represent even if not the identical
+ * currency pair. Empty when there's no open foreign-currency AR — an honest empty state, not a bug
+ * (this test ledger has no non-USD invoices).
+ */
+export function adaptAc52FxExposure(report: { lines?: any[]; totals?: { netUnrealized?: string } }): Ac52FxSummary {
+  const lines: Ac52FxExposureRow[] = (report.lines || []).map((l: any) => {
+    const fcy = Number(l.outstandingAmount) || 0
+    const originalValue = Number(l.originalFunctionalValue) || 0
+    const currentValue = Number(l.currentFunctionalValue) || 0
+    const movement = (l.gainLossType === 'LOSS' ? -1 : 1) * (Number(l.unrealizedGainLoss) || 0)
+    return [
+      `${l.invoiceNumber || l.invoiceId} · ${l.customerName}`,
+      l.invoiceCurrencyCode,
+      fcy,
+      fcy ? round4(originalValue / fcy) : 0,
+      fcy ? round4(currentValue / fcy) : 0,
+      currentValue,
+      movement,
+      l.gainLossType === 'NONE' ? 'Ready' : 'Review',
+    ]
+  })
+  const exposure = lines.reduce((s, l) => s + Math.abs(l[5]), 0)
+  const gain = Number(report.totals?.netUnrealized) || 0
+  return { exposure, gain, lines }
+}
+
 /** Adapt live cashbook bank rows into the shape S.banks expects. */
 export function adaptAc52Banks(rows: RawCashbookBank[]): Ac52Bank[] {
   return rows.map((r) => ({

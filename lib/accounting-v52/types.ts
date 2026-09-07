@@ -228,5 +228,6 @@ export type Ac52HydratePayload = {
     investments?: Ac52Investment[]
     reportRows?: import('./financial-statements').Ac52ReportRows
     approvals?: Ac52Approval[]
+    fx?: import('./adapters').Ac52FxSummary
   }
 }
