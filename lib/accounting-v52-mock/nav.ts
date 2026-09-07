@@ -1,6 +1,7 @@
 /** Accounting V52 page id → Next path */
 export const AC52_PAGE_TO_PATH: Record<string, string> = {
   'overview': '/accounting-v52',
+  'ceo': '/accounting-v52/ceo',
   'approvals': '/accounting-v52/approvals',
   'close': '/accounting-v52/close',
   'ledger': '/accounting-v52/general-ledger',
@@ -10,10 +11,13 @@ export const AC52_PAGE_TO_PATH: Record<string, string> = {
   'payables': '/accounting-v52/payables',
   'receivables': '/accounting-v52/receivables',
   'expenses': '/accounting-v52/expenses',
+  'timesheets': '/accounting-v52/timesheets',
+  'recurring': '/accounting-v52/recurring',
   'inventory': '/accounting-v52/inventory',
   'assets': '/accounting-v52/assets',
   'investments': '/accounting-v52/short-term-investments',
   'reports': '/accounting-v52/reports',
+  'trialbalance': '/accounting-v52/trial-balance',
   'compliance': '/accounting-v52/tax',
   'fx': '/accounting-v52/fx-revaluation',
   'consolidation': '/accounting-v52/consolidation',
@@ -41,6 +45,7 @@ export function pathToAc52Page(pathname: string): string {
 
 export const AC52_NAV_PAGES = [
   { id: 'ac52-overview', page: 'overview', path: '/accounting-v52', name: 'Command Centre' },
+  { id: 'ac52-ceo', page: 'ceo', path: '/accounting-v52/ceo', name: 'CEO View' },
   { id: 'ac52-approvals', page: 'approvals', path: '/accounting-v52/approvals', name: 'Approval Queue' },
   { id: 'ac52-close', page: 'close', path: '/accounting-v52/close', name: 'Period Close' },
   { id: 'ac52-ledger', page: 'ledger', path: '/accounting-v52/general-ledger', name: 'General Ledger' },
@@ -50,10 +55,13 @@ export const AC52_NAV_PAGES = [
   { id: 'ac52-payables', page: 'payables', path: '/accounting-v52/payables', name: 'Payables & Payments' },
   { id: 'ac52-receivables', page: 'receivables', path: '/accounting-v52/receivables', name: 'Receivables' },
   { id: 'ac52-expenses', page: 'expenses', path: '/accounting-v52/expenses', name: 'Expenses & Claims' },
+  { id: 'ac52-timesheets', page: 'timesheets', path: '/accounting-v52/timesheets', name: 'Timesheets & Projects' },
+  { id: 'ac52-recurring', page: 'recurring', path: '/accounting-v52/recurring', name: 'Recurring Schedules' },
   { id: 'ac52-inventory', page: 'inventory', path: '/accounting-v52/inventory', name: 'Inventory Accounting' },
   { id: 'ac52-assets', page: 'assets', path: '/accounting-v52/assets', name: 'Fixed Assets' },
   { id: 'ac52-investments', page: 'investments', path: '/accounting-v52/short-term-investments', name: 'Short-Term Investments' },
   { id: 'ac52-reports', page: 'reports', path: '/accounting-v52/reports', name: 'Financial Reports' },
+  { id: 'ac52-trialbalance', page: 'trialbalance', path: '/accounting-v52/trial-balance', name: 'Trial Balance' },
   { id: 'ac52-compliance', page: 'compliance', path: '/accounting-v52/tax', name: 'Compliance & Tax' },
   { id: 'ac52-fx', page: 'fx', path: '/accounting-v52/fx-revaluation', name: 'FX Revaluation' },
   { id: 'ac52-consolidation', page: 'consolidation', path: '/accounting-v52/consolidation', name: 'Group Consolidation' },

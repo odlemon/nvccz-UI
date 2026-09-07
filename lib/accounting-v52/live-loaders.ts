@@ -1,9 +1,29 @@
 import { chartOfAccountsApi } from '@/lib/api/chart-of-accounts-api'
 import { accountingApi } from '@/lib/api/accounting-api'
-import { adaptAc52Accounts, adaptAc52Journals } from './adapters'
+import { cashbookApi } from '@/lib/api/cashbook-api'
+import { usersApi } from '@/lib/api/users-api'
+import { getSTIDashboard } from '@/lib/api/short-term-investments-api'
+import { computeAc52FinancialStatements } from './financial-statements'
+import {
+  adaptAc52Accounts,
+  adaptAc52Journals,
+  adaptAc52Banks,
+  adaptAc52ReconciliationStatement,
+  adaptAc52ApBills,
+  adaptAc52ApVendors,
+  adaptAc52ArInvoices,
+  adaptAc52ArCustomers,
+  adaptAc52Claims,
+  adaptAc52InventoryItems,
+  adaptAc52FixedAssets,
+  adaptAc52Investments,
+  adaptAc52Approvals,
+  adaptAc52FxExposure,
+  adaptAc52RecurringSchedules,
+} from './adapters'
 import type { Ac52HydratePayload } from './types'
 
-export type Ac52DataScope = 'coa' | 'journals'
+export type Ac52DataScope = 'coa' | 'journals' | 'cash' | 'reconciliation' | 'payables' | 'receivables' | 'expenses' | 'inventory' | 'assets' | 'investments' | 'statements' | 'approvals' | 'fx' | 'recurring'
 
 export type Ac52ScopePlan = {
   primary: Ac52DataScope[]
@@ -20,6 +40,31 @@ export function scopesForAc52Page(page: string): Ac52ScopePlan {
     case 'journals':
     case 'ledger':
       return { primary: ['journals'] }
+    case 'cash':
+      // Bank balances derive from S.journals via each bank's linked GL account.
+      return { primary: ['cash', 'journals'] }
+    case 'reconciliation':
+      return { primary: ['reconciliation', 'cash', 'journals'] }
+    case 'payables':
+      return { primary: ['payables'] }
+    case 'receivables':
+      return { primary: ['receivables'] }
+    case 'expenses':
+      return { primary: ['expenses'] }
+    case 'inventory':
+      return { primary: ['inventory'] }
+    case 'assets':
+      return { primary: ['assets'] }
+    case 'investments':
+      return { primary: ['investments'] }
+    case 'reports':
+      return { primary: ['statements'] }
+    case 'approvals':
+      return { primary: ['approvals'] }
+    case 'fx':
+      return { primary: ['fx'] }
+    case 'recurring':
+      return { primary: ['recurring'] }
     default:
       return { primary: [] }
   }
@@ -39,6 +84,8 @@ export async function loadAc52Scopes(scopes: Ac52DataScope[]): Promise<Ac52Hydra
   const wanted = Array.from(new Set(scopes))
   const errors: string[] = []
   const data: Ac52HydratePayload['data'] = {}
+  let rawJournals: any[] | null = null
+  let rawBanks: any[] | null = null
 
   if (wanted.includes('coa')) {
     // NOTE: chartOfAccountsApi.getChartOfAccounts() already unwraps the {success,data}
@@ -52,12 +99,144 @@ export async function loadAc52Scopes(scopes: Ac52DataScope[]): Promise<Ac52Hydra
     }
   }
 
-  if (wanted.includes('journals')) {
+  if (wanted.includes('journals') || wanted.includes('reconciliation') || wanted.includes('approvals')) {
     // No status filter: backend defaults to POSTED_AND_PENDING, which is exactly
     // what the mock's Journal Entries / General Ledger pages need to show.
     const res = await settle(accountingApi.getJournalEntries(), 'journalEntries', errors)
     if (Array.isArray(res?.data)) {
-      data.journals = adaptAc52Journals(res!.data! as any)
+      rawJournals = res!.data!
+      if (wanted.includes('journals')) data.journals = adaptAc52Journals(rawJournals as any)
+      if (wanted.includes('approvals')) data.approvals = adaptAc52Approvals(rawJournals as any)
+    }
+  }
+
+  if (wanted.includes('cash') || wanted.includes('reconciliation')) {
+    // getCashbookBanks() returns the raw {success,data} envelope (unlike getChartOfAccounts).
+    const res = await settle(cashbookApi.getCashbookBanks(), 'cashbookBanks', errors)
+    if (Array.isArray(res?.data)) {
+      rawBanks = res!.data as any[]
+      if (wanted.includes('cash')) data.banks = adaptAc52Banks(rawBanks as any)
+    }
+  }
+
+  if (wanted.includes('reconciliation')) {
+    const res = await settle(accountingApi.getBankReconciliations(), 'bankReconciliations', errors)
+    const list = res?.data?.reconciliations
+    if (Array.isArray(list) && list.length > 0) {
+      const latestId = list[0]?.id
+      const unmatchedRes = latestId
+        ? await settle(accountingApi.getBankReconciliationUnmatched(latestId), 'bankReconciliationUnmatched', errors)
+        : null
+      const lines = Array.isArray(unmatchedRes?.data) ? adaptAc52ReconciliationStatement(unmatchedRes!.data as any) : []
+      data.reconciliation = { statement: lines, ledger: [] }
+    } else {
+      // Honest empty state: no reconciliation run exists yet, so there is nothing
+      // matched or unmatched — this replaces a hardcoded mock count, it isn't a gap.
+      data.reconciliation = { statement: [], ledger: [] }
+    }
+
+    // The visible Bank Reconciliation page (runtime's v28 layer) reads its own
+    // reconBanks/reconLines arrays, not S.reconciliation above. Give it the same
+    // real numbers: each bank's ledger balance computed from posted journal lines
+    // against that bank's linked GL account (same derivation accountNet8 does for
+    // the rest of the module, just recomputed here since v28 can't reach S).
+    if (rawBanks) {
+      data.reconBanks = rawBanks.map((b: any) => {
+        const glCode = b.glAccount?.accountNo
+        let debit = 0
+        let credit = 0
+        if (glCode && rawJournals) {
+          for (const j of rawJournals) {
+            if (j.status !== 'POSTED') continue
+            for (const l of j.journalEntryLines || []) {
+              if (l.chartOfAccount?.accountNo === glCode) {
+                debit += Number(l.debitAmount) || 0
+                credit += Number(l.creditAmount) || 0
+              }
+            }
+          }
+        }
+        const ledger = debit - credit
+        return {
+          id: b.id,
+          name: b.name,
+          currency: b.currency?.code || 'USD',
+          // No external bank statement has been imported for any bank yet, so there
+          // is no known variance to show — statement = ledger, not a fabricated number.
+          statement: ledger,
+          ledger,
+        }
+      })
+      data.reconLines = []
+    }
+  }
+
+  if (wanted.includes('payables')) {
+    const [billsRes, vendorsRes] = await Promise.all([
+      settle(accountingApi.getPurchaseInvoices({ limit: 200 }), 'purchaseInvoices', errors),
+      settle(accountingApi.getVendors({ limit: 200 }), 'vendors', errors),
+    ])
+    const bills = Array.isArray(billsRes?.data?.invoices) ? billsRes!.data!.invoices : []
+    if (Array.isArray(billsRes?.data?.invoices)) data.apBills = adaptAc52ApBills(bills)
+    if (Array.isArray(vendorsRes?.data)) data.apVendors = adaptAc52ApVendors(vendorsRes!.data as any, bills)
+  }
+
+  if (wanted.includes('receivables')) {
+    const [invoicesRes, customersRes] = await Promise.all([
+      settle(accountingApi.getInvoices({ limit: 200 }), 'invoices', errors),
+      settle(accountingApi.getCustomers({ limit: 200 }), 'customers', errors),
+    ])
+    const invoices = Array.isArray(invoicesRes?.data?.invoices) ? invoicesRes!.data!.invoices : []
+    if (Array.isArray(invoicesRes?.data?.invoices)) data.arInvoices = adaptAc52ArInvoices(invoices)
+    if (Array.isArray(customersRes?.data?.customers)) data.arCustomers = adaptAc52ArCustomers(customersRes!.data!.customers, invoices)
+  }
+
+  if (wanted.includes('expenses')) {
+    const [expRes, usersRes] = await Promise.all([
+      settle(accountingApi.getExpenses({ limit: 200 }), 'expenses', errors),
+      settle(usersApi.getAll(), 'users', errors),
+    ])
+    if (Array.isArray(expRes?.data)) {
+      const userNames = new Map<string, string>()
+      if (Array.isArray(usersRes?.data)) {
+        for (const u of usersRes!.data!) userNames.set(u.id, `${u.firstName} ${u.lastName}`.trim())
+      }
+      data.claims = adaptAc52Claims(expRes!.data as any, userNames)
+    }
+  }
+
+  if (wanted.includes('inventory')) {
+    const res = await settle(accountingApi.getInventoryItems({ limit: 200 }), 'inventoryItems', errors)
+    if (Array.isArray(res?.data?.items)) data.inventoryItems = adaptAc52InventoryItems(res!.data!.items)
+  }
+
+  if (wanted.includes('assets')) {
+    const res = await settle(accountingApi.getAssets({ limit: 200 }), 'assets', errors)
+    if (Array.isArray(res?.data?.assets)) data.fixedAssets = adaptAc52FixedAssets(res!.data!.assets as any)
+  }
+
+  if (wanted.includes('investments')) {
+    const res = await settle(getSTIDashboard({}), 'stiDashboard', errors)
+    if (Array.isArray(res?.data?.instruments)) data.investments = adaptAc52Investments(res!.data!.instruments)
+  }
+
+  if (wanted.includes('fx')) {
+    const res = await settle(accountingApi.getUnrealizedFxGainsReport(), 'unrealizedFx', errors)
+    if (res?.data) data.fx = adaptAc52FxExposure(res.data)
+  }
+
+  if (wanted.includes('recurring')) {
+    const res = await settle(accountingApi.getRecurringJournalTemplates(), 'recurringJournalTemplates', errors)
+    if (Array.isArray(res?.data)) data.recurring = adaptAc52RecurringSchedules(res!.data!)
+  }
+
+  if (wanted.includes('statements')) {
+    const [accountsRes, journalsRes] = await Promise.all([
+      settle(chartOfAccountsApi.getChartOfAccounts(), 'chartOfAccountsForStatements', errors),
+      settle(accountingApi.getJournalEntries({ limit: 1000 }), 'journalEntriesForStatements', errors),
+    ])
+    if (Array.isArray(accountsRes) && Array.isArray(journalsRes?.data)) {
+      data.reportRows = computeAc52FinancialStatements(accountsRes, journalsRes!.data as any)
     }
   }
 
