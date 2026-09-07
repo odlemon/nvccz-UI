@@ -88,6 +88,10 @@ export interface Invoice {
   paymentDate: string | null
   journalEntryId: string
   isActive: boolean
+  /** Present on the live API response despite being absent from earlier versions of this interface (confirmed via direct POST /accounting/invoices response) — dueDate is settable elsewhere, not by CreateInvoiceRequest, so it's frequently null. */
+  dueDate?: string | null
+  paidAmount?: string
+  outstandingAmount?: string
   createdById: string
   createdAt: string
   updatedAt: string
@@ -791,6 +795,9 @@ export interface Expense {
   category?: ExpenseCategory
   vendor?: Vendor
   currency?: AccountingCurrency
+  /** Present on the live API response despite being absent from earlier versions of this interface. */
+  createdById?: string
+  receiptNumber?: string | null
 }
 
 export interface CreateExpenseRequest {

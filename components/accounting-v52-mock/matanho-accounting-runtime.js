@@ -2667,7 +2667,7 @@ const baseRender8=render;
 render=function(){baseRender8();setTimeout(enhance8,180)};
 normaliseState8();S.ui.sidebarExpanded=true;save8();render();setTimeout(enhance8,280);
 window.MatanhoAccountingV8=Object.freeze({version:VERSION,navigate:p=>rerender8(p),getState:()=>structuredClone(S),postJournal:postJournal8,validateJournal:validateJournal8,runInvestmentAccruals:runAccrualBatch8,previewReport:previewReport8});
-rootEl.__ac52Hydrate=function(source){if(!document.contains(rootEl))return;if(!source)return;if(Array.isArray(source.accounts))S.accounts.splice(0,S.accounts.length,...source.accounts);if(Array.isArray(source.journals))S.journals.splice(0,S.journals.length,...source.journals);save8();render()};
+rootEl.__ac52Hydrate=function(source){if(!document.contains(rootEl))return;if(!source)return;if(Array.isArray(source.accounts))S.accounts.splice(0,S.accounts.length,...source.accounts);if(Array.isArray(source.journals))S.journals.splice(0,S.journals.length,...source.journals);if(Array.isArray(source.banks)){S.banks.splice(0,S.banks.length,...source.banks);const validIds=new Set(S.banks.map(b=>b.id));const firstId=S.banks[0]?S.banks[0].id:'all';if(S.ui.cashBank!=='all'&&!validIds.has(S.ui.cashBank))S.ui.cashBank=firstId;if(S.ui.reconBank!=='all'&&!validIds.has(S.ui.reconBank))S.ui.reconBank=firstId}if(source.reconciliation){if(Array.isArray(source.reconciliation.statement))S.reconciliation.statement.splice(0,S.reconciliation.statement.length,...source.reconciliation.statement);if(Array.isArray(source.reconciliation.ledger))S.reconciliation.ledger.splice(0,S.reconciliation.ledger.length,...source.reconciliation.ledger);const recGroup=navGroups.find(g=>g[1].some(x=>x[0]==='reconciliation'));if(recGroup){const item=recGroup[1].find(x=>x[0]==='reconciliation');if(item){const unmatchedCount=S.reconciliation.statement.filter(x=>x.status!=='Matched').length;item[3]=unmatchedCount?String(unmatchedCount):''}}}save8();render()};
 })();
 
 
@@ -4413,6 +4413,9 @@ function click(ev){const el=ev.target.closest('[data-v28]');if(!el)return;const 
 }
 function closeMenus(ev){if(!ev.target.closest('[data-v28="more"]')&&!ev.target.closest('.v28-more-menu'))document.querySelectorAll('.v28-more-menu').forEach(x=>x.remove())}
 installNav();installPages();const baseRender28=render;render=function(){baseRender28();requestAnimationFrame(enhancement)};document.addEventListener('click',click,true);document.addEventListener('click',closeMenus,false);document.addEventListener('keydown',ev=>{if(ev.key==='Escape'){document.querySelector('#v28Overlay')?.remove();document.querySelector('#v28Zoom')?.remove();document.querySelectorAll('.v28-more-menu').forEach(x=>x.remove());if(V28.reconMax){V28.reconMax=false;render()}}}, __ac52Sig);if(['receivables','payables','reconciliation','assets','quotations','billing'].includes(state.page))render();window.MatanhoAccountingV28={version:V,state:V28};
+rootEl.__ac52HydrateReconBanks=function(banks,lines){if(!document.contains(rootEl))return;if(Array.isArray(banks)&&banks.length){reconBanks.splice(0,reconBanks.length,...banks);if(!banks.some(b=>b.id===V28.reconBank))V28.reconBank=banks[0].id}if(Array.isArray(lines))reconLines.splice(0,reconLines.length,...lines);if(typeof render==='function')render()};
+rootEl.__ac52HydrateApAr=function(bills,vendors,invoices,customers){if(!document.contains(rootEl))return;if(Array.isArray(bills)){apBills.splice(0,apBills.length,...bills);try{const g=navGroups.find(g=>g[1].some(x=>x[0]==='payables'));const item=g&&g[1].find(x=>x[0]==='payables');if(item){const openCount=apBills.filter(x=>x.open>0).length;item[3]=openCount?String(openCount):''}}catch(_){}}if(Array.isArray(vendors))apVendors.splice(0,apVendors.length,...vendors);if(Array.isArray(invoices)){arInvoices.splice(0,arInvoices.length,...invoices);try{const g=navGroups.find(g=>g[1].some(x=>x[0]==='receivables'));const item=g&&g[1].find(x=>x[0]==='receivables');if(item){const openCount=arInvoices.filter(x=>x.open>0).length;item[3]=openCount?String(openCount):''}}catch(_){}}if(Array.isArray(customers))arCustomers.splice(0,arCustomers.length,...customers);if(typeof render==='function')render()};
+rootEl.__ac52HydrateClaims=function(items){if(!document.contains(rootEl))return;if(Array.isArray(items)){claims.splice(0,claims.length,...items);try{const g=navGroups.find(g=>g[1].some(x=>x[0]==='expenses'));const item=g&&g[1].find(x=>x[0]==='expenses');if(item){const reviewCount=claims.filter(x=>x.status==='Review').length;item[3]=reviewCount?String(reviewCount):''}}catch(_){}}if(typeof render==='function')render()};
 })();
 
 
@@ -4982,6 +4985,21 @@ document.title='Matanho Accounting Operating System · Enterprise Finance v52';
     const source = (payload && payload.data) || payload || {};
     if (typeof rootEl.__ac52Hydrate === 'function') {
       rootEl.__ac52Hydrate(source);
+    }
+    // Bank Reconciliation's visible page (v28 layer) reads its own reconBanks/reconLines
+    // arrays, separate from S.reconciliation above — both need the real data.
+    if (Array.isArray(source.reconBanks) && typeof rootEl.__ac52HydrateReconBanks === 'function') {
+      rootEl.__ac52HydrateReconBanks(source.reconBanks, source.reconLines);
+    }
+    // Payables/Receivables' visible pages (v28 layer) read their own apBills/apVendors/
+    // arInvoices/arCustomers arrays, separate from S — same situation as reconBanks above.
+    if ((Array.isArray(source.apBills) || Array.isArray(source.apVendors) || Array.isArray(source.arInvoices) || Array.isArray(source.arCustomers))
+        && typeof rootEl.__ac52HydrateApAr === 'function') {
+      rootEl.__ac52HydrateApAr(source.apBills, source.apVendors, source.arInvoices, source.arCustomers);
+    }
+    // Expenses & Claims' visible page (v34 layer) reads its own claims array, separate from S.
+    if (Array.isArray(source.claims) && typeof rootEl.__ac52HydrateClaims === 'function') {
+      rootEl.__ac52HydrateClaims(source.claims);
     }
   }
 
