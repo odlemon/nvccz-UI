@@ -213,5 +213,6 @@ export type Ac52HydratePayload = {
     inventoryItems?: Ac52InventoryItem[]
     fixedAssets?: Ac52FixedAsset[]
     investments?: Ac52Investment[]
+    reportRows?: import('./financial-statements').Ac52ReportRows
   }
 }

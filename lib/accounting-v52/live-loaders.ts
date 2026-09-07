@@ -3,6 +3,7 @@ import { accountingApi } from '@/lib/api/accounting-api'
 import { cashbookApi } from '@/lib/api/cashbook-api'
 import { usersApi } from '@/lib/api/users-api'
 import { getSTIDashboard } from '@/lib/api/short-term-investments-api'
+import { computeAc52FinancialStatements } from './financial-statements'
 import {
   adaptAc52Accounts,
   adaptAc52Journals,
@@ -19,7 +20,7 @@ import {
 } from './adapters'
 import type { Ac52HydratePayload } from './types'
 
-export type Ac52DataScope = 'coa' | 'journals' | 'cash' | 'reconciliation' | 'payables' | 'receivables' | 'expenses' | 'inventory' | 'assets' | 'investments'
+export type Ac52DataScope = 'coa' | 'journals' | 'cash' | 'reconciliation' | 'payables' | 'receivables' | 'expenses' | 'inventory' | 'assets' | 'investments' | 'statements'
 
 export type Ac52ScopePlan = {
   primary: Ac52DataScope[]
@@ -53,6 +54,8 @@ export function scopesForAc52Page(page: string): Ac52ScopePlan {
       return { primary: ['assets'] }
     case 'investments':
       return { primary: ['investments'] }
+    case 'reports':
+      return { primary: ['statements'] }
     default:
       return { primary: [] }
   }
@@ -205,6 +208,16 @@ export async function loadAc52Scopes(scopes: Ac52DataScope[]): Promise<Ac52Hydra
   if (wanted.includes('investments')) {
     const res = await settle(getSTIDashboard({}), 'stiDashboard', errors)
     if (Array.isArray(res?.data?.instruments)) data.investments = adaptAc52Investments(res!.data!.instruments)
+  }
+
+  if (wanted.includes('statements')) {
+    const [accountsRes, journalsRes] = await Promise.all([
+      settle(chartOfAccountsApi.getChartOfAccounts(), 'chartOfAccountsForStatements', errors),
+      settle(accountingApi.getJournalEntries({ limit: 1000 }), 'journalEntriesForStatements', errors),
+    ])
+    if (Array.isArray(accountsRes) && Array.isArray(journalsRes?.data)) {
+      data.reportRows = computeAc52FinancialStatements(accountsRes, journalsRes!.data as any)
+    }
   }
 
   return { data, meta: { errors } }

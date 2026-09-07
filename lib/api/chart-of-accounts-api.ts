@@ -21,6 +21,8 @@ export interface ChartOfAccount {
   isActive: boolean
   createdAt: string
   updatedAt: string
+  /** Present on the live API response despite being absent from earlier versions of this interface. */
+  naturalBalance?: 'DEBIT' | 'CREDIT'
 }
 
 export interface CreateChartOfAccountRequest {
