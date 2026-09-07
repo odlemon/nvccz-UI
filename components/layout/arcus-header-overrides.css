@@ -754,35 +754,92 @@ html.dark [data-arcus-shared-topbar] button,
   color: #94a3b8 !important;
 }
 
-/* Payroll / Accounting sidebar — these render a white sidebar, so dark text is correct */
-.payroll-v6-root .sidebar,
-.accounting-v52-root .sidebar {
-  color: #000000 !important;
-}
-.payroll-v6-root .sidebar .nav-item,
-.accounting-v52-root .sidebar .nav-item {
-  color: #111111 !important;
-}
-.payroll-v6-root .sidebar .nav-item:hover,
-.accounting-v52-root .sidebar .nav-item:hover {
-  color: #000000 !important;
-}
+/* Sidebar text colour is split by what each module actually paints — measured,
+   not assumed:
 
-/* Procurement sidebar renders a dark navy background (like Performance's), so it
-   needs light text — the shared Payroll/Accounting #111111 rule above assumed a
-   white sidebar and made Procurement's nav labels unreadable. */
+     Payroll     dark navy  — linear-gradient(180deg, var(--nav) …), rgb(2,13,29)
+     Procurement dark navy  — same gradient
+     Accounting  WHITE      — rgb(255,255,255)
+
+   Payroll and Procurement therefore need light text; Accounting needs dark.
+   This block previously grouped Payroll with Accounting as "white sidebar, so
+   dark text is correct". That held for Accounting but not Payroll, where black
+   on rgb(2,13,29) is about 1:1 and left the nav labels invisible. */
+.payroll-v6-root .sidebar,
 .procurement-v23-root .sidebar {
   color: #cfd6e4 !important;
 }
+.payroll-v6-root .sidebar .nav-item,
 .procurement-v23-root .sidebar .nav-item {
   color: #aeb9ca !important;
 }
+.payroll-v6-root .sidebar .nav-item:hover,
+.payroll-v6-root .sidebar .nav-item.active,
 .procurement-v23-root .sidebar .nav-item:hover,
 .procurement-v23-root .sidebar .nav-item.active {
   color: #ffffff !important;
 }
+.payroll-v6-root .sidebar .nav-group,
 .procurement-v23-root .sidebar .nav-group {
   color: #7f8ba1 !important;
+}
+
+/* Accounting renders a white sidebar, so it keeps dark text. The active item
+   needs an explicit dark colour too: the module's own stylesheet pairs
+   `.nav-item.active` with a dark navy pill and white text, which becomes white
+   on white once the surface is light. */
+.accounting-v52-root .sidebar {
+  color: #0b1220 !important;
+}
+.accounting-v52-root .sidebar .nav-item {
+  color: #1f2937 !important;
+}
+.accounting-v52-root .sidebar .nav-item:hover {
+  color: #000000 !important;
+}
+.accounting-v52-root .sidebar .nav-group {
+  color: #64748b !important;
+}
+
+/* Pin these sidebars to the top of the viewport, matching Portfolio.
+   The shared topbar is a flex sibling ABOVE each module root, so an in-flow
+   sidebar begins at y=80 and leaves a strip of page background above it, while
+   Portfolio's sidebar — `position: fixed; inset: 0 auto 0 0` — runs the full
+   viewport height. Taking the sidebar out of flow is safe here because .app
+   sizes its first grid track explicitly (282px), so the content column keeps
+   its offset whether or not the sidebar occupies the track.
+
+   The topbar's left section is only a spacer, and each sidebar is narrower than
+   the search field's start (Payroll 282px vs 323px), so nothing is covered.
+
+   Guarded above 760px: below that these modules already position the sidebar as
+   an off-canvas drawer with its own transform, which this would break.
+
+   !important is required, not stylistic: each module's own stylesheet sets
+   `position: relative` on .sidebar at the same specificity and loads after this
+   file, so an unflagged declaration here loses on source order. */
+@media (min-width: 761px) {
+  .payroll-v6-root .sidebar,
+  .accounting-v52-root .sidebar,
+  .procurement-v23-root .sidebar {
+    position: fixed !important;
+    inset: 0 auto 0 0 !important;
+    /* Fixed positioning drops the grid track's sizing, so restate the width the
+       track would have given it. --sidebar is declared on .app and animates
+       between 282px and 88px when the nav collapses, so this keeps following it. */
+    width: var(--sidebar) !important;
+    z-index: 50 !important;
+  }
+  /* .app is `grid-template-columns: var(--sidebar) minmax(0,1fr)` with exactly two
+     children. Once the sidebar is out of flow the shell becomes the only in-flow
+     item and is auto-placed into the FIRST track, collapsing the page to the
+     sidebar's width. Pin it to the second track so the reserved gutter still
+     lines up with the fixed sidebar. */
+  .payroll-v6-root .app > .shell,
+  .accounting-v52-root .app > .shell,
+  .procurement-v23-root .app > .shell {
+    grid-column: 2 !important;
+  }
 }
 
 /* ── 4. Consistent header area ─────────────────────────────────────────── */
