@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { ORG_NAME } from "@/lib/branding"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -190,14 +191,12 @@ function SharedTopbarInner({ currentModule, moduleActions, hideThemeToggle = fal
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="sm" className="h-9 gap-1 px-2 text-xs font-medium">
-                  Matanho Capital
+                  {ORG_NAME}
                   <CiCircleChevDown size={14} className="opacity-50" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem onClick={() => {}}>Matanho Capital</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => {}}>Matanho Holdings</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => {}}>Matanho Advisory</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => {}}>{ORG_NAME}</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
 
