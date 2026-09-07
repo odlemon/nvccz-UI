@@ -56,8 +56,12 @@ export function AccountingV52App() {
           if (page !== initialPage) return
           hasSettledOnInitialPage = true
         }
-        const path = AC52_PAGE_TO_PATH[page] || "/accounting-v52"
-        if (pathnameRef.current !== path) router.push(path)
+        // Pages with no entry (e.g. the V11 Period Close system's internal drill-down ids
+        // like 'v11ws'/'v11task') are client-side-only sub-views nested inside a mapped
+        // page's URL (e.g. '/accounting/close') — the runtime re-renders in place without
+        // changing the Next.js route, so there's nothing to push here.
+        const path = AC52_PAGE_TO_PATH[page]
+        if (path && pathnameRef.current !== path) router.push(path)
         void ensurePageDataRef.current?.(page)
       },
     })
@@ -87,7 +91,7 @@ export function AccountingV52App() {
       const ce = event as CustomEvent
       const detail = ce.detail || {}
       const action = String(detail.action || "")
-      const LIVE_ACTIONS = new Set(["coa-save"])
+      const LIVE_ACTIONS = new Set(["coa-save", "upload-document", "close-task-complete", "timesheet-approve", "timesheet-return", "create-tax-pack", "approval-decision", "journal-submit"])
       if (!LIVE_ACTIONS.has(action)) return
       event.preventDefault()
       if (busyRef.current) return
@@ -107,9 +111,30 @@ export function AccountingV52App() {
         }
         if (!result.handled) return
         // Re-fetch so the UI reflects the authoritative saved row (server-assigned ids, validation-normalised fields).
-        loadedScopesRef.current.delete("coa")
+        // A journal's status (submit/post/void) feeds many other pages that all read the same
+        // ledger — Command Centre and General Ledger both list recent journals, Cash/Reconciliation
+        // derive bank balances from posted lines, and Financial Reports/Trial Balance are built
+        // from the full journal set. Any action that touches a journal must invalidate all of them,
+        // not just the scope of the page the action was triggered from — a prior version of this
+        // only invalidated "approvals" on approval-decision, leaving Command Centre showing a
+        // journal as "Submitted" for the rest of the session after it had actually been voided.
+        const JOURNAL_DEPENDENT_SCOPES: Ac52DataScope[] = ["journals", "approvals", "cash", "reconciliation", "statements"]
+        const ACTION_SCOPE: Record<string, { scopes: Ac52DataScope[]; title: string }> = {
+          "coa-save": { scopes: ["coa"], title: "Chart of Accounts updated" },
+          "upload-document": { scopes: ["vault"], title: "Document uploaded" },
+          "close-task-complete": { scopes: ["close"], title: "Close task completed" },
+          "timesheet-approve": { scopes: ["timesheets"], title: "Timesheet approved" },
+          "timesheet-return": { scopes: ["timesheets"], title: "Timesheet returned" },
+          "create-tax-pack": { scopes: ["compliance"], title: "Tax pack created" },
+          // Approving/rejecting can post or void a journal, execute a payment (cash/payables),
+          // book an investment, or apply a CoA change — invalidate broadly rather than guess which.
+          "approval-decision": { scopes: [...JOURNAL_DEPENDENT_SCOPES, "coa", "payables", "investments"], title: "Approval processed" },
+          "journal-submit": { scopes: JOURNAL_DEPENDENT_SCOPES, title: "Journal submitted" },
+        }
+        const meta = ACTION_SCOPE[action] || { scopes: ["coa"] as Ac52DataScope[], title: "Updated" }
+        for (const scope of meta.scopes) loadedScopesRef.current.delete(scope)
         await ensurePageDataRef.current?.(pathToAc52Page(pathnameRef.current))
-        runtime.commitSuccess?.("Chart of Accounts updated", result.message, "coa")
+        runtime.commitSuccess?.(meta.title, result.message, meta.scopes[0])
       })
     }
 

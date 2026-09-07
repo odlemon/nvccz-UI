@@ -4,7 +4,7 @@
 
 **Audience:** You (project owner), future agents, contractors.
 
-> **Security note:** This file contains server credentials the owner asked to document here for handoff. Current NTS VPS root password: `Debgjnk4@!z`. Rotate passwords after onboarding anyone new. Prefer moving secrets to gitignored `CREDENTIALS.*.local.md` files over time.
+> **Security note:** This file contains server credentials the owner asked to document here for handoff. Current NTS VPS root password: `<see .secrets/ssh.env — rotated 2026-09-07>`. Rotate passwords after onboarding anyone new. Prefer moving secrets to gitignored `CREDENTIALS.*.local.md` files over time.
 
 ---
 
@@ -844,10 +844,10 @@ Or from `nvccz-new`: `npm run dev:upload`
 
 | Environment | IP | SSH | Status (30 Aug 2026) |
 |-------------|-----|-----|----------------------|
-| **NTS shared VPS** (Arcus dev+demo + NVCCZ prod staging) | `31.220.82.129` | `root` / `Debgjnk4@!z` | **Online** — primary deploy target |
+| **NTS shared VPS** (Arcus dev+demo + NVCCZ prod staging) | `31.220.82.129` | `root` / `<see .secrets/ssh.env — rotated 2026-09-07>` | **Online** — primary deploy target |
 | **NVCCZ client VPS** | `102.217.49.126` | `user` / `user@123` on port **3131** | **Offline** — SSH timeout since 28 Aug |
 
-> Rotate `Debgjnk4@!z` and `user@123` after handoff. Deploy scripts embed the NTS root password in `scripts/deploy-arcus-docker-vps.py` and `scripts/deploy-nvccz-nts-prod.py`.
+> Rotate `<see .secrets/ssh.env — rotated 2026-09-07>` and `user@123` after handoff. Deploy scripts embed the NTS root password in `scripts/deploy-arcus-docker-vps.py` and `scripts/deploy-nvccz-nts-prod.py`.
 
 ### NTS VPS (`31.220.82.129`) — layout
 
@@ -1012,7 +1012,7 @@ SSH to NTS:
 
 ```bash
 ssh root@31.220.82.129
-# password: Debgjnk4@!z
+# password: <see .secrets/ssh.env — rotated 2026-09-07>
 ```
 
 ### Arcus
@@ -1150,7 +1150,7 @@ Start all:   npm run start:servers   (MySQL + BE + FE)
 Schema:      cd nvccz && npx prisma db push
 Migrations:  design-refs/vps-pending-migrations.md
 
-NTS VPS:     31.220.82.129  (root / Debgjnk4@!z)
+NTS VPS:     31.220.82.129  (root / <see .secrets/ssh.env — rotated 2026-09-07>)
 Client VPS:  102.217.49.126  (user / user@123 :3131) — OFFLINE
 
 Deploy Arcus:  python scripts/deploy-arcus-docker-vps.py

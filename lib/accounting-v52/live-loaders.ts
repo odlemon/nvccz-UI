@@ -3,6 +3,12 @@ import { accountingApi } from '@/lib/api/accounting-api'
 import { cashbookApi } from '@/lib/api/cashbook-api'
 import { usersApi } from '@/lib/api/users-api'
 import { getSTIDashboard } from '@/lib/api/short-term-investments-api'
+import { getAccountingDocuments } from '@/lib/api/accounting-documents-api'
+import { getTaxReturnPacks } from '@/lib/api/tax-return-pack-api'
+import { getConsolidationSummary } from '@/lib/api/consolidation-api'
+import { getFiscalCalendar, getCloseTasks, type FiscalPeriod } from '@/lib/api/accounting-close-tasks-api'
+import { getMyPendingApprovals } from '@/lib/api/approvals-api'
+import { getPendingApprovalTimesheets, getProjects } from '@/lib/api/timesheets-api'
 import { computeAc52FinancialStatements } from './financial-statements'
 import {
   adaptAc52Accounts,
@@ -20,10 +26,17 @@ import {
   adaptAc52Approvals,
   adaptAc52FxExposure,
   adaptAc52RecurringSchedules,
+  adaptAc52VaultDocuments,
+  adaptAc52TaxPacks,
+  adaptAc52CloseTasks,
+  adaptAc52CloseTasksV11,
+  adaptAc52NonJournalApprovals,
+  adaptAc52Timesheets,
+  adaptAc52Projects,
 } from './adapters'
 import type { Ac52HydratePayload } from './types'
 
-export type Ac52DataScope = 'coa' | 'journals' | 'cash' | 'reconciliation' | 'payables' | 'receivables' | 'expenses' | 'inventory' | 'assets' | 'investments' | 'statements' | 'approvals' | 'fx' | 'recurring'
+export type Ac52DataScope = 'coa' | 'journals' | 'cash' | 'reconciliation' | 'payables' | 'receivables' | 'expenses' | 'inventory' | 'assets' | 'investments' | 'statements' | 'approvals' | 'fx' | 'recurring' | 'vault' | 'compliance' | 'consolidation' | 'close' | 'timesheets'
 
 export type Ac52ScopePlan = {
   primary: Ac52DataScope[]
@@ -32,6 +45,15 @@ export type Ac52ScopePlan = {
 /** Which live scopes a given accounting-v52 page needs. Extend as more pages are wired. */
 export function scopesForAc52Page(page: string): Ac52ScopePlan {
   switch (page) {
+    // Command Centre (overviewPage8 in the runtime) reads S.banks (cash), S.approvals
+    // (pending queue) and S.journals (revenue, recent ledger activity) directly, plus
+    // AR/AP totals derived from the same receivables/payables data other pages use — but
+    // this page previously had no case here at all, so it never issued its own fetch and
+    // relied entirely on whatever localStorage happened to contain from a *different* page
+    // visited earlier in the session (found live: a voided journal kept showing "Submitted"
+    // on Command Centre indefinitely, in a fresh tab, because nothing ever refetched it here).
+    case 'overview':
+      return { primary: ['journals', 'cash', 'payables', 'receivables', 'approvals'] }
     case 'coa':
       return { primary: ['coa'] }
     // General Ledger and account balances are derived client-side from S.journals
@@ -65,6 +87,20 @@ export function scopesForAc52Page(page: string): Ac52ScopePlan {
       return { primary: ['fx'] }
     case 'recurring':
       return { primary: ['recurring'] }
+    case 'vault':
+      return { primary: ['vault'] }
+    case 'compliance':
+      return { primary: ['compliance'] }
+    case 'consolidation':
+      return { primary: ['consolidation'] }
+    case 'close':
+      return { primary: ['close'] }
+    case 'timesheets':
+      return { primary: ['timesheets'] }
+    // Trial Balance (trialBalancePage12) computes account balances from S.accounts + S.journals
+    // directly (core12()/tb12()) — same missing-case bug as 'overview' above, same fix.
+    case 'trialbalance':
+      return { primary: ['coa', 'journals'] }
     default:
       return { primary: [] }
   }
@@ -107,6 +143,14 @@ export async function loadAc52Scopes(scopes: Ac52DataScope[]): Promise<Ac52Hydra
       rawJournals = res!.data!
       if (wanted.includes('journals')) data.journals = adaptAc52Journals(rawJournals as any)
       if (wanted.includes('approvals')) data.approvals = adaptAc52Approvals(rawJournals as any)
+    }
+  }
+
+  if (wanted.includes('approvals')) {
+    const res = await settle(getMyPendingApprovals(), 'myPendingApprovals', errors)
+    if (Array.isArray(res?.data)) {
+      const nonJournal = adaptAc52NonJournalApprovals(res.data)
+      data.approvals = [...(data.approvals || []), ...nonJournal]
     }
   }
 
@@ -228,6 +272,65 @@ export async function loadAc52Scopes(scopes: Ac52DataScope[]): Promise<Ac52Hydra
   if (wanted.includes('recurring')) {
     const res = await settle(accountingApi.getRecurringJournalTemplates(), 'recurringJournalTemplates', errors)
     if (Array.isArray(res?.data)) data.recurring = adaptAc52RecurringSchedules(res!.data!)
+  }
+
+  if (wanted.includes('vault')) {
+    const [docsRes, usersRes] = await Promise.all([
+      settle(getAccountingDocuments(), 'accountingDocuments', errors),
+      settle(usersApi.getAll(), 'users', errors),
+    ])
+    if (Array.isArray(docsRes?.data)) {
+      const userNames = new Map<string, string>()
+      if (Array.isArray(usersRes?.data)) {
+        for (const u of usersRes!.data!) userNames.set(u.id, `${u.firstName} ${u.lastName}`.trim())
+      }
+      data.vaultDocuments = adaptAc52VaultDocuments(docsRes!.data!, userNames)
+    }
+  }
+
+  if (wanted.includes('compliance')) {
+    const [packsRes, usersRes] = await Promise.all([
+      settle(getTaxReturnPacks(), 'taxReturnPacks', errors),
+      settle(usersApi.getAll(), 'users', errors),
+    ])
+    if (Array.isArray(packsRes?.data)) {
+      const userNames = new Map<string, string>()
+      if (Array.isArray(usersRes?.data)) {
+        for (const u of usersRes!.data!) userNames.set(u.id, `${u.firstName} ${u.lastName}`.trim())
+      }
+      data.taxPacks = adaptAc52TaxPacks(packsRes!.data!, userNames)
+    }
+  }
+
+  if (wanted.includes('consolidation')) {
+    const res = await settle(getConsolidationSummary(), 'consolidationSummary', errors)
+    if (res?.data) data.consolidation = res.data
+  }
+
+  if (wanted.includes('close')) {
+    const calRes = await settle(getFiscalCalendar(), 'fiscalCalendar', errors)
+    const allPeriods: FiscalPeriod[] = []
+    for (const fy of calRes?.data?.fiscalYears || []) allPeriods.push(...fy.periods)
+    const now = Date.now()
+    const current =
+      allPeriods.find((p) => p.status === 'OPEN' && new Date(p.startDate).getTime() <= now && now <= new Date(p.endDate).getTime()) ||
+      allPeriods.find((p) => p.status === 'OPEN')
+    if (current) {
+      const tasksRes = await settle(getCloseTasks(current.id), 'accountingCloseTasks', errors)
+      if (Array.isArray(tasksRes?.data)) {
+        data.closeTasks = adaptAc52CloseTasks(tasksRes!.data!)
+        data.closeTasksV11 = adaptAc52CloseTasksV11(tasksRes!.data!)
+      }
+    }
+  }
+
+  if (wanted.includes('timesheets')) {
+    const [tsRes, projRes] = await Promise.all([
+      settle(getPendingApprovalTimesheets(), 'pendingTimesheets', errors),
+      settle(getProjects(), 'projects', errors),
+    ])
+    if (Array.isArray(tsRes?.data)) data.timesheets = adaptAc52Timesheets(tsRes!.data!)
+    if (Array.isArray(projRes?.data)) data.projects = adaptAc52Projects(projRes!.data!, Array.isArray(tsRes?.data) ? tsRes!.data! : [])
   }
 
   if (wanted.includes('statements')) {

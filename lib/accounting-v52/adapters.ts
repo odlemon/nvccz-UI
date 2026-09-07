@@ -1,7 +1,12 @@
 import type { ChartOfAccount } from '@/lib/api/chart-of-accounts-api'
 import type { PurchaseInvoice, Vendor, Invoice, Customer, Expense, InventoryItem, Asset, RecurringJournalTemplate } from '@/lib/api/accounting-api'
 import type { DashboardInstrument } from '@/lib/api/short-term-investments-api'
-import type { Ac52Account, Ac52Journal, Ac52Bank, Ac52ReconciliationLine, Ac52ApBill, Ac52ApVendor, Ac52ArInvoice, Ac52ArCustomer, Ac52Claim, Ac52InventoryItem, Ac52FixedAsset, Ac52Investment, Ac52Approval, Ac52RecurringSchedule } from './types'
+import type { Ac52Account, Ac52Journal, Ac52Bank, Ac52ReconciliationLine, Ac52ApBill, Ac52ApVendor, Ac52ArInvoice, Ac52ArCustomer, Ac52Claim, Ac52InventoryItem, Ac52FixedAsset, Ac52Investment, Ac52Approval, Ac52RecurringSchedule, Ac52VaultDocument, Ac52TaxPack, Ac52CloseTask, Ac52CloseTaskV11, Ac52Timesheet, Ac52Project } from './types'
+import type { AccountingDocument } from '@/lib/api/accounting-documents-api'
+import type { TaxReturnPack } from '@/lib/api/tax-return-pack-api'
+import type { AccountingCloseTask, CloseTaskPerson } from '@/lib/api/accounting-close-tasks-api'
+import type { PendingApproval } from '@/lib/api/approvals-api'
+import type { Timesheet, Project } from '@/lib/api/timesheets-api'
 
 /** Raw shape of GET /cashbook/banks rows. */
 type RawCashbookBank = {
@@ -163,7 +168,7 @@ export function adaptAc52Journals(rows: RawJournalEntry[]): Ac52Journal[] {
   })
 }
 
-/** Adapt live PENDING journal entries into the v8 Approval Centre's S.approvals array. Payment/investment/master-data approval types have no real backend workflow to draw from, so this covers Journal approvals only — the one maker-checker queue genuinely backed by live data (a journal awaiting POSTED status). */
+/** Adapt live PENDING journal entries into the v8 Approval Centre's S.approvals array — a journal awaiting POSTED status, no separate ApprovalRequest/Approval row exists for these (see backendKind on Ac52Approval). */
 export function adaptAc52Approvals(rows: RawJournalEntry[]): Ac52Approval[] {
   return rows
     .filter((r) => r.status === 'PENDING')
@@ -177,7 +182,67 @@ export function adaptAc52Approvals(rows: RawJournalEntry[]): Ac52Approval[] {
       maker: r.createdBy ? `${r.createdBy.firstName || ''} ${r.createdBy.lastName || ''}`.trim() || r.createdBy.email || 'System' : 'System',
       requiredRole: 'Finance Director or CEO',
       status: 'Pending',
+      backendKind: 'journal',
+      backendId: r.id,
     }))
+}
+
+const NON_JOURNAL_STAGE_TYPES = new Set(['MASTER_DATA_COA', 'PAYMENT_EXECUTION', 'INVESTMENT_BOOKING'])
+
+/** Adapt real non-journal approval requests (Chart of Accounts changes, payment execution above the $10k USD threshold, investment booking above the $50k USD threshold — see PaymentInvestmentApprovalService) into the Approval Centre's shape, merged alongside adaptAc52Approvals' journal rows. Scoped to the current user's own assigned approvals (GET /approvals/my-pending has no "all pending" view) — 0 rows is the honest, expected result until a real user holds the CFO role these stages target. Master Data changes have no real amount concept, so they stay honestly 0; Payment/Investment carry a real entityData.amountUsd. */
+export function adaptAc52NonJournalApprovals(rows: PendingApproval[]): Ac52Approval[] {
+  return rows
+    .filter((r) => r.status === 'PENDING' && NON_JOURNAL_STAGE_TYPES.has(r.stage.stageType))
+    .map((r) => {
+      const maker = r.request.requestedBy
+        ? `${r.request.requestedBy.firstName} ${r.request.requestedBy.lastName}`.trim() || r.request.requestedBy.email
+        : 'System'
+      if (r.stage.stageType === 'PAYMENT_EXECUTION') {
+        const d = r.request.entityData
+        return {
+          id: `APR-${r.request.id}`,
+          type: 'Payment',
+          record: d?.kind === 'BATCH' ? `${d.invoiceIds?.length || 0} bills` : d?.paymentReference || r.request.entityId,
+          title: d?.kind === 'BATCH' ? `Batch supplier payment · ${d.invoiceIds?.length || 0} bill(s)` : `Supplier payment · ${d?.paymentReference || r.request.entityId}`,
+          amount: Number(d?.amountUsd) || 0,
+          currency: d?.currencyCode || 'USD',
+          maker,
+          requiredRole: r.stage.stepName,
+          status: 'Pending',
+          backendKind: 'approval',
+          backendId: r.id,
+        }
+      }
+      if (r.stage.stageType === 'INVESTMENT_BOOKING') {
+        const d = r.request.entityData
+        return {
+          id: `APR-${r.request.id}`,
+          type: 'Investment',
+          record: d?.issuer || r.request.entityId,
+          title: `New investment booking · ${d?.issuer || 'Unnamed issuer'}`,
+          amount: Number(d?.amountUsd ?? d?.principal) || 0,
+          currency: d?.currencyCode || 'USD',
+          maker,
+          requiredRole: r.stage.stepName,
+          status: 'Pending',
+          backendKind: 'approval',
+          backendId: r.id,
+        }
+      }
+      return {
+        id: `APR-${r.request.id}`,
+        type: 'Master data',
+        record: r.request.entityId,
+        title: `Chart of Accounts change · ${r.stage.stepName}`,
+        amount: 0,
+        currency: 'USD',
+        maker,
+        requiredRole: r.stage.stepName,
+        status: 'Pending',
+        backendKind: 'approval',
+        backendId: r.id,
+      }
+    })
 }
 
 /** [item, currency, FCY balance, book rate, close rate, base carrying, FX movement, status] — matches the runtime's fxPage23 exposure register table shape (matanho-accounting-runtime.js). */
@@ -428,6 +493,194 @@ export function adaptAc52Claims(rows: Expense[], userNames: Map<string, string>)
     policy: r.receiptNumber ? 'Compliant' : 'Missing receipt',
     status: claimStatusLabel(r.status),
   }))
+}
+
+function vaultDocTypeLabel(mimeType: string | null): string {
+  if (!mimeType) return 'File'
+  if (mimeType === 'application/pdf') return 'PDF document'
+  if (mimeType.startsWith('image/')) return 'Image'
+  if (mimeType.includes('spreadsheet') || mimeType.includes('excel')) return 'Spreadsheet'
+  if (mimeType.includes('word') || mimeType.includes('document')) return 'Document'
+  return 'File'
+}
+
+/** Adapt live uploads into the Document Vault page's `documents` array. No classification/versioning/approval-workflow system exists in the backend for uploaded files (only list+upload, matching the FundDocument precedent it's copied from), so `class`/`versions`/`status` carry honest neutral defaults rather than an invented confidentiality tier or review state — `type` is derived from the real mimeType, `owner`/`modified` are real. */
+export function adaptAc52VaultDocuments(rows: AccountingDocument[], userNames: Map<string, string>): Ac52VaultDocument[] {
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    folder: r.category,
+    type: vaultDocTypeLabel(r.mimeType),
+    owner: (r.uploadedById && userNames.get(r.uploadedById)) || 'Unassigned',
+    modified: (r.updatedAt || r.createdAt || '').slice(0, 10),
+    class: 'Internal',
+    versions: 1,
+    status: 'Uploaded',
+    content: '',
+  }))
+}
+
+const TAX_PACK_STATUS_LABEL: Record<string, string> = {
+  DRAFT: 'Draft',
+  COMPILING: 'Building',
+  DRAFT_REVIEW: 'In review',
+  SIGNED_OFF: 'Approved',
+  FAILED: 'Draft',
+}
+const TAX_PACK_READINESS: Record<string, number> = {
+  DRAFT: 25,
+  COMPILING: 50,
+  DRAFT_REVIEW: 75,
+  SIGNED_OFF: 100,
+  FAILED: 25,
+}
+
+/** Maps a real TaxReturnPack.taxRegime to the mock `compliancePacks` seed's own `type` strings (VAT/WHT/Income tax/Audit file), so the hydrate hook can tell which mock rows a real pack of the same type should replace. */
+const TAX_REGIME_LABEL: Record<string, { type: string; name: string }> = {
+  ZIMRA_CIT: { type: 'Income tax', name: 'Income Tax Pack' },
+  ZIMRA_VAT: { type: 'VAT', name: 'VAT Return Pack' },
+  ZIMRA_WHT: { type: 'WHT', name: 'Withholding Tax Schedule' },
+  ZIMRA_SAFT: { type: 'Audit file', name: 'ZIMRA Audit Support File' },
+}
+
+/** Adapt real tax-return packs (Income Tax with a full CIT+CGT liability, VAT with a real computed net-payable figure, WHT/SAF-T as evidence-and-readiness tracking only — see backend TaxReturnPackCompileService for the regime split) into the Compliance & Tax page's `compliancePacks` shape. `readiness` is derived from the real compile/review/sign-off status rather than an invented completion score, and `exceptions` stays honest at 0 (not tracked at list-endpoint granularity) rather than guessing. */
+export function adaptAc52TaxPacks(rows: TaxReturnPack[], userNames: Map<string, string>): Ac52TaxPack[] {
+  return rows.map((r) => {
+    const meta = TAX_REGIME_LABEL[r.taxRegime] || { type: 'Income tax', name: 'Tax Pack' }
+    return {
+      id: r.id,
+      name: `${meta.name} · ${r.taxPeriod} ${r.taxYear}`,
+      type: meta.type,
+      period: `${r.taxPeriod} ${r.taxYear}`,
+      status: TAX_PACK_STATUS_LABEL[r.status] || 'Draft',
+      readiness: TAX_PACK_READINESS[r.status] ?? 25,
+      exceptions: 0,
+      owner: (r.compiledById && userNames.get(r.compiledById)) || (r.createdById && userNames.get(r.createdById)) || 'Unassigned',
+      due: r.filingDueDate ? r.filingDueDate.slice(0, 10) : 'Not set',
+    }
+  })
+}
+
+const CLOSE_TASK_STATUS_LABEL: Record<string, string> = {
+  OPEN: 'Not started',
+  IN_PROGRESS: 'In progress',
+  COMPLETE: 'Complete',
+}
+
+function closeTaskPersonName(p: CloseTaskPerson | null): string {
+  if (!p) return 'Unassigned'
+  return `${p.firstName} ${p.lastName}`.trim() || p.email
+}
+
+/** Adapt real close-checklist tasks into the Period Close page's `closeTasks` array (dead-code target, kept for potential reuse — see adaptAc52CloseTasksV11 for the one that actually matters). */
+export function adaptAc52CloseTasks(rows: AccountingCloseTask[]): Ac52CloseTask[] {
+  return rows.map((r) => ({
+    workstream: r.workstream,
+    task: r.task,
+    owner: closeTaskPersonName(r.owner),
+    due: r.dueAt ? r.dueAt.slice(0, 10) : 'Not set',
+    evidence: 0,
+    status: CLOSE_TASK_STATUS_LABEL[r.status] || 'Not started',
+    dependency: r.dependsOn ? r.dependsOn.task : 'None',
+    backendId: r.id,
+    fiscalPeriodId: r.fiscalPeriodId,
+  }))
+}
+
+/** Adapt real close-checklist tasks into the V11 Period Close system's `C.tasks` shape — this is the one that actually renders live (home()/workstream()/taskPage(), confirmed empirically). Real id/workstream/name/owner/due/status/dependency; honest neutral defaults for the sub-checklist/evidence-count/priority fields no backend tracks. */
+export function adaptAc52CloseTasksV11(rows: AccountingCloseTask[]): Ac52CloseTaskV11[] {
+  return rows.map((r) => ({
+    id: r.id,
+    ws: r.workstream,
+    name: r.task,
+    owner: closeTaskPersonName(r.owner),
+    due: r.dueAt ? r.dueAt.slice(0, 10) : 'Not set',
+    status: CLOSE_TASK_STATUS_LABEL[r.status] || 'Not started',
+    dependency: r.dependsOn ? r.dependsOn.task : 'None',
+    evidence: 0,
+    required: 1,
+    checklist: [],
+    priority: 'Medium',
+    source: '',
+    note: '',
+    control: r.workstream,
+  }))
+}
+
+const TIMESHEET_STATUS_LABEL: Record<string, string> = {
+  DRAFT: 'Draft',
+  SUBMITTED: 'Submitted',
+  APPROVED: 'Approved',
+  RETURNED: 'Returned',
+}
+
+/** UTC-midnight instant of the Monday starting the viewer's current LOCAL calendar week — used to bucket real timesheet entries onto the Command-tab weekly grid's fixed Mon-Fri columns. Represented in UTC (not local) because entry dates are DATE-only backend values serialized as UTC-midnight ISO strings; comparing local-midnight against those would shift by a day for any non-UTC viewer (confirmed live: this app's real users are UTC+2). */
+function currentWeekMonday(now: Date = new Date()): Date {
+  const day = now.getDay()
+  const diff = day === 0 ? -6 : 1 - day
+  return new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate() + diff))
+}
+
+/** UTC-midnight instant of the calendar date a DATE-only backend value represents, read via UTC getters so it isn't shifted by the viewer's local offset. */
+function utcDateOnly(iso: string): number {
+  const d = new Date(iso)
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())
+}
+
+/** Adapt real timesheets (each with 1+ project entries) into the runtime's flat `ts` array shape — one row per timesheet, aggregated across its entries. Real employee/hours/billable/status; `cost` stays honest 0 (no hourly-rate tracking exists) and `owner` ("Approver") stays 'Unassigned' for anything not yet approved. `days` sums each entry's hours onto whichever weekday of the CURRENT calendar week it falls on (entries outside that window aren't bucketed but still count toward `hours`/`billable`). */
+export function adaptAc52Timesheets(rows: Timesheet[]): Ac52Timesheet[] {
+  const monday = currentWeekMonday()
+  return rows.map((r) => {
+    const hours = r.entries.reduce((s, e) => s + (Number(e.hours) || 0), 0)
+    const billable = r.entries.reduce((s, e) => s + (e.billable ? Number(e.hours) || 0 : 0), 0)
+    const projectNames = [...new Set(r.entries.map((e) => e.project?.name).filter(Boolean))]
+    const days = [0, 0, 0, 0, 0]
+    for (const e of r.entries) {
+      const offset = Math.round((utcDateOnly(e.date) - monday.getTime()) / 86400000)
+      if (offset >= 0 && offset < 5) days[offset] += Number(e.hours) || 0
+    }
+    return {
+      id: r.id,
+      employee: `${r.user.firstName} ${r.user.lastName}`.trim() || r.user.email,
+      project: projectNames.length === 1 ? projectNames[0] : projectNames.length > 1 ? 'Multiple projects' : 'Unassigned',
+      client: r.entries[0]?.project?.clientName || '',
+      hours,
+      billable,
+      cost: 0,
+      status: TIMESHEET_STATUS_LABEL[r.status] || r.status,
+      owner: 'Unassigned',
+      days,
+    }
+  })
+}
+
+/** Adapt real projects into the runtime's `projects` array shape. No hourly-rate/billing-rate/WIP tracking exists on Project itself, so cost/revenue/wip carry honest 0 rather than invented commercial figures. hours/billable ARE real when `timesheets` is supplied — summed from that batch's entries (the only entry-level data this module fetches, i.e. currently-pending-approval timesheets, not an all-time total). */
+export function adaptAc52Projects(rows: Project[], timesheets: Timesheet[] = []): Ac52Project[] {
+  const byProject = new Map<string, { hours: number; billable: number }>()
+  for (const t of timesheets) {
+    for (const e of t.entries) {
+      const cur = byProject.get(e.projectId) || { hours: 0, billable: 0 }
+      cur.hours += Number(e.hours) || 0
+      if (e.billable) cur.billable += Number(e.hours) || 0
+      byProject.set(e.projectId, cur)
+    }
+  }
+  return rows.map((r) => {
+    const agg = byProject.get(r.id) || { hours: 0, billable: 0 }
+    return {
+      id: r.id,
+      name: r.name,
+      client: r.clientName || '',
+      type: r.projectType || '',
+      budget: Number(r.budget) || 0,
+      hours: agg.hours,
+      billable: agg.billable,
+      cost: 0,
+      revenue: 0,
+      wip: 0,
+      status: r.status === 'ACTIVE' ? 'On track' : r.status,
+    }
+  })
 }
 
 /** Adapt live inventory items into the v51 Inventory Accounting page's `inventory` array. No warehouse/category/physical-count system exists in the backend, so those carry honest neutral defaults rather than an invented location or variance. */

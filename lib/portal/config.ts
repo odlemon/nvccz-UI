@@ -68,7 +68,7 @@ export const STAFF_PUBLIC_PASS_THROUGH = [
   '/home',
   '/portfolio',
   '/payroll-v6',
-  '/accounting-v52',
+  '/accounting',
   '/procurement-v23',
   '/performance',
   '/fundraising-kyc',
