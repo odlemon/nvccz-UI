@@ -533,7 +533,11 @@
   .portfolio-v11-root .analytics-chart-card{ min-height: 390px; }
 }
 
-.portfolio-v11-root .dashboard-lower{ display: grid; grid-template-columns: 1fr 1fr .9fr .9fr; gap: 13px; }
+/* Three columns, because renderDashboard emits exactly three cards here:
+   Sector Allocation, Quick Overview and Recent Activity. The fourth track this
+   rule used to declare had no card to fill it, leaving a ~270px void to the
+   right of Recent Activity while the chart row above spanned the full width. */
+.portfolio-v11-root .dashboard-lower{ display: grid; grid-template-columns: 1fr 1fr .9fr; gap: 13px; }
 .portfolio-v11-root .activity-list, .portfolio-v11-root .clean-list{ list-style: none; padding: 0; margin: 0; }
 .portfolio-v11-root .activity-item{ min-height: 48px; display: flex; align-items: center; gap: 9px; border-bottom: 1px solid var(--line); padding: 8px 0; }
 .portfolio-v11-root .activity-item:last-child{ border-bottom: 0; }

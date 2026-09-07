@@ -983,6 +983,18 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
           <section class="grid cols-3 section-gap">${skeletonBlock(140, 'pv11-skeleton-card')}${skeletonBlock(140, 'pv11-skeleton-card')}${skeletonBlock(140, 'pv11-skeleton-card')}</section>
         </section>`;
     }
+    if (state.page === 'dashboard') {
+      // Mirrors renderDashboard exactly: six metric cards, two charts, the three
+      // dashboard-lower cards, then the Portfolio Summary table. The generic
+      // skeleton below shows four metric cards and nothing at all for the lower
+      // row, so Sector Allocation, Quick Overview and Recent Activity used to
+      // pop in with no placeholder.
+      return `${pageHeader(title, 'Loading live data…')}
+        <section class="metric-grid section-gap" aria-busy="true">${Array.from({ length: 6 }, () => `<article class="metric-card">${skeletonBlock(72)}</article>`).join('')}</section>
+        <section class="chart-grid section-gap" aria-busy="true">${skeletonBlock(240, 'pv11-skeleton-card')}${skeletonBlock(240, 'pv11-skeleton-card')}</section>
+        <section class="dashboard-lower section-gap" aria-busy="true">${skeletonBlock(230, 'pv11-skeleton-card')}${skeletonBlock(230, 'pv11-skeleton-card')}${skeletonBlock(230, 'pv11-skeleton-card')}</section>
+        <section class="card table-card pv11-skeleton-card" aria-busy="true">${skeletonBlock(280)}</section>`;
+    }
     return `${pageHeader(title, 'Loading live data…')}
       <section class="metric-grid section-gap">${Array.from({ length: 4 }, () => `<article class="metric-card">${skeletonBlock(72)}</article>`).join('')}</section>
       <section class="chart-grid section-gap">${skeletonBlock(240, 'pv11-skeleton-card')}${skeletonBlock(240, 'pv11-skeleton-card')}</section>
