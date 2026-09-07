@@ -17,6 +17,7 @@ import {
   type PortfolioV11LoadFilters,
 } from "@/lib/portfolio-v11/bootstrap"
 import { handlePortfolioV11Action, hydrateDealDetail } from "@/lib/portfolio-v11/actions"
+import { ORG_LOGO_PATH, ORG_NAME } from "@/lib/branding"
 import { applicationsApi } from "@/lib/api/applications-api"
 import { fundsApi } from "@/lib/api/funds-api"
 import { fundraisingApi } from "@/lib/api/fundraising-api"
@@ -81,8 +82,26 @@ export function PortfolioV11App() {
 
     const initialPage = pathToPv11Page(pathnameRef.current)
 
+    // The vendored shell hardcodes the Matanho wordmark and an "m" monogram.
+    // Point both at the configured brand so the client deployment shows its own
+    // logo in the app chrome, not just on the login page. Also drop the
+    // sidebar-collapsed class so the module opens expanded.
+    const brandedShellHtml = PORTFOLIO_V11_SHELL_HTML.replace(
+      '/portfolio/assets/matanho-logo.png',
+      ORG_LOGO_PATH,
+    )
+      .replace(
+        'alt="Matanho Investment Management ERP"',
+        `alt="${ORG_NAME} Investment Management ERP"`,
+      )
+      .replace(
+        '<span class="brand-logo-collapsed brand-monogram" aria-hidden="true">m</span>',
+        `<span class="brand-logo-collapsed brand-monogram" aria-hidden="true">${(ORG_NAME[0] || "M").toLowerCase()}</span>`,
+      )
+      .replace('class="app-shell sidebar-collapsed"', 'class="app-shell"')
+
     const runtime = startPortfolioV11Runtime(el, {
-      shellHtml: PORTFOLIO_V11_SHELL_HTML,
+      shellHtml: brandedShellHtml,
       initialPage,
       liveOnly: true,
       onNavigate: (page: string) => {

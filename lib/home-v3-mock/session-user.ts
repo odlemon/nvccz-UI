@@ -31,10 +31,21 @@ export function buildHv3SessionUser(
   const name =
     [firstName, lastName].filter(Boolean).join(" ") || email.split("@")[0] || "User"
 
+  // `user.role` comes straight off the login response, where it is an object
+  // ({ id, name, ... }) rather than a string. Interpolating it rendered
+  // "[object Object]" in the app chrome whenever userDetails was missing —
+  // which happens whenever the details fetch is slow (8s timeout) or fails.
+  const roleName = (value: unknown): string =>
+    typeof value === "string"
+      ? value
+      : value && typeof value === "object" && typeof (value as { name?: unknown }).name === "string"
+        ? ((value as { name: string }).name)
+        : ""
+
   const role =
-    userDetails?.role?.name ||
-    userDetails?.departmentRole ||
-    user?.role ||
+    roleName(userDetails?.role) ||
+    (typeof userDetails?.departmentRole === "string" ? userDetails.departmentRole : "") ||
+    roleName(user?.role) ||
     "Team member"
 
   const location = userDetails?.userDepartment || ""

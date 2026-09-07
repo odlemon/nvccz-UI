@@ -436,7 +436,8 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   const state = {
     page: 'dashboard',
     previousPage: null,
-    sidebarCollapsed: storage.get('matanho-portfolio-sidebar','collapsed') !== 'expanded',
+    // Expanded by default; a saved preference still wins.
+    sidebarCollapsed: storage.get('matanho-portfolio-sidebar','expanded') !== 'expanded',
     mobileNavOpen: false,
     theme: storage.get('matanho-portfolio-theme','light'),
     liveData: false,
