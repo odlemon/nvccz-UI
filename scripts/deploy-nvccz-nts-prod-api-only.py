@@ -60,9 +60,18 @@ EXCLUDE_PREFIXES = ("storage/local-upload-mock/", "tmp-")
 EXCLUDE_NAMES = {".env", ".env.local"}
 
 
+def is_build_output_dir(name: str) -> bool:
+    """Any Next.js build directory, however it is suffixed.
+
+    Enumerating the known .next-* dirs lets a new one through silently; a local
+    scratch build pushed the dev tarball past 330 MB mid-upload on 2026-09-07.
+    """
+    return name == ".next" or name.startswith(".next-")
+
+
 def skip(rel: str) -> bool:
     parts = Path(rel).parts
-    if any(p in EXCLUDE_DIRS for p in parts):
+    if any(p in EXCLUDE_DIRS or is_build_output_dir(p) for p in parts):
         return True
     norm = rel.replace("\\", "/")
     if any(norm.startswith(p) for p in EXCLUDE_PREFIXES):
@@ -75,7 +84,7 @@ def skip(rel: str) -> bool:
 def make_tarball(root: Path, prefix: str, out: Path) -> str:
     with tarfile.open(out, mode="w:gz") as tar:
         for dirpath, dirs, files in os.walk(root):
-            dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS]
+            dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS and not is_build_output_dir(d)]
             for f in files:
                 full = Path(dirpath) / f
                 rel = str(full.relative_to(root))

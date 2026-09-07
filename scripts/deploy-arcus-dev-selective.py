@@ -138,9 +138,20 @@ EXCLUDE_NAMES = {
 EXCLUDE_SUFFIXES = (".xlsx", ".log", ".pyc")
 
 
+def is_build_output_dir(name: str) -> bool:
+    """Any Next.js build directory, however it is suffixed.
+
+    EXCLUDE_DIRS names the four known per-portal dirs, which means a new one is
+    packed silently. A scratch `.next-staff-review` built locally pushed this
+    tarball past 330 MB mid-upload before anyone noticed — the same failure mode
+    that made an earlier deploy 186 MB. Matching the prefix closes the class.
+    """
+    return name == ".next" or name.startswith(".next-")
+
+
 def skip(rel: str) -> bool:
     parts = Path(rel).parts
-    if any(p in EXCLUDE_DIRS for p in parts):
+    if any(p in EXCLUDE_DIRS or is_build_output_dir(p) for p in parts):
         return True
     norm = rel.replace("\\", "/")
     if any(norm.startswith(p) for p in EXCLUDE_PREFIXES):
@@ -156,7 +167,7 @@ def skip(rel: str) -> bool:
 def make_tarball(root: Path, arc_prefix: str, out_path: Path) -> str:
     with tarfile.open(out_path, mode="w:gz") as tar:
         for dirpath, dirs, files in os.walk(root):
-            dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS]
+            dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS and not is_build_output_dir(d)]
             for name in files:
                 full = Path(dirpath) / name
                 rel = str(full.relative_to(root))
