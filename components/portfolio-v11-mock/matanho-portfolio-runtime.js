@@ -1349,21 +1349,64 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     });
     const snapDates = Object.keys(snapshotsByDate).sort();
     const snapLabels = snapDates.map(d=>new Date(d).toLocaleDateString('en-GB',{day:'2-digit',month:'short'}));
-    const performance = snapDates.length ? barChart({
-      labels:snapLabels,
+
+    // Capital activity by month, from the real capital-call register. Snapshots
+    // only start accumulating once funds are updated, so calls are the richer
+    // real series and drive both charts; snapshots supply NAV where recorded.
+    const callBuckets = {};
+    capitalCalls.forEach(call => {
+      const d = new Date(call.callDate);
+      if (Number.isNaN(d.getTime())) return;
+      const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      if (!callBuckets[key]) callBuckets[key] = { called:0, collected:0 };
+      callBuckets[key].called += Number(call.amount)||0;
+      callBuckets[key].collected += Number(call.collected)||0;
+    });
+    const callMonths = Object.keys(callBuckets).sort();
+    const monthLabel = k => {
+      const [y,m] = k.split('-').map(Number);
+      return new Date(y, m-1, 1).toLocaleDateString('en-GB',{month:'short',year:'2-digit'});
+    };
+    const toM = v => Number((v/1e6).toFixed(2));
+
+    const performance = callMonths.length ? barChart({
+      labels:callMonths.map(monthLabel),
       series:[
-        { name:'Called capital', color:'var(--emerald)', values:snapDates.map(d=>Number((snapshotsByDate[d].calledCapital/1e6).toFixed(2))) },
-        { name:'Distributed', color:'var(--blue)', values:snapDates.map(d=>Number((snapshotsByDate[d].distributedCapital/1e6).toFixed(2))) },
-        { name:'NAV', color:'var(--navy)', values:snapDates.map(d=>Number((snapshotsByDate[d].nav/1e6).toFixed(2))) }
+        { name:'Called', color:'var(--emerald)', values:callMonths.map(k=>toM(callBuckets[k].called)) },
+        { name:'Collected', color:'var(--blue)', values:callMonths.map(k=>toM(callBuckets[k].collected)) },
+        { name:'Outstanding', color:'var(--amber)', values:callMonths.map(k=>toM(Math.max(0,callBuckets[k].called-callBuckets[k].collected))) }
       ],
       yLabel:'USD (Millions)',
       format:v => `${v}M`
-    }) : null;
-    const jCurve = snapDates.length ? lineChart({
+    }) : (snapDates.length ? barChart({
       labels:snapLabels,
-      series:[{ name:'NAV (USD)', color:'var(--blue)', values:snapDates.map(d=>Number((snapshotsByDate[d].nav/1e6).toFixed(2))) }],
+      series:[
+        { name:'Called capital', color:'var(--emerald)', values:snapDates.map(d=>toM(snapshotsByDate[d].calledCapital)) },
+        { name:'Distributed', color:'var(--blue)', values:snapDates.map(d=>toM(snapshotsByDate[d].distributedCapital)) },
+        { name:'NAV', color:'var(--navy)', values:snapDates.map(d=>toM(snapshotsByDate[d].nav)) }
+      ],
+      yLabel:'USD (Millions)', format:v => `${v}M`
+    }) : null);
+
+    // Cumulative called vs collected — the real shape of capital deployment.
+    let runCalled = 0, runCollected = 0;
+    const cumulative = callMonths.map(k => {
+      runCalled += callBuckets[k].called;
+      runCollected += callBuckets[k].collected;
+      return { called: toM(runCalled), collected: toM(runCollected) };
+    });
+    const jCurve = callMonths.length ? lineChart({
+      labels:callMonths.map(monthLabel),
+      series:[
+        { name:'Cumulative called', color:'var(--blue)', values:cumulative.map(c=>c.called) },
+        { name:'Cumulative collected', color:'var(--emerald)', values:cumulative.map(c=>c.collected) }
+      ],
       yLabel:'USD (Millions)', format:v=>`${v}M`
-    }) : null;
+    }) : (snapDates.length ? lineChart({
+      labels:snapLabels,
+      series:[{ name:'NAV (USD)', color:'var(--blue)', values:snapDates.map(d=>toM(snapshotsByDate[d].nav)) }],
+      yLabel:'USD (Millions)', format:v=>`${v}M`
+    }) : null);
 
     const sectorTotals = {};
     companies.forEach(c=>{ sectorTotals[c.sector||'Other']=(sectorTotals[c.sector||'Other']||0)+(c.fairValue||0); });
@@ -1390,8 +1433,8 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
         ${metricCard({label:'Unrealized Value',value:formatMoney(unrealized),iconName:'pie-chart',accent:'brand',foot:`${activeCompanies} active companies`,action:'metric-unrealized'})}
       </section>
       <section class="chart-grid">
-        ${card('Performance Overview',performance || `<div class="empty-state compact">${icon('bar-chart')}<strong>No recorded snapshots yet</strong><p class="muted small">Builds from real fund-performance snapshots recorded on fund create/update, going forward.</p></div>`,{subtitle:performance?`USD millions · ${snapDates.length} recorded snapshot date${snapDates.length===1?'':'s'} (real, not backfilled history)`:'By activity type (USD)',classes:'chart-card'})}
-        ${card('J-Curve',jCurve || `<div class="empty-state compact">${icon('trend-up')}<strong>No recorded snapshots yet</strong></div>`,{subtitle:'NAV over recorded snapshots · USD millions',classes:'chart-card'})}
+        ${card('Capital Activity',performance || `<div class="empty-state compact">${icon('bar-chart')}<strong>No capital activity recorded yet</strong><p class="muted small">Populates from the real capital-call register as calls are issued and collected.</p></div>`,{subtitle:callMonths.length?`Called, collected and outstanding by month · USD millions · ${capitalCalls.length} real call${capitalCalls.length===1?'':'s'}`:'USD millions',classes:'chart-card'})}
+        ${card('Capital Deployment Curve',jCurve || `<div class="empty-state compact">${icon('trend-up')}<strong>No capital activity recorded yet</strong></div>`,{subtitle:callMonths.length?'Cumulative called vs collected · USD millions':'USD millions',classes:'chart-card'})}
       </section>
       <section class="dashboard-lower">
         ${card('Sector Allocation',sectorSegments.length?donutChart(sectorSegments,formatMoney(sectorTotal),'Fair value',112):`<div class="empty-state compact">${icon('pie-chart')}<strong>No holdings recorded yet</strong></div>`,{footer:'<button class="card-link" data-action="chart-drilldown" data-chart-label="Sector Allocation" data-chart-value="Fair value by sector">View full allocation</button>'})}
