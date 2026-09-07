@@ -2,7 +2,11 @@
 FROM node:20-bookworm-slim AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci
+# Persist npm's download cache between builds. Without this, any change to
+# package-lock.json re-downloads every dependency from the registry; with it,
+# only the changed packages are fetched.
+RUN --mount=type=cache,target=/root/.npm,sharing=locked \
+    npm ci
 
 FROM node:20-bookworm-slim AS build
 WORKDIR /app
@@ -30,7 +34,18 @@ ENV NODE_OPTIONS=--max-old-space-size=4096
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN npm run build
+# Persist Next.js's incremental build cache between builds. The cache id is
+# scoped per portal on purpose: all six portals build from this same Dockerfile
+# and differ only by NEXT_PUBLIC_PORTAL, so a single shared cache would be
+# invalidated by whichever portal built last and help none of them.
+# `sharing=locked` serialises access so two portals building at once cannot
+# corrupt the same cache directory.
+#
+# Note: cache mounts are not committed into the image, so /app/.next/cache is
+# absent from the runtime stage below. That is intentional and harmless — Next
+# repopulates it on demand.
+RUN --mount=type=cache,target=/app/.next/cache,id=next-build-cache-${NEXT_PUBLIC_PORTAL},sharing=locked \
+    npm run build
 
 FROM node:20-bookworm-slim AS runtime
 WORKDIR /app
