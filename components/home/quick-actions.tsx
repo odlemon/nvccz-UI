@@ -57,7 +57,7 @@ const quickActions = [
     id: "account",
     title: "Account & Performance",
     icon: CiUser,
-    href: "/accounting",
+    href: "/account/settings",
     description: "Account settings",
     gradient: "from-teal-500 to-cyan-600"
   }

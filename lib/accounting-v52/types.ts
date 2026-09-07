@@ -179,7 +179,7 @@ export type Ac52RecurringSchedule = {
   autoPost: boolean
 }
 
-/** Shape the runtime's v8-scoped S.approvals array expects (matanho-accounting-runtime.js approvalsPage8). */
+/** Shape the runtime's v8-scoped S.approvals array expects (matanho-accounting-runtime.js approvalsPage8). `backendKind`/`backendId` aren't part of the original mock shape but ride along on real rows so the write path (approve/reject) knows which real endpoint to call: 'journal' -> PATCH journal-entries/:id/post|void (backendId = JournalEntry.id), 'approval' -> POST approvals/:id/approve|reject (backendId = the real Approval.id, not the ApprovalRequest id). */
 export type Ac52Approval = {
   id: string
   type: string
@@ -190,6 +190,8 @@ export type Ac52Approval = {
   maker: string
   requiredRole: string
   status: string
+  backendKind?: 'journal' | 'approval'
+  backendId?: string
 }
 
 /** Shape the runtime's v51-layer `inventory` array expects (matanho-accounting-runtime.js invPage). */
@@ -203,6 +205,94 @@ export type Ac52InventoryItem = {
   value: number
   countVar: number
   obsolete: string
+  status: string
+}
+
+/** Shape the runtime's `documents` array expects (matanho-accounting-runtime.js vaultPage). Real uploads carry no class/versions/status workflow — see adaptAc52VaultDocuments for the honest defaults used. */
+export type Ac52VaultDocument = {
+  id: string
+  name: string
+  folder: string
+  type: string
+  owner: string
+  modified: string
+  class: string
+  versions: number
+  status: string
+  content: string
+}
+
+/** Shape the runtime's `compliancePacks` array expects (matanho-accounting-runtime.js compliance17). Only Income Tax (CIT+CGT) packs are real — the backend has no VAT/WHT/SAF-T pack persistence yet, so those stay mock rows and real Income Tax packs are merged alongside them. */
+export type Ac52TaxPack = {
+  id: string
+  name: string
+  type: string
+  period: string
+  status: string
+  readiness: number
+  exceptions: number
+  owner: string
+  due: string
+}
+
+/** Shape the runtime's `closeTasks` array expects (matanho-accounting-runtime.js closePage — confirmed NOT the live renderer, kept for potential reuse). No per-task evidence-file tracking exists in the backend, so `evidence` stays an honest 0. */
+export type Ac52CloseTask = {
+  workstream: string
+  task: string
+  owner: string
+  due: string
+  evidence: number
+  status: string
+  dependency: string
+  /** Real backend row id — used to route 'mark complete' through the live API instead of the local-only mock fallback. */
+  backendId: string
+  fiscalPeriodId: string
+}
+
+/** Shape the runtime's V11 `C.tasks[i]` expects (matanho-accounting-runtime.js home()/workstream()/taskPage() — the actual live Period Close renderer, confirmed empirically; closePage() above is dead code for this page). No backend tracks a sub-checklist, evidence count, or priority per task, so those carry honest neutral defaults (empty checklist, 0/1 evidence, 'Medium' priority) rather than invented detail — the real fields (id/ws/name/owner/due/status/dependency) drive every downstream view since all of home()'s sibling pages and its single click handler operate generically on C.tasks/C.ws. */
+export type Ac52CloseTaskV11 = {
+  id: string
+  ws: string
+  name: string
+  owner: string
+  due: string
+  status: string
+  dependency: string
+  evidence: number
+  required: number
+  checklist: number[]
+  priority: string
+  source: string
+  note: string
+  control: string
+}
+
+/** Shape the runtime's `ts` array expects (matanho-accounting-runtime.js timesheetsPage34). Real backend has no hourly-rate/cost tracking, so `cost` stays honest 0; `owner` (rendered as "Approver") stays 'Unassigned' until a real approval exists — a SUBMITTED timesheet genuinely has no approver yet. `days` buckets real entry hours onto the current Mon-Fri calendar week for the Command-tab weekly grid (matanho-accounting-runtime.js timesheets48). */
+export type Ac52Timesheet = {
+  id: string
+  employee: string
+  project: string
+  client: string
+  hours: number
+  billable: number
+  cost: number
+  status: string
+  owner: string
+  days: number[]
+}
+
+/** Shape the runtime's `projects` array expects (matanho-accounting-runtime.js timesheetsPage34). No hourly-rate/billing-rate tracking exists in the backend, so hours/billable/cost/revenue/wip carry honest 0 rather than invented commercial figures. */
+export type Ac52Project = {
+  id: string
+  name: string
+  client: string
+  type: string
+  budget: number
+  hours: number
+  billable: number
+  cost: number
+  revenue: number
+  wip: number
   status: string
 }
 
@@ -256,5 +346,12 @@ export type Ac52HydratePayload = {
     approvals?: Ac52Approval[]
     fx?: import('./adapters').Ac52FxSummary
     recurring?: Ac52RecurringSchedule[]
+    vaultDocuments?: Ac52VaultDocument[]
+    taxPacks?: Ac52TaxPack[]
+    consolidation?: import('../api/consolidation-api').ConsolidationSummary
+    closeTasks?: Ac52CloseTask[]
+    closeTasksV11?: Ac52CloseTaskV11[]
+    timesheets?: Ac52Timesheet[]
+    projects?: Ac52Project[]
   }
 }

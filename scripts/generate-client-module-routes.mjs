@@ -73,6 +73,6 @@ export default function Layout({ children }: { children: ReactNode }) {
   }
 }
 
-writeRoutes("accounting-v52", acRoutes, "AccountingV52Layout")
+writeRoutes("accounting", acRoutes, "AccountingV52Layout")
 writeRoutes("procurement-v23", prRoutes, "ProcurementV23Layout")
 console.log("routes ok")
