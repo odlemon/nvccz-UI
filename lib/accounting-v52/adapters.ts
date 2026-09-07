@@ -1,7 +1,7 @@
 import type { ChartOfAccount } from '@/lib/api/chart-of-accounts-api'
 import type { PurchaseInvoice, Vendor, Invoice, Customer, Expense, InventoryItem, Asset } from '@/lib/api/accounting-api'
 import type { DashboardInstrument } from '@/lib/api/short-term-investments-api'
-import type { Ac52Account, Ac52Journal, Ac52Bank, Ac52ReconciliationLine, Ac52ApBill, Ac52ApVendor, Ac52ArInvoice, Ac52ArCustomer, Ac52Claim, Ac52InventoryItem, Ac52FixedAsset, Ac52Investment } from './types'
+import type { Ac52Account, Ac52Journal, Ac52Bank, Ac52ReconciliationLine, Ac52ApBill, Ac52ApVendor, Ac52ArInvoice, Ac52ArCustomer, Ac52Claim, Ac52InventoryItem, Ac52FixedAsset, Ac52Investment, Ac52Approval } from './types'
 
 /** Raw shape of GET /cashbook/banks rows. */
 type RawCashbookBank = {
@@ -161,6 +161,23 @@ export function adaptAc52Journals(rows: RawJournalEntry[]): Ac52Journal[] {
       backendId: r.id,
     }
   })
+}
+
+/** Adapt live PENDING journal entries into the v8 Approval Centre's S.approvals array. Payment/investment/master-data approval types have no real backend workflow to draw from, so this covers Journal approvals only — the one maker-checker queue genuinely backed by live data (a journal awaiting POSTED status). */
+export function adaptAc52Approvals(rows: RawJournalEntry[]): Ac52Approval[] {
+  return rows
+    .filter((r) => r.status === 'PENDING')
+    .map((r) => ({
+      id: `APR-${r.referenceNumber || r.id}`,
+      type: 'Journal',
+      record: r.referenceNumber || r.id,
+      title: r.description,
+      amount: Number(r.totalAmount) || 0,
+      currency: 'USD',
+      maker: r.createdBy ? `${r.createdBy.firstName || ''} ${r.createdBy.lastName || ''}`.trim() || r.createdBy.email || 'System' : 'System',
+      requiredRole: 'Finance Director or CEO',
+      status: 'Pending',
+    }))
 }
 
 /** Adapt live cashbook bank rows into the shape S.banks expects. */

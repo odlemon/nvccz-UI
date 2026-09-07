@@ -17,10 +17,11 @@ import {
   adaptAc52InventoryItems,
   adaptAc52FixedAssets,
   adaptAc52Investments,
+  adaptAc52Approvals,
 } from './adapters'
 import type { Ac52HydratePayload } from './types'
 
-export type Ac52DataScope = 'coa' | 'journals' | 'cash' | 'reconciliation' | 'payables' | 'receivables' | 'expenses' | 'inventory' | 'assets' | 'investments' | 'statements'
+export type Ac52DataScope = 'coa' | 'journals' | 'cash' | 'reconciliation' | 'payables' | 'receivables' | 'expenses' | 'inventory' | 'assets' | 'investments' | 'statements' | 'approvals'
 
 export type Ac52ScopePlan = {
   primary: Ac52DataScope[]
@@ -56,6 +57,8 @@ export function scopesForAc52Page(page: string): Ac52ScopePlan {
       return { primary: ['investments'] }
     case 'reports':
       return { primary: ['statements'] }
+    case 'approvals':
+      return { primary: ['approvals'] }
     default:
       return { primary: [] }
   }
@@ -90,13 +93,14 @@ export async function loadAc52Scopes(scopes: Ac52DataScope[]): Promise<Ac52Hydra
     }
   }
 
-  if (wanted.includes('journals') || wanted.includes('reconciliation')) {
+  if (wanted.includes('journals') || wanted.includes('reconciliation') || wanted.includes('approvals')) {
     // No status filter: backend defaults to POSTED_AND_PENDING, which is exactly
     // what the mock's Journal Entries / General Ledger pages need to show.
     const res = await settle(accountingApi.getJournalEntries(), 'journalEntries', errors)
     if (Array.isArray(res?.data)) {
       rawJournals = res!.data!
       if (wanted.includes('journals')) data.journals = adaptAc52Journals(rawJournals as any)
+      if (wanted.includes('approvals')) data.approvals = adaptAc52Approvals(rawJournals as any)
     }
   }
 

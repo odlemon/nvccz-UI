@@ -153,6 +153,19 @@ export type Ac52Claim = {
   status: string
 }
 
+/** Shape the runtime's v8-scoped S.approvals array expects (matanho-accounting-runtime.js approvalsPage8). */
+export type Ac52Approval = {
+  id: string
+  type: string
+  record: string
+  title: string
+  amount: number
+  currency: string
+  maker: string
+  requiredRole: string
+  status: string
+}
+
 /** Shape the runtime's v51-layer `inventory` array expects (matanho-accounting-runtime.js invPage). */
 export type Ac52InventoryItem = {
   sku: string
@@ -214,5 +227,6 @@ export type Ac52HydratePayload = {
     fixedAssets?: Ac52FixedAsset[]
     investments?: Ac52Investment[]
     reportRows?: import('./financial-statements').Ac52ReportRows
+    approvals?: Ac52Approval[]
   }
 }

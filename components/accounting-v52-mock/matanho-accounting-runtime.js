@@ -2674,6 +2674,9 @@ rootEl.__ac52Hydrate=function(source){if(!document.contains(rootEl))return;if(!s
  // sub-ledger pages instead of showing a stale/mock total.
  if(Array.isArray(source.apBills))S.bills.splice(0,S.bills.length,...source.apBills.map(b=>({id:b.id,vendorId:b.id,invoice:b.invoice,date:b.date,due:b.due,currency:'USD',net:b.gross,vat:0,total:b.gross,outstanding:b.open,project:b.project,status:b.status,journal:b.journal,match:b.match})));
  if(Array.isArray(source.arInvoices))S.invoices.splice(0,S.invoices.length,...source.arInvoices.map(x=>({id:x.id,customerId:x.id,date:x.date,due:x.due,currency:'USD',net:x.gross,vat:0,total:x.gross,outstanding:x.open,project:x.project,status:x.status,journal:x.journal})));
+ // Approval Centre reads S.approvals — real PENDING journals awaiting posting, the one
+ // maker-checker queue genuinely backed by live data (see adaptAc52Approvals).
+ if(Array.isArray(source.approvals))S.approvals.splice(0,S.approvals.length,...source.approvals);
  save8();render()};
 })();
 
