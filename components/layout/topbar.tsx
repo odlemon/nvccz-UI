@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
+import { ORG_NAME, ORG_LOGO_PATH } from "@/lib/branding"
 import { Input } from "@/components/ui/input"
 import {
   DropdownMenu,
@@ -93,7 +94,7 @@ function TopbarInner({ currentModule }: TopbarProps) {
               className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
               onClick={() => window.location.href = '/'}
             >
-              <img src="/new_logo.png" height={40} width={140} alt="Matanho" className="h-10 w-auto object-contain" />
+              <img src={ORG_LOGO_PATH} height={40} width={140} alt={ORG_NAME} className="h-10 w-auto object-contain" />
             </div>
 
           </div>

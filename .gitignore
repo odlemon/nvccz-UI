@@ -30,3 +30,6 @@ next-env.d.ts
 
 # local product docs / SRD (not committed)
 /docs/
+
+# claude code worktrees
+.claude/worktrees/
