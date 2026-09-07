@@ -116,7 +116,13 @@ export function scopesForPage(page: string): PageScopePlan {
 
     case 'dashboard':
       // Metrics/charts first; companies + funds + deal activity follow.
-      return { primary: ['dashboard'], secondary: ['companies', 'funds', 'applications'] }
+      // capitalCalls drives the Capital Activity / Deployment Curve charts,
+      // the open-calls stat and the recent-activity list — without it those
+      // render empty even when calls exist.
+      return {
+        primary: ['dashboard'],
+        secondary: ['companies', 'funds', 'applications', 'capitalCalls'],
+      }
 
     case 'funds':
     case 'fund-detail':
