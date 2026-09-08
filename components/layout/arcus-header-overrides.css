@@ -765,23 +765,91 @@ html.dark [data-arcus-shared-topbar] button,
    This block previously grouped Payroll with Accounting as "white sidebar, so
    dark text is correct". That held for Accounting but not Payroll, where black
    on rgb(2,13,29) is about 1:1 and left the nav labels invisible. */
+/* Payroll and Procurement ship a dark navy sidebar
+   (linear-gradient(180deg, var(--nav) …), rgb(2,13,29)) while every other
+   module — Accounting, FP&A, Fundraising, Street Rates — uses a white one.
+   Converted here to match, rather than kept dark with light text.
+
+   Because the module stylesheets style the whole sidebar for a dark surface,
+   the surrounding chrome has to come with it: brand rule, tenant card, badges,
+   footer and collapse control were all drawn with white-on-dark values. */
 .payroll-v6-root .sidebar,
 .procurement-v23-root .sidebar {
-  color: #cfd6e4 !important;
+  background: #f8fafc !important;
+  border-right: 1px solid #e2e8f0 !important;
+  box-shadow: none !important;
+  color: #0f172a !important;
+}
+/* The module CSS paints ambient glows over the gradient via ::before. */
+.payroll-v6-root .sidebar::before,
+.procurement-v23-root .sidebar::before {
+  background: none !important;
 }
 .payroll-v6-root .sidebar .nav-item,
 .procurement-v23-root .sidebar .nav-item {
-  color: #aeb9ca !important;
+  color: #334155 !important;
 }
 .payroll-v6-root .sidebar .nav-item:hover,
+.procurement-v23-root .sidebar .nav-item:hover {
+  background: #eef2f7 !important;
+  color: #0f172a !important;
+}
 .payroll-v6-root .sidebar .nav-item.active,
-.procurement-v23-root .sidebar .nav-item:hover,
 .procurement-v23-root .sidebar .nav-item.active {
+  background: #2563eb !important;
   color: #ffffff !important;
 }
 .payroll-v6-root .sidebar .nav-group,
 .procurement-v23-root .sidebar .nav-group {
-  color: #7f8ba1 !important;
+  color: #64748b !important;
+}
+/* Count badges: white-on-translucent-white is invisible on a light surface. */
+.payroll-v6-root .sidebar .nav-count,
+.procurement-v23-root .sidebar .nav-count {
+  background: #e2e8f0 !important;
+  color: #475569 !important;
+}
+.payroll-v6-root .sidebar .nav-item.active .nav-count,
+.procurement-v23-root .sidebar .nav-item.active .nav-count {
+  background: rgba(255, 255, 255, 0.25) !important;
+  color: #ffffff !important;
+}
+/* Brand rule, tenant card and footer were drawn with white-on-dark borders. */
+.payroll-v6-root .sidebar .brand,
+.procurement-v23-root .sidebar .brand,
+.payroll-v6-root .sidebar .sidebar-foot,
+.procurement-v23-root .sidebar .sidebar-foot {
+  border-color: #e2e8f0 !important;
+}
+.payroll-v6-root .sidebar .tenant,
+.procurement-v23-root .sidebar .tenant,
+.payroll-v6-root .sidebar .health,
+.procurement-v23-root .sidebar .health {
+  background: #ffffff !important;
+  border-color: #e2e8f0 !important;
+}
+.payroll-v6-root .sidebar .tenant-meta strong,
+.procurement-v23-root .sidebar .tenant-meta strong,
+.payroll-v6-root .sidebar .brand-copy strong,
+.procurement-v23-root .sidebar .brand-copy strong {
+  color: #0f172a !important;
+}
+.payroll-v6-root .sidebar .tenant-meta span,
+.procurement-v23-root .sidebar .tenant-meta span,
+.payroll-v6-root .sidebar .brand-copy span,
+.procurement-v23-root .sidebar .brand-copy span {
+  color: #64748b !important;
+}
+/* The vendored runtimes inline a WHITE brand wordmark as a base64 PNG, drawn for
+   the old dark sidebar and invisible against the light one. It cannot be swapped
+   for another file from here — `content: url(...)` on an <img> is ignored (it
+   computes to `normal`), and the src is baked into the runtime bundle.
+   brightness(0) drives every non-transparent pixel to black while preserving the
+   alpha channel, which renders the wordmark correctly on the light surface. */
+.payroll-v6-root .sidebar .brand img,
+.procurement-v23-root .sidebar .brand img {
+  filter: brightness(0) !important;
+  opacity: 0.85 !important;
 }
 
 /* Accounting renders a white sidebar, so it keeps dark text. The active item

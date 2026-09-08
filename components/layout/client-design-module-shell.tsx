@@ -52,9 +52,23 @@ export function ClientDesignModuleShell({
     html.style.overflow = "hidden"
     document.body.style.overflow = "hidden"
 
-    // Sync saved theme
+    // Sync saved theme.
+    //
+    // hideThemeToggle marks a module as light-only. This block used to apply
+    // dark regardless, which is a second writer of the same class as
+    // SharedTopbar: the topbar cleared `dark` for these modules and this put it
+    // straight back, leaving Home and Portfolio with a dark top bar above a
+    // light page whenever the global preference was dark.
+    //
+    // As in the topbar, localStorage is deliberately left untouched so a real
+    // dark preference survives for the modules that do support it.
     const saved = localStorage.getItem("arcus-theme")
-    if (saved === "dark" || (!saved && window.matchMedia("(prefers-color-scheme: dark)").matches)) {
+    const wantsDark =
+      saved === "dark" || (!saved && window.matchMedia("(prefers-color-scheme: dark)").matches)
+    if (hideThemeToggle) {
+      html.classList.remove("dark")
+      html.setAttribute("data-theme", "light")
+    } else if (wantsDark) {
       html.classList.add("dark")
       html.setAttribute("data-theme", "dark")
     }
@@ -86,7 +100,7 @@ export function ClientDesignModuleShell({
       document.body.style.overflow = prevBody
       document.removeEventListener("click", handleThemeClick, true)
     }
-  }, [])
+  }, [hideThemeToggle])
 
   const handleModuleSelect = (_module: string) => {
     // Module switching handled by ArcusAppSwitcherProvider -> AppSwitcherDropdown

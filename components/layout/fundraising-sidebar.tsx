@@ -7,6 +7,7 @@ import { ChevronsLeft, ChevronsRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { getModuleById } from "@/lib/config/modules"
 import { useRolePermissions } from "@/lib/hooks/useRolePermissions"
+import { ORG_LOGO_PATH, ORG_NAME } from "@/lib/branding"
 
 export function FundraisingSidebar() {
   const pathname = usePathname()
@@ -48,10 +49,37 @@ export function FundraisingSidebar() {
   return (
     <aside
       className={cn(
-        "bg-[#f8fafc] border-r border-[#e2e8f0] h-[calc(100vh-5rem)] sticky top-20 z-10 flex flex-col transition-[width] duration-200",
+        // Full viewport height from the top, matching Portfolio. Was
+        // h-[calc(100vh-5rem)] with sticky top-20, which parked the sidebar
+        // below the 80px topbar; the layout now puts the topbar in the column
+        // beside this one.
+        "bg-[#f8fafc] border-r border-[#e2e8f0] h-screen sticky top-0 z-10 flex flex-col transition-[width] duration-200",
         collapsed ? "w-[68px]" : "w-[240px]",
       )}
     >
+      {/* Brand lockup, so the module opens like Portfolio and Payroll. */}
+      <div
+        className={cn(
+          "flex h-20 shrink-0 items-center border-b border-[#e2e8f0]",
+          collapsed ? "justify-center px-2" : "px-4",
+        )}
+      >
+        {collapsed ? (
+          <span
+            className="grid h-9 w-9 place-items-center rounded-lg bg-[#1e293b] text-sm font-bold text-white"
+            aria-hidden="true"
+          >
+            {ORG_NAME.charAt(0)}
+          </span>
+        ) : (
+          <img
+            src={ORG_LOGO_PATH}
+            alt={ORG_NAME}
+            className="h-9 w-auto max-w-[170px] object-contain object-left"
+          />
+        )}
+      </div>
+
       <div className={cn("px-3 pt-4 pb-2", collapsed && "px-2")}>
         {!collapsed && (
           <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#94a3b8] px-1">
