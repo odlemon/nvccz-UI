@@ -32,13 +32,18 @@ export function EventsLayout({ children }: EventsLayoutProps) {
 
   return (
     <div className="min-h-screen bg-background" data-module="events">
-      <SharedTopbar onModuleSelect={handleModuleSelect} currentModule={currentModule} hideThemeToggle />
-
+      {/* Sidebar first, topbar inside the right-hand column, so the sidebar runs
+          the full height of the viewport and touches the top the way Portfolio's
+          does. Previously the topbar spanned the full width above this row and
+          pushed the sidebar down by 80px. Matches FP&A and Fundraising. */}
       <div className="flex">
         <EventsSidebar />
-        <main className="flex-1 overflow-auto">
-          {children}
-        </main>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <SharedTopbar onModuleSelect={handleModuleSelect} currentModule={currentModule} hideThemeToggle />
+          <main className="flex-1 overflow-auto min-h-[calc(100vh-5rem)]">
+            {children}
+          </main>
+        </div>
       </div>
     </div>
   )

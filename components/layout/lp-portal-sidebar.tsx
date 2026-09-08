@@ -24,6 +24,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { useLpPortal } from "@/components/lp-portal/lp-portal-context"
 import { cn } from "@/lib/utils"
+import { ORG_LOGO_PATH, ORG_NAME } from "@/lib/branding"
 
 interface LpPortalSidebarProps {
   mobile?: boolean
@@ -102,6 +103,34 @@ export function LpPortalSidebar({ mobile = false, onNavigate }: LpPortalSidebarP
         mobile ? "w-full" : isCollapsed ? "w-[62px]" : "w-[206px]",
       )}
     >
+      {/* Brand lockup. The sidebar now runs the full height beside the topbar
+          rather than starting below it, so it opens with the logo like the
+          staff-side modules do. Hidden on the mobile drawer, where the topbar
+          already shows the brand. */}
+      {!mobile && (
+        <div
+          className={cn(
+            "flex h-20 shrink-0 items-center border-b border-[#edf0f5]",
+            isCollapsed ? "justify-center px-2" : "px-4",
+          )}
+        >
+          {isCollapsed ? (
+            <span
+              className="grid h-9 w-9 place-items-center rounded-lg bg-[#1e293b] text-sm font-bold text-white"
+              aria-hidden="true"
+            >
+              {ORG_NAME.charAt(0)}
+            </span>
+          ) : (
+            <img
+              src={ORG_LOGO_PATH}
+              alt={ORG_NAME}
+              className="h-9 w-auto max-w-[140px] object-contain object-left"
+            />
+          )}
+        </div>
+      )}
+
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-2 py-2">
         <Link
           href="/lp-portal"

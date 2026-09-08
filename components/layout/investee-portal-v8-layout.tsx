@@ -11,6 +11,10 @@ export function InvesteePortalV8Layout({ children }: { children: React.ReactNode
       backgroundClassName="bg-[#f3f6fb]"
       loadingFallback={<div className="p-8 text-sm text-[#64748B]">Loading Investee Portal…</div>}
       mockApp={<InvesteePortalV8App />}
+      // Light-only, like the other client-design ports: the shell hardcodes
+      // bg-[#f3f6fb] and the vendored runtime ships no dark variants. Without
+      // this the global dark preference produced a dark top bar over a light page.
+      hideThemeToggle
     >
       {children}
     </ClientDesignModuleShell>

@@ -774,7 +774,8 @@ html.dark [data-arcus-shared-topbar] button,
    the surrounding chrome has to come with it: brand rule, tenant card, badges,
    footer and collapse control were all drawn with white-on-dark values. */
 .payroll-v6-root .sidebar,
-.procurement-v23-root .sidebar {
+.procurement-v23-root .sidebar,
+.investee-portal-v8-root .sidebar {
   background: #f8fafc !important;
   border-right: 1px solid #e2e8f0 !important;
   box-shadow: none !important;
@@ -782,30 +783,36 @@ html.dark [data-arcus-shared-topbar] button,
 }
 /* The module CSS paints ambient glows over the gradient via ::before. */
 .payroll-v6-root .sidebar::before,
-.procurement-v23-root .sidebar::before {
+.procurement-v23-root .sidebar::before,
+.investee-portal-v8-root .sidebar::before {
   background: none !important;
 }
 .payroll-v6-root .sidebar .nav-item,
-.procurement-v23-root .sidebar .nav-item {
+.procurement-v23-root .sidebar .nav-item,
+.investee-portal-v8-root .sidebar .nav-item {
   color: #334155 !important;
 }
 .payroll-v6-root .sidebar .nav-item:hover,
-.procurement-v23-root .sidebar .nav-item:hover {
+.procurement-v23-root .sidebar .nav-item:hover,
+.investee-portal-v8-root .sidebar .nav-item:hover {
   background: #eef2f7 !important;
   color: #0f172a !important;
 }
 .payroll-v6-root .sidebar .nav-item.active,
-.procurement-v23-root .sidebar .nav-item.active {
+.procurement-v23-root .sidebar .nav-item.active,
+.investee-portal-v8-root .sidebar .nav-item.active {
   background: #2563eb !important;
   color: #ffffff !important;
 }
 .payroll-v6-root .sidebar .nav-group,
-.procurement-v23-root .sidebar .nav-group {
+.procurement-v23-root .sidebar .nav-group,
+.investee-portal-v8-root .sidebar .nav-group {
   color: #64748b !important;
 }
 /* Count badges: white-on-translucent-white is invisible on a light surface. */
 .payroll-v6-root .sidebar .nav-count,
-.procurement-v23-root .sidebar .nav-count {
+.procurement-v23-root .sidebar .nav-count,
+.investee-portal-v8-root .sidebar .nav-count {
   background: #e2e8f0 !important;
   color: #475569 !important;
 }
@@ -847,7 +854,8 @@ html.dark [data-arcus-shared-topbar] button,
    brightness(0) drives every non-transparent pixel to black while preserving the
    alpha channel, which renders the wordmark correctly on the light surface. */
 .payroll-v6-root .sidebar .brand img,
-.procurement-v23-root .sidebar .brand img {
+.procurement-v23-root .sidebar .brand img,
+.investee-portal-v8-root .sidebar .brand img {
   filter: brightness(0) !important;
   opacity: 0.85 !important;
 }
@@ -889,7 +897,8 @@ html.dark [data-arcus-shared-topbar] button,
 @media (min-width: 761px) {
   .payroll-v6-root .sidebar,
   .accounting-v52-root .sidebar,
-  .procurement-v23-root .sidebar {
+  .procurement-v23-root .sidebar,
+  .investee-portal-v8-root .sidebar {
     position: fixed !important;
     inset: 0 auto 0 0 !important;
     /* Fixed positioning drops the grid track's sizing, so restate the width the
@@ -905,7 +914,8 @@ html.dark [data-arcus-shared-topbar] button,
      lines up with the fixed sidebar. */
   .payroll-v6-root .app > .shell,
   .accounting-v52-root .app > .shell,
-  .procurement-v23-root .app > .shell {
+  .procurement-v23-root .app > .shell,
+  .investee-portal-v8-root .app > .shell {
     grid-column: 2 !important;
   }
 }
@@ -1387,4 +1397,54 @@ html.dark [data-arcus-shared-topbar] button,
 .procurement-v23-root[data-theme="dark"] .btn:not(.primary):not(.secondary),
 .procurement-v23-root.dark .btn:not(.primary):not(.secondary) {
   color: #dde4f0 !important;
+}
+
+/* ── Fundraising KYC sidebar ─────────────────────────────────────────────
+   The KYC app renders its own shell — .kyc-app-shell is
+   `lg:grid lg:grid-cols-[300px_minmax(0,1fr)]` holding .kyc-sidebar and
+   .kyc-main — so the sidebar cannot be lifted out of the app the way the FP&A
+   and Fundraising layouts were restructured. Pinning it to the viewport gives
+   the same result: it starts at y=0 instead of below the 80px shared topbar.
+
+   Safe because the grid sizes its first track explicitly at 300px, so .kyc-main
+   keeps its offset once the sidebar leaves the flow. Scoped to the lg
+   breakpoint, which is where that grid exists at all — below it the shell is
+   block-level and the sidebar is a normal stacked element.
+
+   The `[data-module]` prefix is load-bearing: fundraising-kyc-overrides.css sets
+   `.fundraising-kyc-root .kyc-sidebar { position: relative !important }` at the
+   same 0,2,0 specificity and is bundled after this file, so the plain
+   `[data-module=…] .kyc-sidebar` form lost the cascade. Repeating the root class
+   here takes it to 0,3,0 and makes the win order-independent. */
+@media (min-width: 1024px) {
+  [data-module="fundraising-kyc"] .fundraising-kyc-root .kyc-sidebar {
+    position: fixed !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: auto !important;
+    width: 300px !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    z-index: 60 !important;
+  }
+  /* A fixed-position child is no longer a grid item, so .kyc-main would auto-place
+     into the (now empty) first track and render 300px wide at x=0. Pin it to the
+     second column explicitly. */
+  [data-module="fundraising-kyc"] .fundraising-kyc-root .kyc-main {
+    grid-column: 2 !important;
+  }
+  /* Collapsed state narrows the grid's first track to 76px; the pinned sidebar
+     is out of flow so it has to follow that width itself. */
+  [data-module="fundraising-kyc"] .fundraising-kyc-root.kyc-sidebar-collapsed .kyc-sidebar {
+    width: 76px !important;
+  }
+  /* The shared topbar spans the full width and would otherwise run underneath
+     the pinned sidebar; its left region is only a spacer, so indent it. */
+  [data-module="fundraising-kyc"] [data-arcus-shared-topbar] > div {
+    padding-left: 316px !important;
+  }
+  [data-module="fundraising-kyc"]:has(.kyc-sidebar-collapsed) [data-arcus-shared-topbar] > div {
+    padding-left: 92px !important;
+  }
 }

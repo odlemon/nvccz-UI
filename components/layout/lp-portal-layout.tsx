@@ -50,12 +50,16 @@ export function LpPortalLayout({ children }: LpPortalLayoutProps) {
   }
 
   return (
-    <div className="flex h-dvh flex-col overflow-hidden bg-background">
-      <LpPortalTopbar />
-      <div className="flex min-h-0 flex-1 overflow-hidden">
-        <div className="hidden h-full shrink-0 lg:flex">
-          <LpPortalSidebar />
-        </div>
+    <div className="flex h-dvh overflow-hidden bg-background">
+      {/* Sidebar first and full height, with the topbar in the column beside it,
+          so it touches the top of the viewport like the staff-side modules.
+          Previously the topbar spanned the full width above this row and pushed
+          the sidebar down by its 80px. */}
+      <div className="hidden h-full shrink-0 lg:flex">
+        <LpPortalSidebar />
+      </div>
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <LpPortalTopbar />
         <main className="min-h-0 min-w-0 flex-1 overflow-y-auto bg-[#f5f7fb]">
           <div className="mx-auto w-full max-w-[1500px] p-3 lg:p-4">{children}</div>
         </main>

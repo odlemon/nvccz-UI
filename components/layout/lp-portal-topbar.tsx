@@ -230,9 +230,12 @@ export function LpPortalTopbar() {
           </SheetContent>
         </Sheet>
 
+        {/* Only on the mobile drawer breakpoint. From lg up the sidebar sits
+            beside this bar and carries the brand itself, so showing it here too
+            put two copies of the logo side by side. */}
         <Link
           href="/home"
-          className="flex shrink-0 items-center gap-2 transition-opacity hover:opacity-80"
+          className="flex shrink-0 items-center gap-2 transition-opacity hover:opacity-80 lg:hidden"
           aria-label="Matanho home"
         >
           <img
