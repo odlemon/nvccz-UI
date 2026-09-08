@@ -918,6 +918,24 @@ html.dark [data-arcus-shared-topbar] button,
   .investee-portal-v8-root .app > .shell {
     grid-column: 2 !important;
   }
+
+  /* procurement-v23.css sets `.app{isolation:isolate}`. isolation creates a
+     stacking context regardless of position, and position:fixed only escapes
+     an ancestor's overflow clipping — not a stacking context it establishes.
+     So the fixed sidebar above was being painted INSIDE .app's stacking
+     context (z-index:50 compared only against .app's other descendants) while
+     .app itself, being position:static with isolation but no z-index, painted
+     as a plain in-flow box — behind the topbar's `sticky z-50` header, which
+     sits at the true page-root stacking context. Confirmed with
+     elementsFromPoint(20,15): the topbar's own div, then the header, then
+     .brand, then .sidebar, in that front-to-back order — the header was
+     genuinely on top of the sidebar despite matching z-index. Removing the
+     isolation lets the fixed sidebar escape to the root context, where its
+     z-index:50!important can be compared against the topbar's directly and
+     wins on tree order (it comes later in the DOM). */
+  .procurement-v23-root .app {
+    isolation: auto !important;
+  }
 }
 
 /* ── 4. Consistent header area ─────────────────────────────────────────── */
