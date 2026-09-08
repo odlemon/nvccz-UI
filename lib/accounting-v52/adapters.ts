@@ -1,12 +1,15 @@
 import type { ChartOfAccount } from '@/lib/api/chart-of-accounts-api'
 import type { PurchaseInvoice, Vendor, Invoice, Customer, Expense, InventoryItem, Asset, RecurringJournalTemplate } from '@/lib/api/accounting-api'
 import type { DashboardInstrument } from '@/lib/api/short-term-investments-api'
-import type { Ac52Account, Ac52Journal, Ac52Bank, Ac52ReconciliationLine, Ac52ApBill, Ac52ApVendor, Ac52ArInvoice, Ac52ArCustomer, Ac52Claim, Ac52InventoryItem, Ac52FixedAsset, Ac52Investment, Ac52Approval, Ac52RecurringSchedule, Ac52VaultDocument, Ac52TaxPack, Ac52CloseTask, Ac52CloseTaskV11, Ac52Timesheet, Ac52Project } from './types'
+import type { Ac52Account, Ac52Journal, Ac52Bank, Ac52ReconciliationLine, Ac52ApBill, Ac52ApVendor, Ac52ArInvoice, Ac52ArCustomer, Ac52Claim, Ac52InventoryItem, Ac52FixedAsset, Ac52Investment, Ac52Approval, Ac52RecurringSchedule, Ac52VaultDocument, Ac52TaxPack, Ac52CloseTask, Ac52CloseTaskV11, Ac52Timesheet, Ac52Project, Ac52AuditEvent, Ac52AccessData } from './types'
 import type { AccountingDocument } from '@/lib/api/accounting-documents-api'
 import type { TaxReturnPack } from '@/lib/api/tax-return-pack-api'
 import type { AccountingCloseTask, CloseTaskPerson } from '@/lib/api/accounting-close-tasks-api'
 import type { PendingApproval } from '@/lib/api/approvals-api'
 import type { Timesheet, Project } from '@/lib/api/timesheets-api'
+import type { AuditLogRow } from '@/lib/api/audit-log-api'
+import type { AppUser } from '@/lib/api/users-api'
+import type { AppRole } from '@/lib/api/roles-api'
 
 /** Raw shape of GET /cashbook/banks rows. */
 type RawCashbookBank = {
@@ -761,4 +764,133 @@ export function adaptAc52Investments(rows: DashboardInstrument[]): Ac52Investmen
     limit: '—',
     status: STI_STATUS_LABEL[r.status] || r.status,
   }))
+}
+
+/**
+ * Adapt the real users and roles tables into the RBAC page's fixtures. The mock asserted MFA
+ * enrolment ("Enforced") and last-active times ("2 min ago") for every user; neither is tracked
+ * anywhere in this backend, so both report '—' rather than claiming a security control is in
+ * force. The permission matrix is built from the keys roles genuinely hold, so it reflects
+ * actual access rather than a hardcoded list of plausible-looking permission names.
+ */
+export function adaptAc52AccessData(users: AppUser[], roles: AppRole[]): Ac52AccessData {
+  const rolePermissions: Record<string, string[]> = {}
+  const keySet = new Set<string>()
+  for (const r of roles) {
+    // `permissions` is typed `unknown` because the column is free-form JSON. In this database it
+    // holds `{name, value}` objects (e.g. {name:'manage_accounting', value:true}), but plain
+    // strings appear in some roles too, so both are accepted. A permission explicitly set to
+    // false is a revocation, not a grant, so it is excluded rather than shown as held.
+    const raw = Array.isArray(r.permissions) ? r.permissions : []
+    const perms: string[] = []
+    for (const p of raw) {
+      if (typeof p === 'string') perms.push(p)
+      else if (p && typeof p === 'object') {
+        const o = p as { name?: unknown; value?: unknown }
+        if (typeof o.name === 'string' && o.value !== false) perms.push(o.name)
+      }
+    }
+    rolePermissions[r.name] = perms
+    for (const p of perms) keySet.add(p)
+  }
+  // Accounting-relevant keys first so the matrix opens on what this module actually governs,
+  // then everything else alphabetically. Capped because some roles carry very long lists and the
+  // matrix is a fixed-width table.
+  const permissionKeys = Array.from(keySet)
+    .sort((a, b) => {
+      const aa = /account|ledger|journal|payable|receivable|tax|payment|period/i.test(a) ? 0 : 1
+      const bb = /account|ledger|journal|payable|receivable|tax|payment|period/i.test(b) ? 0 : 1
+      return aa - bb || a.localeCompare(b)
+    })
+    .slice(0, 24)
+  return {
+    users: users.map((u) => {
+      const dept = typeof u.department === 'string' ? u.department : u.department?.name
+      return {
+        name: `${u.firstName} ${u.lastName}`.trim() || u.email,
+        email: u.email,
+        role: u.role?.name || '—',
+        scope: dept || '—',
+        mfa: '—',
+        last: u.lastSeen ? new Date(u.lastSeen).toLocaleString('en-GB') : '—',
+        status: 'Active',
+      }
+    }),
+    // Only roles that exist in the roles table — the mock listed ten invented job titles.
+    // Ordered by how many of the displayed permission keys each role actually holds: the matrix
+    // renders the first seven as columns, and an arbitrary slice of 59 roles showed seven that
+    // hold no accounting permission at all, so every toggle read as off.
+    roles: [...roles]
+      .sort((a, b) => (rolePermissions[b.name]?.length || 0) - (rolePermissions[a.name]?.length || 0) || a.name.localeCompare(b.name))
+      .map((r) => r.name),
+    rolePermissions,
+    permissionKeys,
+  }
+}
+
+/**
+ * Map an AuditLog action onto the runtime's `class` column, which drives the status pill.
+ * The backend has no classification field, so this is derived from the action verb rather
+ * than invented, and anything unrecognised falls back to the neutral 'Control' pill instead
+ * of being guessed into a category it may not belong to.
+ */
+function auditEventClass(action: string): string {
+  const a = (action || '').toUpperCase()
+  if (a.includes('LOGIN') || a.includes('LOGOUT') || a.includes('PERMISSION') || a.includes('DENIED')) return 'Security'
+  if (a.includes('APPROVE') || a.includes('REJECT') || a.includes('SIGN')) return 'Approval'
+  if (a.includes('CREATE') || a.includes('UPDATE') || a.includes('DELETE') || a.includes('POST') || a.includes('VOID')) return 'Change'
+  if (a.includes('EXPORT') || a.includes('SYNC') || a.includes('IMPORT')) return 'Integration'
+  return 'Control'
+}
+
+/**
+ * Build the detail cell. The backend stores structured oldValues/newValues rather than the
+ * prose sentence the mock showed, so summarise which fields actually changed instead of
+ * dumping JSON into a table cell. With nothing structured recorded, name the entity acted
+ * on — that is what is genuinely known — rather than narrating an event.
+ */
+function auditEventDetail(row: AuditLogRow): string {
+  const oldV = row.oldValues && typeof row.oldValues === 'object' ? (row.oldValues as Record<string, unknown>) : null
+  const newV = row.newValues && typeof row.newValues === 'object' ? (row.newValues as Record<string, unknown>) : null
+  if (newV) {
+    const changed = Object.keys(newV).filter((k) => !oldV || JSON.stringify(oldV[k]) !== JSON.stringify(newV[k]))
+    if (changed.length) {
+      return `Changed ${changed.slice(0, 4).join(', ')}${changed.length > 4 ? ` +${changed.length - 4} more` : ''}`
+    }
+  }
+  const entity = [row.entityType, row.entityId].filter(Boolean).join(' ')
+  return entity ? `${row.action} on ${entity}` : row.action
+}
+
+/**
+ * Adapt real AuditLog rows into the runtime's `auditLog` array — used by auditPage() (the
+ * standalone Immutable Audit Trail page) and by settings17()'s 'audit' tab, which both read
+ * the same array. AuditLog stores only adminId, so `role` is resolved via the users lookup;
+ * a service-originated row with no admin reports 'System'/'Service' and its real absence of
+ * a client IP, rather than borrowing a person's name or showing a fabricated host address.
+ */
+export function adaptAc52AuditEvents(rows: AuditLogRow[], userRoles: Map<string, string>): Ac52AuditEvent[] {
+  return rows.map((r) => {
+    const name = r.admin ? `${r.admin.firstName} ${r.admin.lastName}`.trim() : ''
+    const ts = new Date(r.timestamp)
+    return {
+      time: Number.isNaN(ts.getTime())
+        ? '—'
+        : ts.toLocaleString('en-GB', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+          }),
+      event: r.action,
+      record: r.entityId || r.entityType || '—',
+      user: name || 'System',
+      role: (r.adminId && userRoles.get(r.adminId)) || (name ? '—' : 'Service'),
+      ip: r.ipAddress || 'service',
+      detail: auditEventDetail(r),
+      class: auditEventClass(r.action),
+    }
+  })
 }

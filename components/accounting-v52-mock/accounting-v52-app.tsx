@@ -32,6 +32,10 @@ export function AccountingV52App() {
   const pathnameRef = useRef(pathname)
   pathnameRef.current = pathname
   const loadedScopesRef = useRef<Set<Ac52DataScope>>(new Set())
+  // Scopes with a fetch in flight right now, mapped to that fetch. loadedScopesRef is only
+  // written after the await resolves, so without this a scope requested again in the
+  // meantime refetches instead of joining the request already running.
+  const pendingScopesRef = useRef<Map<Ac52DataScope, Promise<void>>>(new Map())
   const accountsCacheRef = useRef<Ac52Account[]>([])
   const busyRef = useRef(false)
   const ensurePageDataRef = useRef<null | ((page: string) => Promise<void>)>(null)
@@ -69,22 +73,55 @@ export function AccountingV52App() {
 
     ensurePageDataRef.current = async (page: string) => {
       const plan = scopesForAc52Page(page)
-      const primary = plan.primary.filter((s) => !loadedScopesRef.current.has(s))
-      if (!primary.length) return
-      runtime.beginLiveLoad?.()
-      try {
-        const payload = await loadAc52Scopes(primary)
-        if (apiRef.current !== runtime) return
-        if (Array.isArray(payload.data?.accounts)) accountsCacheRef.current = payload.data!.accounts!
-        runtime.hydrate?.(payload)
-        for (const s of primary) loadedScopesRef.current.add(s)
-        runtime.endLiveLoad?.()
-        if (payload.meta.errors.length) {
-          runtime.failLiveLoad?.(payload.meta.errors.join("; "))
-        }
-      } catch (err: any) {
-        runtime.failLiveLoad?.(err?.message || "Failed to load live accounting data.")
+      // Three call sites reach this on a single cold load — the mount call below, the
+      // pathname effect, and the runtime's own onNavigate callback — and the runtime can
+      // fire onNavigate more than once while it boots. Filtering on loadedScopesRef alone
+      // deduplicated none of them, because that set is only written after the fetch
+      // resolves: measured live, every endpoint on Command Centre was fetched 6x per load.
+      // Skipping scopes that are already in flight collapses that back to one fetch each.
+      const primary = plan.primary.filter(
+        (s) => !loadedScopesRef.current.has(s) && !pendingScopesRef.current.has(s),
+      )
+      if (!primary.length) {
+        // Nothing new to fetch, but a fetch this page depends on may still be running —
+        // await it so callers that refresh after a write (invalidateScopes below) observe
+        // the hydrated data rather than returning before it lands.
+        const inFlight = plan.primary
+          .map((s) => pendingScopesRef.current.get(s))
+          .filter((p): p is Promise<void> => Boolean(p))
+        if (inFlight.length) await Promise.all(inFlight)
+        return
       }
+      runtime.beginLiveLoad?.()
+      // Declared up front (rather than `const run = (async () => ...)()`) so the finally
+      // block below can compare against it — TS cannot prove definite assignment for a const
+      // referenced from inside the very expression that initialises it.
+      let run: Promise<void> | undefined
+      run = (async () => {
+        try {
+          const payload = await loadAc52Scopes(primary)
+          if (apiRef.current !== runtime) return
+          if (Array.isArray(payload.data?.accounts)) accountsCacheRef.current = payload.data!.accounts!
+          runtime.hydrate?.(payload)
+          for (const s of primary) loadedScopesRef.current.add(s)
+          runtime.endLiveLoad?.()
+          if (payload.meta.errors.length) {
+            runtime.failLiveLoad?.(payload.meta.errors.join("; "))
+          }
+        } catch (err: any) {
+          runtime.failLiveLoad?.(err?.message || "Failed to load live accounting data.")
+        } finally {
+          // Only clear our own entry: an invalidation during this fetch drops it from the
+          // map and starts a newer one under the same key, which must not be evicted here.
+          for (const s of primary) {
+            if (pendingScopesRef.current.get(s) === run) pendingScopesRef.current.delete(s)
+          }
+        }
+      })()
+      // Safe to register after starting `run`: it runs synchronously only up to its first
+      // await, so no other caller can observe an empty pending map before this loop.
+      for (const s of primary) pendingScopesRef.current.set(s, run!)
+      await run
     }
 
     const onBeforeAction = (event: Event) => {
@@ -132,7 +169,13 @@ export function AccountingV52App() {
           "journal-submit": { scopes: JOURNAL_DEPENDENT_SCOPES, title: "Journal submitted" },
         }
         const meta = ACTION_SCOPE[action] || { scopes: ["coa"] as Ac52DataScope[], title: "Updated" }
-        for (const scope of meta.scopes) loadedScopesRef.current.delete(scope)
+        // Drop the in-flight entry too, not just the loaded flag: a fetch issued before this
+        // write would return pre-write data, and leaving it registered would make the refresh
+        // below join that stale request instead of issuing a new one.
+        for (const scope of meta.scopes) {
+          loadedScopesRef.current.delete(scope)
+          pendingScopesRef.current.delete(scope)
+        }
         await ensurePageDataRef.current?.(pathToAc52Page(pathnameRef.current))
         runtime.commitSuccess?.(meta.title, result.message, meta.scopes[0])
       })

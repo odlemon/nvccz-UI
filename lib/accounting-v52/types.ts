@@ -326,6 +326,92 @@ export type Ac52Investment = {
   status: string
 }
 
+/**
+ * Shape the runtime's `auditLog` array expects (matanho-accounting-runtime.js line ~203 —
+ * consumed by auditPage() for the standalone Immutable Audit Trail page and by settings17()'s
+ * 'audit' tab). The backend's AuditLog row carries no role, so `role` is resolved from the
+ * users list where possible and left as an honest '—' when the actor is a system/service
+ * event with no user attached.
+ */
+export type Ac52AuditEvent = {
+  time: string
+  event: string
+  record: string
+  user: string
+  role: string
+  ip: string
+  detail: string
+  class: string
+}
+
+/**
+ * Real replacement for the runtime's `ceoEntities` demo fixture (matanho-accounting-runtime.js
+ * ceoPage()). Assembled in live-loaders from the consolidation summary plus the same posted-journal
+ * cash derivation Command Centre uses, so the CEO View ties to the operational pages instead of
+ * showing a parallel set of invented figures. `close` is null and `risk` 0 because neither
+ * per-entity close progress nor a finance risk register exists in the backend.
+ */
+export type Ac52CeoEntity = {
+  id: string
+  name: string
+  sector: string
+  revenue: number
+  profit: number
+  cash: number
+  ar: number
+  ap: number
+  risk: number
+  close: number | null
+  margin: number
+}
+
+export type Ac52CeoSummary = {
+  cash: number
+  revenue: number
+  netIncome: number
+  entities: Ac52CeoEntity[]
+}
+
+/**
+ * Real replacement for the runtime's `users` / `roles` / `rolePermissions` fixtures, consumed by
+ * accessPage12() (the live Dynamic RBAC renderer — note pages.access is assigned three times and
+ * accessPage12 is last) and by settings17()'s 'access' tab.
+ *
+ * `mfa` and `last` are '—': the backend tracks neither MFA enrolment nor last-active time for
+ * users, and the mock's "Enforced" / "2 min ago" values asserted both. `scope` is the user's real
+ * department where one is set — there is no per-user entity/fund scoping model to read.
+ */
+export type Ac52AccessUser = {
+  name: string
+  email: string
+  role: string
+  scope: string
+  mfa: string
+  last: string
+  status: string
+}
+
+export type Ac52AccessData = {
+  users: Ac52AccessUser[]
+  roles: string[]
+  /** Role name -> the permission keys that role actually holds, straight from the roles table. */
+  rolePermissions: Record<string, string[]>
+  /** Permission keys actually in use, so the matrix shows real keys rather than invented ones. */
+  permissionKeys: string[]
+}
+
+/**
+ * Real fiscal periods for Settings > Periods & lock (settings17). The tiles this replaces were
+ * four hardcoded months carrying invented lock dates ("Locked 03 Jul") and completion
+ * percentages. No per-period completion metric exists, so none is shown.
+ */
+export type Ac52FiscalPeriod = {
+  id: string
+  name: string
+  status: string
+  isCurrent: boolean
+}
+
 export type Ac52HydratePayload = {
   data?: {
     accounts?: Ac52Account[]
@@ -353,5 +439,9 @@ export type Ac52HydratePayload = {
     closeTasksV11?: Ac52CloseTaskV11[]
     timesheets?: Ac52Timesheet[]
     projects?: Ac52Project[]
+    auditLog?: Ac52AuditEvent[]
+    ceo?: Ac52CeoSummary
+    access?: Ac52AccessData
+    fiscalPeriods?: Ac52FiscalPeriod[]
   }
 }
