@@ -36,6 +36,12 @@ export interface AccountingCloseTask {
 export interface FiscalPeriod {
   id: string
   periodNumber: number
+  /**
+   * Backend-supplied label, e.g. "January 2026". Use this rather than formatting `startDate`:
+   * these are DATE columns serialised at UTC midnight, and January 2026 comes back as
+   * 2025-12-31T00:00:00Z, so month-formatting the start date names the wrong month.
+   */
+  name?: string
   startDate: string
   endDate: string
   status: string

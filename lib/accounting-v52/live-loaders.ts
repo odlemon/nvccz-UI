@@ -9,6 +9,8 @@ import { getConsolidationSummary } from '@/lib/api/consolidation-api'
 import { getFiscalCalendar, getCloseTasks, type FiscalPeriod } from '@/lib/api/accounting-close-tasks-api'
 import { getMyPendingApprovals } from '@/lib/api/approvals-api'
 import { getPendingApprovalTimesheets, getProjects } from '@/lib/api/timesheets-api'
+import { getAuditLogs } from '@/lib/api/audit-log-api'
+import { rolesApi } from '@/lib/api/roles-api'
 import { computeAc52FinancialStatements } from './financial-statements'
 import {
   adaptAc52Accounts,
@@ -33,10 +35,12 @@ import {
   adaptAc52NonJournalApprovals,
   adaptAc52Timesheets,
   adaptAc52Projects,
+  adaptAc52AuditEvents,
+  adaptAc52AccessData,
 } from './adapters'
 import type { Ac52HydratePayload } from './types'
 
-export type Ac52DataScope = 'coa' | 'journals' | 'cash' | 'reconciliation' | 'payables' | 'receivables' | 'expenses' | 'inventory' | 'assets' | 'investments' | 'statements' | 'approvals' | 'fx' | 'recurring' | 'vault' | 'compliance' | 'consolidation' | 'close' | 'timesheets'
+export type Ac52DataScope = 'coa' | 'journals' | 'cash' | 'reconciliation' | 'payables' | 'receivables' | 'expenses' | 'inventory' | 'assets' | 'investments' | 'statements' | 'approvals' | 'fx' | 'recurring' | 'vault' | 'compliance' | 'consolidation' | 'close' | 'timesheets' | 'audit' | 'ceo' | 'access'
 
 export type Ac52ScopePlan = {
   primary: Ac52DataScope[]
@@ -97,6 +101,24 @@ export function scopesForAc52Page(page: string): Ac52ScopePlan {
       return { primary: ['close'] }
     case 'timesheets':
       return { primary: ['timesheets'] }
+    // CEO View (ceoPage in the runtime) had no case here either, so on a cold load it
+    // rendered its hardcoded ceoEntities fixture end to end — $6.84m group liquidity against
+    // a real $3.50m, $189.5k receivables against a real $7.8k, four legal entities against
+    // one real one. It needs the same figures Command Centre derives, plus the real entity
+    // list from the consolidation summary.
+    case 'ceo':
+      return { primary: ['journals', 'cash', 'payables', 'receivables', 'approvals', 'consolidation', 'close', 'ceo'] }
+    // Settings' "Configured banks" table reads live bank state, but without this case the
+    // page never fetched it: on a cold load it listed the mock CBZ/Stanbic/FBC banks on GL
+    // 1101-1103 instead of the real account on GL 1100. 'close' backs the periods tab.
+    case 'settings':
+      return { primary: ['cash', 'close', 'audit', 'consolidation', 'access'] }
+    case 'audit':
+      return { primary: ['audit'] }
+    // Dynamic RBAC (accessPage12) rendered an invented user register, ten invented role titles
+    // and a permission matrix of permission keys that do not exist in this system.
+    case 'access':
+      return { primary: ['access'] }
     // Trial Balance (trialBalancePage12) computes account balances from S.accounts + S.journals
     // directly (core12()/tb12()) — same missing-case bug as 'overview' above, same fix.
     case 'trialbalance':
@@ -322,6 +344,23 @@ export async function loadAc52Scopes(scopes: Ac52DataScope[]): Promise<Ac52Hydra
         data.closeTasksV11 = adaptAc52CloseTasksV11(tasksRes!.data!)
       }
     }
+    // The real period list, for Settings > Periods & lock — which showed four hardcoded months
+    // with invented lock dates and completion percentages. Most recent first, capped at the
+    // handful the tile grid displays.
+    if (allPeriods.length) {
+      data.fiscalPeriods = [...allPeriods]
+        .sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime())
+        .slice(0, 8)
+        .map((p) => ({
+          id: p.id,
+          // p.name ("January 2026") not a formatted startDate — see the FiscalPeriod type: these
+          // are UTC-midnight DATE values, and January 2026 starts 2025-12-31Z, so formatting the
+          // start date labels every period with the previous month.
+          name: p.name || `Period ${p.periodNumber}`,
+          status: p.status === 'OPEN' ? 'Open' : 'Closed',
+          isCurrent: p.id === current?.id,
+        }))
+    }
   }
 
   if (wanted.includes('timesheets')) {
@@ -333,6 +372,35 @@ export async function loadAc52Scopes(scopes: Ac52DataScope[]): Promise<Ac52Hydra
     if (Array.isArray(projRes?.data)) data.projects = adaptAc52Projects(projRes!.data!, Array.isArray(tsRes?.data) ? tsRes!.data! : [])
   }
 
+  if (wanted.includes('audit')) {
+    const [logRes, usersRes] = await Promise.all([
+      settle(getAuditLogs(100), 'auditLogs', errors),
+      settle(usersApi.getAll(), 'users', errors),
+    ])
+    if (Array.isArray(logRes?.data?.items)) {
+      // AuditLog carries adminId but no role, so build an id -> role-name lookup to fill the
+      // page's Role column instead of leaving every row blank.
+      const userRoles = new Map<string, string>()
+      if (Array.isArray(usersRes?.data)) {
+        for (const u of usersRes!.data!) {
+          const role = (u as any).role?.name || (u as any).roleName || (u as any).roleCode
+          if (role) userRoles.set(u.id, String(role))
+        }
+      }
+      data.auditLog = adaptAc52AuditEvents(logRes!.data!.items, userRoles)
+    }
+  }
+
+  if (wanted.includes('access')) {
+    const [usersRes, rolesRes] = await Promise.all([
+      settle(usersApi.getAll(), 'usersForAccess', errors),
+      settle(rolesApi.getAll(), 'rolesForAccess', errors),
+    ])
+    if (Array.isArray(usersRes?.data) && Array.isArray(rolesRes?.data)) {
+      data.access = adaptAc52AccessData(usersRes!.data!, rolesRes!.data!)
+    }
+  }
+
   if (wanted.includes('statements')) {
     const [accountsRes, journalsRes] = await Promise.all([
       settle(chartOfAccountsApi.getChartOfAccounts(), 'chartOfAccountsForStatements', errors),
@@ -340,6 +408,60 @@ export async function loadAc52Scopes(scopes: Ac52DataScope[]): Promise<Ac52Hydra
     ])
     if (Array.isArray(accountsRes) && Array.isArray(journalsRes?.data)) {
       data.reportRows = computeAc52FinancialStatements(accountsRes, journalsRes!.data as any)
+    }
+  }
+
+  // Assembled last, because it is derived from the scopes above rather than fetched: the CEO
+  // View's headline figures. Previously this page had no scope at all and rendered its
+  // ceoEntities demo fixture end to end (a $6.84m group liquidity against a real $3.50m, and
+  // four legal entities against the one that actually exists).
+  if (wanted.includes('ceo')) {
+    // Cash is derived the same way the reconciliation block above derives it — posted journal
+    // lines against each bank's linked GL account — so this figure ties to Command Centre and
+    // Cash Book rather than being a second, independently-computed number.
+    let cash = 0
+    if (rawBanks && rawJournals) {
+      for (const b of rawBanks) {
+        const glCode = (b as any).glAccount?.accountNo
+        if (!glCode) continue
+        for (const j of rawJournals) {
+          if (j.status !== 'POSTED') continue
+          for (const l of j.journalEntryLines || []) {
+            if (l.chartOfAccount?.accountNo === glCode) {
+              cash += (Number(l.debitAmount) || 0) - (Number(l.creditAmount) || 0)
+            }
+          }
+        }
+      }
+    }
+    const cons = data.consolidation as any
+    const consEntities: any[] = Array.isArray(cons?.entities) ? cons.entities : []
+    data.ceo = {
+      cash,
+      revenue: Number(cons?.consolidated?.revenue) || 0,
+      netIncome: Number(cons?.consolidated?.netIncome) || 0,
+      // One row per real ForecastEntity. Revenue/profit come from that entity's own ledger
+      // slice; cash is only attributable to a single entity when there is exactly one, so with
+      // several it stays 0 rather than being allocated on an invented basis. `risk` and `close`
+      // are 0/null: no finance risk register exists in this backend, and per-entity close
+      // progress is not tracked (close tasks are per fiscal period, group-wide).
+      entities: consEntities.map((e) => {
+        const revenue = Number(e.incomeStatement?.revenue) || 0
+        const profit = Number(e.incomeStatement?.netIncome) || 0
+        return {
+          id: e.forecastEntityId,
+          name: e.entityName,
+          sector: String(e.entityType || '').replace(/_/g, ' ').toLowerCase() || '—',
+          revenue,
+          profit,
+          cash: consEntities.length === 1 ? cash : 0,
+          ar: 0,
+          ap: 0,
+          risk: 0,
+          close: null,
+          margin: revenue ? (profit / revenue) * 100 : 0,
+        }
+      }),
     }
   }
 
