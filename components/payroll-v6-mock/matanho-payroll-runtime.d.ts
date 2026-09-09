@@ -9,5 +9,7 @@ declare module "@/components/payroll-v6-mock/matanho-payroll-runtime" {
   ): {
     setPage: (page: string) => void
     destroy: () => void
+    /** Added by scripts/patch-payroll-runtime.mjs — replaces fixtures with live data. */
+    hydrate?: (payload: unknown) => void
   }
 }
