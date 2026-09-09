@@ -50,6 +50,7 @@ export type PayrollV6LivePayload = {
   counts: Record<string, number | null>
   dashboard: Record<string, any> | null
   reference: Record<string, any>
+  leaveBalances: any[]
   mypay: Record<string, any>
   errors: LoaderError[]
 }
@@ -70,6 +71,9 @@ async function safe<T>(source: string, fn: () => Promise<T>, fallback: T): Promi
     return fallback
   }
 }
+
+/** Shown wherever the backend genuinely has no value for a displayed field. */
+const DASH = "—"
 
 const num = (v: unknown): number => {
   const n = Number(v)
@@ -150,31 +154,34 @@ function adaptEmployees(
       initials: initialsOf(first, last),
       email: e.user?.email ?? null,
       department: e.departmentCode ?? "Unassigned",
-      title: null, // no job-title column on Employee — shown as a dash
-      branch: null, // no branch column on Employee — shown as a dash
-      type: e.contractEffectiveDate ? "Permanent" : null,
-      start: fmtDate(e.contractEffectiveDate),
-      phone: null, // not captured on the employee record
+      // The runtime interpolates these straight into a template literal, so a
+      // null would render the text "null" on screen. An em dash is the honest
+      // rendering for a field the Employee record simply does not carry.
+      title: DASH,
+      branch: DASH,
+      type: e.contractEffectiveDate ? "Permanent" : DASH,
+      start: fmtDate(e.contractEffectiveDate) ?? DASH,
+      phone: DASH, // not captured on the employee record
       // Money, straight from the payload
       base: num(e.basicSalary),
       zig: num(e.salarySplitZigPct) > 0 ? num(e.basicSalary) * num(e.salarySplitZigPct) : 0,
       currency: currencyLabel(e),
       // Compliance identifiers
-      bank: maskAccount(e.bankName, e.accountNumber),
+      bank: maskAccount(e.bankName, e.accountNumber) ?? DASH,
       tax: e.zimraBpNumber ?? "Pending",
       nssa: e.idNumber ?? "Pending",
       // Derived, not invented
       readiness: readinessOf(e),
       status: statusOf(e),
-      leave: annual === undefined ? null : `${annual} days`,
+      leave: annual === undefined ? DASH : `${annual} days`,
       training: cert
         ? cert.overdue > 0
           ? `${cert.overdue} overdue`
           : cert.expiring > 0
             ? `${cert.expiring} expiring`
             : "Compliant"
-        : null,
-      documents: null, // no document store wired for employees yet
+        : DASH,
+      documents: DASH, // no document store wired for employees yet
       terminated: e.terminated === true,
       isActive: e.isActive === true,
     }
@@ -422,6 +429,16 @@ export async function loadPayrollV6LiveData(): Promise<PayrollV6LivePayload> {
     exceptions,
     counts,
     dashboard,
+    leaveBalances: (leaveRows ?? []).map((l: any) => ({
+      employeeId: l.employeeId,
+      employeeNumber: l.employee?.employeeNumber ?? null,
+      name: l.employee?.user
+        ? `${l.employee.user.firstName ?? ""} ${l.employee.user.lastName ?? ""}`.trim()
+        : (l.employee?.employeeNumber ?? DASH),
+      department: l.employee?.departmentCode ?? "Unassigned",
+      leaveType: l.leaveType,
+      balance: num(l.balance),
+    })),
     reference: {
       taxRules: taxRules ?? [],
       allowanceTypes: allowanceTypes ?? [],
@@ -432,12 +449,58 @@ export async function loadPayrollV6LiveData(): Promise<PayrollV6LivePayload> {
       courses: courses ?? [],
       certifications: certifications ?? [],
     },
-    mypay: {
-      payslips: myPayslips ?? [],
-      portal: myPortal,
-      leaveBalances: myLeave ?? [],
-      employee: access?.employee ?? null,
-    },
+    mypay: (() => {
+      // Label each payslip with the period of the run it belongs to, newest
+      // first, so My Pay can show real periods instead of a fixed "June 2026".
+      const runById = new Map(
+        (runsResult?.runs ?? []).map((r: any) => [r.id, r]),
+      )
+      const slips = (myPayslips ?? [])
+        .map((p: any) => {
+          // The self-service endpoint already includes the run, which matters
+          // because a plain employee cannot read /payroll-runs at all (403) and
+          // the admin lookup below is therefore empty for them.
+          const run = p.payrollRun ?? runById.get(p.payrollRunId)
+          return {
+            id: p.id,
+            payrollRunId: p.payrollRunId,
+            period: run?.payPeriod ?? run?.name ?? DASH,
+            payDate: run?.endDate ?? null,
+            gross: num(p.grossPay),
+            deductions: num(p.totalDeductions),
+            net: num(p.netPay),
+            currency: p.currency?.code ?? "USD",
+            employeeNumber: p.employee?.employeeNumber ?? null,
+            basicSalary: num(p.employee?.basicSalary),
+          }
+        })
+        .sort((a, b) => String(b.period).localeCompare(String(a.period)))
+
+      const portal: any = myPortal ?? {}
+      return {
+        payslips: slips,
+        latest: slips[0] ?? null,
+        portal,
+        // The signed-in user's OWN record. The page previously rendered
+        // employees[0] — the first person in the roster — so every user saw
+        // somebody else's bank, tax and employment details.
+        self: {
+          employeeNumber: portal.employeeNumber ?? access?.employee?.employeeNumber ?? DASH,
+          bank: maskAccount(portal.bankName, portal.accountNumber) ?? DASH,
+          tax: portal.zimraBpNumber ?? "Pending",
+          nssa: portal.idNumber ?? "Pending",
+          department: portal.departmentCode ?? "Unassigned",
+          basicSalary: num(portal.basicSalary),
+          start: fmtDate(portal.contractEffectiveDate) ?? DASH,
+          currency: portal.currency?.code ?? "USD",
+        },
+        leaveBalances: (myLeave ?? []).map((l: any) => ({
+          leaveType: l.leaveType,
+          balance: num(l.balance),
+        })),
+        employee: access?.employee ?? null,
+      }
+    })(),
     errors: [...errors],
   }
 }
