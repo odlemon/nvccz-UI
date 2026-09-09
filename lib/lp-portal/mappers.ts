@@ -295,7 +295,10 @@ export function mapMessageThreadRow(thread: LpMessageThreadSummary) {
     relatedId: thread.relatedId,
     preview: thread.lastMessagePreview,
     updated: formatDate(thread.lastMessageAt, "datetime"),
-    unread: thread.unreadCount,
+    // The API returns unreadCount as a STRING ("0"/"1"), and the screen sums these with
+    // `sum + (c.unread ?? 0)` — string concatenation, so a single thread rendered the badge
+    // and tab as "00" rather than "0". Coerced at the boundary so the view model is numeric.
+    unread: Number(thread.unreadCount ?? 0) || 0,
     linkedLabel: `${thread.relatedType} ${thread.relatedId}`,
     participants: [] as Array<{ name: string; initials: string; color: string }>,
     messages: [] as Array<{
