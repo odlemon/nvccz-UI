@@ -194,6 +194,9 @@ analytics tables below were found.
 | 9 | Commitments reported US$54M committed / US$33M funded against a payload summing to 79M / 53M | Trace flagged `54.00`; the admitted row was absent from every bucket | The seeder wrote a non-canonical status `ADMITTED`; the service writes `ADMITTED_AT_CLOSE`. Seed corrected |
 | 10 | Forecasts' Funnel / Source / Owner tables each showed one row reading `Name unavailable / Campaignid / cmttz...` | Trace flagged `54`, which came from a campaign id string | `toRowsArray` now converts the keyed-object analytics shapes; backend returns owner names |
 | 11 | 20 `*-mock-data.ts` fixtures, two carrying fabricated KPI money and counts | Read of the fixtures | Deleted; genuine helpers moved to `*-presentation.ts` |
+| 12 | Closings were **read-only**: the screen listed them but `createClosing`, `patchClosing` and `postClosingReadiness` were called by no component, so "run a closing" was impossible in the UI | grep for those three methods across `components/fundraising/` returned only `listClosings` | Added schedule / sign-off / advance controls on the closing card, gated on all three sign-offs |
+| 13 | The closing card pinned `targetAmount` to "—" and the progress bar to 0% | A closing carries a real `targetAmount`; the seeded ones are 50M/40M/30M | Read the real value and compute the percentage |
+| 14 | Campaigns' Templates, Distribution Lists, Events and Materials tabs had never rendered a row | All four endpoints returned `200 {"data":[]}` — no data existed for any campaign | Seeded them; all four now render content |
 
 ### 5.3 Control inventory - every wizard, dialog and export
 
@@ -362,7 +365,54 @@ carries every SRD field it lists as missing (trading name, registration number, 
 relationship owner, sanctions/risk/classification, asset-class and geographic preferences, next
 action), and the Campaigns and Investors exports it marks "backend-pending" both produce a CSV.
 
-### 6.3 Platform finding: the SYSADMIN profile cookie is silently dropped
+**Trip E - 9 steps, 0 failures.** Schedule a closing, sign it off, run it.
+
+This closes the last part of definition-of-done 7a. Until this work the screen could only
+*list* closings: `createClosing`, `patchClosing` and `postClosingReadiness` all existed in the
+API client and were called by no component, so running a closing was not possible in the UI at
+all. See defect 12 in 5.2.
+
+```
+201 POST  /fundraising/closings                       <- schedule
+200 POST  /fundraising/closings/:id/readiness   x2    <- the missing sign-offs
+200 PATCH /fundraising/closings/:id                   <- run it
+```
+
+The trip asserts the gate as well as the happy path: the Run control is disabled until legal,
+compliance and fund operations have all signed off, becomes enabled once they have, and the
+card then reports Completed.
+
+Two things this found about the test rather than the app, both worth recording because they
+are easy to get wrong:
+
+- The readiness chips are **toggles**. The first version clicked all three blindly, which
+  *withdrew* a sign-off that was already given and left the closing less ready than it started
+  - the UI was right to keep Run disabled. The trip now reads each chip's state first.
+- A closing already at `SCHEDULED` needs one advance, not two. The trip drives until the card
+  reports Completed instead of assuming a step count.
+
+### 6.3 Coverage: what was exercised, and what was not
+
+Worth being precise, because "all 20 screens verified" means different things at different
+depths:
+
+| Depth | What it establishes | Coverage |
+|---|---|---|
+| Renders, calls the API, numbers traced | The screen is live and its figures come from payloads | **20 / 20 screens** |
+| Every control traced to the call it makes | No dead or silently no-op controls | **All wizards, dialogs and exports** (5.3) |
+| Driven end-to-end through the UI | The workflow actually works for a user | **Trips A-E**, below |
+
+Trips A-E exercise: investor organisations, contacts, pipeline (overview **and** board, including
+a real drag transition and the amount editor), commitments, closings, due diligence, approvals,
+and the write-refusal path for a non-editing role.
+
+Not driven end-to-end, and honestly so: meetings create/complete/cancel, document upload,
+data-room upload and access grants, agreement send/sign, RFP-to-mandate conversion, and KYC case
+decisions. Each has been traced to a live handler and a real endpoint (5.3) and each screen
+renders live data with no errors, but no one has clicked through those particular flows in this
+pass.
+
+### 6.4 Platform finding: the SYSADMIN profile cookie is silently dropped
 
 Found while chasing an intermittent "Access denied" on Due Diligence during a combined
 Trip A + B run. **This is not a fundraising defect** - it is platform-wide and sits in shared
