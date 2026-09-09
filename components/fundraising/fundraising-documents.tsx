@@ -137,6 +137,16 @@ export function FundraisingDocuments() {
       setDocumentDetail(null)
       return
     }
+    // The unified index merges in data-room documents ("dr-…") and agreement artefacts
+    // ("agr-…") as virtual rows. GET /documents/:id rejects those by design — they are only
+    // reachable through their source API until registered via POST /documents. Requesting
+    // one anyway produced a 400 and a console error on every visit to this screen, so show
+    // what the list already gave us instead of asking for a detail that cannot exist.
+    if (/^(dr|agr)-/.test(selected.id)) {
+      setDocumentDetail(null)
+      setDetailLoading(false)
+      return
+    }
     let cancelled = false
     setDetailLoading(true)
     fundraisingApi
